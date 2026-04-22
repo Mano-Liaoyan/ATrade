@@ -1,26 +1,26 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-04-23
+**Current Step:** Step 1: Scaffold the Next.js app
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-04-22
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Read the current frontend, AppHost, test, and architecture files
-- [ ] Confirm `frontend/` is still the placeholder Node server
-- [ ] Confirm the AppHost frontend resource still targets `npm run dev`
+- [x] Read the current frontend, AppHost, test, and architecture files
+- [x] Confirm `frontend/` is still the placeholder Node server
+- [x] Confirm the AppHost frontend resource still targets `npm run dev`
 
 ---
 
 ### Step 1: Scaffold the Next.js app
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Convert `frontend/` into a minimal Next.js application
 - [ ] Keep `npm run dev` as the frontend entrypoint
@@ -95,6 +95,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-22 23:54 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-22 23:54 | Step 0 started | Preflight |
 
 ---
 
