@@ -1,27 +1,27 @@
 # TP-003: Scaffold `ATrade.Api` and wire it into AppHost — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-04-23
+**Current Step:** Step 1: Scaffold `src/ATrade.Api`
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-04-22
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Read the listed docs and current AppHost / ServiceDefaults / test files
-- [ ] Confirm `src/ATrade.Api/` does not yet exist
-- [ ] Confirm `ATrade.sln` does not yet include an API project
-- [ ] Confirm the current AppHost graph only launches the placeholder frontend
+- [x] Read the listed docs and current AppHost / ServiceDefaults / test files
+- [x] Confirm `src/ATrade.Api/` does not yet exist
+- [x] Confirm `ATrade.sln` does not yet include an API project
+- [x] Confirm the current AppHost graph only launches the placeholder frontend
 
 ---
 
 ### Step 1: Scaffold `src/ATrade.Api`
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `src/ATrade.Api/ATrade.Api.csproj`
 - [ ] Create `src/ATrade.Api/Program.cs`
@@ -97,6 +97,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-22 23:14 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-22 23:14 | Step 0 started | Preflight |
 
 ---
 
