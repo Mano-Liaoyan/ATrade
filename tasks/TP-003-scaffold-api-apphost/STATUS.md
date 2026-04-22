@@ -1,6 +1,6 @@
 # TP-003: Scaffold `ATrade.Api` and wire it into AppHost — Status
 
-**Current Step:** Step 4: Update docs
+**Current Step:** Step 5: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -51,17 +51,17 @@
 ---
 
 ### Step 4: Update docs
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md`
-- [ ] Update `docs/architecture/modules.md`
-- [ ] Update `docs/architecture/overview.md` if bootstrap-status wording changed
-- [ ] Update `README.md` if current runnable-slice wording changed
+- [x] Update `scripts/README.md`
+- [x] Update `docs/architecture/modules.md`
+- [x] Update `docs/architecture/overview.md` if bootstrap-status wording changed
+- [x] Update `README.md` if current runnable-slice wording changed
 
 ---
 
 ### Step 5: Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `dotnet build ATrade.sln`
 - [ ] `bash tests/start-contract/start-wrapper-tests.sh`
