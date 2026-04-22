@@ -1,0 +1,93 @@
+name: Implementation work
+description: Queue an implementation-ready engineering task for the agent workforce.
+title: "[Implementation]: "
+labels:
+  - agent:ready
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the requested behavior or repository change.
+      placeholder: Add the implementation objective and why it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: success-criteria
+    attributes:
+      label: Success criteria
+      description: Describe what must be true when this issue is complete.
+      placeholder: Bullet the required code, docs, and verification outcomes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      description: Match the Taskplane size contract for one issue-sized slice.
+      options:
+        - S
+        - M
+        - L
+        - XL
+    validations:
+      required: true
+
+  - type: dropdown
+    id: owning-role
+    attributes:
+      label: Owning role
+      description: Select the role that should pick up the work first.
+      options:
+        - role:senior-engineer
+        - role:senior-test-engineer
+        - role:devops
+        - role:architect
+        - role:scrum-master
+        - role:handyman
+        - role:onboarder
+    validations:
+      required: true
+
+  - type: dropdown
+    id: docs-impact
+    attributes:
+      label: Documentation impact
+      description: Durable repository changes must update docs in the same change.
+      options:
+        - No durable doc change expected
+        - Update an existing active doc and docs/INDEX.md if needed
+        - Add a new active doc and update docs/INDEX.md
+        - Needs triage before implementation
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: List the commands, tests, or manual checks required before review.
+      placeholder: Include specific build, test, or smoke checks.
+    validations:
+      required: true
+
+  - type: textarea
+    id: unblock-context
+    attributes:
+      label: Blockers or unblock context
+      description: If this work depends on another issue, approval, or missing input, record the unblock note that should travel with the issue.
+      placeholder: State what could block the work and what note should be left if it moves to agent:needs-human or agent:blocked.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: coordination-checklist
+    attributes:
+      label: Coordination checklist
+      options:
+        - label: I reviewed the active docs listed in docs/INDEX.md before filing this implementation issue.
+          required: true
+        - label: I understand this issue should move through agent:ready → agent:claimed → agent:in-progress → agent:review.
+          required: true

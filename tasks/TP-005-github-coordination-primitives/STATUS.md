@@ -1,6 +1,6 @@
 # TP-005: Establish GitHub coordination primitives — Status
 
-**Current Step:** Step 2: Add GitHub templates
+**Current Step:** Step 3: Add the coordination doc
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -30,18 +30,18 @@
 ---
 
 ### Step 2: Add GitHub templates
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `.github/ISSUE_TEMPLATE/config.yml`
-- [ ] Create `.github/ISSUE_TEMPLATE/implementation.yml`
-- [ ] Create `.github/ISSUE_TEMPLATE/coordination.yml`
-- [ ] Create `.github/PULL_REQUEST_TEMPLATE.md`
-- [ ] Capture size, role, docs impact, verification, and unblock context where relevant
+- [x] Create `.github/ISSUE_TEMPLATE/config.yml`
+- [x] Create `.github/ISSUE_TEMPLATE/implementation.yml`
+- [x] Create `.github/ISSUE_TEMPLATE/coordination.yml`
+- [x] Create `.github/PULL_REQUEST_TEMPLATE.md`
+- [x] Capture size, role, docs impact, verification, and unblock context where relevant
 
 ---
 
 ### Step 3: Add the coordination doc
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `docs/process/github-coordination.md` with frontmatter
 - [ ] Document workflow-state and role labels
@@ -102,6 +102,8 @@
 | 2026-04-23 | Step 1 started | Define the label manifest |
 | 2026-04-23 | Step 1 completed | Added `.github/labels.yml` with workflow and role labels |
 | 2026-04-23 | Step 2 started | Add GitHub templates |
+| 2026-04-23 | Step 2 completed | Added issue and PR templates for implementation and coordination work |
+| 2026-04-23 | Step 3 started | Add the coordination doc |
 
 ---
 
