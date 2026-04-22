@@ -45,7 +45,7 @@
 - [ ] Update `tests/start-contract/start-wrapper-tests.sh`
 - [ ] Update `scripts/README.md`
 - [ ] Update `README.md` only if wording changed
-- [ ] Update `PLAN.md` to reflect the completed Windows CI verification milestone
+- [ ] Update active plan docs (`PLAN.md`, and `plans/devops/CURRENT.md` if wording changed) to reflect the completed Windows CI verification milestone
 
 ---
 
