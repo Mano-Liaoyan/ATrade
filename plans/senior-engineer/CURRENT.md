@@ -29,7 +29,19 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- Start with the first architect-approved implementation issue that builds on the existing `start run` bootstrap
+- Branch `feature/start-run-bootstrap` now contains the bootstrapped `start run` contract and minimal Aspire AppHost; open the follow-up issue that scaffolds the first real backend or Next.js slice on top of that baseline
+
+## Recent Progress
+
+- Reviewed and completed the bootstrap branch in `.worktrees/start-run-bootstrap`
+- Verified the Linux-hosted `start run` path, direct AppHost startup, and wrapper regression coverage before handoff
+
+## Verification
+
+- `bash tests/start-contract/start-wrapper-tests.sh`
+- `dotnet build ATrade.sln`
+- `timeout 20s ./start run`
+- `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
 
 ## References
 

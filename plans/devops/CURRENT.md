@@ -31,7 +31,7 @@ Implement the next bootstrap layer now that the repository has a worktree-capabl
 
 ## Resume From Here
 
-- Continue in `.worktrees/start-run-bootstrap` on `feature/start-run-bootstrap`; first capture Windows-hosted verification for `./start.ps1 run` and `./start.cmd run`, then extend the bootstrap AppHost from the placeholder frontend graph to real .NET services and infrastructure resources
+- Branch `feature/start-run-bootstrap` is committed and ready for PR review; first capture Windows-hosted verification for `./start.ps1 run` and `./start.cmd run`, then extend the bootstrap AppHost from the placeholder frontend graph to real .NET services and infrastructure resources
 
 ## Recent Progress
 
