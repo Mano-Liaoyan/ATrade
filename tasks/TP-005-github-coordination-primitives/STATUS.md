@@ -1,6 +1,6 @@
 # TP-005: Establish GitHub coordination primitives — Status
 
-**Current Step:** Step 4: Update the doc index and pointers
+**Current Step:** Step 5: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -52,15 +52,15 @@
 ---
 
 ### Step 4: Update the doc index and pointers
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `docs/INDEX.md`
-- [ ] Update `README.md` only if a pointer is needed
+- [x] Update `docs/INDEX.md`
+- [x] Update `README.md` only if a pointer is needed
 
 ---
 
 ### Step 5: Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `rg -n "agent:ready|agent:blocked|agent:resume-ready|role:architect|role:senior-engineer" .github/labels.yml docs/process/github-coordination.md .github/ISSUE_TEMPLATE .github/PULL_REQUEST_TEMPLATE.md`
 - [ ] Confirm every referenced label exists in `.github/labels.yml`
@@ -88,6 +88,7 @@
 |-----------|-------------|----------|
 | Workflow labels extracted from `AGENTS.md`/`.pi/skills/github-coordination/SKILL.md`: `agent:ready`, `agent:claimed`, `agent:in-progress`, `agent:needs-human`, `agent:blocked`, `agent:resume-ready`, `agent:review`, `agent:merged`, `agent:docs-required`, `agent:trivial` | Use in `.github/labels.yml` and templates | `AGENTS.md`; `.pi/skills/github-coordination/SKILL.md` |
 | Role labels extracted from `AGENTS.md`/`.pi/skills/github-coordination/SKILL.md`: `role:architect`, `role:senior-engineer`, `role:senior-test-engineer`, `role:devops`, `role:scrum-master`, `role:code-reviewer`, `role:handyman`, `role:onboarder` | Use in `.github/labels.yml` and templates | `AGENTS.md`; `.pi/skills/github-coordination/SKILL.md` |
+| README pointer was not added because the existing read order already sends humans to `docs/INDEX.md`, which now lists the coordination doc | Leave README unchanged in this slice | `README.md`; `docs/INDEX.md` |
 
 ---
 
@@ -106,6 +107,8 @@
 | 2026-04-23 | Step 3 started | Add the coordination doc |
 | 2026-04-23 | Step 3 completed | Added `docs/process/github-coordination.md` with labels, sizing, and resume flow |
 | 2026-04-23 | Step 4 started | Update the doc index and pointers |
+| 2026-04-23 | Step 4 completed | Added coordination doc to `docs/INDEX.md`; README pointer not needed |
+| 2026-04-23 | Step 5 started | Verification |
 
 ---
 

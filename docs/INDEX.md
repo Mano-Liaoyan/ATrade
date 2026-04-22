@@ -29,6 +29,7 @@ decisions.
 | [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md) | devops | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored. |
 | [`architecture/overview.md`](architecture/overview.md) | architect | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract. |
 | [`architecture/modules.md`](architecture/modules.md) | architect | Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus. |
+| [`process/github-coordination.md`](process/github-coordination.md) | scrum-master | Repository-side GitHub coordination contract for labels, sizing, blocked work, and resume flow. |
 
 ## Legacy-Review-Pending Documents
 
