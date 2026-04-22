@@ -1,5 +1,6 @@
 ---
 name: handyman
+model: github-copilot/claude-haiku-4.5
 description: Use for cheap, low-risk, trivial edits — typo fixes, link repairs, label cleanup, tiny mechanical doc updates. Escalates the moment scope expands.
 status: active
 owner: handyman

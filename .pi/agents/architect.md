@@ -1,5 +1,6 @@
 ---
 name: architect
+model: github-copilot/claude-opus-4.7
 description: Use for system design, boundary decisions, startup contracts, integration patterns, and long-horizon technical direction. Invoke when architecture errors would be expensive to unwind.
 status: active
 owner: architect

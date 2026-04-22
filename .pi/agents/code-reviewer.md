@@ -1,5 +1,6 @@
 ---
 name: code-reviewer
+model: github-copilot/gpt-5.4
 description: Use to review draft PRs and risky diffs for bugs, regressions, missing tests, missing docs, and contract mismatches. Produces severity-ordered findings and merge recommendations.
 status: active
 owner: code-reviewer

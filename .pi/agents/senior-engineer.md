@@ -1,5 +1,6 @@
 ---
 name: senior-engineer
+model: github-copilot/gpt-5.4
 description: Use to implement architect-approved work with minimal, production-quality changes and verification. The default implementer for code-bearing issues.
 status: active
 owner: senior-engineer

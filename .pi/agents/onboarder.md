@@ -1,5 +1,6 @@
 ---
 name: onboarder
+model: github-copilot/claude-haiku-4.5
 description: Use when adding a new workforce role — creates the role charter, plan scaffold, docs index updates, and any supporting skills.
 status: active
 owner: onboarder

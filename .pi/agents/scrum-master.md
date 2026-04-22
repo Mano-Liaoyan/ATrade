@@ -1,5 +1,6 @@
 ---
 name: scrum-master
+model: github-copilot/gpt-5.4
 description: Use for issue breakdown, label transitions, PR state coordination, and plan reconciliation. Coordination-only — does not implement code.
 status: active
 owner: scrum-master

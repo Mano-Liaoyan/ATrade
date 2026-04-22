@@ -1,5 +1,6 @@
 ---
 name: senior-test-engineer
+model: github-copilot/gpt-5.4
 description: Use for TDD discipline, regression coverage, flaky test investigations, and evidence-backed verification before risky changes ship.
 status: active
 owner: senior-test-engineer

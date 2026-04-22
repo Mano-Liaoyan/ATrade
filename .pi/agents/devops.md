@@ -1,5 +1,6 @@
 ---
 name: devops
+model: github-copilot/claude-sonnet-4.6
 description: Use for startup scripts, Aspire AppHost orchestration, CI/CD workflows, environment contracts, and automation glue between local and production surfaces.
 status: active
 owner: devops
