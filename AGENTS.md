@@ -35,8 +35,8 @@ Every agent must follow these rules:
 Every agent starts with this sequence:
 
 1. Identify its role.
-2. Read `agents/<role>.md`.
-3. Load `skills/retrieve-plan/SKILL.md`.
+2. Read `.claude/agents/<role>.md`.
+3. Load `.claude/skills/retrieve-plan/SKILL.md`.
 4. Read `plans/<role>/CURRENT.md`.
 5. Read `PLAN.md`.
 6. Read `docs/INDEX.md` and only then consult any `active` docs referenced there.
@@ -55,7 +55,7 @@ The default workforce is:
 - `handyman`
 - `onboarder`
 
-Each role has a charter in `agents/` and a live plan in `plans/<role>/CURRENT.md`.
+Each role has a charter in `.claude/agents/` and a live plan in `plans/<role>/CURRENT.md`.
 
 ## Operating Loop
 
@@ -77,7 +77,7 @@ Roles choose from three model tiers:
 - `balanced`: solid quality for everyday engineering work
 - `cheap`: low-cost, fast, reserved for narrow low-risk work
 
-The exact model names are not hard-coded here. Each role file declares its preferred tier. The `skills/selecting-model-tier/SKILL.md` rubric governs exceptions.
+The exact model names are not hard-coded here. Each role file declares its preferred tier. The `.claude/skills/selecting-model-tier/SKILL.md` rubric governs exceptions.
 
 ## Parallelism
 
@@ -88,7 +88,7 @@ Parallelism is the default once git worktrees are available.
 - Multiple agents may review in parallel only when they are not changing the same branch state.
 - When tasks overlap heavily, they must be sequenced deliberately.
 
-Use `skills/parallel-worktree-development/SKILL.md` whenever 2 or more independent issues can proceed in parallel.
+Use `.claude/skills/parallel-worktree-development/SKILL.md` whenever 2 or more independent issues can proceed in parallel.
 
 ## GitHub-Native Coordination
 
@@ -198,7 +198,7 @@ The flow is:
 4. Code Reviewer reviews the governance change.
 5. The new role enters rotation.
 
-Use `skills/onboarding-new-agent/SKILL.md` for that process.
+Use `.claude/skills/onboarding-new-agent/SKILL.md` for that process.
 
 ## Human Escalation
 

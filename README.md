@@ -60,9 +60,9 @@ ATrade/
 ├── AGENT.md              # Repo-wide autonomous workforce contract
 ├── README.md             # Human-facing overview
 ├── PLAN.md               # Root bootstrap plan
-├── agents/               # Role charters for the workforce
+├── .claude/agents/       # Role charters for the workforce
+├── .claude/skills/       # Repo-local workflow skills
 ├── plans/                # Per-role current plans and archives
-├── skills/               # Repo-local workflow skills
 ├── docs/                 # Indexed documentation with lifecycle status
 ├── scripts/              # Script contracts and later implementations
 ├── src/                  # .NET 10 services and AppHost
@@ -84,8 +84,8 @@ For humans:
 For agents:
 
 1. `AGENT.md`
-2. `agents/<role>.md`
-3. `skills/retrieve-plan/SKILL.md`
+2. `.claude/agents/<role>.md`
+3. `.claude/skills/retrieve-plan/SKILL.md`
 4. `plans/<role>/CURRENT.md`
 5. `PLAN.md`
 6. `docs/INDEX.md` and only documents with `status: active`
@@ -113,7 +113,7 @@ The repository is designed for an agent workforce made up of:
 - Handyman
 - Onboarder
 
-The operating contract for those roles lives in `AGENT.md`, with per-role details in `agents/`.
+The operating contract for those roles lives in `AGENT.md`, with per-role details in `.claude/agents/`.
 
 ## Current Status
 

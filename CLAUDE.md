@@ -19,12 +19,12 @@ The repository-wide operating contract now lives in `AGENT.md`, not here.
 When working in this repository, use this order:
 
 1. `AGENT.md`
-2. `agents/<role>.md`
-3. `skills/retrieve-plan/SKILL.md`
+2. `.claude/agents/<role>.md`
+3. `.claude/skills/retrieve-plan/SKILL.md`
 4. `plans/<role>/CURRENT.md`
 5. `PLAN.md`
 6. `docs/INDEX.md` and only documents marked `active`
-7. Task-specific skills under `skills/`
+7. Task-specific skills under `.claude/skills/`
 
 ## Current Reality
 

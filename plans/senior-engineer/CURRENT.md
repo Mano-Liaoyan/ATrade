@@ -6,7 +6,7 @@ summary: Live plan for the Senior Engineer role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - agents/senior-engineer.md
+  - .claude/agents/senior-engineer.md
 ---
 
 # Senior Engineer Current Plan

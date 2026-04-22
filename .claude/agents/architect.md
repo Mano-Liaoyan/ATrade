@@ -1,12 +1,14 @@
 ---
+name: architect
+description: Use for system design, boundary decisions, startup contracts, integration patterns, and long-horizon technical direction. Invoke when architecture errors would be expensive to unwind.
 status: active
 owner: architect
 updated: 2026-04-22
 summary: Architect role charter for system design, boundaries, and long-horizon technical direction.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/architect/CURRENT.md
-  - skills/karpathy-guidelines/SKILL.md
+  - .claude/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Architect

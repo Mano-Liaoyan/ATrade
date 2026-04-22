@@ -1,10 +1,12 @@
 ---
+name: devops
+description: Use for startup scripts, Aspire AppHost orchestration, CI/CD workflows, environment contracts, and automation glue between local and production surfaces.
 status: active
 owner: devops
 updated: 2026-04-22
 summary: DevOps role charter for startup scripts, CI/CD, AppHost orchestration, and automation safety.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/devops/CURRENT.md
   - scripts/README.md
 ---

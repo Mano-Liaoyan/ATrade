@@ -6,7 +6,7 @@ summary: Live plan for the Architect role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - agents/architect.md
+  - .claude/agents/architect.md
 ---
 
 # Architect Current Plan

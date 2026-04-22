@@ -69,7 +69,7 @@ Hold these in context:
 | Immediate role work | `plans/<role>/CURRENT.md` |
 | Shared repository milestones | `PLAN.md` |
 | Authoritative docs list | `docs/INDEX.md` |
-| Role charter | `agents/<role>.md` |
+| Role charter | `.claude/agents/<role>.md` |
 | Task-specific state | linked issue or draft PR |
 
 ## Integration with Other Skills
