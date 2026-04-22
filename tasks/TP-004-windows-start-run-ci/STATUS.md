@@ -1,6 +1,6 @@
 # TP-004: Add Windows CI verification for `start run` — Status
 
-**Current Step:** Step 2: Add GitHub Actions coverage
+**Current Step:** Step 3: Keep repo-local verification and docs in sync
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -30,17 +30,17 @@
 ---
 
 ### Step 2: Add GitHub Actions coverage
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `.github/workflows/windows-start-run.yml`
-- [ ] Use `windows-latest`
-- [ ] Install required .NET and Node toolchains
-- [ ] Run the PowerShell smoke harness in CI
+- [x] Create `.github/workflows/windows-start-run.yml`
+- [x] Use `windows-latest`
+- [x] Install required .NET and Node toolchains
+- [x] Run the PowerShell smoke harness in CI
 
 ---
 
 ### Step 3: Keep repo-local verification and docs in sync
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update `tests/start-contract/start-wrapper-tests.sh`
 - [ ] Update `scripts/README.md`
