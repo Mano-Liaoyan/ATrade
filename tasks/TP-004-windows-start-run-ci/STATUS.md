@@ -1,6 +1,6 @@
 # TP-004: Add Windows CI verification for `start run` — Status
 
-**Current Step:** Step 4: Verification
+**Current Step:** Step 5: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -50,16 +50,16 @@
 ---
 
 ### Step 4: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `bash tests/start-contract/start-wrapper-tests.sh`
-- [ ] `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`
-- [ ] Record that the durable deliverable is the checked-in Windows CI path
+- [x] `bash tests/start-contract/start-wrapper-tests.sh`
+- [x] `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`
+- [x] Record that the durable deliverable is the checked-in Windows CI path
 
 ---
 
 ### Step 5: Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
@@ -98,3 +98,5 @@
 ## Notes
 
 *Goal: convert the documented Windows verification gap into a durable CI-backed check without changing the startup contract itself.*
+
+- Verification note: this Linux task environment did not claim a successful live Windows run; the durable deliverable is the checked-in `windows-latest` workflow plus `tests/start-contract/start-wrapper-windows.ps1`.
