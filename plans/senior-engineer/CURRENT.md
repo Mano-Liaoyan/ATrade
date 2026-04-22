@@ -19,7 +19,7 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Active Checklist
 
-- [ ] Scaffold the first backend projects against the existing AppHost and service defaults
+- [x] Scaffold the first backend projects against the existing AppHost and service defaults
 - [ ] Replace the placeholder frontend with the first Next.js application slice when an implementation issue is ready
 - [ ] Extend the AppHost graph as architect-approved services and infrastructure resources are introduced
 
@@ -29,19 +29,21 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- Branch `feature/start-run-bootstrap` now contains the bootstrapped `start run` contract and minimal Aspire AppHost; open the follow-up issue that scaffolds the first real backend or Next.js slice on top of that baseline
+- `ATrade.Api` is now scaffolded and wired into the AppHost; the next implementation slice should either replace the placeholder frontend with the first Next.js app or extend the backend beyond the `/health` scaffold
 
 ## Recent Progress
 
+- Completed TP-003 by scaffolding `src/ATrade.Api`, wiring it into `ATrade.AppHost`, adding bootstrap smoke coverage, and updating the implementation docs
 - Reviewed and completed the bootstrap branch in `.worktrees/start-run-bootstrap`
 - Verified the Linux-hosted `start run` path, direct AppHost startup, and wrapper regression coverage before handoff
 
 ## Verification
 
-- `bash tests/start-contract/start-wrapper-tests.sh`
 - `dotnet build ATrade.sln`
-- `timeout 20s ./start run`
+- `bash tests/start-contract/start-wrapper-tests.sh`
+- `bash tests/apphost/api-bootstrap-tests.sh`
 - `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
+- `timeout 20s ./start run`
 
 ## References
 

@@ -39,9 +39,10 @@ There must not be separate mandatory commands for the frontend, workers, or infr
 The current bootstrap slice intentionally implements a smaller runnable graph:
 
 - Aspire AppHost
+- a minimal `ATrade.Api` backend service managed by Aspire
 - a placeholder JavaScript frontend process managed by Aspire
 
-Later slices extend that graph with real backend services, workers, a real Next.js app, and infrastructure resources.
+Later slices extend that graph with additional backend services, workers, a real Next.js app, and infrastructure resources.
 
 ## Planned Layout
 
@@ -104,6 +105,7 @@ Behavior must stay semantically identical across platforms.
 ## Current Verification Scope
 
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
+- direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
 - `./start.ps1 run` and `./start.cmd run` are implemented but still need Windows-hosted execution verification
 
 ## Bootstrap Status
@@ -113,6 +115,7 @@ The `run` contract is now bootstrapped in the repository.
 - `./start run` delegates to the Aspire AppHost
 - `./start.ps1 run` provides the PowerShell entrypoint
 - `./start.cmd run` provides the Windows command prompt entrypoint
-- the current graph is intentionally minimal and hosts a placeholder JavaScript frontend
+- the current graph hosts the first minimal `ATrade.Api` service and the placeholder JavaScript frontend
+- infrastructure resources remain intentionally out of scope for this bootstrap slice
 
 Reserved subcommands such as `test`, `build`, and `lint` remain future work.

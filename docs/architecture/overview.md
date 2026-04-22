@@ -18,9 +18,14 @@ see_also:
 > governance-first bootstrap mode (see `README.md` → *Current Status* and
 > `PLAN.md` for the live milestone list). Where this document says "runs",
 > "hosts", or "orchestrates" the reader should understand "will, once the
-> corresponding milestone in `PLAN.md` is complete". The single piece of this
-> graph that is actually runnable today is the Aspire AppHost bootstrap
-> described in `scripts/README.md`.
+> corresponding milestone in `PLAN.md` is complete". The runnable slice today
+> is the Aspire AppHost bootstrap described in `scripts/README.md`, which now
+> launches the first minimal `ATrade.Api` service alongside the placeholder
+> frontend.
+>
+> **Current backend slice:** `ATrade.Api` presently provides only a stable
+> `GET /health` smoke endpoint and shared hosting defaults. Domain modules,
+> workers, and infrastructure resources remain future milestones.
 
 ## 1. Shape Of The System
 

@@ -1,80 +1,80 @@
 # TP-003: Scaffold `ATrade.Api` and wire it into AppHost — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 6: Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-23
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Read the listed docs and current AppHost / ServiceDefaults / test files
-- [ ] Confirm `src/ATrade.Api/` does not yet exist
-- [ ] Confirm `ATrade.sln` does not yet include an API project
-- [ ] Confirm the current AppHost graph only launches the placeholder frontend
+- [x] Read the listed docs and current AppHost / ServiceDefaults / test files
+- [x] Confirm `src/ATrade.Api/` does not yet exist
+- [x] Confirm `ATrade.sln` does not yet include an API project
+- [x] Confirm the current AppHost graph only launches the placeholder frontend
 
 ---
 
 ### Step 1: Scaffold `src/ATrade.Api`
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `src/ATrade.Api/ATrade.Api.csproj`
-- [ ] Create `src/ATrade.Api/Program.cs`
-- [ ] Add `ATrade.Api` to `ATrade.sln`
-- [ ] Reference `ATrade.ServiceDefaults`
-- [ ] Expose `GET /health` with a stable success response
+- [x] Create `src/ATrade.Api/ATrade.Api.csproj`
+- [x] Create `src/ATrade.Api/Program.cs`
+- [x] Add `ATrade.Api` to `ATrade.sln`
+- [x] Reference `ATrade.ServiceDefaults`
+- [x] Expose `GET /health` with a stable success response
 
 ---
 
 ### Step 2: Wire shared defaults and AppHost
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Add the minimum shared extension code in `src/ATrade.ServiceDefaults/Extensions.cs`
-- [ ] Update `src/ATrade.AppHost/ATrade.AppHost.csproj` for API project wiring
-- [ ] Update `src/ATrade.AppHost/Program.cs` to launch `ATrade.Api` and the frontend
-- [ ] Keep infra resources out of scope
+- [x] Add the minimum shared extension code in `src/ATrade.ServiceDefaults/Extensions.cs`
+- [x] Update `src/ATrade.AppHost/ATrade.AppHost.csproj` for API project wiring
+- [x] Update `src/ATrade.AppHost/Program.cs` to launch `ATrade.Api` and the frontend
+- [x] Keep infra resources out of scope
 
 ---
 
 ### Step 3: Add regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/api-bootstrap-tests.sh`
-- [ ] Verify direct API smoke coverage for `GET /health`
-- [ ] Update `tests/start-contract/start-wrapper-tests.sh` only if the new graph changes expected bootstrap behavior
+- [x] Create `tests/apphost/api-bootstrap-tests.sh`
+- [x] Verify direct API smoke coverage for `GET /health`
+- [x] Update `tests/start-contract/start-wrapper-tests.sh` only if the new graph changes expected bootstrap behavior
 
 ---
 
 ### Step 4: Update docs
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md`
-- [ ] Update `docs/architecture/modules.md`
-- [ ] Update `docs/architecture/overview.md` if bootstrap-status wording changed
-- [ ] Update `README.md` if current runnable-slice wording changed
+- [x] Update `scripts/README.md`
+- [x] Update `docs/architecture/modules.md`
+- [x] Update `docs/architecture/overview.md` if bootstrap-status wording changed
+- [x] Update `README.md` if current runnable-slice wording changed
 
 ---
 
 ### Step 5: Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet build ATrade.sln`
-- [ ] `bash tests/start-contract/start-wrapper-tests.sh`
-- [ ] `bash tests/apphost/api-bootstrap-tests.sh`
-- [ ] `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
-- [ ] `timeout 20s ./start run`
+- [x] `dotnet build ATrade.sln`
+- [x] `bash tests/start-contract/start-wrapper-tests.sh`
+- [x] `bash tests/apphost/api-bootstrap-tests.sh`
+- [x] `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
+- [x] `timeout 20s ./start run`
 
 ---
 
 ### Step 6: Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Commit with conventions
+- [x] Commit with conventions
 
 ---
 
@@ -97,6 +97,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-22 23:14 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-22 23:14 | Step 0 started | Preflight |
+| 2026-04-22 23:26 | Worker iter 1 | done in 716s, tools: 133 |
+| 2026-04-22 23:26 | Task complete | .DONE created |
 
 ---
 

@@ -14,13 +14,17 @@ see_also:
 # ATrade Module Map
 
 > **Status note:** This document describes the **target** module layout of
-> the ATrade codebase, not what is present in the repository today. Only
-> `src/ATrade.AppHost` and `src/ATrade.ServiceDefaults` currently exist; the
-> `workers/` directory and the backend feature modules listed below are
-> aspirational and will land in later milestones tracked by `PLAN.md`. The
-> `frontend/` placeholder is a minimal Node process bootstrapped so Aspire
-> can orchestrate a JavaScript resource; the real Next.js app replaces it
-> later.
+> the ATrade codebase, not a finished implementation. `src/ATrade.AppHost`,
+> `src/ATrade.ServiceDefaults`, and the first scaffolded backend service,
+> `src/ATrade.Api`, currently exist. The `workers/` directory and the other
+> backend feature modules listed below remain aspirational and will land in
+> later milestones tracked by `PLAN.md`. The `frontend/` placeholder is still
+> a minimal Node process bootstrapped so Aspire can orchestrate a JavaScript
+> resource; the real Next.js app replaces it later.
+>
+> **Current runnable slice:** today the AppHost launches `ATrade.Api` plus the
+> placeholder frontend, and `ATrade.Api` only exposes a stable `GET /health`
+> smoke endpoint while broader domain modules remain future work.
 
 ## 1. How To Read This Document
 
@@ -54,8 +58,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   expose HTTP endpoints for the frontend and API; emit unified telemetry.
 - **Expected dependencies:** Every other runtime module as declared
   resources; `Postgres`, `TimescaleDB`, `Redis`, `NATS` as Aspire-managed
-  infrastructure resources (currently stubbed out to a JavaScript frontend
-  only — see `src/ATrade.AppHost/Program.cs`).
+  infrastructure resources. In the current runnable slice, the AppHost wires
+  only `ATrade.Api` plus the placeholder JavaScript frontend — see
+  `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 
@@ -69,19 +74,22 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   .NET module.
 - **First-phase focus:** None directly — infrastructure module.
 
-### 2.3 `ATrade.Api` *(planned)*
+### 2.3 `ATrade.Api` *(exists today, first slice only)*
 
 - **Purpose:** The single public HTTP surface for the Next.js frontend and
   any future external clients.
-- **Responsibilities:** Authenticated REST/streaming endpoints for
-  accounts, portfolios, strategies, orders, and market-data queries;
-  translation of HTTP requests into module calls and NATS publications;
-  SignalR or WebSocket streaming for UI updates.
-- **Expected dependencies:** `ATrade.ServiceDefaults`, every backend
-  feature module, `Postgres`, `Redis` (session/rate-limit), `NATS`
-  (publishing intents, subscribing to UI-bound events).
-- **First-phase focus:** Surfaces IBKR account/order data and Polygon
-  market data through provider-agnostic contracts.
+- **Responsibilities:** In the current slice, provide a minimal ASP.NET
+  Core host that uses `ATrade.ServiceDefaults` and exposes a stable
+  `GET /health` smoke endpoint. Later slices add authenticated
+  REST/streaming endpoints for accounts, portfolios, strategies, orders,
+  and market-data queries plus translation of HTTP requests into module
+  calls and NATS publications.
+- **Expected dependencies:** `ATrade.ServiceDefaults` today; later,
+  every backend feature module, `Postgres`, `Redis` (session/rate-limit),
+  and `NATS` (publishing intents, subscribing to UI-bound events).
+- **First-phase focus:** The scaffold proves the backend/AppHost bootstrap
+  path. Functional IBKR account/order and Polygon market-data surfaces land
+  in later slices.
 
 ### 2.4 `ATrade.Accounts` *(planned)*
 
