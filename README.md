@@ -1,0 +1,123 @@
+---
+status: active
+owner: architect
+updated: 2026-04-22
+summary: Human-facing overview of the rebooted ATrade repository and its core operating contracts.
+see_also:
+  - AGENT.md
+  - PLAN.md
+  - docs/INDEX.md
+---
+
+# ATrade
+
+ATrade is a documentation-first reboot of a personal swing and position trading platform.
+
+The target system is a modular monolith with .NET 10 backends, a Next.js frontend, and Aspire 13.2 as the single local orchestrator for apps, workers, and infrastructure.
+
+## What This Repository Defines
+
+This repository currently defines the operating model for the next implementation:
+
+- One semantic command to start the full stack: `go run`
+- Aspire 13.2 as the orchestration layer for backend services, Next.js, and infrastructure
+- An autonomous multi-agent development system that can plan, implement, review, document, and evolve itself
+- A documentation contract where only tracked, current docs may guide agents
+
+This README is intentionally conceptual. It describes the target repo contract, not a finished implementation.
+
+## Stack Contract
+
+The target stack is:
+
+- Backend: `.NET 10`
+- Orchestrator: `Aspire 13.2`
+- Frontend: `Next.js`
+- Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
+- Broker/data focus: `IBKR` and `Polygon` for the first delivery phase
+- Agent workflow: GitHub issues, draft PRs, reusable skills, and parallel worktrees
+
+## Run Contract
+
+The repository-wide startup contract is `go run`.
+
+- On Unix-like systems, the repo will expose `./go run`
+- On Windows, the repo will expose the same contract through `go.cmd run` and `./go.ps1 run`
+- All variants delegate to Aspire AppHost so one command brings up the API, workers, Next.js, and required infrastructure
+
+The script itself is not implemented in this pass. Its design is documented in `scripts/README.md`, and its delivery is tracked in `PLAN.md`.
+
+## Repository Map
+
+The intended structure is:
+
+```text
+ATrade/
+├── AGENT.md              # Repo-wide autonomous workforce contract
+├── README.md             # Human-facing overview
+├── PLAN.md               # Root bootstrap plan
+├── agents/               # Role charters for the workforce
+├── plans/                # Per-role current plans and archives
+├── skills/               # Repo-local workflow skills
+├── docs/                 # Indexed documentation with lifecycle status
+├── scripts/              # Script contracts and later implementations
+├── src/                  # .NET 10 services and AppHost
+├── workers/              # Long-running workers
+└── frontend/             # Next.js application
+```
+
+Some of those directories are still aspirational. `PLAN.md` is the source of truth for what has been bootstrapped already.
+
+## Read Order
+
+For humans:
+
+1. `README.md`
+2. `PLAN.md`
+3. `docs/INDEX.md`
+4. `scripts/README.md`
+
+For agents:
+
+1. `AGENT.md`
+2. `agents/<role>.md`
+3. `skills/retrieve-plan/SKILL.md`
+4. `plans/<role>/CURRENT.md`
+5. `docs/INDEX.md` and only documents with `status: active`
+
+## Documentation Rules
+
+Documentation is part of the product, not an afterthought.
+
+- Every durable repository addition must have a corresponding document or indexed reference
+- `docs/INDEX.md` is the discovery layer for agents
+- Only documents marked `active` are authoritative
+- Documents marked `legacy-review-pending` or `obsolete` must not drive implementation decisions
+- When a document becomes stale, it is marked and retained for history rather than silently reused
+
+## Autonomous Workforce
+
+The repository is designed for an agent workforce made up of:
+
+- Architect
+- Senior Engineer
+- Senior Test Engineer
+- DevOps Engineer
+- Scrum Master
+- Code Reviewer instances
+- Handyman
+- Onboarder
+
+The operating contract for those roles lives in `AGENT.md`, with per-role details in `agents/`.
+
+## Current Status
+
+This repository is in governance-first bootstrap mode.
+
+- The old Blazor- and script-oriented docs have been replaced at the top level
+- Existing implementation-era docs under `docs/` are preserved but treated as `legacy-review-pending` until the Architect revalidates or obsoletes them
+- The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`
+
+## License
+
+MIT License — see `LICENSE`.
