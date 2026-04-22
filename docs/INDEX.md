@@ -77,24 +77,8 @@ Only documents marked `active` are authoritative for implementation decisions.
 | `skills/selecting-model-tier/SKILL.md` | Choose quality, balanced, or cheap model tiers by blast radius and cost | architect | active | 2026-04-22 | `agents/README.md` |
 | `skills/github-coordination/SKILL.md` | Coordinate issues, labels, draft PRs, and blocked work | scrum-master | active | 2026-04-22 | `AGENT.md` |
 
-## Legacy Docs Pending Review
+## Legacy Documentation
 
-These docs are preserved from the previous implementation and are not authoritative yet.
+No legacy implementation docs are included in this baseline snapshot.
 
-| Path | Summary | Owner | Status | Updated | See also |
-|------|---------|-------|--------|---------|----------|
-| `docs/architecture.md` | Legacy architecture overview from the previous implementation | architect | legacy-review-pending | 2026-04-21 | `PLAN.md` |
-| `docs/infrastructure.md` | Legacy infrastructure and deployment notes | devops | legacy-review-pending | 2026-04-21 | `scripts/README.md` |
-| `docs/IBKR_MARKET_DATA_FIELD_IDS.md` | Reference sheet for IBKR market data fields | market-data | legacy-review-pending | 2026-04-21 | `docs/modules/market-data.md` |
-| `docs/modules/algo-engine.md` | Legacy algo engine module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/backtest.md` | Legacy backtest module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/broker-integration.md` | Legacy broker integration module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/frontend-and-workers.md` | Legacy frontend and worker notes from the Blazor era | architect | legacy-review-pending | 2026-04-21 | `README.md` |
-| `docs/modules/indicators.md` | Legacy indicators module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/market-data.md` | Legacy market data module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/portfolio.md` | Legacy portfolio module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/screener.md` | Legacy screener module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/strategy-sdk.md` | Legacy strategy SDK module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/strategy.md` | Legacy strategy module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/supporting-modules.md` | Legacy supporting modules notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
-| `docs/modules/trading-engine.md` | Legacy trading engine module notes | architect | legacy-review-pending | 2026-04-21 | `docs/architecture.md` |
+If old documents are restored later, they must be added here as `legacy-review-pending` before agents may treat them as historical context.

@@ -22,8 +22,9 @@ When working in this repository, use this order:
 2. `agents/<role>.md`
 3. `skills/retrieve-plan/SKILL.md`
 4. `plans/<role>/CURRENT.md`
-5. `docs/INDEX.md` and only documents marked `active`
-6. Task-specific skills under `skills/`
+5. `PLAN.md`
+6. `docs/INDEX.md` and only documents marked `active`
+7. Task-specific skills under `skills/`
 
 ## Current Reality
 
@@ -31,7 +32,7 @@ When working in this repository, use this order:
 - The target frontend is `Next.js`, not Blazor
 - The target local orchestrator is `Aspire 13.2`
 - The target startup contract is `go run`
-- Existing legacy module docs remain in the repo for review, but they are not authoritative unless `docs/INDEX.md` marks them `active`
+- Any legacy docs restored later must be added to `docs/INDEX.md` as `legacy-review-pending` before agents may use them for historical context
 
 ## Tooling Guidance
 

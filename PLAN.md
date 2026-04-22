@@ -23,7 +23,7 @@ Stand up the repository contracts for the next implementation before writing app
 - [x] ~~Create the first baseline commit so git worktrees become available~~
 - [ ] Implement the cross-platform `go run` script contract from `scripts/README.md`
 - [ ] Add Aspire AppHost that orchestrates .NET services, Next.js, and infrastructure resources
-- [ ] Revalidate or obsolete all legacy implementation docs under `docs/`
+- [ ] Author the first implementation-facing architecture and module docs for the new codebase
 - [ ] Establish GitHub labels, issue templates, and Actions for autonomous coordination
 - [ ] Scaffold the first .NET 10 backend projects and Next.js frontend
 
@@ -34,7 +34,7 @@ Stand up the repository contracts for the next implementation before writing app
 
 ## Notes
 
-- Existing docs under `docs/` are preserved for review but are not authoritative unless `docs/INDEX.md` marks them `active`.
+- Only indexed `active` docs are authoritative. Legacy docs must be explicitly reintroduced and marked before use.
 - The single-command local startup contract is `go run` on both Unix and Windows.
 - Aspire 13.2 remains the preferred orchestrator and must manage Next.js in addition to .NET services.
 - `.worktrees/` is now available for isolated parallel feature delivery.

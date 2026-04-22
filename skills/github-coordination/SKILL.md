@@ -37,6 +37,19 @@ GitHub is the shared queue, memory, and audit trail for autonomous work.
 - `agent:resume-ready`
 - `agent:review`
 - `agent:merged`
+- `agent:docs-required`
+- `agent:trivial`
+
+Recommended role labels:
+
+- `role:architect`
+- `role:senior-engineer`
+- `role:senior-test-engineer`
+- `role:devops`
+- `role:scrum-master`
+- `role:code-reviewer`
+- `role:handyman`
+- `role:onboarder`
 
 ## Common Mistakes
 

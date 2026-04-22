@@ -12,13 +12,15 @@ see_also:
 
 ## Goal
 
-Expose one semantic startup command on both Unix and Windows:
+Expose one semantic startup contract on both Unix and Windows through repo-local shims:
 
 - Unix-like: `./go run`
 - Windows PowerShell: `./go.ps1 run`
 - Windows shell-friendly alias: `go run`
 
 All variants must mean the same thing: start the entire local ATrade stack.
+
+In this repository, `go run` refers to the repo-local shim contract, not the Go toolchain.
 
 ## Required Behavior
 

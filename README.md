@@ -39,11 +39,15 @@ The target stack is:
 
 ## Run Contract
 
-The repository-wide startup contract is `go run`.
+The repository-wide startup contract is the repo-local `go` shim.
+
+The canonical invocations are:
 
 - On Unix-like systems, the repo will expose `./go run`
 - On Windows, the repo will expose the same contract through `go.cmd run` and `./go.ps1 run`
 - All variants delegate to Aspire AppHost so one command brings up the API, workers, Next.js, and required infrastructure
+
+In this repository, the phrase `go run` refers to that repo-local shim contract, not the Go toolchain.
 
 The script itself is not implemented in this pass. Its design is documented in `scripts/README.md`, and its delivery is tracked in `PLAN.md`.
 
@@ -83,7 +87,8 @@ For agents:
 2. `agents/<role>.md`
 3. `skills/retrieve-plan/SKILL.md`
 4. `plans/<role>/CURRENT.md`
-5. `docs/INDEX.md` and only documents with `status: active`
+5. `PLAN.md`
+6. `docs/INDEX.md` and only documents with `status: active`
 
 ## Documentation Rules
 
@@ -115,7 +120,7 @@ The operating contract for those roles lives in `AGENT.md`, with per-role detail
 This repository is in governance-first bootstrap mode.
 
 - The old Blazor- and script-oriented docs have been replaced at the top level
-- Existing implementation-era docs under `docs/` are preserved but treated as `legacy-review-pending` until the Architect revalidates or obsoletes them
+- No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them
 - The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`
 
 ## License
