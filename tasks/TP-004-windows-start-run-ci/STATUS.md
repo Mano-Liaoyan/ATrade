@@ -1,26 +1,26 @@
 # TP-004: Add Windows CI verification for `start run` — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-04-23
+**Current Step:** Step 1: Add a Windows smoke harness
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-04-22
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Read the startup-contract docs, wrapper files, and current Linux regression test
-- [ ] Confirm there is no existing Windows workflow for `start run`
-- [ ] Confirm `scripts/README.md` still documents Windows verification as an open gap
+- [x] Read the startup-contract docs, wrapper files, and current Linux regression test
+- [x] Confirm there is no existing Windows workflow for `start run`
+- [x] Confirm `scripts/README.md` still documents Windows verification as an open gap
 
 ---
 
 ### Step 1: Add a Windows smoke harness
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/start-contract/start-wrapper-windows.ps1`
 - [ ] Exercise `./start.ps1 run` and `./start.cmd run`
@@ -83,6 +83,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-22 23:44 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-22 23:44 | Step 0 started | Preflight |
 
 ---
 
