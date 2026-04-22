@@ -1,6 +1,6 @@
 # TP-003: Scaffold `ATrade.Api` and wire it into AppHost — Status
 
-**Current Step:** Step 1: Scaffold `src/ATrade.Api`
+**Current Step:** Step 2: Wire shared defaults and AppHost
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -21,18 +21,18 @@
 ---
 
 ### Step 1: Scaffold `src/ATrade.Api`
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `src/ATrade.Api/ATrade.Api.csproj`
-- [ ] Create `src/ATrade.Api/Program.cs`
-- [ ] Add `ATrade.Api` to `ATrade.sln`
-- [ ] Reference `ATrade.ServiceDefaults`
-- [ ] Expose `GET /health` with a stable success response
+- [x] Create `src/ATrade.Api/ATrade.Api.csproj`
+- [x] Create `src/ATrade.Api/Program.cs`
+- [x] Add `ATrade.Api` to `ATrade.sln`
+- [x] Reference `ATrade.ServiceDefaults`
+- [x] Expose `GET /health` with a stable success response
 
 ---
 
 ### Step 2: Wire shared defaults and AppHost
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add the minimum shared extension code in `src/ATrade.ServiceDefaults/Extensions.cs`
 - [ ] Update `src/ATrade.AppHost/ATrade.AppHost.csproj` for API project wiring
