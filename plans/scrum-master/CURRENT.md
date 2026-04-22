@@ -1,17 +1,17 @@
 ---
 status: active
 owner: scrum-master
-updated: 2026-04-22
+updated: 2026-04-23
 summary: Live plan for the Scrum Master role.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - PLAN.md
   - .pi/agents/scrum-master.md
 ---
 
 # Scrum Master Current Plan
 
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-23
 
 ## Current Focus
 
@@ -19,9 +19,10 @@ Create the issue and PR coordination model that lets the workforce run continuou
 
 ## Active Checklist
 
-- [ ] Create the initial GitHub label taxonomy from `AGENT.md`
-- [ ] Define issue sizing rules for parallel work
-- [ ] Define how blocked work is resumed after human approval
+- [x] Create the initial GitHub label taxonomy from `AGENTS.md`
+- [x] Define issue sizing rules for parallel work
+- [x] Define how blocked work is resumed after human approval
+- [ ] Define the first GitHub automation pass that can sync labels and enforce templates
 
 ## Blockers
 
@@ -29,12 +30,17 @@ Create the issue and PR coordination model that lets the workforce run continuou
 
 ## Resume From Here
 
-- Open coordination issues for labels, issue templates, and PR templates
+- Build on `docs/process/github-coordination.md` by defining the first automation slice for label sync and issue/PR guardrails
+
+## Recent Progress
+
+- Completed TP-005 by adding `.github/labels.yml`, issue/PR templates, and `docs/process/github-coordination.md`
 
 ## References
 
-- `AGENT.md`
+- `AGENTS.md`
 - `.pi/skills/github-coordination/SKILL.md`
+- `docs/process/github-coordination.md`
 
 ## Archive
 
