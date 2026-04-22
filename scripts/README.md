@@ -1,7 +1,7 @@
 ---
 status: active
 owner: devops
-updated: 2026-04-22
+updated: 2026-04-23
 summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:
   - PLAN.md
@@ -106,7 +106,7 @@ Behavior must stay semantically identical across platforms.
 
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
 - direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
-- `./start.ps1 run` and `./start.cmd run` are implemented but still need Windows-hosted execution verification
+- `./start.ps1 run` and `./start.cmd run` are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`
 
 ## Bootstrap Status
 
@@ -115,6 +115,7 @@ The `run` contract is now bootstrapped in the repository.
 - `./start run` delegates to the Aspire AppHost
 - `./start.ps1 run` provides the PowerShell entrypoint
 - `./start.cmd run` provides the Windows command prompt entrypoint
+- GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
 - the current graph hosts the first minimal `ATrade.Api` service and the placeholder JavaScript frontend
 - infrastructure resources remain intentionally out of scope for this bootstrap slice
 

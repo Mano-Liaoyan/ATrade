@@ -1,6 +1,6 @@
 # TP-004: Add Windows CI verification for `start run` — Status
 
-**Current Step:** Step 3: Keep repo-local verification and docs in sync
+**Current Step:** Step 4: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -40,17 +40,17 @@
 ---
 
 ### Step 3: Keep repo-local verification and docs in sync
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `tests/start-contract/start-wrapper-tests.sh`
-- [ ] Update `scripts/README.md`
-- [ ] Update `README.md` only if wording changed
-- [ ] Update active plan docs (`PLAN.md`, and `plans/devops/CURRENT.md` if wording changed) to reflect the completed Windows CI verification milestone
+- [x] Update `tests/start-contract/start-wrapper-tests.sh`
+- [x] Update `scripts/README.md`
+- [x] Update `README.md` only if wording changed
+- [x] Update active plan docs (`PLAN.md`, and `plans/devops/CURRENT.md` if wording changed) to reflect the completed Windows CI verification milestone
 
 ---
 
 ### Step 4: Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `bash tests/start-contract/start-wrapper-tests.sh`
 - [ ] `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`

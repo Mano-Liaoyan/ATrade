@@ -196,6 +196,14 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.sh" 'Missing AppHost project at %s'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'Missing AppHost project at $ProjectPath'
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-ps1' -CommandText './start.ps1 run'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-cmd' -CommandText './start.cmd run'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" '$SuccessMarker = '
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'runs-on: windows-latest'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'actions/setup-dotnet@v4'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'dotnet-version: 10.0.x'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'actions/setup-node@v4'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" './tests/start-contract/start-wrapper-windows.ps1'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'Sdk="Microsoft.NET.Sdk.Web"'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.ServiceDefaults.csproj'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'builder.AddServiceDefaults()'
@@ -213,7 +221,11 @@ main() {
   assert_file_contains "$repo_root/frontend/server.js" 'ATrade frontend bootstrap'
   assert_file_contains "$repo_root/scripts/README.md" 'The `run` contract is now bootstrapped in the repository.'
   assert_file_contains "$repo_root/scripts/README.md" './start run'
+  assert_file_contains "$repo_root/scripts/README.md" 'are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`'
+  assert_file_contains "$repo_root/README.md" 'Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.'
+  assert_file_contains "$repo_root/PLAN.md" 'Verify `./start.ps1 run` and `./start.cmd run` on a Windows-hosted runtime or CI worker~~'
   assert_file_contains "$repo_root/plans/devops/CURRENT.md" 'Bootstrap the `start run` wrapper contract and Linux-hosted AppHost startup path'
+  assert_file_contains "$repo_root/plans/devops/CURRENT.md" 'Verify `./start.ps1 run` and `./start.cmd run` on a Windows host or in CI~~'
 
   assert_start_run_dispatches
   assert_start_run_script_failure_paths

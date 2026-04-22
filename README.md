@@ -1,7 +1,7 @@
 ---
 status: active
 owner: architect
-updated: 2026-04-22
+updated: 2026-04-23
 summary: Human-facing overview of the rebooted ATrade repository and its core operating contracts.
 see_also:
   - AGENT.md
@@ -122,6 +122,7 @@ This repository is in governance-first bootstrap mode.
 - The old Blazor- and script-oriented docs have been replaced at the top level
 - No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them
 - The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + the placeholder frontend
+- Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.
 - The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`
 
 ## License
