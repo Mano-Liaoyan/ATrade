@@ -1,6 +1,6 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
-**Current Step:** Step 1: Scaffold the Next.js app
+**Current Step:** Step 2: Keep AppHost orchestration working
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -20,18 +20,19 @@
 ---
 
 ### Step 1: Scaffold the Next.js app
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Convert `frontend/` into a minimal Next.js application
-- [ ] Keep `npm run dev` as the frontend entrypoint
-- [ ] Add the necessary Next.js config and app files
-- [ ] Replace the placeholder server with a real page at `/`
-- [ ] Expose stable visible text markers for shell smoke tests
+- [x] Convert `frontend/` into a minimal Next.js application
+- [x] Keep `npm run dev` as the frontend entrypoint
+- [x] Add the necessary Next.js config and app files
+- [x] Replace the placeholder server with a real page at `/`
+- [x] Expose stable visible text markers for shell smoke tests
+- [x] Ignore Next.js local build artifacts and dependencies
 
 ---
 
 ### Step 2: Keep AppHost orchestration working
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update `src/ATrade.AppHost/Program.cs` only as needed
 - [ ] Preserve the existing API + frontend bootstrap graph
