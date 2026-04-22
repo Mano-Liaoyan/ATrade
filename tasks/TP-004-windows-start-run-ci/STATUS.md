@@ -1,6 +1,6 @@
 # TP-004: Add Windows CI verification for `start run` — Status
 
-**Current Step:** Step 1: Add a Windows smoke harness
+**Current Step:** Step 2: Add GitHub Actions coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -20,17 +20,17 @@
 ---
 
 ### Step 1: Add a Windows smoke harness
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/start-contract/start-wrapper-windows.ps1`
-- [ ] Exercise `./start.ps1 run` and `./start.cmd run`
-- [ ] Detect successful startup without hanging indefinitely
-- [ ] Tear down launched processes cleanly with CI-friendly exit codes
+- [x] Create `tests/start-contract/start-wrapper-windows.ps1`
+- [x] Exercise `./start.ps1 run` and `./start.cmd run`
+- [x] Detect successful startup without hanging indefinitely
+- [x] Tear down launched processes cleanly with CI-friendly exit codes
 
 ---
 
 ### Step 2: Add GitHub Actions coverage
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `.github/workflows/windows-start-run.yml`
 - [ ] Use `windows-latest`
