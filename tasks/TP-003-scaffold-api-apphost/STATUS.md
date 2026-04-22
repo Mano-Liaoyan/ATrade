@@ -1,6 +1,6 @@
 # TP-003: Scaffold `ATrade.Api` and wire it into AppHost — Status
 
-**Current Step:** Step 2: Wire shared defaults and AppHost
+**Current Step:** Step 3: Add regression coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -32,17 +32,17 @@
 ---
 
 ### Step 2: Wire shared defaults and AppHost
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add the minimum shared extension code in `src/ATrade.ServiceDefaults/Extensions.cs`
-- [ ] Update `src/ATrade.AppHost/ATrade.AppHost.csproj` for API project wiring
-- [ ] Update `src/ATrade.AppHost/Program.cs` to launch `ATrade.Api` and the frontend
-- [ ] Keep infra resources out of scope
+- [x] Add the minimum shared extension code in `src/ATrade.ServiceDefaults/Extensions.cs`
+- [x] Update `src/ATrade.AppHost/ATrade.AppHost.csproj` for API project wiring
+- [x] Update `src/ATrade.AppHost/Program.cs` to launch `ATrade.Api` and the frontend
+- [x] Keep infra resources out of scope
 
 ---
 
 ### Step 3: Add regression coverage
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/api-bootstrap-tests.sh`
 - [ ] Verify direct API smoke coverage for `GET /health`
