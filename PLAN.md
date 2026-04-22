@@ -21,7 +21,7 @@ Stand up the repository contracts for the next implementation before writing app
 
 - [x] ~~Rewrite top-level repository identity around Aspire 13.2, Next.js, and autonomous agents~~
 - [x] ~~Create the first baseline commit so git worktrees become available~~
-- [ ] Implement the cross-platform `go run` script contract from `scripts/README.md`
+- [ ] Implement the cross-platform `start run` script contract from `scripts/README.md`
 - [ ] Add Aspire AppHost that orchestrates .NET services, Next.js, and infrastructure resources
 - [ ] Author the first implementation-facing architecture and module docs for the new codebase
 - [ ] Establish GitHub labels, issue templates, and Actions for autonomous coordination
@@ -35,6 +35,6 @@ Stand up the repository contracts for the next implementation before writing app
 ## Notes
 
 - Only indexed `active` docs are authoritative. Legacy docs must be explicitly reintroduced and marked before use.
-- The single-command local startup contract is `go run` on both Unix and Windows.
+- The single-command local startup contract is `start run` on both Unix and Windows.
 - Aspire 13.2 remains the preferred orchestrator and must manage Next.js in addition to .NET services.
 - `.worktrees/` is now available for isolated parallel feature delivery.

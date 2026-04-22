@@ -5,8 +5,8 @@ updated: 2026-04-22
 summary: Template for a role-specific live plan file.
 see_also:
   - plans/README.md
-  - skills/retrieve-plan/SKILL.md
-  - skills/update-plan/SKILL.md
+  - .claude/skills/retrieve-plan/SKILL.md
+  - .claude/skills/update-plan/SKILL.md
 ---
 
 # <Role> Current Plan

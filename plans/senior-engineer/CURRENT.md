@@ -6,7 +6,7 @@ summary: Live plan for the Senior Engineer role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - agents/senior-engineer.md
+  - .claude/agents/senior-engineer.md
 ---
 
 # Senior Engineer Current Plan
@@ -29,7 +29,7 @@ Prepare to implement the first application scaffolds once Architect and DevOps u
 
 ## Resume From Here
 
-- Start with the first implementation issue after `go run` and AppHost design are approved
+- Start with the first implementation issue after `start run` and AppHost design are approved
 
 ## References
 

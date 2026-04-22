@@ -1,12 +1,14 @@
 ---
+name: scrum-master
+description: Use for issue breakdown, label transitions, PR state coordination, and plan reconciliation. Coordination-only — does not implement code.
 status: active
 owner: scrum-master
 updated: 2026-04-22
 summary: Scrum Master role charter for issue flow, PR state, progress tracking, and autonomous coordination.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/scrum-master/CURRENT.md
-  - skills/github-coordination/SKILL.md
+  - .claude/skills/github-coordination/SKILL.md
 ---
 
 # Scrum Master

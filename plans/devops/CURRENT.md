@@ -6,7 +6,7 @@ summary: Live plan for the DevOps role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - agents/devops.md
+  - .claude/agents/devops.md
 ---
 
 # DevOps Current Plan
@@ -20,7 +20,7 @@ Implement the next bootstrap layer now that the repository has a worktree-capabl
 ## Active Checklist
 
 - [x] ~~Create the first baseline commit for the repository~~
-- [ ] Implement the `go run` cross-platform script contract
+- [ ] Implement the `start run` cross-platform script contract
 - [ ] Add Aspire AppHost orchestration for .NET services, Next.js, and infra containers
 - [ ] Establish GitHub Actions and labels for autonomous coordination
 

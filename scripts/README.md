@@ -2,7 +2,7 @@
 status: active
 owner: devops
 updated: 2026-04-22
-summary: Design contract for the future cross-platform `go run` startup command.
+summary: Design contract for the future cross-platform `start run` startup command.
 see_also:
   - PLAN.md
   - AGENT.md
@@ -14,17 +14,19 @@ see_also:
 
 Expose one semantic startup contract on both Unix and Windows through repo-local shims:
 
-- Unix-like: `./go run`
-- Windows PowerShell: `./go.ps1 run`
-- Windows shell-friendly alias: `go run`
+- Unix-like: `./start run`
+- Windows PowerShell: `./start.ps1 run`
+- Windows Command Prompt: `./start.cmd run`
 
 All variants must mean the same thing: start the entire local ATrade stack.
 
-In this repository, `go run` refers to the repo-local shim contract, not the Go toolchain.
+In this repository, `start run` refers to the repo-local shim contract, not the Windows shell built-in.
+
+Windows documentation must use an explicit relative path when invoking the repo-local shim.
 
 ## Required Behavior
 
-`go run` must bring up:
+`start run` must bring up:
 
 - Aspire AppHost
 - backend services
@@ -42,14 +44,14 @@ Suggested layout:
 
 ```text
 ATrade/
-├── go                  # POSIX entrypoint
-├── go.ps1              # PowerShell entrypoint
-├── go.cmd              # Optional Windows shell shim
+├── start               # POSIX entrypoint
+├── start.ps1           # PowerShell entrypoint
+├── start.cmd           # Windows command prompt entrypoint
 └── scripts/
-    ├── go.run.sh
-    ├── go.run.ps1
-    ├── go.test.sh
-    ├── go.test.ps1
+    ├── start.run.sh
+    ├── start.run.ps1
+    ├── start.test.sh
+    ├── start.test.ps1
     └── ...
 ```
 
@@ -74,14 +76,14 @@ Aspire must orchestrate the Next.js app directly so the frontend participates in
 
 Only `run` is mandatory for the first implementation wave, but the contract reserves:
 
-- `go run`
-- `go test`
-- `go build`
-- `go lint`
-- `go fmt`
-- `go agents:dispatch`
-- `go plans:check`
-- `go docs:check`
+- `start run`
+- `start test`
+- `start build`
+- `start lint`
+- `start fmt`
+- `start agents:dispatch`
+- `start plans:check`
+- `start docs:check`
 
 ## Windows And Unix Rule
 

@@ -1,12 +1,14 @@
 ---
+name: senior-test-engineer
+description: Use for TDD discipline, regression coverage, flaky test investigations, and evidence-backed verification before risky changes ship.
 status: active
 owner: senior-test-engineer
 updated: 2026-04-22
 summary: Senior Test Engineer role charter for TDD, regression prevention, and verification discipline.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/senior-test-engineer/CURRENT.md
-  - skills/karpathy-guidelines/SKILL.md
+  - .claude/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Senior Test Engineer

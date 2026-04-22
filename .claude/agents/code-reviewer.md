@@ -1,12 +1,14 @@
 ---
+name: code-reviewer
+description: Use to review draft PRs and risky diffs for bugs, regressions, missing tests, missing docs, and contract mismatches. Produces severity-ordered findings and merge recommendations.
 status: active
 owner: code-reviewer
 updated: 2026-04-22
 summary: Code Reviewer role charter for correctness-first reviews and merge safety.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/code-reviewer/CURRENT.md
-  - skills/karpathy-guidelines/SKILL.md
+  - .claude/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Code Reviewer

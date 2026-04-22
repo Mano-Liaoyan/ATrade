@@ -1,12 +1,14 @@
 ---
+name: handyman
+description: Use for cheap, low-risk, trivial edits — typo fixes, link repairs, label cleanup, tiny mechanical doc updates. Escalates the moment scope expands.
 status: active
 owner: handyman
 updated: 2026-04-22
 summary: Handyman role charter for cheap, low-risk, trivial repository work.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/handyman/CURRENT.md
-  - skills/selecting-model-tier/SKILL.md
+  - .claude/skills/selecting-model-tier/SKILL.md
 ---
 
 # Handyman

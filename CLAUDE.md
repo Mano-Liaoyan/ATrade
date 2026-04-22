@@ -19,19 +19,19 @@ The repository-wide operating contract now lives in `AGENT.md`, not here.
 When working in this repository, use this order:
 
 1. `AGENT.md`
-2. `agents/<role>.md`
-3. `skills/retrieve-plan/SKILL.md`
+2. `.claude/agents/<role>.md`
+3. `.claude/skills/retrieve-plan/SKILL.md`
 4. `plans/<role>/CURRENT.md`
 5. `PLAN.md`
 6. `docs/INDEX.md` and only documents marked `active`
-7. Task-specific skills under `skills/`
+7. Task-specific skills under `.claude/skills/`
 
 ## Current Reality
 
 - This repository is defining the next implementation, not preserving the previous one
 - The target frontend is `Next.js`, not Blazor
 - The target local orchestrator is `Aspire 13.2`
-- The target startup contract is `go run`
+- The target startup contract is `start run`
 - Any legacy docs restored later must be added to `docs/INDEX.md` as `legacy-review-pending` before agents may use them for historical context
 
 ## Tooling Guidance

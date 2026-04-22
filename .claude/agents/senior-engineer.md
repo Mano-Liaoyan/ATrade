@@ -1,12 +1,14 @@
 ---
+name: senior-engineer
+description: Use to implement architect-approved work with minimal, production-quality changes and verification. The default implementer for code-bearing issues.
 status: active
 owner: senior-engineer
 updated: 2026-04-22
 summary: Senior Engineer role charter for implementing approved architecture with minimal, verifiable changes.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/senior-engineer/CURRENT.md
-  - skills/karpathy-guidelines/SKILL.md
+  - .claude/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Senior Engineer

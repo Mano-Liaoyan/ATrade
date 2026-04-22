@@ -6,7 +6,7 @@ summary: Live plan for the Handyman role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - agents/handyman.md
+  - .claude/agents/handyman.md
 ---
 
 # Handyman Current Plan
@@ -34,7 +34,7 @@ Stay available for low-risk cleanup and mechanical repository maintenance.
 ## References
 
 - `AGENT.md`
-- `agents/handyman.md`
+- `.claude/agents/handyman.md`
 
 ## Archive
 

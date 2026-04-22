@@ -1,12 +1,14 @@
 ---
+name: onboarder
+description: Use when adding a new workforce role — creates the role charter, plan scaffold, docs index updates, and any supporting skills.
 status: active
 owner: onboarder
 updated: 2026-04-22
 summary: Onboarder role charter for adding new workforce roles, plans, and supporting guidance.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - plans/onboarder/CURRENT.md
-  - skills/onboarding-new-agent/SKILL.md
+  - .claude/skills/onboarding-new-agent/SKILL.md
 ---
 
 # Onboarder
