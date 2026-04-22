@@ -1,0 +1,33 @@
+{
+  "configVersion": 1,
+  "taskRunner": {
+    "project": {
+      "name": "ATrade",
+      "description": ""
+    },
+    "paths": {
+      "tasks": "tasks"
+    },
+    "taskAreas": {
+      "general": {
+        "path": "tasks",
+        "prefix": "TP",
+        "context": "tasks/CONTEXT.md"
+      }
+    },
+    "worker": {
+      "model": "github-copilot/gpt-5.4"
+    },
+    "reviewer": {
+      "model": "github-copilot/claude-sonnet-4.6"
+    }
+  },
+  "orchestrator": {
+    "supervisor": {
+      "model": "github-copilot/claude-opus-4.7"
+    },
+    "merge": {
+      "model": "github-copilot/gpt-5.4"
+    }
+  }
+}
