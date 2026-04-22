@@ -1,6 +1,6 @@
 # TP-003: Scaffold `ATrade.Api` and wire it into AppHost — Status
 
-**Current Step:** Step 3: Add regression coverage
+**Current Step:** Step 4: Update docs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -42,16 +42,16 @@
 ---
 
 ### Step 3: Add regression coverage
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/api-bootstrap-tests.sh`
-- [ ] Verify direct API smoke coverage for `GET /health`
-- [ ] Update `tests/start-contract/start-wrapper-tests.sh` only if the new graph changes expected bootstrap behavior
+- [x] Create `tests/apphost/api-bootstrap-tests.sh`
+- [x] Verify direct API smoke coverage for `GET /health`
+- [x] Update `tests/start-contract/start-wrapper-tests.sh` only if the new graph changes expected bootstrap behavior
 
 ---
 
 ### Step 4: Update docs
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update `scripts/README.md`
 - [ ] Update `docs/architecture/modules.md`
