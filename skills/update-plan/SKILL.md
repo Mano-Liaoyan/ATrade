@@ -40,7 +40,7 @@ Record:
 Use checkbox + strikethrough for fully completed checklist items.
 
 ```markdown
-- [ ] Implement `go run` script shim
+- [ ] Implement `start run` script shim
 - [x] ~~Bootstrap repo-level agent governance docs~~
 ```
 

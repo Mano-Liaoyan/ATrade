@@ -31,7 +31,7 @@ When working in this repository, use this order:
 - This repository is defining the next implementation, not preserving the previous one
 - The target frontend is `Next.js`, not Blazor
 - The target local orchestrator is `Aspire 13.2`
-- The target startup contract is `go run`
+- The target startup contract is `start run`
 - Any legacy docs restored later must be added to `docs/INDEX.md` as `legacy-review-pending` before agents may use them for historical context
 
 ## Tooling Guidance

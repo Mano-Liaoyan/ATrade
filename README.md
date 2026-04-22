@@ -19,7 +19,7 @@ The target system is a modular monolith with .NET 10 backends, a Next.js fronten
 
 This repository currently defines the operating model for the next implementation:
 
-- One semantic command to start the full stack: `go run`
+- One semantic command to start the full stack: `start run`
 - Aspire 13.2 as the orchestration layer for backend services, Next.js, and infrastructure
 - An autonomous multi-agent development system that can plan, implement, review, document, and evolve itself
 - A documentation contract where only tracked, current docs may guide agents
@@ -39,17 +39,17 @@ The target stack is:
 
 ## Run Contract
 
-The repository-wide startup contract is the repo-local `go` shim.
+The repository-wide startup contract is the repo-local `start` shim.
 
 The canonical invocations are:
 
-- On Unix-like systems, the repo will expose `./go run`
-- On Windows, the repo will expose the same contract through `go.cmd run` and `./go.ps1 run`
+- On Unix-like systems, the repo will expose `./start run`
+- On Windows, the repo will expose the same contract through `./start.cmd run` and `./start.ps1 run`
 - All variants delegate to Aspire AppHost so one command brings up the API, workers, Next.js, and required infrastructure
 
-In this repository, the phrase `go run` refers to that repo-local shim contract, not the Go toolchain.
+In this repository, the phrase `start run` refers to that repo-local shim contract, not the Windows shell built-in.
 
-The script itself is not implemented in this pass. Its design is documented in `scripts/README.md`, and its delivery is tracked in `PLAN.md`.
+The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
 
 ## Repository Map
 

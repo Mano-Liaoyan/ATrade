@@ -2,7 +2,7 @@
 status: active
 owner: devops
 updated: 2026-04-22
-summary: Design contract for the future cross-platform `go run` startup command.
+summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:
   - PLAN.md
   - AGENT.md
@@ -14,17 +14,19 @@ see_also:
 
 Expose one semantic startup contract on both Unix and Windows through repo-local shims:
 
-- Unix-like: `./go run`
-- Windows PowerShell: `./go.ps1 run`
-- Windows shell-friendly alias: `go run`
+- Unix-like: `./start run`
+- Windows PowerShell: `./start.ps1 run`
+- Windows Command Prompt: `./start.cmd run`
 
 All variants must mean the same thing: start the entire local ATrade stack.
 
-In this repository, `go run` refers to the repo-local shim contract, not the Go toolchain.
+In this repository, `start run` refers to the repo-local shim contract, not the Windows shell built-in.
+
+Windows documentation must use an explicit relative path when invoking the repo-local shim.
 
 ## Required Behavior
 
-`go run` must bring up:
+The long-term `start run` contract is to bring up:
 
 - Aspire AppHost
 - backend services
@@ -34,6 +36,13 @@ In this repository, `go run` refers to the repo-local shim contract, not the Go 
 
 There must not be separate mandatory commands for the frontend, workers, or infra in the normal local startup path.
 
+The current bootstrap slice intentionally implements a smaller runnable graph:
+
+- Aspire AppHost
+- a placeholder JavaScript frontend process managed by Aspire
+
+Later slices extend that graph with real backend services, workers, a real Next.js app, and infrastructure resources.
+
 ## Planned Layout
 
 The script surface should be thin and delegating.
@@ -42,14 +51,14 @@ Suggested layout:
 
 ```text
 ATrade/
-├── go                  # POSIX entrypoint
-├── go.ps1              # PowerShell entrypoint
-├── go.cmd              # Optional Windows shell shim
+├── start               # POSIX entrypoint
+├── start.ps1           # PowerShell entrypoint
+├── start.cmd           # Windows command prompt entrypoint
 └── scripts/
-    ├── go.run.sh
-    ├── go.run.ps1
-    ├── go.test.sh
-    ├── go.test.ps1
+    ├── start.run.sh
+    ├── start.run.ps1
+    ├── start.test.sh
+    ├── start.test.ps1
     └── ...
 ```
 
@@ -74,14 +83,14 @@ Aspire must orchestrate the Next.js app directly so the frontend participates in
 
 Only `run` is mandatory for the first implementation wave, but the contract reserves:
 
-- `go run`
-- `go test`
-- `go build`
-- `go lint`
-- `go fmt`
-- `go agents:dispatch`
-- `go plans:check`
-- `go docs:check`
+- `start run`
+- `start test`
+- `start build`
+- `start lint`
+- `start fmt`
+- `start agents:dispatch`
+- `start plans:check`
+- `start docs:check`
 
 ## Windows And Unix Rule
 
@@ -92,6 +101,18 @@ Behavior must stay semantically identical across platforms.
 - same environment contract where possible
 - platform-specific wrappers may differ internally, but not conceptually
 
-## Bootstrap Limitation
+## Current Verification Scope
 
-This document defines the contract only. The scripts are not implemented in this pass.
+- `./start run` and direct AppHost startup are verified in this repository's Linux environment
+- `./start.ps1 run` and `./start.cmd run` are implemented but still need Windows-hosted execution verification
+
+## Bootstrap Status
+
+The `run` contract is now bootstrapped in the repository.
+
+- `./start run` delegates to the Aspire AppHost
+- `./start.ps1 run` provides the PowerShell entrypoint
+- `./start.cmd run` provides the Windows command prompt entrypoint
+- the current graph is intentionally minimal and hosts a placeholder JavaScript frontend
+
+Reserved subcommands such as `test`, `build`, and `lint` remain future work.

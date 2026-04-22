@@ -15,21 +15,21 @@ see_also:
 
 ## Current Focus
 
-Prepare to implement the first application scaffolds once Architect and DevOps unblock the repository bootstrap.
+Implement the first application scaffolds on top of the bootstrapped `start run` contract and minimal Aspire AppHost.
 
 ## Active Checklist
 
-- [ ] Wait for the Architect's initial AppHost and service-boundary decisions
-- [ ] Scaffold the first backend projects after the startup contract is approved
-- [ ] Scaffold the Next.js frontend once Aspire orchestration requirements are stable
+- [ ] Scaffold the first backend projects against the existing AppHost and service defaults
+- [ ] Replace the placeholder frontend with the first Next.js application slice when an implementation issue is ready
+- [ ] Extend the AppHost graph as architect-approved services and infrastructure resources are introduced
 
 ## Blockers
 
-- Startup contract is still documentation-only
+- None right now
 
 ## Resume From Here
 
-- Start with the first implementation issue after `go run` and AppHost design are approved
+- Start with the first architect-approved implementation issue that builds on the existing `start run` bootstrap
 
 ## References
 

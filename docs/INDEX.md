@@ -36,7 +36,7 @@ Only documents marked `active` are authoritative for implementation decisions.
 | `plans/README.md` | Explains per-role plans and archive rules | scrum-master | active | 2026-04-22 | `plans/TEMPLATE.md`, `PLAN.md` |
 | `plans/TEMPLATE.md` | Template for role-local current plans | scrum-master | active | 2026-04-22 | `plans/README.md` |
 | `docs/DOC_TEMPLATE.md` | Frontmatter and structure template for durable docs | architect | active | 2026-04-22 | `AGENT.md` |
-| `scripts/README.md` | Design for the future cross-platform `go run` contract | devops | active | 2026-04-22 | `PLAN.md`, `AGENT.md` |
+| `scripts/README.md` | Bootstrap status, scope, and verification notes for the cross-platform `start run` entrypoints | devops | active | 2026-04-22 | `PLAN.md`, `AGENT.md` |
 
 ## Role Charters
 
@@ -76,6 +76,18 @@ Only documents marked `active` are authoritative for implementation decisions.
 | `skills/documenting-changes/SKILL.md` | Keep docs and index aligned with repository changes | architect | active | 2026-04-22 | `docs/DOC_TEMPLATE.md` |
 | `skills/selecting-model-tier/SKILL.md` | Choose quality, balanced, or cheap model tiers by blast radius and cost | architect | active | 2026-04-22 | `agents/README.md` |
 | `skills/github-coordination/SKILL.md` | Coordinate issues, labels, draft PRs, and blocked work | scrum-master | active | 2026-04-22 | `AGENT.md` |
+
+## Superpowers Specs
+
+| Path | Summary | Owner | Status | Updated | See also |
+|------|---------|-------|--------|---------|----------|
+| `docs/superpowers/specs/2026-04-22-start-run-bootstrap-design.md` | Approved design for the first bootstrap implementation of the cross-platform `start run` contract and minimal Aspire AppHost | devops | active | 2026-04-22 | `scripts/README.md`, `PLAN.md` |
+
+## Superpowers Plans
+
+| Path | Summary | Owner | Status | Updated | See also |
+|------|---------|-------|--------|---------|----------|
+| `docs/superpowers/plans/2026-04-22-start-run-bootstrap-implementation.md` | Implementation plan for the first `start run` bootstrap slice with thin wrappers, minimal Aspire AppHost, and a placeholder JavaScript frontend | devops | active | 2026-04-22 | `docs/superpowers/specs/2026-04-22-start-run-bootstrap-design.md`, `plans/devops/CURRENT.md` |
 
 ## Legacy Documentation
 

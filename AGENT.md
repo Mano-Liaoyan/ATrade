@@ -232,16 +232,16 @@ Reviewers focus on:
 
 ## Single Command Contract
 
-The target startup contract for the repository is the repo-local `go` shim.
+The target startup contract for the repository is the repo-local `start` shim.
 
 That contract must be implemented on both Unix and Windows and must delegate to Aspire AppHost so one command brings up the backend, workers, frontend, and infrastructure.
 
 Canonical invocations:
 
-- Unix-like: `./go run`
-- Windows: `./go.ps1 run` or `go.cmd run`
+- Unix-like: `./start run`
+- Windows: `./start.ps1 run` or `./start.cmd run`
 
-Within repository documentation, `go run` refers to this shim contract, not the Go toolchain.
+Within repository documentation, `start run` refers to this shim contract, not the Windows shell built-in. Use explicit relative paths on Windows.
 
 The design lives in `scripts/README.md`.
 
