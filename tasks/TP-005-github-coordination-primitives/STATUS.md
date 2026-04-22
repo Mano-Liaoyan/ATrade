@@ -1,6 +1,6 @@
 # TP-005: Establish GitHub coordination primitives — Status
 
-**Current Step:** Step 3: Add the coordination doc
+**Current Step:** Step 4: Update the doc index and pointers
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -41,18 +41,18 @@
 ---
 
 ### Step 3: Add the coordination doc
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `docs/process/github-coordination.md` with frontmatter
-- [ ] Document workflow-state and role labels
-- [ ] Define sizing rules aligned to `S`, `M`, `L`, `XL`
-- [ ] Define blocked-work and resume flow
-- [ ] Cross-link the active coordination sources
+- [x] Create `docs/process/github-coordination.md` with frontmatter
+- [x] Document workflow-state and role labels
+- [x] Define sizing rules aligned to `S`, `M`, `L`, `XL`
+- [x] Define blocked-work and resume flow
+- [x] Cross-link the active coordination sources
 
 ---
 
 ### Step 4: Update the doc index and pointers
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update `docs/INDEX.md`
 - [ ] Update `README.md` only if a pointer is needed
@@ -104,6 +104,8 @@
 | 2026-04-23 | Step 2 started | Add GitHub templates |
 | 2026-04-23 | Step 2 completed | Added issue and PR templates for implementation and coordination work |
 | 2026-04-23 | Step 3 started | Add the coordination doc |
+| 2026-04-23 | Step 3 completed | Added `docs/process/github-coordination.md` with labels, sizing, and resume flow |
+| 2026-04-23 | Step 4 started | Update the doc index and pointers |
 
 ---
 
