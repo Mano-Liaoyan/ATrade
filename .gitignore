@@ -65,7 +65,7 @@ nunit-*.xml
 # Agent workflow
 .worktrees/
 
-# Taskplane runtime artifacts (machine-specific, do not commit)
+# Taskplane / Pi runtime artifacts (machine-specific, do not commit)
 .pi/batch-state.json
 .pi/batch-history.json
 .pi/lane-state-*
@@ -75,6 +75,15 @@ nunit-*.xml
 .pi/orch-logs/
 .pi/orch-abort-signal
 .pi/settings.json
+.pi/dashboard-preferences.json
+.pi/taskplane.json
+.pi/diagnostics/
+.pi/mailbox/
+.pi/runtime/
+.pi/supervisor/
+.pi/telemetry/
+.pi/verification/
+tasks/dependencies.json
 .taskplane-tasks/
 
 # Pi project-local packages (if using pi install -l)

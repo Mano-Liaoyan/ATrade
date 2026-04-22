@@ -16,18 +16,22 @@
       }
     },
     "worker": {
-      "model": "github-copilot/gpt-5.4"
+      "model": "github-copilot/claude-sonnet-4.6",
+      "thinking": "high"
     },
     "reviewer": {
-      "model": "github-copilot/claude-sonnet-4.6"
+      "model": "github-copilot/gpt-5.4",
+      "thinking": "xhigh"
     }
   },
   "orchestrator": {
     "supervisor": {
-      "model": "github-copilot/claude-opus-4.7"
+      "model": "github-copilot/gpt-5.4",
+      "thinking": "high"
     },
     "merge": {
-      "model": "github-copilot/gpt-5.4"
+      "model": "github-copilot/gpt-5.4",
+      "thinking": "off"
     }
   }
 }
