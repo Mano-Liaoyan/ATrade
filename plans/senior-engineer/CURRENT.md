@@ -15,21 +15,33 @@ see_also:
 
 ## Current Focus
 
-Prepare to implement the first application scaffolds once Architect and DevOps unblock the repository bootstrap.
+Implement the first application scaffolds on top of the bootstrapped `start run` contract and minimal Aspire AppHost.
 
 ## Active Checklist
 
-- [ ] Wait for the Architect's initial AppHost and service-boundary decisions
-- [ ] Scaffold the first backend projects after the startup contract is approved
-- [ ] Scaffold the Next.js frontend once Aspire orchestration requirements are stable
+- [ ] Scaffold the first backend projects against the existing AppHost and service defaults
+- [ ] Replace the placeholder frontend with the first Next.js application slice when an implementation issue is ready
+- [ ] Extend the AppHost graph as architect-approved services and infrastructure resources are introduced
 
 ## Blockers
 
-- Startup contract is still documentation-only
+- None right now
 
 ## Resume From Here
 
-- Start with the first implementation issue after `start run` and AppHost design are approved
+- Branch `feature/start-run-bootstrap` now contains the bootstrapped `start run` contract and minimal Aspire AppHost; open the follow-up issue that scaffolds the first real backend or Next.js slice on top of that baseline
+
+## Recent Progress
+
+- Reviewed and completed the bootstrap branch in `.worktrees/start-run-bootstrap`
+- Verified the Linux-hosted `start run` path, direct AppHost startup, and wrapper regression coverage before handoff
+
+## Verification
+
+- `bash tests/start-contract/start-wrapper-tests.sh`
+- `dotnet build ATrade.sln`
+- `timeout 20s ./start run`
+- `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
 
 ## References
 

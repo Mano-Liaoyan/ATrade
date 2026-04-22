@@ -49,7 +49,7 @@ The canonical invocations are:
 
 In this repository, the phrase `start run` refers to that repo-local shim contract, not the Windows shell built-in.
 
-The script itself is not implemented in this pass. Its design is documented in `scripts/README.md`, and its delivery is tracked in `PLAN.md`.
+The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
 
 ## Repository Map
 

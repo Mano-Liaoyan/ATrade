@@ -2,7 +2,7 @@
 status: active
 owner: devops
 updated: 2026-04-22
-summary: Design contract for the future cross-platform `start run` startup command.
+summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:
   - PLAN.md
   - AGENT.md
@@ -26,7 +26,7 @@ Windows documentation must use an explicit relative path when invoking the repo-
 
 ## Required Behavior
 
-`start run` must bring up:
+The long-term `start run` contract is to bring up:
 
 - Aspire AppHost
 - backend services
@@ -35,6 +35,13 @@ Windows documentation must use an explicit relative path when invoking the repo-
 - infrastructure resources managed by Aspire
 
 There must not be separate mandatory commands for the frontend, workers, or infra in the normal local startup path.
+
+The current bootstrap slice intentionally implements a smaller runnable graph:
+
+- Aspire AppHost
+- a placeholder JavaScript frontend process managed by Aspire
+
+Later slices extend that graph with real backend services, workers, a real Next.js app, and infrastructure resources.
 
 ## Planned Layout
 
@@ -94,6 +101,18 @@ Behavior must stay semantically identical across platforms.
 - same environment contract where possible
 - platform-specific wrappers may differ internally, but not conceptually
 
-## Bootstrap Limitation
+## Current Verification Scope
 
-This document defines the contract only. The scripts are not implemented in this pass.
+- `./start run` and direct AppHost startup are verified in this repository's Linux environment
+- `./start.ps1 run` and `./start.cmd run` are implemented but still need Windows-hosted execution verification
+
+## Bootstrap Status
+
+The `run` contract is now bootstrapped in the repository.
+
+- `./start run` delegates to the Aspire AppHost
+- `./start.ps1 run` provides the PowerShell entrypoint
+- `./start.cmd run` provides the Windows command prompt entrypoint
+- the current graph is intentionally minimal and hosts a placeholder JavaScript frontend
+
+Reserved subcommands such as `test`, `build`, and `lint` remain future work.

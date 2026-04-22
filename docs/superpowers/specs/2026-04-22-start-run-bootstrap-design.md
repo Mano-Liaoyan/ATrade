@@ -113,6 +113,7 @@ The AppHost must be real and runnable.
 For the first slice it should:
 
 - start successfully through `dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
+- include the minimal AppHost launch profile needed for direct local `dotnet run` startup without extra shell-exported dashboard bootstrap variables
 - include a JavaScript-managed frontend resource using the Aspire JavaScript hosting package line
 - provide a clear extension point for later API, worker, and infrastructure resources
 
