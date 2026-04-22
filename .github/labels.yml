@@ -1,0 +1,58 @@
+labels:
+  # Workflow state labels
+  - name: agent:ready
+    color: "0e8a16"
+    description: Ready to be claimed by an agent.
+  - name: agent:claimed
+    color: "1d76db"
+    description: Claimed by an agent and queued for work in a branch or worktree.
+  - name: agent:in-progress
+    color: "0052cc"
+    description: Actively being implemented or updated by the assigned agent.
+  - name: agent:needs-human
+    color: "d93f0b"
+    description: Waiting on a human decision, approval, or missing input before work can continue.
+  - name: agent:blocked
+    color: "b60205"
+    description: Blocked by a dependency or external condition that is not an immediate human approval.
+  - name: agent:resume-ready
+    color: "0e8a16"
+    description: Previously blocked work is unblocked and ready for an agent to resume.
+  - name: agent:review
+    color: "5319e7"
+    description: Ready for review after implementation and verification.
+  - name: agent:merged
+    color: "1a7f37"
+    description: Merged and complete in the target branch.
+  - name: agent:docs-required
+    color: "fbca04"
+    description: Requires documentation updates before completion.
+  - name: agent:trivial
+    color: "cfd3d7"
+    description: Small, low-risk work that may fit a lightweight execution path.
+
+  # Owning role labels
+  - name: role:architect
+    color: "8b5cf6"
+    description: Owned or primarily driven by the Architect role.
+  - name: role:senior-engineer
+    color: "2563eb"
+    description: Owned or primarily driven by the Senior Engineer role.
+  - name: role:senior-test-engineer
+    color: "0f766e"
+    description: Owned or primarily driven by the Senior Test Engineer role.
+  - name: role:devops
+    color: "0284c7"
+    description: Owned or primarily driven by the DevOps role.
+  - name: role:scrum-master
+    color: "ea580c"
+    description: Owned or primarily driven by the Scrum Master role.
+  - name: role:code-reviewer
+    color: "7c3aed"
+    description: Owned or primarily driven by the Code Reviewer role.
+  - name: role:handyman
+    color: "4b5563"
+    description: Owned or primarily driven by the Handyman role.
+  - name: role:onboarder
+    color: "be185d"
+    description: Owned or primarily driven by the Onboarder role.

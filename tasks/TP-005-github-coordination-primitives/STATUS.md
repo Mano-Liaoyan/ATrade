@@ -1,6 +1,6 @@
 # TP-005: Establish GitHub coordination primitives — Status
 
-**Current Step:** Step 1: Define the label manifest
+**Current Step:** Step 2: Add GitHub templates
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -20,17 +20,17 @@
 ---
 
 ### Step 1: Define the label manifest
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `.github/labels.yml`
-- [ ] Include workflow labels
-- [ ] Include role labels
-- [ ] Record name, description, and color for each label
+- [x] Create `.github/labels.yml`
+- [x] Include workflow labels
+- [x] Include role labels
+- [x] Record name, description, and color for each label
 
 ---
 
 ### Step 2: Add GitHub templates
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `.github/ISSUE_TEMPLATE/config.yml`
 - [ ] Create `.github/ISSUE_TEMPLATE/implementation.yml`
@@ -100,6 +100,8 @@
 | 2026-04-22 23:44 | Step 0 started | Preflight |
 | 2026-04-23 | Step 0 completed | Preflight findings captured in STATUS discoveries |
 | 2026-04-23 | Step 1 started | Define the label manifest |
+| 2026-04-23 | Step 1 completed | Added `.github/labels.yml` with workflow and role labels |
+| 2026-04-23 | Step 2 started | Add GitHub templates |
 
 ---
 
