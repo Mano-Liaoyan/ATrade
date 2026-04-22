@@ -8,7 +8,7 @@ summary: Architect role charter for system design, boundaries, and long-horizon 
 see_also:
   - AGENTS.md
   - plans/architect/CURRENT.md
-  - .claude/skills/karpathy-guidelines/SKILL.md
+  - .pi/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Architect

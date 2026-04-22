@@ -5,7 +5,7 @@ updated: 2026-04-22
 summary: Index of agent roles and the conventions for adding a new role.
 see_also:
   - AGENT.md
-  - .claude/skills/onboarding-new-agent/SKILL.md
+  - .pi/skills/onboarding-new-agent/SKILL.md
   - plans/README.md
 ---
 
@@ -35,11 +35,11 @@ Each role file describes:
 
 ## Adding A New Role
 
-Use `.claude/skills/onboarding-new-agent/SKILL.md`.
+Use `.pi/skills/onboarding-new-agent/SKILL.md`.
 
 Every new role must include:
 
-1. `.claude/agents/<role>.md`
+1. `.pi/agents/<role>.md`
 2. `plans/<role>/CURRENT.md`
 3. `plans/<role>/archive/`
 4. updates to `docs/INDEX.md`

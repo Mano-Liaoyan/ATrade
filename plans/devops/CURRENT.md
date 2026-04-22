@@ -6,7 +6,7 @@ summary: Live plan for the DevOps role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - .claude/agents/devops.md
+  - .pi/agents/devops.md
 ---
 
 # DevOps Current Plan

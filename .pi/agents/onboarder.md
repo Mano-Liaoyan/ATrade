@@ -8,7 +8,7 @@ summary: Onboarder role charter for adding new workforce roles, plans, and suppo
 see_also:
   - AGENTS.md
   - plans/onboarder/CURRENT.md
-  - .claude/skills/onboarding-new-agent/SKILL.md
+  - .pi/skills/onboarding-new-agent/SKILL.md
 ---
 
 # Onboarder

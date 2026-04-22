@@ -6,7 +6,7 @@ summary: Live plan for the Senior Test Engineer role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - .claude/agents/senior-test-engineer.md
+  - .pi/agents/senior-test-engineer.md
 ---
 
 # Senior Test Engineer Current Plan

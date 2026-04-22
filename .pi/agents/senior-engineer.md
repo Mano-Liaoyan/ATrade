@@ -8,7 +8,7 @@ summary: Senior Engineer role charter for implementing approved architecture wit
 see_also:
   - AGENTS.md
   - plans/senior-engineer/CURRENT.md
-  - .claude/skills/karpathy-guidelines/SKILL.md
+  - .pi/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Senior Engineer

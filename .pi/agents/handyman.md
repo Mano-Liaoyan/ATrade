@@ -8,7 +8,7 @@ summary: Handyman role charter for cheap, low-risk, trivial repository work.
 see_also:
   - AGENTS.md
   - plans/handyman/CURRENT.md
-  - .claude/skills/selecting-model-tier/SKILL.md
+  - .pi/skills/selecting-model-tier/SKILL.md
 ---
 
 # Handyman

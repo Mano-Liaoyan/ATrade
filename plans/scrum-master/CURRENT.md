@@ -6,7 +6,7 @@ summary: Live plan for the Scrum Master role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - .claude/agents/scrum-master.md
+  - .pi/agents/scrum-master.md
 ---
 
 # Scrum Master Current Plan
@@ -34,7 +34,7 @@ Create the issue and PR coordination model that lets the workforce run continuou
 ## References
 
 - `AGENT.md`
-- `.claude/skills/github-coordination/SKILL.md`
+- `.pi/skills/github-coordination/SKILL.md`
 
 ## Archive
 

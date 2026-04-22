@@ -6,7 +6,7 @@ summary: Live plan for the Code Reviewer role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - .claude/agents/code-reviewer.md
+  - .pi/agents/code-reviewer.md
 ---
 
 # Code Reviewer Current Plan

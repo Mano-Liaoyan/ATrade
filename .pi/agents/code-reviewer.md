@@ -8,7 +8,7 @@ summary: Code Reviewer role charter for correctness-first reviews and merge safe
 see_also:
   - AGENTS.md
   - plans/code-reviewer/CURRENT.md
-  - .claude/skills/karpathy-guidelines/SKILL.md
+  - .pi/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Code Reviewer

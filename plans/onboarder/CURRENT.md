@@ -6,7 +6,7 @@ summary: Live plan for the Onboarder role.
 see_also:
   - AGENT.md
   - PLAN.md
-  - .claude/agents/onboarder.md
+  - .pi/agents/onboarder.md
 ---
 
 # Onboarder Current Plan
@@ -29,12 +29,12 @@ Keep the workforce extensible without letting role sprawl create overlap and con
 
 ## Resume From Here
 
-- Start from `.claude/skills/onboarding-new-agent/SKILL.md` when the first role-creation issue appears
+- Start from `.pi/skills/onboarding-new-agent/SKILL.md` when the first role-creation issue appears
 
 ## References
 
-- `.claude/agents/README.md`
-- `.claude/skills/onboarding-new-agent/SKILL.md`
+- `.pi/agents/README.md`
+- `.pi/skills/onboarding-new-agent/SKILL.md`
 
 ## Archive
 

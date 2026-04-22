@@ -23,10 +23,10 @@ Do not use this skill for one-off work. Use an issue or an existing role instead
 
 1. Confirm the gap is recurring, not incidental.
 2. Check whether updating an existing role would solve it more simply.
-3. Create `.claude/agents/<role>.md`.
+3. Create `.pi/agents/<role>.md`.
 4. Create `plans/<role>/CURRENT.md` from `plans/TEMPLATE.md`.
 5. Create `plans/<role>/archive/`.
-6. Update `.claude/agents/README.md`.
+6. Update `.pi/agents/README.md`.
 7. Update `docs/INDEX.md`.
 8. Add supporting skills only if the role needs reusable guidance not already covered.
 

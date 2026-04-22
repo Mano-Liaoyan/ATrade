@@ -8,7 +8,7 @@ summary: Senior Test Engineer role charter for TDD, regression prevention, and v
 see_also:
   - AGENTS.md
   - plans/senior-test-engineer/CURRENT.md
-  - .claude/skills/karpathy-guidelines/SKILL.md
+  - .pi/skills/karpathy-guidelines/SKILL.md
 ---
 
 # Senior Test Engineer

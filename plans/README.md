@@ -6,8 +6,8 @@ summary: Explains the per-role planning system, archive rule, and plan file life
 see_also:
   - AGENT.md
   - PLAN.md
-  - .claude/skills/retrieve-plan/SKILL.md
-  - .claude/skills/update-plan/SKILL.md
+  - .pi/skills/retrieve-plan/SKILL.md
+  - .pi/skills/update-plan/SKILL.md
 ---
 
 # Plans

@@ -8,7 +8,7 @@ summary: Scrum Master role charter for issue flow, PR state, progress tracking, 
 see_also:
   - AGENTS.md
   - plans/scrum-master/CURRENT.md
-  - .claude/skills/github-coordination/SKILL.md
+  - .pi/skills/github-coordination/SKILL.md
 ---
 
 # Scrum Master
