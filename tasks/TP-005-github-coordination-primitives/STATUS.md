@@ -1,6 +1,6 @@
 # TP-005: Establish GitHub coordination primitives — Status
 
-**Current Step:** Step 5: Verification
+**Current Step:** Step 6: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -60,16 +60,16 @@
 ---
 
 ### Step 5: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `rg -n "agent:ready|agent:blocked|agent:resume-ready|role:architect|role:senior-engineer" .github/labels.yml docs/process/github-coordination.md .github/ISSUE_TEMPLATE .github/PULL_REQUEST_TEMPLATE.md`
-- [ ] Confirm every referenced label exists in `.github/labels.yml`
-- [ ] Confirm `docs/INDEX.md` lists the coordination doc
+- [x] `rg -n "agent:ready|agent:blocked|agent:resume-ready|role:architect|role:senior-engineer" .github/labels.yml docs/process/github-coordination.md .github/ISSUE_TEMPLATE .github/PULL_REQUEST_TEMPLATE.md`
+- [x] Confirm every referenced label exists in `.github/labels.yml`
+- [x] Confirm `docs/INDEX.md` lists the coordination doc
 
 ---
 
 ### Step 6: Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
@@ -109,6 +109,8 @@
 | 2026-04-23 | Step 4 started | Update the doc index and pointers |
 | 2026-04-23 | Step 4 completed | Added coordination doc to `docs/INDEX.md`; README pointer not needed |
 | 2026-04-23 | Step 5 started | Verification |
+| 2026-04-23 | Step 5 completed | Verified label references and docs index coverage |
+| 2026-04-23 | Step 6 started | Delivery |
 
 ---
 
