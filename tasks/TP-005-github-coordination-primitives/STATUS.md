@@ -1,26 +1,26 @@
 # TP-005: Establish GitHub coordination primitives — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 1: Define the label manifest
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Read `AGENTS.md`, the GitHub coordination skill, and the Scrum Master plan
-- [ ] Confirm `.github/` does not yet contain coordination templates or a label manifest
-- [ ] Extract the recommended workflow and role labels from the active docs
+- [x] Read `AGENTS.md`, the GitHub coordination skill, and the Scrum Master plan
+- [x] Confirm `.github/` does not yet contain coordination templates or a label manifest
+- [x] Extract the recommended workflow and role labels from the active docs
 
 ---
 
 ### Step 1: Define the label manifest
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `.github/labels.yml`
 - [ ] Include workflow labels
@@ -86,6 +86,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Workflow labels extracted from `AGENTS.md`/`.pi/skills/github-coordination/SKILL.md`: `agent:ready`, `agent:claimed`, `agent:in-progress`, `agent:needs-human`, `agent:blocked`, `agent:resume-ready`, `agent:review`, `agent:merged`, `agent:docs-required`, `agent:trivial` | Use in `.github/labels.yml` and templates | `AGENTS.md`; `.pi/skills/github-coordination/SKILL.md` |
+| Role labels extracted from `AGENTS.md`/`.pi/skills/github-coordination/SKILL.md`: `role:architect`, `role:senior-engineer`, `role:senior-test-engineer`, `role:devops`, `role:scrum-master`, `role:code-reviewer`, `role:handyman`, `role:onboarder` | Use in `.github/labels.yml` and templates | `AGENTS.md`; `.pi/skills/github-coordination/SKILL.md` |
 
 ---
 
@@ -94,6 +96,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-22 23:44 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-22 23:44 | Step 0 started | Preflight |
+| 2026-04-23 | Step 0 completed | Preflight findings captured in STATUS discoveries |
+| 2026-04-23 | Step 1 started | Define the label manifest |
 
 ---
 
