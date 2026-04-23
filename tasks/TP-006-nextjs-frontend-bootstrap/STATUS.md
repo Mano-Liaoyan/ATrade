@@ -1,6 +1,6 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
-**Current Step:** Step 3: Add smoke coverage
+**Current Step:** Step 4: Update docs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -41,16 +41,16 @@
 ---
 
 ### Step 3: Add smoke coverage
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
-- [ ] Verify direct frontend startup and page markers
-- [ ] Update `tests/start-contract/start-wrapper-tests.sh` for the Next.js contract
+- [x] Create `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- [x] Verify direct frontend startup and page markers
+- [x] Update `tests/start-contract/start-wrapper-tests.sh` for the Next.js contract
 
 ---
 
 ### Step 4: Update docs
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update `scripts/README.md`
 - [ ] Update `docs/architecture/modules.md`
