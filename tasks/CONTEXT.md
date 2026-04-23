@@ -17,14 +17,14 @@ bootstrap plan and current milestones.
 
 ## Target Stack
 
-| Layer | Choice |
-|-------|--------|
-| Backend | .NET 10 |
-| Orchestrator | Aspire 13.2 (manages apps, workers, infra) |
-| Frontend | Next.js |
-| Infrastructure | Postgres, TimescaleDB, Redis, NATS |
-| Broker / Data (phase 1) | IBKR, Polygon |
-| Agent workflow | GitHub issues, draft PRs, reusable skills, parallel worktrees |
+| Layer                   | Choice                                                        |
+| ----------------------- | ------------------------------------------------------------- |
+| Backend                 | .NET 10                                                       |
+| Orchestrator            | Aspire 13.2 (manages apps, workers, infra)                    |
+| Frontend                | Next.js                                                       |
+| Infrastructure          | Postgres, TimescaleDB, Redis, NATS                            |
+| Broker / Data (phase 1) | IBKR, Polygon                                                 |
+| Agent workflow          | GitHub issues, draft PRs, reusable skills, parallel worktrees |
 
 ## Run Contract
 
@@ -84,16 +84,16 @@ The repo-wide operating contract is `AGENTS.md`.
 
 ## Key Files
 
-| Category | Path |
-|----------|------|
-| Repo identity | `README.md` |
-| Bootstrap plan | `PLAN.md` |
-| Agent contract | `AGENTS.md` |
-| Doc index | `docs/INDEX.md` |
-| Run contract design | `scripts/README.md` |
-| Tasks | `tasks/` |
-| Taskplane config | `.pi/taskplane-config.json` |
-| Parallel worktrees | `.worktrees/` |
+| Category            | Path                        |
+| ------------------- | --------------------------- |
+| Repo identity       | `README.md`                 |
+| Bootstrap plan      | `PLAN.md`                   |
+| Agent contract      | `AGENTS.md`                 |
+| Doc index           | `docs/INDEX.md`             |
+| Run contract design | `scripts/README.md`         |
+| Tasks               | `tasks/`                    |
+| Taskplane config    | `.pi/taskplane-config.json` |
+| Parallel worktrees  | `.worktrees/`               |
 
 ## Technical Debt / Future Work
 
