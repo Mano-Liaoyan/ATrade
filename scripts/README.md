@@ -36,13 +36,14 @@ The long-term `start run` contract is to bring up:
 
 There must not be separate mandatory commands for the frontend, workers, or infra in the normal local startup path.
 
-The current bootstrap slice intentionally implements only the first runnable subset of that graph:
+The current bootstrap slice now implements the first infrastructure-aware runnable subset of that graph:
 
 - Aspire AppHost
 - a minimal `ATrade.Api` backend service managed by Aspire
 - the first real Next.js frontend slice managed by Aspire
+- Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources declared in the AppHost graph
 
-Later slices extend that graph with additional backend services, workers, richer frontend routes, and infrastructure resources.
+Later slices extend that graph with additional backend services, workers, and richer frontend routes.
 
 ## Planned Layout
 
@@ -107,6 +108,7 @@ Behavior must stay semantically identical across platforms.
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
 - direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
 - direct frontend startup and the Next.js home-page markers are verified in this repository's Linux environment via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- the AppHost manifest now verifies `Postgres`, `TimescaleDB`, `Redis`, `NATS`, `api`, and `frontend` without requiring a container engine via `tests/apphost/apphost-infrastructure-manifest-tests.sh`
 - `./start.ps1 run` and `./start.cmd run` are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`
 
 ## Bootstrap Status
@@ -117,8 +119,8 @@ The `run` contract is now bootstrapped in the repository for the first real AppH
 - `./start.ps1 run` provides the PowerShell entrypoint
 - `./start.cmd run` provides the Windows command prompt entrypoint
 - GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
-- the current graph hosts the first minimal `ATrade.Api` service and the first real Next.js frontend home page
+- the current graph hosts the first minimal `ATrade.Api` service, the first real Next.js frontend home page, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path plus stable visible markers for the home page
-- infrastructure resources remain intentionally out of scope for this bootstrap slice
+- `tests/apphost/apphost-infrastructure-manifest-tests.sh` verifies that the published AppHost manifest preserves `api` / `frontend` and declares the four managed infrastructure resources
 
 Reserved subcommands such as `test`, `build`, and `lint` remain future work.

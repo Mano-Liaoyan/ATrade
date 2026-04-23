@@ -24,8 +24,10 @@ see_also:
 > work.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api` plus the
-> Next.js frontend home page, and `ATrade.Api` only exposes a stable
-> `GET /health` smoke endpoint while broader domain modules remain future work.
+> Next.js frontend home page, declares `Postgres`, `TimescaleDB`, `Redis`, and
+> `NATS` as managed infrastructure resources, and still keeps `ATrade.Api`
+> limited to a stable `GET /health` smoke endpoint while broader domain modules
+> remain future work.
 
 ## 1. How To Read This Document
 
@@ -60,8 +62,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Expected dependencies:** Every other runtime module as declared
   resources; `Postgres`, `TimescaleDB`, `Redis`, `NATS` as Aspire-managed
   infrastructure resources. In the current runnable slice, the AppHost wires
-  only `ATrade.Api` plus the bootstrap Next.js frontend home page — see
-  `src/ATrade.AppHost/Program.cs`.
+  `ATrade.Api` plus the bootstrap Next.js frontend home page and declares the
+  four shared infrastructure resources without adding application consumers yet
+  — see `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 

@@ -1,6 +1,6 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
-**Current Step:** Step 4: Update docs and plan
+**Current Step:** Step 5: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -48,17 +48,17 @@
 ---
 
 ### Step 4: Update docs and plan
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md`
-- [ ] Update `docs/architecture/overview.md`
-- [ ] Update `PLAN.md` if the milestone status changes
-- [ ] Update other current-state docs only where needed
+- [x] Update `scripts/README.md`
+- [x] Update `docs/architecture/overview.md`
+- [x] Update `PLAN.md` if the milestone status changes
+- [x] Update other current-state docs only where needed
 
 ---
 
 ### Step 5: Verification
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] `dotnet build ATrade.sln`
 - [ ] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
@@ -102,6 +102,8 @@
 | 2026-04-23 06:15 | Step 3 started | Add verification |
 | 2026-04-23 06:17 | Step 3 completed | Added manifest-based AppHost infrastructure verification script and passed it without needing a container engine |
 | 2026-04-23 06:17 | Step 4 started | Update docs and plan |
+| 2026-04-23 06:23 | Step 4 completed | Updated `scripts/README.md`, `docs/architecture/overview.md`, `PLAN.md`, `README.md`, and `docs/architecture/modules.md` to reflect the infrastructure-aware AppHost graph |
+| 2026-04-23 06:23 | Step 5 started | Verification |
 
 ---
 

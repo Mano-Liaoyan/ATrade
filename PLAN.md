@@ -15,7 +15,7 @@ see_also:
 
 ## Current Focus
 
-Extend the runnable bootstrap into deeper backend/frontend slices, worker shells, and AppHost-managed infrastructure resources.
+Extend the runnable bootstrap into deeper backend/frontend slices and worker shells on top of the AppHost-managed infrastructure resources now declared by the current AppHost graph.
 
 ## Milestones
 
@@ -32,12 +32,12 @@ Extend the runnable bootstrap into deeper backend/frontend slices, worker shells
 
 ## Active Cross-Role Dependencies
 
-- Senior Engineer and DevOps must extend the current AppHost graph with infrastructure resources and future workers without breaking the cross-platform `start run` contract.
+- Senior Engineer and DevOps must preserve the new infrastructure-aware AppHost graph while adding future workers without breaking the cross-platform `start run` contract.
 - Architect and Scrum Master must keep the roadmap, task inventory, and active docs aligned as the first feature-module slices are staged.
 
 ## Notes
 
 - Only indexed `active` docs are authoritative. Legacy docs must be explicitly reintroduced and marked before use.
 - The single-command local startup contract is `start run` on both Unix and Windows.
-- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api` plus the Next.js home page; Postgres, TimescaleDB, Redis, NATS, and future workers remain later milestones.
+- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api`, the Next.js home page, and named `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources; future workers remain later milestones.
 - `.worktrees/` is now available for isolated parallel feature delivery.
