@@ -20,8 +20,8 @@ see_also:
 > "hosts", or "orchestrates" the reader should understand "will, once the
 > corresponding milestone in `PLAN.md` is complete". The runnable slice today
 > is the Aspire AppHost bootstrap described in `scripts/README.md`, which now
-> launches the first minimal `ATrade.Api` service alongside the placeholder
-> frontend.
+> launches the first minimal `ATrade.Api` service alongside the first real
+> Next.js home page.
 >
 > **Current backend slice:** `ATrade.Api` presently provides only a stable
 > `GET /health` smoke endpoint and shared hosting defaults. Domain modules,
@@ -107,7 +107,8 @@ architecture the AppHost is responsible for:
 - Starting the main .NET API host built on `ATrade.ServiceDefaults`
 - Starting every worker process defined under `workers/`
 - Starting the Next.js app as an Aspire-managed JavaScript resource (the
-  pattern already sketched in `src/ATrade.AppHost/Program.cs`)
+  pattern already exercised by the bootstrap home page in
+  `src/ATrade.AppHost/Program.cs`)
 - Declaring `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as Aspire-managed
   infrastructure resources and wiring their connection strings into the
   services that need them

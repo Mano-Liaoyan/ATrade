@@ -1,0 +1,38 @@
+name: Windows start run smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/windows-start-run.yml'
+      - 'start.ps1'
+      - 'start.cmd'
+      - 'scripts/start.run.ps1'
+      - 'src/ATrade.AppHost/**'
+      - 'src/ATrade.Api/**'
+      - 'frontend/**'
+      - 'tests/start-contract/**'
+  workflow_dispatch:
+
+jobs:
+  windows-start-run:
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Windows start wrapper smoke harness
+        shell: pwsh
+        run: |
+          ./tests/start-contract/start-wrapper-windows.ps1

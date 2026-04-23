@@ -18,13 +18,14 @@ see_also:
 > `src/ATrade.ServiceDefaults`, and the first scaffolded backend service,
 > `src/ATrade.Api`, currently exist. The `workers/` directory and the other
 > backend feature modules listed below remain aspirational and will land in
-> later milestones tracked by `PLAN.md`. The `frontend/` placeholder is still
-> a minimal Node process bootstrapped so Aspire can orchestrate a JavaScript
-> resource; the real Next.js app replaces it later.
+> later milestones tracked by `PLAN.md`. The `frontend/` directory now hosts
+> the first real Next.js slice: a minimal home page that proves Aspire can
+> orchestrate a real frontend runtime, while broader UI routes remain later
+> work.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api` plus the
-> placeholder frontend, and `ATrade.Api` only exposes a stable `GET /health`
-> smoke endpoint while broader domain modules remain future work.
+> Next.js frontend home page, and `ATrade.Api` only exposes a stable
+> `GET /health` smoke endpoint while broader domain modules remain future work.
 
 ## 1. How To Read This Document
 
@@ -59,7 +60,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Expected dependencies:** Every other runtime module as declared
   resources; `Postgres`, `TimescaleDB`, `Redis`, `NATS` as Aspire-managed
   infrastructure resources. In the current runnable slice, the AppHost wires
-  only `ATrade.Api` plus the placeholder JavaScript frontend — see
+  only `ATrade.Api` plus the bootstrap Next.js frontend home page — see
   `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
@@ -203,7 +204,7 @@ exclusively through `NATS` and the shared databases.
 
 ## 4. Frontend — `frontend/`
 
-### 4.1 Next.js app *(placeholder today, planned target)*
+### 4.1 Next.js app *(exists today, bootstrap slice only)*
 
 - **Purpose:** The sole user-facing surface for ATrade.
 - **Responsibilities:** Render dashboards for accounts, positions,
@@ -214,9 +215,10 @@ exclusively through `NATS` and the shared databases.
 - **Expected dependencies:** `ATrade.Api` for all data; the Aspire
   AppHost for process lifecycle and environment wiring.
 - **First-phase focus:** UI surfaces for IBKR accounts/orders and
-  Polygon-sourced market data; the current `frontend/server.js` is a
-  placeholder so Aspire can orchestrate a JavaScript resource before the
-  real Next.js app lands.
+  Polygon-sourced market data; the current slice is intentionally small and
+  serves a stable home page (`ATrade Frontend Home` / `Next.js Bootstrap
+  Slice`) so shell smoke tests can verify the real Next.js runtime before
+  broader feature work lands.
 
 ## 5. Dependency Summary
 

@@ -1,66 +1,67 @@
 # TP-004: Add Windows CI verification for `start run` — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-04-23
+**Current Step:** Step 5: Delivery
+**Status:** ✅ Complete
+**Last Updated:** 2026-04-22
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Read the startup-contract docs, wrapper files, and current Linux regression test
-- [ ] Confirm there is no existing Windows workflow for `start run`
-- [ ] Confirm `scripts/README.md` still documents Windows verification as an open gap
+- [x] Read the startup-contract docs, wrapper files, and current Linux regression test
+- [x] Confirm there is no existing Windows workflow for `start run`
+- [x] Confirm `scripts/README.md` still documents Windows verification as an open gap
 
 ---
 
 ### Step 1: Add a Windows smoke harness
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/start-contract/start-wrapper-windows.ps1`
-- [ ] Exercise `./start.ps1 run` and `./start.cmd run`
-- [ ] Detect successful startup without hanging indefinitely
-- [ ] Tear down launched processes cleanly with CI-friendly exit codes
+- [x] Create `tests/start-contract/start-wrapper-windows.ps1`
+- [x] Exercise `./start.ps1 run` and `./start.cmd run`
+- [x] Detect successful startup without hanging indefinitely
+- [x] Tear down launched processes cleanly with CI-friendly exit codes
 
 ---
 
 ### Step 2: Add GitHub Actions coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `.github/workflows/windows-start-run.yml`
-- [ ] Use `windows-latest`
-- [ ] Install required .NET and Node toolchains
-- [ ] Run the PowerShell smoke harness in CI
+- [x] Create `.github/workflows/windows-start-run.yml`
+- [x] Use `windows-latest`
+- [x] Install required .NET and Node toolchains
+- [x] Run the PowerShell smoke harness in CI
 
 ---
 
 ### Step 3: Keep repo-local verification and docs in sync
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Update `tests/start-contract/start-wrapper-tests.sh`
-- [ ] Update `scripts/README.md`
-- [ ] Update `README.md` only if wording changed
+- [x] Update `tests/start-contract/start-wrapper-tests.sh`
+- [x] Update `scripts/README.md`
+- [x] Update `README.md` only if wording changed
+- [x] Update active plan docs (`PLAN.md`, and `plans/devops/CURRENT.md` if wording changed) to reflect the completed Windows CI verification milestone
 
 ---
 
 ### Step 4: Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `bash tests/start-contract/start-wrapper-tests.sh`
-- [ ] `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`
-- [ ] Record that the durable deliverable is the checked-in Windows CI path
+- [x] `bash tests/start-contract/start-wrapper-tests.sh`
+- [x] `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`
+- [x] Record that the durable deliverable is the checked-in Windows CI path
 
 ---
 
 ### Step 5: Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Commit with conventions
+- [x] Commit with conventions
 
 ---
 
@@ -83,6 +84,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-22 23:44 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-22 23:44 | Step 0 started | Preflight |
+| 2026-04-22 23:54 | Worker iter 1 | done in 612s, tools: 115 |
+| 2026-04-22 23:54 | Task complete | .DONE created |
 
 ---
 
@@ -95,3 +100,5 @@
 ## Notes
 
 *Goal: convert the documented Windows verification gap into a durable CI-backed check without changing the startup contract itself.*
+
+- Verification note: this Linux task environment did not claim a successful live Windows run; the durable deliverable is the checked-in `windows-latest` workflow plus `tests/start-contract/start-wrapper-windows.ps1`.

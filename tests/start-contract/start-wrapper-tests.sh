@@ -44,6 +44,15 @@ assert_file_not_contains() {
   fi
 }
 
+assert_file_not_exists() {
+  local file_path="$1"
+
+  if [[ -e "$file_path" ]]; then
+    printf 'expected file to not exist: %s\n' "$file_path" >&2
+    return 1
+  fi
+}
+
 assert_executable_exists() {
   local file_path="$1"
 
@@ -161,6 +170,21 @@ assert_apphost_launch_profile_bootstraps_runtime() {
   assert_contains "$apphost_output" '__STATUS__=124'
 }
 
+assert_apphost_manifest_preserves_nextjs_frontend() {
+  local manifest_path
+  manifest_path="$(mktemp --suffix=.json)"
+
+  dotnet run --project "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" -- --publisher manifest --output-path "$manifest_path" >/dev/null
+
+  assert_file_contains "$manifest_path" '"api"'
+  assert_file_contains "$manifest_path" '"frontend"'
+  assert_file_contains "$manifest_path" '"targetPort": 3000'
+  assert_file_contains "$manifest_path" '"external": true'
+  assert_file_contains "$manifest_path" '"PORT": "{frontend.bindings.http.targetPort}"'
+
+  rm -f "$manifest_path"
+}
+
 main() {
   assert_executable_exists "$repo_root/start"
   assert_executable_exists "$repo_root/scripts/start.run.sh"
@@ -196,6 +220,14 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.sh" 'Missing AppHost project at %s'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'Missing AppHost project at $ProjectPath'
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-ps1' -CommandText './start.ps1 run'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-cmd' -CommandText './start.cmd run'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" '$SuccessMarker = '
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'runs-on: windows-latest'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'actions/setup-dotnet@v4'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'dotnet-version: 10.0.x'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'actions/setup-node@v4'
+  assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" './tests/start-contract/start-wrapper-windows.ps1'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'Sdk="Microsoft.NET.Sdk.Web"'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.ServiceDefaults.csproj'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'builder.AddServiceDefaults()'
@@ -208,16 +240,28 @@ main() {
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'DistributedApplication.CreateBuilder(args)'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddProject<Projects.ATrade_Api>("api")'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddJavaScriptApp("frontend", "../../frontend", "dev")'
-  assert_file_contains "$repo_root/frontend/package.json" '"dev": "node server.js"'
-  assert_file_contains "$repo_root/frontend/server.js" 'const port = Number(process.env.PORT ?? 3000);'
-  assert_file_contains "$repo_root/frontend/server.js" 'ATrade frontend bootstrap'
+  assert_file_contains "$repo_root/frontend/package.json" '"dev": "next dev --hostname 0.0.0.0"'
+  assert_file_contains "$repo_root/frontend/package.json" '"build": "next build"'
+  assert_file_contains "$repo_root/frontend/package.json" '"start": "next start"'
+  assert_file_contains "$repo_root/frontend/app/layout.tsx" "import './globals.css';"
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'ATrade Frontend Home'
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'Next.js Bootstrap Slice'
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$repo_root/frontend/next-env.d.ts" '/// <reference types="next" />'
+  assert_file_contains "$repo_root/frontend/tsconfig.json" '"name": "next"'
+  assert_file_not_exists "$repo_root/frontend/server.js"
   assert_file_contains "$repo_root/scripts/README.md" 'The `run` contract is now bootstrapped in the repository.'
   assert_file_contains "$repo_root/scripts/README.md" './start run'
+  assert_file_contains "$repo_root/scripts/README.md" 'are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`'
+  assert_file_contains "$repo_root/README.md" 'Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.'
+  assert_file_contains "$repo_root/PLAN.md" 'Verify `./start.ps1 run` and `./start.cmd run` on a Windows-hosted runtime or CI worker~~'
   assert_file_contains "$repo_root/plans/devops/CURRENT.md" 'Bootstrap the `start run` wrapper contract and Linux-hosted AppHost startup path'
+  assert_file_contains "$repo_root/plans/devops/CURRENT.md" 'Verify `./start.ps1 run` and `./start.cmd run` on a Windows host or in CI~~'
 
   assert_start_run_dispatches
   assert_start_run_script_failure_paths
   assert_apphost_launch_profile_bootstraps_runtime
+  assert_apphost_manifest_preserves_nextjs_frontend
 }
 
 main "$@"

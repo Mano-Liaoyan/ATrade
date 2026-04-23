@@ -1,7 +1,7 @@
 ---
 status: active
 owner: devops
-updated: 2026-04-22
+updated: 2026-04-23
 summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:
   - PLAN.md
@@ -40,9 +40,9 @@ The current bootstrap slice intentionally implements a smaller runnable graph:
 
 - Aspire AppHost
 - a minimal `ATrade.Api` backend service managed by Aspire
-- a placeholder JavaScript frontend process managed by Aspire
+- the first real Next.js frontend slice managed by Aspire
 
-Later slices extend that graph with additional backend services, workers, a real Next.js app, and infrastructure resources.
+Later slices extend that graph with additional backend services, workers, richer frontend routes, and infrastructure resources.
 
 ## Planned Layout
 
@@ -106,7 +106,8 @@ Behavior must stay semantically identical across platforms.
 
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
 - direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
-- `./start.ps1 run` and `./start.cmd run` are implemented but still need Windows-hosted execution verification
+- direct frontend startup and the Next.js home-page markers are verified in this repository's Linux environment via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `./start.ps1 run` and `./start.cmd run` are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`
 
 ## Bootstrap Status
 
@@ -115,7 +116,9 @@ The `run` contract is now bootstrapped in the repository.
 - `./start run` delegates to the Aspire AppHost
 - `./start.ps1 run` provides the PowerShell entrypoint
 - `./start.cmd run` provides the Windows command prompt entrypoint
-- the current graph hosts the first minimal `ATrade.Api` service and the placeholder JavaScript frontend
+- GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
+- the current graph hosts the first minimal `ATrade.Api` service and the first real Next.js frontend home page
+- `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path plus stable visible markers for the home page
 - infrastructure resources remain intentionally out of scope for this bootstrap slice
 
 Reserved subcommands such as `test`, `build`, and `lint` remain future work.
