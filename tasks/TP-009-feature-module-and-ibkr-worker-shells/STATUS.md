@@ -1,6 +1,6 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 6: Verification
+**Current Step:** Step 7: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -66,16 +66,16 @@
 ---
 
 ### Step 6: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `dotnet build ATrade.sln`
-- [ ] `bash tests/scaffolding/project-shells-tests.sh`
-- [ ] Confirm docs do not overstate functionality
+- [x] `dotnet build ATrade.sln`
+- [x] `bash tests/scaffolding/project-shells-tests.sh`
+- [x] Confirm docs do not overstate functionality
 
 ---
 
 ### Step 7: Delivery
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
