@@ -49,7 +49,7 @@ The canonical invocations are:
 
 In this repository, the phrase `start run` refers to that repo-local shim contract, not the Windows shell built-in.
 
-The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches the first scaffolded backend service, `ATrade.Api`, alongside the first real Next.js home page. `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
+The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches the first scaffolded backend service, `ATrade.Api`, alongside the first real Next.js home page. Additional compileable shells now exist for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker`, but they are not wired into the AppHost runtime graph yet. `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
 
 ## Repository Map
 
@@ -70,7 +70,7 @@ ATrade/
 └── frontend/             # Next.js application
 ```
 
-Some of those directories are still aspirational. `PLAN.md` is the source of truth for what has been bootstrapped already.
+Some of those directories are still shell-only or aspirational. `PLAN.md` is the source of truth for what has been bootstrapped already.
 
 ## Read Order
 
@@ -121,7 +121,7 @@ This repository is in governance-first bootstrap mode.
 
 - The old Blazor- and script-oriented docs have been replaced at the top level
 - No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them
-- The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + the first Next.js frontend home page
+- The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + the first Next.js frontend home page; `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` now exist as compileable scaffolding only and are not yet part of the runtime graph
 - Direct frontend startup and home-page marker verification are covered by `tests/apphost/frontend-nextjs-bootstrap-tests.sh`.
 - Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.
 - The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`

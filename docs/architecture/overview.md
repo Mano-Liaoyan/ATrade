@@ -24,8 +24,11 @@ see_also:
 > Next.js home page.
 >
 > **Current backend slice:** `ATrade.Api` presently provides only a stable
-> `GET /health` smoke endpoint and shared hosting defaults. Domain modules,
-> workers, and infrastructure resources remain future milestones.
+> `GET /health` smoke endpoint and shared hosting defaults. The first
+> compileable shells for `ATrade.Accounts`, `ATrade.Orders`,
+> `ATrade.MarketData`, and `ATrade.Ibkr.Worker` now exist, but they remain
+> intentionally inert and are not wired into the AppHost runtime graph yet.
+> Infrastructure resources remain future milestones.
 
 ## 1. Shape Of The System
 
@@ -172,8 +175,9 @@ integrations, and only those two:
 Both integrations live behind provider-agnostic module boundaries on the
 backend side (see `modules.md` → *Broker* and *Market Data*), so additional
 providers can be added later without reshaping the rest of the monolith.
-Until those modules and their workers exist, the rest of this document is
-aspirational in the way called out at the top.
+Until those modules, workers, and infrastructure integrations become
+functional rather than scaffolded, the rest of this document is aspirational
+in the way called out at the top.
 
 ## 6. Relationship To Other Documents
 

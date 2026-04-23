@@ -1,6 +1,6 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 5: Update docs and plan
+**Current Step:** Step 6: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -57,16 +57,16 @@
 ---
 
 ### Step 5: Update docs and plan
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `docs/architecture/modules.md`
-- [ ] Update other current-state docs only where needed
-- [ ] Update `PLAN.md` if milestone wording changes
+- [x] Update `docs/architecture/modules.md`
+- [x] Update other current-state docs only where needed
+- [x] Update `PLAN.md` if milestone wording changes
 
 ---
 
 ### Step 6: Verification
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] `dotnet build ATrade.sln`
 - [ ] `bash tests/scaffolding/project-shells-tests.sh`
