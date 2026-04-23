@@ -4,9 +4,9 @@ owner: code-reviewer
 updated: 2026-04-22
 summary: Live plan for the Code Reviewer role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/code-reviewer.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/code-reviewer.md
 ---
 
 # Code Reviewer Current Plan
@@ -33,7 +33,7 @@ Review governance and bootstrap changes for correctness, consistency, and missin
 
 ## References
 
-- `AGENT.md`
+- `AGENTS.md`
 - `docs/INDEX.md`
 
 ## Archive

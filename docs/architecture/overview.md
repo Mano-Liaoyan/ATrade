@@ -21,14 +21,15 @@ see_also:
 > corresponding milestone in `PLAN.md` is complete". The runnable slice today
 > is the Aspire AppHost bootstrap described in `scripts/README.md`, which now
 > launches the first minimal `ATrade.Api` service alongside the first real
-> Next.js home page.
+> Next.js home page and declares Aspire-managed `Postgres`, `TimescaleDB`,
+> `Redis`, and `NATS` resources.
 >
 > **Current backend slice:** `ATrade.Api` presently provides only a stable
-> `GET /health` smoke endpoint and shared hosting defaults. The first
-> compileable shells for `ATrade.Accounts`, `ATrade.Orders`,
-> `ATrade.MarketData`, and `ATrade.Ibkr.Worker` now exist, but they remain
+> `GET /health` smoke endpoint and shared hosting defaults. The infrastructure
+> layer is now declared in the AppHost graph, and the first compileable shells
+> for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and
+> `ATrade.Ibkr.Worker` now exist, but those domain modules and workers remain
 > intentionally inert and are not wired into the AppHost runtime graph yet.
-> Infrastructure resources remain future milestones.
 
 ## 1. Shape Of The System
 
@@ -114,7 +115,9 @@ architecture the AppHost is responsible for:
   `src/ATrade.AppHost/Program.cs`)
 - Declaring `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as Aspire-managed
   infrastructure resources and wiring their connection strings into the
-  services that need them
+  services that need them. The current runnable slice already declares those
+  resources in `src/ATrade.AppHost/Program.cs`, even though no application
+  module consumes them yet.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 

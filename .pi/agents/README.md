@@ -4,9 +4,9 @@ owner: onboarder
 updated: 2026-04-22
 summary: Index of agent roles and the conventions for adding a new role.
 see_also:
-  - AGENT.md
-  - .pi/skills/onboarding-new-agent/SKILL.md
-  - plans/README.md
+  - ../../AGENTS.md
+  - ../skills/onboarding-new-agent/SKILL.md
+  - ../../plans/README.md
 ---
 
 # Agent Roles

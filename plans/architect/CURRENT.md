@@ -4,9 +4,9 @@ owner: architect
 updated: 2026-04-22
 summary: Live plan for the Architect role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/architect.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/architect.md
 ---
 
 # Architect Current Plan
