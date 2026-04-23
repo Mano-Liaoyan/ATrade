@@ -1,7 +1,7 @@
 # TP-007: Reconcile planning and docs with the actual repo state — Status
 
 **Current Step:** Step 5: Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-23
 **Review Level:** 1
 **Review Counter:** 0
@@ -55,9 +55,9 @@
 ---
 
 ### Step 5: Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Commit with conventions
+- [x] Commit with conventions
 
 ---
 
@@ -86,6 +86,7 @@
 | Repo-wide `AGENT.md` grep now only hits the TP-007 task packet itself; active docs under `README.md`, `PLAN.md`, `docs/`, and `scripts/` are clean. | Verified with the Step 4 grep command. | `README.md`, `PLAN.md`, `docs/`, `scripts/`, `tasks/TP-007-*` |
 | The only open `PLAN.md` milestones now match real gaps: no `workers/` tree exists yet and `src/ATrade.AppHost/Program.cs` still lacks `Postgres`/`TimescaleDB`/`Redis`/`NATS` resources. | Verified against the repo tree and queued TP-008 / TP-009 tasks in Step 4. | `PLAN.md`, `src/ATrade.AppHost/Program.cs`, `tasks/TP-008-*`, `tasks/TP-009-*` |
 | Diff inspection shows only docs/plan/task files changed for TP-007; no application/runtime files were modified. | Verified with `git diff --name-only HEAD~4..HEAD` plus the current worktree diff in Step 4. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md`, `tasks/CONTEXT.md` |
+| TP-007 delivery now has step-boundary commits using the task convention (`docs(TP-007): ...` plus one checkpoint commit for Step 0). | Verified and checked off in Step 5. | Git history for TP-007 task branch |
 
 ---
 
