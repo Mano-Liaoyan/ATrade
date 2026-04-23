@@ -1,6 +1,6 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 3: Wire the solution, not the runtime graph
+**Current Step:** Step 4: Add lightweight verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -39,16 +39,16 @@
 ---
 
 ### Step 3: Wire the solution, not the runtime graph
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add all new projects to `ATrade.sln`
-- [ ] Keep `src/ATrade.AppHost/Program.cs` unchanged unless build-only scaffolding truly requires otherwise
-- [ ] Keep runtime behavior otherwise unchanged
+- [x] Add all new projects to `ATrade.sln`
+- [x] Keep `src/ATrade.AppHost/Program.cs` unchanged unless build-only scaffolding truly requires otherwise
+- [x] Keep runtime behavior otherwise unchanged
 
 ---
 
 ### Step 4: Add lightweight verification
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/scaffolding/project-shells-tests.sh`
 - [ ] Verify expected files exist and are listed in `ATrade.sln`
