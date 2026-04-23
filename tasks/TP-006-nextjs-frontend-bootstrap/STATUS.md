@@ -1,7 +1,7 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
 **Current Step:** Step 6: Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-22
 **Review Level:** 2
 **Review Counter:** 0
@@ -71,9 +71,9 @@
 ---
 
 ### Step 6: Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Commit with conventions
+- [x] Commit with conventions
 
 ---
 
@@ -101,6 +101,8 @@
 | 2026-04-22 23:54 | Step 0 started | Preflight |
 | 2026-04-23 | Step 2 graph verification | Confirmed `src/ATrade.AppHost/Program.cs` still declares both `api` and `frontend` Aspire resources. |
 | 2026-04-23 | Step 2 scope verification | Confirmed the AppHost change set adds no Aspire infra resources beyond the existing API + frontend graph. |
+| 2026-04-23 00:11 | Worker iter 1 | done in 1001s, tools: 138 |
+| 2026-04-23 00:11 | Task complete | .DONE created |
 
 ---
 
