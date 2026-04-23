@@ -1,6 +1,6 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
-**Current Step:** Step 2: Preserve the current bootstrap graph
+**Current Step:** Step 3: Add verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -30,16 +30,16 @@
 ---
 
 ### Step 2: Preserve the current bootstrap graph
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Keep `ATrade.Api` and the frontend in the graph
-- [ ] Avoid speculative consumers of the new resources
-- [ ] Keep broker logic, market-data logic, and worker wiring out of scope
+- [x] Keep `ATrade.Api` and the frontend in the graph
+- [x] Avoid speculative consumers of the new resources
+- [x] Keep broker logic, market-data logic, and worker wiring out of scope
 
 ---
 
 ### Step 3: Add verification
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/apphost-infrastructure-manifest-tests.sh`
 - [ ] Verify the published manifest includes infra resources and still includes `api` / `frontend`
@@ -98,6 +98,8 @@
 | 2026-04-23 06:12 | Step 1 started | Declare managed infrastructure resources |
 | 2026-04-23 06:14 | Step 1 completed | Added Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources plus AppHost hosting packages |
 | 2026-04-23 06:14 | Step 2 started | Preserve the current bootstrap graph |
+| 2026-04-23 06:15 | Step 2 completed | Verified `Program.cs` still declares `api` and `frontend` and adds no worker, broker, market-data, or `WithReference(...)` consumers |
+| 2026-04-23 06:15 | Step 3 started | Add verification |
 
 ---
 
