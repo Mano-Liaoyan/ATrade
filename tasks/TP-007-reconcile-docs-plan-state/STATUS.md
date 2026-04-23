@@ -1,6 +1,6 @@
 # TP-007: Reconcile planning and docs with the actual repo state — Status
 
-**Current Step:** Step 2: Fix doc-link and read-order drift
+**Current Step:** Step 3: Refresh task-area context
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -29,16 +29,16 @@
 ---
 
 ### Step 2: Fix doc-link and read-order drift
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Replace stale `AGENT.md` references with `AGENTS.md`
-- [ ] Ensure read-order and `see_also` pointers resolve
-- [ ] Avoid unintended authority/status changes
+- [x] Replace stale `AGENT.md` references with `AGENTS.md`
+- [x] Ensure read-order and `see_also` pointers resolve
+- [x] Avoid unintended authority/status changes
 
 ---
 
 ### Step 3: Refresh task-area context
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update `tasks/CONTEXT.md` next task ID and future-work notes
 - [ ] Keep context aligned with roadmap and active docs
@@ -78,6 +78,9 @@
 | `PLAN.md` now distinguishes completed bootstrap work from the still-open AppHost-infra / feature-module follow-up milestones. | Verified and checked off in Step 1. | `PLAN.md` |
 | `README.md` and `scripts/README.md` now describe the current runnable slice as real-but-limited rather than implying the repo is only conceptual. | Verified and checked off in Step 1. | `README.md`, `scripts/README.md` |
 | Status language now consistently distinguishes the current AppHost + API + Next.js bootstrap from still-pending workers, infra resources, and deeper feature modules. | Verified and checked off in Step 1. | `PLAN.md`, `README.md`, `scripts/README.md` |
+| Stale `AGENT.md` references were replaced across active repo docs, role plans, and agent-planning helper docs. | Verified and checked off in Step 2. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md` |
+| Frontmatter `see_also` paths and README read-order pointers were rechecked so the updated links resolve to real files from their document locations. | Verified with a path-resolution script in Step 2. | `scripts/README.md`, `plans/README.md`, `plans/**/*.md`, `.pi/agents/README.md`, `README.md` |
+| Updated docs kept their existing `status: active` authority classification while links were corrected. | Verified by grepping the frontmatter status lines in Step 2. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md` |
 
 ---
 

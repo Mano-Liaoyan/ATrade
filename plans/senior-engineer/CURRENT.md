@@ -4,9 +4,9 @@ owner: senior-engineer
 updated: 2026-04-23
 summary: Live plan for the Senior Engineer role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/senior-engineer.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/senior-engineer.md
 ---
 
 # Senior Engineer Current Plan

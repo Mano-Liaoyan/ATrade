@@ -4,9 +4,9 @@ owner: devops
 updated: 2026-04-23
 summary: Live plan for the DevOps role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/devops.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/devops.md
 ---
 
 # DevOps Current Plan

@@ -4,8 +4,8 @@ owner: devops
 updated: 2026-04-23
 summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:
-  - PLAN.md
-  - AGENT.md
+  - ../PLAN.md
+  - ../AGENTS.md
 ---
 
 # Startup Script Contract

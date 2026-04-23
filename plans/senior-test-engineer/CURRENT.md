@@ -4,9 +4,9 @@ owner: senior-test-engineer
 updated: 2026-04-22
 summary: Live plan for the Senior Test Engineer role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/senior-test-engineer.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/senior-test-engineer.md
 ---
 
 # Senior Test Engineer Current Plan
@@ -34,7 +34,7 @@ Define how TDD and verification will apply once the first implementation issues 
 ## References
 
 - `PLAN.md`
-- `AGENT.md`
+- `AGENTS.md`
 
 ## Archive
 

@@ -4,7 +4,7 @@ owner: architect
 updated: 2026-04-23
 summary: Human-facing overview of the rebooted ATrade repository and its core operating contracts.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - PLAN.md
   - docs/INDEX.md
 ---
@@ -57,7 +57,7 @@ The intended structure is:
 
 ```text
 ATrade/
-├── AGENT.md              # Repo-wide autonomous workforce contract
+├── AGENTS.md              # Repo-wide autonomous workforce contract
 ├── README.md             # Human-facing overview
 ├── PLAN.md               # Root bootstrap plan
 ├── .pi/agents/       # Role charters for the workforce
@@ -83,7 +83,7 @@ For humans:
 
 For agents:
 
-1. `AGENT.md`
+1. `AGENTS.md`
 2. `.pi/agents/<role>.md`
 3. `.pi/skills/retrieve-plan/SKILL.md`
 4. `plans/<role>/CURRENT.md`
@@ -113,7 +113,7 @@ The repository is designed for an agent workforce made up of:
 - Handyman
 - Onboarder
 
-The operating contract for those roles lives in `AGENT.md`, with per-role details in `.pi/agents/`.
+The operating contract for those roles lives in `AGENTS.md`, with per-role details in `.pi/agents/`.
 
 ## Current Status
 

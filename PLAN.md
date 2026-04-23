@@ -4,7 +4,7 @@ owner: scrum-master
 updated: 2026-04-23
 summary: Bootstrap plan for the governance-first ATrade reboot.
 see_also:
-  - AGENT.md
+  - AGENTS.md
   - scripts/README.md
   - docs/INDEX.md
 ---

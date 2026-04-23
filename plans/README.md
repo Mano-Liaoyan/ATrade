@@ -4,10 +4,10 @@ owner: scrum-master
 updated: 2026-04-22
 summary: Explains the per-role planning system, archive rule, and plan file lifecycle.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/skills/retrieve-plan/SKILL.md
-  - .pi/skills/update-plan/SKILL.md
+  - ../AGENTS.md
+  - ../PLAN.md
+  - ../.pi/skills/retrieve-plan/SKILL.md
+  - ../.pi/skills/update-plan/SKILL.md
 ---
 
 # Plans

@@ -4,9 +4,9 @@ owner: onboarder
 updated: 2026-04-22
 summary: Live plan for the Onboarder role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/onboarder.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/onboarder.md
 ---
 
 # Onboarder Current Plan

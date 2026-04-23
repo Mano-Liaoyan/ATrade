@@ -4,9 +4,9 @@ owner: handyman
 updated: 2026-04-23
 summary: Live plan for the Handyman role.
 see_also:
-  - AGENT.md
-  - PLAN.md
-  - .pi/agents/handyman.md
+  - ../../AGENTS.md
+  - ../../PLAN.md
+  - ../../.pi/agents/handyman.md
 ---
 
 # Handyman Current Plan
@@ -43,7 +43,7 @@ Stay available for low-risk cleanup and mechanical repository maintenance.
 
 ## References
 
-- `AGENT.md`
+- `AGENTS.md`
 - `.pi/agents/handyman.md`
 
 ## Archive
