@@ -1,6 +1,6 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 2: Scaffold the IBKR worker shell
+**Current Step:** Step 3: Wire the solution, not the runtime graph
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -29,17 +29,17 @@
 ---
 
 ### Step 2: Scaffold the IBKR worker shell
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `workers/ATrade.Ibkr.Worker`
-- [ ] Keep the worker compileable and intentionally inert
-- [ ] Reference shared defaults only where appropriate
-- [ ] Avoid broker, NATS, and database wiring
+- [x] Create `workers/ATrade.Ibkr.Worker`
+- [x] Keep the worker compileable and intentionally inert
+- [x] Reference shared defaults only where appropriate
+- [x] Avoid broker, NATS, and database wiring
 
 ---
 
 ### Step 3: Wire the solution, not the runtime graph
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Add all new projects to `ATrade.sln`
 - [ ] Keep `src/ATrade.AppHost/Program.cs` unchanged unless build-only scaffolding truly requires otherwise
