@@ -17,7 +17,7 @@ The target system is a modular monolith with .NET 10 backends, a Next.js fronten
 
 ## What This Repository Defines
 
-This repository currently defines the operating model for the next implementation:
+This repository currently defines the operating model and the first runnable bootstrap slice for the next implementation:
 
 - One semantic command to start the full stack: `start run`
 - Aspire 13.2 as the orchestration layer for backend services, Next.js, and infrastructure
@@ -70,7 +70,7 @@ ATrade/
 └── frontend/             # Next.js application
 ```
 
-Some of those directories are still aspirational. `PLAN.md` is the source of truth for what has been bootstrapped already.
+Some of those directories are only partially realized today. `src/` and `frontend/` already host the current runnable bootstrap slice, while `workers/` and most feature modules remain aspirational. `PLAN.md` is the source of truth for what has been bootstrapped already versus what is still queued.
 
 ## Read Order
 
@@ -117,14 +117,16 @@ The operating contract for those roles lives in `AGENT.md`, with per-role detail
 
 ## Current Status
 
-This repository is in governance-first bootstrap mode.
+This repository is still in governance-first bootstrap mode, but the bootstrap is now materially underway.
 
-- The old Blazor- and script-oriented docs have been replaced at the top level
-- No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them
-- The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + the first Next.js frontend home page
+- The old Blazor- and script-oriented docs have been replaced at the top level.
+- The first implementation-facing architecture docs and GitHub coordination artifacts are present under `docs/architecture/`, `docs/process/`, and `.github/`.
+- No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them.
+- The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + the first Next.js frontend home page.
 - Direct frontend startup and home-page marker verification are covered by `tests/apphost/frontend-nextjs-bootstrap-tests.sh`.
 - Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.
-- The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`
+- The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`.
+- Workers, AppHost-managed infrastructure resources, and deeper backend/frontend feature modules remain future work tracked in `PLAN.md`.
 
 ## License
 

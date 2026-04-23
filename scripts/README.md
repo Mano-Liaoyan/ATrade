@@ -18,7 +18,7 @@ Expose one semantic startup contract on both Unix and Windows through repo-local
 - Windows PowerShell: `./start.ps1 run`
 - Windows Command Prompt: `./start.cmd run`
 
-All variants must mean the same thing: start the entire local ATrade stack.
+All variants must mean the same thing: start the currently implemented local ATrade stack, growing toward the full target graph over time.
 
 In this repository, `start run` refers to the repo-local shim contract, not the Windows shell built-in.
 
@@ -36,7 +36,7 @@ The long-term `start run` contract is to bring up:
 
 There must not be separate mandatory commands for the frontend, workers, or infra in the normal local startup path.
 
-The current bootstrap slice intentionally implements a smaller runnable graph:
+The current bootstrap slice intentionally implements only the first runnable subset of that graph:
 
 - Aspire AppHost
 - a minimal `ATrade.Api` backend service managed by Aspire
@@ -111,7 +111,7 @@ Behavior must stay semantically identical across platforms.
 
 ## Bootstrap Status
 
-The `run` contract is now bootstrapped in the repository.
+The `run` contract is now bootstrapped in the repository for the first real AppHost-managed slice.
 
 - `./start run` delegates to the Aspire AppHost
 - `./start.ps1 run` provides the PowerShell entrypoint
