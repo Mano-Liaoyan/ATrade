@@ -1,6 +1,6 @@
 # TP-007: Reconcile planning and docs with the actual repo state — Status
 
-**Current Step:** Step 3: Refresh task-area context
+**Current Step:** Step 4: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -38,15 +38,15 @@
 ---
 
 ### Step 3: Refresh task-area context
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `tasks/CONTEXT.md` next task ID and future-work notes
-- [ ] Keep context aligned with roadmap and active docs
+- [x] Update `tasks/CONTEXT.md` next task ID and future-work notes
+- [x] Keep context aligned with roadmap and active docs
 
 ---
 
 ### Step 4: Verification
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] `grep -RIn "AGENT\\.md" README.md PLAN.md docs scripts tasks || true`
 - [ ] Confirm remaining open `PLAN.md` items are truly pending
@@ -81,6 +81,8 @@
 | Stale `AGENT.md` references were replaced across active repo docs, role plans, and agent-planning helper docs. | Verified and checked off in Step 2. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md` |
 | Frontmatter `see_also` paths and README read-order pointers were rechecked so the updated links resolve to real files from their document locations. | Verified with a path-resolution script in Step 2. | `scripts/README.md`, `plans/README.md`, `plans/**/*.md`, `.pi/agents/README.md`, `README.md` |
 | Updated docs kept their existing `status: active` authority classification while links were corrected. | Verified by grepping the frontmatter status lines in Step 2. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md` |
+| `tasks/CONTEXT.md` now points to `TP-008` as the next queued task and summarizes the staged TP-008 / TP-009 follow-up work accurately. | Verified and checked off in Step 3. | `tasks/CONTEXT.md` |
+| Task-area context now matches the remaining open roadmap items and active architecture/docs surface instead of the earlier pre-bootstrap summary. | Verified and checked off in Step 3. | `tasks/CONTEXT.md`, `PLAN.md`, `README.md` |
 
 ---
 
