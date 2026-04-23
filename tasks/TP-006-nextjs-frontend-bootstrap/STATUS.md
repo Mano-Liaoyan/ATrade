@@ -1,6 +1,6 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
-**Current Step:** Step 4: Update docs
+**Current Step:** Step 5: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -50,17 +50,17 @@
 ---
 
 ### Step 4: Update docs
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md`
-- [ ] Update `docs/architecture/modules.md`
-- [ ] Update `docs/architecture/overview.md` if current-slice wording changed
-- [ ] Update `README.md` if current-status wording changed
+- [x] Update `scripts/README.md`
+- [x] Update `docs/architecture/modules.md`
+- [x] Update `docs/architecture/overview.md` if current-slice wording changed
+- [x] Update `README.md` if current-status wording changed
 
 ---
 
 ### Step 5: Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - [ ] `bash tests/start-contract/start-wrapper-tests.sh`
