@@ -1,6 +1,6 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
-**Current Step:** Step 5: Verification
+**Current Step:** Step 6: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -58,16 +58,16 @@
 ---
 
 ### Step 5: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `dotnet build ATrade.sln`
-- [ ] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
-- [ ] Confirm docs and plan text match the resulting graph
+- [x] `dotnet build ATrade.sln`
+- [x] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
+- [x] Confirm docs and plan text match the resulting graph
 
 ---
 
 ### Step 6: Delivery
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
@@ -104,6 +104,8 @@
 | 2026-04-23 06:17 | Step 4 started | Update docs and plan |
 | 2026-04-23 06:23 | Step 4 completed | Updated `scripts/README.md`, `docs/architecture/overview.md`, `PLAN.md`, `README.md`, and `docs/architecture/modules.md` to reflect the infrastructure-aware AppHost graph |
 | 2026-04-23 06:23 | Step 5 started | Verification |
+| 2026-04-23 06:26 | Step 5 completed | `dotnet build ATrade.sln` and `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passed; docs and plan language matches the manifest graph |
+| 2026-04-23 06:26 | Step 6 started | Delivery |
 
 ---
 
