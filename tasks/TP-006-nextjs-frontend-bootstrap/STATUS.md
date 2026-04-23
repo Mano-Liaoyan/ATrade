@@ -1,6 +1,6 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
-**Current Step:** Step 2: Keep AppHost orchestration working
+**Current Step:** Step 3: Add smoke coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -32,16 +32,16 @@
 ---
 
 ### Step 2: Keep AppHost orchestration working
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `src/ATrade.AppHost/Program.cs` only as needed
-- [ ] Preserve the existing API + frontend bootstrap graph
-- [ ] Keep infra resources out of scope
+- [x] Update `src/ATrade.AppHost/Program.cs` only as needed
+- [x] Preserve the existing API + frontend bootstrap graph
+- [x] Keep infra resources out of scope
 
 ---
 
 ### Step 3: Add smoke coverage
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - [ ] Verify direct frontend startup and page markers
@@ -88,6 +88,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| AppHost JavaScript resource did not need a `Program.cs` change because `AddJavaScriptApp("frontend", "../../frontend", "dev")` still launches `npm run dev` with the existing `PORT` endpoint wiring. | Verified by direct AppHost startup smoke; keep `src/ATrade.AppHost/Program.cs` unchanged. | `src/ATrade.AppHost/Program.cs` |
 
 ---
 
@@ -98,6 +99,8 @@
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-04-22 23:54 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-22 23:54 | Step 0 started | Preflight |
+| 2026-04-23 | Step 2 graph verification | Confirmed `src/ATrade.AppHost/Program.cs` still declares both `api` and `frontend` Aspire resources. |
+| 2026-04-23 | Step 2 scope verification | Confirmed the AppHost change set adds no Aspire infra resources beyond the existing API + frontend graph. |
 
 ---
 
