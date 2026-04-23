@@ -1,6 +1,6 @@
 # TP-006: Replace the placeholder frontend with the first Next.js slice — Status
 
-**Current Step:** Step 5: Verification
+**Current Step:** Step 6: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-22
 **Review Level:** 2
@@ -60,18 +60,18 @@
 ---
 
 ### Step 5: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
-- [ ] `bash tests/start-contract/start-wrapper-tests.sh`
-- [ ] `dotnet build ATrade.sln`
-- [ ] `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
-- [ ] `timeout 20s ./start run`
+- [x] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- [x] `bash tests/start-contract/start-wrapper-tests.sh`
+- [x] `dotnet build ATrade.sln`
+- [x] `timeout 20s dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj`
+- [x] `timeout 20s ./start run`
 
 ---
 
 ### Step 6: Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
