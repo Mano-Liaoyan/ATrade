@@ -1,7 +1,7 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
 **Current Step:** Step 6: Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-23
 **Review Level:** 2
 **Review Counter:** 0
@@ -67,9 +67,9 @@
 ---
 
 ### Step 6: Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Commit with conventions
+- [x] Commit with conventions
 
 ---
 
@@ -106,6 +106,9 @@
 | 2026-04-23 06:23 | Step 5 started | Verification |
 | 2026-04-23 06:26 | Step 5 completed | `dotnet build ATrade.sln` and `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passed; docs and plan language matches the manifest graph |
 | 2026-04-23 06:26 | Step 6 started | Delivery |
+| 2026-04-23 06:28 | Step 6 completed | Verified conventional `feat(TP-008): ...` step commits are present in git history and marked the task complete |
+| 2026-04-23 06:18 | Worker iter 1 | done in 712s, tools: 137 |
+| 2026-04-23 06:18 | Task complete | .DONE created |
 
 ---
 
