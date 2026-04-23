@@ -1,26 +1,26 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
-**Current Step:** Step 0: Preflight
-**Status:** ⏳ Ready
+**Current Step:** Step 1: Declare managed infrastructure resources
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Read the AppHost, docs, and existing apphost test files
-- [ ] Confirm the AppHost currently declares only `api` and `frontend`
-- [ ] Confirm no existing test already covers infra-resource declarations
+- [x] Read the AppHost, docs, and existing apphost test files
+- [x] Confirm the AppHost currently declares only `api` and `frontend`
+- [x] Confirm no existing test already covers infra-resource declarations
 
 ---
 
 ### Step 1: Declare managed infrastructure resources
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update AppHost package/project surface as needed
 - [ ] Add named Aspire-managed resources for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`
@@ -92,6 +92,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-23 06:06 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-23 06:06 | Step 0 started | Preflight |
+| 2026-04-23 06:12 | Step 0 completed | Read active docs, confirmed AppHost currently declares only `api` and `frontend`, and confirmed no existing tests cover infra resources |
+| 2026-04-23 06:12 | Step 1 started | Declare managed infrastructure resources |
 
 ---
 
