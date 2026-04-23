@@ -1,0 +1,109 @@
+name: Coordination or governance work
+description: Track labels, plans, docs, review flow, or other cross-agent coordination work.
+title: "[Coordination]: "
+labels:
+  - agent:ready
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the coordination problem or governance change.
+      placeholder: Explain the workflow gap, policy update, or repo contract change.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: coordination-scope
+    attributes:
+      label: Coordination scope
+      description: Choose the area this issue affects most.
+      options:
+        - GitHub labels or templates
+        - Plans or issue scheduling
+        - Documentation contract
+        - Review or handoff flow
+        - Worktree or branch coordination
+        - Other repository governance
+    validations:
+      required: true
+
+  - type: dropdown
+    id: size
+    attributes:
+      label: Size
+      description: Match the Taskplane sizing contract.
+      options:
+        - S
+        - M
+        - L
+        - XL
+    validations:
+      required: true
+
+  - type: dropdown
+    id: owning-role
+    attributes:
+      label: Owning role
+      description: Select the role that should drive the coordination work.
+      options:
+        - role:scrum-master
+        - role:architect
+        - role:code-reviewer
+        - role:devops
+        - role:onboarder
+        - role:senior-engineer
+        - role:senior-test-engineer
+        - role:handyman
+    validations:
+      required: true
+
+  - type: textarea
+    id: durable-changes
+    attributes:
+      label: Durable repository changes
+      description: List the files, docs, or templates you expect to add or update.
+      placeholder: Identify docs, manifests, templates, plan files, or scripts likely to change.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: docs-impact
+    attributes:
+      label: Documentation impact
+      description: Coordination changes usually update active docs and docs/INDEX.md.
+      options:
+        - Update an existing active doc and docs/INDEX.md if needed
+        - Add a new active doc and update docs/INDEX.md
+        - No durable doc change expected
+        - Needs triage before implementation
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: Describe how the coordination contract will be validated.
+      placeholder: Include searches, template checks, doc index updates, or review steps.
+    validations:
+      required: true
+
+  - type: textarea
+    id: unblock-context
+    attributes:
+      label: Blocked-work and resume context
+      description: If this issue may need a human decision, record the exact unblock question and the resume note that should be preserved.
+      placeholder: Include the note that should accompany agent:needs-human, agent:blocked, or agent:resume-ready.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: coordination-checklist
+    attributes:
+      label: Coordination checklist
+      options:
+        - label: I will keep issue state in GitHub labels instead of relying on chat history alone.
+          required: true
+        - label: I will update the relevant role plan if the work is blocked or materially changes the repo contract.
+          required: true
