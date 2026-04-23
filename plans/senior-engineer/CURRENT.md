@@ -29,10 +29,11 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- TP-006 replaced the placeholder frontend with the first real Next.js home page and smoke coverage; the next implementation slice should extend the AppHost graph with backend feature modules or architect-approved infrastructure resources.
+- TP-009 added compileable shells for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` plus `tests/scaffolding/project-shells-tests.sh`; the next implementation slice should either wire architect-approved runtime resources into the AppHost graph or start filling one of the new modules with real behavior.
 
 ## Recent Progress
 
+- Completed TP-009 by scaffolding `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker`, extending shared defaults to generic-host workers, adding `tests/scaffolding/project-shells-tests.sh`, and syncing the architecture/current-state docs
 - Completed TP-006 by converting `frontend/` into the first real Next.js app, adding `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, updating the wrapper regression harness for the new contract, and syncing the active docs
 - Completed TP-004 by adding `tests/start-contract/start-wrapper-windows.ps1`, wiring a `windows-latest` GitHub Actions workflow, syncing verification docs, and extending the Linux regression script to assert the Windows CI path
 - Completed TP-003 by scaffolding `src/ATrade.Api`, wiring it into `ATrade.AppHost`, adding bootstrap smoke coverage, and updating the implementation docs
@@ -42,6 +43,7 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 ## Verification
 
 - `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `bash tests/scaffolding/project-shells-tests.sh`
 - `dotnet build ATrade.sln`
 - `bash tests/start-contract/start-wrapper-tests.sh`
 - `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`

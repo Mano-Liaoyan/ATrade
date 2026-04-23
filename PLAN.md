@@ -11,7 +11,7 @@ see_also:
 
 # ATrade Bootstrap Plan
 
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-23
 
 ## Current Focus
 
@@ -26,7 +26,7 @@ Extend the runnable bootstrap into real services, infrastructure resources, and 
 - [ ] Add Aspire AppHost that orchestrates .NET services, Next.js, and infrastructure resources
 - [ ] Author the first implementation-facing architecture and module docs for the new codebase
 - [ ] Establish GitHub labels, issue templates, and Actions for autonomous coordination
-- [ ] Scaffold the first .NET 10 backend projects and Next.js frontend
+- [x] ~~Scaffold the first .NET 10 backend projects and Next.js frontend~~
 
 ## Active Cross-Role Dependencies
 

@@ -1,83 +1,83 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 0: Preflight
-**Status:** ⏳ Ready
+**Current Step:** Step 7: Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-23
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Read the module docs, solution, and project patterns
-- [ ] Confirm the target module/worker projects do not yet exist
-- [ ] Confirm `workers/` does not yet contain a real worker project
+- [x] Read the module docs, solution, and project patterns
+- [x] Confirm the target module/worker projects do not yet exist
+- [x] Confirm `workers/` does not yet contain a real worker project
 
 ---
 
 ### Step 1: Scaffold feature-module shells
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Create minimal compileable shells for `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData`
-- [ ] Add one tiny placeholder type per project
-- [ ] Keep namespaces and project names aligned with docs
+- [x] Create minimal compileable shells for `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData`
+- [x] Add one tiny placeholder type per project
+- [x] Keep namespaces and project names aligned with docs
 
 ---
 
 ### Step 2: Scaffold the IBKR worker shell
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Create `workers/ATrade.Ibkr.Worker`
-- [ ] Keep the worker compileable and intentionally inert
-- [ ] Reference shared defaults only where appropriate
-- [ ] Avoid broker, NATS, and database wiring
+- [x] Create `workers/ATrade.Ibkr.Worker`
+- [x] Keep the worker compileable and intentionally inert
+- [x] Reference shared defaults only where appropriate
+- [x] Avoid broker, NATS, and database wiring
 
 ---
 
 ### Step 3: Wire the solution, not the runtime graph
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Add all new projects to `ATrade.sln`
-- [ ] Keep `src/ATrade.AppHost/Program.cs` unchanged unless build-only scaffolding truly requires otherwise
-- [ ] Keep runtime behavior otherwise unchanged
+- [x] Add all new projects to `ATrade.sln`
+- [x] Keep `src/ATrade.AppHost/Program.cs` unchanged unless build-only scaffolding truly requires otherwise
+- [x] Keep runtime behavior otherwise unchanged
 
 ---
 
 ### Step 4: Add lightweight verification
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/scaffolding/project-shells-tests.sh`
-- [ ] Verify expected files exist and are listed in `ATrade.sln`
-- [ ] Verify the solution builds
+- [x] Create `tests/scaffolding/project-shells-tests.sh`
+- [x] Verify expected files exist and are listed in `ATrade.sln`
+- [x] Verify the solution builds
 
 ---
 
 ### Step 5: Update docs and plan
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Update `docs/architecture/modules.md`
-- [ ] Update other current-state docs only where needed
-- [ ] Update `PLAN.md` if milestone wording changes
+- [x] Update `docs/architecture/modules.md`
+- [x] Update other current-state docs only where needed
+- [x] Update `PLAN.md` if milestone wording changes
 
 ---
 
 ### Step 6: Verification
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] `dotnet build ATrade.sln`
-- [ ] `bash tests/scaffolding/project-shells-tests.sh`
-- [ ] Confirm docs do not overstate functionality
+- [x] `dotnet build ATrade.sln`
+- [x] `bash tests/scaffolding/project-shells-tests.sh`
+- [x] Confirm docs do not overstate functionality
 
 ---
 
 ### Step 7: Delivery
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Commit with conventions
+- [x] Commit with conventions
 
 ---
 
@@ -100,6 +100,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-23 05:57 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-23 05:57 | Step 0 started | Preflight |
+| 2026-04-23 06:08 | Worker iter 1 | done in 680s, tools: 151 |
+| 2026-04-23 06:08 | Task complete | .DONE created |
 
 ---
 
