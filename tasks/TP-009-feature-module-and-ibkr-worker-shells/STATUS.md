@@ -1,6 +1,6 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 1: Scaffold feature-module shells
+**Current Step:** Step 2: Scaffold the IBKR worker shell
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -20,16 +20,16 @@
 ---
 
 ### Step 1: Scaffold feature-module shells
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create minimal compileable shells for `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData`
-- [ ] Add one tiny placeholder type per project
-- [ ] Keep namespaces and project names aligned with docs
+- [x] Create minimal compileable shells for `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData`
+- [x] Add one tiny placeholder type per project
+- [x] Keep namespaces and project names aligned with docs
 
 ---
 
 ### Step 2: Scaffold the IBKR worker shell
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Create `workers/ATrade.Ibkr.Worker`
 - [ ] Keep the worker compileable and intentionally inert
