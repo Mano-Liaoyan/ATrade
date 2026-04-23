@@ -1,6 +1,6 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
-**Current Step:** Step 1: Declare managed infrastructure resources
+**Current Step:** Step 2: Preserve the current bootstrap graph
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -20,17 +20,17 @@
 ---
 
 ### Step 1: Declare managed infrastructure resources
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update AppHost package/project surface as needed
-- [ ] Add named Aspire-managed resources for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`
-- [ ] Be explicit about the local `TimescaleDB` representation
-- [ ] Use stable resource names for future wiring
+- [x] Update AppHost package/project surface as needed
+- [x] Add named Aspire-managed resources for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`
+- [x] Be explicit about the local `TimescaleDB` representation
+- [x] Use stable resource names for future wiring
 
 ---
 
 ### Step 2: Preserve the current bootstrap graph
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Keep `ATrade.Api` and the frontend in the graph
 - [ ] Avoid speculative consumers of the new resources
@@ -96,6 +96,8 @@
 | 2026-04-23 06:06 | Step 0 started | Preflight |
 | 2026-04-23 06:12 | Step 0 completed | Read active docs, confirmed AppHost currently declares only `api` and `frontend`, and confirmed no existing tests cover infra resources |
 | 2026-04-23 06:12 | Step 1 started | Declare managed infrastructure resources |
+| 2026-04-23 06:14 | Step 1 completed | Added Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources plus AppHost hosting packages |
+| 2026-04-23 06:14 | Step 2 started | Preserve the current bootstrap graph |
 
 ---
 
