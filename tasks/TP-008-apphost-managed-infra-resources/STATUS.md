@@ -1,6 +1,6 @@
 # TP-008: Extend AppHost with managed infrastructure resources — Status
 
-**Current Step:** Step 3: Add verification
+**Current Step:** Step 4: Update docs and plan
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -39,16 +39,16 @@
 ---
 
 ### Step 3: Add verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/apphost-infrastructure-manifest-tests.sh`
-- [ ] Verify the published manifest includes infra resources and still includes `api` / `frontend`
-- [ ] Keep the primary verification path container-engine-independent
+- [x] Create `tests/apphost/apphost-infrastructure-manifest-tests.sh`
+- [x] Verify the published manifest includes infra resources and still includes `api` / `frontend`
+- [x] Keep the primary verification path container-engine-independent
 
 ---
 
 ### Step 4: Update docs and plan
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update `scripts/README.md`
 - [ ] Update `docs/architecture/overview.md`
@@ -100,6 +100,8 @@
 | 2026-04-23 06:14 | Step 2 started | Preserve the current bootstrap graph |
 | 2026-04-23 06:15 | Step 2 completed | Verified `Program.cs` still declares `api` and `frontend` and adds no worker, broker, market-data, or `WithReference(...)` consumers |
 | 2026-04-23 06:15 | Step 3 started | Add verification |
+| 2026-04-23 06:17 | Step 3 completed | Added manifest-based AppHost infrastructure verification script and passed it without needing a container engine |
+| 2026-04-23 06:17 | Step 4 started | Update docs and plan |
 
 ---
 
