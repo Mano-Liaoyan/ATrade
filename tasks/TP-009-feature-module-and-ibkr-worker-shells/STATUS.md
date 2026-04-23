@@ -1,26 +1,26 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 0: Preflight
-**Status:** ⏳ Ready
+**Current Step:** Step 1: Scaffold feature-module shells
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Read the module docs, solution, and project patterns
-- [ ] Confirm the target module/worker projects do not yet exist
-- [ ] Confirm `workers/` does not yet contain a real worker project
+- [x] Read the module docs, solution, and project patterns
+- [x] Confirm the target module/worker projects do not yet exist
+- [x] Confirm `workers/` does not yet contain a real worker project
 
 ---
 
 ### Step 1: Scaffold feature-module shells
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Create minimal compileable shells for `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData`
 - [ ] Add one tiny placeholder type per project
@@ -100,6 +100,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-23 05:57 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-23 05:57 | Step 0 started | Preflight |
 
 ---
 
