@@ -1,26 +1,26 @@
 # TP-007: Reconcile planning and docs with the actual repo state — Status
 
-**Current Step:** Step 0: Preflight
-**Status:** ⏳ Ready
+**Current Step:** Step 1: Reconcile plan and status language
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** S
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not started
+**Status:** ✅ Complete
 
-- [ ] Read the active docs and planning files
-- [ ] Identify stale status claims
-- [ ] Identify stale `AGENT.md` references
+- [x] Read the active docs and planning files
+- [x] Identify stale status claims
+- [x] Identify stale `AGENT.md` references
 
 ---
 
 ### Step 1: Reconcile plan and status language
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update `PLAN.md` milestone text where completed work is still shown as open
 - [ ] Update `README.md` and `scripts/README.md` current-status wording where needed
@@ -72,6 +72,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| `PLAN.md` still shows AppHost, architecture docs, GitHub coordination, and first backend/frontend scaffolds as open even though those slices now exist. | Reconcile milestone status language in Step 1. | `PLAN.md`; verified against `src/`, `frontend/`, `docs/architecture/*`, `.github/*`, and current README/scripts docs |
+| `README.md` and `tasks/CONTEXT.md` still describe `src/` and `frontend/` as aspirational despite the current AppHost + `ATrade.Api` + Next.js bootstrap slice. | Update current-state wording in Steps 1 and 3. | `README.md`, `tasks/CONTEXT.md` |
+| Multiple active docs still point to `AGENT.md` even though the repository contract file is `AGENTS.md`. | Replace stale references in Step 2 without changing document status/authority. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md` |
 
 ---
 
@@ -80,6 +83,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-23 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-23 05:57 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-23 05:57 | Step 0 started | Preflight |
 
 ---
 
