@@ -1,6 +1,6 @@
 # TP-007: Reconcile planning and docs with the actual repo state — Status
 
-**Current Step:** Step 4: Verification
+**Current Step:** Step 5: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 1
@@ -46,16 +46,16 @@
 ---
 
 ### Step 4: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `grep -RIn "AGENT\\.md" README.md PLAN.md docs scripts tasks || true`
-- [ ] Confirm remaining open `PLAN.md` items are truly pending
-- [ ] Confirm the change stayed documentation-only
+- [x] `grep -RIn "AGENT\\.md" README.md PLAN.md docs scripts tasks || true`
+- [x] Confirm remaining open `PLAN.md` items are truly pending
+- [x] Confirm the change stayed documentation-only
 
 ---
 
 ### Step 5: Delivery
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
@@ -83,6 +83,9 @@
 | Updated docs kept their existing `status: active` authority classification while links were corrected. | Verified by grepping the frontmatter status lines in Step 2. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md` |
 | `tasks/CONTEXT.md` now points to `TP-008` as the next queued task and summarizes the staged TP-008 / TP-009 follow-up work accurately. | Verified and checked off in Step 3. | `tasks/CONTEXT.md` |
 | Task-area context now matches the remaining open roadmap items and active architecture/docs surface instead of the earlier pre-bootstrap summary. | Verified and checked off in Step 3. | `tasks/CONTEXT.md`, `PLAN.md`, `README.md` |
+| Repo-wide `AGENT.md` grep now only hits the TP-007 task packet itself; active docs under `README.md`, `PLAN.md`, `docs/`, and `scripts/` are clean. | Verified with the Step 4 grep command. | `README.md`, `PLAN.md`, `docs/`, `scripts/`, `tasks/TP-007-*` |
+| The only open `PLAN.md` milestones now match real gaps: no `workers/` tree exists yet and `src/ATrade.AppHost/Program.cs` still lacks `Postgres`/`TimescaleDB`/`Redis`/`NATS` resources. | Verified against the repo tree and queued TP-008 / TP-009 tasks in Step 4. | `PLAN.md`, `src/ATrade.AppHost/Program.cs`, `tasks/TP-008-*`, `tasks/TP-009-*` |
+| Diff inspection shows only docs/plan/task files changed for TP-007; no application/runtime files were modified. | Verified with `git diff --name-only HEAD~4..HEAD` plus the current worktree diff in Step 4. | `README.md`, `PLAN.md`, `scripts/README.md`, `plans/**/*.md`, `.pi/agents/README.md`, `tasks/CONTEXT.md` |
 
 ---
 
