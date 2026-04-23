@@ -1,6 +1,6 @@
 # TP-009: Scaffold first feature-module shells and the IBKR worker shell — Status
 
-**Current Step:** Step 4: Add lightweight verification
+**Current Step:** Step 5: Update docs and plan
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-23
 **Review Level:** 2
@@ -48,16 +48,16 @@
 ---
 
 ### Step 4: Add lightweight verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/scaffolding/project-shells-tests.sh`
-- [ ] Verify expected files exist and are listed in `ATrade.sln`
-- [ ] Verify the solution builds
+- [x] Create `tests/scaffolding/project-shells-tests.sh`
+- [x] Verify expected files exist and are listed in `ATrade.sln`
+- [x] Verify the solution builds
 
 ---
 
 ### Step 5: Update docs and plan
-**Status:** ⬜ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update `docs/architecture/modules.md`
 - [ ] Update other current-state docs only where needed
