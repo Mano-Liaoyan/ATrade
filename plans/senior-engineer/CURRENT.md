@@ -20,7 +20,7 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 ## Active Checklist
 
 - [x] Scaffold the first backend projects against the existing AppHost and service defaults
-- [ ] Replace the placeholder frontend with the first Next.js application slice when an implementation issue is ready
+- [x] Replace the placeholder frontend with the first Next.js application slice when an implementation issue is ready
 - [ ] Extend the AppHost graph as architect-approved services and infrastructure resources are introduced
 
 ## Blockers
@@ -29,10 +29,11 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- TP-004 closed the Windows wrapper verification gap with a checked-in `windows-latest` workflow; the next implementation slice should replace the placeholder frontend with the first Next.js app or extend the backend beyond the `/health` scaffold
+- TP-006 replaced the placeholder frontend with the first real Next.js home page and smoke coverage; the next implementation slice should extend the AppHost graph with backend feature modules or architect-approved infrastructure resources.
 
 ## Recent Progress
 
+- Completed TP-006 by converting `frontend/` into the first real Next.js app, adding `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, updating the wrapper regression harness for the new contract, and syncing the active docs
 - Completed TP-004 by adding `tests/start-contract/start-wrapper-windows.ps1`, wiring a `windows-latest` GitHub Actions workflow, syncing verification docs, and extending the Linux regression script to assert the Windows CI path
 - Completed TP-003 by scaffolding `src/ATrade.Api`, wiring it into `ATrade.AppHost`, adding bootstrap smoke coverage, and updating the implementation docs
 - Reviewed and completed the bootstrap branch in `.worktrees/start-run-bootstrap`
@@ -40,6 +41,7 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Verification
 
+- `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `dotnet build ATrade.sln`
 - `bash tests/start-contract/start-wrapper-tests.sh`
 - `grep -n "windows-latest\|start.ps1 run\|start.cmd run" .github/workflows/windows-start-run.yml tests/start-contract/start-wrapper-windows.ps1`
