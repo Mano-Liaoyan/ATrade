@@ -1,0 +1,113 @@
+# TP-010: Fix the Aspire-managed Next.js runtime contract — Status
+
+**Current Step:** Step 0: Preflight
+**Status:** ⏳ Not started
+**Last Updated:** 2026-04-24
+**Review Level:** 2
+**Review Counter:** 0
+**Iteration:** 0
+**Size:** M
+
+---
+
+### Step 0: Preflight
+**Status:** ⏳ Not started
+
+- [ ] Re-read the current AppHost frontend resource configuration
+- [ ] Confirm direct `frontend/` startup is clean and the defect is specific to the AppHost-managed path
+- [ ] Confirm there is currently no explicit Next.js config pinning Turbopack root
+
+---
+
+### Step 1: Fix frontend environment semantics
+**Status:** ⏳ Not started
+
+- [ ] Update the AppHost frontend resource so `next dev` runs with a valid Next.js `NODE_ENV`
+- [ ] Do not use custom environment names in `NODE_ENV`
+- [ ] Preserve richer app environment identity through a separate variable if needed
+
+---
+
+### Step 2: Fix workspace-root detection
+**Status:** ⏳ Not started
+
+- [ ] Add explicit Next.js config so Turbopack/workspace resolution points at `frontend/`
+- [ ] Make the fix durable even if an extra lockfile appears at the repo root later
+- [ ] Avoid relying on one-off manual cleanup
+
+---
+
+### Step 3: Preserve the startup contract
+**Status:** ⏳ Not started
+
+- [ ] Keep the frontend package scripts semantically intact unless a minimal change is required
+- [ ] Keep the AppHost-managed frontend resource on port 3000 with external exposure
+- [ ] Keep direct `cd frontend && npm run dev` working
+
+---
+
+### Step 4: Add verification
+**Status:** ⏳ Not started
+
+- [ ] Extend the frontend bootstrap test or add a dedicated runtime test
+- [ ] Verify direct startup still serves the home page markers
+- [ ] Verify the AppHost-managed frontend path no longer emits the `NODE_ENV` warning
+- [ ] Verify the AppHost-managed frontend path no longer emits the workspace-root warning
+
+---
+
+### Step 5: Update docs
+**Status:** ⏳ Not started
+
+- [ ] Update `scripts/README.md` if runtime semantics need to be explicit there
+- [ ] Update `README.md` / `PLAN.md` only if wording is now stale
+
+---
+
+### Step 6: Verification
+**Status:** ⏳ Not started
+
+- [ ] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- [ ] Run any new AppHost runtime verification added by this task
+- [ ] Confirm the AppHost-managed frontend startup is warning-free for these issues
+
+---
+
+### Step 7: Delivery
+**Status:** ⏳ Not started
+
+- [ ] Commit with conventions
+
+---
+
+## Reviews
+
+| # | Type | Step | Verdict | File |
+|---|------|------|---------|------|
+
+---
+
+## Discoveries
+
+| Discovery | Disposition | Location |
+|-----------|-------------|----------|
+
+---
+
+## Execution Log
+
+| Timestamp | Action | Outcome |
+|-----------|--------|---------|
+| 2026-04-24 | Task staged | PROMPT.md and STATUS.md created |
+
+---
+
+## Blockers
+
+*None yet*
+
+---
+
+## Notes
+
+*Goal: make the AppHost-managed frontend launch behave like a correct Next.js development runtime, not a heuristic or machine-specific setup.*
