@@ -81,6 +81,14 @@ The frontend is no longer Blazor.
 
 Aspire must orchestrate the Next.js app directly so the frontend participates in the same local graph, environment setup, and lifecycle as the .NET services.
 
+## Next.js Runtime Contract
+
+The AppHost-managed frontend must preserve the same core runtime assumptions as direct startup inside `frontend/`.
+
+- The AppHost still launches the existing `npm run dev` script.
+- The AppHost explicitly sets `NODE_ENV=development` for `next dev`; richer repo-specific environment identity must not be encoded through `NODE_ENV`.
+- `frontend/next.config.ts` pins `turbopack.root` to the frontend directory so workspace-root detection does not depend on lockfile heuristics higher in the repo.
+
 ## Reserved Commands
 
 Only `run` is mandatory for the first implementation wave, but the contract reserves:
@@ -108,6 +116,7 @@ Behavior must stay semantically identical across platforms.
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
 - direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
 - direct frontend startup and the Next.js home-page markers are verified in this repository's Linux environment via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- the AppHost-managed frontend runtime path is verified via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, including `NODE_ENV=development`, preserved AppHost frontend logs, and warning-free startup even when a temporary repo-root lockfile exists
 - the AppHost manifest now verifies `Postgres`, `TimescaleDB`, `Redis`, `NATS`, `api`, and `frontend` without requiring a container engine via `tests/apphost/apphost-infrastructure-manifest-tests.sh`
 - `./start.ps1 run` and `./start.cmd run` are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`
 
@@ -120,7 +129,7 @@ The `run` contract is now bootstrapped in the repository for the first real AppH
 - `./start.cmd run` provides the Windows command prompt entrypoint
 - GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
 - the current graph hosts the first minimal `ATrade.Api` service, the first real Next.js frontend home page, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
-- `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path plus stable visible markers for the home page
+- `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path, stable visible markers for the home page, and the AppHost-managed frontend runtime contract (`NODE_ENV=development` + warning-free Turbopack root resolution)
 - `tests/apphost/apphost-infrastructure-manifest-tests.sh` verifies that the published AppHost manifest preserves `api` / `frontend` and declares the four managed infrastructure resources
 
 Reserved subcommands such as `test`, `build`, and `lint` remain future work.

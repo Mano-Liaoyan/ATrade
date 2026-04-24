@@ -1,6 +1,6 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 5: Update docs
+**Current Step:** Step 6: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -57,15 +57,15 @@
 ---
 
 ### Step 5: Update docs
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md` if runtime semantics need to be explicit there
-- [ ] Update `README.md` / `PLAN.md` only if wording is now stale
+- [x] Update `scripts/README.md` if runtime semantics need to be explicit there
+- [x] Update `README.md` / `PLAN.md` only if wording is now stale
 
 ---
 
 ### Step 6: Verification
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - [ ] Run any new AppHost runtime verification added by this task
@@ -114,3 +114,4 @@
 
 *Goal: make the AppHost-managed frontend launch behave like a correct Next.js development runtime, not a heuristic or machine-specific setup.*
 *Step 1 decision: no separate frontend app-environment variable was added because nothing in the repo currently consumes a richer frontend runtime identity; the minimal durable fix is to pin AppHost-managed `NODE_ENV=development` and keep other environment semantics unchanged.*
+*Step 5 decision: `README.md` and `PLAN.md` were re-checked after the runtime-contract fix and did not need wording changes because their current statements remain accurate at the existing level of abstraction.*
