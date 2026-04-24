@@ -1,6 +1,6 @@
 # TP-011: Fix AppHost-managed container startup under a Podman-backed Docker API — Status
 
-**Current Step:** Step 3: Preserve the bootstrap graph
+**Current Step:** Step 4: Add verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 3
@@ -38,16 +38,16 @@
 ---
 
 ### Step 3: Preserve the bootstrap graph
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Keep the existing AppHost graph names and roles intact
-- [ ] Do not replace Aspire with ad-hoc scripts or `docker compose`
-- [ ] Avoid unrelated consumer wiring
+- [x] Keep the existing AppHost graph names and roles intact
+- [x] Do not replace Aspire with ad-hoc scripts or `docker compose`
+- [x] Avoid unrelated consumer wiring
 
 ---
 
 ### Step 4: Add verification
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Add runtime-focused AppHost infrastructure verification when an engine is available
 - [ ] Verify affected containers get a real pids limit (`pids.max > 1`)
@@ -96,6 +96,7 @@
 | Manual `timescale/timescaledb:latest-pg17` runs with `--pids-limit 2048` still failed without deterministic tuning inputs: `001_timescaledb_tune.sh` could not read `/sys/fs/cgroup/memory.max` or `/sys/fs/cgroup/cpu.max` and `timescaledb-tune` panicked; the same image stayed running once `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` were supplied. | Use explicit tuning inputs in Step 2 rather than suppressing the failure. | Manual container repro on 2026-04-24 in lane-1 worktree |
 | `src/ATrade.AppHost/Program.cs` now sets an explicit `--pids-limit 2048` container runtime argument for the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` resources, and the AppHost project still builds cleanly. | Use this as the repo-local runtime fix baseline for verification in later steps. | `src/ATrade.AppHost/Program.cs`; `dotnet build src/ATrade.AppHost/ATrade.AppHost.csproj` |
 | `src/ATrade.AppHost/Program.cs` now supplies deterministic `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` values to the existing `timescaledb` resource; a live `./start run` repro showed the AppHost-managed `timescaledb`, `postgres`, `redis`, and `nats` containers all reach `Status=running` with `PidsLimit=2048`. | Keep the `timescaledb` resource in the AppHost graph while making the Podman-backed runtime path start cleanly. | `src/ATrade.AppHost/Program.cs`; runtime repro on 2026-04-24 in lane-1 worktree |
+| `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` still passed after the runtime fixes, preserving the `postgres`, `timescaledb`, `redis`, `nats`, `api`, and `frontend` graph names; direct code inspection of `src/ATrade.AppHost/Program.cs` confirmed the graph still uses Aspire primitives without `docker compose`, ad-hoc startup scripts, or new consumer wiring. | Treat as proof that the task preserved the bootstrap graph while staying in scope. | `tests/apphost/apphost-infrastructure-manifest-tests.sh`; `src/ATrade.AppHost/Program.cs` |
 
 ---
 
@@ -111,6 +112,7 @@
 | 2026-04-24 11:31 | Confirmed TimescaleDB tuning failure after safe pids | Manual `timescaledb` runs with `--pids-limit 2048` still crashed in `001_timescaledb_tune.sh` until explicit `TS_TUNE_MEMORY` and `TS_TUNE_NUM_CPUS` values were provided. |
 | 2026-04-24 11:31 | Applied explicit infra pids limits | `ATrade.AppHost` now passes `--pids-limit 2048` to the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` containers, and `dotnet build src/ATrade.AppHost/ATrade.AppHost.csproj` succeeded. |
 | 2026-04-24 11:35 | Applied deterministic TimescaleDB tuning inputs | `ATrade.AppHost` now sets `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` on the existing `timescaledb` resource, and a live `./start run` repro showed all four infra containers reach `Status=running` with `PidsLimit=2048`. |
+| 2026-04-24 11:36 | Verified the bootstrap graph stayed intact | Manifest verification still passed for `postgres`, `timescaledb`, `redis`, `nats`, `api`, and `frontend`, and `Program.cs` still used Aspire-only resource wiring with no ad-hoc scripts, compose path, or unrelated consumers. |
 
 ---
 
