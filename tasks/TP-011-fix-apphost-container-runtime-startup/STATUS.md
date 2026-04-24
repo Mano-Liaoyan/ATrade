@@ -1,26 +1,26 @@
 # TP-011: Fix AppHost-managed container startup under a Podman-backed Docker API — Status
 
-**Current Step:** Step 0: Preflight
-**Status:** ⏳ Not started
+**Current Step:** Step 1: Fix process limits for AppHost-managed containers
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 3
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⏳ Not started
+**Status:** ✅ Complete
 
-- [ ] Reproduce/confirm the AppHost-created container runtime state in this repo
-- [ ] Confirm the effective `pids.max` problem on AppHost-created infra containers
-- [ ] Confirm the TimescaleDB tuning-script failure mode after pids are fixed
+- [x] Reproduce/confirm the AppHost-created container runtime state in this repo
+- [x] Confirm the effective `pids.max` problem on AppHost-created infra containers
+- [x] Confirm the TimescaleDB tuning-script failure mode after pids are fixed
 
 ---
 
 ### Step 1: Fix process limits for AppHost-managed containers
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update the AppHost resource configuration so infra containers do not inherit the broken default pids behavior
 - [ ] Use an explicit, readable container runtime configuration rather than a hidden machine tweak
@@ -91,6 +91,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| `timeout 60s ./start run` created fresh AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` containers; inspect output confirmed each launched with `HostConfig.PidsLimit=0` under the Podman-backed Docker API. | Use as baseline evidence for Step 1 runtime fix. | Runtime repro on 2026-04-24 in lane-1 worktree |
+| Live container inspection confirmed the broken translation from `HostConfig.PidsLimit=0` to an effective cgroup `pids.max=1`: `postgres` exposed `PROCROOT_PIDS_MAX ... 1`, `timescaledb` exposed `cat /sys/fs/cgroup/pids.max => 1`, and container logs showed `Cannot fork` / Go `newosproc` failures. | Treat as root cause evidence for AppHost-managed infra startup failures. | Runtime repro on 2026-04-24 in lane-1 worktree |
+| Manual `timescale/timescaledb:latest-pg17` runs with `--pids-limit 2048` still failed without deterministic tuning inputs: `001_timescaledb_tune.sh` could not read `/sys/fs/cgroup/memory.max` or `/sys/fs/cgroup/cpu.max` and `timescaledb-tune` panicked; the same image stayed running once `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` were supplied. | Use explicit tuning inputs in Step 2 rather than suppressing the failure. | Manual container repro on 2026-04-24 in lane-1 worktree |
 
 ---
 
@@ -99,6 +102,11 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-24 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-24 09:20 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-24 09:20 | Step 0 started | Preflight |
+| 2026-04-24 11:30 | Reproduced AppHost runtime state | `./start run` created fresh managed infra containers with `HostConfig.PidsLimit=0` for `postgres`, `timescaledb`, `redis`, and `nats`. |
+| 2026-04-24 11:30 | Confirmed broken effective pids limit | Live container inspection showed AppHost-created infra containers hit effective `pids.max=1`, producing `Cannot fork` and `newosproc` failures under the Podman-backed Docker API. |
+| 2026-04-24 11:31 | Confirmed TimescaleDB tuning failure after safe pids | Manual `timescaledb` runs with `--pids-limit 2048` still crashed in `001_timescaledb_tune.sh` until explicit `TS_TUNE_MEMORY` and `TS_TUNE_NUM_CPUS` values were provided. |
 
 ---
 
