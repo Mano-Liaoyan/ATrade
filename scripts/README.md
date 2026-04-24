@@ -42,6 +42,8 @@ The current bootstrap slice now implements the first infrastructure-aware runnab
 - a minimal `ATrade.Api` backend service managed by Aspire
 - the first real Next.js frontend slice managed by Aspire
 - Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources declared in the AppHost graph
+- explicit container-runtime `--pids-limit 2048` settings for the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` resources so Podman-backed Docker API runs do not collapse to an effective `pids.max=1`
+- deterministic `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` inputs for the `timescaledb` resource so its init-time tuning script does not crash in the rootless Podman environment used here
 
 Later slices extend that graph with additional backend services, workers, and richer frontend routes.
 
@@ -117,7 +119,8 @@ Behavior must stay semantically identical across platforms.
 - direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
 - direct frontend startup and the Next.js home-page markers are verified in this repository's Linux environment via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - the AppHost-managed frontend runtime path is verified via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, including `NODE_ENV=development`, preserved AppHost frontend logs, and warning-free startup even when a temporary repo-root lockfile exists
-- the AppHost manifest now verifies `Postgres`, `TimescaleDB`, `Redis`, `NATS`, `api`, and `frontend` without requiring a container engine via `tests/apphost/apphost-infrastructure-manifest-tests.sh`
+- the AppHost manifest now verifies `Postgres`, `TimescaleDB`, `Redis`, `NATS`, `api`, and `frontend` without requiring a container engine via `tests/apphost/apphost-infrastructure-manifest-tests.sh`, including the deterministic `TS_TUNE_*` inputs for `timescaledb`
+- when a local Docker-compatible engine is available, `tests/apphost/apphost-infrastructure-runtime-tests.sh` starts `./start run`, verifies the AppHost-managed infra containers get a real process limit (`pids.max > 1`), and confirms `postgres` / `timescaledb` no longer die in their entrypoint scripts
 - `./start.ps1 run` and `./start.cmd run` are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`
 
 ## Bootstrap Status
@@ -129,7 +132,9 @@ The `run` contract is now bootstrapped in the repository for the first real AppH
 - `./start.cmd run` provides the Windows command prompt entrypoint
 - GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
 - the current graph hosts the first minimal `ATrade.Api` service, the first real Next.js frontend home page, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
+- the AppHost graph now applies explicit runtime safeguards for the local Podman-backed Docker API path: `--pids-limit 2048` on the four managed infra containers plus deterministic `TS_TUNE_MEMORY=512MB` / `TS_TUNE_NUM_CPUS=2` values for `timescaledb`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path, stable visible markers for the home page, and the AppHost-managed frontend runtime contract (`NODE_ENV=development` + warning-free Turbopack root resolution)
-- `tests/apphost/apphost-infrastructure-manifest-tests.sh` verifies that the published AppHost manifest preserves `api` / `frontend` and declares the four managed infrastructure resources
+- `tests/apphost/apphost-infrastructure-manifest-tests.sh` verifies that the published AppHost manifest preserves `api` / `frontend`, declares the four managed infrastructure resources, and carries the `timescaledb` tuning inputs in an engine-independent way
+- `tests/apphost/apphost-infrastructure-runtime-tests.sh` verifies the live AppHost-managed infra startup path when a local engine is available, including effective `pids.max > 1` and clean `postgres` / `timescaledb` startup
 
 Reserved subcommands such as `test`, `build`, and `lint` remain future work.

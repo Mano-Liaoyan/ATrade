@@ -1,6 +1,6 @@
 # TP-011: Fix AppHost-managed container startup under a Podman-backed Docker API — Status
 
-**Current Step:** Step 5: Update docs
+**Current Step:** Step 6: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 3
@@ -57,15 +57,16 @@
 ---
 
 ### Step 5: Update docs
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md`
-- [ ] Update `README.md` / `PLAN.md` only if wording would otherwise be stale
+- [x] Update `scripts/README.md`
+- [x] Update `README.md` / `PLAN.md` only if wording would otherwise be stale
+- [x] Call out any important local runtime assumptions without overstating support
 
 ---
 
 ### Step 6: Verification
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
 - [ ] Run the new runtime-focused AppHost infrastructure verification
@@ -115,6 +116,7 @@
 | 2026-04-24 11:35 | Applied deterministic TimescaleDB tuning inputs | `ATrade.AppHost` now sets `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` on the existing `timescaledb` resource, and a live `./start run` repro showed all four infra containers reach `Status=running` with `PidsLimit=2048`. |
 | 2026-04-24 11:36 | Verified the bootstrap graph stayed intact | Manifest verification still passed for `postgres`, `timescaledb`, `redis`, `nats`, `api`, and `frontend`, and `Program.cs` still used Aspire-only resource wiring with no ad-hoc scripts, compose path, or unrelated consumers. |
 | 2026-04-24 11:42 | Added runtime infrastructure verification | New `tests/apphost/apphost-infrastructure-runtime-tests.sh` now verifies real AppHost-managed container startup plus effective `pids.max > 1`, and the manifest test still passes with the new deterministic `TS_TUNE_*` assertions. |
+| 2026-04-24 11:43 | Updated runtime docs | `scripts/README.md` now describes the explicit infra `--pids-limit 2048` safeguard, the deterministic `timescaledb` tuning inputs, and the new runtime verification path; `README.md` / `PLAN.md` were inspected and left unchanged because their current wording remained truthful. |
 
 ---
 
