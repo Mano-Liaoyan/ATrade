@@ -119,6 +119,8 @@
 | 2026-04-24 11:42 | Added runtime infrastructure verification | New `tests/apphost/apphost-infrastructure-runtime-tests.sh` now verifies real AppHost-managed container startup plus effective `pids.max > 1`, and the manifest test still passes with the new deterministic `TS_TUNE_*` assertions. |
 | 2026-04-24 11:43 | Updated runtime docs | `scripts/README.md` now describes the explicit infra `--pids-limit 2048` safeguard, the deterministic `timescaledb` tuning inputs, and the new runtime verification path; `README.md` / `PLAN.md` were inspected and left unchanged because their current wording remained truthful. |
 | 2026-04-24 11:44 | Completed final runtime verification | `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` and `bash tests/apphost/apphost-infrastructure-runtime-tests.sh` both passed, confirming the old `Cannot fork` / `newosproc` startup class is resolved on the managed AppHost infra path. |
+| 2026-04-24 09:52 | Worker iter 1 | done in 1908s, tools: 158 |
+| 2026-04-24 09:52 | Task complete | .DONE created |
 
 ---
 
