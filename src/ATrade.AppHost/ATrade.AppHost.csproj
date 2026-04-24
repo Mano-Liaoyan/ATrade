@@ -19,5 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ATrade.Api\ATrade.Api.csproj" />
+    <ProjectReference Include="..\ATrade.ServiceDefaults\ATrade.ServiceDefaults.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 </Project>

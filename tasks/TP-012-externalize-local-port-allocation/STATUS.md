@@ -1,6 +1,6 @@
 # TP-012: Externalize local port allocation into a repo `.env` contract — Status
 
-**Current Step:** Step 2: Wire AppHost and startup paths to the env contract
+**Current Step:** Step 3: Wire tests to the same source of truth
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -30,16 +30,16 @@
 ---
 
 ### Step 2: Wire AppHost and startup paths to the env contract
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update AppHost/startup code to read the env-driven port values
-- [ ] Centralize the relevant frontend/api/infra runtime path configuration
-- [ ] Avoid regressing TP-010 / TP-011 fixes
+- [x] Update AppHost/startup code to read the env-driven port values
+- [x] Centralize the relevant frontend/api/infra runtime path configuration
+- [x] Avoid regressing TP-010 / TP-011 fixes
 
 ---
 
 ### Step 3: Wire tests to the same source of truth
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update affected test harnesses to use the shared env contract
 - [ ] Remove stale duplicated port assumptions where appropriate
@@ -99,6 +99,9 @@
 | Defined contract variables: `ATRADE_API_HTTP_PORT`, `ATRADE_FRONTEND_DIRECT_HTTP_PORT`, and `ATRADE_APPHOST_FRONTEND_HTTP_PORT`. | Use explicit names tied to the direct API path, direct frontend path, and AppHost-managed frontend path. | `.env.example` |
 | Intentionally ephemeral/internal ports remain outside the contract. | `.env.example` now explicitly leaves AppHost `127.0.0.1:0` internals and service target ports (`5432`/`6379`/`4222`) in code instead of freezing them in `.env`. | `.env.example`, `src/ATrade.AppHost/Properties/launchSettings.json`, `src/ATrade.AppHost/Program.cs` |
 | Fallback behavior is defined at the contract boundary. | `.env.example` documents that local startup and test helpers should use the committed template values whenever a developer-local `.env` file is absent. | `.env.example` |
+| AppHost and API startup code now read the repo-level contract. | Added a shared `LocalDevelopmentPortContractLoader` used by `ATrade.AppHost` and `ATrade.Api`; manifest generation honored `ATRADE_APPHOST_FRONTEND_HTTP_PORT=3005`, and direct API startup served `/health` on `ATRADE_API_HTTP_PORT=5188`. | `src/ATrade.ServiceDefaults/LocalDevelopmentPortContract.cs`, `src/ATrade.AppHost/Program.cs`, `src/ATrade.Api/Program.cs` |
+| Startup path and contract resolution are now centralized. | The shared loader resolves repo root + frontend path in C#, while `scripts/local-env.sh` lets `./start run` load the same `.env`/`.env.example` contract without duplicating path logic; wrapper verification honored `ATRADE_APPHOST_FRONTEND_HTTP_PORT=3012`. | `src/ATrade.ServiceDefaults/LocalDevelopmentPortContract.cs`, `scripts/local-env.sh`, `scripts/start.run.sh` |
+| TP-010 / TP-011 safeguards still hold after the port-contract wiring. | `tests/apphost/frontend-nextjs-bootstrap-tests.sh` and `tests/apphost/apphost-infrastructure-manifest-tests.sh` passed after the startup changes, preserving the `NODE_ENV`/Turbopack and infra-manifest expectations. | `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh` |
 
 ---
 
@@ -120,6 +123,11 @@
 | 2026-04-24 14:50 | Fallback contract documented | Recorded that `.env.example` supplies the default local-port values when `.env` is absent |
 | 2026-04-24 14:50 | Step 1 completed | Repo-level env contract shape and variables recorded |
 | 2026-04-24 14:50 | Step 2 started | Wiring AppHost and direct startup paths to the shared env contract |
+| 2026-04-24 14:58 | AppHost/startup wiring completed | Added shared contract loading to AppHost and API startup paths and verified env-driven port overrides |
+| 2026-04-24 15:02 | Startup path config centralized | Shared repo-root/frontend-path contract loading now backs both C# startup and `./start run` |
+| 2026-04-24 15:06 | Regression checks passed | Frontend bootstrap and AppHost infrastructure manifest tests still passed after the port-contract wiring |
+| 2026-04-24 15:06 | Step 2 completed | AppHost/direct-start wiring now consumes the shared local-port contract |
+| 2026-04-24 15:06 | Step 3 started | Updating test harnesses to consume the same env contract |
 
 ---
 
