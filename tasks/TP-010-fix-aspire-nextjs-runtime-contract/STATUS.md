@@ -1,6 +1,6 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 1: Fix frontend environment semantics
+**Current Step:** Step 2: Fix workspace-root detection
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -20,16 +20,16 @@
 ---
 
 ### Step 1: Fix frontend environment semantics
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update the AppHost frontend resource so `next dev` runs with a valid Next.js `NODE_ENV`
-- [ ] Do not use custom environment names in `NODE_ENV`
-- [ ] Preserve richer app environment identity through a separate variable if needed
+- [x] Update the AppHost frontend resource so `next dev` runs with a valid Next.js `NODE_ENV`
+- [x] Do not use custom environment names in `NODE_ENV`
+- [x] Preserve richer app environment identity through a separate variable if needed
 
 ---
 
 ### Step 2: Fix workspace-root detection
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Add explicit Next.js config so Turbopack/workspace resolution points at `frontend/`
 - [ ] Make the fix durable even if an extra lockfile appears at the repo root later
@@ -113,3 +113,4 @@
 ## Notes
 
 *Goal: make the AppHost-managed frontend launch behave like a correct Next.js development runtime, not a heuristic or machine-specific setup.*
+*Step 1 decision: no separate frontend app-environment variable was added because nothing in the repo currently consumes a richer frontend runtime identity; the minimal durable fix is to pin AppHost-managed `NODE_ENV=development` and keep other environment semantics unchanged.*
