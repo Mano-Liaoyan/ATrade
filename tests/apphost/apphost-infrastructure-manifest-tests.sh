@@ -43,6 +43,8 @@ assert_manifest_declares_infrastructure_graph() {
   assert_file_contains "$manifest_path" '"image": "docker.io/timescale/timescaledb:latest-pg17"'
   assert_file_contains "$manifest_path" '"image": "docker.io/library/redis:'
   assert_file_contains "$manifest_path" '"image": "docker.io/library/nats:'
+  assert_file_contains "$manifest_path" '"TS_TUNE_MEMORY": "512MB"'
+  assert_file_contains "$manifest_path" '"TS_TUNE_NUM_CPUS": "2"'
 
   assert_file_contains "$manifest_path" '"targetPort": 5432'
   assert_file_contains "$manifest_path" '"targetPort": 6379'
