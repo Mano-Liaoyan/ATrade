@@ -18,6 +18,7 @@ builder.AddProject<Projects.ATrade_Api>("api")
 
 builder.AddJavaScriptApp("frontend", "../../frontend", "dev")
     .WithNpm()
+    .WithEnvironment("NODE_ENV", "development")
     .WithHttpEndpoint(targetPort: 3000, env: "PORT")
     .WithExternalHttpEndpoints();
 

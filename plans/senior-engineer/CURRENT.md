@@ -1,7 +1,7 @@
 ---
 status: active
 owner: senior-engineer
-updated: 2026-04-23
+updated: 2026-04-24
 summary: Live plan for the Senior Engineer role.
 see_also:
   - ../../AGENTS.md
@@ -11,7 +11,7 @@ see_also:
 
 # Senior Engineer Current Plan
 
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-24
 
 ## Current Focus
 
@@ -29,10 +29,11 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- TP-009 added compileable shells for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` plus `tests/scaffolding/project-shells-tests.sh`; the next implementation slice should either wire architect-approved runtime resources into the AppHost graph or start filling one of the new modules with real behavior.
+- TP-010 hardened the AppHost-managed Next.js runtime contract; the next implementation slice should either wire architect-approved runtime resources into the AppHost graph or start filling one of the new backend/worker modules with real behavior.
 
 ## Recent Progress
 
+- Completed TP-010 by pinning the AppHost-managed frontend `NODE_ENV` to `development`, adding `frontend/next.config.ts` to pin `turbopack.root`, extending `tests/apphost/frontend-nextjs-bootstrap-tests.sh` to verify AppHost-managed warning-free startup, and syncing `scripts/README.md`
 - Completed TP-009 by scaffolding `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker`, extending shared defaults to generic-host workers, adding `tests/scaffolding/project-shells-tests.sh`, and syncing the architecture/current-state docs
 - Completed TP-006 by converting `frontend/` into the first real Next.js app, adding `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, updating the wrapper regression harness for the new contract, and syncing the active docs
 - Completed TP-004 by adding `tests/start-contract/start-wrapper-windows.ps1`, wiring a `windows-latest` GitHub Actions workflow, syncing verification docs, and extending the Linux regression script to assert the Windows CI path
@@ -43,6 +44,7 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 ## Verification
 
 - `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `DCP_PRESERVE_EXECUTABLE_LOGS=true dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj` with a temporary repo-root `package-lock.json` fixture while asserting warning-free AppHost-managed frontend logs
 - `bash tests/scaffolding/project-shells-tests.sh`
 - `dotnet build ATrade.sln`
 - `bash tests/start-contract/start-wrapper-tests.sh`
