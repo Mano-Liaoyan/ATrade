@@ -1,6 +1,6 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 4: Add verification
+**Current Step:** Step 5: Update docs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -47,17 +47,17 @@
 ---
 
 ### Step 4: Add verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Extend the frontend bootstrap test or add a dedicated runtime test
-- [ ] Verify direct startup still serves the home page markers
-- [ ] Verify the AppHost-managed frontend path no longer emits the `NODE_ENV` warning
-- [ ] Verify the AppHost-managed frontend path no longer emits the workspace-root warning
+- [x] Extend the frontend bootstrap test or add a dedicated runtime test
+- [x] Verify direct startup still serves the home page markers
+- [x] Verify the AppHost-managed frontend path no longer emits the `NODE_ENV` warning
+- [x] Verify the AppHost-managed frontend path no longer emits the workspace-root warning
 
 ---
 
 ### Step 5: Update docs
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update `scripts/README.md` if runtime semantics need to be explicit there
 - [ ] Update `README.md` / `PLAN.md` only if wording is now stale
