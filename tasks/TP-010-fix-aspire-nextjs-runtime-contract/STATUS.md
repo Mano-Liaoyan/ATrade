@@ -1,6 +1,6 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 3: Preserve the startup contract
+**Current Step:** Step 4: Add verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -38,16 +38,16 @@
 ---
 
 ### Step 3: Preserve the startup contract
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Keep the frontend package scripts semantically intact unless a minimal change is required
-- [ ] Keep the AppHost-managed frontend resource on port 3000 with external exposure
-- [ ] Keep direct `cd frontend && npm run dev` working
+- [x] Keep the frontend package scripts semantically intact unless a minimal change is required
+- [x] Keep the AppHost-managed frontend resource on port 3000 with external exposure
+- [x] Keep direct `cd frontend && npm run dev` working
 
 ---
 
 ### Step 4: Add verification
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Extend the frontend bootstrap test or add a dedicated runtime test
 - [ ] Verify direct startup still serves the home page markers
