@@ -1,6 +1,6 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 6: Verification
+**Current Step:** Step 7: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -65,16 +65,16 @@
 ---
 
 ### Step 6: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
-- [ ] Run any new AppHost runtime verification added by this task
-- [ ] Confirm the AppHost-managed frontend startup is warning-free for these issues
+- [x] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- [x] Run any new AppHost runtime verification added by this task
+- [x] Confirm the AppHost-managed frontend startup is warning-free for these issues
 
 ---
 
 ### Step 7: Delivery
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
