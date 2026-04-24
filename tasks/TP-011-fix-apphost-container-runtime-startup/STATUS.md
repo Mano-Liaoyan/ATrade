@@ -1,6 +1,6 @@
 # TP-011: Fix AppHost-managed container startup under a Podman-backed Docker API — Status
 
-**Current Step:** Step 6: Verification
+**Current Step:** Step 7: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 3
@@ -66,16 +66,16 @@
 ---
 
 ### Step 6: Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
-- [ ] Run the new runtime-focused AppHost infrastructure verification
-- [ ] Confirm the original startup failure class is resolved
+- [x] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
+- [x] Run the new runtime-focused AppHost infrastructure verification
+- [x] Confirm the original startup failure class is resolved
 
 ---
 
 ### Step 7: Delivery
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
@@ -99,6 +99,7 @@
 | `src/ATrade.AppHost/Program.cs` now supplies deterministic `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` values to the existing `timescaledb` resource; a live `./start run` repro showed the AppHost-managed `timescaledb`, `postgres`, `redis`, and `nats` containers all reach `Status=running` with `PidsLimit=2048`. | Keep the `timescaledb` resource in the AppHost graph while making the Podman-backed runtime path start cleanly. | `src/ATrade.AppHost/Program.cs`; runtime repro on 2026-04-24 in lane-1 worktree |
 | `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` still passed after the runtime fixes, preserving the `postgres`, `timescaledb`, `redis`, `nats`, `api`, and `frontend` graph names; direct code inspection of `src/ATrade.AppHost/Program.cs` confirmed the graph still uses Aspire primitives without `docker compose`, ad-hoc startup scripts, or new consumer wiring. | Treat as proof that the task preserved the bootstrap graph while staying in scope. | `tests/apphost/apphost-infrastructure-manifest-tests.sh`; `src/ATrade.AppHost/Program.cs` |
 | `tests/apphost/apphost-infrastructure-runtime-tests.sh` now launches `./start run`, captures the fresh AppHost-managed infra containers for that session, verifies `HostConfig.PidsLimit`/effective `pids.max > 1` through `/proc/<pid>/root/sys/fs/cgroup/pids.max`, and asserts `postgres` / `timescaledb` logs no longer die in entrypoint scripts. The manifest test now also asserts the deterministic `TS_TUNE_*` values. | Use the runtime script when an engine is available and keep the manifest script as the engine-independent guardrail. | `tests/apphost/apphost-infrastructure-runtime-tests.sh`; `tests/apphost/apphost-infrastructure-manifest-tests.sh` |
+| Final verification passed: the manifest test stayed green, the runtime test proved the AppHost-managed infra containers get `PidsLimit=2048` plus effective `pids.max > 1`, and the runtime assertions found no `Cannot fork`, `newosproc`, or `timescaledb-tune` cgroup-probe crash markers. | Treat as task-completion evidence for the original startup failure class. | `tests/apphost/apphost-infrastructure-manifest-tests.sh`; `tests/apphost/apphost-infrastructure-runtime-tests.sh` |
 
 ---
 
@@ -117,6 +118,7 @@
 | 2026-04-24 11:36 | Verified the bootstrap graph stayed intact | Manifest verification still passed for `postgres`, `timescaledb`, `redis`, `nats`, `api`, and `frontend`, and `Program.cs` still used Aspire-only resource wiring with no ad-hoc scripts, compose path, or unrelated consumers. |
 | 2026-04-24 11:42 | Added runtime infrastructure verification | New `tests/apphost/apphost-infrastructure-runtime-tests.sh` now verifies real AppHost-managed container startup plus effective `pids.max > 1`, and the manifest test still passes with the new deterministic `TS_TUNE_*` assertions. |
 | 2026-04-24 11:43 | Updated runtime docs | `scripts/README.md` now describes the explicit infra `--pids-limit 2048` safeguard, the deterministic `timescaledb` tuning inputs, and the new runtime verification path; `README.md` / `PLAN.md` were inspected and left unchanged because their current wording remained truthful. |
+| 2026-04-24 11:44 | Completed final runtime verification | `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` and `bash tests/apphost/apphost-infrastructure-runtime-tests.sh` both passed, confirming the old `Cannot fork` / `newosproc` startup class is resolved on the managed AppHost infra path. |
 
 ---
 
