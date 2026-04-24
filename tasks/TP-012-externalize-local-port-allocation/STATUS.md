@@ -1,6 +1,6 @@
 # TP-012: Externalize local port allocation into a repo `.env` contract — Status
 
-**Current Step:** Step 3: Wire tests to the same source of truth
+**Current Step:** Step 4: Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -39,16 +39,16 @@
 ---
 
 ### Step 3: Wire tests to the same source of truth
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update affected test harnesses to use the shared env contract
-- [ ] Remove stale duplicated port assumptions where appropriate
-- [ ] Keep CI deterministic
+- [x] Update affected test harnesses to use the shared env contract
+- [x] Remove stale duplicated port assumptions where appropriate
+- [x] Keep CI deterministic
 
 ---
 
 ### Step 4: Verification
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Prove the `.env` contract is actually consumed
 - [ ] Verify direct API/frontend startup still works
@@ -102,6 +102,9 @@
 | AppHost and API startup code now read the repo-level contract. | Added a shared `LocalDevelopmentPortContractLoader` used by `ATrade.AppHost` and `ATrade.Api`; manifest generation honored `ATRADE_APPHOST_FRONTEND_HTTP_PORT=3005`, and direct API startup served `/health` on `ATRADE_API_HTTP_PORT=5188`. | `src/ATrade.ServiceDefaults/LocalDevelopmentPortContract.cs`, `src/ATrade.AppHost/Program.cs`, `src/ATrade.Api/Program.cs` |
 | Startup path and contract resolution are now centralized. | The shared loader resolves repo root + frontend path in C#, while `scripts/local-env.sh` lets `./start run` load the same `.env`/`.env.example` contract without duplicating path logic; wrapper verification honored `ATRADE_APPHOST_FRONTEND_HTTP_PORT=3012`. | `src/ATrade.ServiceDefaults/LocalDevelopmentPortContract.cs`, `scripts/local-env.sh`, `scripts/start.run.sh` |
 | TP-010 / TP-011 safeguards still hold after the port-contract wiring. | `tests/apphost/frontend-nextjs-bootstrap-tests.sh` and `tests/apphost/apphost-infrastructure-manifest-tests.sh` passed after the startup changes, preserving the `NODE_ENV`/Turbopack and infra-manifest expectations. | `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh` |
+| Test harnesses now load the shared local-port contract. | `api-bootstrap`, `frontend-nextjs-bootstrap`, `apphost-infrastructure-manifest`, and `start-wrapper` tests now source `scripts/local-env.sh` and consume the same `ATRADE_*` variables as startup code. | `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh`, `tests/start-contract/start-wrapper-tests.sh` |
+| Stale duplicated port literals were removed from verification paths. | The tests now derive API/frontend manifest/runtime expectations from `ATRADE_*` values instead of repeating `5181`/`3111`/`3000` in multiple places; only the committed `.env.example` template keeps the canonical defaults. | `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh`, `tests/start-contract/start-wrapper-tests.sh`, `.env.example` |
+| CI remains deterministic without a developer-local `.env`. | With `ATRADE_*` overrides unset, the updated shell tests pass by loading committed defaults from `.env.example`; the frontend runtime check now derives its DCP session folder from the current AppHost log instead of stale global process state. | `.env.example`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh`, `tests/start-contract/start-wrapper-tests.sh` |
 
 ---
 
@@ -128,6 +131,11 @@
 | 2026-04-24 15:06 | Regression checks passed | Frontend bootstrap and AppHost infrastructure manifest tests still passed after the port-contract wiring |
 | 2026-04-24 15:06 | Step 2 completed | AppHost/direct-start wiring now consumes the shared local-port contract |
 | 2026-04-24 15:06 | Step 3 started | Updating test harnesses to consume the same env contract |
+| 2026-04-24 15:11 | Test harnesses wired | AppHost and direct-start shell tests now load the shared local-port contract helper |
+| 2026-04-24 15:12 | Duplicated test literals removed | Verification paths now derive developer-controlled ports from the shared env contract instead of local copies |
+| 2026-04-24 15:18 | Deterministic test defaults verified | Updated shell tests passed with the contract overrides unset, proving `.env.example` is sufficient for CI defaults |
+| 2026-04-24 15:18 | Step 3 completed | Test harnesses now consume the same local-port contract as startup code |
+| 2026-04-24 15:18 | Step 4 started | Verifying the env contract is actually consumed end-to-end |
 
 ---
 
