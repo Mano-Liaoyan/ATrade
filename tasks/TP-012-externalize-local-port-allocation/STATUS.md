@@ -1,6 +1,6 @@
 # TP-012: Externalize local port allocation into a repo `.env` contract — Status
 
-**Current Step:** Step 5: Documentation
+**Current Step:** Step 6: Final verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -58,15 +58,15 @@
 ---
 
 ### Step 5: Documentation
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update `scripts/README.md`
-- [ ] Update `README.md` / `PLAN.md` only if wording would otherwise be stale
+- [x] Update `scripts/README.md`
+- [x] Update `README.md` / `PLAN.md` only if wording would otherwise be stale
 
 ---
 
 ### Step 6: Final verification
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Run the affected tests
 - [ ] Confirm the repo still boots with defaults
@@ -109,6 +109,8 @@
 | Direct API/frontend startup works with `.env` overrides. | `tests/apphost/local-port-contract-tests.sh` passed with a temporary `.env` setting API/frontend direct ports to `5197` and `3117`, proving the direct-start paths still boot under the shared contract. | `tests/apphost/local-port-contract-tests.sh` |
 | AppHost manifest/runtime checks still pass with the shared contract. | The same temporary-`.env` verification run also passed the AppHost-managed frontend runtime assertions and the infrastructure manifest assertions, so the AppHost verification path still holds under env-driven ports. | `tests/apphost/local-port-contract-tests.sh`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh` |
 | Changed `.env` ports propagate through the relevant startup/test paths. | A temporary repo `.env` drove API/direct frontend/AppHost frontend verification on `5197` / `3117` / `3017`, confirming the shared contract affects both direct-start URLs and the AppHost frontend manifest/runtime path. | `tests/apphost/local-port-contract-tests.sh`, `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh` |
+| Startup docs now describe the repo-level local-port contract. | `scripts/README.md` now documents `.env.example` vs `.env`, the three `ATRADE_*` variables, the intentional exclusions, and the new override verification harness. | `scripts/README.md` |
+| Top-level startup guidance stayed aligned with the new contract. | `README.md` now points operator-facing startup guidance at the repo-level `.env` defaults/override model; `PLAN.md` was inspected and did not need wording changes. | `README.md`, `PLAN.md` |
 
 ---
 
@@ -146,6 +148,10 @@
 | 2026-04-24 15:22 | Port propagation verified | Temporary repo `.env` values propagated to direct-start URLs and the AppHost frontend port expectations |
 | 2026-04-24 15:22 | Step 4 completed | Verification now proves the shared `.env` contract is consumed and overrideable |
 | 2026-04-24 15:22 | Step 5 started | Updating operator-facing docs for the local-port contract |
+| 2026-04-24 15:25 | scripts/README updated | Documented the repo-level `.env` port contract, exclusions, defaults, and verification coverage |
+| 2026-04-24 15:26 | README synced | Added top-level operator-facing note about the repo-level `.env` port contract and confirmed `PLAN.md` remained accurate |
+| 2026-04-24 15:26 | Step 5 completed | Startup documentation now reflects the repo-level local-port contract |
+| 2026-04-24 15:26 | Step 6 started | Running final verification for defaults and single-source-of-truth behavior |
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: architect
-updated: 2026-04-23
+updated: 2026-04-24
 summary: Human-facing overview of the rebooted ATrade repository and its core operating contracts.
 see_also:
   - AGENTS.md
@@ -49,7 +49,7 @@ The canonical invocations are:
 
 In this repository, the phrase `start run` refers to that repo-local shim contract, not the Windows shell built-in.
 
-The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches the first scaffolded backend service, `ATrade.Api`, alongside the first real Next.js home page, declares managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph, and now includes compileable shells for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` that are not yet wired into the runtime graph. `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
+The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches the first scaffolded backend service, `ATrade.Api`, alongside the first real Next.js home page, declares managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph, and now includes compileable shells for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` that are not yet wired into the runtime graph. Developer-controlled local bind ports now come from the repo-level `.env` contract (`.env.example` defaults plus optional ignored `.env` overrides). `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
 
 ## Repository Map
 
