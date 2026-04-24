@@ -1,26 +1,26 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 0: Preflight
-**Status:** ⏳ Not started
+**Current Step:** Step 1: Fix frontend environment semantics
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 ---
 
 ### Step 0: Preflight
-**Status:** ⏳ Not started
+**Status:** ✅ Complete
 
-- [ ] Re-read the current AppHost frontend resource configuration
-- [ ] Confirm direct `frontend/` startup is clean and the defect is specific to the AppHost-managed path
-- [ ] Confirm there is currently no explicit Next.js config pinning Turbopack root
+- [x] Re-read the current AppHost frontend resource configuration
+- [x] Confirm direct `frontend/` startup is clean and the defect is specific to the AppHost-managed path
+- [x] Confirm there is currently no explicit Next.js config pinning Turbopack root
 
 ---
 
 ### Step 1: Fix frontend environment semantics
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Update the AppHost frontend resource so `next dev` runs with a valid Next.js `NODE_ENV`
 - [ ] Do not use custom environment names in `NODE_ENV`
@@ -99,6 +99,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-24 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-24 08:45 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-24 08:45 | Step 0 started | Preflight |
 
 ---
 
