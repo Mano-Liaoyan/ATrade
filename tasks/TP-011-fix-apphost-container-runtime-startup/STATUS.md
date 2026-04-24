@@ -1,6 +1,6 @@
 # TP-011: Fix AppHost-managed container startup under a Podman-backed Docker API — Status
 
-**Current Step:** Step 1: Fix process limits for AppHost-managed containers
+**Current Step:** Step 2: Fix TimescaleDB startup for rootless Podman compatibility
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 3
@@ -20,16 +20,16 @@
 ---
 
 ### Step 1: Fix process limits for AppHost-managed containers
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update the AppHost resource configuration so infra containers do not inherit the broken default pids behavior
-- [ ] Use an explicit, readable container runtime configuration rather than a hidden machine tweak
-- [ ] Apply the fix consistently to the AppHost-managed infra resources that need it
+- [x] Update the AppHost resource configuration so infra containers do not inherit the broken default pids behavior
+- [x] Use an explicit, readable container runtime configuration rather than a hidden machine tweak
+- [x] Apply the fix consistently to the AppHost-managed infra resources that need it
 
 ---
 
 ### Step 2: Fix TimescaleDB startup for rootless Podman compatibility
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Make `timescaledb` start cleanly under the same runtime path after the pids fix
 - [ ] Prefer deterministic tuning inputs or another real configuration fix over hiding the problem
@@ -94,6 +94,7 @@
 | `timeout 60s ./start run` created fresh AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` containers; inspect output confirmed each launched with `HostConfig.PidsLimit=0` under the Podman-backed Docker API. | Use as baseline evidence for Step 1 runtime fix. | Runtime repro on 2026-04-24 in lane-1 worktree |
 | Live container inspection confirmed the broken translation from `HostConfig.PidsLimit=0` to an effective cgroup `pids.max=1`: `postgres` exposed `PROCROOT_PIDS_MAX ... 1`, `timescaledb` exposed `cat /sys/fs/cgroup/pids.max => 1`, and container logs showed `Cannot fork` / Go `newosproc` failures. | Treat as root cause evidence for AppHost-managed infra startup failures. | Runtime repro on 2026-04-24 in lane-1 worktree |
 | Manual `timescale/timescaledb:latest-pg17` runs with `--pids-limit 2048` still failed without deterministic tuning inputs: `001_timescaledb_tune.sh` could not read `/sys/fs/cgroup/memory.max` or `/sys/fs/cgroup/cpu.max` and `timescaledb-tune` panicked; the same image stayed running once `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` were supplied. | Use explicit tuning inputs in Step 2 rather than suppressing the failure. | Manual container repro on 2026-04-24 in lane-1 worktree |
+| `src/ATrade.AppHost/Program.cs` now sets an explicit `--pids-limit 2048` container runtime argument for the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` resources, and the AppHost project still builds cleanly. | Use this as the repo-local runtime fix baseline for verification in later steps. | `src/ATrade.AppHost/Program.cs`; `dotnet build src/ATrade.AppHost/ATrade.AppHost.csproj` |
 
 ---
 
@@ -107,6 +108,7 @@
 | 2026-04-24 11:30 | Reproduced AppHost runtime state | `./start run` created fresh managed infra containers with `HostConfig.PidsLimit=0` for `postgres`, `timescaledb`, `redis`, and `nats`. |
 | 2026-04-24 11:30 | Confirmed broken effective pids limit | Live container inspection showed AppHost-created infra containers hit effective `pids.max=1`, producing `Cannot fork` and `newosproc` failures under the Podman-backed Docker API. |
 | 2026-04-24 11:31 | Confirmed TimescaleDB tuning failure after safe pids | Manual `timescaledb` runs with `--pids-limit 2048` still crashed in `001_timescaledb_tune.sh` until explicit `TS_TUNE_MEMORY` and `TS_TUNE_NUM_CPUS` values were provided. |
+| 2026-04-24 11:31 | Applied explicit infra pids limits | `ATrade.AppHost` now passes `--pids-limit 2048` to the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` containers, and `dotnet build src/ATrade.AppHost/ATrade.AppHost.csproj` succeeded. |
 
 ---
 
