@@ -29,10 +29,11 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- TP-010 hardened the AppHost-managed Next.js runtime contract; the next implementation slice should either wire architect-approved runtime resources into the AppHost graph or start filling one of the new backend/worker modules with real behavior.
+- TP-011 hardened the AppHost-managed infrastructure startup path for the current Podman-backed Docker API environment and added runtime verification; the next implementation slice should either wire architect-approved runtime resource consumers into the AppHost graph or start filling one of the new backend/worker modules with real behavior.
 
 ## Recent Progress
 
+- Completed TP-011 by adding explicit AppHost infra `--pids-limit 2048` runtime args, deterministic `timescaledb` tuning inputs, `tests/apphost/apphost-infrastructure-runtime-tests.sh`, and truthful runtime docs for the Podman-backed Docker API startup path
 - Completed TP-010 by pinning the AppHost-managed frontend `NODE_ENV` to `development`, adding `frontend/next.config.ts` to pin `turbopack.root`, extending `tests/apphost/frontend-nextjs-bootstrap-tests.sh` to verify AppHost-managed warning-free startup, and syncing `scripts/README.md`
 - Completed TP-009 by scaffolding `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker`, extending shared defaults to generic-host workers, adding `tests/scaffolding/project-shells-tests.sh`, and syncing the architecture/current-state docs
 - Completed TP-006 by converting `frontend/` into the first real Next.js app, adding `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, updating the wrapper regression harness for the new contract, and syncing the active docs
@@ -44,6 +45,8 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 ## Verification
 
 - `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
+- `bash tests/apphost/apphost-infrastructure-runtime-tests.sh`
 - `DCP_PRESERVE_EXECUTABLE_LOGS=true dotnet run --project src/ATrade.AppHost/ATrade.AppHost.csproj` with a temporary repo-root `package-lock.json` fixture while asserting warning-free AppHost-managed frontend logs
 - `bash tests/scaffolding/project-shells-tests.sh`
 - `dotnet build ATrade.sln`
