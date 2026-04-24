@@ -18,10 +18,6 @@ public static class LocalDevelopmentPortContractLoader
     public const string FrontendDirectHttpPortVariableName = "ATRADE_FRONTEND_DIRECT_HTTP_PORT";
     public const string AppHostFrontendHttpPortVariableName = "ATRADE_APPHOST_FRONTEND_HTTP_PORT";
 
-    private const int DefaultApiHttpPort = 5181;
-    private const int DefaultFrontendDirectHttpPort = 3111;
-    private const int DefaultAppHostFrontendHttpPort = 3000;
-
     private static readonly Lazy<LocalDevelopmentPortContract> CurrentContract = new(CreateCurrentContract);
 
     public static LocalDevelopmentPortContract Load() => CurrentContract.Value;
@@ -48,9 +44,9 @@ public static class LocalDevelopmentPortContractLoader
             repositoryRoot,
             Path.Combine(repositoryRoot, "frontend"),
             loadedFromPath,
-            GetPort(contractValues, ApiHttpPortVariableName, DefaultApiHttpPort),
-            GetPort(contractValues, FrontendDirectHttpPortVariableName, DefaultFrontendDirectHttpPort),
-            GetPort(contractValues, AppHostFrontendHttpPortVariableName, DefaultAppHostFrontendHttpPort));
+            GetRequiredPort(contractValues, ApiHttpPortVariableName, loadedFromPath),
+            GetRequiredPort(contractValues, FrontendDirectHttpPortVariableName, loadedFromPath),
+            GetRequiredPort(contractValues, AppHostFrontendHttpPortVariableName, loadedFromPath));
     }
 
     private static string ResolveRepositoryRoot()
@@ -131,7 +127,7 @@ public static class LocalDevelopmentPortContractLoader
         return values;
     }
 
-    private static int GetPort(IReadOnlyDictionary<string, string> contractValues, string variableName, int fallback)
+    private static int GetRequiredPort(IReadOnlyDictionary<string, string> contractValues, string variableName, string loadedFromPath)
     {
         var configuredValue = Environment.GetEnvironmentVariable(variableName);
         if (string.IsNullOrWhiteSpace(configuredValue) && contractValues.TryGetValue(variableName, out var fileValue))
@@ -141,7 +137,7 @@ public static class LocalDevelopmentPortContractLoader
 
         if (string.IsNullOrWhiteSpace(configuredValue))
         {
-            return fallback;
+            throw new InvalidOperationException($"{variableName} must be provided either through the environment or the local port contract at '{loadedFromPath}'.");
         }
 
         if (!int.TryParse(configuredValue, out var port) || port is <= 0 or > 65535)

@@ -1,6 +1,6 @@
 # TP-012: Externalize local port allocation into a repo `.env` contract — Status
 
-**Current Step:** Step 6: Final verification
+**Current Step:** Step 7: Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -66,16 +66,16 @@
 ---
 
 ### Step 6: Final verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Run the affected tests
-- [ ] Confirm the repo still boots with defaults
-- [ ] Confirm the env contract is the single source of truth for developer-controlled local ports
+- [x] Run the affected tests
+- [x] Confirm the repo still boots with defaults
+- [x] Confirm the env contract is the single source of truth for developer-controlled local ports
 
 ---
 
 ### Step 7: Delivery
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Commit with conventions
 
@@ -111,6 +111,9 @@
 | Changed `.env` ports propagate through the relevant startup/test paths. | A temporary repo `.env` drove API/direct frontend/AppHost frontend verification on `5197` / `3117` / `3017`, confirming the shared contract affects both direct-start URLs and the AppHost frontend manifest/runtime path. | `tests/apphost/local-port-contract-tests.sh`, `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh` |
 | Startup docs now describe the repo-level local-port contract. | `scripts/README.md` now documents `.env.example` vs `.env`, the three `ATRADE_*` variables, the intentional exclusions, and the new override verification harness. | `scripts/README.md` |
 | Top-level startup guidance stayed aligned with the new contract. | `README.md` now points operator-facing startup guidance at the repo-level `.env` defaults/override model; `PLAN.md` was inspected and did not need wording changes. | `README.md`, `PLAN.md` |
+| Final affected-test sweep passed. | With the contract overrides unset, `api-bootstrap`, `frontend-nextjs-bootstrap`, `apphost-infrastructure-manifest`, `local-port-contract`, `start-wrapper`, and `apphost-infrastructure-runtime` all passed during the final verification sweep. | `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, `tests/apphost/apphost-infrastructure-manifest-tests.sh`, `tests/apphost/local-port-contract-tests.sh`, `tests/start-contract/start-wrapper-tests.sh`, `tests/apphost/apphost-infrastructure-runtime-tests.sh` |
+| The repo still boots with default local-port values. | `timeout 20s ./start run` succeeded with the `ATRADE_*` overrides unset, confirming the committed defaults remain runnable without a developer-local `.env`. | `./start run`, `.env.example` |
+| The repo-level env contract is now the single source of truth for developer-controlled local ports. | `LocalDevelopmentPortContractLoader` now requires `ATRADE_*` values to come from the environment or `.env`/`.env.example`, the shell helper reads the same contract, and final grep verification showed the only remaining canonical default values live in `.env.example` (plus a test assertion that checks that template). | `.env.example`, `scripts/local-env.sh`, `src/ATrade.ServiceDefaults/LocalDevelopmentPortContract.cs`, `tests/start-contract/start-wrapper-tests.sh` |
 
 ---
 
@@ -152,6 +155,11 @@
 | 2026-04-24 15:26 | README synced | Added top-level operator-facing note about the repo-level `.env` port contract and confirmed `PLAN.md` remained accurate |
 | 2026-04-24 15:26 | Step 5 completed | Startup documentation now reflects the repo-level local-port contract |
 | 2026-04-24 15:26 | Step 6 started | Running final verification for defaults and single-source-of-truth behavior |
+| 2026-04-24 15:29 | Final test sweep passed | All affected startup/AppHost verification scripts passed with default contract values |
+| 2026-04-24 15:31 | Default boot confirmed | `./start run` still reached the distributed-application startup banner with the default contract values |
+| 2026-04-24 15:36 | Single source confirmed | Removed the C# hardcoded fallback ports so startup/tests now rely on the shared env contract or explicit overrides only |
+| 2026-04-24 15:36 | Step 6 completed | Final verification passed for defaults, overrides, and single-source-of-truth behavior |
+| 2026-04-24 15:36 | Step 7 started | Preparing final delivery commit |
 
 ---
 
