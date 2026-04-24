@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-04-23
 **Status:** Active
-**Next Task ID:** TP-008
+**Next Task ID:** TP-010
 
 ---
 
@@ -107,12 +107,8 @@ The repo-wide operating contract is `AGENTS.md`.
 
 _Items discovered during task execution are logged here by agents._
 
-- `TP-008` extends `src/ATrade.AppHost` with Aspire-managed `Postgres`,
-  `TimescaleDB`, `Redis`, and `NATS` resources while preserving the current
-  API + frontend bootstrap graph.
-- `TP-009` adds the first backend feature-module shells under `src/` plus the
-  first `workers/ATrade.Ibkr.Worker` scaffold without introducing runtime
-  broker logic yet.
-- Those queued tasks align directly with the remaining open `PLAN.md`
-  milestones: extend the AppHost graph with infrastructure resources, then add
-  the first feature-module and worker shells.
+- [ ] `TP-007` — Reconcile planning and docs with the actual repo state
+- [ ] `TP-008` — Extend AppHost with managed infrastructure resources
+- [ ] `TP-009` — Scaffold first feature-module shells and the IBKR worker shell
+- Open milestones tracked in `PLAN.md` should stay aligned with the task packets
+  above and with the active docs.
