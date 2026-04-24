@@ -1,6 +1,6 @@
 # TP-010: Fix the Aspire-managed Next.js runtime contract — Status
 
-**Current Step:** Step 2: Fix workspace-root detection
+**Current Step:** Step 3: Preserve the startup contract
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-24
 **Review Level:** 2
@@ -29,16 +29,16 @@
 ---
 
 ### Step 2: Fix workspace-root detection
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add explicit Next.js config so Turbopack/workspace resolution points at `frontend/`
-- [ ] Make the fix durable even if an extra lockfile appears at the repo root later
-- [ ] Avoid relying on one-off manual cleanup
+- [x] Add explicit Next.js config so Turbopack/workspace resolution points at `frontend/`
+- [x] Make the fix durable even if an extra lockfile appears at the repo root later
+- [x] Avoid relying on one-off manual cleanup
 
 ---
 
 ### Step 3: Preserve the startup contract
-**Status:** ⏳ Not started
+**Status:** 🟨 In Progress
 
 - [ ] Keep the frontend package scripts semantically intact unless a minimal change is required
 - [ ] Keep the AppHost-managed frontend resource on port 3000 with external exposure
