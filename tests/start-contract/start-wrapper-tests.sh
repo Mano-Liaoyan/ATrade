@@ -2,6 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+. "$repo_root/scripts/local-env.sh"
+atrade_load_local_port_contract "$repo_root"
+
 run_script_backup=''
 
 assert_contains() {
@@ -178,7 +181,7 @@ assert_apphost_manifest_preserves_nextjs_frontend() {
 
   assert_file_contains "$manifest_path" '"api"'
   assert_file_contains "$manifest_path" '"frontend"'
-  assert_file_contains "$manifest_path" '"targetPort": 3000'
+  assert_file_contains "$manifest_path" "\"targetPort\": $ATRADE_APPHOST_FRONTEND_HTTP_PORT"
   assert_file_contains "$manifest_path" '"external": true'
   assert_file_contains "$manifest_path" '"PORT": "{frontend.bindings.http.targetPort}"'
 
@@ -215,6 +218,9 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.sh" '#!/usr/bin/env bash'
   assert_file_contains "$repo_root/scripts/start.run.ps1" "\$ErrorActionPreference = 'Stop'"
   assert_file_contains "$repo_root/scripts/start.run.sh" 'src/ATrade.AppHost/ATrade.AppHost.csproj'
+  assert_file_contains "$repo_root/scripts/start.run.sh" 'atrade_load_local_port_contract'
+  assert_file_contains "$repo_root/scripts/local-env.sh" 'ATRADE_PORT_CONTRACT_PATH'
+  assert_file_contains "$repo_root/.env.example" 'ATRADE_APPHOST_FRONTEND_HTTP_PORT=3000'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'src/ATrade.AppHost/ATrade.AppHost.csproj'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'Missing AppHost project at %s'
@@ -230,6 +236,7 @@ main() {
   assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" './tests/start-contract/start-wrapper-windows.ps1'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'Sdk="Microsoft.NET.Sdk.Web"'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.ServiceDefaults.csproj'
+  assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'LocalDevelopmentPortContractLoader.ApplyApiHttpPortDefault(builder);'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'builder.AddServiceDefaults()'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'app.MapGet("/health", () => Results.Text("ok", "text/plain"));'
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'Sdk="Microsoft.NET.Sdk"'
@@ -237,9 +244,12 @@ main() {
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" '<IsAspireHost>true</IsAspireHost>'
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'Aspire.Hosting.JavaScript'
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'ATrade.Api.csproj'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'ATrade.ServiceDefaults.csproj'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'LocalDevelopmentPortContractLoader.Load()'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'DistributedApplication.CreateBuilder(args)'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddProject<Projects.ATrade_Api>("api")'
-  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddJavaScriptApp("frontend", "../../frontend", "dev")'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddJavaScriptApp("frontend", localPortContract.FrontendDirectory, "dev")'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'WithHttpEndpoint(targetPort: localPortContract.AppHostFrontendHttpPort, env: "PORT")'
   assert_file_contains "$repo_root/frontend/package.json" '"dev": "next dev --hostname 0.0.0.0"'
   assert_file_contains "$repo_root/frontend/package.json" '"build": "next build"'
   assert_file_contains "$repo_root/frontend/package.json" '"start": "next start"'

@@ -2,9 +2,12 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+. "$repo_root/scripts/local-env.sh"
+atrade_load_local_port_contract "$repo_root"
+
 api_pid=''
 api_log=''
-api_url='http://127.0.0.1:5181'
+api_url="http://127.0.0.1:${ATRADE_API_HTTP_PORT}"
 
 assert_file_contains() {
   local file_path="$1"

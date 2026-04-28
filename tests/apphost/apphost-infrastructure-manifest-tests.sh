@@ -2,6 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+. "$repo_root/scripts/local-env.sh"
+atrade_load_local_port_contract "$repo_root"
+
 manifest_path=''
 
 assert_file_contains() {
@@ -49,7 +52,7 @@ assert_manifest_declares_infrastructure_graph() {
   assert_file_contains "$manifest_path" '"targetPort": 5432'
   assert_file_contains "$manifest_path" '"targetPort": 6379'
   assert_file_contains "$manifest_path" '"targetPort": 4222'
-  assert_file_contains "$manifest_path" '"targetPort": 3000'
+  assert_file_contains "$manifest_path" "\"targetPort\": $ATRADE_APPHOST_FRONTEND_HTTP_PORT"
   assert_file_contains "$manifest_path" '"type": "project.v0"'
   assert_file_contains "$manifest_path" '"type": "container.v1"'
   assert_file_contains "$manifest_path" '"type": "container.v0"'

@@ -1,3 +1,4 @@
+using ATrade.ServiceDefaults;
 using Aspire.Hosting;
 using Aspire.Hosting.JavaScript;
 
@@ -5,6 +6,7 @@ const string safeInfraContainerPidsLimit = "2048";
 const string timescaleTuneMemory = "512MB";
 const string timescaleTuneCpuCount = "2";
 
+var localPortContract = LocalDevelopmentPortContractLoader.Load();
 var builder = DistributedApplication.CreateBuilder(args);
 
 builder.AddPostgres("postgres")
@@ -26,10 +28,10 @@ builder.AddNats("nats")
 builder.AddProject<Projects.ATrade_Api>("api")
     .WithExternalHttpEndpoints();
 
-builder.AddJavaScriptApp("frontend", "../../frontend", "dev")
+builder.AddJavaScriptApp("frontend", localPortContract.FrontendDirectory, "dev")
     .WithNpm()
     .WithEnvironment("NODE_ENV", "development")
-    .WithHttpEndpoint(targetPort: 3000, env: "PORT")
+    .WithHttpEndpoint(targetPort: localPortContract.AppHostFrontendHttpPort, env: "PORT")
     .WithExternalHttpEndpoints();
 
 builder.Build().Run();

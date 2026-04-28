@@ -2,6 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+. "$repo_root/scripts/local-env.sh"
+atrade_load_local_port_contract "$repo_root"
+
 frontend_pid=''
 frontend_log=''
 apphost_pid=''
@@ -9,8 +12,8 @@ apphost_log=''
 apphost_frontend_log=''
 manifest_path=''
 root_lock_created=0
-frontend_url='http://127.0.0.1:3111'
-apphost_frontend_url='http://127.0.0.1:3000'
+frontend_url="http://127.0.0.1:${ATRADE_FRONTEND_DIRECT_HTTP_PORT}"
+apphost_frontend_url="http://127.0.0.1:${ATRADE_APPHOST_FRONTEND_HTTP_PORT}"
 
 assert_file_contains() {
   local file_path="$1"
@@ -173,7 +176,7 @@ assert_apphost_manifest_preserves_frontend_resource() {
   assert_file_contains "$manifest_path" '"api"'
   assert_file_contains "$manifest_path" '"frontend"'
   assert_file_contains "$manifest_path" '"NODE_ENV": "development"'
-  assert_file_contains "$manifest_path" '"targetPort": 3000'
+  assert_file_contains "$manifest_path" "\"targetPort\": $ATRADE_APPHOST_FRONTEND_HTTP_PORT"
   assert_file_contains "$manifest_path" '"external": true'
   assert_file_contains "$manifest_path" '"PORT": "{frontend.bindings.http.targetPort}"'
 }
@@ -198,17 +201,15 @@ assert_apphost_frontend_runtime_is_warning_free() {
   ) &
   apphost_pid=$!
 
-  local dcp_pid=''
   local session_folder=''
+  local session_folder_candidate=''
   local attempt
 
   for attempt in {1..120}; do
-    dcp_pid="$(ps -eo pid=,args= | awk '/dcp run-controllers/ && !/awk/ { print $1 }' | tail -n 1)"
-    if [[ -n "$dcp_pid" && -r /proc/"$dcp_pid"/environ ]]; then
-      session_folder="$(tr '\0' '\n' </proc/"$dcp_pid"/environ | awk -F= '$1=="DCP_SESSION_FOLDER" { print $2 }')"
-      if [[ -n "$session_folder" && -d "$session_folder" ]]; then
-        break
-      fi
+    session_folder_candidate="$(grep -oE '/tmp/aspire-dcp[^"[:space:]]+/kubeconfig' "$apphost_log" | tail -n 1 | sed 's#/kubeconfig$##' || true)"
+    if [[ -n "$session_folder_candidate" && -d "$session_folder_candidate" ]]; then
+      session_folder="$session_folder_candidate"
+      break
     fi
 
     if ! kill -0 "$apphost_pid" 2>/dev/null; then
@@ -227,7 +228,7 @@ assert_apphost_frontend_runtime_is_warning_free() {
   fi
 
   for attempt in {1..120}; do
-    apphost_frontend_log="$(find "$session_folder" -maxdepth 1 -type f -name 'frontend-*_out_*' ! -name 'frontend-installer-*' | sort | head -n 1)"
+    apphost_frontend_log="$(find "$session_folder" -maxdepth 1 -type f -name 'frontend-*_out_*' ! -name 'frontend-installer-*' | sort | tail -n 1)"
     if [[ -n "$apphost_frontend_log" ]]; then
       break
     fi
@@ -278,11 +279,11 @@ assert_apphost_frontend_runtime_is_warning_free() {
   fi
 
   assert_process_environment_contains "$next_pid" 'NODE_ENV=development'
-  assert_process_environment_contains "$next_pid" 'PORT=3000'
+  assert_process_environment_contains "$next_pid" "PORT=$ATRADE_APPHOST_FRONTEND_HTTP_PORT"
   assert_process_environment_contains "$next_pid" "PWD=$repo_root/frontend"
   assert_process_environment_contains "$next_pid" "INIT_CWD=$repo_root/frontend"
   assert_file_contains "$apphost_frontend_log" 'next dev --hostname 0.0.0.0'
-  assert_file_contains "$apphost_frontend_log" 'http://localhost:3000'
+  assert_file_contains "$apphost_frontend_log" "http://localhost:$ATRADE_APPHOST_FRONTEND_HTTP_PORT"
   assert_file_not_contains "$apphost_frontend_log" 'non-standard "NODE_ENV"'
   assert_file_not_contains "$apphost_frontend_log" 'inferred your workspace root'
   assert_file_not_contains "$apphost_frontend_log" 'Detected multiple lockfiles'
