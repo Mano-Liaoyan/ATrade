@@ -145,7 +145,7 @@ Behavior must stay semantically identical across platforms.
 
 ## Bootstrap Status
 
-The `run` contract is now bootstrapped in the repository for the first real AppHost-managed slice.
+The `run` contract is now bootstrapped in the repository. This covers the first real AppHost-managed slice.
 
 - `./start run` delegates to the Aspire AppHost
 - `./start.ps1 run` provides the PowerShell entrypoint
