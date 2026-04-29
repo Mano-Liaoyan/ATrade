@@ -24,6 +24,18 @@ public static class IbkrBrokerStatus
         state: BrokerProviderStates.NotConfigured,
         message: message);
 
+    public static BrokerProviderStatus CredentialsMissing(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities, string message) => Create(
+        options,
+        capabilities,
+        state: BrokerProviderStates.CredentialsMissing,
+        message: message);
+
+    public static BrokerProviderStatus IbeamContainerConfigured(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities, string message) => Create(
+        options,
+        capabilities,
+        state: BrokerProviderStates.IbeamContainerConfigured,
+        message: message);
+
     public static BrokerProviderStatus Error(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities, string message) => Create(
         options,
         capabilities,
@@ -65,7 +77,7 @@ public static class IbkrBrokerStatus
             State: state,
             Mode: ToBrokerAccountMode(options.AccountMode),
             IntegrationEnabled: options.IntegrationEnabled,
-            HasPaperAccountId: !string.IsNullOrWhiteSpace(options.PaperAccountId),
+            HasPaperAccountId: options.HasConfiguredPaperAccountId,
             Authenticated: authenticated,
             Connected: connected,
             Competing: competing,

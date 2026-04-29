@@ -14,9 +14,24 @@ public sealed class IbkrGatewayOptions
 
     public string? PaperAccountId { get; set; }
 
+    public string? Username { get; set; }
+
+    public string? Password { get; set; }
+
     public TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(DefaultTimeoutSeconds);
 
     public IbkrGatewayContainerOptions GatewayContainer { get; set; } = new();
+
+    public bool HasConfiguredCredentials =>
+        HasRealContractValue(Username, IbkrGatewayPlaceholderValues.Username) &&
+        HasRealContractValue(Password, IbkrGatewayPlaceholderValues.Password);
+
+    public bool HasConfiguredPaperAccountId =>
+        HasRealContractValue(PaperAccountId, IbkrGatewayPlaceholderValues.PaperAccountId);
+
+    public bool HasConfiguredIbeamContainer =>
+        GatewayContainer.IsIbeamImage &&
+        GatewayContainer.Port is > 0 and <= 65535;
 
     public static IbkrGatewayOptions FromConfiguration(IConfiguration configuration)
     {
@@ -29,6 +44,8 @@ public sealed class IbkrGatewayOptions
         var configuredGatewayUrl = NullIfWhiteSpace(configuration[IbkrGatewayEnvironmentVariables.GatewayUrl]);
         var configuredGatewayImage = NullIfWhiteSpace(configuration[IbkrGatewayEnvironmentVariables.GatewayImage]);
         var configuredPaperAccountId = NullIfWhiteSpace(configuration[IbkrGatewayEnvironmentVariables.PaperAccountId]);
+        var configuredUsername = NullIfWhiteSpace(configuration[IbkrGatewayEnvironmentVariables.Username]);
+        var configuredPassword = NullIfWhiteSpace(configuration[IbkrGatewayEnvironmentVariables.Password]);
         var configuredAccountMode = NullIfWhiteSpace(configuration[IbkrGatewayEnvironmentVariables.AccountMode]);
 
         if (configuredIntegrationEnabled.HasValue)
@@ -53,6 +70,8 @@ public sealed class IbkrGatewayOptions
         }
 
         options.PaperAccountId = configuredPaperAccountId;
+        options.Username = configuredUsername;
+        options.Password = configuredPassword;
         options.GatewayContainer.Image = configuredGatewayImage;
 
         if (configuredGatewayPort is > 0)
@@ -79,5 +98,11 @@ public sealed class IbkrGatewayOptions
         return string.IsNullOrWhiteSpace(value)
             ? null
             : value.Trim();
+    }
+
+    private static bool HasRealContractValue(string? value, string fakePlaceholder)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            !string.Equals(value.Trim(), fakePlaceholder, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -13,15 +13,12 @@ public sealed record PaperTradingEnvironmentContract(
     string IbkrPassword,
     string? GatewayTimeoutSeconds)
 {
-    private const string FakeIbkrUsernamePlaceholder = "IBKR_USERNAME";
-    private const string FakeIbkrPasswordPlaceholder = "IBKR_PASSWORD";
-
     public bool IsBrokerIntegrationEnabled =>
         bool.TryParse(BrokerIntegrationEnabled, out var enabled) && enabled;
 
     public bool HasConfiguredIbeamCredentials =>
-        HasRealCredentialValue(IbkrUsername, FakeIbkrUsernamePlaceholder) &&
-        HasRealCredentialValue(IbkrPassword, FakeIbkrPasswordPlaceholder);
+        HasRealCredentialValue(IbkrUsername, IbkrGatewayPlaceholderValues.Username) &&
+        HasRealCredentialValue(IbkrPassword, IbkrGatewayPlaceholderValues.Password);
 
     public bool ShouldStartIbeamContainer =>
         IsBrokerIntegrationEnabled &&

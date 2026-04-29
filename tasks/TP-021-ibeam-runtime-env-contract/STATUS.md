@@ -1,6 +1,6 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 2: Wire `voyz/ibeam:latest` into AppHost safely
+**Current Step:** Step 3: Extend broker options, worker status, and redaction
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -47,13 +47,13 @@
 ---
 
 ### Step 3: Extend broker options, worker status, and redaction
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Broker env constants/options include new credential-bearing variables
-- [ ] API/worker status distinguishes safe iBeam states
-- [ ] Paper/data-only guardrails remain in force
-- [ ] Redaction/live-mode tests cover new env names
-- [ ] Targeted broker safety tests pass
+- [x] Broker env constants/options include new credential-bearing variables
+- [x] API/worker status distinguishes safe iBeam states
+- [x] Paper/data-only guardrails remain in force
+- [x] Redaction/live-mode tests cover new env names
+- [x] Targeted broker safety tests pass
 
 ---
 

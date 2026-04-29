@@ -15,3 +15,10 @@ public static class IbkrGatewayEnvironmentVariables
     public const string IbeamAccount = "IBEAM_ACCOUNT";
     public const string IbeamPassword = "IBEAM_PASSWORD";
 }
+
+public static class IbkrGatewayPlaceholderValues
+{
+    public const string Username = "IBKR_USERNAME";
+    public const string Password = "IBKR_PASSWORD";
+    public const string PaperAccountId = "IBKR_ACCOUNT_ID";
+}
