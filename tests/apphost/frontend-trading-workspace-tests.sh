@@ -123,10 +123,19 @@ assert_frontend_dependencies_and_source() {
     return 1
   fi
 
-  assert_file_contains "$repo_root/frontend/lib/watchlistStorage.ts" 'localStorage'
+  assert_file_contains "$repo_root/frontend/lib/watchlistClient.ts" '/api/workspace/watchlist'
+  assert_file_contains "$repo_root/frontend/lib/watchlistClient.ts" 'buildApiUrl'
   assert_file_contains "$repo_root/frontend/lib/watchlistStorage.ts" 'atrade.paperTrading.watchlist.v1'
+  assert_file_contains "$repo_root/frontend/lib/watchlistStorage.ts" 'backendMigrated'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'getWatchlist'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'pinWatchlistSymbol'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'unpinWatchlistSymbol'
   assert_file_contains "$repo_root/frontend/components/TrendingList.tsx" 'data-testid="trending-list"'
   assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'data-testid="watchlist-panel"'
+  assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'Backend workspace preference'
+  assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'Postgres'
+  assert_file_not_contains "$repo_root/frontend/components/Watchlist.tsx" 'localStorage'
+  assert_file_not_contains "$repo_root/frontend/components/Watchlist.tsx" 'Local browser preference'
   assert_file_contains "$repo_root/frontend/components/CandlestickChart.tsx" 'data-testid="candlestick-chart"'
   assert_file_contains "$repo_root/frontend/types/marketData.ts" "'1m', '5m', '1h', '1D'"
   assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'connectMarketDataStream'
@@ -178,6 +187,8 @@ start_frontend_and_assert_markers() {
   assert_file_contains "$root_response" 'Next.js Bootstrap Slice'
   assert_file_contains "$root_response" 'Aspire AppHost Frontend Contract'
   assert_file_contains "$root_response" 'Trading workspace MVP'
+  assert_file_contains "$root_response" 'backend-saved watchlists'
+  assert_file_contains "$root_response" 'Postgres-backed workspace watchlists'
   assert_file_contains "$root_response" 'Loading backend-driven trending'
 
   wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"

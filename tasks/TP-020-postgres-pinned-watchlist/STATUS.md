@@ -57,14 +57,14 @@
 ---
 
 ### Step 4: Add restart-persistence verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Postgres persistence shell test added
-- [ ] API schema initialization verified against Postgres
-- [ ] API restart persistence verified against same database
-- [ ] Duplicate and invalid-symbol behavior verified
-- [ ] Frontend trading workspace tests updated for backend-owned pins
-- [ ] Targeted persistence/frontend tests pass
+- [x] Postgres persistence shell test added
+- [x] API schema initialization verified against Postgres
+- [x] API restart persistence verified against same database
+- [x] Duplicate and invalid-symbol behavior verified
+- [x] Frontend trading workspace tests updated for backend-owned pins
+- [x] Targeted persistence/frontend tests pass
 
 ---
 
@@ -128,6 +128,7 @@
 | 2026-04-29 21:43 | Step 3 started | Move the frontend watchlist to the backend source of truth |
 | 2026-04-29 23:50 | Step 3 complete | Frontend now loads/persists pins through backend watchlist API, migrates cached localStorage pins once, shows backend/cache/error states, and `npm run build` passed after `npm ci`. |
 | 2026-04-29 23:51 | Step 4 started | Restart-persistence verification hydrated with explicit schema initialization coverage. |
+| 2026-04-29 23:58 | Step 4 complete | Added disposable-Postgres restart persistence test; verified schema initialization, duplicate/invalid handling, API restart survival, and updated frontend workspace smoke tests. |
 
 ---
 
