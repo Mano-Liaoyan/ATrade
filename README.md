@@ -1,7 +1,7 @@
 ---
 status: active
 owner: architect
-updated: 2026-04-24
+updated: 2026-04-29
 summary: Human-facing overview of the rebooted ATrade repository and its core operating contracts.
 see_also:
   - AGENTS.md
@@ -49,7 +49,7 @@ The canonical invocations are:
 
 In this repository, the phrase `start run` refers to that repo-local shim contract, not the Windows shell built-in.
 
-The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches the first scaffolded backend service, `ATrade.Api`, alongside the first real Next.js home page, declares managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph, and now includes compileable shells for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` that are not yet wired into the runtime graph. Developer-controlled local bind ports now come from the repo-level `.env` contract (`.env.example` defaults plus optional ignored `.env` overrides). `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
+The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches the first scaffolded backend service, `ATrade.Api`, alongside an AppHost-managed `ATrade.Ibkr.Worker` shell and the first real Next.js home page; declares managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph; and wires explicit managed-resource references from `api` to the backend infrastructure plus from `ibkr-worker` to its initial `Postgres` / `Redis` / `NATS` dependencies. `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData` remain compileable shells only. Developer-controlled local bind ports now come from the repo-level `.env` contract (`.env.example` defaults plus optional ignored `.env` overrides). `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
 
 ## Repository Map
 
@@ -122,12 +122,12 @@ This repository is still in governance-first bootstrap mode, but the bootstrap i
 - The old Blazor- and script-oriented docs have been replaced at the top level.
 - The first implementation-facing architecture docs and GitHub coordination artifacts are present under `docs/architecture/`, `docs/process/`, and `.github/`.
 - No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them.
-- The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + the first Next.js frontend home page + named Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources.
-- `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker` now exist as compileable scaffolding only and are not yet part of the runtime graph.
+- The current runnable slice is Aspire AppHost + the minimal `ATrade.Api` health endpoint + an inert AppHost-managed `ATrade.Ibkr.Worker` shell + the first Next.js frontend home page + named Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources.
+- `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData` now exist as compileable scaffolding only; `ATrade.Ibkr.Worker` is part of the runtime graph but still intentionally lacks broker, messaging, and database behavior beyond AppHost wiring.
 - Direct frontend startup and home-page marker verification are covered by `tests/apphost/frontend-nextjs-bootstrap-tests.sh`.
 - Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.
 - The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`.
-- Worker processes and deeper backend/frontend feature modules remain future work tracked in `PLAN.md`; the AppHost-managed infrastructure layer is now declared, but not yet consumed by application modules.
+- Additional worker processes and deeper backend/frontend feature modules remain future work tracked in `PLAN.md`; the AppHost-managed infrastructure layer is now declared and explicitly referenced by the current `api` and `ibkr-worker` graph resources, even though application behavior still has not started consuming those dependencies.
 
 ## License
 
