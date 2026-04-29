@@ -6,11 +6,11 @@ public sealed record AccountOverview(
     string BrokerConnection,
     IReadOnlyList<AccountOverviewAccount> Accounts)
 {
-    public static AccountOverview Bootstrap { get; } = new(
-        Module: "accounts",
-        Status: "bootstrap",
-        BrokerConnection: "not-configured",
-        Accounts: Array.Empty<AccountOverviewAccount>());
+  public static AccountOverview Bootstrap { get; } = new(
+      Module: "accounts",
+      Status: "bootstrap",
+      BrokerConnection: "not-configured",
+      Accounts: []);
 }
 
 public sealed record AccountOverviewAccount;
