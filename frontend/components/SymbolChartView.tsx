@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getCandles, getIndicators } from '../lib/marketDataClient';
 import { connectMarketDataStream, type MarketDataStreamState, type MarketDataStreamSubscription } from '../lib/marketDataStream';
 import type { CandleSeriesResponse, IndicatorResponse, MarketDataUpdate, OhlcvCandle, Timeframe } from '../types/marketData';
+import { AnalysisPanel } from './AnalysisPanel';
 import { BrokerPaperStatus } from './BrokerPaperStatus';
 import { CandlestickChart } from './CandlestickChart';
 import { IndicatorPanel } from './IndicatorPanel';
@@ -133,6 +134,8 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
         {!loading && !error && candles ? <CandlestickChart candles={candles} indicators={indicators} /> : null}
 
         <IndicatorPanel indicators={indicators} />
+
+        <AnalysisPanel symbol={normalizedSymbol} timeframe={timeframe} candleSource={candles?.source} />
 
         <div className="chart-footer-note">
           <p>

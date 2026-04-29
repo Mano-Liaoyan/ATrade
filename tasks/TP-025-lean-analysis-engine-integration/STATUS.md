@@ -1,6 +1,6 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
-**Current Step:** Step 3: Wire LEAN analysis through API and frontend
+**Current Step:** Step 4: Add LEAN verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -46,18 +46,18 @@
 ---
 
 ### Step 3: Wire LEAN analysis through API and frontend
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] LEAN provider registered in API when configured
-- [ ] Analysis endpoints run over market-data provider bars
-- [ ] Frontend analysis client/types/panel added
-- [ ] Loading/unavailable/timeout/error states handled
-- [ ] Frontend build passes
+- [x] LEAN provider registered in API when configured
+- [x] Analysis endpoints run over market-data provider bars
+- [x] Frontend analysis client/types/panel added
+- [x] Loading/unavailable/timeout/error states handled
+- [x] Frontend build passes
 
 ---
 
 ### Step 4: Add LEAN verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] LEAN analysis shell test added
 - [ ] Provider/configuration registration verified
