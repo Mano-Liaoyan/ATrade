@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ATrade.Accounts\ATrade.Accounts.csproj" />
     <ProjectReference Include="..\ATrade.Analysis\ATrade.Analysis.csproj" />
+    <ProjectReference Include="..\ATrade.Analysis.Lean\ATrade.Analysis.Lean.csproj" />
     <ProjectReference Include="..\ATrade.Brokers\ATrade.Brokers.csproj" />
     <ProjectReference Include="..\ATrade.Brokers.Ibkr\ATrade.Brokers.Ibkr.csproj" />
     <ProjectReference Include="..\ATrade.MarketData\ATrade.MarketData.csproj" />

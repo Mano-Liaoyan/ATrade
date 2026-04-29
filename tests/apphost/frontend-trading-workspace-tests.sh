@@ -156,6 +156,16 @@ assert_frontend_dependencies_and_source() {
   assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'fallbackTimer = window.setInterval'
   assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'Search another IBKR stock'
   assert_file_contains "$repo_root/frontend/components/BrokerPaperStatus.tsx" 'No real orders'
+  assert_file_contains "$repo_root/frontend/types/analysis.ts" 'AnalysisResult'
+  assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/engines'
+  assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/run'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-panel"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-run-button"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-unavailable"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-no-automation-note"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'analysis-timeout'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'Analysis only — no brokerage routing or automatic order placement.'
+  assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" '<AnalysisPanel'
 }
 
 assert_frontend_build() {
@@ -221,6 +231,9 @@ start_frontend_and_assert_markers() {
   assert_file_contains "$chart_response" 'SignalR'
   assert_file_contains "$chart_response" 'IBKR/iBeam'
   assert_file_contains "$chart_response" 'Search another IBKR stock'
+  assert_file_contains "$chart_response" 'Analysis engine'
+  assert_file_contains "$chart_response" 'Provider-neutral signals'
+  assert_file_contains "$chart_response" 'Analysis only'
   assert_file_not_contains "$chart_response" 'mocked'
   assert_file_contains "$chart_response" 'No real orders'
 }

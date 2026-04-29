@@ -468,7 +468,9 @@ a:hover {
 }
 
 .indicator-panel,
-.broker-status-grid {
+.broker-status-grid,
+.analysis-result-summary,
+.analysis-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
@@ -476,7 +478,9 @@ a:hover {
 }
 
 .indicator-panel > div,
-.broker-status-grid > div {
+.broker-status-grid > div,
+.analysis-result-summary > div,
+.analysis-metrics > div {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 16px;
   background: rgba(15, 23, 42, 0.56);
@@ -496,10 +500,96 @@ a:hover {
   font-size: 1.2rem;
 }
 
-.indicator-panel small {
+.indicator-panel small,
+.analysis-result-summary small {
   display: block;
   margin-top: 0.2rem;
   color: var(--muted);
+}
+
+.analysis-panel {
+  margin: 1rem 0;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 1rem;
+}
+
+.analysis-heading {
+  margin-bottom: 0.75rem;
+}
+
+.analysis-pill--ready {
+  color: var(--positive);
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.analysis-pill--muted {
+  color: var(--muted);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.analysis-copy {
+  margin-top: 0;
+}
+
+.analysis-unavailable,
+.analysis-error {
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.56);
+  padding: 0.9rem;
+}
+
+.analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.analysis-actions span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.analysis-result {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.analysis-metric-list ul,
+.analysis-signals ul {
+  display: grid;
+  gap: 0.6rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.analysis-metric-list li,
+.analysis-signals li {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 0.75rem;
+}
+
+.analysis-metric-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.analysis-metric-list span,
+.analysis-signals span,
+.analysis-signals small {
+  color: var(--muted);
+}
+
+.analysis-signals p {
+  margin: 0.35rem 0 0;
 }
 
 .chart-footer-note {
@@ -530,7 +620,9 @@ a:hover {
   }
 
   .indicator-panel,
-  .broker-status-grid {
+  .broker-status-grid,
+  .analysis-result-summary,
+  .analysis-metrics {
     grid-template-columns: 1fr 1fr;
   }
 }

@@ -1,5 +1,6 @@
 using ATrade.Accounts;
 using ATrade.Analysis;
+using ATrade.Analysis.Lean;
 using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 using ATrade.MarketData;
@@ -17,6 +18,7 @@ builder.Services.AddAccountsModule();
 builder.Services.AddOrdersModule();
 builder.Services.AddMarketDataModule();
 builder.Services.AddAnalysisModule();
+builder.Services.AddLeanAnalysisEngine(builder.Configuration);
 builder.Services.AddIbkrMarketDataProvider();
 builder.Services.AddWorkspacesModule(builder.Configuration);
 builder.Services.AddSignalR();
@@ -81,9 +83,15 @@ app.MapGet(
     (IAnalysisEngineRegistry analysisEngines) => Results.Ok(analysisEngines.GetEngines()));
 app.MapPost(
     "/api/analysis/run",
-    async (AnalysisRequest request, IAnalysisEngineRegistry analysisEngines, CancellationToken cancellationToken) =>
+    async (AnalysisRunApiRequest request, IAnalysisEngineRegistry analysisEngines, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
-        var result = await analysisEngines.AnalyzeAsync(request, cancellationToken);
+        if (!TryCreateAnalysisRequest(request, marketDataService, out var analysisRequest, out var errorResult))
+        {
+            return errorResult;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = await analysisEngines.AnalyzeAsync(analysisRequest, cancellationToken);
         return ToAnalysisResult(result);
     });
 app.MapGet(
@@ -164,6 +172,96 @@ static IResult ToAnalysisResult(AnalysisResult result) => result.Error?.Code swi
         ? Results.BadRequest(result)
         : Results.Ok(result),
 };
+
+static bool TryCreateAnalysisRequest(
+    AnalysisRunApiRequest? request,
+    IMarketDataService marketDataService,
+    out AnalysisRequest analysisRequest,
+    out IResult errorResult)
+{
+    analysisRequest = null!;
+    errorResult = null!;
+
+    if (request is null)
+    {
+        errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "An analysis request payload is required."));
+        return false;
+    }
+
+    var timeframe = string.IsNullOrWhiteSpace(request.Timeframe) ? MarketDataTimeframes.OneDay : request.Timeframe.Trim();
+    var symbol = request.Symbol ?? CreateSymbolIdentityFromCode(request.SymbolCode);
+    var bars = request.Bars;
+
+    if (bars is null || bars.Count == 0)
+    {
+        var symbolCode = symbol?.Symbol ?? request.SymbolCode;
+        if (string.IsNullOrWhiteSpace(symbolCode))
+        {
+            errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol or symbolCode is required for analysis."));
+            return false;
+        }
+
+        if (!marketDataService.TryGetCandles(symbolCode, timeframe, out var candleSeries, out var marketDataError))
+        {
+            errorResult = ToMarketDataErrorResult(marketDataError);
+            return false;
+        }
+
+        if (candleSeries is null || candleSeries.Candles.Count == 0)
+        {
+            errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Market-data provider returned no candles for analysis."));
+            return false;
+        }
+
+        bars = candleSeries.Candles;
+        timeframe = candleSeries.Timeframe;
+        symbol ??= ResolveSymbolIdentity(marketDataService, candleSeries);
+    }
+
+    if (symbol is null)
+    {
+        errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol identity is required when analysis bars are supplied directly."));
+        return false;
+    }
+
+    analysisRequest = new AnalysisRequest(
+        symbol,
+        timeframe,
+        request.RequestedAtUtc ?? DateTimeOffset.UtcNow,
+        bars,
+        request.EngineId,
+        request.StrategyName);
+    return true;
+}
+
+static MarketDataSymbolIdentity? CreateSymbolIdentityFromCode(string? symbolCode)
+{
+    return string.IsNullOrWhiteSpace(symbolCode)
+        ? null
+        : new MarketDataSymbolIdentity(symbolCode.Trim().ToUpperInvariant(), "market-data-provider", null, MarketDataAssetClasses.Stock, "UNKNOWN", "USD");
+}
+
+static MarketDataSymbolIdentity ResolveSymbolIdentity(IMarketDataService marketDataService, CandleSeriesResponse candleSeries)
+{
+    if (marketDataService.TryGetSymbol(candleSeries.Symbol, out var marketSymbol) && marketSymbol is not null)
+    {
+        return new MarketDataSymbolIdentity(
+            marketSymbol.Symbol,
+            candleSeries.Source,
+            ProviderSymbolId: null,
+            marketSymbol.AssetClass,
+            marketSymbol.Exchange,
+            Currency: "USD");
+    }
+
+    return new MarketDataSymbolIdentity(
+        candleSeries.Symbol,
+        candleSeries.Source,
+        ProviderSymbolId: null,
+        MarketDataAssetClasses.Stock,
+        Exchange: "UNKNOWN",
+        Currency: "USD");
+}
 
 static Task<IResult> GetWorkspaceWatchlistAsync(
     IWorkspaceIdentityProvider identityProvider,
@@ -254,6 +352,15 @@ static IReadOnlyList<WorkspaceWatchlistSymbolInput> NormalizeReplacementWatchlis
     var symbols = request?.Symbols ?? Array.Empty<WorkspaceWatchlistSymbolInput>();
     return symbols.Select(NormalizePinnedSymbolRequest).ToArray();
 }
+
+public sealed record AnalysisRunApiRequest(
+    MarketDataSymbolIdentity? Symbol,
+    string? SymbolCode,
+    string? Timeframe,
+    DateTimeOffset? RequestedAtUtc,
+    IReadOnlyList<OhlcvCandle>? Bars,
+    string? EngineId,
+    string? StrategyName);
 
 public sealed record ReplaceWorkspaceWatchlistRequest(IReadOnlyList<WorkspaceWatchlistSymbolInput>? Symbols);
 

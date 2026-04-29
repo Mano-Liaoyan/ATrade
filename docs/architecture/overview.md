@@ -202,13 +202,13 @@ The next staged feature direction is a **paper-trading workspace** inside the
 Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
 and trending symbols. The backend and UI halves of that direction are now
 started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
-states, deterministic paper-order simulation, deterministic market-data/trending
-surfaces, SignalR chart updates, and Postgres-backed watchlist preferences
-already route through `ATrade.Api`. The slice keeps the current
-modular-monolith and Aspire contracts intact by routing browser traffic through
-`ATrade.Api`, using SignalR for browser-facing real-time updates, using NATS for
-internal fan-out, keeping orders simulated rather than live, and treating
-official IBKR Gateway / iBeam connectivity plus the future LEAN signal source
+states, deterministic paper-order simulation, provider-backed market-data
+surfaces, SignalR chart updates, Postgres-backed watchlist preferences, and the
+optional LEAN analysis provider already route through `ATrade.Api`. The slice
+keeps the current modular-monolith and Aspire contracts intact by routing
+browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
+updates, using NATS for internal fan-out, keeping orders simulated rather than
+live, and treating official IBKR Gateway / iBeam connectivity plus LEAN analysis
 as plug-ins behind provider-neutral contracts rather than as reasons to add new
 runtime surfaces or API/UI assumptions.
 
@@ -228,7 +228,7 @@ in the way called out at the top.
 - `provider-abstractions.md` — broker and market-data provider switching
   contract.
 - `paper-trading-workspace.md` — paper-only workspace architecture,
-  streaming boundaries, charting-library decision, and future LEAN seam.
+  streaming boundaries, charting-library decision, and LEAN analysis seam.
 - `../INDEX.md` — documentation discovery layer; the architecture docs
   are indexed there with `status: active`.
 

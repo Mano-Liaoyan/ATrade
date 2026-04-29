@@ -32,7 +32,8 @@ see_also:
 > paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
 > IBKR scanner-driven trending symbols, IBKR stock search, Postgres-backed
 > watchlists, `lightweight-charts` candlesticks, timeframe switching,
-> indicators, source metadata, and SignalR-to-HTTP fallback behavior.
+> indicators, source metadata, an analysis panel that can run LEAN when the
+> analysis runtime is configured, and SignalR-to-HTTP fallback behavior.
 > Production mocked market-data providers have been removed; missing iBeam
 > runtime, credentials, or authentication returns safe
 > provider-not-configured/provider-unavailable/authentication-required errors
@@ -127,10 +128,11 @@ result limit before returning provider-neutral `symbol`, `name`, `assetClass`,
 `exchange`, `currency`, `provider`, and provider-symbol-id metadata (IBKR
 `conid` for the current provider). SignalR is the outward-facing streaming layer
 for browsers and creates provider-backed snapshots when the IBKR/iBeam provider
-is available. The analysis endpoints resolve `IAnalysisEngineRegistry` and
-currently return explicit `analysis-engine-not-configured` metadata until a
-concrete provider is added; NATS remains the internal event backbone between API
-and workers.
+is available. The analysis endpoints resolve `IAnalysisEngineRegistry`; they
+return explicit `analysis-engine-not-configured` metadata when no engine is
+selected and run the configured LEAN provider over `IMarketDataService` candles
+when `ATRADE_ANALYSIS_ENGINE=Lean`; NATS remains the internal event backbone
+between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -156,7 +158,12 @@ The paper-trading slice extends existing planned responsibilities as follows:
   reading credentials directly
 - `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
   request/result contracts, engine/source metadata, API-facing registry, and
-  no-configured-engine fallback for future LEAN or alternate analysis runtimes
+  no-configured-engine fallback for LEAN or alternate analysis runtimes
+- `ATrade.Analysis.Lean` owns the first concrete analysis provider. It builds a
+  temporary official-LEAN workspace from ATrade OHLCV bars, runs an
+  analysis-only moving-average/backtest algorithm through the configured LEAN
+  CLI or Docker-backed runtime, parses provider-neutral signals/metrics, and
+  rejects brokerage/order-routing source tokens.
 - `ATrade.Workspaces` owns backend workspace preferences, including the current
   Postgres schema/repository for pinned watchlist symbols and metadata fields
   (`provider`, optional provider id / IBKR `conid`, name, exchange, currency,
@@ -437,33 +444,38 @@ production search never falls back to a committed symbol allowlist. If iBeam is
 disabled, missing credentials, unauthenticated, or unreachable, search returns a
 stable provider error payload instead of fake results.
 
-## 10. Future LEAN Seam
+## 10. LEAN Analysis Provider
 
-LEAN is a **future analysis engine provider**, not an API/frontend dependency.
-The current repository now has the `ATrade.Analysis` seam and HTTP contracts
-that LEAN should implement later: `GET /api/analysis/engines` for discovery and
-`POST /api/analysis/run` for provider-neutral request/result payloads. Until a
-provider is registered, those endpoints return explicit
-`analysis-engine-not-configured` metadata rather than fake signals.
+LEAN is now the first **analysis engine provider**, not an API/frontend
+dependency. The repository has the `ATrade.Analysis` seam, the
+`ATrade.Analysis.Lean` provider module, and HTTP contracts for discovery and
+execution: `GET /api/analysis/engines` and `POST /api/analysis/run`.
 
-The architecture should therefore preserve provider-neutral market-data,
-analysis, and signal contracts:
+When no provider is configured, those endpoints still return explicit
+`analysis-engine-not-configured` metadata rather than fake signals. When an
+ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
+LEAN provider and `POST /api/analysis/run` can fetch normalized candles from the
+current market-data provider before invoking LEAN. Runtime absence, timeout, or
+non-zero LEAN exits return `analysis-engine-unavailable` instead of successful
+synthetic results.
+
+The architecture preserves provider-neutral market-data, analysis, and signal
+contracts:
 
 - market/trending signals are normalized before they reach the UI
 - analysis requests consume `MarketDataSymbolIdentity` plus normalized
   `OhlcvCandle` bars instead of LEAN runtime types
 - analysis results include engine/source metadata so the frontend can display
-  whether output came from a future LEAN provider or another engine
-- NATS events and persisted factor/signal records should not assume LEAN types
-- the frontend should render signal source metadata without caring whether the
-  source is IBKR/iBeam, internal analytics, LEAN, or another analysis engine
-- future LEAN work belongs behind `ATrade.Analysis` contracts that consume the
-  normalized market-data/provider shapes rather than becoming an API or UI
-  assumption
+  whether output came from LEAN or another engine
+- NATS events and persisted factor/signal records must not assume LEAN types
+- the frontend renders signal source metadata through `AnalysisPanel` without
+  binding its types to QuantConnect/LEAN classes
+- LEAN remains behind `ATrade.Analysis` contracts and the generated algorithm is
+  analysis-only: no brokerage model, no live mode, no order placement, and no
+  calls to ATrade order endpoints
 
-When LEAN is introduced later, it should plug into the existing analysis /
-market-data / strategy signal boundary rather than forcing the paper-trading
-workspace to be redesigned.
+Future analysis engines should plug into the same analysis / market-data /
+strategy signal boundary without redesigning the paper-trading workspace.
 
 ## 11. Configuration Contract Summary
 
@@ -481,6 +493,14 @@ family must expose only paper-safe placeholders:
 - `ATRADE_IBKR_PAPER_ACCOUNT_ID`
 - `ATRADE_FRONTEND_API_BASE_URL`
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL`
+- `ATRADE_ANALYSIS_ENGINE`
+- `ATRADE_LEAN_RUNTIME_MODE`
+- `ATRADE_LEAN_CLI_COMMAND`
+- `ATRADE_LEAN_DOCKER_COMMAND`
+- `ATRADE_LEAN_DOCKER_IMAGE`
+- `ATRADE_LEAN_WORKSPACE_ROOT`
+- `ATRADE_LEAN_TIMEOUT_SECONDS`
+- `ATRADE_LEAN_KEEP_WORKSPACE`
 
 Rules:
 
@@ -492,6 +512,8 @@ Rules:
 - any real local secret belongs only in the ignored repo-root `.env`
 - AppHost passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to iBeam via secret
   parameters and never passes the paper account id to the container
+- LEAN placeholders are non-secret local runtime settings and stay disabled by
+  default with `ATRADE_ANALYSIS_ENGINE=none`
 - changing these variables must never create a live-trading or real-order path
 
 ## 12. Change Control
