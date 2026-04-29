@@ -1,6 +1,6 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 5: Update docs for real IBKR data and removed mocks
+**Current Step:** Step 6: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -79,14 +79,14 @@
 ---
 
 ### Step 6: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Docker/iBeam-dependent runtime tests pass or cleanly skip
-- [ ] All failures fixed
-- [ ] Source audit confirms mocks/configuration removed
-- [ ] Frontend build passes
-- [ ] Solution build passes
+- [x] FULL test suite passing
+- [x] Docker/iBeam-dependent runtime tests pass or cleanly skip
+- [x] All failures fixed
+- [x] Source audit confirms mocks/configuration removed
+- [x] Frontend build passes
+- [x] Solution build passes
 
 ---
 
@@ -121,6 +121,7 @@
 | 2026-04-29 22:21 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 22:21 | Step 0 started | Preflight |
 | 2026-04-30 | Step 2 source audit | `git grep -n -E 'MockMarketData|mock-deterministic|Mocked' -- src frontend` returned no matches |
+| 2026-04-30 | Step 6 source audit | `git grep -n -E 'MockMarketData|mock-deterministic|Mocked' -- src frontend` and broad mocked-market-data audit returned no production matches |
 
 ---
 
