@@ -6,6 +6,7 @@ namespace ATrade.Analysis.Lean;
 public sealed class LeanAnalysisEngine(
     LeanAnalysisOptions options,
     ILeanRuntimeExecutor runtimeExecutor,
+    ILeanAnalysisWorkspaceFactory workspaceFactory,
     ILogger<LeanAnalysisEngine> logger) : IAnalysisEngine
 {
     private static readonly AnalysisEngineCapabilities LeanCapabilities = new(
@@ -25,25 +26,118 @@ public sealed class LeanAnalysisEngine(
 
     public AnalysisEngineCapabilities Capabilities => LeanCapabilities;
 
-    public ValueTask<AnalysisResult> AnalyzeAsync(AnalysisRequest request, CancellationToken cancellationToken = default)
+    public async ValueTask<AnalysisResult> AnalyzeAsync(AnalysisRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        _ = runtimeExecutor;
-        logger.LogInformation("LEAN analysis engine is configured with {RuntimeDescription}.", options.RuntimeDescription);
 
-        var result = new AnalysisResult(
-            AnalysisResultStatuses.Failed,
-            Metadata,
-            new AnalysisDataSource(LeanAnalysisOptions.DefaultProvider, options.RuntimeDescription, DateTimeOffset.UtcNow),
+        LeanPreparedWorkspace? workspace = null;
+        var source = CreateSource();
+
+        try
+        {
+            workspace = await workspaceFactory.CreateAsync(request, cancellationToken);
+            var execution = await runtimeExecutor.ExecuteAsync(
+                new LeanRuntimeExecutionRequest(
+                    workspace.WorkspacePath,
+                    workspace.ProjectName,
+                    workspace.OutputDirectory,
+                    options.Timeout),
+                cancellationToken);
+
+            if (execution.TimedOut)
+            {
+                return CreateErrorResult(
+                    request,
+                    source,
+                    AnalysisResultStatuses.Failed,
+                    AnalysisEngineErrorCodes.EngineUnavailable,
+                    $"LEAN analysis timed out after {options.Timeout.TotalSeconds:N0} seconds.");
+            }
+
+            if (execution.ExitCode != 0)
+            {
+                logger.LogWarning("LEAN runtime exited with code {ExitCode}: {StandardError}", execution.ExitCode, Truncate(execution.StandardError));
+                return CreateErrorResult(
+                    request,
+                    source,
+                    AnalysisResultStatuses.Failed,
+                    AnalysisEngineErrorCodes.EngineUnavailable,
+                    $"LEAN runtime exited with code {execution.ExitCode}. {Truncate(execution.StandardError)}".Trim());
+            }
+
+            return LeanAnalysisResultParser.Parse(execution, request, workspace.Input, Metadata, source);
+        }
+        catch (LeanInputConversionException exception)
+        {
+            return CreateErrorResult(
+                request,
+                source,
+                AnalysisResultStatuses.Failed,
+                AnalysisEngineErrorCodes.InvalidRequest,
+                exception.Message);
+        }
+        catch (LeanRuntimeUnavailableException exception)
+        {
+            logger.LogWarning(exception, "LEAN runtime is not available.");
+            return CreateErrorResult(
+                request,
+                source,
+                AnalysisResultStatuses.Failed,
+                AnalysisEngineErrorCodes.EngineUnavailable,
+                exception.Message);
+        }
+        catch (LeanAnalysisResultParseException exception)
+        {
+            logger.LogWarning(exception, "LEAN runtime output could not be parsed.");
+            return CreateErrorResult(
+                request,
+                source,
+                AnalysisResultStatuses.Failed,
+                AnalysisEngineErrorCodes.EngineUnavailable,
+                exception.Message);
+        }
+        finally
+        {
+            if (workspace is not null)
+            {
+                workspaceFactory.Cleanup(workspace);
+            }
+        }
+    }
+
+    private AnalysisDataSource CreateSource() => new(
+        LeanAnalysisOptions.DefaultProvider,
+        $"{options.RuntimeDescription}; project={LeanAnalysisWorkspaceFactory.ProjectName}",
+        DateTimeOffset.UtcNow);
+
+    private AnalysisResult CreateErrorResult(
+        AnalysisRequest request,
+        AnalysisDataSource source,
+        string status,
+        string errorCode,
+        string message) => new(
+            status,
+            Metadata with { State = AnalysisEngineStates.Unavailable, Message = message },
+            source,
             request.Symbol,
             request.Timeframe,
             DateTimeOffset.UtcNow,
             Array.Empty<AnalysisSignal>(),
             Array.Empty<AnalysisMetric>(),
             Backtest: null,
-            new AnalysisError(AnalysisEngineErrorCodes.EngineUnavailable, "LEAN runtime integration is configured; analysis execution will generate a LEAN workspace in the execution step."));
+            new AnalysisError(errorCode, message));
 
-        return ValueTask.FromResult(result);
+    private static string Truncate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.ReplaceLineEndings(" ").Trim();
+        return normalized.Length <= 500
+            ? normalized
+            : normalized[..500];
     }
 }

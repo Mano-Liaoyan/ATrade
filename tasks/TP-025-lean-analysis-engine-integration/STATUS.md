@@ -1,6 +1,6 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
-**Current Step:** Step 2: Implement analysis-only LEAN execution over ATrade market data
+**Current Step:** Step 3: Wire LEAN analysis through API and frontend
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -35,18 +35,18 @@
 ---
 
 ### Step 2: Implement analysis-only LEAN execution over ATrade market data
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] ATrade bars/symbols convert into LEAN input format
-- [ ] Minimal LEAN analysis/backtest algorithm implemented
-- [ ] Provider-neutral signals/metrics/results returned
-- [ ] No brokerage/order-routing side effects enforced
-- [ ] Targeted LEAN provider tests pass
+- [x] ATrade bars/symbols convert into LEAN input format
+- [x] Minimal LEAN analysis/backtest algorithm implemented
+- [x] Provider-neutral signals/metrics/results returned
+- [x] No brokerage/order-routing side effects enforced
+- [x] Targeted LEAN provider tests pass
 
 ---
 
 ### Step 3: Wire LEAN analysis through API and frontend
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] LEAN provider registered in API when configured
 - [ ] Analysis endpoints run over market-data provider bars

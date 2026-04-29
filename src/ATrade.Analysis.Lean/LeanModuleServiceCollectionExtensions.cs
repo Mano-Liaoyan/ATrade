@@ -23,6 +23,7 @@ public static class LeanModuleServiceCollectionExtensions
         }
 
         services.TryAddSingleton<ILeanRuntimeExecutor, LeanRuntimeExecutor>();
+        services.TryAddSingleton<ILeanAnalysisWorkspaceFactory, LeanAnalysisWorkspaceFactory>();
         services.AddSingleton<IAnalysisEngine, LeanAnalysisEngine>();
 
         return services;
