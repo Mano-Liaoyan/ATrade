@@ -36,7 +36,9 @@ app.UseCors("LocalFrontend");
 
 app.MapGet("/health", () => Results.Text("ok", "text/plain"));
 app.MapGet("/api/accounts/overview", (IAccountOverviewProvider overviewProvider) => Results.Ok(overviewProvider.GetOverview()));
-app.MapGet("/api/market-data/trending", (IMarketDataService marketDataService) => Results.Ok(marketDataService.GetTrendingSymbols()));
+app.MapGet(
+    "/api/market-data/trending",
+    (IMarketDataService marketDataService) => ExecuteMarketDataRequest(() => Results.Ok(marketDataService.GetTrendingSymbols())));
 app.MapGet(
     "/api/market-data/{symbol}/candles",
     (string symbol, string? timeframe, IMarketDataService marketDataService) =>
@@ -46,9 +48,7 @@ app.MapGet(
             return Results.Ok(response);
         }
 
-        return error?.Code == "unsupported-symbol"
-            ? Results.NotFound(error)
-            : Results.BadRequest(error);
+        return ToMarketDataErrorResult(error);
     });
 app.MapGet(
     "/api/market-data/{symbol}/indicators",
@@ -59,9 +59,7 @@ app.MapGet(
             return Results.Ok(response);
         }
 
-        return error?.Code == "unsupported-symbol"
-            ? Results.NotFound(error)
-            : Results.BadRequest(error);
+        return ToMarketDataErrorResult(error);
     });
 app.MapGet(
     "/api/broker/ibkr/status",
@@ -101,6 +99,35 @@ app.MapDelete("/api/workspace/watchlist/{symbol}", UnpinWorkspaceWatchlistSymbol
 app.MapHub<MarketDataHub>("/hubs/market-data");
 
 app.Run();
+
+static IResult ExecuteMarketDataRequest(Func<IResult> operation)
+{
+    try
+    {
+        return operation();
+    }
+    catch (MarketDataProviderUnavailableException exception)
+    {
+        return ToMarketDataErrorResult(exception.Error);
+    }
+}
+
+static IResult ToMarketDataErrorResult(MarketDataError? error)
+{
+    if (error is null)
+    {
+        return Results.BadRequest(new MarketDataError("market-data-error", "Market-data request failed."));
+    }
+
+    return error.Code switch
+    {
+        "unsupported-symbol" => Results.NotFound(error),
+        MarketDataProviderErrorCodes.ProviderNotConfigured or MarketDataProviderErrorCodes.ProviderUnavailable => Results.Json(
+            error,
+            statusCode: StatusCodes.Status503ServiceUnavailable),
+        _ => Results.BadRequest(error),
+    };
+}
 
 static Task<IResult> GetWorkspaceWatchlistAsync(
     IWorkspaceIdentityProvider identityProvider,

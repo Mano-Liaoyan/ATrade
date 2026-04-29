@@ -1,6 +1,6 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 2: Remove production mocked market-data code and configuration
+**Current Step:** Step 3: Wire IBKR-backed HTTP and SignalR behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -46,13 +46,13 @@
 ---
 
 ### Step 3: Wire IBKR-backed HTTP and SignalR behavior
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] API endpoints use IBKR provider abstraction
-- [ ] SignalR snapshots/streaming use provider or return unavailable safely
-- [ ] Endpoint shapes/source metadata updated
-- [ ] Frontend copy/error states updated for real provider status
-- [ ] Targeted API/frontend checks pass
+- [x] API endpoints use IBKR provider abstraction
+- [x] SignalR snapshots/streaming use provider or return unavailable safely
+- [x] Endpoint shapes/source metadata updated
+- [x] Frontend copy/error states updated for real provider status
+- [x] Targeted API/frontend checks pass
 
 ---
 

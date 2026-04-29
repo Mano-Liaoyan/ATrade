@@ -27,6 +27,7 @@ export function TradingWorkspace() {
   const [watchlistSymbols, setWatchlistSymbols] = useState<WatchlistSymbol[]>([]);
   const [marketDataLoading, setMarketDataLoading] = useState(true);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
+  const [marketDataSource, setMarketDataSource] = useState<string | null>(null);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [watchlistSource, setWatchlistSource] = useState<WatchlistSource>('backend');
@@ -45,8 +46,10 @@ export function TradingWorkspace() {
     try {
       const response = await getTrendingSymbols();
       setTrendingSymbols(response.symbols);
+      setMarketDataSource(response.source);
     } catch (caughtError) {
-      setMarketDataError(caughtError instanceof Error ? caughtError.message : 'The market-data backend is unavailable.');
+      setMarketDataError(caughtError instanceof Error ? caughtError.message : 'IBKR market data is unavailable.');
+      setMarketDataSource(null);
       setTrendingSymbols([]);
     } finally {
       setMarketDataLoading(false);
@@ -133,12 +136,12 @@ export function TradingWorkspace() {
     <section className="workspace-stack" data-testid="trading-workspace">
       <div className="workspace-status-row" aria-live="polite">
         <span className="status-dot" aria-hidden="true" />
-        <span>Paper-only workspace consuming backend market data and Postgres-backed workspace watchlists.</span>
+        <span>Paper-only workspace consuming IBKR/iBeam market data and Postgres-backed workspace watchlists.</span>
       </div>
 
       {marketDataLoading ? (
         <div className="workspace-panel loading-state" role="status">
-          Loading backend-driven trending stocks and ETFs…
+          Loading IBKR/iBeam trending stocks and ETFs…
         </div>
       ) : null}
 
@@ -146,10 +149,10 @@ export function TradingWorkspace() {
         <div className="workspace-layout">
           {marketDataError ? (
             <div className="workspace-panel error-state" role="alert">
-              <strong>Market data backend unavailable.</strong>
+              <strong>IBKR market data unavailable.</strong>
               <p>{marketDataError}</p>
               <button className="primary-button" type="button" onClick={() => void loadTrendingSymbols()}>
-                Retry backend request
+                Retry IBKR market data
               </button>
             </div>
           ) : null}
@@ -157,7 +160,7 @@ export function TradingWorkspace() {
           {!marketDataError && sortedTrendingSymbols.length === 0 ? (
             <div className="workspace-panel empty-state">
               <strong>No trending symbols returned.</strong>
-              <p>The backend responded, but no stocks or ETFs were available for the workspace.</p>
+              <p>The IBKR/iBeam provider responded, but no stocks or ETFs were available for the workspace.</p>
             </div>
           ) : null}
 
@@ -165,6 +168,7 @@ export function TradingWorkspace() {
             <TrendingList
               symbols={sortedTrendingSymbols}
               pinnedSymbols={pinnedSymbolNames}
+              source={marketDataSource}
               onTogglePin={handleTogglePin}
               actionsDisabled={watchlistActionsDisabled}
               savingSymbol={savingSymbol}

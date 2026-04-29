@@ -9,9 +9,10 @@ type TrendingListProps = {
   onTogglePin: (symbol: TrendingSymbol) => void;
   actionsDisabled?: boolean;
   savingSymbol?: string | null;
+  source?: string | null;
 };
 
-export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisabled = false, savingSymbol = null }: TrendingListProps) {
+export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisabled = false, savingSymbol = null, source = null }: TrendingListProps) {
   const pinnedSet = new Set(pinnedSymbols.map((symbol) => symbol.toUpperCase()));
 
   return (
@@ -21,7 +22,7 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisab
           <p className="eyebrow">Backend-driven market data</p>
           <h2 id="trending-title">Trending stocks and ETFs</h2>
         </div>
-        <span className="pill">IBKR scanner factors</span>
+        <span className="pill">{formatSourceLabel(source)}</span>
       </div>
 
       <div className="symbol-grid">
@@ -79,6 +80,18 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisab
       </div>
     </section>
   );
+}
+
+function formatSourceLabel(source: string | null): string {
+  if (!source) {
+    return 'IBKR market-data factors';
+  }
+
+  if (source.includes('scanner')) {
+    return 'IBKR scanner factors';
+  }
+
+  return `IBKR source: ${source}`;
 }
 
 function formatCurrency(value: number): string {

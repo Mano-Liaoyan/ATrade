@@ -30,6 +30,23 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
+    public void StreamingService_ReturnsProviderUnavailableWithoutFallbackSnapshot()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) =>
+            throw new InvalidOperationException("The fake handler must not receive streaming snapshot requests when credentials are missing."));
+        var provider = CreateProvider(handler, CreateOptions(withCredentials: false));
+        var streamingService = new MarketDataStreamingService(provider, provider);
+
+        var result = streamingService.TryCreateSnapshot("AAPL", MarketDataTimeframes.OneDay, out var update, out var error);
+
+        Assert.False(result);
+        Assert.Null(update);
+        Assert.NotNull(error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderNotConfigured, error.Code);
+        Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
     public void Provider_ReportsUnavailableWhenIbeamSessionIsNotAuthenticated()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
@@ -99,6 +116,7 @@ public sealed class IbkrMarketDataProviderTests
         var latestResult = provider.TryGetLatestUpdate("AAPL", MarketDataTimeframes.OneDay, out var latest, out var latestError);
 
         Assert.True(status.IsAvailable);
+        Assert.Equal(IbkrMarketDataSource.Scanner, trending.Source);
         var trendingSymbol = Assert.Single(trending.Symbols);
         Assert.Equal("AAPL", trendingSymbol.Symbol);
         Assert.Equal("Apple Inc.", trendingSymbol.Name);
@@ -121,13 +139,15 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Null(candlesError);
         Assert.Equal("AAPL", candles!.Symbol);
         Assert.Equal(MarketDataTimeframes.OneDay, candles.Timeframe);
+        Assert.Equal(IbkrMarketDataSource.History, candles.Source);
         Assert.Equal(2, candles.Candles.Count);
         Assert.Equal(195.11m, candles.Candles[0].Open);
         Assert.Equal(58_000_000, candles.Candles[^1].Volume);
 
         Assert.True(indicatorsResult);
         Assert.Null(indicatorsError);
-        Assert.Equal(2, indicators!.MovingAverages.Count);
+        Assert.Equal(IbkrMarketDataSource.History, indicators!.Source);
+        Assert.Equal(2, indicators.MovingAverages.Count);
         Assert.Equal(2, indicators.Rsi.Count);
         Assert.Equal(2, indicators.Macd.Count);
 

@@ -128,7 +128,7 @@ public sealed class IbkrMarketDataProvider(
             .Select((result, index) => CreateTrendingSymbol(result, index + 1, snapshots))
             .ToArray();
 
-        return new TrendingSymbolsResponse(DateTimeOffset.UtcNow, symbols);
+        return new TrendingSymbolsResponse(DateTimeOffset.UtcNow, symbols, IbkrMarketDataSource.Scanner);
     }
 
     public bool TrySearchSymbols(string query, out MarketDataSymbolSearchResponse? response, out MarketDataError? error)
@@ -214,7 +214,7 @@ public sealed class IbkrMarketDataProvider(
             return false;
         }
 
-        response = new CandleSeriesResponse(contract.Symbol, definition.Name, DateTimeOffset.UtcNow, candles);
+        response = new CandleSeriesResponse(contract.Symbol, definition.Name, DateTimeOffset.UtcNow, candles, IbkrMarketDataSource.History);
         return true;
     }
 
@@ -226,7 +226,10 @@ public sealed class IbkrMarketDataProvider(
             return false;
         }
 
-        response = indicatorService.Calculate(candleResponse.Symbol, candleResponse.Timeframe, candleResponse.Candles);
+        response = indicatorService.Calculate(candleResponse.Symbol, candleResponse.Timeframe, candleResponse.Candles) with
+        {
+            Source = candleResponse.Source,
+        };
         return true;
     }
 
