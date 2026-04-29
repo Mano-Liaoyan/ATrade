@@ -2,30 +2,33 @@
 status: active
 owner: maintainer
 updated: 2026-04-29
-summary: Provider-neutral broker and market-data contract for swapping ATrade providers without changing API or frontend payloads.
+summary: Provider-neutral broker, market-data, and analysis provider contracts for swapping ATrade providers without changing API or frontend payloads.
 see_also:
   - ../INDEX.md
   - overview.md
   - modules.md
   - paper-trading-workspace.md
+  - analysis-engines.md
   - ../../README.md
   - ../../PLAN.md
 ---
 
 # Provider Abstractions
 
-ATrade composes broker and market-data implementations behind provider-neutral
-contracts. The API and frontend must depend on ATrade contracts and payloads,
-not on the concrete IBKR Gateway/iBeam runtime, Polygon, or any future analysis
-engine.
+ATrade composes broker, market-data, and analysis implementations behind
+provider-neutral contracts. The API and frontend must depend on ATrade
+contracts and payloads, not on the concrete IBKR Gateway/iBeam runtime,
+Polygon, LEAN, or any future provider runtime.
 
-This document is the authoritative switching contract for the current provider
-seams introduced in `TP-019`.
+This document is the switching overview for the provider seams introduced in
+`TP-019` and extended by the analysis engine contract. The detailed analysis
+engine contract lives in `analysis-engines.md`.
 
 ## 1. Goals
 
 - Allow broker status providers to change without rewriting API endpoint code.
 - Allow market-data providers to change without changing HTTP/SignalR payloads.
+- Allow analysis engines to change without changing API/frontend request or result payloads.
 - Keep paper-only safety explicit: real order placement is not supported by the
   current contract.
 - Keep provider unavailable and not-configured states explicit so runtime,
@@ -111,21 +114,41 @@ Unavailable handling:
   that already expose `MarketDataError`; provider tasks must not silently fall
   back to synthetic data when iBeam is unavailable.
 
-## 4. Composition Rules
+## 4. Analysis Engine Provider Family
+
+Analysis engine contracts live in `src/ATrade.Analysis` and are documented in
+`analysis-engines.md`.
+
+Core rules:
+
+- `IAnalysisEngine` implementations consume `AnalysisRequest`, which contains
+  `MarketDataSymbolIdentity` and normalized `OhlcvCandle` bars from
+  `ATrade.MarketData`.
+- API callers use `GET /api/analysis/engines` and `POST /api/analysis/run`, not
+  provider-specific endpoints.
+- `AnalysisResult` always carries engine metadata, source metadata, signals,
+  metrics, optional backtest summary, and optional error information.
+- With no concrete provider configured, the fallback returns the explicit
+  `analysis-engine-not-configured` result instead of synthetic signals.
+- LEAN and future runtimes belong in concrete provider modules; API/core
+  contracts remain provider-neutral.
+
+## 5. Composition Rules
 
 - API endpoint handlers may depend on provider-neutral contracts such as
-  `IBrokerProvider`, `IMarketDataService`, and SignalR-facing market-data
-  services.
+  `IBrokerProvider`, `IMarketDataService`, `IAnalysisEngineRegistry`, and
+  SignalR-facing market-data services.
 - API endpoint handlers must not instantiate concrete providers such as the
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
   swapped by changing DI registration, not endpoint code. The current API
-  composes `AddMarketDataModule()` plus `AddIbkrMarketDataProvider()`.
+  composes `AddMarketDataModule()` plus `AddIbkrMarketDataProvider()` and
+  `AddAnalysisModule()` with a no-engine fallback.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.
 
-## 5. Current IBKR Market-Data Provider And Future Plug-ins
+## 6. Current IBKR Market-Data Provider And Future Plug-ins
 
 Current implementation:
 
@@ -152,11 +175,11 @@ Future plug-ins:
   workflows.
 - Polygon or another market-data provider may be added later behind the same
   contracts and source metadata rules.
-- LEAN remains a future analysis-engine provider seam; it must consume
-  normalized market-data/signal contracts rather than becoming an API or UI
-  assumption.
+- LEAN remains a future analysis-engine provider behind `ATrade.Analysis`; it
+  must consume normalized market-data/signal contracts rather than becoming an
+  API or UI assumption.
 
-## 6. Change Control
+## 7. Change Control
 
 Changes that add provider capabilities, expose new provider states, or weaken
 paper-only guardrails must update this document, `modules.md`, and

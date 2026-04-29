@@ -10,6 +10,7 @@ see_also:
   - docs/architecture/overview.md
   - docs/architecture/modules.md
   - docs/architecture/provider-abstractions.md
+  - docs/architecture/analysis-engines.md
   - docs/architecture/paper-trading-workspace.md
 ---
 
@@ -28,7 +29,7 @@ queue for the next provider-backed trading workspace increment.
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
 - Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract and IBKR/iBeam-backed market data
-- Analysis direction: provider-neutral analysis contracts plus LEAN integration queued in `TP-024` and `TP-025`
+- Analysis direction: provider-neutral `ATrade.Analysis` contracts and no-engine API behavior with LEAN integration queued in `TP-025`
 
 ## Run Contract
 
@@ -55,12 +56,15 @@ The current runnable slice includes:
   - `GET /api/market-data/trending`
   - `GET /api/market-data/{symbol}/candles`
   - `GET /api/market-data/{symbol}/indicators`
+  - `GET /api/analysis/engines`
+  - `POST /api/analysis/run`
   - `GET /api/workspace/watchlist`
   - `PUT /api/workspace/watchlist`
   - `POST /api/workspace/watchlist`
   - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
 - `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
+- `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and backend-saved watchlists.
@@ -75,8 +79,11 @@ of falling back to production mocks. Pinned symbols are backend-owned workspace
 preferences persisted in the AppHost-managed Postgres database through
 `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist`; browser `localStorage` is only a non-authoritative
-cache / one-time migration source. The active task queue continues with IBKR
-search and LEAN analysis while keeping API/frontend payloads provider-neutral.
+cache / one-time migration source. Analysis engine discovery/run contracts are
+available through `/api/analysis/engines` and `/api/analysis/run`; until a
+provider is configured they return explicit `analysis-engine-not-configured`
+metadata with no fake signals. The active task queue continues with LEAN as the
+first analysis provider while keeping API/frontend payloads provider-neutral.
 
 ## Active Task Queue
 
@@ -116,7 +123,7 @@ agents used by the orchestrator.
 
 - Use `docs/INDEX.md` as the documentation discovery layer.
 - Only documents marked `active` are implementation authority.
-- `docs/architecture/provider-abstractions.md` and `docs/architecture/paper-trading-workspace.md` define the provider seams and paper-trading workspace contract.
+- `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md`, and `docs/architecture/paper-trading-workspace.md` define the provider seams, analysis engine contract, and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
 - No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
@@ -133,6 +140,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/ibkr-market-data-provider-tests.sh`
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/provider-abstraction-contract-tests.sh`
+- `tests/apphost/analysis-engine-contract-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
