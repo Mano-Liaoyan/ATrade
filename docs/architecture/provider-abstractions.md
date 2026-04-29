@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Provider-neutral broker and market-data contract for swapping ATrade providers without changing API or frontend payloads.
 see_also:
   - ../INDEX.md
@@ -76,9 +76,8 @@ Market-data provider contracts live in `src/ATrade.MarketData`.
 
 Core types:
 
-- `IMarketDataProvider` — provider seam for trending/scanner results, symbol
-  lookup, symbol-search readiness, historical candles, indicators, and latest
-  snapshots.
+- `IMarketDataProvider` — provider seam for trending/scanner results, stock
+  search, symbol lookup, historical candles, indicators, and latest snapshots.
 - `IMarketDataStreamingProvider` — streaming snapshot/group-name seam used by
   the SignalR compatibility layer.
 - `MarketDataProviderIdentity` — stable provider id plus display name.
@@ -86,17 +85,21 @@ Core types:
   candles, indicators, streaming snapshots, symbol search, and mock-data usage.
 - `MarketDataProviderStatus` — provider id, `available` / `not-configured` /
   `unavailable` state, message, observation time, and capabilities.
-- `MarketDataSymbolIdentity`, `OhlcvCandle`, `CandleSeriesResponse`,
+- `MarketDataSymbolIdentity`, `MarketDataSymbolSearchResult`,
+  `MarketDataSymbolSearchResponse`, `OhlcvCandle`, `CandleSeriesResponse`,
   `IndicatorResponse`, `MarketDataUpdate`, and trending response records — the
-  payload-safe domain shapes providers must emit, including source metadata
-  such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, or scanner source ids.
+  payload-safe domain shapes providers must emit. Search identity includes
+  `symbol`, `provider`, `providerSymbolId`, `assetClass`, `exchange`, and
+  `currency`; for IBKR the provider symbol id is the Client Portal `conid`.
+  Other payloads include source metadata such as `ibkr-ibeam-history`,
+  `ibkr-ibeam-snapshot`, or scanner source ids.
 
 Compatibility layer:
 
 - `IMarketDataService` remains the HTTP-facing compatibility service used by
-  existing endpoints.
-- `MarketDataService` composes `IMarketDataProvider` and preserves current
-  endpoint payload behavior.
+  existing endpoints, including `GET /api/market-data/search`.
+- `MarketDataService` composes `IMarketDataProvider`, validates stock search
+  query length/asset class/result limit, and preserves endpoint payload behavior.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`.
 - Production provider composition is now `ATrade.MarketData.Ibkr`; the former
@@ -107,6 +110,8 @@ Unavailable handling:
 - Providers report status through `MarketDataProviderStatus`.
 - `not-configured` maps to `provider-not-configured`.
 - `unavailable` maps to `provider-unavailable`.
+- rejected Client Portal requests caused by unauthenticated iBeam sessions may
+  surface `authentication-required` while still avoiding fake data.
 - Compatibility services return these safe errors for request/response methods
   that already expose `MarketDataError`; provider tasks must not silently fall
   back to synthetic data when iBeam is unavailable.
@@ -135,21 +140,26 @@ Current implementation:
 - It does not read credential environment variables directly. Credential and
   paper-account presence is evaluated through typed gateway configuration and
   the paper-only guard.
-- It translates Client Portal contract search (`/iserver/secdef/search`),
-  snapshots (`/iserver/marketdata/snapshot`), historical bars
-  (`/iserver/marketdata/history`), and scanner results
-  (`/iserver/scanner/run`) into provider-neutral ATrade payloads.
+- It translates Client Portal contract search (`/iserver/secdef/search`) plus
+  contract detail (`/iserver/secdef/info`), snapshots
+  (`/iserver/marketdata/snapshot`), historical bars (`/iserver/marketdata/history`),
+  and scanner results (`/iserver/scanner/run`) into provider-neutral ATrade
+  payloads.
+- Search returns stock results with symbol, display name, asset class, exchange,
+  currency, provider id, and provider symbol id/IBKR `conid`; no production
+  hard-coded stock allowlist is used.
 - Trending uses the scanner source `ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`
   rather than a hard-coded symbol catalog.
 - Missing local runtime, placeholder credentials, unauthenticated sessions,
   unreachable gateway, or rejected live mode return `not-configured` /
-  `unavailable` states and `provider-not-configured` / `provider-unavailable`
-  errors rather than fallback data.
+  `unavailable` states and `provider-not-configured` / `provider-unavailable` /
+  `authentication-required` errors rather than fallback data.
 
 Future plug-ins:
 
-- `TP-023` may use the market-data symbol-search hook for pin-any-symbol
-  workflows.
+- The current Next.js workspace uses the market-data search hook for
+  pin-any-symbol workflows while persisting provider metadata through
+  `ATrade.Workspaces`.
 - Polygon or another market-data provider may be added later behind the same
   contracts and source metadata rules.
 - LEAN remains a future analysis-engine provider seam; it must consume

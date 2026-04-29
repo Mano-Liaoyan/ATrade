@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -53,6 +53,7 @@ The current runnable slice includes:
   - `GET /api/broker/ibkr/status`
   - `POST /api/orders/simulate`
   - `GET /api/market-data/trending`
+  - `GET /api/market-data/search`
   - `GET /api/market-data/{symbol}/candles`
   - `GET /api/market-data/{symbol}/indicators`
   - `GET /api/workspace/watchlist`
@@ -60,8 +61,8 @@ The current runnable slice includes:
   - `POST /api/workspace/watchlist`
   - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
-- `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
-- `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata.
+- `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
+- `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and backend-saved watchlists.
 
@@ -75,8 +76,12 @@ of falling back to production mocks. Pinned symbols are backend-owned workspace
 preferences persisted in the AppHost-managed Postgres database through
 `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist`; browser `localStorage` is only a non-authoritative
-cache / one-time migration source. The active task queue continues with IBKR
-search and LEAN analysis while keeping API/frontend payloads provider-neutral.
+cache / one-time migration source. Users can search IBKR/iBeam stocks through
+`/api/market-data/search`, open result chart pages, and pin provider metadata
+(`provider`, provider symbol id / IBKR `conid`, name, exchange, currency, and
+asset class) into the backend watchlist without a production hard-coded symbol
+catalog. The active task queue continues with LEAN analysis while keeping
+API/frontend payloads provider-neutral.
 
 ## Active Task Queue
 
@@ -131,6 +136,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/ibkr-paper-safety-tests.sh`
 - `tests/apphost/ibeam-runtime-contract-tests.sh`
 - `tests/apphost/ibkr-market-data-provider-tests.sh`
+- `tests/apphost/ibkr-symbol-search-tests.sh`
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/provider-abstraction-contract-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`

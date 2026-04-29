@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker and market-data seams.
 see_also:
   - ../INDEX.md
@@ -28,16 +28,18 @@ see_also:
 > credentials-missing, configured-iBeam, connecting/authenticated/degraded,
 > and rejected-live statuses while remaining intentionally light on broker-side state.
 > `ATrade.MarketData` now provides provider-neutral market-data contracts,
-> compatibility services, provider status/error shapes, and SignalR snapshot
-> contracts, while `ATrade.MarketData.Ibkr` provides the first real IBKR/iBeam
-> market-data provider. `ATrade.Workspaces` owns the first backend-persisted workspace preference: Postgres-backed pinned
-> watchlists with provider/IBKR metadata columns and a temporary local user /
+> compatibility services, provider status/error shapes, stock search contracts,
+> and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
+> first real IBKR/iBeam market-data provider including secdef search/detail
+> mapping. `ATrade.Workspaces` owns the first backend-persisted workspace
+> preference: Postgres-backed pinned watchlists with provider/IBKR metadata
+> columns, provider/conid duplicate handling, and a temporary local user /
 > workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
 > `frontend/` directory now hosts the first paper-trading workspace UI slice:
-> a Next.js home route with backend-driven trending symbols, Postgres-backed
-> watchlists, symbol navigation, and `lightweight-charts` chart routes while
-> preserving the original bootstrap smoke markers.
+> a Next.js home route with backend-driven trending symbols, IBKR stock search,
+> Postgres-backed watchlists, symbol navigation, and `lightweight-charts` chart
+> routes while preserving the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -47,7 +49,7 @@ see_also:
 > container only when ignored `.env` credentials enable integration; and keeps the browser-facing backend slice focused on
 > `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
-> `GET /api/market-data/{symbol}/candles`,
+> `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`,
 > `GET /api/market-data/{symbol}/indicators`, `GET` / `PUT` / `POST`
 > `/api/workspace/watchlist`, `DELETE /api/workspace/watchlist/{symbol}`, and
 > `/hubs/market-data` while the worker limits itself to paper-safe
@@ -116,6 +118,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   broker, MarketData, and Workspaces modules, and exposes stable `GET /health`,
   `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
   `POST /api/orders/simulate`, `GET /api/market-data/trending`,
+  `GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
   `GET /api/market-data/{symbol}/candles?timeframe=...`,
   `GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
   `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
@@ -127,9 +130,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   paper-only fills while making live broker order placement impossible by
   construction; and the market-data endpoints/hub depend on compatibility
   services over `IMarketDataProvider` / `IMarketDataStreamingProvider` while
-  returning IBKR/iBeam scanner, snapshot, historical candle, indicator, source
-  metadata, and provider-unavailable payloads without a production fallback
-  provider. The watchlist endpoints resolve the temporary local workspace identity, initialize
+  returning IBKR/iBeam scanner, stock search, snapshot, historical candle,
+  indicator, source metadata, and provider-unavailable/authentication-required
+  payloads without a production fallback provider. The watchlist endpoints resolve the temporary local workspace identity, initialize
   the `ATrade.Workspaces` schema idempotently, persist pinned symbols in
   Postgres, return stable metadata payloads, and surface validation/storage
   failures as stable JSON errors. The AppHost now injects runtime connection
@@ -207,11 +210,13 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** Market data ingestion, storage, and query.
 - **Responsibilities:** In the current slice, provide provider-neutral
   market-data provider contracts, provider identity/capability/status models,
-  symbol identity and search-readiness hooks, OHLCV candle and indicator
+  symbol identity and stock-search contracts, OHLCV candle and indicator
   payload shapes with source metadata, compatibility services for the existing
   HTTP/SignalR API, moving-average / RSI / MACD indicator calculations,
   transparent trending factors, and a SignalR hub/snapshot service consumed by
-  `ATrade.Api`. Concrete providers are registered by composition; production no
+  `ATrade.Api`. Search results include provider, provider symbol id, asset
+  class, exchange, currency, and name so UI/watchlist payloads remain provider-neutral.
+  Concrete providers are registered by composition; production no
   longer ships a deterministic market-data provider or catalog fallback. Future
   slices may persist historical chart queries in TimescaleDB, publish real-time
   updates onto NATS for API / SignalR projection, and cache hot reads in Redis.
@@ -230,9 +235,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   and repository operations for pinned watchlist symbols. The current schema
   stores `user_id`, `workspace_id`, normalized symbol, provider, optional
   provider symbol id / IBKR `conid`, display name, exchange, currency, asset
-  class, sort order, and timestamps so TP-023 can enrich pins from IBKR search
-  without a disruptive table rewrite. The local identity provider is explicitly
-  temporary until authentication and named workspaces are introduced.
+  class, sort order, and timestamps. It enriches existing manual pins when a
+  user pins a searched result and deduplicates by provider/conid when available,
+  falling back to normalized symbol identity otherwise. The local identity
+  provider is explicitly temporary until authentication and named workspaces are
+  introduced.
 - **Expected dependencies:** `Postgres` via the AppHost-provided
   `ConnectionStrings:postgres`, `Microsoft.Extensions.Configuration`,
   `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. It is composed by
@@ -276,12 +283,12 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** IBKR/iBeam market-data adapter behind the provider-neutral
   market-data contract.
 - **Responsibilities:** Translate official Client Portal/iBeam auth status,
-  contract lookup, snapshot, historical bar, and scanner responses into ATrade
-  market-data payloads; expose `ibkr-ibeam-*` source metadata; implement
+  contract search/detail, snapshot, historical bar, and scanner responses into
+  ATrade market-data payloads; expose `ibkr-ibeam-*` source metadata; implement
   `IMarketDataProvider` and `IMarketDataStreamingProvider`; reuse broker/iBeam
   gateway configuration without reading credentials directly; and return safe
-  provider-not-configured/provider-unavailable errors when iBeam is disabled,
-  missing credentials, unauthenticated, degraded, or unreachable.
+  provider-not-configured/provider-unavailable/authentication-required errors
+  when iBeam is disabled, missing credentials, unauthenticated, degraded, or unreachable.
 - **Expected dependencies:** `ATrade.MarketData`, `ATrade.Brokers.Ibkr`, and
   the local `voyz/ibeam:latest` Client Portal runtime when integration is
   enabled through ignored `.env` values.
@@ -369,16 +376,16 @@ references.
   AppHost for process lifecycle and environment wiring.
 - **First-phase focus:** UI surfaces for paper-only IBKR connection /
   account views, simulated orders, IBKR/iBeam-backed market data, clear
-  provider-not-configured/provider-unavailable states, and transparent
-  trending-factor/source explanations. The current slice preserves the stable
-  home-page markers (`ATrade Frontend Home` / `Next.js Bootstrap Slice` /
-  `Aspire AppHost Frontend Contract`) while adding the first workspace route:
-  IBKR scanner-backed trending stocks/ETFs, symbol navigation to
-  `/symbols/[symbol]`, backend watchlist API reads/writes with a
-  non-authoritative localStorage cache/migration source, `lightweight-charts`
-  candlesticks with `1m` / `5m` / `1h` / `1D` timeframe switching,
-  moving-average / RSI / MACD panels, SignalR updates with HTTP fallback, and
-  explicit no-real-orders messaging.
+  provider-not-configured/provider-unavailable/authentication-required states,
+  and transparent trending-factor/source explanations. The current slice
+  preserves the stable home-page markers (`ATrade Frontend Home` / `Next.js
+  Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding the first
+  workspace route: IBKR scanner-backed trending stocks/ETFs, reusable IBKR stock
+  search controls, symbol navigation to `/symbols/[symbol]`, backend watchlist
+  API reads/writes with provider metadata and a non-authoritative localStorage
+  cache/migration source, `lightweight-charts` candlesticks with `1m` / `5m` /
+  `1h` / `1D` timeframe switching, moving-average / RSI / MACD panels, SignalR
+  updates with HTTP fallback, and explicit no-real-orders messaging.
 
 ## 5. Dependency Summary
 

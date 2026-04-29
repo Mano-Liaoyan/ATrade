@@ -1,6 +1,6 @@
 # TP-023: Add IBKR stock search and pin-any-symbol workflow — Status
 
-**Current Step:** Step 5: Update docs for IBKR search
+**Current Step:** Step 6: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -68,17 +68,17 @@
 ---
 
 ### Step 5: Update docs for IBKR search
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Paper-trading workspace doc updated
-- [ ] Modules doc updated
-- [ ] Provider abstractions doc updated
-- [ ] README reviewed and updated if stale
+- [x] Paper-trading workspace doc updated
+- [x] Modules doc updated
+- [x] Provider abstractions doc updated
+- [x] README reviewed and updated if stale
 
 ---
 
 ### Step 6: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Docker/iBeam-dependent runtime tests pass or cleanly skip
@@ -128,6 +128,8 @@
 | 2026-04-30 | Step 4 started | IBKR stock search verification scripts |
 | 2026-04-30 | Step 4 completed | Added ibkr-symbol-search-tests.sh, expanded frontend workspace verification, and ran targeted search/frontend scripts. |
 | 2026-04-30 | Step 5 started | Documentation updates for IBKR search workflow |
+| 2026-04-30 | Step 5 completed | Updated active docs and README for IBKR search endpoint, UX, provider metadata, and verification script. |
+| 2026-04-30 | Step 6 started | Full testing and verification gate |
 
 ---
 
