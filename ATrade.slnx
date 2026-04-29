@@ -1,0 +1,23 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/ATrade.Accounts/ATrade.Accounts.csproj" />
+    <Project Path="src/ATrade.Api/ATrade.Api.csproj" />
+    <Project Path="src/ATrade.AppHost/ATrade.AppHost.csproj" />
+    <Project Path="src/ATrade.Brokers.Ibkr/ATrade.Brokers.Ibkr.csproj" />
+    <Project Path="src/ATrade.MarketData/ATrade.MarketData.csproj" />
+    <Project Path="src/ATrade.Orders/ATrade.Orders.csproj" />
+    <Project Path="src/ATrade.ServiceDefaults/ATrade.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj" />
+    <Project Path="tests/ATrade.Orders.Tests/ATrade.Orders.Tests.csproj" />
+  </Folder>
+  <Folder Name="/workers/">
+    <Project Path="workers/ATrade.Ibkr.Worker/ATrade.Ibkr.Worker.csproj" />
+  </Folder>
+</Solution>
