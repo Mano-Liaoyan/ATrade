@@ -1,6 +1,6 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
-**Current Step:** Step 1: Add LEAN provider project and runtime configuration
+**Current Step:** Step 2: Implement analysis-only LEAN execution over ATrade market data
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -24,18 +24,18 @@
 ---
 
 ### Step 1: Add LEAN provider project and runtime configuration
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] LEAN provider project added to solution
-- [ ] Official LEAN runtime/package/CLI/container integration added
-- [ ] Safe LEAN config placeholders added to env templates
-- [ ] LEAN provider registered behind analysis abstraction
-- [ ] Targeted LEAN provider build passes
+- [x] LEAN provider project added to solution
+- [x] Official LEAN runtime/package/CLI/container integration added
+- [x] Safe LEAN config placeholders added to env templates
+- [x] LEAN provider registered behind analysis abstraction
+- [x] Targeted LEAN provider build passes
 
 ---
 
 ### Step 2: Implement analysis-only LEAN execution over ATrade market data
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] ATrade bars/symbols convert into LEAN input format
 - [ ] Minimal LEAN analysis/backtest algorithm implemented
