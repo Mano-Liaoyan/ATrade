@@ -1,8 +1,8 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 6: Testing & Verification
-**Status:** 🟡 In Progress
-**Last Updated:** 2026-04-29
+**Current Step:** Step 7: Documentation & Delivery
+**Status:** ✅ Complete
+**Last Updated:** 2026-04-30
 **Review Level:** 3
 **Review Counter:** 0
 **Iteration:** 1
@@ -91,11 +91,11 @@
 ---
 
 ### Step 7: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -110,6 +110,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| IBKR market-data trending uses the Client Portal scanner source `ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`; there is no production hard-coded symbol catalog fallback. | Implemented and documented | `src/ATrade.MarketData.Ibkr`, docs/architecture/provider-abstractions.md |
+| API/frontend no-credential behavior is now safe provider-not-configured/provider-unavailable responses instead of synthetic data. | Verified by apphost scripts and docs | `tests/apphost/ibkr-market-data-provider-tests.sh`, `frontend/lib/marketDataClient.ts` |
+| Test-only fake HTTP handlers live in the IBKR market-data test project; production code uses typed HttpClient clients only. | Verified by source audit | `tests/ATrade.MarketData.Ibkr.Tests/IbkrMarketDataProviderTests.cs` |
 
 ---
 
@@ -133,4 +136,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Check-if-affected docs: README updated for IBKR/iBeam market data; scripts/README unchanged because startup/env contract was not changed beyond existing TP-021 iBeam wiring; docs/INDEX unchanged because no new docs were added.
