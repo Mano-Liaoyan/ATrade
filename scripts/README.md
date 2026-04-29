@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:
   - ../PLAN.md
@@ -44,6 +44,7 @@ The current bootstrap slice now implements the first infrastructure-aware runnab
 - the first real Next.js frontend slice managed by Aspire
 - Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources declared in the AppHost graph
 - an optional AppHost-managed `ibkr-gateway` iBeam container using `voyz/ibeam:latest` when broker integration is enabled locally with real ignored `.env` credentials
+- provider-neutral analysis endpoints with an optional LEAN analysis provider selected by ignored `.env` runtime settings
 - explicit AppHost resource references from `api` to `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, plus matching worker references from `ibkr-worker` to `Postgres`, `Redis`, and `NATS`
 - explicit container-runtime `--pids-limit 2048` settings for the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` resources so Podman-backed Docker API runs do not collapse to an effective `pids.max=1`
 - deterministic `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` inputs for the `timescaledb` resource so its init-time tuning script does not crash in the rootless Podman environment used here
@@ -112,10 +113,11 @@ now come from a repo-level `.env` contract.
 - `ATRADE_FRONTEND_DIRECT_HTTP_PORT` — direct `frontend/` `npm run dev` verification path
 - `ATRADE_APPHOST_FRONTEND_HTTP_PORT` — AppHost-managed Next.js frontend port
 
-### Paper-trading and iBeam runtime placeholders
+### Paper-trading, iBeam, and LEAN runtime placeholders
 
-These placeholders define the safe local IBKR/iBeam contract without committing
-real credentials or enabling broker behavior by default.
+These placeholders define the safe local IBKR/iBeam and analysis-runtime
+contract without committing real credentials or enabling broker behavior by
+default.
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker/iBeam wiring; committed default stays `false`
 - `ATRADE_BROKER_ACCOUNT_MODE` — committed default stays `Paper`; live mode remains rejected by the API, worker, and simulation guardrails
@@ -128,6 +130,14 @@ real credentials or enabling broker behavior by default.
 - `ATRADE_IBKR_PAPER_ACCOUNT_ID` — fake `IBKR_ACCOUNT_ID` placeholder for a paper account identifier; real values stay only in ignored `.env` and surface only as redacted booleans in status payloads
 - `ATRADE_FRONTEND_API_BASE_URL` — legacy/frontend-to-API base URL for the paper-trading workspace
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL` — browser-safe Next.js public API base URL used by the trading workspace HTTP and SignalR clients; committed default mirrors `ATRADE_FRONTEND_API_BASE_URL`
+- `ATRADE_ANALYSIS_ENGINE` — analysis provider selector; committed default is `none`, set ignored `.env` to `Lean` to enable the LEAN provider
+- `ATRADE_LEAN_RUNTIME_MODE` — official LEAN runtime invocation mode (`cli` by default, `docker` supported for a Docker-backed command wrapper)
+- `ATRADE_LEAN_CLI_COMMAND` — local official LEAN CLI command/path; committed default is `lean`
+- `ATRADE_LEAN_DOCKER_COMMAND` — Docker-compatible command/path for containerized LEAN invocation; committed default is `docker`
+- `ATRADE_LEAN_DOCKER_IMAGE` — LEAN runtime image placeholder; committed default is `quantconnect/lean:foundation`
+- `ATRADE_LEAN_WORKSPACE_ROOT` — optional non-secret local directory for generated LEAN workspaces; blank uses a temp directory
+- `ATRADE_LEAN_TIMEOUT_SECONDS` — analysis runtime timeout; committed default is `45`
+- `ATRADE_LEAN_KEEP_WORKSPACE` — optional debugging flag for generated LEAN workspaces; committed default is `false`
 
 To start local iBeam for user-driven IBKR API login, copy `.env.template` to
 `.env`, set `ATRADE_BROKER_INTEGRATION_ENABLED=true`, keep
@@ -142,7 +152,7 @@ This contract intentionally does **not** move everything into `.env`.
 
 - AppHost internal host/dashboard bindings stay intentionally ephemeral on `127.0.0.1:0`.
 - Service/container target ports such as `5432`, `6379`, and `4222` remain fixed where the protocol or container image expects them.
-- Real broker credentials, session cookies, tokens, real account identifiers, or any value that would create a live-trading path must never appear in `.env.example` or `.env.template`.
+- Real broker credentials, session cookies, tokens, real account identifiers, or any value that would create a live-trading path must never appear in `.env.example` or `.env.template`. LEAN settings are non-secret local runtime settings only and must not contain broker credentials.
 
 ## Reserved Commands
 
@@ -169,9 +179,9 @@ Behavior must stay semantically identical across platforms.
 ## Current Verification Scope
 
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
-- direct `ATrade.Api` startup, `GET /health` smoke coverage, the read-only Accounts overview endpoint, the safe IBKR status endpoint, deterministic paper-order simulation, and deterministic mocked market-data endpoints/SignalR hub are verified in this repository's Linux environment via `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/accounts-feature-bootstrap-tests.sh`, `tests/apphost/ibkr-paper-safety-tests.sh`, and `tests/apphost/market-data-feature-tests.sh`
+- direct `ATrade.Api` startup, `GET /health` smoke coverage, the read-only Accounts overview endpoint, the safe IBKR status endpoint, deterministic paper-order simulation, provider-backed market-data unavailable states, and analysis endpoints are verified in this repository's Linux environment via `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/accounts-feature-bootstrap-tests.sh`, `tests/apphost/ibkr-paper-safety-tests.sh`, `tests/apphost/market-data-feature-tests.sh`, `tests/apphost/analysis-engine-contract-tests.sh`, and `tests/apphost/lean-analysis-engine-tests.sh`
 - direct frontend startup and the Next.js home-page markers are verified in this repository's Linux environment via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
-- the frontend trading workspace source/build/direct-runtime checks are verified via `tests/apphost/frontend-trading-workspace-tests.sh`, including the chart/SignalR dependencies, no proprietary TradingView package, localStorage watchlist source, direct API/frontend startup, landing/chart markers, timeframe controls, SignalR label, and no-real-orders marker
+- the frontend trading workspace source/build/direct-runtime checks are verified via `tests/apphost/frontend-trading-workspace-tests.sh`, including the chart/SignalR dependencies, no proprietary TradingView package, backend watchlist source, direct API/frontend startup, landing/chart markers, timeframe controls, SignalR label, analysis panel markers, and no-real-orders marker
 - the AppHost-managed frontend runtime path is verified via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, including `NODE_ENV=development`, preserved AppHost frontend logs, and warning-free startup even when a temporary repo-root lockfile exists
 - `tests/apphost/local-port-contract-tests.sh` writes a temporary repo `.env` and verifies that direct API startup, direct frontend startup, and the AppHost frontend/manifest checks all honor changed local port values
 - the AppHost manifest now verifies `Postgres`, `TimescaleDB`, `Redis`, `NATS`, `api`, and `frontend` without requiring a container engine via `tests/apphost/apphost-infrastructure-manifest-tests.sh`, including the deterministic `TS_TUNE_*` inputs for `timescaledb`
@@ -188,9 +198,9 @@ The `run` contract is now bootstrapped in the repository. This covers the first 
 - `./start.ps1 run` provides the PowerShell entrypoint
 - `./start.cmd run` provides the Windows command prompt entrypoint
 - GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
-- the current graph hosts `ATrade.Api` with its `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `POST /api/orders/simulate`, `GET /api/market-data/trending`, candle/indicator, and `/hubs/market-data` SignalR slice, an `ATrade.Ibkr.Worker` background service that reports safe paper-session states, the first Next.js trading workspace route set, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
+- the current graph hosts `ATrade.Api` with its `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `POST /api/orders/simulate`, `GET /api/market-data/trending`, candle/indicator, `GET /api/analysis/engines`, `POST /api/analysis/run`, and `/hubs/market-data` SignalR slice, an `ATrade.Ibkr.Worker` background service that reports safe paper-session states, the first Next.js trading workspace route set with analysis panel, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
 - the AppHost now wires explicit managed-resource references into the application graph: `api` receives `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, while `ibkr-worker` receives `Postgres`, `Redis`, and `NATS`
-- developer-controlled local bind ports, safe IBKR/iBeam paper-mode placeholders, and the browser-safe `NEXT_PUBLIC_ATRADE_API_BASE_URL` frontend API base URL now come from the repo-level `.env` contract (`.env.example`/`.env.template` defaults + optional ignored `.env` overrides)
+- developer-controlled local bind ports, safe IBKR/iBeam paper-mode placeholders, LEAN runtime placeholders, and the browser-safe `NEXT_PUBLIC_ATRADE_API_BASE_URL` frontend API base URL now come from the repo-level `.env` contract (`.env.example`/`.env.template` defaults + optional ignored `.env` overrides)
 - the AppHost graph now applies explicit runtime safeguards for the local Podman-backed Docker API path: `--pids-limit 2048` on the four managed infra containers plus deterministic `TS_TUNE_MEMORY=512MB` / `TS_TUNE_NUM_CPUS=2` values for `timescaledb`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path, stable visible markers for the home page, and the AppHost-managed frontend runtime contract (`NODE_ENV=development` + warning-free Turbopack root resolution)
 - `tests/apphost/apphost-infrastructure-manifest-tests.sh` verifies that the published AppHost manifest preserves `api` / `frontend`, declares the four managed infrastructure resources, and carries the `timescaledb` tuning inputs in an engine-independent way

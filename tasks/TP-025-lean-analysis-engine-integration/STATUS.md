@@ -1,6 +1,6 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
-**Current Step:** Step 5: Update docs for LEAN analysis
+**Current Step:** Step 6: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -69,18 +69,18 @@
 ---
 
 ### Step 5: Update docs for LEAN analysis
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Analysis engines doc updated for LEAN implementation
-- [ ] Paper-trading workspace doc updated
-- [ ] Modules doc updated for Analysis/LEAN/API/frontend
-- [ ] Provider abstractions doc updated
-- [ ] Scripts README/README reviewed and updated if stale
+- [x] Analysis engines doc updated for LEAN implementation
+- [x] Paper-trading workspace doc updated
+- [x] Modules doc updated for Analysis/LEAN/API/frontend
+- [x] Provider abstractions doc updated
+- [x] Scripts README/README reviewed and updated if stale
 
 ---
 
 ### Step 6: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Docker/iBeam/LEAN-dependent tests pass or cleanly skip

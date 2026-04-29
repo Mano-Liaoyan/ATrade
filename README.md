@@ -29,7 +29,7 @@ queue for the next provider-backed trading workspace increment.
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
 - Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract and IBKR/iBeam-backed market data
-- Analysis direction: provider-neutral `ATrade.Analysis` contracts and no-engine API behavior with LEAN integration queued in `TP-025`
+- Analysis direction: provider-neutral `ATrade.Analysis` contracts with `ATrade.Analysis.Lean` as the first optional analysis provider when the official LEAN runtime is configured locally
 
 ## Run Contract
 
@@ -66,9 +66,10 @@ The current runnable slice includes:
   - `/hubs/market-data`
 - `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
 - `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
+- `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI/Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and backend-saved watchlists.
+- `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
 
 Current market data is served through the `ATrade.MarketData.Ibkr` provider
 behind `ATrade.MarketData` contracts. When the local iBeam/Gateway runtime is
@@ -85,10 +86,12 @@ cache / one-time migration source. Users can search IBKR/iBeam stocks through
 (`provider`, provider symbol id / IBKR `conid`, name, exchange, currency, and
 asset class) into the backend watchlist without a production hard-coded symbol
 catalog. Analysis engine discovery/run contracts are available through
-`/api/analysis/engines` and `/api/analysis/run`; until a provider is configured
-they return explicit `analysis-engine-not-configured` metadata with no fake
-signals. The active task queue continues with LEAN as the first analysis provider
-while keeping API/frontend payloads provider-neutral.
+`/api/analysis/engines` and `/api/analysis/run`. With no provider selected they
+return explicit `analysis-engine-not-configured` metadata with no fake signals;
+when ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers
+`ATrade.Analysis.Lean`, runs LEAN over market-data-provider candles, and returns
+provider-neutral signals/metrics/backtest summaries. Missing LEAN runtime or
+timeouts surface as safe `analysis-engine-unavailable` responses.
 
 ## Active Task Queue
 
@@ -147,6 +150,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/provider-abstraction-contract-tests.sh`
 - `tests/apphost/analysis-engine-contract-tests.sh`
+- `tests/apphost/lean-analysis-engine-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`

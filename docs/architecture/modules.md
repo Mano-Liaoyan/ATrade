@@ -20,8 +20,8 @@ see_also:
 > `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`,
 > `src/ATrade.Brokers`, `src/ATrade.Brokers.Ibkr`, `src/ATrade.Orders`,
 > `src/ATrade.MarketData`, `src/ATrade.MarketData.Ibkr`,
-> `src/ATrade.Analysis`, `src/ATrade.Workspaces`, and
-> `workers/ATrade.Ibkr.Worker` now exist.
+> `src/ATrade.Analysis`, `src/ATrade.Analysis.Lean`,
+> `src/ATrade.Workspaces`, and `workers/ATrade.Ibkr.Worker` now exist.
 > `ATrade.Accounts` provides the deterministic bootstrap overview endpoint,
 > `ATrade.Brokers` defines the provider-neutral broker contract,
 > `ATrade.Brokers.Ibkr` implements that contract with the paper-only IBKR/iBeam
@@ -35,8 +35,10 @@ see_also:
 > first real IBKR/iBeam market-data provider including secdef search/detail
 > mapping. `ATrade.Analysis` now defines the provider-neutral analysis engine
 > seam, API-facing registry, normalized request/result shapes, engine/source
-> metadata, and no-configured-engine fallback that future LEAN or alternate
-> engines must implement. `ATrade.Workspaces` owns the first backend-persisted
+> metadata, and no-configured-engine fallback. `ATrade.Analysis.Lean` now
+> implements LEAN as the first analysis engine provider behind that seam using
+> a generated analysis-only LEAN workspace and safe runtime-unavailable states.
+> `ATrade.Workspaces` owns the first backend-persisted
 > workspace preference: Postgres-backed pinned watchlists with provider/IBKR
 > metadata columns, provider/conid duplicate handling, and a temporary local user /
 > workspace identity seam. The remaining modules and workers listed below stay
@@ -44,7 +46,8 @@ see_also:
 > `frontend/` directory now hosts the first paper-trading workspace UI slice:
 > a Next.js home route with backend-driven trending symbols, IBKR stock search,
 > Postgres-backed watchlists, symbol navigation, and `lightweight-charts` chart
-> routes while preserving the original bootstrap smoke markers.
+> routes plus an analysis panel for provider-neutral LEAN signals/metrics while
+> preserving the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -141,8 +144,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   indicator, source metadata, and provider-unavailable/authentication-required
   payloads without a production fallback provider. The analysis endpoints
   resolve `IAnalysisEngineRegistry`, expose provider-neutral engine
-  discovery/run payloads, and return explicit `analysis-engine-not-configured`
-  responses until a concrete engine is registered. The watchlist endpoints resolve the temporary local workspace identity, initialize
+  discovery/run payloads, return explicit `analysis-engine-not-configured`
+  responses when no engine is selected, and invoke the LEAN provider over
+  market-data-provider candles when configured. The watchlist endpoints resolve the temporary local workspace identity, initialize
   the `ATrade.Workspaces` schema idempotently, persist pinned symbols in
   Postgres, return stable metadata payloads, and surface validation/storage
   failures as stable JSON errors. The AppHost now injects runtime connection
@@ -153,8 +157,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   module calls and NATS publications.
 - **Expected dependencies:** `ATrade.ServiceDefaults`, `ATrade.Accounts`,
   `ATrade.Brokers`, `ATrade.Brokers.Ibkr`, `ATrade.Orders`,
-  `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, `ATrade.Analysis`, and
-  `ATrade.Workspaces` today for functional behavior;
+  `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, `ATrade.Analysis`,
+  `ATrade.Analysis.Lean`, and `ATrade.Workspaces` today for functional behavior;
   the current AppHost graph also provides `Postgres`, `TimescaleDB`, `Redis`,
   and `NATS` connection info. `Postgres` is consumed by `ATrade.Workspaces`
   now; the other infrastructure references remain ready for later slices.
@@ -162,7 +166,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   pattern: official IBKR session status, deterministic order simulation,
   IBKR/iBeam-backed market-data HTTP/SignalR surfaces with safe unavailable
   states, provider-neutral analysis discovery/run contracts with an explicit
-  no-engine fallback, and Postgres-backed workspace watchlists for the frontend workspace.
+  no-engine fallback plus optional LEAN execution, and Postgres-backed workspace watchlists for the frontend workspace.
 
 ### 2.4 `ATrade.Accounts` *(exists today, first read-only slice)*
 
@@ -248,15 +252,31 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   engine metadata/capability/status shapes, normalized `AnalysisRequest` and
   `AnalysisResult` records, signal/metric/backtest output contracts, and the
   `NoConfiguredAnalysisEngine` fallback. The current API surface exposes
-  `GET /api/analysis/engines` and `POST /api/analysis/run`; with no concrete
+  `GET /api/analysis/engines` and `POST /api/analysis/run`; with no selected
   provider, run requests return `analysis-engine-not-configured` with empty
   signals, metrics, and backtest output.
 - **Expected dependencies:** `ATrade.MarketData` for normalized
   `MarketDataSymbolIdentity` and `OhlcvCandle` inputs; composed by
-  `ATrade.Api`. Concrete providers such as a future LEAN adapter may depend on
+  `ATrade.Api`. Concrete providers such as `ATrade.Analysis.Lean` may depend on
   external runtimes, but this contract module must remain provider-neutral.
-- **First-phase focus:** Provide the seam that TP-025 can use to add LEAN as a
-  provider without making LEAN an API, frontend, or core contract assumption.
+- **First-phase focus:** Provide the seam that LEAN now implements without
+  making LEAN an API, frontend, or core contract assumption.
+
+### 2.8.1 `ATrade.Analysis.Lean` *(exists today, first analysis provider)*
+
+- **Purpose:** LEAN adapter behind the provider-neutral analysis engine seam.
+- **Responsibilities:** Bind safe LEAN runtime options, generate temporary LEAN
+  project workspaces from ATrade-normalized OHLCV bars, execute the configured
+  official LEAN CLI or Docker-backed runtime, parse the emitted analysis result
+  marker, and return provider-neutral signals, metrics, and backtest summaries.
+  The generated algorithm is analysis-only and guardrails reject brokerage,
+  live-mode, order-placement, and ATrade order-endpoint calls.
+- **Expected dependencies:** `ATrade.Analysis`, `ATrade.MarketData`, .NET
+  hosting/configuration abstractions, and an optional local official LEAN CLI or
+  compatible Docker runtime selected through ignored `.env` values.
+- **First-phase focus:** Provide moving-average crossover analysis/backtest
+  output over the same market-data-provider bars the API and frontend already
+  use, while cleanly reporting runtime-unavailable/timeout states.
 
 ### 2.9 `ATrade.Workspaces` *(exists today, first backend-owned preference slice)*
 
@@ -288,9 +308,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   (evaluation traces), `NATS` (signal publication), `ATrade.MarketData`,
   `ATrade.ServiceDefaults`.
 - **First-phase focus:** Swing/position strategies evaluated against
-  Polygon bars or provider-neutral analysis requests. Any future LEAN adoption
-  plugs in through `ATrade.Analysis` as a signal/backtest provider seam, not as
-  an API or frontend dependency.
+  Polygon bars or provider-neutral analysis requests. LEAN plugs in through
+  `ATrade.Analysis` as a signal/backtest provider seam, not as an API or
+  frontend dependency.
 
 ### 2.11 `ATrade.Brokers.Ibkr` *(exists today, first broker slice)*
 

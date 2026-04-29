@@ -121,8 +121,9 @@ Unavailable handling:
 
 ## 4. Analysis Engine Provider Family
 
-Analysis engine contracts live in `src/ATrade.Analysis` and are documented in
-`analysis-engines.md`.
+Analysis engine contracts live in `src/ATrade.Analysis`; the first concrete
+provider lives in `src/ATrade.Analysis.Lean`. Detailed behavior is documented
+in `analysis-engines.md`.
 
 Core rules:
 
@@ -135,8 +136,12 @@ Core rules:
   metrics, optional backtest summary, and optional error information.
 - With no concrete provider configured, the fallback returns the explicit
   `analysis-engine-not-configured` result instead of synthetic signals.
-- LEAN and future runtimes belong in concrete provider modules; API/core
-  contracts remain provider-neutral.
+- `ATrade.Analysis.Lean` is selected by `ATRADE_ANALYSIS_ENGINE=Lean`, converts
+  ATrade bars into a temporary official-LEAN workspace, invokes the configured
+  LEAN CLI/Docker runtime, and maps results back into the provider-neutral
+  `AnalysisResult` shape.
+- LEAN and future runtimes belong in concrete provider modules; API/core and
+  frontend contracts remain provider-neutral.
 
 ## 5. Composition Rules
 
@@ -146,9 +151,11 @@ Core rules:
 - API endpoint handlers must not instantiate concrete providers such as the
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
-  swapped by changing DI registration, not endpoint code. The current API
-  composes `AddMarketDataModule()` plus `AddIbkrMarketDataProvider()` and
-  `AddAnalysisModule()` with a no-engine fallback.
+  swapped by changing DI registration/configuration, not endpoint paths or
+  frontend type names. The current API composes `AddMarketDataModule()` plus
+  `AddIbkrMarketDataProvider()`, `AddAnalysisModule()`, and
+  `AddLeanAnalysisEngine(...)`; LEAN only becomes active when configuration
+  selects it.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.
@@ -185,9 +192,13 @@ Future plug-ins:
   `ATrade.Workspaces`.
 - Polygon or another market-data provider may be added later behind the same
   contracts and source metadata rules.
-- LEAN remains a future analysis-engine provider behind `ATrade.Analysis`; it
-  must consume normalized market-data/signal contracts rather than becoming an
-  API or UI assumption.
+- LEAN is now the first analysis-engine provider behind `ATrade.Analysis`; it
+  consumes normalized market-data/signal contracts and must not become an API or
+  UI type assumption. Runtime-unavailable or timeout states surface as explicit
+  analysis errors instead of fake results.
+- Additional analysis engines can replace or complement LEAN by implementing
+  `IAnalysisEngine` in their own provider modules and preserving the same
+  request/result contracts.
 
 ## 7. Change Control
 

@@ -1,8 +1,8 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
-summary: Provider-neutral analysis engine contract for backtesting, signal, and metric providers without coupling API/frontend payloads to LEAN.
+updated: 2026-04-30
+summary: Provider-neutral analysis engine contract and the LEAN provider implementation for backtesting, signal, and metric providers without coupling API/frontend payloads to LEAN.
 see_also:
   - ../INDEX.md
   - overview.md
@@ -16,12 +16,10 @@ see_also:
 # Analysis Engine Abstraction
 
 ATrade analysis engines are provider-neutral strategy/backtest providers. The
-current implementation defines the contract and API surface only; it does not
-run LEAN or any other production analysis runtime yet.
-
-The seam exists so LEAN can be the first implementation while the API,
-frontend, and persisted payloads stay independent from LEAN-specific types.
-Future engines must plug in behind the same `ATrade.Analysis` contracts.
+current implementation ships the core `ATrade.Analysis` contract plus
+`ATrade.Analysis.Lean`, the first concrete provider. LEAN is invoked only behind
+that provider seam; API and frontend payloads continue to use ATrade request and
+result records instead of QuantConnect/LEAN types.
 
 ## 1. Goals
 
@@ -33,10 +31,13 @@ Future engines must plug in behind the same `ATrade.Analysis` contracts.
   where a signal, metric, or backtest summary came from.
 - Return an explicit `analysis-engine-not-configured` result when no provider
   is configured instead of fake production signals.
-- Keep API and core contracts free of LEAN package references until a concrete
-  provider module is added by a later task.
+- Keep concrete runtime packages and process details isolated in provider
+  modules such as `ATrade.Analysis.Lean`.
+- Preserve the paper-trading safety rule: analysis engines may generate
+  signals/metrics, but they must not route brokerage orders or enable live
+  trading.
 
-## 2. Module And Contracts
+## 2. Provider-Neutral Contracts
 
 Provider-neutral analysis contracts live in `src/ATrade.Analysis`.
 
@@ -67,81 +68,130 @@ return engine-runtime-specific objects.
 
 ## 3. API Surface
 
-`ATrade.Api` composes `AddAnalysisModule()` and exposes:
+`ATrade.Api` composes `AddAnalysisModule()` and `AddLeanAnalysisEngine(...)`.
+The LEAN provider is registered only when configuration selects it.
 
 - `GET /api/analysis/engines` — returns available engine descriptors. With no
   configured provider, it returns a single `not-configured` descriptor whose
-  capabilities do not claim production analysis support.
-- `POST /api/analysis/run` — accepts `AnalysisRequest` and returns
-  `AnalysisResult`. With no configured provider, it returns HTTP 503 with
+  capabilities do not claim production analysis support. With LEAN selected, it
+  returns `engineId = "lean"` with signal/backtest/metric capabilities and
+  `requiresExternalRuntime = true`.
+- `POST /api/analysis/run` — accepts a provider-neutral analysis request. When
+  callers supply only `symbolCode` + `timeframe`, the API obtains candles from
+  the configured `IMarketDataService` and builds an `AnalysisRequest` over those
+  normalized bars. With no configured provider, it returns HTTP 503 with
   `status = "not-configured"`, error code `analysis-engine-not-configured`, and
-  no signals, metrics, or backtest summary.
+  no signals, metrics, or backtest summary. With LEAN selected, it forwards the
+  normalized bars to `ATrade.Analysis.Lean`.
 
-These endpoints are the API contract that the frontend should bind to. They are
-not LEAN endpoints, and they should not expose LEAN terminology in request or
-response shapes.
+These endpoints are not LEAN endpoints. They must not expose QuantConnect types,
+LEAN project files, or provider-specific DTO names.
 
-## 4. Source And Engine Metadata
+## 4. LEAN Provider Implementation
 
-Every `AnalysisResult` carries two metadata blocks:
+`src/ATrade.Analysis.Lean` is the first concrete analysis provider. The chosen
+integration approach is an official LEAN runtime process boundary:
 
-- `engine` identifies the analysis provider/runtime that produced the result,
-  including provider id, display name, version, state, and message.
-- `source` identifies the source of the result payload, such as
-  `analysis-engine-not-configured` today or a future provider-specific source id
-  emitted by a concrete analysis engine.
+1. ATrade converts normalized `OhlcvCandle` bars into a temporary LEAN project
+   workspace containing `atrade-bars.csv`, `main.py`, and a minimal project
+   `config.json`.
+2. `main.py` defines an analysis-only `QCAlgorithm` that reads the ATrade CSV,
+   calculates a moving-average crossover signal set, risk/return metrics, and a
+   backtest summary, and emits a single `ATRADE_ANALYSIS_RESULT:` JSON marker.
+3. `LeanRuntimeExecutor` invokes the configured official LEAN CLI command
+   (`lean backtest ...`) or the Docker-backed command wrapper when
+   `ATRADE_LEAN_RUNTIME_MODE=docker` is selected.
+4. `LeanAnalysisResultParser` maps the emitted marker into provider-neutral
+   `AnalysisResult`, `AnalysisSignal`, `AnalysisMetric`, and `BacktestSummary`
+   records.
+5. Runtime absence, timeouts, non-zero exits, and parse failures return explicit
+   `analysis-engine-unavailable` errors rather than fake successful analysis.
 
-Frontend surfaces should display this metadata similarly to market-data source
-metadata. The metadata is required even for errors so operators can distinguish
-between no configured engine, an unavailable runtime, and future successful
-provider output.
+The provider includes guardrails that reject generated algorithm source
+containing brokerage/order-routing tokens such as `MarketOrder`,
+`SetBrokerageModel`, `SetLiveMode`, or `/api/orders`. The generated algorithm
+sets cash for backtest accounting but does not add brokerage models, route
+orders, call IBKR order endpoints, or enable live mode.
 
-## 5. No-Configured-Engine Behavior
+## 5. Configuration Contract
 
-The default module registration does not fabricate analysis. Until a concrete
-engine is registered, discovery and run requests make the missing provider
-explicit:
+Committed templates keep analysis disabled by default and expose only safe,
+non-secret placeholders:
 
-- discovery shows `engineId = "not-configured"` and state `not-configured`
-- run requests return `analysis-engine-not-configured`
-- signal, metric, and backtest arrays stay empty/null
-- HTTP callers receive a 503 rather than a successful fake analysis payload
+```text
+ATRADE_ANALYSIS_ENGINE=none
+ATRADE_LEAN_RUNTIME_MODE=cli
+ATRADE_LEAN_CLI_COMMAND=lean
+ATRADE_LEAN_DOCKER_COMMAND=docker
+ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation
+ATRADE_LEAN_WORKSPACE_ROOT=
+ATRADE_LEAN_TIMEOUT_SECONDS=45
+ATRADE_LEAN_KEEP_WORKSPACE=false
+```
 
-This behavior is part of the safety contract. Future providers may replace the
-fallback by registering an `IAnalysisEngine`; they must still preserve explicit
-unavailable/not-configured errors when their runtime cannot execute.
+To enable LEAN locally, copy `.env.example` or `.env.template` to ignored
+`.env`, set `ATRADE_ANALYSIS_ENGINE=Lean`, install/configure the official LEAN
+CLI or a compatible Docker runtime, and adjust workspace/timeout values if
+needed. No LEAN setting may contain broker credentials or account identifiers.
 
-## 6. LEAN Integration Boundary
+Automated tests do not require LEAN to be installed. Unit tests exercise the
+adapter through deterministic runtime fixtures; apphost verification reports a
+clean skip when the official CLI is unavailable.
 
-LEAN is expected to become the first concrete analysis engine in a follow-up
-module, but only behind this seam. The provider module may depend on LEAN, adapt
-LEAN inputs/outputs, and emit provider/source metadata. `ATrade.Api`,
-`ATrade.Analysis`, market-data contracts, frontend components, and persisted
-analysis payloads must remain provider-neutral.
+## 6. Result Shape
 
-Future LEAN work should therefore:
+A successful LEAN run returns the same provider-neutral result shape any future
+engine must return:
 
-- consume `AnalysisRequest` and normalized `OhlcvCandle` bars
-- translate provider/runtime errors into `AnalysisError` codes and safe states
-- emit `AnalysisResult` with accurate engine/source metadata
-- avoid introducing real order placement or live-trading behavior
-- update this document, `modules.md`, and `paper-trading-workspace.md` when the
-  concrete provider lands
+- `status = "completed"`
+- `engine.engineId = "lean"` and provider/display/version metadata
+- `source.provider = "LEAN"` plus runtime/workspace source text
+- the input `MarketDataSymbolIdentity` and timeframe
+- zero or more `AnalysisSignal` entries, currently moving-average crossover
+  signals with direction, confidence, time, and rationale
+- `AnalysisMetric` entries such as total return, max drawdown, and signal count
+- `BacktestSummary` with start/end window, initial capital, final equity, total
+  return, trade count, and win rate
 
-## 7. Verification
+Errors use the same `AnalysisResult` envelope with `status = "failed"` or
+`not-configured`, an `AnalysisError`, and empty signal/metric/backtest payloads
+where appropriate.
 
-The contract is verified by:
+## 7. Replacing Or Adding Engines
 
-- `tests/ATrade.Analysis.Tests/` for contract and fallback behavior
-- `tests/apphost/analysis-engine-contract-tests.sh` for solution/project/API
-  wiring, no-engine HTTP behavior, and absence of LEAN references in API/core
-  contracts
+Another engine should replace or complement LEAN by implementing `IAnalysisEngine`
+in a separate provider module and registering that module conditionally through
+configuration. It must:
 
-The full repository verification suite should include the analysis contract
-script alongside the existing provider, apphost, and frontend checks.
+- consume `AnalysisRequest` over normalized ATrade bars
+- emit `AnalysisResult` without provider-specific DTOs
+- translate runtime errors into `AnalysisError` codes and safe states
+- avoid live trading, brokerage routing, and automatic order placement
+- update this document and provider/module/workspace docs when its runtime and
+  configuration contract are introduced
 
-## 8. Change Control
+The API/frontend should not change when engines swap. Provider selection belongs
+in DI/configuration and `engineId`, not in endpoint paths or frontend type names.
+
+## 8. Verification
+
+The contract and LEAN provider are verified by:
+
+- `tests/ATrade.Analysis.Tests/` for core contract and fallback behavior
+- `tests/ATrade.Analysis.Lean.Tests/` for input conversion, option binding,
+  service registration, result parsing, timeout/error handling, and no-order
+  guardrails
+- `tests/apphost/analysis-engine-contract-tests.sh` for provider-neutral API
+  contract and no-engine HTTP behavior
+- `tests/apphost/lean-analysis-engine-tests.sh` for LEAN registration,
+  configuration placeholders, provider-neutral boundaries, optional runtime
+  skip behavior, and no trading side effects
+- `tests/apphost/frontend-trading-workspace-tests.sh` for analysis panel source
+  markers in the paper-trading UI
+
+## 9. Change Control
 
 Changes that add engine capabilities, alter request/result payloads, introduce a
-concrete runtime dependency, or weaken the no-configured-engine behavior must
-update this document and the linked active architecture docs in the same change.
+new runtime dependency, or weaken no-configured/unavailable/no-order behavior
+must update this document and the linked active architecture docs in the same
+change.
