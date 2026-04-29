@@ -1,7 +1,7 @@
 ---
 status: active
 owner: architect
-updated: 2026-04-23
+updated: 2026-04-29
 summary: Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract.
 see_also:
   - ../INDEX.md
@@ -28,8 +28,11 @@ see_also:
 > `GET /health` smoke endpoint and shared hosting defaults. The infrastructure
 > layer is now declared in the AppHost graph, and the first compileable shells
 > for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and
-> `ATrade.Ibkr.Worker` now exist, but those domain modules and workers remain
-> intentionally inert and are not wired into the AppHost runtime graph yet.
+> `ATrade.Ibkr.Worker` now exist. `ATrade.Ibkr.Worker` is now an
+> AppHost-managed project resource that receives `Postgres`, `Redis`, and
+> `NATS` references, but it remains intentionally inert; the domain modules
+> and worker still do not implement broker, market-data, or database
+> behavior.
 
 ## 1. Shape Of The System
 
@@ -116,8 +119,9 @@ architecture the AppHost is responsible for:
 - Declaring `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as Aspire-managed
   infrastructure resources and wiring their connection strings into the
   services that need them. The current runnable slice already declares those
-  resources in `src/ATrade.AppHost/Program.cs`, even though no application
-  module consumes them yet.
+  resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
+  four, and wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
+  even though the application code still only exposes smoke-host behavior.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 

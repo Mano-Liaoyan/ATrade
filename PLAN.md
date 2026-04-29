@@ -1,7 +1,7 @@
 ---
 status: active
 owner: scrum-master
-updated: 2026-04-23
+updated: 2026-04-29
 summary: Bootstrap plan for the governance-first ATrade reboot.
 see_also:
   - AGENTS.md
@@ -15,7 +15,7 @@ see_also:
 
 ## Current Focus
 
-Extend the runnable bootstrap into deeper backend/frontend slices and worker shells on top of the AppHost-managed infrastructure resources now declared by the current AppHost graph.
+Build the first real backend feature behavior on top of the AppHost graph that now includes the first worker/resource-consumer wiring.
 
 ## Milestones
 
@@ -29,7 +29,7 @@ Extend the runnable bootstrap into deeper backend/frontend slices and worker she
 - [x] ~~Scaffold the first .NET 10 backend projects and Next.js frontend~~
 - [x] ~~Declare managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph~~
 - [x] ~~Add the first backend feature-module shells and the inert `ATrade.Ibkr.Worker` shell~~
-- [ ] Extend the AppHost graph with real worker wiring and application resource consumers
+- [x] ~~Extend the AppHost graph with real worker wiring and application resource consumers~~
 - [ ] Add the first backend feature behavior on top of the bootstrap slice
 
 ## Active Cross-Role Dependencies
@@ -41,5 +41,5 @@ Extend the runnable bootstrap into deeper backend/frontend slices and worker she
 
 - Only indexed `active` docs are authoritative. Legacy docs must be explicitly reintroduced and marked before use.
 - The single-command local startup contract is `start run` on both Unix and Windows.
-- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api`, the Next.js home page, and named `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources; future workers remain later milestones.
+- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api`, `ATrade.Ibkr.Worker`, the Next.js home page, and named `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources, with explicit AppHost resource references wired into the API and worker graph.
 - `.worktrees/` is now available for isolated parallel feature delivery.

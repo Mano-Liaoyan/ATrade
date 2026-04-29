@@ -1,7 +1,7 @@
 ---
 status: active
 owner: architect
-updated: 2026-04-23
+updated: 2026-04-29
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus.
 see_also:
   - ../INDEX.md
@@ -17,21 +17,24 @@ see_also:
 > the ATrade codebase, not a finished implementation. `src/ATrade.AppHost`,
 > `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, and the first compileable
 > shells for `src/ATrade.Accounts`, `src/ATrade.Orders`,
-> `src/ATrade.MarketData`, and `workers/ATrade.Ibkr.Worker` now exist. Those
-> new projects are structural scaffolding only: they compile, expose only a
-> marker type or inert background-service shell, and are not yet wired into
-> the AppHost runtime graph or any broker/data infrastructure. The remaining
-> modules and workers listed below stay aspirational and will land in later
-> milestones tracked by `PLAN.md`. The `frontend/` directory now hosts the
-> first real Next.js slice: a minimal home page that proves Aspire can
-> orchestrate a real frontend runtime, while broader UI routes remain later
-> work.
+> `src/ATrade.MarketData`, and `workers/ATrade.Ibkr.Worker` now exist.
+> `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData` remain
+> structural scaffolding only. `ATrade.Ibkr.Worker` is now wired into the
+> AppHost runtime graph and receives `Postgres`, `Redis`, and `NATS`
+> references, but it still runs only an inert background-service shell with
+> no broker or data behavior. The remaining modules and workers listed below
+> stay aspirational and will land in later milestones tracked by `PLAN.md`.
+> The `frontend/` directory now hosts the first real Next.js slice: a minimal
+> home page that proves Aspire can orchestrate a real frontend runtime, while
+> broader UI routes remain later work.
 >
-> **Current runnable slice:** today the AppHost launches `ATrade.Api` plus the
-> Next.js frontend home page, declares `Postgres`, `TimescaleDB`, `Redis`, and
-> `NATS` as managed infrastructure resources, and still keeps `ATrade.Api`
-> limited to a stable `GET /health` smoke endpoint while the newly added module
-> and worker shells remain compile-time structure only.
+> **Current runnable slice:** today the AppHost launches `ATrade.Api`,
+> `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
+> `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as managed infrastructure
+> resources; and wires the `api` / `ibkr-worker` resources to their expected
+> managed infrastructure while keeping `ATrade.Api` limited to a stable
+> `GET /health` smoke endpoint and the worker limited to its inert hosted
+> service shell.
 
 ## 1. How To Read This Document
 
@@ -66,9 +69,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Expected dependencies:** Every other runtime module as declared
   resources; `Postgres`, `TimescaleDB`, `Redis`, `NATS` as Aspire-managed
   infrastructure resources. In the current runnable slice, the AppHost wires
-  `ATrade.Api` plus the bootstrap Next.js frontend home page and declares the
-  four shared infrastructure resources without adding application consumers yet
-  — see `src/ATrade.AppHost/Program.cs`.
+  `ATrade.Api`, `ATrade.Ibkr.Worker`, and the bootstrap Next.js frontend home
+  page; declares the four shared infrastructure resources; sends `api` the
+  full backend infrastructure set; and sends `ibkr-worker` its current
+  `Postgres` / `Redis` / `NATS` references — see
+  `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 
@@ -88,13 +93,17 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   any future external clients.
 - **Responsibilities:** In the current slice, provide a minimal ASP.NET
   Core host that uses `ATrade.ServiceDefaults` and exposes a stable
-  `GET /health` smoke endpoint. Later slices add authenticated
-  REST/streaming endpoints for accounts, portfolios, strategies, orders,
-  and market-data queries plus translation of HTTP requests into module
-  calls and NATS publications.
-- **Expected dependencies:** `ATrade.ServiceDefaults` today; later,
-  every backend feature module, `Postgres`, `Redis` (session/rate-limit),
-  and `NATS` (publishing intents, subscribing to UI-bound events).
+  `GET /health` smoke endpoint. The AppHost now also injects the runtime
+  connection information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`
+  so the local graph matches the API's planned infrastructure shape, even
+  though the API does not consume those stores functionally yet. Later
+  slices add authenticated REST/streaming endpoints for accounts,
+  portfolios, strategies, orders, and market-data queries plus translation
+  of HTTP requests into module calls and NATS publications.
+- **Expected dependencies:** `ATrade.ServiceDefaults` today for functional
+  behavior; the current AppHost graph also provides `Postgres`,
+  `TimescaleDB`, `Redis`, and `NATS` connection info so later slices can
+  begin consuming them without reshaping the runtime topology.
 - **First-phase focus:** The scaffold proves the backend/AppHost bootstrap
   path. Functional IBKR account/order and Polygon market-data surfaces land
   in later slices.
@@ -183,8 +192,9 @@ AppHost. Anything that must not block an HTTP request handler — streaming
 connections, scheduled jobs, broker sessions — belongs in a worker. They
 share `ATrade.ServiceDefaults` and communicate with the API host
 exclusively through `NATS` and the shared databases. The first worker
-project now exists as compileable scaffolding, but it is not yet added to
-the AppHost runtime graph.
+project now exists as compileable scaffolding, and `ATrade.Ibkr.Worker` is
+now added to the AppHost runtime graph with its initial infrastructure
+references.
 
 ### 3.1 `ATrade.Ibkr.Worker` *(exists today, shell only)*
 
@@ -192,13 +202,16 @@ the AppHost runtime graph.
   `ATrade.Brokers.Ibkr`.
 - **Responsibilities:** In the current slice, compile as an inert worker
   shell that starts a hosted background service and idles without broker,
-  NATS, or database wiring. Future slices maintain the IBKR connection,
-  consume order intents from NATS, and publish executions, positions, and
-  account updates.
+  NATS, or database consumers. The AppHost now wires `Postgres`, `Redis`,
+  and `NATS` connection info into the process so the runtime graph matches
+  the worker's planned dependencies before any broker behavior lands.
+  Future slices maintain the IBKR connection, consume order intents from
+  NATS, and publish executions, positions, and account updates.
 - **Expected dependencies:** `ATrade.Brokers.Ibkr`, `NATS`, `Redis`,
   `Postgres` (for durable intent/execution correlation),
-  `ATrade.ServiceDefaults`. The current shell only references shared
-  defaults.
+  `ATrade.ServiceDefaults`. The current shell still uses only shared
+  defaults functionally, but the AppHost runtime graph now provides the
+  `Postgres` / `Redis` / `NATS` references it will consume later.
 - **First-phase focus:** Core first-phase worker.
 
 ### 3.2 `polygon-worker` *(planned)*

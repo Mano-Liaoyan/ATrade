@@ -1,6 +1,6 @@
 # TP-013: Wire the IBKR worker and AppHost resource consumers — Status
 
-**Current Step:** Step 3: Update docs and milestone state
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -46,18 +46,18 @@
 ---
 
 ### Step 3: Update docs and milestone state
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `scripts/README.md` updated for worker/resource-consumer wiring
-- [ ] `docs/architecture/overview.md` current-slice wording updated
-- [ ] `docs/architecture/modules.md` dependency/runtime notes updated
-- [ ] `PLAN.md` milestone state updated if implementation satisfies it
-- [ ] `README.md` checked and updated if stale
+- [x] `scripts/README.md` updated for worker/resource-consumer wiring
+- [x] `docs/architecture/overview.md` current-slice wording updated
+- [x] `docs/architecture/modules.md` dependency/runtime notes updated
+- [x] `PLAN.md` milestone state updated if implementation satisfies it
+- [x] `README.md` checked and updated if stale
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Runtime infrastructure test passes or cleanly skips when no engine is available
