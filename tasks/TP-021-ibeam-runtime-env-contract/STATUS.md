@@ -58,14 +58,14 @@
 ---
 
 ### Step 4: Add iBeam runtime contract verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] iBeam runtime shell test added
 - [x] Env template safety verified
 - [x] `.env.template` and `.env.example` synchronization verified
 - [x] AppHost iBeam image/default-disabled behavior verified
 - [x] Status redaction verified
-- [ ] Targeted iBeam runtime contract test passes
+- [x] Targeted iBeam runtime contract test passes
 
 ---
 

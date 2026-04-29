@@ -50,7 +50,7 @@ with open(manifest_path, encoding="utf-8") as handle:
     manifest = json.load(handle)
 
 resources = manifest.get("resources", {})
-for resource_name in ("ibkr-username", "ibkr-password"):
+for resource_name in ("ibkr-username", "ibkr-password", "ibkr-paper-account-id"):
     resource = resources.get(resource_name)
     if resource is None:
         raise SystemExit(f"missing secret parameter resource: {resource_name}")
@@ -119,7 +119,7 @@ expected_api_env = {
     "ATRADE_IBKR_GATEWAY_PORT": "5000",
     "ATRADE_IBKR_GATEWAY_IMAGE": "voyz/ibeam:latest",
     "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS": "15",
-    "ATRADE_IBKR_PAPER_ACCOUNT_ID": "IBKR_ACCOUNT_ID",
+    "ATRADE_IBKR_PAPER_ACCOUNT_ID": "{ibkr-paper-account-id.value}",
     "ATRADE_IBKR_USERNAME": "{ibkr-username.value}",
     "ATRADE_IBKR_PASSWORD": "{ibkr-password.value}",
 }
@@ -137,7 +137,7 @@ expected_worker_env = {
     "ATRADE_IBKR_GATEWAY_PORT": "5000",
     "ATRADE_IBKR_GATEWAY_IMAGE": "voyz/ibeam:latest",
     "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS": "15",
-    "ATRADE_IBKR_PAPER_ACCOUNT_ID": "IBKR_ACCOUNT_ID",
+    "ATRADE_IBKR_PAPER_ACCOUNT_ID": "{ibkr-paper-account-id.value}",
     "ATRADE_IBKR_USERNAME": "{ibkr-username.value}",
     "ATRADE_IBKR_PASSWORD": "{ibkr-password.value}",
 }
@@ -184,6 +184,8 @@ for resource_name in ("api", "ibkr-worker"):
     env = resources[resource_name].get("env", {})
     if env.get("ATRADE_BROKER_INTEGRATION_ENABLED") != "true":
         raise SystemExit(f"{resource_name} should still receive the enabled integration flag")
+    if env.get("ATRADE_IBKR_PAPER_ACCOUNT_ID") != "{ibkr-paper-account-id.value}":
+        raise SystemExit(f"{resource_name} paper account id env must stay a secret parameter reference")
     if env.get("ATRADE_IBKR_USERNAME") != "{ibkr-username.value}":
         raise SystemExit(f"{resource_name} username env must stay a secret parameter reference")
     if env.get("ATRADE_IBKR_PASSWORD") != "{ibkr-password.value}":
@@ -210,6 +212,7 @@ manifest_text = manifest_path.read_text(encoding="utf-8")
 for forbidden in (
     "REAL_IBKR_USERNAME_SHOULD_NOT_SURFACE",
     "REAL_IBKR_PASSWORD_SHOULD_NOT_SURFACE",
+    "IBKR_ACCOUNT_ID",
 ):
     if forbidden in manifest_text:
         raise SystemExit(f"manifest exposed raw IBKR credential value: {forbidden}")
@@ -238,6 +241,8 @@ if http_binding.get("targetPort") != 5000:
 
 for resource_name in ("api", "ibkr-worker"):
     env = resources[resource_name].get("env", {})
+    if env.get("ATRADE_IBKR_PAPER_ACCOUNT_ID") != "{ibkr-paper-account-id.value}":
+        raise SystemExit(f"{resource_name} paper account id env must be a secret parameter reference")
     if env.get("ATRADE_IBKR_USERNAME") != "{ibkr-username.value}":
         raise SystemExit(f"{resource_name} username env must be a secret parameter reference")
     if env.get("ATRADE_IBKR_PASSWORD") != "{ibkr-password.value}":

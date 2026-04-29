@@ -13,6 +13,7 @@ var paperTradingContract = PaperTradingEnvironmentContract.Load(localPortContrac
 var builder = DistributedApplication.CreateBuilder(args);
 var ibkrUsername = builder.AddParameter("ibkr-username", () => paperTradingContract.IbkrUsername, secret: true);
 var ibkrPassword = builder.AddParameter("ibkr-password", () => paperTradingContract.IbkrPassword, secret: true);
+var ibkrPaperAccountId = builder.AddParameter("ibkr-paper-account-id", () => paperTradingContract.PaperAccountId, secret: true);
 
 var postgres = builder.AddPostgres("postgres")
     .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
@@ -53,7 +54,7 @@ var api = builder.AddProject<Projects.ATrade_Api>("api")
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayUrl, paperTradingContract.GatewayUrl)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayPort, paperTradingContract.GatewayPort)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayImage, paperTradingContract.GatewayImage)
-    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, paperTradingContract.PaperAccountId)
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, ibkrPaperAccountId)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.Username, ibkrUsername)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.Password, ibkrPassword);
 
@@ -66,7 +67,7 @@ var ibkrWorker = builder.AddProject<Projects.ATrade_Ibkr_Worker>("ibkr-worker")
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayUrl, paperTradingContract.GatewayUrl)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayPort, paperTradingContract.GatewayPort)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayImage, paperTradingContract.GatewayImage)
-    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, paperTradingContract.PaperAccountId)
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, ibkrPaperAccountId)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.Username, ibkrUsername)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.Password, ibkrPassword);
 
