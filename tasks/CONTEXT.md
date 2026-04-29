@@ -31,15 +31,15 @@ implementation queue.
 
 Active task packets live directly under `tasks/`:
 
-| Task | Summary |
-|------|---------|
-| `TP-019` | Provider-neutral broker and market-data abstractions |
-| `TP-020` | Postgres-persisted pinned stock/watchlist state |
+| Task     | Summary                                                            |
+| -------- | ------------------------------------------------------------------ |
+| `TP-019` | Provider-neutral broker and market-data abstractions               |
+| `TP-020` | Postgres-persisted pinned stock/watchlist state                    |
 | `TP-021` | `voyz/ibeam:latest` runtime and ignored `.env` IBKR login contract |
-| `TP-022` | IBKR/iBeam market-data provider and production mock removal |
-| `TP-023` | IBKR stock search and pin-any-symbol workflow |
-| `TP-024` | Provider-neutral analysis engine abstraction |
-| `TP-025` | LEAN as the first analysis engine provider |
+| `TP-022` | IBKR/iBeam market-data provider and production mock removal        |
+| `TP-023` | IBKR stock search and pin-any-symbol workflow                      |
+| `TP-024` | Provider-neutral analysis engine abstraction                       |
+| `TP-025` | LEAN as the first analysis engine provider                         |
 
 Completed task packets have been moved to `tasks/archive/`.
 
@@ -65,27 +65,18 @@ All variants delegate to the Aspire AppHost.
 
 ## Key Files
 
-| Category | Path |
-|----------|------|
-| Human overview | `README.md` |
-| Current plan | `PLAN.md` |
-| Documentation index | `docs/INDEX.md` |
-| Startup contract | `scripts/README.md` |
-| Active tasks | `tasks/TP-019-*` through `tasks/TP-025-*` |
-| Archived tasks | `tasks/archive/` |
-| Taskplane config | `.pi/taskplane-config.json` |
-| AppHost | `src/ATrade.AppHost/Program.cs` |
-| API | `src/ATrade.Api/Program.cs` |
-| Frontend | `frontend/` |
-
-## Cleanup State
-
-The old role-based planning and workforce files have been removed:
-
-- `plans/` no longer exists.
-- Repo-local workforce agent role files were removed from `.pi/agents/`.
-- Repo-local workforce skills were removed from `.pi/skills/`.
-- Remaining `.pi/agents/` files are Taskplane runtime agents used by the orchestrator.
+| Category            | Path                                      |
+| ------------------- | ----------------------------------------- |
+| Human overview      | `README.md`                               |
+| Current plan        | `PLAN.md`                                 |
+| Documentation index | `docs/INDEX.md`                           |
+| Startup contract    | `scripts/README.md`                       |
+| Active tasks        | `tasks/TP-019-*` through `tasks/TP-025-*` |
+| Archived tasks      | `tasks/archive/`                          |
+| Taskplane config    | `.pi/taskplane-config.json`               |
+| AppHost             | `src/ATrade.AppHost/Program.cs`           |
+| API                 | `src/ATrade.Api/Program.cs`               |
+| Frontend            | `frontend/`                               |
 
 ## Documentation Rules
 
