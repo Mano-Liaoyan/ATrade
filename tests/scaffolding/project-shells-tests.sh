@@ -58,7 +58,8 @@ main() {
   assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/Program.cs" 'builder.AddServiceDefaults()'
   assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/Program.cs" 'builder.Services.AddIbkrBrokerAdapter(builder.Configuration);'
   assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/IbkrWorkerShell.cs" 'ATrade.Ibkr.Worker is disabled and will remain idle'
-  assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/IbkrWorkerShell.cs" 'rejected-live-mode'
+  assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/IbkrWorkerShell.cs" 'BrokerProviderStates.RejectedLiveMode'
+  assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/IbkrWorkerShell.cs" 'BrokerProviderStates.CredentialsMissing'
 
   assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Accounts'
   assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Brokers'

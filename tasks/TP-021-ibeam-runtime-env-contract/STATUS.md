@@ -1,6 +1,6 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 5: Update runtime and safety documentation
+**Current Step:** Step 6: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -79,12 +79,12 @@
 ---
 
 ### Step 6: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Docker/iBeam-dependent runtime tests pass or cleanly skip
-- [ ] All failures fixed
-- [ ] Solution build passes
+- [x] FULL test suite passing
+- [x] Docker/iBeam-dependent runtime tests pass or cleanly skip
+- [x] All failures fixed
+- [x] Solution build passes
 
 ---
 
