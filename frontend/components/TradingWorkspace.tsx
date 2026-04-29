@@ -16,7 +16,8 @@ import {
   readCachedWatchlist,
   writeCachedWatchlist,
 } from '../lib/watchlistStorage';
-import type { TrendingSymbol } from '../types/marketData';
+import type { MarketDataSymbolSearchResult, TrendingSymbol } from '../types/marketData';
+import { SymbolSearch } from './SymbolSearch';
 import { TrendingList } from './TrendingList';
 import { Watchlist } from './Watchlist';
 
@@ -109,6 +110,29 @@ export function TradingWorkspace() {
     [applyWatchlistResponse, pinnedSymbolNames, savingSymbol, watchlistError, watchlistLoading],
   );
 
+  const handleToggleSearchPin = useCallback(
+    async (result: MarketDataSymbolSearchResult) => {
+      if (watchlistLoading || watchlistError || savingSymbol) {
+        return;
+      }
+
+      const normalizedSymbol = getSearchResultSymbol(result);
+      setSavingSymbol(normalizedSymbol);
+
+      try {
+        const response = pinnedSymbolNames.includes(normalizedSymbol)
+          ? await unpinWatchlistSymbol(normalizedSymbol)
+          : await pinWatchlistSymbol(createSearchResultWatchlistInput(result));
+        applyWatchlistResponse(response);
+      } catch (caughtError) {
+        setWatchlistError(formatWatchlistError(caughtError, false));
+      } finally {
+        setSavingSymbol(null);
+      }
+    },
+    [applyWatchlistResponse, pinnedSymbolNames, savingSymbol, watchlistError, watchlistLoading],
+  );
+
   const handleRemovePin = useCallback(
     async (symbol: string) => {
       if (watchlistLoading || watchlistError || savingSymbol) {
@@ -138,6 +162,13 @@ export function TradingWorkspace() {
         <span className="status-dot" aria-hidden="true" />
         <span>Paper-only workspace consuming IBKR/iBeam market data and Postgres-backed workspace watchlists.</span>
       </div>
+
+      <SymbolSearch
+        pinnedSymbols={pinnedSymbolNames}
+        actionsDisabled={watchlistActionsDisabled}
+        savingSymbol={savingSymbol}
+        onTogglePin={handleToggleSearchPin}
+      />
 
       {marketDataLoading ? (
         <div className="workspace-panel loading-state" role="status">
@@ -217,11 +248,25 @@ async function migrateCachedWatchlistAfterBackendLoad(response: WatchlistRespons
 function createWatchlistInput(symbol: TrendingSymbol): WatchlistSymbolInput {
   return {
     symbol: symbol.symbol,
-    provider: 'manual',
+    provider: 'ibkr',
     name: symbol.name,
     exchange: symbol.exchange,
     currency: 'USD',
-    assetClass: symbol.assetClass === 'Stock' ? 'STK' : symbol.assetClass,
+    assetClass: normalizeAssetClass(symbol.assetClass),
+  };
+}
+
+function createSearchResultWatchlistInput(result: MarketDataSymbolSearchResult): WatchlistSymbolInput {
+  const providerSymbolId = result.providerSymbolId ?? result.identity.providerSymbolId;
+  return {
+    symbol: getSearchResultSymbol(result),
+    provider: result.provider || result.identity.provider,
+    providerSymbolId,
+    ibkrConid: parseIbkrConid(result.provider || result.identity.provider, providerSymbolId),
+    name: result.name,
+    exchange: result.exchange || result.identity.exchange,
+    currency: result.currency || result.identity.currency,
+    assetClass: normalizeAssetClass(result.assetClass || result.identity.assetClass),
   };
 }
 
@@ -232,6 +277,22 @@ function createManualWatchlistInput(symbol: string): WatchlistSymbolInput {
     currency: 'USD',
     assetClass: 'STK',
   };
+}
+
+function getSearchResultSymbol(result: MarketDataSymbolSearchResult): string {
+  return (result.symbol || result.identity.symbol).toUpperCase();
+}
+
+function normalizeAssetClass(assetClass: string): string {
+  return assetClass.toUpperCase() === 'STOCK' ? 'STK' : assetClass.toUpperCase();
+}
+
+function parseIbkrConid(provider: string, providerSymbolId: string | null): number | null {
+  if (provider.toLowerCase() !== 'ibkr' || !providerSymbolId || !/^\d+$/.test(providerSymbolId)) {
+    return null;
+  }
+
+  return Number(providerSymbolId);
 }
 
 function createCachedWatchlistSymbol(symbol: string, sortOrder: number): WatchlistSymbol {

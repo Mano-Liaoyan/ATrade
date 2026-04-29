@@ -7,6 +7,7 @@ import type { CandleSeriesResponse, IndicatorResponse, MarketDataUpdate, OhlcvCa
 import { BrokerPaperStatus } from './BrokerPaperStatus';
 import { CandlestickChart } from './CandlestickChart';
 import { IndicatorPanel } from './IndicatorPanel';
+import { SymbolSearch } from './SymbolSearch';
 import { TimeframeSelector } from './TimeframeSelector';
 
 type SymbolChartViewProps = {
@@ -111,6 +112,13 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
             <TimeframeSelector value={timeframe} onChange={setTimeframe} />
           </div>
         </div>
+
+        <SymbolSearch
+          title="Search another IBKR stock"
+          description="Jump from this symbol page to any IBKR/iBeam stock result without relying on a local symbol catalog."
+          compact
+          limit={6}
+        />
 
         {loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div> : null}
         {!loading && error ? (

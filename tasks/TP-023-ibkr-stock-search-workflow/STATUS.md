@@ -1,6 +1,6 @@
 # TP-023: Add IBKR stock search and pin-any-symbol workflow — Status
 
-**Current Step:** Step 3: Add frontend search and pin UX
+**Current Step:** Step 4: Add IBKR stock search verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -45,18 +45,18 @@
 ---
 
 ### Step 3: Add frontend search and pin UX
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `SymbolSearch` component added
-- [ ] Frontend search client/types added
-- [ ] Users can search, open, and pin IBKR results
-- [ ] Loading/no-results/provider-error states handled
-- [ ] Frontend build passes
+- [x] `SymbolSearch` component added
+- [x] Frontend search client/types added
+- [x] Users can search, open, and pin IBKR results
+- [x] Loading/no-results/provider-error states handled
+- [x] Frontend build passes
 
 ---
 
 ### Step 4: Add IBKR stock search verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] IBKR symbol search shell test added
 - [ ] No hard-coded production search allowlist verified
@@ -123,6 +123,8 @@
 | 2026-04-30 | Step 2 started | Persist searched symbol metadata into workspace watchlists |
 | 2026-04-30 | Step 2 completed | Watchlist pinning now preserves/enriches provider metadata, deduplicates provider identities, and verifies IBKR metadata across API restart. |
 | 2026-04-30 | Step 3 started | Frontend symbol search and pin UX |
+| 2026-04-30 | Step 3 completed | Added reusable SymbolSearch, frontend search client/types, workspace pin/open flow, symbol-page search, and passing frontend build. |
+| 2026-04-30 | Step 4 started | IBKR stock search verification scripts |
 
 ---
 
