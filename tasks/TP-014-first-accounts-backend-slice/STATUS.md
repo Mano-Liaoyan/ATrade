@@ -1,6 +1,6 @@
 # TP-014: Add the first read-only Accounts backend slice — Status
 
-**Current Step:** Step 3: Add feature-slice verification
+**Current Step:** Step 4: Update docs and milestone state
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -46,19 +46,19 @@
 ---
 
 ### Step 3: Add feature-slice verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/accounts-feature-bootstrap-tests.sh`
-- [ ] Verify API references Accounts and solution builds
-- [ ] Assert `/health` returns `ok`
-- [ ] Assert `/api/accounts/overview` returns expected JSON markers
-- [ ] Assert endpoint has no external service requirement
-- [ ] Targeted feature test passes
+- [x] Create `tests/apphost/accounts-feature-bootstrap-tests.sh`
+- [x] Verify API references Accounts and solution builds
+- [x] Assert `/health` returns `ok`
+- [x] Assert `/api/accounts/overview` returns expected JSON markers
+- [x] Assert endpoint has no external service requirement
+- [x] Targeted feature test passes
 
 ---
 
 ### Step 4: Update docs and milestone state
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `docs/architecture/modules.md` current-state notes updated
 - [ ] `docs/architecture/overview.md` current backend slice updated
@@ -111,6 +111,7 @@
 | 2026-04-29 00:24 | Step 0 completed | Preflight checks verified current shell state and TP-013 dependency |
 | 2026-04-29 00:29 | Step 1 completed | Added deterministic Accounts overview types, bootstrap provider, DI registration, and successful project build |
 | 2026-04-29 00:33 | Step 2 completed | Wired Accounts into API startup, preserved health, and verified both endpoints via API smoke check |
+| 2026-04-29 00:38 | Step 3 completed | Added accounts feature bootstrap test covering solution build, health, overview JSON, and infrastructure-free startup |
 
 ---
 
