@@ -1,5 +1,5 @@
 import { buildApiUrl } from './apiBaseUrl';
-import type { CandleSeriesResponse, IndicatorResponse, Timeframe, TrendingSymbolsResponse } from '../types/marketData';
+import type { CandleSeriesResponse, IndicatorResponse, MarketDataSymbolSearchResponse, Timeframe, TrendingSymbolsResponse } from '../types/marketData';
 
 export class ApiClientError extends Error {
   constructor(
@@ -21,6 +21,22 @@ type ApiErrorPayload = {
 
 export async function getTrendingSymbols(): Promise<TrendingSymbolsResponse> {
   return fetchJson<TrendingSymbolsResponse>('/api/market-data/trending');
+}
+
+export async function searchSymbols(
+  query: string,
+  options: { assetClass?: string; limit?: number } = {},
+): Promise<MarketDataSymbolSearchResponse> {
+  const params = new URLSearchParams({
+    query: query.trim(),
+    assetClass: options.assetClass ?? 'stock',
+  });
+
+  if (options.limit !== undefined) {
+    params.set('limit', String(options.limit));
+  }
+
+  return fetchJson<MarketDataSymbolSearchResponse>(`/api/market-data/search?${params.toString()}`);
 }
 
 export async function getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeriesResponse> {
@@ -69,8 +85,18 @@ function formatMarketDataError(status: number, error: ApiErrorPayload | null): s
 
   if (error?.code === 'provider-unavailable') {
     return detail
-      ? `IBKR market data is unavailable or authentication is required. ${detail}`
-      : 'IBKR market data is unavailable or authentication is required.';
+      ? `IBKR market data is unavailable. ${detail}`
+      : 'IBKR market data is unavailable.';
+  }
+
+  if (error?.code === 'authentication-required') {
+    return detail
+      ? `IBKR authentication is required before market data can be searched. ${detail}`
+      : 'IBKR authentication is required before market data can be searched.';
+  }
+
+  if (error?.code === 'invalid-search-query' || error?.code === 'unsupported-asset-class' || error?.code === 'invalid-search-limit') {
+    return detail ?? 'The market-data search request is invalid.';
   }
 
   if (detail) {

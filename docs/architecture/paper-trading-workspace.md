@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
@@ -23,18 +23,19 @@ see_also:
 > `ATrade.MarketData.Ibkr` as the IBKR/iBeam market-data provider,
 > `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
-> `GET /api/market-data/{symbol}/candles`, and
+> `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, a `/hubs/market-data` SignalR
 > hub, backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
 > endpoints backed by the AppHost-managed Postgres resource, AppHost-driven
 > paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
-> IBKR scanner-driven trending symbols, Postgres-backed watchlists,
-> `lightweight-charts` candlesticks, timeframe switching, indicators, source
-> metadata, and SignalR-to-HTTP fallback behavior. Production mocked
-> market-data providers have been removed; missing iBeam runtime, credentials,
-> or authentication returns safe provider-not-configured/provider-unavailable
-> errors rather than fallback data. Durable paper-order storage and real broker
-> order placement remain future work.
+> IBKR scanner-driven trending symbols, IBKR stock search, Postgres-backed
+> watchlists, `lightweight-charts` candlesticks, timeframe switching,
+> indicators, source metadata, and SignalR-to-HTTP fallback behavior.
+> Production mocked market-data providers have been removed; missing iBeam
+> runtime, credentials, or authentication returns safe
+> provider-not-configured/provider-unavailable/authentication-required errors
+> rather than fallback data. Durable paper-order storage and real broker order
+> placement remain future work.
 
 ## 1. Scope And Non-Negotiable Safety Rules
 
@@ -107,6 +108,7 @@ TimescaleDB. All durable and broker-aware behavior goes through the API.
 
 The current backend slice exposes `GET /api/broker/ibkr/status`,
 `POST /api/orders/simulate`, `GET /api/market-data/trending`,
+`GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
 `GET /api/market-data/{symbol}/candles?timeframe=...`,
 `GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
 `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
@@ -114,12 +116,15 @@ The current backend slice exposes `GET /api/broker/ibkr/status`,
 strictly server-side. The broker endpoint resolves the provider-neutral
 `IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`
 and the `ATrade.MarketData.Ibkr` provider to translate IBKR Client Portal/iBeam
-contract lookup, scanner, snapshot, and historical bar responses into
-provider-neutral trending, OHLCV candle, moving-average, RSI, MACD, and source
-metadata payloads for `1m`, `5m`, `1h`, and `1D`. SignalR is the outward-facing
-streaming layer for browsers and creates provider-backed snapshots when the
-IBKR/iBeam provider is available; NATS remains the internal event backbone
-between API and workers.
+contract search/detail, scanner, snapshot, and historical bar responses into
+provider-neutral stock search, trending, OHLCV candle, moving-average, RSI,
+MACD, and source metadata payloads for `1m`, `5m`, `1h`, and `1D`. The search
+endpoint enforces a minimum query length, stock-only asset class, and a capped
+result limit before returning provider-neutral `symbol`, `name`, `assetClass`,
+`exchange`, `currency`, `provider`, and provider-symbol-id metadata (IBKR
+`conid` for the current provider). SignalR is the outward-facing streaming layer
+for browsers and creates provider-backed snapshots when the IBKR/iBeam provider
+is available; NATS remains the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -139,13 +144,16 @@ The paper-trading slice extends existing planned responsibilities as follows:
   status/error states, symbol-search readiness hooks, historical chart queries,
   compatibility services, and SignalR snapshot contracts
 - `ATrade.MarketData.Ibkr` owns the first real market-data provider: IBKR/iBeam
-  Client Portal contract lookup, scanner/trending-equivalent mapping,
-  snapshots, historical bars, indicator inputs, source metadata, and safe
-  not-configured/unavailable responses without reading credentials directly
+  Client Portal contract search/detail lookup, scanner/trending-equivalent
+  mapping, snapshots, historical bars, indicator inputs, source metadata, and
+  safe not-configured/unavailable/authentication-required responses without
+  reading credentials directly
 - `ATrade.Workspaces` owns backend workspace preferences, including the current
   Postgres schema/repository for pinned watchlist symbols and metadata fields
-  (`provider`, optional provider id / IBKR `conid`, exchange, currency, asset
-  class, sort order, and timestamps)
+  (`provider`, optional provider id / IBKR `conid`, name, exchange, currency,
+  asset class, sort order, and timestamps). Pins can be enriched from search
+  results and duplicate handling prefers provider/conid identity when present,
+  falling back to normalized symbols otherwise.
 - `ATrade.Ibkr.Worker` owns IBKR Gateway session management and any future
   paper-safe broker polling/streaming work
 
@@ -340,12 +348,16 @@ machine changes:
 Durable watchlist preferences are now stored in **Postgres** as workspace-scoped
 settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. The
 frontend loads, pins, and unpins through the backend watchlist API, then updates
-its browser cache from the backend response. The `localStorage` key
-`atrade.paperTrading.watchlist.v1` is intentionally non-authoritative: it may
-seed a one-time migration into Postgres and may render a clearly labeled
-read-only cached snapshot when the backend/database is unavailable, but it must
-not be treated as saved state and must not contain secrets, broker account
-identifiers, or tokens.
+its browser cache from the backend response. Search-result pins send the
+provider-neutral metadata returned by `GET /api/market-data/search`: provider,
+provider symbol id (IBKR `conid` today), optional `ibkrConid`, name, exchange,
+currency, and asset class. Re-pinning a previously manual row enriches the
+stored metadata without requiring an API restart or table rewrite. The
+`localStorage` key `atrade.paperTrading.watchlist.v1` is intentionally
+non-authoritative: it may seed a one-time migration into Postgres and may render
+a clearly labeled read-only cached snapshot when the backend/database is
+unavailable, but it must not be treated as saved state and must not contain
+secrets, broker account identifiers, or tokens.
 
 ## 8. Charting Library Decision
 
@@ -363,9 +375,13 @@ Current implementation:
 - `frontend/components/CandlestickChart.tsx` uses `lightweight-charts` for
   OHLC candlesticks, volume, moving-average overlays, crosshair legend,
   zooming, and panning
+- `frontend/components/SymbolSearch.tsx` provides reusable IBKR stock search
+  controls for the workspace and symbol pages, including loading, validation,
+  no-results, and provider/authentication error states
 - `frontend/components/SymbolChartView.tsx` combines HTTP candle/indicator
-  fetches with SignalR updates from `/hubs/market-data` and falls back to HTTP
-  polling when streaming is unavailable
+  fetches with SignalR updates from `/hubs/market-data`, embeds the compact
+  symbol search control, and falls back to HTTP polling when streaming is
+  unavailable
 
 Licensing guardrail:
 
@@ -394,6 +410,23 @@ black-box "hotness" number via `GET /api/market-data/trending`. The Next.js
 landing workspace renders the backend-provided IBKR source metadata and clearly
 surfaces provider-not-configured/provider-unavailable states when local iBeam is
 not ready.
+
+### 9.1 IBKR stock search and pin-any-symbol workflow
+
+Users are no longer constrained to a trending/default list. The reusable
+`SymbolSearch` component calls `GET /api/market-data/search` through
+`frontend/lib/marketDataClient.ts`, renders IBKR/iBeam stock results, links each
+result to `/symbols/{symbol}`, and can pin/unpin the selected result through the
+backend watchlist API. The frontend uses provider-neutral fields (`provider`,
+`providerSymbolId`, `assetClass`, `exchange`, `currency`, and display `name`) and
+only derives `ibkrConid` for persisted metadata when the provider is `ibkr` and
+the provider symbol id is numeric.
+
+The backend search path uses IBKR Client Portal `/iserver/secdef/search` plus
+`/iserver/secdef/info` enrichment. Automated tests use fake IBKR HTTP responses;
+production search never falls back to a committed symbol allowlist. If iBeam is
+disabled, missing credentials, unauthenticated, or unreachable, search returns a
+stable provider error payload instead of fake results.
 
 ## 10. Future LEAN Seam
 

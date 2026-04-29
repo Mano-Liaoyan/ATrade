@@ -153,12 +153,19 @@ public sealed class IbkrMarketDataProvider(
         response = new MarketDataSymbolSearchResponse(
             DateTimeOffset.UtcNow,
             contracts
-                .Take(20)
+                .Take(MarketDataSymbolSearchLimits.MaximumLimit)
                 .Select(contract => new MarketDataSymbolSearchResult(
-                    new MarketDataSymbolIdentity(contract.Symbol, contract.Conid, contract.AssetClass, contract.Exchange),
+                    new MarketDataSymbolIdentity(
+                        contract.Symbol,
+                        Identity.Provider,
+                        contract.Conid,
+                        contract.AssetClass,
+                        contract.Exchange,
+                        contract.Currency),
                     contract.Name,
                     contract.Sector))
-                .ToArray());
+                .ToArray(),
+            IbkrMarketDataSource.Provider);
         return true;
     }
 

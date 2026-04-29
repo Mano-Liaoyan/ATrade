@@ -49,11 +49,31 @@ internal static class PostgresWorkspaceWatchlistSql
         """;
 
     public const string UpsertPinnedSymbol = """
-        WITH next_sort_order AS (
-            SELECT COALESCE(MAX(sort_order) + 1, 0) AS value
-              FROM atrade_workspaces.workspace_watchlist_pins
+        WITH deleted_provider_duplicate AS (
+            DELETE FROM atrade_workspaces.workspace_watchlist_pins
              WHERE user_id = @user_id
                AND workspace_id = @workspace_id
+               AND symbol <> @symbol
+               AND provider = @provider
+               AND (
+                   (@provider_symbol_id IS NOT NULL AND provider_symbol_id = @provider_symbol_id)
+                   OR (@ibkr_conid IS NOT NULL AND ibkr_conid = @ibkr_conid)
+               )
+             RETURNING sort_order
+        ),
+        next_sort_order AS (
+            SELECT COALESCE(
+                (SELECT MIN(sort_order) FROM deleted_provider_duplicate),
+                (SELECT sort_order
+                   FROM atrade_workspaces.workspace_watchlist_pins
+                  WHERE user_id = @user_id
+                    AND workspace_id = @workspace_id
+                    AND symbol = @symbol),
+                (SELECT COALESCE(MAX(sort_order) + 1, 0)
+                   FROM atrade_workspaces.workspace_watchlist_pins
+                  WHERE user_id = @user_id
+                    AND workspace_id = @workspace_id)
+            ) AS value
         )
         INSERT INTO atrade_workspaces.workspace_watchlist_pins (
             user_id,
@@ -84,7 +104,13 @@ internal static class PostgresWorkspaceWatchlistSql
                @observed_at_utc
           FROM next_sort_order
         ON CONFLICT (user_id, workspace_id, symbol) DO UPDATE
-            SET provider = EXCLUDED.provider,
+            SET provider = CASE
+                    WHEN EXCLUDED.provider <> 'manual'
+                         OR EXCLUDED.provider_symbol_id IS NOT NULL
+                         OR EXCLUDED.ibkr_conid IS NOT NULL
+                    THEN EXCLUDED.provider
+                    ELSE atrade_workspaces.workspace_watchlist_pins.provider
+                END,
                 provider_symbol_id = COALESCE(EXCLUDED.provider_symbol_id, atrade_workspaces.workspace_watchlist_pins.provider_symbol_id),
                 ibkr_conid = COALESCE(EXCLUDED.ibkr_conid, atrade_workspaces.workspace_watchlist_pins.ibkr_conid),
                 name = COALESCE(EXCLUDED.name, atrade_workspaces.workspace_watchlist_pins.name),

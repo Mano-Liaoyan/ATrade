@@ -97,7 +97,7 @@ public sealed class IbkrMarketDataProviderTests
         Assert.False(result);
         Assert.Null(search);
         Assert.NotNull(error);
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, error.Code);
+        Assert.Equal(MarketDataProviderErrorCodes.AuthenticationRequired, error.Code);
         Assert.Contains("not authenticated", error.Message);
     }
 
@@ -127,8 +127,14 @@ public sealed class IbkrMarketDataProviderTests
         Assert.True(searchResult);
         Assert.Null(searchError);
         var searchMatch = Assert.Single(search!.Results);
+        Assert.Equal(IbkrMarketDataSource.Provider, search!.Source);
         Assert.Equal("AAPL", searchMatch.Identity.Symbol);
+        Assert.Equal(IbkrMarketDataSource.Provider, searchMatch.Identity.Provider);
         Assert.Equal("265598", searchMatch.Identity.ProviderSymbolId);
+        Assert.Equal("Stock", searchMatch.Identity.AssetClass);
+        Assert.Equal("NASDAQ", searchMatch.Identity.Exchange);
+        Assert.Equal("USD", searchMatch.Identity.Currency);
+        Assert.Equal("Apple Inc.", searchMatch.Name);
 
         Assert.True(symbolResult);
         Assert.NotNull(symbol);
@@ -159,6 +165,7 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Equal(IbkrMarketDataSource.Snapshot, latest.Source);
 
         Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == IbkrMarketDataClient.ContractSearchPath);
+        Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == IbkrMarketDataClient.ContractInfoPath);
         Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == IbkrMarketDataClient.SnapshotPath);
         Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == IbkrMarketDataClient.HistoricalDataPath);
         Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath == IbkrMarketDataClient.ScannerPath);
@@ -218,7 +225,19 @@ public sealed class IbkrMarketDataProviderTests
                     symbol = "AAPL",
                     companyName = "Apple Inc.",
                     secType = "STK",
+                    sector = "Technology",
+                },
+            }),
+            IbkrMarketDataClient.ContractInfoPath => JsonResponse(new[]
+            {
+                new
+                {
+                    conid = "265598",
+                    symbol = "AAPL",
+                    companyName = "Apple Inc.",
+                    secType = "STK",
                     exchange = "NASDAQ",
+                    currency = "USD",
                     sector = "Technology",
                 },
             }),
@@ -254,6 +273,7 @@ public sealed class IbkrMarketDataProviderTests
                     companyName = "Apple Inc.",
                     secType = "STK",
                     exchange = "NASDAQ",
+                    currency = "USD",
                     sector = "Technology",
                     score = 99.4m,
                     changePercent = 1.18m,

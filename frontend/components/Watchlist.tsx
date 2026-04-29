@@ -59,7 +59,7 @@ export function Watchlist({
       {!loading && symbols.length === 0 && !error ? (
         <div className="empty-state">
           <strong>No pinned symbols yet.</strong>
-          <p>Pin a trending stock or ETF to persist it to your backend workspace watchlist.</p>
+          <p>Use IBKR stock search or pin a provider-backed trending result to persist it to your backend workspace watchlist.</p>
         </div>
       ) : null}
 
@@ -69,6 +69,7 @@ export function Watchlist({
             const details = bySymbol.get(watchlistSymbol.symbol);
             const name = watchlistSymbol.name ?? details?.name ?? 'Pinned symbol';
             const exchange = watchlistSymbol.exchange ?? details?.exchange;
+            const provider = watchlistSymbol.provider === 'ibkr' ? 'IBKR' : watchlistSymbol.provider;
             const isSaving = savingSymbol === watchlistSymbol.symbol.toUpperCase();
 
             return (
@@ -77,7 +78,7 @@ export function Watchlist({
                   <Link className="symbol-link" href={`/symbols/${encodeURIComponent(watchlistSymbol.symbol)}`}>
                     {watchlistSymbol.symbol}
                   </Link>
-                  <p>{exchange ? `${name} · ${exchange}` : name}</p>
+                  <p>{exchange ? `${name} · ${exchange} · ${provider}` : `${name} · ${provider}`}</p>
                 </div>
                 <button
                   className="text-button"

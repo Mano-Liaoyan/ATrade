@@ -40,6 +40,19 @@ app.MapGet(
     "/api/market-data/trending",
     (IMarketDataService marketDataService) => ExecuteMarketDataRequest(() => Results.Ok(marketDataService.GetTrendingSymbols())));
 app.MapGet(
+    "/api/market-data/search",
+    (string? query, string? assetClass, int? limit, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (marketDataService.TrySearchSymbols(query, assetClass, limit, out var response, out var error))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Results.Ok(response);
+        }
+
+        return ToMarketDataErrorResult(error);
+    });
+app.MapGet(
     "/api/market-data/{symbol}/candles",
     (string symbol, string? timeframe, IMarketDataService marketDataService) =>
     {
@@ -122,7 +135,7 @@ static IResult ToMarketDataErrorResult(MarketDataError? error)
     return error.Code switch
     {
         "unsupported-symbol" => Results.NotFound(error),
-        MarketDataProviderErrorCodes.ProviderNotConfigured or MarketDataProviderErrorCodes.ProviderUnavailable => Results.Json(
+        MarketDataProviderErrorCodes.ProviderNotConfigured or MarketDataProviderErrorCodes.ProviderUnavailable or MarketDataProviderErrorCodes.AuthenticationRequired => Results.Json(
             error,
             statusCode: StatusCodes.Status503ServiceUnavailable),
         _ => Results.BadRequest(error),

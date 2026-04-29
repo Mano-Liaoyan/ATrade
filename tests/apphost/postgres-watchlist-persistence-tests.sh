@@ -223,6 +223,44 @@ if duplicates:
 PY
 }
 
+assert_symbol_metadata() {
+  local response_file="$1"
+  local symbol="$2"
+  local provider="$3"
+  local provider_symbol_id="$4"
+  local ibkr_conid="$5"
+  local name="$6"
+  local exchange="$7"
+  local currency="$8"
+  local asset_class="$9"
+
+  python3 - "$response_file" "$symbol" "$provider" "$provider_symbol_id" "$ibkr_conid" "$name" "$exchange" "$currency" "$asset_class" <<'PY'
+import json
+import sys
+
+response_path, expected_symbol, expected_provider, expected_provider_symbol_id, expected_ibkr_conid, expected_name, expected_exchange, expected_currency, expected_asset_class = sys.argv[1:]
+with open(response_path, "r", encoding="utf-8") as handle:
+    payload = json.load(handle)
+
+matches = [entry for entry in payload.get("symbols", []) if entry.get("symbol") == expected_symbol]
+if len(matches) != 1:
+    raise SystemExit(f"expected one {expected_symbol} entry, got {matches!r}")
+entry = matches[0]
+expected = {
+    "provider": expected_provider,
+    "providerSymbolId": expected_provider_symbol_id,
+    "ibkrConid": int(expected_ibkr_conid),
+    "name": expected_name,
+    "exchange": expected_exchange,
+    "currency": expected_currency,
+    "assetClass": expected_asset_class,
+}
+for key, value in expected.items():
+    if entry.get(key) != value:
+        raise SystemExit(f"expected {expected_symbol}.{key}={value!r}, got {entry.get(key)!r} in {entry!r}")
+PY
+}
+
 assert_invalid_symbol_error() {
   local response_file="$1"
 
@@ -266,11 +304,16 @@ main() {
   request_json POST '/api/workspace/watchlist' '{"symbol":"AAPL","provider":"manual","name":"Apple Inc.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
   assert_symbols_exactly "$response_file" AAPL
 
+  request_json POST '/api/workspace/watchlist' '{"symbol":"AAPL","provider":"ibkr","providerSymbolId":"265598","ibkrConid":265598,"name":"Apple Inc.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
+  assert_symbols_exactly "$response_file" AAPL
+  assert_symbol_metadata "$response_file" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
+
   request_json POST '/api/workspace/watchlist' '{"symbol":"MSFT","provider":"manual","name":"Microsoft Corp.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
   assert_symbols_exactly "$response_file" AAPL MSFT
 
   request_json POST '/api/workspace/watchlist' '{"symbol":" aapl ","provider":"manual"}' "$response_file" 200
   assert_symbols_exactly "$response_file" AAPL MSFT
+  assert_symbol_metadata "$response_file" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
 
   request_json POST '/api/workspace/watchlist' '{"symbol":"not a valid symbol"}' "$invalid_response_file" 400
   assert_invalid_symbol_error "$invalid_response_file"
@@ -280,6 +323,7 @@ main() {
 
   request_json GET '/api/workspace/watchlist' '' "$response_file" 200
   assert_symbols_exactly "$response_file" AAPL MSFT
+  assert_symbol_metadata "$response_file" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
 
   printf 'Postgres watchlist persistence verified across API restart.\n'
 }

@@ -23,6 +23,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
 {
     public const string AuthStatusPath = "/v1/api/iserver/auth/status";
     public const string ContractSearchPath = "/v1/api/iserver/secdef/search";
+    public const string ContractInfoPath = "/v1/api/iserver/secdef/info";
     public const string SnapshotPath = "/v1/api/iserver/marketdata/snapshot";
     public const string HistoricalDataPath = "/v1/api/iserver/marketdata/history";
     public const string ScannerPath = "/v1/api/iserver/scanner/run";
@@ -60,11 +61,34 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         await EnsureMarketDataSuccessAsync(response, cancellationToken).ConfigureAwait(false);
 
         using var document = await ReadJsonDocumentAsync(response, cancellationToken).ConfigureAwait(false);
-        return EnumerateResultItems(document.RootElement)
-            .Select(ParseContract)
+        var searchContracts = EnumerateResultItems(document.RootElement)
+            .Select(element => ParseContract(element))
             .Where(contract => contract is not null)
             .Cast<IbkrContract>()
+            .Take(MarketDataSymbolSearchLimits.MaximumLimit)
             .ToArray();
+
+        var enrichedContracts = new List<IbkrContract>(searchContracts.Length);
+        foreach (var contract in searchContracts)
+        {
+            enrichedContracts.Add(await GetContractInfoAsync(contract, cancellationToken).ConfigureAwait(false));
+        }
+
+        return enrichedContracts;
+    }
+
+    private async Task<IbkrContract> GetContractInfoAsync(IbkrContract contract, CancellationToken cancellationToken)
+    {
+        var path = $"{ContractInfoPath}?conid={Uri.EscapeDataString(contract.Conid)}&secType={Uri.EscapeDataString(ToIbkrSecType(contract.AssetClass))}";
+        using var response = await httpClient.GetAsync(path, cancellationToken).ConfigureAwait(false);
+        await EnsureMarketDataSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+
+        using var document = await ReadJsonDocumentAsync(response, cancellationToken).ConfigureAwait(false);
+        var detail = EnumerateResultItems(document.RootElement)
+            .Select(element => ParseContract(element, contract))
+            .FirstOrDefault(parsed => parsed is not null);
+
+        return detail is null ? contract : MergeContract(contract, detail);
     }
 
     public async Task<IReadOnlyList<IbkrMarketDataSnapshot>> GetSnapshotsAsync(IReadOnlyList<string> conids, CancellationToken cancellationToken = default)
@@ -164,7 +188,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
             throw new IbkrMarketDataProviderException(
-                MarketDataProviderErrorCodes.ProviderUnavailable,
+                MarketDataProviderErrorCodes.AuthenticationRequired,
                 "IBKR iBeam rejected the market-data request because the session is not authenticated.");
         }
 
@@ -196,13 +220,15 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         return new[] { root };
     }
 
-    private static IbkrContract? ParseContract(JsonElement element)
+    private static IbkrContract? ParseContract(JsonElement element, IbkrContract? fallback = null)
     {
         var conid = element.GetStringValue("conid", "con_id", "contractId", "contract_id")
             ?? element.GetNestedStringValue("contract", "conid")
-            ?? element.GetNestedStringValue("contract", "con_id");
+            ?? element.GetNestedStringValue("contract", "con_id")
+            ?? fallback?.Conid;
         var symbol = element.GetStringValue("symbol", "ticker", "localSymbol")
-            ?? element.GetNestedStringValue("contract", "symbol");
+            ?? element.GetNestedStringValue("contract", "symbol")
+            ?? fallback?.Symbol;
 
         if (string.IsNullOrWhiteSpace(conid) || string.IsNullOrWhiteSpace(symbol))
         {
@@ -211,16 +237,36 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
 
         var assetClass = element.GetStringValue("secType", "assetClass", "asset_class")
             ?? element.GetNestedStringValue("contract", "secType")
-            ?? TryReadFirstSectionSecType(element)
+            ?? TryReadFirstSectionString(element, "secType", "assetClass")
+            ?? fallback?.AssetClass
             ?? "Stock";
-        var exchange = element.GetStringValue("exchange", "listingExchange", "listing_exchange")
+        var exchange = element.GetStringValue("exchange", "listingExchange", "listing_exchange", "primaryExchange")
             ?? element.GetNestedStringValue("contract", "exchange")
+            ?? fallback?.Exchange
             ?? "SMART";
         var name = element.GetStringValue("companyName", "companyHeader", "description", "contract_description_1", "name")
+            ?? fallback?.Name
             ?? symbol;
-        var sector = element.GetStringValue("sector", "industry", "category") ?? assetClass;
+        var sector = element.GetStringValue("sector", "industry", "category") ?? fallback?.Sector ?? assetClass;
+        var currency = element.GetStringValue("currency", "currencyCode", "baseCurrency")
+            ?? element.GetNestedStringValue("contract", "currency")
+            ?? TryReadFirstSectionString(element, "currency", "currencyCode")
+            ?? fallback?.Currency
+            ?? "USD";
 
-        return new IbkrContract(NormalizeSymbol(symbol), name, NormalizeAssetClass(assetClass), exchange, conid, sector);
+        return new IbkrContract(NormalizeSymbol(symbol), name, NormalizeAssetClass(assetClass), exchange, conid, sector, NormalizeCurrency(currency));
+    }
+
+    private static IbkrContract MergeContract(IbkrContract searchContract, IbkrContract detailContract)
+    {
+        return new IbkrContract(
+            string.IsNullOrWhiteSpace(detailContract.Symbol) ? searchContract.Symbol : detailContract.Symbol,
+            string.IsNullOrWhiteSpace(detailContract.Name) ? searchContract.Name : detailContract.Name,
+            string.IsNullOrWhiteSpace(detailContract.AssetClass) ? searchContract.AssetClass : detailContract.AssetClass,
+            string.IsNullOrWhiteSpace(detailContract.Exchange) ? searchContract.Exchange : detailContract.Exchange,
+            string.IsNullOrWhiteSpace(detailContract.Conid) ? searchContract.Conid : detailContract.Conid,
+            string.IsNullOrWhiteSpace(detailContract.Sector) ? searchContract.Sector : detailContract.Sector,
+            string.IsNullOrWhiteSpace(detailContract.Currency) ? searchContract.Currency : detailContract.Currency);
     }
 
     private static IbkrMarketDataSnapshot? ParseSnapshot(JsonElement element)
@@ -293,7 +339,8 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
                 NormalizeAssetClass(element.GetStringValue("secType", "assetClass", "asset_class") ?? "Stock"),
                 element.GetStringValue("exchange", "listingExchange", "listing_exchange") ?? "SMART",
                 conid,
-                element.GetStringValue("sector", "industry", "category") ?? "Stock");
+                element.GetStringValue("sector", "industry", "category") ?? "Stock",
+                NormalizeCurrency(element.GetStringValue("currency", "currencyCode", "baseCurrency") ?? "USD"));
         }
 
         return new IbkrScannerResult(
@@ -311,7 +358,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
             IbkrMarketDataSource.Scanner);
     }
 
-    private static string? TryReadFirstSectionSecType(JsonElement element)
+    private static string? TryReadFirstSectionString(JsonElement element, params string[] names)
     {
         if (!element.TryGetPropertyIgnoreCase("sections", out var sections) || sections.ValueKind != JsonValueKind.Array)
         {
@@ -320,10 +367,10 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
 
         foreach (var section in sections.EnumerateArray())
         {
-            var secType = section.GetStringValue("secType", "assetClass");
-            if (!string.IsNullOrWhiteSpace(secType))
+            var value = section.GetStringValue(names);
+            if (!string.IsNullOrWhiteSpace(value))
             {
-                return secType;
+                return value;
             }
         }
 
@@ -338,6 +385,18 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
     }
 
     private static string NormalizeSymbol(string symbol) => symbol.Trim().ToUpperInvariant();
+
+    private static string NormalizeCurrency(string currency) => currency.Trim().ToUpperInvariant();
+
+    private static string ToIbkrSecType(string assetClass)
+    {
+        return assetClass.Trim().ToUpperInvariant() switch
+        {
+            "STOCK" or "STK" => "STK",
+            "ETF" => "ETF",
+            var normalized => normalized,
+        };
+    }
 
     private static string NormalizeAssetClass(string assetClass)
     {
