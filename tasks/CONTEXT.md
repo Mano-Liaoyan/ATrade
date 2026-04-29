@@ -110,5 +110,7 @@ _Items discovered during task execution are logged here by agents._
 - [ ] `TP-007` — Reconcile planning and docs with the actual repo state
 - [ ] `TP-008` — Extend AppHost with managed infrastructure resources
 - [ ] `TP-009` — Scaffold first feature-module shells and the IBKR worker shell
+- [ ] **Frontend dependency audit** — `npm install lightweight-charts @microsoft/signalr` reported 2 moderate npm advisories during TP-018; review dependency-policy options without forcing breaking upgrades.
+- [ ] **Task inventory reconciliation** — TP-018 recovered the mocked market-data contract locally while `tasks/TP-017-mocked-market-data-trending-signalr/STATUS.md` still says `Not Started`; reconcile task state after merge so TP-017 is not re-run blindly.
 - Open milestones tracked in `PLAN.md` should stay aligned with the task packets
   above and with the active docs.

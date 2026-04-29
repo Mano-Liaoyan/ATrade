@@ -24,15 +24,16 @@ see_also:
 > `ATrade.Ibkr.Worker` shell while declaring Aspire-managed `Postgres`,
 > `TimescaleDB`, `Redis`, and `NATS` resources.
 >
-> **Current backend slice:** `ATrade.Api` now provides a stable `GET /health`
-> smoke endpoint plus the first read-only feature endpoint,
-> `GET /api/accounts/overview`, which returns deterministic bootstrap JSON
-> from `ATrade.Accounts`. The infrastructure layer is declared in the AppHost
-> graph, and `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker`
-> remain intentionally early: the worker is an AppHost-managed project
-> resource that receives `Postgres`, `Redis`, and `NATS` references but still
-> runs only an inert hosted-service shell, while the remaining domain modules
-> do not yet implement broker, market-data, or database behavior.
+> **Current backend slice:** `ATrade.Api` now provides stable `GET /health`,
+> `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, and
+> `POST /api/orders/simulate` endpoints. `ATrade.Accounts` still returns
+> deterministic bootstrap JSON, `ATrade.Brokers.Ibkr` now supplies the
+> paper-only broker seam, and `ATrade.Orders` now owns deterministic
+> paper-order simulation. The AppHost graph continues to declare the shared
+> infrastructure resources and now also forwards the safe IBKR paper-mode
+> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`; the worker
+> remains intentionally early, but it now reports safe disabled/paper/
+> rejected-live states instead of idling as a purely inert shell.
 
 ## 1. Shape Of The System
 
@@ -120,8 +121,10 @@ architecture the AppHost is responsible for:
   infrastructure resources and wiring their connection strings into the
   services that need them. The current runnable slice already declares those
   resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
-  four, and wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
-  even though the application code still only exposes smoke-host behavior.
+  four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
+  forwards the safe paper-trading IBKR environment contract into both .NET
+  processes, and only declares an optional `ibkr-gateway` container when a
+  non-placeholder official image is provided locally.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 
@@ -182,6 +185,19 @@ integrations, and only those two:
 Both integrations live behind provider-agnostic module boundaries on the
 backend side (see `modules.md` → *Broker* and *Market Data*), so additional
 providers can be added later without reshaping the rest of the monolith.
+
+The next staged feature direction is a **paper-trading workspace** inside the
+Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
+and trending symbols. The backend half of that direction is now started: safe
+IBKR session status and deterministic paper-order simulation already route
+through `ATrade.Api`, while the broader UI, SignalR fan-out, and market/trending
+surfaces remain future work. The slice keeps the current modular-monolith and
+Aspire contracts intact by routing browser traffic through `ATrade.Api`, using
+SignalR for browser-facing real-time updates, using NATS for internal fan-out,
+keeping orders simulated rather than live, and treating official IBKR Gateway
+session / paper-market connectivity plus the future LEAN signal source as seams
+rather than as reasons to add new runtime surfaces.
+
 Until those modules, workers, and infrastructure integrations become
 functional rather than scaffolded, the rest of this document is aspirational
 in the way called out at the top.
@@ -195,7 +211,9 @@ in the way called out at the top.
   bootstrap status of the AppHost.
 - `modules.md` — module-by-module map of the backend, workers, and
   frontend surfaces referenced throughout this document.
-- `../INDEX.md` — documentation discovery layer; both architecture docs
+- `paper-trading-workspace.md` — paper-only workspace architecture,
+  streaming boundaries, charting-library decision, and future LEAN seam.
+- `../INDEX.md` — documentation discovery layer; the architecture docs
   are indexed there with `status: active`.
 
 ## 7. Change Control

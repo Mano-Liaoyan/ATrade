@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\ATrade.Brokers.Ibkr\ATrade.Brokers.Ibkr.csproj" />
     <ProjectReference Include="..\..\src\ATrade.ServiceDefaults\ATrade.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

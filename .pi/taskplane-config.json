@@ -20,17 +20,17 @@
       "thinking": "high"
     },
     "reviewer": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "thinking": "xhigh"
     }
   },
   "orchestrator": {
     "supervisor": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "thinking": "high"
     },
     "merge": {
-      "model": "github-copilot/gpt-5.4",
+      "model": "github-copilot/gpt-5.5",
       "thinking": "off"
     }
   }

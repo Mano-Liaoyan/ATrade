@@ -15,28 +15,32 @@ see_also:
 
 > **Status note:** This document describes the **target** module layout of
 > the ATrade codebase, not a finished implementation. `src/ATrade.AppHost`,
-> `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`, the
-> compileable shells for `src/ATrade.Orders` and `src/ATrade.MarketData`, and
-> `workers/ATrade.Ibkr.Worker` now exist. `ATrade.Accounts` now provides the
-> first real backend feature behavior: a deterministic bootstrap overview
-> service that `ATrade.Api` exposes at `GET /api/accounts/overview`.
-> `ATrade.Orders` and `ATrade.MarketData` remain structural scaffolding only.
-> `ATrade.Ibkr.Worker` is now wired into the AppHost runtime graph and
-> receives `Postgres`, `Redis`, and `NATS` references, but it still runs only
-> an inert background-service shell with no broker or data behavior. The
-> remaining modules and workers listed below stay aspirational and will land
-> in later milestones tracked by `PLAN.md`. The `frontend/` directory now
-> hosts the first real Next.js slice: a minimal home page that proves Aspire
-> can orchestrate a real frontend runtime, while broader UI routes remain
-> later work.
+> `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`,
+> `src/ATrade.Brokers.Ibkr`, `src/ATrade.Orders`, `src/ATrade.MarketData`, and
+> `workers/ATrade.Ibkr.Worker` now exist. `ATrade.Accounts` provides the
+> deterministic bootstrap overview endpoint, `ATrade.Brokers.Ibkr` now owns the
+> paper-only broker seam, `ATrade.Orders` now owns deterministic paper-order
+> simulation, and `ATrade.Ibkr.Worker` now reports safe disabled/paper/rejected
+> status while remaining intentionally light on broker-side state.
+> `ATrade.MarketData` now provides deterministic mocked symbol, candle,
+> indicator, trending-factor, and SignalR snapshot contracts for the first
+> workspace slice. The remaining modules and workers listed below stay
+> aspirational and will land in later milestones tracked by `PLAN.md`. The
+> `frontend/` directory now hosts the first paper-trading workspace UI slice:
+> a Next.js home route with backend-driven trending symbols, local browser
+> watchlists, symbol navigation, and `lightweight-charts` chart routes while
+> preserving the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
 > `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as managed infrastructure
-> resources; and wires the `api` / `ibkr-worker` resources to their expected
-> managed infrastructure while keeping `ATrade.Api` limited to stable
-> `GET /health` and `GET /api/accounts/overview` bootstrap endpoints and the
-> worker limited to its inert hosted service shell.
+> resources; forwards the safe IBKR paper-trading environment contract into
+> `api` / `ibkr-worker`; and keeps the browser-facing backend slice focused on
+> `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
+> `POST /api/orders/simulate`, `GET /api/market-data/trending`,
+> `GET /api/market-data/{symbol}/candles`,
+> `GET /api/market-data/{symbol}/indicators`, and `/hubs/market-data` while
+> the worker limits itself to paper-safe session/status monitoring.
 
 ## 1. How To Read This Document
 
@@ -73,9 +77,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   infrastructure resources. In the current runnable slice, the AppHost wires
   `ATrade.Api`, `ATrade.Ibkr.Worker`, and the bootstrap Next.js frontend home
   page; declares the four shared infrastructure resources; sends `api` the
-  full backend infrastructure set; and sends `ibkr-worker` its current
-  `Postgres` / `Redis` / `NATS` references — see
-  `src/ATrade.AppHost/Program.cs`.
+  full backend infrastructure set; sends `ibkr-worker` its current
+  `Postgres` / `Redis` / `NATS` references; forwards the safe paper-mode IBKR
+  environment contract to the API and worker; and only declares an
+  `ibkr-gateway` container when a non-placeholder official image is supplied
+  locally — see `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 
@@ -89,31 +95,41 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   .NET module.
 - **First-phase focus:** None directly — infrastructure module.
 
-### 2.3 `ATrade.Api` *(exists today, first feature slice)*
+### 2.3 `ATrade.Api` *(exists today, paper-safe backend slice)*
 
 - **Purpose:** The single public HTTP surface for the Next.js frontend and
   any future external clients.
-- **Responsibilities:** In the current slice, provide a minimal ASP.NET
-  Core host that uses `ATrade.ServiceDefaults`, composes the Accounts
-  module, and exposes stable `GET /health` and `GET /api/accounts/overview`
-  endpoints. The overview endpoint returns deterministic bootstrap JSON from
-  `ATrade.Accounts` (`module`, `status`, `brokerConnection`, `accounts`)
-  without pretending persistence, broker connectivity, or broader domain
-  behavior exists yet. The AppHost now also injects the runtime connection
-  information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS` so the
-  local graph matches the API's planned infrastructure shape, even though
-  the API does not consume those stores functionally yet. Later slices add
-  authenticated REST/streaming endpoints for deeper accounts, portfolios,
-  strategies, orders, and market-data queries plus translation of HTTP
+- **Responsibilities:** In the current slice, provide an ASP.NET Core host
+  that uses `ATrade.ServiceDefaults`, composes the Accounts, Orders, IBKR
+  broker, and MarketData modules, and exposes stable `GET /health`,
+  `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
+  `POST /api/orders/simulate`, `GET /api/market-data/trending`,
+  `GET /api/market-data/{symbol}/candles?timeframe=...`,
+  `GET /api/market-data/{symbol}/indicators?timeframe=...`, and
+  `/hubs/market-data`. The overview endpoint still returns deterministic
+  bootstrap JSON from `ATrade.Accounts` (`module`, `status`,
+  `brokerConnection`, `accounts`); the broker status endpoint projects the
+  safe `ATrade.Brokers.Ibkr` status shape without leaking secrets; the
+  simulation endpoint returns deterministic paper-only fills while making
+  live broker order placement impossible by construction; and the market-data
+  endpoints/hub return deterministic mocked stocks, ETFs, candles,
+  indicators, trending factors, and SignalR snapshots without external
+  providers. The AppHost now also injects the runtime connection information
+  for `Postgres`, `TimescaleDB`, `Redis`, and `NATS` so the local graph
+  matches the API's planned infrastructure shape, even though the API does
+  not consume those stores functionally yet. Later slices add authenticated
+  REST/streaming endpoints for deeper accounts, backend-owned watchlists,
+  charts, strategies, and market-data queries plus translation of HTTP
   requests into module calls and NATS publications.
-- **Expected dependencies:** `ATrade.ServiceDefaults` and `ATrade.Accounts`
-  today for functional behavior; the current AppHost graph also provides
-  `Postgres`, `TimescaleDB`, `Redis`, and `NATS` connection info so later
-  slices can begin consuming them without reshaping the runtime topology.
-- **First-phase focus:** The scaffold now proves the backend/AppHost
-  bootstrap path and the first feature-module composition pattern.
-  Functional IBKR account/order and Polygon market-data surfaces land in
-  later slices.
+- **Expected dependencies:** `ATrade.ServiceDefaults`, `ATrade.Accounts`,
+  `ATrade.Brokers.Ibkr`, `ATrade.Orders`, and `ATrade.MarketData` today for
+  functional behavior; the current AppHost graph also provides `Postgres`,
+  `TimescaleDB`, `Redis`, and `NATS` connection info so later slices can
+  begin consuming them without reshaping the runtime topology.
+- **First-phase focus:** The backend now proves the paper-safe composition
+  pattern: official IBKR session status, deterministic order simulation, and
+  deterministic mocked market-data HTTP/SignalR surfaces for the frontend
+  workspace.
 
 ### 2.4 `ATrade.Accounts` *(exists today, first read-only slice)*
 
@@ -135,33 +151,42 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Reconcile against IBKR account and execution
   events after the bootstrap overview slice proves module wiring.
 
-### 2.5 `ATrade.Orders` *(exists today, shell only)*
+### 2.5 `ATrade.Orders` *(exists today, first paper-simulation slice)*
 
 - **Purpose:** Order lifecycle and routing.
-- **Responsibilities:** In the current slice, compile as a dedicated module
-  with an `OrdersAssemblyMarker` type only. Future slices validate order
-  intents, persist order state transitions, route to the correct broker
-  integration via NATS, and publish execution updates.
-- **Expected dependencies:** `Postgres` (order state), `NATS` (publish
-  intents, consume executions), `ATrade.Accounts`,
-  `ATrade.ServiceDefaults`. The current shell intentionally carries no
-  runtime wiring yet.
-- **First-phase focus:** Routes exclusively to IBKR; provider-agnostic
-  order contract is required so other brokers can be added later.
+- **Responsibilities:** In the current slice, own deterministic paper-order
+  request/response contracts, validate paper-order inputs, enforce
+  paper-only eligibility through `ATrade.Brokers.Ibkr`, and return
+  deterministic simulated fills for `POST /api/orders/simulate`. Persistence,
+  lifecycle fan-out, and broker handoff remain future work, and no
+  live-trading path belongs in this module family.
+- **Expected dependencies:** `ATrade.Brokers.Ibkr` and
+  `ATrade.ServiceDefaults` today for functional behavior; `Postgres`
+  (order state), `NATS` (publish intents, consume executions), and
+  `ATrade.Accounts` join later when paper-order persistence and projections
+  land.
+- **First-phase focus:** Own the paper-only order workflow for the workspace
+  while keeping the order contract provider-neutral so other brokers can be
+  added later.
 
-### 2.6 `ATrade.MarketData` *(exists today, shell only)*
+### 2.6 `ATrade.MarketData` *(exists today, deterministic mocked-data slice)*
 
 - **Purpose:** Market data ingestion, storage, and query.
-- **Responsibilities:** In the current slice, compile as a dedicated module
-  with a `MarketDataAssemblyMarker` type only. Future slices define
-  bar/tick schemas, expose historical queries against TimescaleDB,
-  publish real-time updates onto NATS for subscribers, and cache hot reads
-  in Redis.
-- **Expected dependencies:** `TimescaleDB` (hypertables), `Redis` (hot
-  cache), `NATS` (real-time fan-out), `ATrade.ServiceDefaults`. The current
-  shell intentionally carries no runtime wiring yet.
-- **First-phase focus:** Polygon is the only data provider; provider
-  adapter lives behind an internal `IMarketDataProvider`-style boundary.
+- **Responsibilities:** In the current slice, provide provider-neutral mocked
+  market-data contracts, a deterministic stock/ETF catalog, OHLCV candle
+  generation for `1m`, `5m`, `1h`, and `1D`, moving-average / RSI / MACD
+  indicator calculations, transparent trending factors, DI registration, and
+  a SignalR hub/snapshot service consumed by `ATrade.Api`. Future slices
+  expose historical chart queries against TimescaleDB, publish real-time
+  updates onto NATS for API / SignalR projection, cache hot reads in Redis,
+  and keep deterministic mocked quote/bar feeds available until real provider
+  ingestion lands.
+- **Expected dependencies:** No external runtime services today beyond
+  composition into `ATrade.Api`; future slices add `TimescaleDB` (hypertables),
+  `Redis` (hot cache), `NATS` (real-time fan-out), and `ATrade.ServiceDefaults`.
+- **First-phase focus:** Polygon remains the primary long-term market-data
+  provider, but the current workspace starts with mocked quotes, bars,
+  indicators, and trending factors behind the same provider-neutral boundary.
 
 ### 2.7 `ATrade.Strategies` *(planned)*
 
@@ -173,19 +198,25 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   (evaluation traces), `NATS` (signal publication), `ATrade.MarketData`,
   `ATrade.ServiceDefaults`.
 - **First-phase focus:** Swing/position strategies evaluated against
-  Polygon bars.
+  Polygon bars. Any future LEAN adoption plugs into this area as a
+  signal-source seam, not as a first-slice dependency.
 
-### 2.8 `ATrade.Brokers.Ibkr` *(planned)*
+### 2.8 `ATrade.Brokers.Ibkr` *(exists today, first broker slice)*
 
 - **Purpose:** IBKR broker adapter.
-- **Responsibilities:** Translate internal order intents into IBKR API
-  calls; ingest IBKR execution, position, and account updates; surface
-  them back onto NATS using provider-neutral event shapes.
-- **Expected dependencies:** `NATS`, `Redis` (rate-limit counters for the
-  IBKR API), `ATrade.ServiceDefaults`. Paired with
-  `ATrade.Ibkr.Worker` under `workers/`.
-- **First-phase focus:** The entire module is the first-phase broker
-  integration.
+- **Responsibilities:** In the current slice, bind typed paper-mode broker
+  options, enforce a paper-only guard, expose the official Gateway
+  auth-status client boundary, normalize safe broker status/capability
+  shapes, and keep order placement, credential storage, unofficial SDKs, and
+  persistence out of scope. Later explicitly reviewed slices may translate
+  approved paper-only order intents into IBKR API calls and surface the
+  results back onto NATS.
+- **Expected dependencies:** Shared hosting/configuration abstractions today;
+  consumed directly by `ATrade.Api` and `ATrade.Ibkr.Worker`. Future slices
+  may additionally use `NATS` and `Redis` for broker event publication and
+  rate-limit counters. Paired with `ATrade.Ibkr.Worker` under `workers/`.
+- **First-phase focus:** Provide the paper-only broker seam: session status
+  first, paper-safe data next, and no live-trading behavior.
 
 ### 2.9 `ATrade.MarketData.Polygon` *(planned)*
 
@@ -210,23 +241,27 @@ project now exists as compileable scaffolding, and `ATrade.Ibkr.Worker` is
 now added to the AppHost runtime graph with its initial infrastructure
 references.
 
-### 3.1 `ATrade.Ibkr.Worker` *(exists today, shell only)*
+### 3.1 `ATrade.Ibkr.Worker` *(exists today, first paper-status slice)*
 
 - **Purpose:** Host the IBKR session and execute the broker-side half of
   `ATrade.Brokers.Ibkr`.
-- **Responsibilities:** In the current slice, compile as an inert worker
-  shell that starts a hosted background service and idles without broker,
-  NATS, or database consumers. The AppHost now wires `Postgres`, `Redis`,
-  and `NATS` connection info into the process so the runtime graph matches
-  the worker's planned dependencies before any broker behavior lands.
-  Future slices maintain the IBKR connection, consume order intents from
-  NATS, and publish executions, positions, and account updates.
+- **Responsibilities:** In the current slice, start a hosted background
+  service that composes `ATrade.Brokers.Ibkr`, reports safe disabled /
+  not-configured / connecting / authenticated / degraded / error states,
+  and fails fast on rejected live-mode requests before any broker call. When
+  paper mode is enabled, it polls the official auth-status endpoint through
+  the broker adapter; when disabled, it remains idle. The AppHost now wires
+  `Postgres`, `Redis`, and `NATS` connection info into the process so the
+  runtime graph matches the worker's planned dependencies before any broker
+  messaging or database behavior lands.
 - **Expected dependencies:** `ATrade.Brokers.Ibkr`, `NATS`, `Redis`,
   `Postgres` (for durable intent/execution correlation),
-  `ATrade.ServiceDefaults`. The current shell still uses only shared
-  defaults functionally, but the AppHost runtime graph now provides the
-  `Postgres` / `Redis` / `NATS` references it will consume later.
-- **First-phase focus:** Core first-phase worker.
+  `ATrade.ServiceDefaults`. The current worker uses the broker adapter and
+  shared defaults functionally today, while the AppHost runtime graph already
+  provides the `Postgres` / `Redis` / `NATS` references it will consume more
+  deeply later.
+- **First-phase focus:** Core worker for paper-only IBKR session and broker
+  status handling.
 
 ### 3.2 `polygon-worker` *(planned)*
 
@@ -251,21 +286,27 @@ references.
 
 ## 4. Frontend — `frontend/`
 
-### 4.1 Next.js app *(exists today, bootstrap slice only)*
+### 4.1 Next.js app *(exists today, first trading workspace slice)*
 
 - **Purpose:** The sole user-facing surface for ATrade.
 - **Responsibilities:** Render dashboards for accounts, positions,
-  orders, strategies, and market data; stream live updates; delegate all
-  server-side concerns to `ATrade.Api`; participate in the Aspire graph
-  as a JavaScript resource so it starts, stops, and is observed with the
-  rest of the stack.
+  orders, strategies, and market data; host watchlists, paper-order
+  tickets, trending panels, and `lightweight-charts`-based chart surfaces;
+  stream live updates over SignalR; delegate all server-side concerns to
+  `ATrade.Api`; participate in the Aspire graph as a JavaScript resource so
+  it starts, stops, and is observed with the rest of the stack.
 - **Expected dependencies:** `ATrade.Api` for all data; the Aspire
   AppHost for process lifecycle and environment wiring.
-- **First-phase focus:** UI surfaces for IBKR accounts/orders and
-  Polygon-sourced market data; the current slice is intentionally small and
-  serves a stable home page (`ATrade Frontend Home` / `Next.js Bootstrap
-  Slice`) so shell smoke tests can verify the real Next.js runtime before
-  broader feature work lands.
+- **First-phase focus:** UI surfaces for paper-only IBKR connection /
+  account views, simulated orders, mocked-or-provider-backed market data,
+  and transparent trending-factor explanations. The current slice preserves
+  the stable home-page markers (`ATrade Frontend Home` /
+  `Next.js Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding
+  the first workspace route: backend-driven trending stocks/ETFs, symbol
+  navigation to `/symbols/[symbol]`, localStorage watchlist persistence,
+  `lightweight-charts` candlesticks with `1m` / `5m` / `1h` / `1D` timeframe
+  switching, moving-average / RSI / MACD panels, SignalR updates with HTTP
+  fallback, and explicit no-real-orders messaging.
 
 ## 5. Dependency Summary
 
@@ -276,7 +317,8 @@ frontend (Next.js)
     │  HTTP / streaming
     ▼
 ATrade.Api ──► ATrade.Accounts
-          ├──► ATrade.Orders ──────► ATrade.Brokers.Ibkr ◄── ATrade.Ibkr.Worker
+          ├──► ATrade.Brokers.Ibkr ◄── ATrade.Ibkr.Worker
+          ├──► ATrade.Orders ──────┘
           ├──► ATrade.Strategies ◄── strategy-worker
           └──► ATrade.MarketData ──► ATrade.MarketData.Polygon ◄── polygon-worker
 

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: architect
-updated: 2026-04-23
+updated: 2026-04-29
 summary: Documentation discovery layer for the ATrade repository; lists every tracked doc and its lifecycle status.
 see_also:
   - ../README.md
@@ -29,6 +29,7 @@ decisions.
 | [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md) | devops | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored. |
 | [`architecture/overview.md`](architecture/overview.md) | architect | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract. |
 | [`architecture/modules.md`](architecture/modules.md) | architect | Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus. |
+| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | architect | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice. |
 | [`process/github-coordination.md`](process/github-coordination.md) | scrum-master | Repository-side GitHub coordination contract for labels, sizing, blocked work, and resume flow. |
 
 ## Legacy-Review-Pending Documents

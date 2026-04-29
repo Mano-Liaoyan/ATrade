@@ -1,0 +1,12 @@
+namespace ATrade.Brokers.Ibkr;
+
+public static class IbkrGatewayEnvironmentVariables
+{
+    public const string IntegrationEnabled = "ATRADE_BROKER_INTEGRATION_ENABLED";
+    public const string AccountMode = "ATRADE_BROKER_ACCOUNT_MODE";
+    public const string GatewayUrl = "ATRADE_IBKR_GATEWAY_URL";
+    public const string GatewayPort = "ATRADE_IBKR_GATEWAY_PORT";
+    public const string GatewayImage = "ATRADE_IBKR_GATEWAY_IMAGE";
+    public const string PaperAccountId = "ATRADE_IBKR_PAPER_ACCOUNT_ID";
+    public const string GatewayTimeoutSeconds = "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS";
+}

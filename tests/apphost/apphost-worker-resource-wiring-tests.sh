@@ -15,6 +15,12 @@ trap cleanup EXIT
 assert_manifest_wires_worker_and_application_resources() {
   manifest_path="$(mktemp --suffix=.json)"
 
+  ATRADE_BROKER_INTEGRATION_ENABLED=false \
+  ATRADE_BROKER_ACCOUNT_MODE=Paper \
+  ATRADE_IBKR_GATEWAY_URL=http://127.0.0.1:5000 \
+  ATRADE_IBKR_GATEWAY_PORT=5000 \
+  ATRADE_IBKR_GATEWAY_IMAGE=example.invalid/ibkr-gateway-paper:local \
+  ATRADE_IBKR_PAPER_ACCOUNT_ID=PAPER_ACCOUNT_ID \
   dotnet run --project "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" -- --publisher manifest --output-path "$manifest_path" >/dev/null
 
   python3 - <<'PY' "$manifest_path"
@@ -36,6 +42,9 @@ required_resource_types = {
     "redis": "container.v0",
     "nats": "container.v0",
 }
+
+if "ibkr-gateway" in resources:
+    raise SystemExit("ibkr-gateway should stay optional and must not appear for the placeholder image contract")
 
 for resource_name, expected_type in required_resource_types.items():
     resource = resources.get(resource_name)
@@ -60,6 +69,13 @@ expected_api_env = {
     "TIMESCALEDB_HOST": "{timescaledb.bindings.tcp.host}",
     "REDIS_HOST": "{redis.bindings.tcp.host}",
     "NATS_HOST": "{nats.bindings.tcp.host}",
+    "ATRADE_BROKER_INTEGRATION_ENABLED": "false",
+    "ATRADE_BROKER_ACCOUNT_MODE": "Paper",
+    "ATRADE_IBKR_GATEWAY_URL": "http://127.0.0.1:5000",
+    "ATRADE_IBKR_GATEWAY_PORT": "5000",
+    "ATRADE_IBKR_GATEWAY_IMAGE": "example.invalid/ibkr-gateway-paper:local",
+    "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS": "15",
+    "ATRADE_IBKR_PAPER_ACCOUNT_ID": "PAPER_ACCOUNT_ID",
 }
 
 expected_worker_env = {
@@ -69,6 +85,13 @@ expected_worker_env = {
     "POSTGRES_HOST": "{postgres.bindings.tcp.host}",
     "REDIS_HOST": "{redis.bindings.tcp.host}",
     "NATS_HOST": "{nats.bindings.tcp.host}",
+    "ATRADE_BROKER_INTEGRATION_ENABLED": "false",
+    "ATRADE_BROKER_ACCOUNT_MODE": "Paper",
+    "ATRADE_IBKR_GATEWAY_URL": "http://127.0.0.1:5000",
+    "ATRADE_IBKR_GATEWAY_PORT": "5000",
+    "ATRADE_IBKR_GATEWAY_IMAGE": "example.invalid/ibkr-gateway-paper:local",
+    "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS": "15",
+    "ATRADE_IBKR_PAPER_ACCOUNT_ID": "PAPER_ACCOUNT_ID",
 }
 
 for key, expected_value in expected_api_env.items():
