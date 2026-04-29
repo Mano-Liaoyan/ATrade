@@ -1,6 +1,6 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 4: Replace mocked-data verification with IBKR-provider verification
+**Current Step:** Step 5: Update docs for real IBKR data and removed mocks
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -69,12 +69,12 @@
 ---
 
 ### Step 5: Update docs for real IBKR data and removed mocks
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Paper-trading workspace doc updated for IBKR data and no production mocks
-- [ ] Modules doc updated for MarketData/API/frontend/provider current state
-- [ ] Provider abstractions doc updated for IBKR implementation
-- [ ] README reviewed and updated if stale
+- [x] Paper-trading workspace doc updated for IBKR data and no production mocks
+- [x] Modules doc updated for MarketData/API/frontend/provider current state
+- [x] Provider abstractions doc updated for IBKR implementation
+- [x] README reviewed and updated if stale
 
 ---
 

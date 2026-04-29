@@ -15,23 +15,25 @@ see_also:
 
 # Paper-Trading Workspace Architecture
 
-> **Status note:** This document still defines the staged architecture and
-> safety contract for the broader paper-trading workspace, and the first
-> paper-trading UI slice is now implemented against deterministic mocked data.
-> The current repository now also defines provider-neutral broker and
-> market-data contracts so IBKR/iBeam and future analysis providers plug in
-> behind API/frontend-stable seams. The current repository ships
-> `ATrade.Brokers.Ibkr` as a paper-only broker adapter, `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
+> **Status note:** This document defines the staged architecture and safety
+> contract for the broader paper-trading workspace. The current repository now
+> uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
+> first real market-data provider behind API/frontend-stable seams. The current
+> repository ships `ATrade.Brokers.Ibkr` as a paper-only broker adapter,
+> `ATrade.MarketData.Ibkr` as the IBKR/iBeam market-data provider,
+> `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, a `/hubs/market-data` SignalR
-> hub, deterministic mocked market-data providers behind compatibility services,
-> backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
+> hub, backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
 > endpoints backed by the AppHost-managed Postgres resource, AppHost-driven
-> paper-safe broker configuration wiring, and a Next.js workspace with trending
-> symbols, Postgres-backed watchlists, `lightweight-charts` candlesticks,
-> timeframe switching, indicators, and SignalR-to-HTTP fallback behavior.
-> Durable paper-order storage, provider-backed market data, and real broker
+> paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
+> IBKR scanner-driven trending symbols, Postgres-backed watchlists,
+> `lightweight-charts` candlesticks, timeframe switching, indicators, source
+> metadata, and SignalR-to-HTTP fallback behavior. Production mocked
+> market-data providers have been removed; missing iBeam runtime, credentials,
+> or authentication returns safe provider-not-configured/provider-unavailable
+> errors rather than fallback data. Durable paper-order storage and real broker
 > order placement remain future work.
 
 ## 1. Scope And Non-Negotiable Safety Rules
@@ -52,12 +54,11 @@ The slice is governed by five non-negotiable rules:
    contract.
 4. **Secrets stay in ignored local `.env` only.** Usernames, passwords,
    tokens, and real account identifiers must never be committed.
-5. **Mocked market/trending data is acceptable now; unsafe realism is not.**
-   Until the follow-on provider work lands, the UI may rely on deterministic
-   mocked quotes, bars, watchlists, and trending signals only through the
-   provider abstraction layer. Once a real provider is selected, missing local
-   runtime or credentials must surface as safe not-configured/unavailable
-   states rather than silently falling back to fake data.
+5. **Market/trending data must be honest about provider state.** Production
+   market data now comes from the IBKR/iBeam provider through the provider
+   abstraction layer. Missing local runtime, credentials, authentication, or
+   degraded provider state must surface as safe not-configured/unavailable
+   responses rather than silently falling back to synthetic data.
 
 ## 2. Product Shape
 
@@ -111,12 +112,14 @@ The current backend slice exposes `GET /api/broker/ibkr/status`,
 `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
 `DELETE /api/workspace/watchlist/{symbol}`, and the `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
-`IBrokerProvider` contract. The market-data endpoints serve deterministic
-mocked stocks/ETFs, OHLCV candles for `1m`, `5m`, `1h`, and `1D`, and
-moving-average / RSI / MACD payloads through `IMarketDataService`, which now
-composes `IMarketDataProvider` instead of binding endpoint code to the mock.
-SignalR is the outward-facing streaming layer for browsers; NATS remains the
-internal event backbone between API and workers.
+`IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`
+and the `ATrade.MarketData.Ibkr` provider to translate IBKR Client Portal/iBeam
+contract lookup, scanner, snapshot, and historical bar responses into
+provider-neutral trending, OHLCV candle, moving-average, RSI, MACD, and source
+metadata payloads for `1m`, `5m`, `1h`, and `1D`. SignalR is the outward-facing
+streaming layer for browsers and creates provider-backed snapshots when the
+IBKR/iBeam provider is available; NATS remains the internal event backbone
+between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -133,10 +136,12 @@ The paper-trading slice extends existing planned responsibilities as follows:
   fills; the current backend slice already returns deterministic simulated
   fills directly from this module
 - `ATrade.MarketData` owns provider-neutral quote/bar contracts, provider
-  status/error states, symbol-search readiness hooks, and historical chart
-  queries; the current slice provides deterministic temporary symbol, candle,
-  indicator, trending-factor, and SignalR snapshot provider implementations
-  without Polygon, TimescaleDB, Redis, NATS, LEAN, or paid news/data services
+  status/error states, symbol-search readiness hooks, historical chart queries,
+  compatibility services, and SignalR snapshot contracts
+- `ATrade.MarketData.Ibkr` owns the first real market-data provider: IBKR/iBeam
+  Client Portal contract lookup, scanner/trending-equivalent mapping,
+  snapshots, historical bars, indicator inputs, source metadata, and safe
+  not-configured/unavailable responses without reading credentials directly
 - `ATrade.Workspaces` owns backend workspace preferences, including the current
   Postgres schema/repository for pinned watchlist symbols and metadata fields
   (`provider`, optional provider id / IBKR `conid`, exchange, currency, asset
@@ -202,16 +207,14 @@ source**:
   `ATrade.Api` over HTTP + SignalR
 - `ATrade.Api` talks to `IMarketDataService` / `IMarketDataStreamingService`,
   which compose swappable provider contracts under `ATrade.MarketData`
-- the backend may later source market data from the official IBKR Gateway or
-  iBeam APIs when paper-safe subscriptions are wired in
-- until that provider work lands, the API may serve deterministic mocked quote
-  and bar streams with the same payload shape
-- after a real provider is selected, local runtime or credential gaps must be
-  reported as provider `not-configured` / `unavailable` states rather than as
-  automatic mock fallback
+- the backend now sources market data from the official IBKR Client Portal /
+  iBeam APIs when the local paper iBeam session is configured and authenticated
+- local runtime, credential, authentication, or gateway gaps are reported as
+  provider `not-configured` / `unavailable` states rather than as automatic
+  fallback data
 
-This keeps the UI contract stable while allowing the market-data source to move
-from mocked data to real paper-safe streaming later.
+This keeps the UI contract stable while making the current market-data source
+explicitly real-provider backed and safely unavailable when iBeam is not ready.
 
 ## 5. No-Real-Trades Order Model
 
@@ -226,8 +229,8 @@ The order flow is:
 3. The order is stored as a paper order owned by ATrade, not as a live broker
    order.
 4. A simulation component publishes lifecycle updates (`accepted`, `working`,
-   `partially-filled`, `filled`, `cancelled`, `rejected`) using mocked or
-   paper-safe market inputs.
+   `partially-filled`, `filled`, `cancelled`, `rejected`) using paper-safe
+   provider market inputs.
 5. `ATrade.Api` projects those updates to the frontend through SignalR.
 
 Current implementation note: the backend now ships the safe first subset of
@@ -294,7 +297,7 @@ portfolio state.
 The intended data path is:
 
 ```text
-IBKR session / mocked market events / paper-order simulation
+IBKR session / IBKR market-data events / paper-order simulation
         ▼
       NATS
         ▼
@@ -371,24 +374,26 @@ Licensing guardrail:
 - if that approval is ever granted, this document, `README.md`, and the docs
   index must be updated in the same change
 
-## 9. Mocked Trending Factors Now
+## 9. IBKR Scanner Trending Factors Now
 
-Trending symbols are intentionally mocked in the first slice so the UI can be
-built without waiting for real provider ingestion.
+Trending symbols now come from the IBKR/iBeam provider rather than a production
+symbol catalog. `ATrade.MarketData.Ibkr` runs the IBKR scanner query documented
+in source metadata (`ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`) and enriches
+scanner rows with IBKR snapshots when available.
 
-The mocked factor model should explain a symbol's score using four explicit
-components:
+The factor model explains a symbol's score using provider-derived components:
 
-- **volume spike** — unusual volume relative to the symbol's recent baseline
-- **price momentum** — directional move across the selected lookback window
-- **volatility** — realized intraday or short-window range expansion
-- **news-sentiment placeholder** — a clearly labeled placeholder factor until a
-  real news/sentiment source exists
+- **volume spike** — day volume / scanner volume contribution from IBKR data
+- **price momentum** — percentage move from IBKR scanner or snapshot data
+- **volatility** — absolute move contribution derived from provider values
+- **external signal** — currently neutral until a dedicated news/sentiment
+  provider exists
 
 The API exposes these as transparent factor contributions rather than a
 black-box "hotness" number via `GET /api/market-data/trending`. The Next.js
-landing workspace renders those backend-provided stock/ETF factors and never
-pretends they came from a real provider.
+landing workspace renders the backend-provided IBKR source metadata and clearly
+surfaces provider-not-configured/provider-unavailable states when local iBeam is
+not ready.
 
 ## 10. Future LEAN Seam
 
@@ -401,7 +406,7 @@ signal contracts:
 - market/trending signals are normalized before they reach the UI
 - NATS events and persisted factor/signal records should not assume LEAN types
 - the frontend should render signal source metadata without caring whether the
-  source is mocked logic, internal analytics, or future LEAN integration
+  source is IBKR/iBeam, internal analytics, or future LEAN integration
 - future LEAN work belongs behind analysis-engine contracts that consume the
   normalized market-data/provider shapes rather than becoming an API or UI
   assumption

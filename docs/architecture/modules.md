@@ -18,8 +18,8 @@ see_also:
 > the ATrade codebase, not a finished implementation. `src/ATrade.AppHost`,
 > `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`,
 > `src/ATrade.Brokers`, `src/ATrade.Brokers.Ibkr`, `src/ATrade.Orders`,
-> `src/ATrade.MarketData`, `src/ATrade.Workspaces`, and
-> `workers/ATrade.Ibkr.Worker` now exist.
+> `src/ATrade.MarketData`, `src/ATrade.MarketData.Ibkr`,
+> `src/ATrade.Workspaces`, and `workers/ATrade.Ibkr.Worker` now exist.
 > `ATrade.Accounts` provides the deterministic bootstrap overview endpoint,
 > `ATrade.Brokers` defines the provider-neutral broker contract,
 > `ATrade.Brokers.Ibkr` implements that contract with the paper-only IBKR/iBeam
@@ -28,9 +28,9 @@ see_also:
 > credentials-missing, configured-iBeam, connecting/authenticated/degraded,
 > and rejected-live statuses while remaining intentionally light on broker-side state.
 > `ATrade.MarketData` now provides provider-neutral market-data contracts,
-> compatibility services, deterministic temporary provider implementations,
-> and SignalR snapshot contracts for the first workspace slice. `ATrade.Workspaces`
-> owns the first backend-persisted workspace preference: Postgres-backed pinned
+> compatibility services, provider status/error shapes, and SignalR snapshot
+> contracts, while `ATrade.MarketData.Ibkr` provides the first real IBKR/iBeam
+> market-data provider. `ATrade.Workspaces` owns the first backend-persisted workspace preference: Postgres-backed pinned
 > watchlists with provider/IBKR metadata columns and a temporary local user /
 > workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
@@ -63,8 +63,8 @@ Each module entry below records four fields:
   resources the module relies on, named using the components defined in
   `overview.md` (`Postgres`, `TimescaleDB`, `Redis`, `NATS`) and in
   `README.md` → *Stack Contract*.
-- **First-phase focus** — where `IBKR` (broker) and `Polygon` (market data)
-  enter the picture, if at all.
+- **First-phase focus** — where `IBKR` (broker and current market data),
+  Polygon, and later analysis providers enter the picture, if at all.
 
 Module boundaries are **logical**, not deployment boundaries. Every backend
 module ships inside the same .NET 10 solution and is composed at runtime by
@@ -127,9 +127,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   paper-only fills while making live broker order placement impossible by
   construction; and the market-data endpoints/hub depend on compatibility
   services over `IMarketDataProvider` / `IMarketDataStreamingProvider` while
-  returning deterministic temporary stocks, ETFs, candles, indicators,
-  trending factors, and SignalR snapshots without external providers. The
-  watchlist endpoints resolve the temporary local workspace identity, initialize
+  returning IBKR/iBeam scanner, snapshot, historical candle, indicator, source
+  metadata, and provider-unavailable payloads without a production fallback
+  provider. The watchlist endpoints resolve the temporary local workspace identity, initialize
   the `ATrade.Workspaces` schema idempotently, persist pinned symbols in
   Postgres, return stable metadata payloads, and surface validation/storage
   failures as stable JSON errors. The AppHost now injects runtime connection
@@ -140,14 +140,14 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   module calls and NATS publications.
 - **Expected dependencies:** `ATrade.ServiceDefaults`, `ATrade.Accounts`,
   `ATrade.Brokers`, `ATrade.Brokers.Ibkr`, `ATrade.Orders`,
-  `ATrade.MarketData`, and `ATrade.Workspaces` today for functional behavior;
+  `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, and `ATrade.Workspaces` today for functional behavior;
   the current AppHost graph also provides `Postgres`, `TimescaleDB`, `Redis`,
   and `NATS` connection info. `Postgres` is consumed by `ATrade.Workspaces`
   now; the other infrastructure references remain ready for later slices.
 - **First-phase focus:** The backend now proves the paper-safe composition
   pattern: official IBKR session status, deterministic order simulation,
-  deterministic mocked market-data HTTP/SignalR surfaces, and Postgres-backed
-  workspace watchlists for the frontend workspace.
+  IBKR/iBeam-backed market-data HTTP/SignalR surfaces with safe unavailable
+  states, and Postgres-backed workspace watchlists for the frontend workspace.
 
 ### 2.4 `ATrade.Accounts` *(exists today, first read-only slice)*
 
@@ -208,20 +208,19 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Responsibilities:** In the current slice, provide provider-neutral
   market-data provider contracts, provider identity/capability/status models,
   symbol identity and search-readiness hooks, OHLCV candle and indicator
-  payload shapes, compatibility services for the existing HTTP/SignalR API,
-  a deterministic temporary stock/ETF provider, candle generation for `1m`,
-  `5m`, `1h`, and `1D`, moving-average / RSI / MACD indicator calculations,
-  transparent trending factors, DI registration, and a SignalR hub/snapshot
-  service consumed by `ATrade.Api`. Future slices expose historical chart
-  queries against TimescaleDB, publish real-time updates onto NATS for API /
-  SignalR projection, cache hot reads in Redis, and replace deterministic
-  mocked quote/bar feeds with real provider ingestion.
-- **Expected dependencies:** No external runtime services today beyond
-  composition into `ATrade.Api`; future slices add `TimescaleDB` (hypertables),
-  `Redis` (hot cache), `NATS` (real-time fan-out), and `ATrade.ServiceDefaults`.
-- **First-phase focus:** Polygon remains the primary long-term market-data
-  provider, but the current workspace starts with mocked quotes, bars,
-  indicators, and trending factors behind the same provider-neutral boundary.
+  payload shapes with source metadata, compatibility services for the existing
+  HTTP/SignalR API, moving-average / RSI / MACD indicator calculations,
+  transparent trending factors, and a SignalR hub/snapshot service consumed by
+  `ATrade.Api`. Concrete providers are registered by composition; production no
+  longer ships a deterministic market-data provider or catalog fallback. Future
+  slices may persist historical chart queries in TimescaleDB, publish real-time
+  updates onto NATS for API / SignalR projection, and cache hot reads in Redis.
+- **Expected dependencies:** No external runtime services in the contract module
+  beyond composition into `ATrade.Api`; concrete providers such as
+  `ATrade.MarketData.Ibkr` depend on broker/iBeam configuration and gateway
+  clients.
+- **First-phase focus:** Keep HTTP/SignalR payloads provider-neutral while the
+  current workspace uses the IBKR/iBeam provider behind this boundary.
 
 ### 2.8 `ATrade.Workspaces` *(exists today, first backend-owned preference slice)*
 
@@ -272,7 +271,24 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Provide the paper-only broker seam: session status
   first, paper-safe data next, and no live-trading behavior.
 
-### 2.11 `ATrade.MarketData.Polygon` *(planned)*
+### 2.11 `ATrade.MarketData.Ibkr` *(exists today, first real market-data provider)*
+
+- **Purpose:** IBKR/iBeam market-data adapter behind the provider-neutral
+  market-data contract.
+- **Responsibilities:** Translate official Client Portal/iBeam auth status,
+  contract lookup, snapshot, historical bar, and scanner responses into ATrade
+  market-data payloads; expose `ibkr-ibeam-*` source metadata; implement
+  `IMarketDataProvider` and `IMarketDataStreamingProvider`; reuse broker/iBeam
+  gateway configuration without reading credentials directly; and return safe
+  provider-not-configured/provider-unavailable errors when iBeam is disabled,
+  missing credentials, unauthenticated, degraded, or unreachable.
+- **Expected dependencies:** `ATrade.MarketData`, `ATrade.Brokers.Ibkr`, and
+  the local `voyz/ibeam:latest` Client Portal runtime when integration is
+  enabled through ignored `.env` values.
+- **First-phase focus:** Real paper-safe market data for the paper-trading
+  workspace without production mock fallback.
+
+### 2.12 `ATrade.MarketData.Polygon` *(planned)*
 
 - **Purpose:** Polygon market-data adapter.
 - **Responsibilities:** Pull historical bars into TimescaleDB; maintain
@@ -352,16 +368,17 @@ references.
 - **Expected dependencies:** `ATrade.Api` for all data; the Aspire
   AppHost for process lifecycle and environment wiring.
 - **First-phase focus:** UI surfaces for paper-only IBKR connection /
-  account views, simulated orders, mocked-or-provider-backed market data,
-  and transparent trending-factor explanations. The current slice preserves
-  the stable home-page markers (`ATrade Frontend Home` /
-  `Next.js Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding
-  the first workspace route: backend-driven trending stocks/ETFs, symbol
-  navigation to `/symbols/[symbol]`, backend watchlist API reads/writes with a
-  non-authoritative localStorage cache/migration source,
-  `lightweight-charts` candlesticks with `1m` / `5m` / `1h` / `1D` timeframe
-  switching, moving-average / RSI / MACD panels, SignalR updates with HTTP
-  fallback, and explicit no-real-orders messaging.
+  account views, simulated orders, IBKR/iBeam-backed market data, clear
+  provider-not-configured/provider-unavailable states, and transparent
+  trending-factor/source explanations. The current slice preserves the stable
+  home-page markers (`ATrade Frontend Home` / `Next.js Bootstrap Slice` /
+  `Aspire AppHost Frontend Contract`) while adding the first workspace route:
+  IBKR scanner-backed trending stocks/ETFs, symbol navigation to
+  `/symbols/[symbol]`, backend watchlist API reads/writes with a
+  non-authoritative localStorage cache/migration source, `lightweight-charts`
+  candlesticks with `1m` / `5m` / `1h` / `1D` timeframe switching,
+  moving-average / RSI / MACD panels, SignalR updates with HTTP fallback, and
+  explicit no-real-orders messaging.
 
 ## 5. Dependency Summary
 
@@ -376,7 +393,8 @@ ATrade.Api ──► ATrade.Accounts
           ├──► ATrade.Orders ─────────────────────────────┘
           ├──► ATrade.Workspaces ──► Postgres
           ├──► ATrade.Strategies ◄── strategy-worker
-          └──► ATrade.MarketData ──► ATrade.MarketData.Polygon ◄── polygon-worker
+          └──► ATrade.MarketData ◄──── ATrade.MarketData.Ibkr
+                              └──► ATrade.MarketData.Polygon ◄── polygon-worker
 
 All modules ──► ATrade.ServiceDefaults
 All modules ──► Postgres / TimescaleDB / Redis / NATS (as noted above)
