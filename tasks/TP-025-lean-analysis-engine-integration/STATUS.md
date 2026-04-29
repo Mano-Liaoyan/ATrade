@@ -1,11 +1,11 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-04-29
+**Current Step:** Step 1: Add LEAN provider project and runtime configuration
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-04-30
 **Review Level:** 3
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,18 +13,18 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
-- [ ] Analysis abstraction/no-engine behavior confirmed
-- [ ] Normalized market-data bars confirmed
-- [ ] LEAN integration approach selected and recorded
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
+- [x] Analysis abstraction/no-engine behavior confirmed
+- [x] Normalized market-data bars confirmed
+- [x] LEAN integration approach selected and recorded
 
 ---
 
 ### Step 1: Add LEAN provider project and runtime configuration
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] LEAN provider project added to solution
 - [ ] Official LEAN runtime/package/CLI/container integration added
@@ -110,6 +110,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Selected LEAN integration approach: invoke the official LEAN runtime through a configured LEAN CLI command or Docker-backed CLI/container workspace. The provider will generate a temporary analysis-only LEAN workspace from ATrade normalized bars, return provider-neutral results, and report unavailable/skip states when the runtime is absent instead of faking production output. Local check found Docker installed and `lean` CLI absent. | Implement in `ATrade.Analysis.Lean`; document runtime/config placeholders. | Step 0 preflight |
 
 ---
 
@@ -118,6 +119,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-29 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-29 23:12 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-29 23:12 | Step 0 started | Preflight |
 
 ---
 
