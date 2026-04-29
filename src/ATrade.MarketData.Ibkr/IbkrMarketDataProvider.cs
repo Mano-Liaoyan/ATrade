@@ -378,7 +378,7 @@ public sealed class IbkrMarketDataProvider(
             VolumeSpike: Round(volume > 0 ? Math.Min(3m, volume / 1_000_000m) : 0m),
             PriceMomentum: changePercent,
             Volatility: Round(Math.Abs(changePercent)),
-            NewsSentimentPlaceholder: 0m);
+            ExternalSignal: 0m);
 
         return new TrendingSymbol(
             result.Symbol,

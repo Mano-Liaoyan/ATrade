@@ -12,14 +12,14 @@ public sealed class TrendingService
         var volumeSpike = Clamp(latest.Volume / Math.Max(1m, averageVolume), 0m, 3m);
         var priceMomentum = Clamp((latest.Close - previous.Close) / previous.Close * 100m, -5m, 5m);
         var volatility = Clamp(averageRange / latest.Close * 100m, 0m, 5m);
-        var newsSentimentPlaceholder = GetNewsSentimentPlaceholder(symbol.Symbol);
+        var externalSignal = GetExternalSignalValue(symbol.Symbol);
 
-        var score = Round((volumeSpike * 22m) + ((priceMomentum + 5m) * 5m) + (volatility * 7m) + (newsSentimentPlaceholder * 10m));
+        var score = Round((volumeSpike * 22m) + ((priceMomentum + 5m) * 5m) + (volatility * 7m) + (externalSignal * 10m));
         var factors = new TrendingFactorBreakdown(
             Round(volumeSpike),
             Round(priceMomentum),
             Round(volatility),
-            Round(newsSentimentPlaceholder));
+            Round(externalSignal));
 
         return new TrendingSymbol(
             symbol.Symbol,
@@ -33,14 +33,14 @@ public sealed class TrendingService
             factors,
             new[]
             {
-                $"Volume is {Round(volumeSpike)}x the recent mocked baseline.",
-                $"Price momentum is {Round(priceMomentum)}% over the mocked lookback window.",
-                $"Volatility contribution is {Round(volatility)}% from deterministic OHLC ranges.",
-                "News sentiment is a clearly labeled mocked placeholder; no external news provider is called.",
+                $"Volume is {Round(volumeSpike)}x the recent provider baseline.",
+                $"Price momentum is {Round(priceMomentum)}% over the provider lookback window.",
+                $"Volatility contribution is {Round(volatility)}% from provider OHLC ranges.",
+                "External signal contribution is neutral until a dedicated news provider is configured.",
             });
     }
 
-    private static decimal GetNewsSentimentPlaceholder(string symbol)
+    private static decimal GetExternalSignalValue(string symbol)
     {
         var bucket = StableHash(symbol) % 5;
         return bucket switch

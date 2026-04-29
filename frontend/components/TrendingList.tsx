@@ -21,7 +21,7 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisab
           <p className="eyebrow">Backend-driven market data</p>
           <h2 id="trending-title">Trending stocks and ETFs</h2>
         </div>
-        <span className="pill">Mocked factors</span>
+        <span className="pill">IBKR scanner factors</span>
       </div>
 
       <div className="symbol-grid">

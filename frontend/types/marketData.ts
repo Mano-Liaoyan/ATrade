@@ -19,7 +19,7 @@ export type TrendingFactorBreakdown = {
   volumeSpike: number;
   priceMomentum: number;
   volatility: number;
-  newsSentimentPlaceholder: number;
+  externalSignal: number;
 };
 
 export type TrendingSymbol = MarketDataSymbol & {

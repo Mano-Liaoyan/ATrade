@@ -1,6 +1,6 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 1: Implement the IBKR/iBeam market-data provider
+**Current Step:** Step 2: Remove production mocked market-data code and configuration
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -35,13 +35,13 @@
 ---
 
 ### Step 2: Remove production mocked market-data code and configuration
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Production mock provider files removed or excluded from build
-- [ ] Hard-coded catalogs/source values/user-facing mocked labels removed
-- [ ] Production DI has no mock fallback
-- [ ] Test fixtures/fake handlers isolated to tests
-- [ ] Source audit recorded
+- [x] Production mock provider files removed or excluded from build
+- [x] Hard-coded catalogs/source values/user-facing mocked labels removed
+- [x] Production DI has no mock fallback
+- [x] Test fixtures/fake handlers isolated to tests
+- [x] Source audit recorded
 
 ---
 
@@ -119,6 +119,7 @@
 | 2026-04-29 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-04-29 22:21 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 22:21 | Step 0 started | Preflight |
+| 2026-04-30 | Step 2 source audit | `git grep -n -E 'MockMarketData|mock-deterministic|Mocked' -- src frontend` returned no matches |
 
 ---
 

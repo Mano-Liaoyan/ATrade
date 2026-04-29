@@ -2,6 +2,7 @@ using ATrade.Accounts;
 using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 using ATrade.MarketData;
+using ATrade.MarketData.Ibkr;
 using ATrade.Orders;
 using ATrade.ServiceDefaults;
 using ATrade.Workspaces;
@@ -14,6 +15,7 @@ builder.Services.AddIbkrBrokerAdapter(builder.Configuration);
 builder.Services.AddAccountsModule();
 builder.Services.AddOrdersModule();
 builder.Services.AddMarketDataModule();
+builder.Services.AddIbkrMarketDataProvider();
 builder.Services.AddWorkspacesModule(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddCors(options =>

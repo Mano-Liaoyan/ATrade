@@ -46,7 +46,7 @@ public sealed record TrendingFactorBreakdown(
     decimal VolumeSpike,
     decimal PriceMomentum,
     decimal Volatility,
-    decimal NewsSentimentPlaceholder);
+    decimal ExternalSignal);
 
 public sealed record TrendingSymbol(
     string Symbol,

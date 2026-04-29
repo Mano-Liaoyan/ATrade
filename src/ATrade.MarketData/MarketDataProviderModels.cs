@@ -37,16 +37,7 @@ public sealed record MarketDataProviderCapabilities(
     bool SupportsIndicators,
     bool SupportsStreamingSnapshots,
     bool SupportsSymbolSearch,
-    bool UsesMockData)
-{
-    public static MarketDataProviderCapabilities DeterministicMock { get; } = new(
-        SupportsTrendingScanner: true,
-        SupportsHistoricalCandles: true,
-        SupportsIndicators: true,
-        SupportsStreamingSnapshots: true,
-        SupportsSymbolSearch: false,
-        UsesMockData: true);
-}
+    bool UsesMockData);
 
 public sealed record MarketDataProviderStatus(
     string Provider,

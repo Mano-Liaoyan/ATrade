@@ -133,7 +133,7 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
           </p>
           {latestUpdate ? (
             <p>
-              Last mocked stream update: {latestUpdate.symbol} {latestUpdate.timeframe} close {latestUpdate.close.toFixed(2)} from {latestUpdate.source}.
+              Last market-data stream update: {latestUpdate.symbol} {latestUpdate.timeframe} close {latestUpdate.close.toFixed(2)} from {latestUpdate.source}.
             </p>
           ) : null}
         </div>
