@@ -1,8 +1,8 @@
 # TP-024: Add provider-neutral analysis engine abstraction and API contract — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
-**Last Updated:** 2026-04-29
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
+**Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
 **Iteration:** 1
@@ -78,11 +78,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -97,6 +97,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Full-suite command referenced `tests/apphost/ibkr-symbol-search-tests.sh` while TP-023 is still not started. | Added a provider-level compatibility shell that verifies the existing TP-022 IBKR search hook without implementing TP-023 API/frontend search; TP-023 should extend it. | `tests/apphost/ibkr-symbol-search-tests.sh`; `tasks/TP-023-ibkr-stock-search-workflow/STATUS.md` |
 
 ---
 
