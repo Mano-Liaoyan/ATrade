@@ -1,6 +1,6 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 3: Extend broker options, worker status, and redaction
+**Current Step:** Step 4: Add iBeam runtime contract verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -58,13 +58,14 @@
 ---
 
 ### Step 4: Add iBeam runtime contract verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] iBeam runtime shell test added
-- [ ] Env template safety verified
-- [ ] `.env.template` and `.env.example` synchronization verified
-- [ ] AppHost iBeam image/default-disabled behavior verified
-- [ ] Status redaction verified
+- [x] iBeam runtime shell test added
+- [x] Env template safety verified
+- [x] `.env.template` and `.env.example` synchronization verified
+- [x] AppHost iBeam image/default-disabled behavior verified
+- [x] Status redaction verified
+- [ ] Targeted iBeam runtime contract test passes
 
 ---
 
