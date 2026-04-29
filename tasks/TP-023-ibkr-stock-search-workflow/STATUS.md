@@ -1,6 +1,6 @@
 # TP-023: Add IBKR stock search and pin-any-symbol workflow — Status
 
-**Current Step:** Step 4: Add IBKR stock search verification
+**Current Step:** Step 5: Update docs for IBKR search
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -56,18 +56,19 @@
 ---
 
 ### Step 4: Add IBKR stock search verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] IBKR symbol search shell test added
-- [ ] No hard-coded production search allowlist verified
-- [ ] Fake IBKR result mapping verified
-- [ ] No-credential error behavior verified
-- [ ] Frontend search controls verified
+- [x] IBKR symbol search shell test added
+- [x] No hard-coded production search allowlist verified
+- [x] Fake IBKR result mapping verified
+- [x] No-credential error behavior verified
+- [x] Frontend search controls verified
+- [x] Targeted search/frontend verification scripts pass
 
 ---
 
 ### Step 5: Update docs for IBKR search
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Paper-trading workspace doc updated
 - [ ] Modules doc updated
@@ -125,6 +126,8 @@
 | 2026-04-30 | Step 3 started | Frontend symbol search and pin UX |
 | 2026-04-30 | Step 3 completed | Added reusable SymbolSearch, frontend search client/types, workspace pin/open flow, symbol-page search, and passing frontend build. |
 | 2026-04-30 | Step 4 started | IBKR stock search verification scripts |
+| 2026-04-30 | Step 4 completed | Added ibkr-symbol-search-tests.sh, expanded frontend workspace verification, and ran targeted search/frontend scripts. |
+| 2026-04-30 | Step 5 started | Documentation updates for IBKR search workflow |
 
 ---
 
