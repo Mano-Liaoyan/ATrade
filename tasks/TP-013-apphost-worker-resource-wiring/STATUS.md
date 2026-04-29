@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Aspire `WithReference(...)` publishes connection-string plus host/port environment for each referenced resource | Captured in the new manifest test to prove `api` gets `postgres` / `timescaledb` / `redis` / `nats` wiring while `ibkr-worker` intentionally omits `timescaledb` | `tests/apphost/apphost-worker-resource-wiring-tests.sh` |
+| A Docker-compatible engine is available in this execution lane | Full runtime infrastructure verification ran live instead of skipping, so the existing infra safety checks were exercised alongside the new worker wiring | `tests/apphost/apphost-infrastructure-runtime-tests.sh` |
 
 ---
 
