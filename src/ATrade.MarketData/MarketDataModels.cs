@@ -46,7 +46,7 @@ public sealed record TrendingFactorBreakdown(
     decimal VolumeSpike,
     decimal PriceMomentum,
     decimal Volatility,
-    decimal NewsSentimentPlaceholder);
+    decimal ExternalSignal);
 
 public sealed record TrendingSymbol(
     string Symbol,
@@ -62,7 +62,8 @@ public sealed record TrendingSymbol(
 
 public sealed record TrendingSymbolsResponse(
     DateTimeOffset GeneratedAt,
-    IReadOnlyList<TrendingSymbol> Symbols);
+    IReadOnlyList<TrendingSymbol> Symbols,
+    string Source = "provider");
 
 public sealed record OhlcvCandle(
     DateTimeOffset Time,
@@ -76,7 +77,8 @@ public sealed record CandleSeriesResponse(
     string Symbol,
     string Timeframe,
     DateTimeOffset GeneratedAt,
-    IReadOnlyList<OhlcvCandle> Candles);
+    IReadOnlyList<OhlcvCandle> Candles,
+    string Source = "provider");
 
 public sealed record MovingAveragePoint(DateTimeOffset Time, decimal Sma20, decimal Sma50);
 
@@ -89,7 +91,8 @@ public sealed record IndicatorResponse(
     string Timeframe,
     IReadOnlyList<MovingAveragePoint> MovingAverages,
     IReadOnlyList<RsiPoint> Rsi,
-    IReadOnlyList<MacdPoint> Macd);
+    IReadOnlyList<MacdPoint> Macd,
+    string Source = "provider");
 
 public sealed record MarketDataUpdate(
     string Symbol,

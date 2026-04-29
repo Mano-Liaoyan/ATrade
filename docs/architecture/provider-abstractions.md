@@ -16,8 +16,8 @@ see_also:
 
 ATrade composes broker and market-data implementations behind provider-neutral
 contracts. The API and frontend must depend on ATrade contracts and payloads,
-not on the concrete IBKR Gateway/iBeam runtime, deterministic mocks, Polygon,
-or any future analysis engine.
+not on the concrete IBKR Gateway/iBeam runtime, Polygon, or any future analysis
+engine.
 
 This document is the authoritative switching contract for the current provider
 seams introduced in `TP-019`.
@@ -28,10 +28,11 @@ seams introduced in `TP-019`.
 - Allow market-data providers to change without changing HTTP/SignalR payloads.
 - Keep paper-only safety explicit: real order placement is not supported by the
   current contract.
-- Keep provider unavailable and not-configured states explicit so follow-on
-  tasks return safe errors instead of silently falling back to fake data.
-- Keep deterministic mocked market data only as temporary compatibility until
-  the real provider task replaces it.
+- Keep provider unavailable and not-configured states explicit so runtime,
+  credential, or authentication gaps return safe errors instead of silently
+  falling back to synthetic data.
+- Keep concrete provider implementations replaceable by DI registration while
+  preserving provider-neutral HTTP/SignalR payload shapes and source metadata.
 
 ## 2. Broker Provider Contract
 
@@ -87,7 +88,8 @@ Core types:
   `unavailable` state, message, observation time, and capabilities.
 - `MarketDataSymbolIdentity`, `OhlcvCandle`, `CandleSeriesResponse`,
   `IndicatorResponse`, `MarketDataUpdate`, and trending response records — the
-  payload-safe domain shapes providers must emit.
+  payload-safe domain shapes providers must emit, including source metadata
+  such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, or scanner source ids.
 
 Compatibility layer:
 
@@ -97,9 +99,8 @@ Compatibility layer:
   endpoint payload behavior.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`.
-- `MockMarketDataService` and `MockMarketDataStreamingService` are temporary
-  provider implementations only. They keep the current deterministic MVP
-  behavior until the real IBKR/iBeam provider work lands.
+- Production provider composition is now `ATrade.MarketData.Ibkr`; the former
+  production market-data mock providers and catalog fallback have been removed.
 
 Unavailable handling:
 
@@ -108,7 +109,7 @@ Unavailable handling:
 - `unavailable` maps to `provider-unavailable`.
 - Compatibility services return these safe errors for request/response methods
   that already expose `MarketDataError`; provider tasks must not silently fall
-  back to mock data when a real provider is missing.
+  back to synthetic data when iBeam is unavailable.
 
 ## 4. Composition Rules
 
@@ -116,22 +117,41 @@ Unavailable handling:
   `IBrokerProvider`, `IMarketDataService`, and SignalR-facing market-data
   services.
 - API endpoint handlers must not instantiate concrete providers such as the
-  IBKR Gateway client or mocked market-data services.
+  IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
-  swapped by changing DI registration, not endpoint code.
+  swapped by changing DI registration, not endpoint code. The current API
+  composes `AddMarketDataModule()` plus `AddIbkrMarketDataProvider()`.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.
 
-## 5. Future Provider Plug-ins
+## 5. Current IBKR Market-Data Provider And Future Plug-ins
 
-- `TP-021` may add local iBeam/Gateway runtime wiring, but it must remain a
-  concrete provider implementation detail behind the broker/market-data seams.
-- `TP-022` may replace the temporary mocked market-data provider with an
-  IBKR/iBeam provider. If local runtime or credentials are missing, it must use
-  `not-configured` or `unavailable` instead of falling back to mocked data.
+Current implementation:
+
+- `ATrade.MarketData.Ibkr` implements `IMarketDataProvider` and
+  `IMarketDataStreamingProvider` using the local iBeam/Client Portal Gateway
+  base URL and session configuration supplied by `ATrade.Brokers.Ibkr`.
+- It does not read credential environment variables directly. Credential and
+  paper-account presence is evaluated through typed gateway configuration and
+  the paper-only guard.
+- It translates Client Portal contract search (`/iserver/secdef/search`),
+  snapshots (`/iserver/marketdata/snapshot`), historical bars
+  (`/iserver/marketdata/history`), and scanner results
+  (`/iserver/scanner/run`) into provider-neutral ATrade payloads.
+- Trending uses the scanner source `ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`
+  rather than a hard-coded symbol catalog.
+- Missing local runtime, placeholder credentials, unauthenticated sessions,
+  unreachable gateway, or rejected live mode return `not-configured` /
+  `unavailable` states and `provider-not-configured` / `provider-unavailable`
+  errors rather than fallback data.
+
+Future plug-ins:
+
 - `TP-023` may use the market-data symbol-search hook for pin-any-symbol
   workflows.
+- Polygon or another market-data provider may be added later behind the same
+  contracts and source metadata rules.
 - LEAN remains a future analysis-engine provider seam; it must consume
   normalized market-data/signal contracts rather than becoming an API or UI
   assumption.

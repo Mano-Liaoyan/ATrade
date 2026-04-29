@@ -27,7 +27,7 @@ queue for the next provider-backed trading workspace increment.
 - Frontend: `Next.js`
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
-- Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract and follow-on market-data work queued in `TP-022`
+- Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract and IBKR/iBeam-backed market data
 - Analysis direction: provider-neutral analysis contracts plus LEAN integration queued in `TP-024` and `TP-025`
 
 ## Run Contract
@@ -60,18 +60,23 @@ The current runnable slice includes:
   - `POST /api/workspace/watchlist`
   - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
+- `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and backend-saved watchlists.
 
-The current market-data behavior is still the MVP baseline: market data is
-deterministic temporary provider data behind `ATrade.MarketData` contracts.
-Pinned symbols are now backend-owned workspace preferences persisted in the
-AppHost-managed Postgres database through `ATrade.Workspaces` and surfaced to
-the frontend through `/api/workspace/watchlist`; browser `localStorage` is only
-a non-authoritative cache / one-time migration source. The active task queue
-continues replacing temporary market data with real IBKR/iBeam data, IBKR
-search, and LEAN analysis while keeping API/frontend payloads provider-neutral.
+Current market data is served through the `ATrade.MarketData.Ibkr` provider
+behind `ATrade.MarketData` contracts. When the local iBeam/Gateway runtime is
+configured and authenticated through ignored `.env` values, API endpoints return
+IBKR scanner, snapshot, and historical bar data with source metadata. When iBeam
+is disabled, missing credentials, unauthenticated, or unreachable, the API and
+frontend surface safe provider-not-configured/provider-unavailable states instead
+of falling back to production mocks. Pinned symbols are backend-owned workspace
+preferences persisted in the AppHost-managed Postgres database through
+`ATrade.Workspaces` and surfaced to the frontend through
+`/api/workspace/watchlist`; browser `localStorage` is only a non-authoritative
+cache / one-time migration source. The active task queue continues with IBKR
+search and LEAN analysis while keeping API/frontend payloads provider-neutral.
 
 ## Active Task Queue
 
@@ -125,6 +130,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/accounts-feature-bootstrap-tests.sh`
 - `tests/apphost/ibkr-paper-safety-tests.sh`
 - `tests/apphost/ibeam-runtime-contract-tests.sh`
+- `tests/apphost/ibkr-market-data-provider-tests.sh`
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/provider-abstraction-contract-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`

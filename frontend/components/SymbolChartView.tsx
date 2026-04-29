@@ -37,7 +37,7 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
       setCandles(candleResponse);
       setIndicators(indicatorResponse);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Chart data is unavailable.');
+      setError(caughtError instanceof Error ? caughtError.message : 'IBKR chart data is unavailable.');
     } finally {
       if (showLoading) {
         setLoading(false);
@@ -115,7 +115,7 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
         {loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div> : null}
         {!loading && error ? (
           <div className="error-state" role="alert">
-            <strong>Chart data unavailable.</strong>
+            <strong>IBKR chart data unavailable.</strong>
             <p>{error}</p>
             <button className="primary-button" type="button" onClick={() => void refreshChartData(true)}>
               Retry chart data
@@ -128,12 +128,18 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
 
         <div className="chart-footer-note">
           <p>
-            HTTP candles/indicators are refreshed on demand. SignalR updates apply when `/hubs/market-data` is reachable;
-            if streaming is unavailable this view falls back to HTTP polling.
+            HTTP candles/indicators are refreshed from IBKR/iBeam on demand. SignalR applies IBKR snapshot updates when `/hubs/market-data` is reachable;
+            if streaming is unavailable this view falls back to HTTP polling without synthetic fallback data.
           </p>
+          {candles ? (
+            <p>Current candle source: {formatSourceLabel(candles.source)}.</p>
+          ) : null}
+          {streamState === 'unavailable' ? (
+            <p>Streaming snapshots are unavailable; polling continues against the IBKR/iBeam HTTP provider.</p>
+          ) : null}
           {latestUpdate ? (
             <p>
-              Last mocked stream update: {latestUpdate.symbol} {latestUpdate.timeframe} close {latestUpdate.close.toFixed(2)} from {latestUpdate.source}.
+              Last market-data stream update: {latestUpdate.symbol} {latestUpdate.timeframe} close {latestUpdate.close.toFixed(2)} from {formatSourceLabel(latestUpdate.source)}.
             </p>
           ) : null}
         </div>
@@ -142,6 +148,14 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
       <BrokerPaperStatus />
     </div>
   );
+}
+
+function formatSourceLabel(source: string): string {
+  if (source.includes('ibkr')) {
+    return 'IBKR/iBeam';
+  }
+
+  return source;
 }
 
 function applyMarketDataUpdate(current: CandleSeriesResponse | null, update: MarketDataUpdate): CandleSeriesResponse | null {
