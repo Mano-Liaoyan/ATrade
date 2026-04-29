@@ -26,11 +26,13 @@ see_also:
 > `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, a `/hubs/market-data` SignalR
 > hub, deterministic mocked market-data providers behind compatibility services,
-> AppHost-driven paper-safe broker configuration wiring, and a Next.js workspace with trending symbols,
-> local browser watchlists, `lightweight-charts` candlesticks, timeframe
-> switching, indicators, and SignalR-to-HTTP fallback behavior. Durable
-> paper-order storage, backend-owned user preferences, provider-backed market
-> data, and real broker order placement remain future work.
+> backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
+> endpoints backed by the AppHost-managed Postgres resource, AppHost-driven
+> paper-safe broker configuration wiring, and a Next.js workspace with trending
+> symbols, Postgres-backed watchlists, `lightweight-charts` candlesticks,
+> timeframe switching, indicators, and SignalR-to-HTTP fallback behavior.
+> Durable paper-order storage, provider-backed market data, and real broker
+> order placement remain future work.
 
 ## 1. Scope And Non-Negotiable Safety Rules
 
@@ -84,8 +86,8 @@ The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
 - watchlist, chart, order-ticket, and account widgets
-- browser-side session state for active tabs, open panels, and optimistic UI
-  interactions
+- browser-side session state for active tabs, open panels, non-authoritative
+  watchlist cache/migration state, and optimistic UI interactions
 - SignalR subscriptions for real-time account, order, and market updates
 
 The frontend does **not** talk directly to IBKR, Redis, NATS, Postgres, or
@@ -95,8 +97,8 @@ TimescaleDB. All durable and broker-aware behavior goes through the API.
 
 `ATrade.Api` remains the only browser-facing backend surface and expands with:
 
-- HTTP endpoints for workspace bootstrap data, watchlists, account state,
-  paper orders, and chart history
+- HTTP endpoints for workspace bootstrap data, Postgres-backed watchlists,
+  account state, paper orders, and chart history
 - SignalR hubs that push account, order, quote, bar, and trending updates to
   the browser
 - translation between browser commands and internal module calls / NATS events
@@ -105,8 +107,9 @@ TimescaleDB. All durable and broker-aware behavior goes through the API.
 The current backend slice exposes `GET /api/broker/ibkr/status`,
 `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 `GET /api/market-data/{symbol}/candles?timeframe=...`,
-`GET /api/market-data/{symbol}/indicators?timeframe=...`, and the
-`/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
+`GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
+`PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
+`DELETE /api/workspace/watchlist/{symbol}`, and the `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
 `IBrokerProvider` contract. The market-data endpoints serve deterministic
 mocked stocks/ETFs, OHLCV candles for `1m`, `5m`, `1h`, and `1D`, and
@@ -134,6 +137,10 @@ The paper-trading slice extends existing planned responsibilities as follows:
   queries; the current slice provides deterministic temporary symbol, candle,
   indicator, trending-factor, and SignalR snapshot provider implementations
   without Polygon, TimescaleDB, Redis, NATS, LEAN, or paid news/data services
+- `ATrade.Workspaces` owns backend workspace preferences, including the current
+  Postgres schema/repository for pinned watchlist symbols and metadata fields
+  (`provider`, optional provider id / IBKR `conid`, exchange, currency, asset
+  class, sort order, and timestamps)
 - `ATrade.Ibkr.Worker` owns IBKR Gateway session management and any future
   paper-safe broker polling/streaming work
 
@@ -240,6 +247,13 @@ Postgres remains the canonical relational store for:
 - durable user workspace preferences
 - audit-friendly snapshots of broker/session capability state
 
+Current implementation note: pinned workspace watchlists are already stored in
+Postgres by `ATrade.Workspaces` under the AppHost-provided `postgres`
+connection string. Rows carry `user_id` and `workspace_id`; until authentication
+and named workspaces exist, the API deliberately uses the temporary
+`local-user` / `paper-trading` identity seam documented in
+`LocalWorkspaceIdentityProvider`.
+
 ### 6.2 TimescaleDB
 
 TimescaleDB stores time-series data needed by the workspace:
@@ -289,8 +303,9 @@ server-owned.
 The Next.js frontend may own short-lived UI state such as:
 
 - active tab and panel arrangement during a browser session
-- the current MVP watchlist stored under `atrade.paperTrading.watchlist.v1` in
-  browser `localStorage` as a convenience cache until backend preferences land
+- a non-authoritative cached copy of backend watchlist symbols under
+  `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
+  and one-time migration of pre-Postgres pins
 - unsaved chart drawing state that is not yet persisted
 - optimistic rendering between command submission and SignalR confirmation
 
@@ -307,11 +322,15 @@ machine changes:
 
 ### 7.3 Preference storage choice
 
-Durable user preferences are stored in **Postgres** as user-scoped workspace
-settings in the target architecture. In the current MVP, the frontend persists
-only a local browser watchlist in `localStorage` to survive refreshes on the
-same machine. That cache is intentionally not authoritative, not shared across
-machines, and must not contain secrets, broker account identifiers, or tokens.
+Durable watchlist preferences are now stored in **Postgres** as workspace-scoped
+settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. The
+frontend loads, pins, and unpins through the backend watchlist API, then updates
+its browser cache from the backend response. The `localStorage` key
+`atrade.paperTrading.watchlist.v1` is intentionally non-authoritative: it may
+seed a one-time migration into Postgres and may render a clearly labeled
+read-only cached snapshot when the backend/database is unavailable, but it must
+not be treated as saved state and must not contain secrets, broker account
+identifiers, or tokens.
 
 ## 8. Charting Library Decision
 

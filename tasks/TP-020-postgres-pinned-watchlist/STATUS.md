@@ -1,6 +1,6 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 4: Add restart-persistence verification
+**Current Step:** Step 5: Update docs for backend-owned preferences
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -69,11 +69,11 @@
 ---
 
 ### Step 5: Update docs for backend-owned preferences
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Paper-trading workspace doc updated
-- [ ] Modules doc updated for Workspaces/API/frontend ownership
-- [ ] Overview/README reviewed and updated if stale
+- [x] Paper-trading workspace doc updated
+- [x] Modules doc updated for Workspaces/API/frontend ownership
+- [x] Overview/README reviewed and updated if stale
 
 ---
 
@@ -129,6 +129,8 @@
 | 2026-04-29 23:50 | Step 3 complete | Frontend now loads/persists pins through backend watchlist API, migrates cached localStorage pins once, shows backend/cache/error states, and `npm run build` passed after `npm ci`. |
 | 2026-04-29 23:51 | Step 4 started | Restart-persistence verification hydrated with explicit schema initialization coverage. |
 | 2026-04-29 23:58 | Step 4 complete | Added disposable-Postgres restart persistence test; verified schema initialization, duplicate/invalid handling, API restart survival, and updated frontend workspace smoke tests. |
+| 2026-04-29 23:59 | Step 5 started | Updating active architecture docs for backend-owned watchlist preferences. |
+| 2026-04-30 00:05 | Step 5 complete | Updated paper workspace, modules, overview, and README docs for Postgres-backed watchlists and the temporary local workspace identity seam. |
 
 ---
 
