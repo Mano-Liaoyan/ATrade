@@ -1,7 +1,7 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 6: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 7: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-29
 **Review Level:** 2
 **Review Counter:** 0
@@ -89,11 +89,11 @@
 ---
 
 ### Step 7: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -108,6 +108,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Disposable Postgres tests need the same non-default container pids limit used by AppHost in this environment to avoid fork failures. | Encoded `--pids-limit 2048` in the persistence test container launch. | `tests/apphost/postgres-watchlist-persistence-tests.sh` |
+| No new architecture document was added for Workspaces; existing active docs were sufficient. | Reviewed `docs/INDEX.md`; no index update required. | `docs/INDEX.md` |
 
 ---
 
@@ -133,6 +135,8 @@
 | 2026-04-30 00:05 | Step 5 complete | Updated paper workspace, modules, overview, and README docs for Postgres-backed watchlists and the temporary local workspace identity seam. |
 | 2026-04-30 00:06 | Step 6 started | Running full repository verification suite. |
 | 2026-04-30 00:18 | Step 6 complete | Full suite command passed; Docker-backed Postgres/runtime checks passed; explicit frontend build and solution build passed. |
+| 2026-04-30 00:19 | Step 7 started | Reviewing delivery documentation requirements and discoveries. |
+| 2026-04-30 00:22 | Step 7 complete | Delivery docs verified, affected docs reviewed, and discoveries logged. Task complete. |
 
 ---
 
