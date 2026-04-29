@@ -103,6 +103,7 @@ agents used by the orchestrator.
 
 - Use `docs/INDEX.md` as the documentation discovery layer.
 - Only documents marked `active` are implementation authority.
+- `docs/architecture/provider-abstractions.md` and `docs/architecture/paper-trading-workspace.md` define the provider seams and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
 - No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
