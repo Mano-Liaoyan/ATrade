@@ -1,6 +1,6 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 3: Wire IBKR-backed HTTP and SignalR behavior
+**Current Step:** Step 4: Replace mocked-data verification with IBKR-provider verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -57,13 +57,14 @@
 ---
 
 ### Step 4: Replace mocked-data verification with IBKR-provider verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] IBKR market-data provider shell test added
-- [ ] Old mocked endpoint assertions replaced
-- [ ] No-credential provider-unavailable behavior verified
-- [ ] Fake HTTP mapping tests cover IBKR responses
-- [ ] Frontend tests no longer assert mocked copy
+- [x] IBKR market-data provider shell test added
+- [x] Old mocked endpoint assertions replaced
+- [x] No-credential provider-unavailable behavior verified
+- [x] Fake HTTP mapping tests cover IBKR responses
+- [x] Frontend tests no longer assert mocked copy
+- [x] Targeted verification scripts pass
 
 ---
 

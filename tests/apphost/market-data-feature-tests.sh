@@ -35,6 +35,16 @@ assert_file_contains() {
   fi
 }
 
+assert_file_not_contains() {
+  local file_path="$1"
+  local needle="$2"
+
+  if [[ -f "$file_path" ]] && grep -Fq -- "$needle" "$file_path"; then
+    printf 'expected %s not to contain %s\n' "$file_path" "$needle" >&2
+    return 1
+  fi
+}
+
 cleanup() {
   if [[ -n "$api_pid" ]] && kill -0 "$api_pid" 2>/dev/null; then
     kill "$api_pid" 2>/dev/null || true
@@ -50,19 +60,28 @@ cleanup() {
 
 trap cleanup EXIT
 
-start_api() {
+start_api_without_real_credentials() {
   local api_project="$repo_root/src/ATrade.Api/ATrade.Api.csproj"
 
   api_log="$(mktemp)"
   health_file="$(mktemp)"
   response_file="$(mktemp)"
 
+  ATRADE_BROKER_INTEGRATION_ENABLED=true \
+  ATRADE_BROKER_ACCOUNT_MODE=Paper \
+  ATRADE_IBKR_GATEWAY_URL=http://127.0.0.1:5000 \
+  ATRADE_IBKR_GATEWAY_PORT=5000 \
+  ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest \
+  ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=1 \
+  ATRADE_IBKR_USERNAME=IBKR_USERNAME \
+  ATRADE_IBKR_PASSWORD=IBKR_PASSWORD \
+  ATRADE_IBKR_PAPER_ACCOUNT_ID=IBKR_ACCOUNT_ID \
   ASPNETCORE_URLS="$api_url" dotnet run --project "$api_project" >"$api_log" 2>&1 &
   api_pid=$!
 
   local attempt
   local health_code=''
-  for attempt in {1..40}; do
+  for attempt in {1..60}; do
     health_code="$(curl --silent --show-error --output "$health_file" --write-out '%{http_code}' "$api_url/health" || true)"
     if [[ "$health_code" == '200' ]]; then
       break
@@ -78,22 +97,25 @@ start_api() {
   done
 
   if [[ "$health_code" != '200' ]]; then
-    printf 'expected GET %s/health to return HTTP 200, got %s\n' "$api_url" "$health_code" >&2
+    printf 'expected GET /health to return HTTP 200, got %s\n' "$health_code" >&2
     cat "$api_log" >&2
     return 1
   fi
 
   if [[ "$(cat "$health_file")" != 'ok' ]]; then
-    printf 'expected GET %s/health to return ok, got %s\n' "$api_url" "$(cat "$health_file")" >&2
+    printf 'expected GET /health to return ok, got %s\n' "$(cat "$health_file")" >&2
     return 1
   fi
 }
 
-assert_trending_payload() {
+assert_provider_unavailable_response() {
+  local path="$1"
   local status_code
-  status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' "$api_url/api/market-data/trending")"
-  if [[ "$status_code" != '200' ]]; then
-    printf 'expected trending endpoint to return HTTP 200, got %s\n' "$status_code" >&2
+
+  status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' "$api_url$path")"
+  if [[ "$status_code" != '503' ]]; then
+    printf 'expected %s to return HTTP 503 provider-not-configured without credentials, got %s\n' "$path" "$status_code" >&2
+    cat "$response_file" >&2
     cat "$api_log" >&2
     return 1
   fi
@@ -102,87 +124,37 @@ assert_trending_payload() {
 import json, sys
 from pathlib import Path
 payload = json.loads(Path(sys.argv[1]).read_text())
-symbols = payload.get("symbols", [])
-if len(symbols) < 6:
-    raise SystemExit(f"expected at least 6 mocked trending symbols, got {len(symbols)}")
-asset_classes = {item.get("assetClass") for item in symbols}
-if "Stock" not in asset_classes or "ETF" not in asset_classes:
-    raise SystemExit(f"expected both Stock and ETF trending symbols, got {asset_classes!r}")
-for required in ("AAPL", "SPY"):
-    if required not in {item.get("symbol") for item in symbols}:
-        raise SystemExit(f"missing expected symbol {required}")
-for item in symbols:
-    factors = item.get("factors", {})
-    for key in ("volumeSpike", "priceMomentum", "volatility", "newsSentimentPlaceholder"):
-        if key not in factors:
-            raise SystemExit(f"missing factor {key} in {item!r}")
-    reasons = " ".join(item.get("reasons", []))
-    if "placeholder" not in reasons.lower():
-        raise SystemExit(f"expected placeholder sentiment reason in {item!r}")
+if payload.get("code") != "provider-not-configured":
+    raise SystemExit(f"expected provider-not-configured response, got {payload!r}")
+message = payload.get("message", "")
+if "IBKR" not in message or "iBeam" not in message:
+    raise SystemExit(f"provider-not-configured response must explain IBKR/iBeam state: {payload!r}")
+for forbidden in ("mock", "IBKR_USERNAME", "IBKR_PASSWORD", "IBKR_ACCOUNT_ID"):
+    if forbidden in json.dumps(payload):
+        raise SystemExit(f"provider-unavailable response contained forbidden fake/catalog/credential value: {forbidden}")
 PY
 }
 
-assert_candles_and_indicators() {
-  local timeframe
-  local status_code
+assert_market_data_source_contract() {
+  local api_project="$repo_root/src/ATrade.Api/ATrade.Api.csproj"
+  local api_program="$repo_root/src/ATrade.Api/Program.cs"
+  local market_data_project="$repo_root/src/ATrade.MarketData/ATrade.MarketData.csproj"
+  local ibkr_project="$repo_root/src/ATrade.MarketData.Ibkr/ATrade.MarketData.Ibkr.csproj"
 
-  for timeframe in 1m 5m 1h 1D; do
-    status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' "$api_url/api/market-data/AAPL/candles?timeframe=$timeframe")"
-    if [[ "$status_code" != '200' ]]; then
-      printf 'expected candles endpoint for %s to return HTTP 200, got %s\n' "$timeframe" "$status_code" >&2
-      cat "$api_log" >&2
-      return 1
-    fi
-
-    python3 - "$response_file" "$timeframe" <<'PY'
-import json, sys
-from pathlib import Path
-payload = json.loads(Path(sys.argv[1]).read_text())
-timeframe = sys.argv[2]
-if payload.get("symbol") != "AAPL":
-    raise SystemExit(f"unexpected candle symbol: {payload!r}")
-if payload.get("timeframe") != timeframe:
-    raise SystemExit(f"unexpected candle timeframe: {payload!r}")
-candles = payload.get("candles", [])
-if len(candles) < 100:
-    raise SystemExit(f"expected stable chart history for {timeframe}, got {len(candles)} candles")
-for key in ("time", "open", "high", "low", "close", "volume"):
-    if key not in candles[-1]:
-        raise SystemExit(f"missing candle key {key}: {candles[-1]!r}")
-PY
-
-    status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' "$api_url/api/market-data/AAPL/indicators?timeframe=$timeframe")"
-    if [[ "$status_code" != '200' ]]; then
-      printf 'expected indicators endpoint for %s to return HTTP 200, got %s\n' "$timeframe" "$status_code" >&2
-      cat "$api_log" >&2
-      return 1
-    fi
-
-    python3 - "$response_file" "$timeframe" <<'PY'
-import json, sys
-from pathlib import Path
-payload = json.loads(Path(sys.argv[1]).read_text())
-timeframe = sys.argv[2]
-if payload.get("symbol") != "AAPL" or payload.get("timeframe") != timeframe:
-    raise SystemExit(f"unexpected indicator identity: {payload!r}")
-for key in ("movingAverages", "rsi", "macd"):
-    values = payload.get(key, [])
-    if len(values) < 100:
-        raise SystemExit(f"expected indicator series {key} for {timeframe}, got {len(values)}")
-PY
-  done
-
-  status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' "$api_url/api/market-data/AAPL/candles?timeframe=10m")"
-  if [[ "$status_code" != '400' ]]; then
-    printf 'expected invalid timeframe to return HTTP 400, got %s\n' "$status_code" >&2
-    return 1
-  fi
-
-  status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' "$api_url/api/market-data/NOPE/candles?timeframe=1m")"
-  if [[ "$status_code" != '404' ]]; then
-    printf 'expected invalid symbol to return HTTP 404, got %s\n' "$status_code" >&2
-    return 1
-  fi
+  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.MarketData.Ibkr'
+  assert_file_contains "$api_project" 'ATrade.MarketData.Ibkr.csproj'
+  assert_file_contains "$api_project" 'ATrade.MarketData.csproj'
+  assert_file_contains "$market_data_project" 'Microsoft.AspNetCore.App'
+  assert_file_contains "$ibkr_project" 'ATrade.Brokers.Ibkr.csproj'
+  assert_file_contains "$api_program" 'builder.Services.AddMarketDataModule();'
+  assert_file_contains "$api_program" 'builder.Services.AddIbkrMarketDataProvider();'
+  assert_file_contains "$api_program" '/api/market-data/trending'
+  assert_file_contains "$api_program" 'app.MapHub<MarketDataHub>("/hubs/market-data");'
+  assert_file_contains "$repo_root/src/ATrade.MarketData/MarketDataModels.cs" 'string Source = "provider"'
+  assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs" 'IbkrMarketDataSource.History'
+  assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs" 'IbkrMarketDataSource.Snapshot'
+  assert_file_not_contains "$repo_root/src/ATrade.MarketData/MarketDataModuleServiceCollectionExtensions.cs" 'MockMarketData'
+  assert_file_not_contains "$repo_root/frontend/components/TrendingList.tsx" 'Mocked factors'
 }
 
 main() {
@@ -191,23 +163,12 @@ main() {
     return 1
   fi
 
-  local api_project="$repo_root/src/ATrade.Api/ATrade.Api.csproj"
-  local api_program="$repo_root/src/ATrade.Api/Program.cs"
-  local market_data_project="$repo_root/src/ATrade.MarketData/ATrade.MarketData.csproj"
-
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.MarketData'
-  assert_file_contains "$api_project" 'ATrade.MarketData.csproj'
-  assert_file_contains "$market_data_project" 'Microsoft.AspNetCore.App'
-  assert_file_contains "$api_program" 'builder.Services.AddMarketDataModule();'
-  assert_file_contains "$api_program" 'builder.Services.AddSignalR();'
-  assert_file_contains "$api_program" 'app.MapGet("/api/market-data/trending"'
-  assert_file_contains "$api_program" 'app.MapHub<MarketDataHub>("/hubs/market-data");'
-
+  assert_market_data_source_contract
   dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
-
-  start_api
-  assert_trending_payload
-  assert_candles_and_indicators
+  start_api_without_real_credentials
+  assert_provider_unavailable_response '/api/market-data/trending'
+  assert_provider_unavailable_response '/api/market-data/UNCONFIGURED/candles?timeframe=1D'
+  assert_provider_unavailable_response '/api/market-data/UNCONFIGURED/indicators?timeframe=1D'
 }
 
 main "$@"
