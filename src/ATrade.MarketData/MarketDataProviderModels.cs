@@ -11,7 +11,23 @@ public static class MarketDataProviderErrorCodes
 {
     public const string ProviderNotConfigured = "provider-not-configured";
     public const string ProviderUnavailable = "provider-unavailable";
+    public const string AuthenticationRequired = "authentication-required";
     public const string SearchNotSupported = "search-not-supported";
+    public const string InvalidSearchQuery = "invalid-search-query";
+    public const string UnsupportedAssetClass = "unsupported-asset-class";
+    public const string InvalidSearchLimit = "invalid-search-limit";
+}
+
+public static class MarketDataAssetClasses
+{
+    public const string Stock = "STK";
+}
+
+public static class MarketDataSymbolSearchLimits
+{
+    public const int MinimumQueryLength = 2;
+    public const int DefaultLimit = 10;
+    public const int MaximumLimit = 20;
 }
 
 public sealed record MarketDataProviderIdentity(string Provider, string DisplayName)
@@ -27,9 +43,11 @@ public sealed record MarketDataProviderIdentity(string Provider, string DisplayN
 
 public sealed record MarketDataSymbolIdentity(
     string Symbol,
+    string Provider,
     string? ProviderSymbolId,
     string AssetClass,
-    string Exchange);
+    string Exchange,
+    string Currency);
 
 public sealed record MarketDataProviderCapabilities(
     bool SupportsTrendingScanner,
@@ -82,8 +100,22 @@ public sealed record MarketDataProviderStatus(
 public sealed record MarketDataSymbolSearchResult(
     MarketDataSymbolIdentity Identity,
     string Name,
-    string Sector);
+    string Sector)
+{
+    public string Symbol => Identity.Symbol;
+
+    public string Provider => Identity.Provider;
+
+    public string? ProviderSymbolId => Identity.ProviderSymbolId;
+
+    public string AssetClass => Identity.AssetClass;
+
+    public string Exchange => Identity.Exchange;
+
+    public string Currency => Identity.Currency;
+}
 
 public sealed record MarketDataSymbolSearchResponse(
     DateTimeOffset GeneratedAt,
-    IReadOnlyList<MarketDataSymbolSearchResult> Results);
+    IReadOnlyList<MarketDataSymbolSearchResult> Results,
+    string Source = "provider");

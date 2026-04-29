@@ -112,6 +112,8 @@ public interface IMarketDataService
 {
     TrendingSymbolsResponse GetTrendingSymbols();
 
+    bool TrySearchSymbols(string? query, string? assetClass, int? limit, out MarketDataSymbolSearchResponse? response, out MarketDataError? error);
+
     bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol);
 
     bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error);

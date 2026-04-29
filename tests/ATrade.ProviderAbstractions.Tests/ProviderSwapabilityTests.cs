@@ -27,15 +27,23 @@ public sealed class ProviderSwapabilityTests
         var service = new MarketDataService(provider);
 
         var trending = service.GetTrendingSymbols();
+        var searchResult = service.TrySearchSymbols("test", "stock", 5, out var search, out var searchError);
         var candlesResult = service.TryGetCandles("TEST", MarketDataTimeframes.OneDay, out var candles, out var error);
 
         Assert.Equal("test-market-data", provider.Identity.Provider);
         Assert.Single(trending.Symbols);
+        Assert.True(searchResult);
+        Assert.Null(searchError);
+        var searchMatch = Assert.Single(search!.Results);
+        Assert.Equal("test-market-data", searchMatch.Identity.Provider);
+        Assert.Equal("provider-test-id", searchMatch.Identity.ProviderSymbolId);
+        Assert.Equal("USD", searchMatch.Identity.Currency);
         Assert.True(candlesResult);
         Assert.Null(error);
         Assert.NotNull(candles);
         Assert.Equal("TEST", candles.Symbol);
         Assert.Equal(1, provider.TrendingCallCount);
+        Assert.Equal(1, provider.SearchCallCount);
         Assert.Equal(1, provider.CandleCallCount);
     }
 
@@ -55,6 +63,34 @@ public sealed class ProviderSwapabilityTests
         Assert.NotNull(error);
         Assert.Equal(MarketDataProviderErrorCodes.ProviderNotConfigured, error.Code);
         Assert.Equal(0, provider.CandleCallCount);
+    }
+
+    [Fact]
+    public void MarketDataService_ValidatesSearchRequestsAndClampsLimitBeforeCallingProvider()
+    {
+        var provider = new TestMarketDataProvider(
+            MarketDataProviderStatus.Available(TestMarketDataProvider.ProviderIdentity, TestMarketDataProvider.ProviderCapabilities),
+            searchResultCount: MarketDataSymbolSearchLimits.MaximumLimit + 5);
+        var service = new MarketDataService(provider);
+
+        var tooShort = service.TrySearchSymbols("T", "stock", 5, out var tooShortResponse, out var tooShortError);
+        var unsupportedAssetClass = service.TrySearchSymbols("TEST", "crypto", 5, out var unsupportedResponse, out var unsupportedError);
+        var invalidLimit = service.TrySearchSymbols("TEST", "stock", 0, out var invalidLimitResponse, out var invalidLimitError);
+        var clampedLimit = service.TrySearchSymbols("TEST", "stock", 999, out var clampedResponse, out var clampedError);
+
+        Assert.False(tooShort);
+        Assert.Null(tooShortResponse);
+        Assert.Equal(MarketDataProviderErrorCodes.InvalidSearchQuery, tooShortError?.Code);
+        Assert.False(unsupportedAssetClass);
+        Assert.Null(unsupportedResponse);
+        Assert.Equal(MarketDataProviderErrorCodes.UnsupportedAssetClass, unsupportedError?.Code);
+        Assert.False(invalidLimit);
+        Assert.Null(invalidLimitResponse);
+        Assert.Equal(MarketDataProviderErrorCodes.InvalidSearchLimit, invalidLimitError?.Code);
+        Assert.True(clampedLimit);
+        Assert.Null(clampedError);
+        Assert.Equal(MarketDataSymbolSearchLimits.MaximumLimit, clampedResponse!.Results.Count);
+        Assert.Equal(1, provider.SearchCallCount);
     }
 
     private sealed class TestBrokerProvider : IBrokerProvider
@@ -88,7 +124,7 @@ public sealed class ProviderSwapabilityTests
         }
     }
 
-    private sealed class TestMarketDataProvider(MarketDataProviderStatus status) : IMarketDataProvider
+    private sealed class TestMarketDataProvider(MarketDataProviderStatus status, int searchResultCount = 1) : IMarketDataProvider
     {
         public static MarketDataProviderIdentity ProviderIdentity { get; } = MarketDataProviderIdentity.Create("test-market-data", "Test market data");
 
@@ -101,6 +137,8 @@ public sealed class ProviderSwapabilityTests
             UsesMockData: false);
 
         public int TrendingCallCount { get; private set; }
+
+        public int SearchCallCount { get; private set; }
 
         public int CandleCallCount { get; private set; }
 
@@ -133,12 +171,22 @@ public sealed class ProviderSwapabilityTests
 
         public bool TrySearchSymbols(string query, out MarketDataSymbolSearchResponse? response, out MarketDataError? error)
         {
+            SearchCallCount++;
             response = new MarketDataSymbolSearchResponse(
                 DateTimeOffset.UtcNow,
-                new[]
-                {
-                    new MarketDataSymbolSearchResult(new MarketDataSymbolIdentity("TEST", "provider-test-id", "Stock", "TESTEX"), "Test Corp.", "Testing"),
-                });
+                Enumerable.Range(1, searchResultCount)
+                    .Select(index => new MarketDataSymbolSearchResult(
+                        new MarketDataSymbolIdentity(
+                            index == 1 ? "TEST" : $"TEST{index}",
+                            Identity.Provider,
+                            index == 1 ? "provider-test-id" : $"provider-test-id-{index}",
+                            MarketDataAssetClasses.Stock,
+                            "TESTEX",
+                            "USD"),
+                        index == 1 ? "Test Corp." : $"Test Corp. {index}",
+                        "Testing"))
+                    .ToArray(),
+                Identity.Provider);
             error = null;
             return true;
         }

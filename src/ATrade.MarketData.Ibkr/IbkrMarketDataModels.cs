@@ -17,7 +17,8 @@ public sealed record IbkrContract(
     string AssetClass,
     string Exchange,
     string Conid,
-    string Sector);
+    string Sector,
+    string Currency);
 
 public sealed record IbkrMarketDataSnapshot(
     string Conid,

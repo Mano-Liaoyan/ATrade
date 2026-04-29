@@ -1,6 +1,6 @@
 # TP-023: Add IBKR stock search and pin-any-symbol workflow — Status
 
-**Current Step:** Step 1: Add backend IBKR stock search contracts and endpoints
+**Current Step:** Step 2: Connect search results to persisted watchlists
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -23,18 +23,18 @@
 ---
 
 ### Step 1: Add backend IBKR stock search contracts and endpoints
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Provider-neutral search contract added or extended
-- [ ] IBKR/iBeam search maps provider-neutral results
-- [ ] Search API endpoint added with limits/errors
-- [ ] Search avoids hard-coded production allowlists
-- [ ] Targeted provider/API tests pass
+- [x] Provider-neutral search contract added or extended
+- [x] IBKR/iBeam search maps provider-neutral results
+- [x] Search API endpoint added with limits/errors
+- [x] Search avoids hard-coded production allowlists
+- [x] Targeted provider/API tests pass
 
 ---
 
 ### Step 2: Connect search results to persisted watchlists
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Watchlist command model stores provider metadata
 - [ ] Existing rows remain compatible and can be enriched
@@ -119,6 +119,8 @@
 | 2026-04-29 22:46 | Step 0 started | Preflight |
 | 2026-04-30 | Step 0 completed | Required paths present; TP-020 and TP-022 complete; production source has no mocked symbol catalog; watchlist schema includes provider metadata columns. |
 | 2026-04-30 | Step 1 started | Backend IBKR search contracts and endpoint work |
+| 2026-04-30 | Step 1 completed | Added provider-neutral search metadata, IBKR secdef search/detail enrichment, API search endpoint validation, and targeted provider/API verification. |
+| 2026-04-30 | Step 2 started | Persist searched symbol metadata into workspace watchlists |
 
 ---
 
