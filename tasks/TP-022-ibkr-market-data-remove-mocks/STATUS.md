@@ -1,6 +1,6 @@
 # TP-022: Replace mocked market data with IBKR/iBeam provider and remove production mocks — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Implement the IBKR/iBeam market-data provider
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -24,13 +24,13 @@
 ---
 
 ### Step 1: Implement the IBKR/iBeam market-data provider
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] IBKR market-data provider project/implementation added
-- [ ] Provider uses iBeam/Gateway config and not direct credential reads
-- [ ] Contract lookup, snapshots, historical bars, and scanner/trending mapping implemented
-- [ ] Provider-unavailable/not-authenticated errors implemented
-- [ ] Targeted IBKR MarketData tests/build pass
+- [x] IBKR market-data provider project/implementation added
+- [x] Provider uses iBeam/Gateway config and not direct credential reads
+- [x] Contract lookup, snapshots, historical bars, and scanner/trending mapping implemented
+- [x] Provider-unavailable/not-authenticated errors implemented
+- [x] Targeted IBKR MarketData tests/build pass
 
 ---
 
