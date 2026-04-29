@@ -1,7 +1,7 @@
 # TP-019: Introduce provider-neutral broker and market-data abstractions — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-29
 **Review Level:** 3
 **Review Counter:** 0
@@ -76,11 +76,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -95,6 +95,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Archived TP-017 status header still reads `🔵 Ready for Execution` even though the implemented market-data slice is present and baseline tests pass. | Left code unchanged; recorded for archival hygiene only. | `tasks/archive/TP-017-mocked-market-data-trending-signalr/STATUS.md` |
+| Paper-trading config contract test expected stale `docs/INDEX.md` owner text (`architect`) for the active paper workspace doc. | Updated the test to match current `maintainer` ownership and full suite passes. | `tests/apphost/paper-trading-config-contract-tests.sh` |
 
 ---
 
@@ -117,6 +119,8 @@
 | 2026-04-29 21:45 | Step 5 started | Full verification |
 | 2026-04-29 22:05 | Step 5 complete | Full suite and solution build passed; Docker-dependent runtime script exited 0; stale paper-trading contract assertion fixed. |
 | 2026-04-29 22:05 | Step 6 started | Delivery checks |
+| 2026-04-29 22:15 | Step 6 complete | Delivery docs and discoveries verified. |
+| 2026-04-29 22:15 | Task complete | All TP-019 steps complete with full verification passing. |
 
 ---
 
