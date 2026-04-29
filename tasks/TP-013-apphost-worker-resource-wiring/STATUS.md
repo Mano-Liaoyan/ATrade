@@ -1,6 +1,6 @@
 # TP-013: Wire the IBKR worker and AppHost resource consumers — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -57,17 +57,17 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Runtime infrastructure test passes or cleanly skips when no engine is available
-- [ ] All failures fixed
-- [ ] Manifest preserves frontend local-port and infrastructure safeguards
+- [x] FULL test suite passing
+- [x] Runtime infrastructure test passes or cleanly skips when no engine is available
+- [x] All failures fixed
+- [x] Manifest preserves frontend local-port and infrastructure safeguards
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] "Check If Affected" docs reviewed
