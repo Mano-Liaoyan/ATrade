@@ -1,6 +1,6 @@
 ---
 status: active
-owner: architect
+owner: maintainer
 updated: 2026-04-29
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus.
 see_also:
@@ -345,6 +345,6 @@ on `NATS` using provider-neutral contracts defined by `ATrade.Orders` and
 
 This document is `status: active` and therefore authoritative. Adding a
 new module, splitting an existing module, or changing first-phase broker
-or data focus requires an architect-approved edit to this document and a
+or data focus requires a maintainer-approved edit to this document and a
 matching update to `overview.md` and, where structure changes, `README.md`
 — per the Documentation Contract in `AGENTS.md`.

@@ -1,47 +1,65 @@
 ---
 status: active
-owner: scrum-master
+owner: maintainer
 updated: 2026-04-29
-summary: Bootstrap plan for the governance-first ATrade reboot.
+summary: Current implementation plan for the provider-backed ATrade paper-trading workspace upgrade.
 see_also:
-  - AGENTS.md
-  - scripts/README.md
+  - README.md
   - docs/INDEX.md
+  - scripts/README.md
+  - tasks/CONTEXT.md
 ---
 
-# ATrade Bootstrap Plan
+# ATrade Current Plan
 
 **Last updated:** 2026-04-29
 
 ## Current Focus
 
-Use the implemented paper-trading workspace MVP — safe IBKR status/simulation, deterministic mocked market data, SignalR updates, and the `lightweight-charts` Next.js workspace — as the baseline for deeper backend-owned preferences, provider-backed data, durable paper orders, and strategy/LEAN seams while preserving the current AppHost graph.
+Deliver the provider-backed paper-trading workspace upgrade queued in `TP-019`
+through `TP-025`:
 
-## Milestones
+- provider-neutral broker and market-data abstractions
+- Postgres-persisted pinned symbols/watchlists
+- `voyz/ibeam:latest` IBKR runtime with credentials read only from ignored `.env`
+- real IBKR/iBeam market data and stock search
+- provider-neutral analysis contracts
+- LEAN as the first analysis engine provider
 
-- [x] ~~Rewrite top-level repository identity around Aspire 13.2, Next.js, and autonomous agents~~
-- [x] ~~Create the first baseline commit so git worktrees become available~~
-- [x] ~~Bootstrap the repo-local `start run` wrapper contract and Linux-hosted AppHost path from `scripts/README.md`~~
-- [x] ~~Verify `./start.ps1 run` and `./start.cmd run` on a Windows-hosted runtime or CI worker~~
-- [x] ~~Bootstrap the first Aspire AppHost graph for `ATrade.Api` plus the Next.js home page~~
-- [x] ~~Author the first implementation-facing architecture and module docs for the new codebase~~
-- [x] ~~Establish GitHub labels, issue templates, and Actions for autonomous coordination~~
-- [x] ~~Scaffold the first .NET 10 backend projects and Next.js frontend~~
-- [x] ~~Declare managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph~~
-- [x] ~~Add the first backend feature-module shells and the inert `ATrade.Ibkr.Worker` shell~~
-- [x] ~~Extend the AppHost graph with real worker wiring and application resource consumers~~
-- [x] ~~Add the first backend feature behavior on top of the bootstrap slice~~
-- [x] ~~Stage and deliver the first paper-trading workspace slice (paper-only IBKR session status, mocked market/trending data, SignalR updates, `lightweight-charts` UI, and simulated order workflow)~~
+## Active Task Queue
 
-## Active Cross-Role Dependencies
+| Task | Status | Depends on | Summary |
+|------|--------|------------|---------|
+| `TP-019` | Ready | `TP-016`, `TP-017` | Introduce provider-neutral broker and market-data abstractions. |
+| `TP-020` | Ready after deps | `TP-018`, `TP-019` | Persist pinned stock watchlists in Postgres. |
+| `TP-021` | Ready after deps | `TP-019` | Wire `voyz/ibeam:latest` and the ignored `.env` IBKR login contract. |
+| `TP-022` | Ready after deps | `TP-019`, `TP-021` | Replace production mocked market data with the IBKR/iBeam provider. |
+| `TP-023` | Ready after deps | `TP-020`, `TP-022` | Add IBKR stock search and pin-any-symbol workflow. |
+| `TP-024` | Ready after deps | `TP-019`, `TP-022` | Add provider-neutral analysis engine abstraction and API contract. |
+| `TP-025` | Ready after deps | `TP-022`, `TP-024` | Integrate LEAN as the first analysis engine provider. |
 
-- Senior Engineer and DevOps must preserve the new infrastructure-aware AppHost graph while adding future workers without breaking the cross-platform `start run` contract.
-- Architect and Scrum Master must keep the roadmap, task inventory, and active docs aligned as the first feature-module slices are staged.
+Completed task packets are archived under `tasks/archive/`.
 
-## Notes
+## Execution Order
 
-- Only indexed `active` docs are authoritative. Legacy docs must be explicitly reintroduced and marked before use.
-- The single-command local startup contract is `start run` on both Unix and Windows.
-- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api`, `ATrade.Ibkr.Worker`, the Next.js home page, and named `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources, with explicit AppHost resource references wired into the API and worker graph. The first backend feature behavior is now live as the read-only Accounts overview endpoint at `GET /api/accounts/overview` alongside `GET /health`.
-- `docs/architecture/paper-trading-workspace.md` now defines the paper-only workspace contract: official IBKR Gateway session status, mocked market/trending data for the first slice, SignalR browser updates, `lightweight-charts` as the MVP charting baseline, and LEAN as a future seam rather than an immediate dependency. TP-016 implemented the safe IBKR status/order-simulation backend; TP-018 recovered the deterministic mocked market-data HTTP/SignalR contract locally and added the first Next.js trading workspace with localStorage watchlists, candlestick charts, indicators, SignalR fallback, and no-real-orders guardrails.
-- `.worktrees/` is now available for isolated parallel feature delivery.
+1. Run `TP-019` first to establish provider abstractions.
+2. After `TP-019`, run `TP-020` and `TP-021` when their file-scope conflicts allow.
+3. Run `TP-022` after `TP-021` to replace production market-data mocks.
+4. Run `TP-023` after `TP-020` and `TP-022`.
+5. Run `TP-024` after `TP-022`.
+6. Run `TP-025` after `TP-024`.
+
+The orchestrator dependency sections in each `PROMPT.md` are the machine-readable
+source for batch ordering.
+
+## Guardrails
+
+- Keep the repo-local startup contract as `start run` on Unix and Windows.
+- Keep secrets, IBKR credentials, account identifiers, tokens, and session cookies out of git.
+- Real IBKR/iBeam and LEAN checks must use ignored `.env` values and cleanly skip when local runtimes or credentials are unavailable.
+- Do not add real order placement or live-trading behavior in this queued batch.
+- Update active docs in the same change as durable code/runtime changes.
+
+## Next Task ID
+
+`TP-026`

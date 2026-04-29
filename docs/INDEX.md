@@ -1,8 +1,8 @@
 ---
 status: active
-owner: architect
+owner: maintainer
 updated: 2026-04-29
-summary: Documentation discovery layer for the ATrade repository; lists every tracked doc and its lifecycle status.
+summary: Documentation discovery layer for active ATrade repository docs.
 see_also:
   - ../README.md
   - ../AGENTS.md
@@ -11,33 +11,26 @@ see_also:
 
 # ATrade Documentation Index
 
-This file is the documentation discovery layer required by `AGENTS.md` →
-*Documentation Contract*. Every tracked document in the repository must be
-listed here with its `status`. Only documents marked `active` may be used
-as implementation authority; `legacy-review-pending` and `obsolete`
-documents are retained for history and must not drive implementation
-decisions.
+This file is the documentation discovery layer for the repository. Only
+documents listed as `active` should guide implementation work.
 
 ## Active Documents
 
 | Document | Owner | Summary |
 |----------|-------|---------|
-| [`../README.md`](../README.md) | architect | Human-facing overview of the rebooted ATrade repository and its core operating contracts. |
-| [`../AGENTS.md`](../AGENTS.md) | architect | Repository-wide operating contract for the autonomous ATrade workforce. |
-| [`../PLAN.md`](../PLAN.md) | scrum-master | Bootstrap plan for the governance-first ATrade reboot. |
-| [`../scripts/README.md`](../scripts/README.md) | devops | Bootstrap status and contract for the cross-platform `start run` entrypoints. |
-| [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md) | devops | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored. |
-| [`architecture/overview.md`](architecture/overview.md) | architect | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract. |
-| [`architecture/modules.md`](architecture/modules.md) | architect | Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus. |
-| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | architect | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice. |
-| [`process/github-coordination.md`](process/github-coordination.md) | scrum-master | Repository-side GitHub coordination contract for labels, sizing, blocked work, and resume flow. |
+| [`../README.md`](../README.md) | maintainer | Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue. |
+| [`../AGENTS.md`](../AGENTS.md) | maintainer | Repository guidance after removal of the old role-based autonomous workforce files. |
+| [`../PLAN.md`](../PLAN.md) | maintainer | Current implementation plan for the provider-backed ATrade paper-trading workspace upgrade. |
+| [`../scripts/README.md`](../scripts/README.md) | maintainer | Bootstrap status and contract for the cross-platform `start run` entrypoints. |
+| [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md) | maintainer | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored. |
+| [`architecture/overview.md`](architecture/overview.md) | maintainer | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract. |
+| [`architecture/modules.md`](architecture/modules.md) | maintainer | Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus. |
+| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | maintainer | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice. |
+| [`process/github-coordination.md`](process/github-coordination.md) | maintainer | Lightweight GitHub and Taskplane coordination contract after removal of the old role-based workforce. |
 
 ## Legacy-Review-Pending Documents
 
-*None.* Legacy docs from the pre-reboot repository were removed from the
-top level and have not been reintroduced. If any are restored, they must
-be indexed here with `status: legacy-review-pending` before agents may
-consult them.
+*None.*
 
 ## Obsolete Documents
 
@@ -45,12 +38,7 @@ consult them.
 
 ## Conventions
 
-- Every tracked document carries frontmatter with `status`, `owner`,
-  `updated`, `summary`, and `see_also` (see `AGENTS.md` → *Documentation
-  Contract*).
-- Durable repository changes must include a doc update in the same
-  change.
-- New docs are added to the *Active Documents* table in the same PR that
-  introduces them.
-- Stale docs are moved to *Legacy-Review-Pending Documents* or *Obsolete
-  Documents* and their frontmatter `status` updated to match.
+- Durable repository changes should update the relevant active documentation in the same change.
+- New docs must be added to the active table when introduced.
+- Stale docs should be moved to *Legacy-Review-Pending Documents* or *Obsolete Documents* with matching frontmatter status.
+- Completed Taskplane packets live under `../tasks/archive/` and are not active implementation authority.

@@ -1,6 +1,6 @@
 ---
 status: active
-owner: architect
+owner: maintainer
 updated: 2026-04-29
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
@@ -388,5 +388,5 @@ Rules:
 This document is `status: active` and authoritative for the paper-trading
 workspace direction. Any change that weakens the paper-only guardrails,
 introduces live trading, changes the charting-library decision, or makes LEAN
-an immediate dependency requires an architect-approved update to this file and
+an immediate dependency requires a maintainer-approved update to this file and
 matching updates to the active repository docs that summarize the same area.

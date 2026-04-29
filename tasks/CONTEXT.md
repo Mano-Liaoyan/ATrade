@@ -1,116 +1,102 @@
 # General — Context
 
-**Last Updated:** 2026-04-23
+**Last Updated:** 2026-04-29
 **Status:** Active
-**Next Task ID:** TP-010
+**Next Task ID:** TP-026
 
 ---
 
 ## Project Overview
 
-ATrade is a documentation-first reboot of a personal swing and position
-trading platform. The target system is a **modular monolith** orchestrated
-locally by Aspire 13.2 through a single semantic command: `start run`.
+ATrade is a personal swing and position trading platform implemented as a
+.NET 10 / Next.js modular monolith and orchestrated locally by Aspire 13.2.
 
-See `README.md` for the human-facing overview and `PLAN.md` for the
-bootstrap plan and current milestones.
+Use `README.md` for the human-facing overview and `PLAN.md` for the current
+implementation queue.
 
-## Target Stack
+## Current Repository State
 
-| Layer                   | Choice                                                        |
-| ----------------------- | ------------------------------------------------------------- |
-| Backend                 | .NET 10                                                       |
-| Orchestrator            | Aspire 13.2 (manages apps, workers, infra)                    |
-| Frontend                | Next.js                                                       |
-| Infrastructure          | Postgres, TimescaleDB, Redis, NATS                            |
-| Broker / Data (phase 1) | IBKR, Polygon                                                 |
-| Agent workflow          | GitHub issues, draft PRs, reusable skills, parallel worktrees |
+- `src/ATrade.AppHost` launches the local Aspire graph.
+- `src/ATrade.Api` exposes health, accounts overview, safe IBKR status,
+  simulated orders, market-data HTTP endpoints, and a market-data SignalR hub.
+- `workers/ATrade.Ibkr.Worker` provides the current safe IBKR worker shell.
+- `frontend/` contains the Next.js paper-trading workspace.
+- AppHost-managed local infrastructure includes Postgres, TimescaleDB, Redis,
+  and NATS.
+- The MVP workspace still uses deterministic mocked market data and a
+  browser-local watchlist; active tasks replace these with real provider-backed
+  behavior.
 
-## Run Contract
+## Active Task Queue
+
+Active task packets live directly under `tasks/`:
+
+| Task | Summary |
+|------|---------|
+| `TP-019` | Provider-neutral broker and market-data abstractions |
+| `TP-020` | Postgres-persisted pinned stock/watchlist state |
+| `TP-021` | `voyz/ibeam:latest` runtime and ignored `.env` IBKR login contract |
+| `TP-022` | IBKR/iBeam market-data provider and production mock removal |
+| `TP-023` | IBKR stock search and pin-any-symbol workflow |
+| `TP-024` | Provider-neutral analysis engine abstraction |
+| `TP-025` | LEAN as the first analysis engine provider |
+
+Completed task packets have been moved to `tasks/archive/`.
+
+## Taskplane Usage
+
+This repository uses Taskplane task packets for implementation work.
+
+- Run all ready tasks: `/orch all`
+- Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
+- New tasks should use the next ID: `TP-026`
+- Task packets must include `PROMPT.md` and `STATUS.md`
+- Finished task directories should be moved to `tasks/archive/`
+
+## Runtime Contract
 
 The repo-local `start` shim is the single startup contract across platforms:
 
 - Unix-like: `./start run`
-- Windows: `./start.cmd run` or `./start.ps1 run`
+- Windows PowerShell: `./start.ps1 run`
+- Windows Command Prompt: `./start.cmd run`
 
-All variants delegate to the Aspire AppHost. In this repo, `start run`
-always refers to this shim, not the Windows shell built-in.
-
-## Current Repository State
-
-This repository is in **governance-first bootstrap mode**, but the first
-runnable slice is now in place:
-
-- Top-level identity (README, PLAN, AGENTS) is rewritten around Aspire 13.2,
-  Next.js, and the autonomous agent workforce.
-- The first implementation-facing architecture docs and GitHub coordination
-  primitives now exist under `docs/architecture/`, `docs/process/`, and
-  `.github/`.
-- The baseline commit exists, so `.worktrees/` is available for isolated
-  parallel delivery.
-- `src/` now contains `ATrade.AppHost`, `ATrade.ServiceDefaults`, and the
-  minimal `ATrade.Api` scaffold; `frontend/` now contains the first real
-  Next.js home page slice.
-- `workers/`, AppHost-managed infrastructure resources, and deeper backend
-  feature modules remain future work tracked in `PLAN.md` and queued task
-  inventory.
-- Only documents marked `status: active` in `docs/INDEX.md` are
-  authoritative. Legacy docs must be reintroduced as
-  `legacy-review-pending` before use.
-
-## Taskplane Usage
-
-This is the default task area for ATrade. Tasks that don't belong to a
-specific domain area are created here.
-
-- Parallel batch: `/orch all`
-- Single task: `/orch <path/to/PROMPT.md>`
-- Tasks must follow the `EXAMPLE-001` / `EXAMPLE-002` PROMPT.md + STATUS.md
-  shape under `tasks/<TASK-ID>-<slug>/`.
-
-## Autonomous Workforce
-
-Agent roles operating in this repo (charters in `.pi/agents/`):
-
-- Architect
-- Senior Engineer
-- Senior Test Engineer
-- DevOps Engineer
-- Scrum Master
-- Code Reviewer
-- Handyman
-- Onboarder
-
-The repo-wide operating contract is `AGENTS.md`.
-
-## Documentation Rules
-
-- Every durable repository addition must add or update an indexed document.
-- `docs/INDEX.md` is the discovery layer.
-- Only `active` docs drive implementation decisions.
-- `legacy-review-pending` and `obsolete` docs must not be used as authority.
+All variants delegate to the Aspire AppHost.
 
 ## Key Files
 
-| Category            | Path                        |
-| ------------------- | --------------------------- |
-| Repo identity       | `README.md`                 |
-| Bootstrap plan      | `PLAN.md`                   |
-| Agent contract      | `AGENTS.md`                 |
-| Doc index           | `docs/INDEX.md`             |
-| Run contract design | `scripts/README.md`         |
-| Tasks               | `tasks/`                    |
-| Taskplane config    | `.pi/taskplane-config.json` |
-| Parallel worktrees  | `.worktrees/`               |
+| Category | Path |
+|----------|------|
+| Human overview | `README.md` |
+| Current plan | `PLAN.md` |
+| Documentation index | `docs/INDEX.md` |
+| Startup contract | `scripts/README.md` |
+| Active tasks | `tasks/TP-019-*` through `tasks/TP-025-*` |
+| Archived tasks | `tasks/archive/` |
+| Taskplane config | `.pi/taskplane-config.json` |
+| AppHost | `src/ATrade.AppHost/Program.cs` |
+| API | `src/ATrade.Api/Program.cs` |
+| Frontend | `frontend/` |
+
+## Cleanup State
+
+The old role-based planning and workforce files have been removed:
+
+- `plans/` no longer exists.
+- Repo-local workforce agent role files were removed from `.pi/agents/`.
+- Repo-local workforce skills were removed from `.pi/skills/`.
+- Remaining `.pi/agents/` files are Taskplane runtime agents used by the orchestrator.
+
+## Documentation Rules
+
+- Use `docs/INDEX.md` as the documentation discovery layer.
+- Only documents marked `active` are implementation authority.
+- Durable runtime/code changes must update relevant docs in the same change.
+- Do not commit secrets, IBKR credentials, account identifiers, tokens, or session cookies.
+- Do not add real order placement or live-trading behavior in the current task queue.
 
 ## Technical Debt / Future Work
 
-_Items discovered during task execution are logged here by agents._
-
-- [ ] `TP-007` — Reconcile planning and docs with the actual repo state
-- [ ] `TP-008` — Extend AppHost with managed infrastructure resources
-- [ ] `TP-009` — Scaffold first feature-module shells and the IBKR worker shell
-- [ ] **Frontend dependency audit** — `npm install lightweight-charts @microsoft/signalr` reported 2 moderate npm advisories during TP-018; review dependency-policy options without forcing breaking upgrades.
-- [ ] **Task inventory reconciliation** — TP-018 recovered the mocked market-data contract locally while `tasks/TP-017-mocked-market-data-trending-signalr/STATUS.md` still says `Not Started`; reconcile task state after merge so TP-017 is not re-run blindly.
-- Open milestones tracked in `PLAN.md` should stay aligned with the task packets
-  above and with the active docs.
+- [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
+- [ ] Execute `TP-019` through `TP-025` in dependency order.
+- [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.

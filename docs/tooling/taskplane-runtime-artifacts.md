@@ -1,7 +1,7 @@
 ---
 status: active
-owner: devops
-updated: 2026-04-23
+owner: maintainer
+updated: 2026-04-29
 summary: Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored.
 see_also:
   - ../INDEX.md
@@ -15,22 +15,29 @@ ATrade keeps **Taskplane/Pi project configuration** in version control, but it
 must not commit **local runtime state**, diagnostics, or per-operator UI
 preferences.
 
-This distinction matters because Taskplane writes a large amount of execution
-state under `.pi/` and `tasks/` while batches run. Those files are useful for a
-single operator during execution or failure recovery, but they are not durable
-repository truth.
+This distinction matters because Taskplane writes execution state under `.pi/`
+and `tasks/` while batches run. Those files can help during execution or
+failure recovery, but they are not durable repository truth.
 
 ## Commit These Files
 
 These files are part of the repository contract and should remain tracked:
 
-- `.pi/agents/` — role and execution-agent prompts
-- `.pi/skills/` — repository workflow skills
+- `.pi/agents/task-worker.md` — Taskplane worker prompt
+- `.pi/agents/task-reviewer.md` — Taskplane reviewer prompt
+- `.pi/agents/task-merger.md` — Taskplane merge prompt
+- `.pi/agents/supervisor.md` — Taskplane supervisor prompt
+- `.pi/agents/README.md` — notes for the remaining runtime agents
 - `.pi/taskplane-config.json` — project-specific Taskplane execution config
 - `tasks/CONTEXT.md` — task area context and next ID counter
-- `tasks/<TASK-ID>-<slug>/PROMPT.md` — task packets
+- `tasks/<TASK-ID>-<slug>/PROMPT.md` — active task packets
 - `tasks/<TASK-ID>-<slug>/STATUS.md` — durable execution/resume state for a task
 - `tasks/<TASK-ID>-<slug>/.DONE` — durable completion marker when present
+- `tasks/archive/<TASK-ID>-<slug>/` — archived completed task packets
+
+The old role-based `.pi/skills/` folder and old role-agent prompts were removed
+and should not be recreated unless a future human request reintroduces that
+operating model.
 
 ## Ignore These Files
 
@@ -75,5 +82,6 @@ packet's `PROMPT.md`.
 ## Cleanup Guidance
 
 When a batch is complete and no recovery work is needed, it is safe to remove
-local runtime artifacts covered by the ignore rules above. Keep the committed
-Taskplane config and task packets; discard the transient execution traces.
+local runtime artifacts covered by the ignore rules above. Keep committed
+Taskplane config, active task packets, and archived completed task packets;
+discard transient execution traces.

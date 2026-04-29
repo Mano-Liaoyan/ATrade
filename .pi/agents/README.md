@@ -1,47 +1,22 @@
 ---
 status: active
-owner: onboarder
-updated: 2026-04-22
-summary: Index of agent roles and the conventions for adding a new role.
+owner: maintainer
+updated: 2026-04-29
+summary: Notes for the remaining Taskplane runtime agents after removing the old role-based workforce agents.
 see_also:
   - ../../AGENTS.md
-  - ../skills/onboarding-new-agent/SKILL.md
-  - ../../plans/README.md
+  - ../../tasks/CONTEXT.md
+  - ../taskplane-config.json
 ---
 
-# Agent Roles
+# Taskplane Runtime Agents
 
-This directory defines the autonomous workforce for ATrade.
+The Taskplane/orchestrator runtime agents:
 
-Each role file describes:
+- `supervisor.md`
+- `task-worker.md`
+- `task-reviewer.md`
+- `task-merger.md`
 
-- mission
-- preferred model tier
-- primary skills
-- inputs and outputs
-- escalation rules
-- parallelism notes
-
-## Default Roles
-
-- `architect.md`
-- `senior-engineer.md`
-- `senior-test-engineer.md`
-- `devops.md`
-- `scrum-master.md`
-- `code-reviewer.md`
-- `handyman.md`
-- `onboarder.md`
-
-## Adding A New Role
-
-Use `.pi/skills/onboarding-new-agent/SKILL.md`.
-
-Every new role must include:
-
-1. `.pi/agents/<role>.md`
-2. `plans/<role>/CURRENT.md`
-3. `plans/<role>/archive/`
-4. updates to `docs/INDEX.md`
-
-New roles are added only when recurring work does not fit an existing role cleanly.
+Do not recreate role-based plans or repo-local workforce skills unless a future
+human request explicitly reintroduces that operating model.

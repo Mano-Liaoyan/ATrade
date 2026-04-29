@@ -1,6 +1,6 @@
 ---
 status: active
-owner: architect
+owner: maintainer
 updated: 2026-04-29
 summary: Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract.
 see_also:
@@ -13,27 +13,22 @@ see_also:
 
 # ATrade Architecture Overview
 
-> **Status note:** This document describes the **target** architecture of
-> ATrade, not a finished implementation. The repository is currently in
-> governance-first bootstrap mode (see `README.md` → *Current Status* and
-> `PLAN.md` for the live milestone list). Where this document says "runs",
-> "hosts", or "orchestrates" the reader should understand "will, once the
-> corresponding milestone in `PLAN.md` is complete". The runnable slice today
-> is the Aspire AppHost bootstrap described in `scripts/README.md`, which now
-> launches `ATrade.Api`, the first real Next.js home page, and an inert
-> `ATrade.Ibkr.Worker` shell while declaring Aspire-managed `Postgres`,
-> `TimescaleDB`, `Redis`, and `NATS` resources.
+> **Status note:** This document describes the target architecture and the
+> current runnable slice. The repository now has an Aspire AppHost graph that
+> launches `ATrade.Api`, `ATrade.Ibkr.Worker`, the Next.js frontend, and
+> Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources.
+> Active implementation work is tracked in `PLAN.md` and Taskplane packets
+> under `tasks/`.
 >
-> **Current backend slice:** `ATrade.Api` now provides stable `GET /health`,
-> `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, and
-> `POST /api/orders/simulate` endpoints. `ATrade.Accounts` still returns
-> deterministic bootstrap JSON, `ATrade.Brokers.Ibkr` now supplies the
-> paper-only broker seam, and `ATrade.Orders` now owns deterministic
-> paper-order simulation. The AppHost graph continues to declare the shared
-> infrastructure resources and now also forwards the safe IBKR paper-mode
-> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`; the worker
-> remains intentionally early, but it now reports safe disabled/paper/
-> rejected-live states instead of idling as a purely inert shell.
+> **Current backend slice:** `ATrade.Api` provides stable `GET /health`,
+> `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
+> `POST /api/orders/simulate`, market-data HTTP endpoints, and a market-data
+> SignalR hub. `ATrade.Accounts` returns bootstrap-safe overview JSON,
+> `ATrade.Brokers.Ibkr` supplies the paper-only broker seam, `ATrade.Orders`
+> owns deterministic paper-order simulation, and `ATrade.MarketData` supplies
+> the current MVP market-data provider until TP-022 replaces production mocks
+> with IBKR/iBeam data. The AppHost graph forwards the safe IBKR paper-mode
+> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`.
 
 ## 1. Shape Of The System
 
@@ -221,6 +216,6 @@ in the way called out at the top.
 This document is `status: active` and therefore authoritative. Any change
 to the infrastructure list, the number of runtime surfaces, the broker or
 data provider for the first phase, or the role of Aspire requires an
-explicit architect-approved edit to this document **and** to `README.md`
+explicit maintainer-approved edit to this document **and** to `README.md`
 in the same change, per the repository-wide Documentation Contract in
 `AGENTS.md`.

@@ -1,6 +1,6 @@
 ---
 status: active
-owner: devops
+owner: maintainer
 updated: 2026-04-29
 summary: Bootstrap status and contract for the cross-platform `start run` entrypoints.
 see_also:

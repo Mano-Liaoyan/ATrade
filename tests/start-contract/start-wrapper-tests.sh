@@ -263,10 +263,10 @@ main() {
   assert_file_contains "$repo_root/scripts/README.md" 'The `run` contract is now bootstrapped in the repository.'
   assert_file_contains "$repo_root/scripts/README.md" './start run'
   assert_file_contains "$repo_root/scripts/README.md" 'are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`'
-  assert_file_contains "$repo_root/README.md" 'Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.'
-  assert_file_contains "$repo_root/PLAN.md" 'Verify `./start.ps1 run` and `./start.cmd run` on a Windows-hosted runtime or CI worker~~'
-  assert_file_contains "$repo_root/plans/devops/CURRENT.md" 'Bootstrap the `start run` wrapper contract and Linux-hosted AppHost startup path'
-  assert_file_contains "$repo_root/plans/devops/CURRENT.md" 'Verify `./start.ps1 run` and `./start.cmd run` on a Windows host or in CI~~'
+  assert_file_contains "$repo_root/README.md" 'Windows PowerShell: `./start.ps1 run`'
+  assert_file_contains "$repo_root/README.md" 'Windows Command Prompt: `./start.cmd run`'
+  assert_file_contains "$repo_root/PLAN.md" 'Keep the repo-local startup contract as `start run`'
+  assert_file_not_exists "$repo_root/plans"
 
   assert_start_run_dispatches
   assert_start_run_script_failure_paths

@@ -1,135 +1,123 @@
 ---
 status: active
-owner: architect
+owner: maintainer
 updated: 2026-04-29
-summary: Human-facing overview of the rebooted ATrade repository and its core operating contracts.
+summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
-  - AGENTS.md
   - PLAN.md
   - docs/INDEX.md
+  - scripts/README.md
+  - docs/architecture/overview.md
+  - docs/architecture/modules.md
+  - docs/architecture/paper-trading-workspace.md
 ---
 
 # ATrade
 
-ATrade is a documentation-first reboot of a personal swing and position trading platform.
+ATrade is a personal swing and position trading platform built as a modular
+monolith with .NET 10, Next.js, and Aspire 13.2.
 
-The target system is a modular monolith with .NET 10 backends, a Next.js frontend, and Aspire 13.2 as the single local orchestrator for apps, workers, and infrastructure.
+The repository currently contains a runnable local stack and a Taskplane work
+queue for the next provider-backed trading workspace increment.
 
-## What This Repository Defines
-
-This repository currently defines the operating model and the first runnable bootstrap slice for the next implementation:
-
-- One semantic command to start the full stack: `start run`
-- Aspire 13.2 as the orchestration layer for backend services, Next.js, and infrastructure
-- An autonomous multi-agent development system that can plan, implement, review, document, and evolve itself
-- A documentation contract where only tracked, current docs may guide agents
-
-This README is intentionally conceptual. It describes the target repo contract, not a finished implementation.
-
-## Stack Contract
-
-The target stack is:
+## Current Stack
 
 - Backend: `.NET 10`
-- Orchestrator: `Aspire 13.2`
 - Frontend: `Next.js`
+- Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
-- Broker/data focus: `IBKR` and `Polygon` for the first delivery phase
-- Agent workflow: GitHub issues, draft PRs, reusable skills, and parallel worktrees
+- Broker/data direction: `IBKR` through local iBeam/Gateway work queued in `TP-021` and `TP-022`
+- Analysis direction: provider-neutral analysis contracts plus LEAN integration queued in `TP-024` and `TP-025`
 
 ## Run Contract
 
-The repository-wide startup contract is the repo-local `start` shim.
+The repository-wide startup contract is the repo-local `start` shim:
 
-The canonical invocations are:
+- Unix-like: `./start run`
+- Windows PowerShell: `./start.ps1 run`
+- Windows Command Prompt: `./start.cmd run`
 
-- On Unix-like systems, the repo will expose `./start run`
-- On Windows, the repo will expose the same contract through `./start.cmd run` and `./start.ps1 run`
-- All variants delegate to Aspire AppHost so one command brings up the API, workers, Next.js, and required infrastructure
+All variants delegate to the Aspire AppHost so one command can bring up the
+API, worker, frontend, and local infrastructure.
 
-In this repository, the phrase `start run` refers to that repo-local shim contract, not the Windows shell built-in.
+## Current Runtime Surface
 
-The `run` contract is bootstrapped in this pass through the repo-local wrappers and a minimal Aspire AppHost. The current runnable slice launches `ATrade.Api`, whose stable surface now includes `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `POST /api/orders/simulate`, deterministic mocked market-data endpoints for trending/candles/indicators, and `/hubs/market-data`; an AppHost-managed `ATrade.Ibkr.Worker` background service that reports safe paper-session states; and the first Next.js paper-trading workspace routes; declares managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph; wires explicit managed-resource references from `api` to the backend infrastructure plus from `ibkr-worker` to its initial `Postgres` / `Redis` / `NATS` dependencies; and forwards the safe paper-only IBKR environment contract into the API/worker graph. `ATrade.Brokers.Ibkr` now provides the official paper-safe broker seam, `ATrade.Orders` now provides deterministic simulation behavior, and `ATrade.MarketData` now provides deterministic mocked market-data behavior for the frontend MVP. Developer-controlled local bind ports, frontend API base URLs, and paper-mode placeholders now come from the repo-level `.env` contract (`.env.example` defaults plus optional ignored `.env` overrides). `scripts/README.md` captures the current surface, and `PLAN.md` tracks the next extensions.
+The current runnable slice includes:
+
+- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, and NATS.
+- `src/ATrade.Api` — browser-facing backend with:
+  - `GET /health`
+  - `GET /api/accounts/overview`
+  - `GET /api/broker/ibkr/status`
+  - `POST /api/orders/simulate`
+  - `GET /api/market-data/trending`
+  - `GET /api/market-data/{symbol}/candles`
+  - `GET /api/market-data/{symbol}/indicators`
+  - `/hubs/market-data`
+- `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell.
+- `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and an MVP watchlist.
+
+The current market-data and watchlist behavior is still the MVP baseline:
+market data is deterministic mocked data and pinned symbols are browser-local.
+The active task queue replaces those pieces with provider abstractions,
+Postgres persistence, real IBKR/iBeam data, IBKR search, and LEAN analysis.
+
+## Active Task Queue
+
+Active Taskplane packets live directly under `tasks/`:
+
+| Task | Purpose |
+|------|---------|
+| `TP-019` | Provider-neutral broker and market-data abstractions |
+| `TP-020` | Postgres-persisted pinned stock/watchlist state |
+| `TP-021` | `voyz/ibeam:latest` runtime and ignored `.env` IBKR login contract |
+| `TP-022` | IBKR/iBeam market-data provider and production mock removal |
+| `TP-023` | IBKR stock search and pin-any-symbol workflow |
+| `TP-024` | Provider-neutral analysis engine abstraction |
+| `TP-025` | LEAN as the first analysis engine provider |
+
+Completed Taskplane packets have been moved to `tasks/archive/`.
 
 ## Repository Map
 
-The intended structure is:
-
 ```text
 ATrade/
-├── AGENTS.md              # Repo-wide autonomous workforce contract
-├── README.md             # Human-facing overview
-├── PLAN.md               # Root bootstrap plan
-├── .pi/agents/       # Role charters for the workforce
-├── .pi/skills/       # Repo-local workflow skills
-├── plans/                # Per-role current plans and archives
-├── docs/                 # Indexed documentation with lifecycle status
-├── scripts/              # Script contracts and later implementations
-├── src/                  # .NET 10 services and AppHost
-├── workers/              # Long-running workers
-└── frontend/             # Next.js application
+├── README.md             # This overview
+├── PLAN.md               # Current implementation plan
+├── docs/                 # Indexed active documentation
+├── scripts/              # Startup and local environment contracts
+├── src/                  # .NET 10 backend modules and AppHost
+├── workers/              # Long-running worker processes
+├── frontend/             # Next.js application
+├── tasks/                # Active Taskplane packets and archive
+└── .pi/                  # Taskplane/Pi runtime configuration and runtime agents
 ```
 
-Some of those directories are only partially realized today. `src/` and `frontend/` already host the current runnable bootstrap slice, `workers/` now contains the first inert `ATrade.Ibkr.Worker` shell, and most feature behavior remains aspirational. `PLAN.md` is the source of truth for what has been bootstrapped already versus what is still queued.
-
-## Read Order
-
-For humans:
-
-1. `README.md`
-2. `PLAN.md`
-3. `docs/INDEX.md`
-4. `scripts/README.md`
-
-For agents:
-
-1. `AGENTS.md`
-2. `.pi/agents/<role>.md`
-3. `.pi/skills/retrieve-plan/SKILL.md`
-4. `plans/<role>/CURRENT.md`
-5. `PLAN.md`
-6. `docs/INDEX.md` and only documents with `status: active`
+The old role-based `plans/` folder, repo-local workforce agent files, and
+repo-local workforce skills have been removed. Remaining `.pi/agents/` files are
+Taskplane runtime agents used by the orchestrator.
 
 ## Documentation Rules
 
-Documentation is part of the product, not an afterthought.
+- Use `docs/INDEX.md` as the documentation discovery layer.
+- Only documents marked `active` are implementation authority.
+- Durable code or runtime changes must update the relevant active docs in the same change.
+- Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
+- No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
 
-- Every durable repository addition must have a corresponding document or indexed reference
-- `docs/INDEX.md` is the discovery layer for agents
-- Only documents marked `active` are authoritative
-- Documents marked `legacy-review-pending` or `obsolete` must not drive implementation decisions
-- When a document becomes stale, it is marked and retained for history rather than silently reused
+## Verification Entry Points
 
-## Autonomous Workforce
+Common verification scripts live under `tests/`:
 
-The repository is designed for an agent workforce made up of:
+- `tests/start-contract/start-wrapper-tests.sh`
+- `tests/apphost/api-bootstrap-tests.sh`
+- `tests/apphost/accounts-feature-bootstrap-tests.sh`
+- `tests/apphost/ibkr-paper-safety-tests.sh`
+- `tests/apphost/market-data-feature-tests.sh`
+- `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `tests/apphost/frontend-trading-workspace-tests.sh`
 
-- Architect
-- Senior Engineer
-- Senior Test Engineer
-- DevOps Engineer
-- Scrum Master
-- Code Reviewer instances
-- Handyman
-- Onboarder
-
-The operating contract for those roles lives in `AGENTS.md`, with per-role details in `.pi/agents/`.
-
-## Current Status
-
-This repository is still in governance-first bootstrap mode, but the bootstrap is now materially underway.
-
-- The old Blazor- and script-oriented docs have been replaced at the top level.
-- The first implementation-facing architecture docs and GitHub coordination artifacts are present under `docs/architecture/`, `docs/process/`, and `.github/`.
-- No legacy implementation docs are carried in this baseline snapshot; if any are restored later, they must be indexed as `legacy-review-pending` before agents may consult them.
-- The current runnable slice is Aspire AppHost + `ATrade.Api` endpoints for `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `POST /api/orders/simulate`, `GET /api/market-data/trending`, candle/indicator queries, and `/hubs/market-data` + an AppHost-managed `ATrade.Ibkr.Worker` background service that reports safe paper-session states + the first Next.js trading workspace UI + named Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources.
-- The first paper-trading workspace slice now implements the staged paper-trading workspace contract with Next.js watchlists persisted in browser `localStorage`, backend-driven mocked trending stocks/ETFs, symbol navigation, `lightweight-charts` candlestick charts, `1m` / `5m` / `1h` / `1D` timeframe switching, moving-average / RSI / MACD indicators, SignalR updates with HTTP fallback, and no-real-orders labeling. Durable backend preferences, provider-backed market data, paper-order storage, and future LEAN signal integration remain later work documented in `docs/architecture/paper-trading-workspace.md`.
-- `ATrade.Accounts` now provides bootstrap-safe read-only overview behavior exposed through the API; `ATrade.Brokers.Ibkr` now provides the paper-only broker adapter seam; `ATrade.Orders` now provides deterministic simulation behavior; `ATrade.MarketData` now provides deterministic mocked market-data behavior; and `ATrade.Ibkr.Worker` is part of the runtime graph with safe status monitoring while still intentionally lacking broader broker, messaging, and database consumers.
-- Direct API startup and endpoint verification are covered by `tests/apphost/api-bootstrap-tests.sh`, `tests/apphost/accounts-feature-bootstrap-tests.sh`, `tests/apphost/ibkr-paper-safety-tests.sh`, and `tests/apphost/market-data-feature-tests.sh`.
-- Direct frontend startup, home-page marker verification, and the trading workspace smoke checks are covered by `tests/apphost/frontend-nextjs-bootstrap-tests.sh` and `tests/apphost/frontend-trading-workspace-tests.sh`.
-- Windows wrapper verification is backed by GitHub Actions on `windows-latest` through `tests/start-contract/start-wrapper-windows.ps1`.
-- The baseline commit establishes the first worktree-capable starting point for parallel delivery under `.worktrees/`.
-- Additional worker processes and deeper backend/frontend feature modules remain future work tracked in `PLAN.md`; the AppHost-managed infrastructure layer is now declared and explicitly referenced by the current `api` and `ibkr-worker` graph resources, even though application behavior still has not started consuming those dependencies.
+Task packets list their own targeted and full verification commands.
 
 ## License
 

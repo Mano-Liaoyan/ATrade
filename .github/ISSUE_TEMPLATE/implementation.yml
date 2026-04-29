@@ -1,5 +1,5 @@
 name: Implementation work
-description: Queue an implementation-ready engineering task for the agent workforce.
+description: Queue an implementation-ready engineering task.
 title: "[Implementation]: "
 labels:
   - agent:ready
@@ -35,21 +35,14 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: owning-role
+  - type: input
+    id: taskplane-task
     attributes:
-      label: Owning role
-      description: Select the role that should pick up the work first.
-      options:
-        - role:senior-engineer
-        - role:senior-test-engineer
-        - role:devops
-        - role:architect
-        - role:scrum-master
-        - role:handyman
-        - role:onboarder
+      label: Taskplane task
+      description: Link the task packet if one already exists.
+      placeholder: tasks/TP-026-example/PROMPT.md
     validations:
-      required: true
+      required: false
 
   - type: dropdown
     id: docs-impact
@@ -89,5 +82,5 @@ body:
       options:
         - label: I reviewed the active docs listed in docs/INDEX.md before filing this implementation issue.
           required: true
-        - label: I understand this issue should move through agent:ready → agent:claimed → agent:in-progress → agent:review.
+        - label: I understand implementation state should be recoverable from the issue/PR and Taskplane packet, not chat history.
           required: true

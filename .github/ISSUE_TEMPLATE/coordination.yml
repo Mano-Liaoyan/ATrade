@@ -1,5 +1,5 @@
 name: Coordination or governance work
-description: Track labels, plans, docs, review flow, or other cross-agent coordination work.
+description: Track labels, docs, review flow, Taskplane packets, or other repository coordination work.
 title: "[Coordination]: "
 labels:
   - agent:ready
@@ -20,7 +20,7 @@ body:
       description: Choose the area this issue affects most.
       options:
         - GitHub labels or templates
-        - Plans or issue scheduling
+        - Taskplane packets or scheduling
         - Documentation contract
         - Review or handoff flow
         - Worktree or branch coordination
@@ -41,29 +41,21 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: owning-role
+  - type: input
+    id: related-taskplane-task
     attributes:
-      label: Owning role
-      description: Select the role that should drive the coordination work.
-      options:
-        - role:scrum-master
-        - role:architect
-        - role:code-reviewer
-        - role:devops
-        - role:onboarder
-        - role:senior-engineer
-        - role:senior-test-engineer
-        - role:handyman
+      label: Related Taskplane task
+      description: Link a task packet if the coordination work has one.
+      placeholder: tasks/TP-026-example/PROMPT.md
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: durable-changes
     attributes:
       label: Durable repository changes
-      description: List the files, docs, or templates you expect to add or update.
-      placeholder: Identify docs, manifests, templates, plan files, or scripts likely to change.
+      description: List the files, docs, templates, or task packets you expect to add or update.
+      placeholder: Identify docs, manifests, templates, task packets, or scripts likely to change.
     validations:
       required: true
 
@@ -105,5 +97,5 @@ body:
       options:
         - label: I will keep issue state in GitHub labels instead of relying on chat history alone.
           required: true
-        - label: I will update the relevant role plan if the work is blocked or materially changes the repo contract.
+        - label: I will update PLAN.md, tasks/CONTEXT.md, or the relevant task packet if the active queue changes.
           required: true
