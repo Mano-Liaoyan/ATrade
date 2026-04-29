@@ -25,12 +25,19 @@ public sealed class PostgresWorkspaceWatchlistSqlTests
     }
 
     [Fact]
-    public void Upsert_DeduplicatesPinsByWorkspaceAndSymbolWithoutReorderingExistingPins()
+    public void Upsert_DeduplicatesPinsByWorkspaceAndProviderIdentityWithoutReorderingExistingPins()
     {
         var sql = PostgresWorkspaceWatchlistSql.UpsertPinnedSymbol;
 
+        Assert.Contains("deleted_provider_duplicate", sql, StringComparison.Ordinal);
+        Assert.Contains("provider = @provider", sql, StringComparison.Ordinal);
+        Assert.Contains("provider_symbol_id = @provider_symbol_id", sql, StringComparison.Ordinal);
+        Assert.Contains("ibkr_conid = @ibkr_conid", sql, StringComparison.Ordinal);
         Assert.Contains("COALESCE(MAX(sort_order) + 1, 0)", sql, StringComparison.Ordinal);
         Assert.Contains("ON CONFLICT (user_id, workspace_id, symbol) DO UPDATE", sql, StringComparison.Ordinal);
+        Assert.Contains("provider = CASE", sql, StringComparison.Ordinal);
+        Assert.Contains("provider_symbol_id = COALESCE(EXCLUDED.provider_symbol_id", sql, StringComparison.Ordinal);
+        Assert.Contains("ibkr_conid = COALESCE(EXCLUDED.ibkr_conid", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("sort_order = EXCLUDED.sort_order", sql, StringComparison.Ordinal);
         Assert.Contains("updated_at_utc = EXCLUDED.updated_at_utc", sql, StringComparison.Ordinal);
     }

@@ -1,6 +1,6 @@
 # TP-023: Add IBKR stock search and pin-any-symbol workflow — Status
 
-**Current Step:** Step 2: Connect search results to persisted watchlists
+**Current Step:** Step 3: Add frontend search and pin UX
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -34,18 +34,18 @@
 ---
 
 ### Step 2: Connect search results to persisted watchlists
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Watchlist command model stores provider metadata
-- [ ] Existing rows remain compatible and can be enriched
-- [ ] Duplicate handling uses provider/conid when available
-- [ ] Search-result pin/restart tests added
-- [ ] Targeted Workspaces tests pass
+- [x] Watchlist command model stores provider metadata
+- [x] Existing rows remain compatible and can be enriched
+- [x] Duplicate handling uses provider/conid when available
+- [x] Search-result pin/restart tests added
+- [x] Targeted Workspaces tests pass
 
 ---
 
 ### Step 3: Add frontend search and pin UX
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `SymbolSearch` component added
 - [ ] Frontend search client/types added
@@ -121,6 +121,8 @@
 | 2026-04-30 | Step 1 started | Backend IBKR search contracts and endpoint work |
 | 2026-04-30 | Step 1 completed | Added provider-neutral search metadata, IBKR secdef search/detail enrichment, API search endpoint validation, and targeted provider/API verification. |
 | 2026-04-30 | Step 2 started | Persist searched symbol metadata into workspace watchlists |
+| 2026-04-30 | Step 2 completed | Watchlist pinning now preserves/enriches provider metadata, deduplicates provider identities, and verifies IBKR metadata across API restart. |
+| 2026-04-30 | Step 3 started | Frontend symbol search and pin UX |
 
 ---
 

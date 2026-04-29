@@ -3,6 +3,7 @@ namespace ATrade.Workspaces;
 public static class WorkspaceWatchlistDefaults
 {
     public const string ManualProvider = "manual";
+    public const string IbkrProvider = "ibkr";
     public const string DefaultCurrency = "USD";
     public const string DefaultAssetClass = "STK";
 }
