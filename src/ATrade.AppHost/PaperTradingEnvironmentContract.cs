@@ -9,8 +9,25 @@ public sealed record PaperTradingEnvironmentContract(
     string GatewayPort,
     string GatewayImage,
     string PaperAccountId,
+    string IbkrUsername,
+    string IbkrPassword,
     string? GatewayTimeoutSeconds)
 {
+    private const string FakeIbkrUsernamePlaceholder = "IBKR_USERNAME";
+    private const string FakeIbkrPasswordPlaceholder = "IBKR_PASSWORD";
+
+    public bool IsBrokerIntegrationEnabled =>
+        bool.TryParse(BrokerIntegrationEnabled, out var enabled) && enabled;
+
+    public bool HasConfiguredIbeamCredentials =>
+        HasRealCredentialValue(IbkrUsername, FakeIbkrUsernamePlaceholder) &&
+        HasRealCredentialValue(IbkrPassword, FakeIbkrPasswordPlaceholder);
+
+    public bool ShouldStartIbeamContainer =>
+        IsBrokerIntegrationEnabled &&
+        HasConfiguredGatewayImage &&
+        HasConfiguredIbeamCredentials;
+
     public bool HasConfiguredGatewayImage =>
         !string.IsNullOrWhiteSpace(GatewayImage) &&
         !GatewayImage.Contains("example.invalid", StringComparison.OrdinalIgnoreCase);
@@ -30,7 +47,7 @@ public sealed record PaperTradingEnvironmentContract(
         image = string.Empty;
         tag = string.Empty;
 
-        if (!HasConfiguredGatewayImage)
+        if (!ShouldStartIbeamContainer)
         {
             return false;
         }
@@ -63,7 +80,15 @@ public sealed record PaperTradingEnvironmentContract(
             GatewayPort: ResolveRequiredValue(values, IbkrGatewayEnvironmentVariables.GatewayPort, contractPath),
             GatewayImage: ResolveRequiredValue(values, IbkrGatewayEnvironmentVariables.GatewayImage, contractPath),
             PaperAccountId: ResolveRequiredValue(values, IbkrGatewayEnvironmentVariables.PaperAccountId, contractPath),
+            IbkrUsername: ResolveOptionalValue(values, IbkrGatewayEnvironmentVariables.Username) ?? string.Empty,
+            IbkrPassword: ResolveOptionalValue(values, IbkrGatewayEnvironmentVariables.Password) ?? string.Empty,
             GatewayTimeoutSeconds: ResolveOptionalValue(values, IbkrGatewayEnvironmentVariables.GatewayTimeoutSeconds));
+    }
+
+    private static bool HasRealCredentialValue(string? value, string fakePlaceholder)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            !string.Equals(value.Trim(), fakePlaceholder, StringComparison.OrdinalIgnoreCase);
     }
 
     private static Dictionary<string, string> LoadMergedContractValues(string contractPath)

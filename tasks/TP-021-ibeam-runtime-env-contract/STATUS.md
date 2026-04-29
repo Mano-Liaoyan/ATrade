@@ -35,14 +35,14 @@
 ---
 
 ### Step 2: Wire `voyz/ibeam:latest` into AppHost safely
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Environment contract loads new iBeam variables safely
-- [ ] AppHost declares iBeam container when integration is enabled
-- [ ] Secrets are not exposed in logs/status/resource names
-- [ ] Existing AppHost resource wiring preserved
-- [ ] Disabled-by-default and missing-credential behavior remains safe
-- [ ] Targeted AppHost resource tests pass
+- [x] Environment contract loads new iBeam variables safely
+- [x] AppHost declares iBeam container when integration is enabled
+- [x] Secrets are not exposed in logs/status/resource names
+- [x] Existing AppHost resource wiring preserved
+- [x] Disabled-by-default and missing-credential behavior remains safe
+- [x] Targeted AppHost resource tests pass
 
 ---
 
@@ -118,6 +118,7 @@
 | 2026-04-29 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-04-29 20:42 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 20:42 | Step 0 started | Preflight |
+| 2026-04-29 21:58 | Task started | Runtime V2 lane-runner execution |
 
 ---
 

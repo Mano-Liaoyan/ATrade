@@ -8,5 +8,10 @@ public static class IbkrGatewayEnvironmentVariables
     public const string GatewayPort = "ATRADE_IBKR_GATEWAY_PORT";
     public const string GatewayImage = "ATRADE_IBKR_GATEWAY_IMAGE";
     public const string PaperAccountId = "ATRADE_IBKR_PAPER_ACCOUNT_ID";
+    public const string Username = "ATRADE_IBKR_USERNAME";
+    public const string Password = "ATRADE_IBKR_PASSWORD";
     public const string GatewayTimeoutSeconds = "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS";
+
+    public const string IbeamAccount = "IBEAM_ACCOUNT";
+    public const string IbeamPassword = "IBEAM_PASSWORD";
 }
