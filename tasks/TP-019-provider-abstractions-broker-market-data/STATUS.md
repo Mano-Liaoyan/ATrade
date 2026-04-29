@@ -1,6 +1,6 @@
 # TP-019: Introduce provider-neutral broker and market-data abstractions — Status
 
-**Current Step:** Step 2: Add provider-neutral market-data contracts
+**Current Step:** Step 3: Wire provider composition through the API and tests
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -34,18 +34,18 @@
 ---
 
 ### Step 2: Add provider-neutral market-data contracts
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Separate market-data contracts from the concrete mocked provider
-- [ ] Preserve current HTTP payload behavior through a swappable provider layer
-- [ ] Keep existing mocked provider only as temporary compatibility until TP-022
-- [ ] Add provider-unavailable/not-configured state handling
-- [ ] Targeted MarketData build passes
+- [x] Separate market-data contracts from the concrete mocked provider
+- [x] Preserve current HTTP payload behavior through a swappable provider layer
+- [x] Keep existing mocked provider only as temporary compatibility until TP-022
+- [x] Add provider-unavailable/not-configured state handling
+- [x] Targeted MarketData build passes
 
 ---
 
 ### Step 3: Wire provider composition through the API and tests
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] API composition depends on provider-neutral services
 - [ ] Provider swapability tests added
@@ -109,6 +109,8 @@
 | 2026-04-29 20:30 | Step 1 started | Broker provider abstractions |
 | 2026-04-29 20:50 | Step 1 complete | Added `ATrade.Brokers`, neutral broker contracts, IBKR adapter implementation, and passing targeted broker test/build. |
 | 2026-04-29 20:50 | Step 2 started | Market-data provider abstractions |
+| 2026-04-29 21:05 | Step 2 complete | Added market-data provider contracts, compatibility facades over temporary mock providers, unavailable/not-configured states, and passing targeted MarketData build. |
+| 2026-04-29 21:05 | Step 3 started | API provider composition and tests |
 
 ---
 
