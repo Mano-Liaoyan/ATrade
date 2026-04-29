@@ -1,6 +1,6 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 2: Expose backend watchlist API endpoints
+**Current Step:** Step 3: Move the frontend watchlist to the backend source of truth
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -34,7 +34,7 @@
 ---
 
 ### Step 2: Expose backend watchlist API endpoints
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Workspaces module registered in API
 - [x] Read/write/pin/unpin watchlist endpoints mapped
@@ -45,11 +45,12 @@
 ---
 
 ### Step 3: Move the frontend watchlist to the backend source of truth
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Frontend watchlist API client added
 - [ ] Pin/unpin UI calls backend API
 - [ ] localStorage demoted to cache or one-time migration source
+- [ ] Existing localStorage pins migrated once after successful backend load
 - [ ] Backend unavailable/error states handled honestly
 - [ ] Frontend build passes
 
@@ -121,6 +122,9 @@
 | 2026-04-29 21:34 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 22:20 | Step 1 complete | Workspaces module/schema/repository/tests added; targeted tests/build passed (17 tests). |
 | 2026-04-29 22:20 | Step 2 started | Backend watchlist API endpoints. |
+| 2026-04-29 22:25 | Step 2 complete | Backend watchlist endpoints already committed in checkpoint; status reconciled before frontend step. |
+| 2026-04-29 21:43 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-29 21:43 | Step 3 started | Move the frontend watchlist to the backend source of truth |
 
 ---
 
