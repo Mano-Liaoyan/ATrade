@@ -1,6 +1,6 @@
 # TP-019: Introduce provider-neutral broker and market-data abstractions — Status
 
-**Current Step:** Step 4: Document the provider abstraction contract
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -56,17 +56,17 @@
 ---
 
 ### Step 4: Document the provider abstraction contract
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Provider abstraction architecture doc created and indexed
-- [ ] Module docs updated for broker and market-data seams
-- [ ] Paper-trading workspace docs updated for future iBeam/LEAN plug-in boundaries
-- [ ] Overview/README reviewed and updated if stale
+- [x] Provider abstraction architecture doc created and indexed
+- [x] Module docs updated for broker and market-data seams
+- [x] Paper-trading workspace docs updated for future iBeam/LEAN plug-in boundaries
+- [x] Overview/README reviewed and updated if stale
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Docker-dependent runtime test passes or cleanly skips
@@ -113,6 +113,8 @@
 | 2026-04-29 21:05 | Step 3 started | API provider composition and tests |
 | 2026-04-29 21:25 | Step 3 complete | API broker endpoint now uses `IBrokerProvider`; provider swapability tests and provider abstraction shell tests pass; endpoint behavior smoke tests pass. |
 | 2026-04-29 21:25 | Step 4 started | Provider abstraction documentation |
+| 2026-04-29 21:45 | Step 4 complete | Added provider abstraction architecture doc and updated index, module map, overview, paper workspace docs, and README. |
+| 2026-04-29 21:45 | Step 5 started | Full verification |
 
 ---
 

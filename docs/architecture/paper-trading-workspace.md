@@ -7,6 +7,7 @@ see_also:
   - ../INDEX.md
   - overview.md
   - modules.md
+  - provider-abstractions.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -17,13 +18,15 @@ see_also:
 > **Status note:** This document still defines the staged architecture and
 > safety contract for the broader paper-trading workspace, and the first
 > paper-trading UI slice is now implemented against deterministic mocked data.
-> The current repository ships `ATrade.Brokers.Ibkr` as a paper-only broker
-> adapter, `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
+> The current repository now also defines provider-neutral broker and
+> market-data contracts so IBKR/iBeam and future analysis providers plug in
+> behind API/frontend-stable seams. The current repository ships
+> `ATrade.Brokers.Ibkr` as a paper-only broker adapter, `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, a `/hubs/market-data` SignalR
-> hub, deterministic mocked market-data services, AppHost-driven paper-safe
-> broker configuration wiring, and a Next.js workspace with trending symbols,
+> hub, deterministic mocked market-data providers behind compatibility services,
+> AppHost-driven paper-safe broker configuration wiring, and a Next.js workspace with trending symbols,
 > local browser watchlists, `lightweight-charts` candlesticks, timeframe
 > switching, indicators, and SignalR-to-HTTP fallback behavior. Durable
 > paper-order storage, backend-owned user preferences, provider-backed market
@@ -49,7 +52,10 @@ The slice is governed by five non-negotiable rules:
    tokens, and real account identifiers must never be committed.
 5. **Mocked market/trending data is acceptable now; unsafe realism is not.**
    Until the follow-on provider work lands, the UI may rely on deterministic
-   mocked quotes, bars, watchlists, and trending signals.
+   mocked quotes, bars, watchlists, and trending signals only through the
+   provider abstraction layer. Once a real provider is selected, missing local
+   runtime or credentials must surface as safe not-configured/unavailable
+   states rather than silently falling back to fake data.
 
 ## 2. Product Shape
 
@@ -101,11 +107,13 @@ The current backend slice exposes `GET /api/broker/ibkr/status`,
 `GET /api/market-data/{symbol}/candles?timeframe=...`,
 `GET /api/market-data/{symbol}/indicators?timeframe=...`, and the
 `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
-strictly server-side. The market-data endpoints serve deterministic mocked
-stocks/ETFs, OHLCV candles for `1m`, `5m`, `1h`, and `1D`, and moving-average /
-RSI / MACD payloads without external providers. SignalR is the outward-facing
-streaming layer for browsers; NATS remains the internal event backbone between
-API and workers.
+strictly server-side. The broker endpoint resolves the provider-neutral
+`IBrokerProvider` contract. The market-data endpoints serve deterministic
+mocked stocks/ETFs, OHLCV candles for `1m`, `5m`, `1h`, and `1D`, and
+moving-average / RSI / MACD payloads through `IMarketDataService`, which now
+composes `IMarketDataProvider` instead of binding endpoint code to the mock.
+SignalR is the outward-facing streaming layer for browsers; NATS remains the
+internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -113,16 +121,19 @@ The paper-trading slice extends existing planned responsibilities as follows:
 
 - `ATrade.Accounts` owns paper account projections, balances, positions, and
   broker-session summaries
+- `ATrade.Brokers` owns the provider-neutral broker identity, capability,
+  account-mode, and status contracts shared by API, worker, and adapters
 - `ATrade.Brokers.Ibkr` owns typed paper-mode configuration, the official
   Gateway session/status client boundary, paper-only guardrails, and the safe
-  broker status shape shared by the API and worker
+  `IBrokerProvider` implementation shared by the API and worker
 - `ATrade.Orders` owns paper-order validation, lifecycle state, and simulated
   fills; the current backend slice already returns deterministic simulated
   fills directly from this module
-- `ATrade.MarketData` owns provider-neutral quote/bar contracts and historical
-  chart queries; the current slice provides deterministic mocked symbol,
-  candle, indicator, trending-factor, and SignalR snapshot contracts without
-  Polygon, TimescaleDB, Redis, NATS, LEAN, or paid news/data services
+- `ATrade.MarketData` owns provider-neutral quote/bar contracts, provider
+  status/error states, symbol-search readiness hooks, and historical chart
+  queries; the current slice provides deterministic temporary symbol, candle,
+  indicator, trending-factor, and SignalR snapshot provider implementations
+  without Polygon, TimescaleDB, Redis, NATS, LEAN, or paid news/data services
 - `ATrade.Ibkr.Worker` owns IBKR Gateway session management and any future
   paper-safe broker polling/streaming work
 
@@ -141,8 +152,8 @@ responsibilities are:
 - read paper-mode broker configuration from the ignored local `.env`
 - establish or verify a session against the official IBKR Gateway APIs
 - publish normalized session state changes onto NATS
-- expose a provider-neutral status shape that `ATrade.Api` can project to the
-  frontend
+- expose the provider-neutral `BrokerProviderStatus` shape that `ATrade.Api`
+  can project to the frontend
 
 In the currently implemented backend slice, the worker and API share the same
 `ATrade.Brokers.Ibkr` status service so disabled and rejected-live outcomes are
@@ -170,10 +181,15 @@ source**:
 
 - the frontend consumes provider-neutral quotes/bars/trending updates from
   `ATrade.Api` over HTTP + SignalR
-- the backend may later source market data from the official IBKR Gateway APIs
-  when paper-safe subscriptions are wired in
+- `ATrade.Api` talks to `IMarketDataService` / `IMarketDataStreamingService`,
+  which compose swappable provider contracts under `ATrade.MarketData`
+- the backend may later source market data from the official IBKR Gateway or
+  iBeam APIs when paper-safe subscriptions are wired in
 - until that provider work lands, the API may serve deterministic mocked quote
   and bar streams with the same payload shape
+- after a real provider is selected, local runtime or credential gaps must be
+  reported as provider `not-configured` / `unavailable` states rather than as
+  automatic mock fallback
 
 This keeps the UI contract stable while allowing the market-data source to move
 from mocked data to real paper-safe streaming later.
@@ -345,14 +361,19 @@ pretends they came from a real provider.
 
 ## 10. Future LEAN Seam
 
-LEAN is a **future seam**, not a dependency of the first paper-trading slice.
+LEAN is a **future plug-in seam**, not a dependency of the first
+paper-trading slice.
 
-The architecture should therefore preserve a provider-neutral signal contract:
+The architecture should therefore preserve provider-neutral market-data and
+signal contracts:
 
 - market/trending signals are normalized before they reach the UI
 - NATS events and persisted factor/signal records should not assume LEAN types
 - the frontend should render signal source metadata without caring whether the
   source is mocked logic, internal analytics, or future LEAN integration
+- future LEAN work belongs behind analysis-engine contracts that consume the
+  normalized market-data/provider shapes rather than becoming an API or UI
+  assumption
 
 When LEAN is introduced later, it should plug into the existing market-data /
 strategy signal boundary rather than forcing the paper-trading workspace to be

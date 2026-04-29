@@ -6,6 +6,7 @@ summary: Target high-level architecture for the ATrade modular monolith, Aspire 
 see_also:
   - ../INDEX.md
   - modules.md
+  - provider-abstractions.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -24,11 +25,13 @@ see_also:
 > `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, market-data HTTP endpoints, and a market-data
 > SignalR hub. `ATrade.Accounts` returns bootstrap-safe overview JSON,
-> `ATrade.Brokers.Ibkr` supplies the paper-only broker seam, `ATrade.Orders`
-> owns deterministic paper-order simulation, and `ATrade.MarketData` supplies
-> the current MVP market-data provider until TP-022 replaces production mocks
-> with IBKR/iBeam data. The AppHost graph forwards the safe IBKR paper-mode
-> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`.
+> `ATrade.Brokers` defines the provider-neutral broker contract,
+> `ATrade.Brokers.Ibkr` supplies the paper-only IBKR implementation,
+> `ATrade.Orders` owns deterministic paper-order simulation, and
+> `ATrade.MarketData` supplies provider-neutral market-data contracts plus the
+> current temporary deterministic provider until TP-022 replaces production
+> mocks with IBKR/iBeam data. The AppHost graph forwards the safe IBKR
+> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`.
 
 ## 1. Shape Of The System
 
@@ -178,8 +181,9 @@ integrations, and only those two:
 - **Polygon** — market data (historical bars and real-time streams)
 
 Both integrations live behind provider-agnostic module boundaries on the
-backend side (see `modules.md` → *Broker* and *Market Data*), so additional
-providers can be added later without reshaping the rest of the monolith.
+backend side (see `provider-abstractions.md` and `modules.md` → *Broker* /
+*Market Data*), so additional providers can be added later without reshaping
+the rest of the monolith.
 
 The next staged feature direction is a **paper-trading workspace** inside the
 Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
@@ -189,9 +193,10 @@ through `ATrade.Api`, while the broader UI, SignalR fan-out, and market/trending
 surfaces remain future work. The slice keeps the current modular-monolith and
 Aspire contracts intact by routing browser traffic through `ATrade.Api`, using
 SignalR for browser-facing real-time updates, using NATS for internal fan-out,
-keeping orders simulated rather than live, and treating official IBKR Gateway
-session / paper-market connectivity plus the future LEAN signal source as seams
-rather than as reasons to add new runtime surfaces.
+keeping orders simulated rather than live, and treating official IBKR Gateway /
+iBeam connectivity plus the future LEAN signal source as plug-ins behind
+provider-neutral contracts rather than as reasons to add new runtime surfaces
+or API/UI assumptions.
 
 Until those modules, workers, and infrastructure integrations become
 functional rather than scaffolded, the rest of this document is aspirational
@@ -206,6 +211,8 @@ in the way called out at the top.
   bootstrap status of the AppHost.
 - `modules.md` — module-by-module map of the backend, workers, and
   frontend surfaces referenced throughout this document.
+- `provider-abstractions.md` — broker and market-data provider switching
+  contract.
 - `paper-trading-workspace.md` — paper-only workspace architecture,
   streaming boundaries, charting-library decision, and future LEAN seam.
 - `../INDEX.md` — documentation discovery layer; the architecture docs
