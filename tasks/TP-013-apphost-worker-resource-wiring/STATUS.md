@@ -1,6 +1,6 @@
 # TP-013: Wire the IBKR worker and AppHost resource consumers — Status
 
-**Current Step:** Step 1: Wire the worker and resource references in AppHost
+**Current Step:** Step 2: Add manifest verification for the new runtime graph
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -23,19 +23,19 @@
 ---
 
 ### Step 1: Wire the worker and resource references in AppHost
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add the IBKR worker project reference to AppHost
-- [ ] Assign named variables for managed infrastructure resources in AppHost
-- [ ] Add `ibkr-worker` to the AppHost graph
-- [ ] Reference expected infrastructure from `api` and `ibkr-worker`
-- [ ] Preserve frontend, port, and container-runtime safeguards
-- [ ] Targeted build passes
+- [x] Add the IBKR worker project reference to AppHost
+- [x] Assign named variables for managed infrastructure resources in AppHost
+- [x] Add `ibkr-worker` to the AppHost graph
+- [x] Reference expected infrastructure from `api` and `ibkr-worker`
+- [x] Preserve frontend, port, and container-runtime safeguards
+- [x] Targeted build passes
 
 ---
 
 ### Step 2: Add manifest verification for the new runtime graph
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/apphost-worker-resource-wiring-tests.sh`
 - [ ] Verify manifest contains `ibkr-worker` plus the existing graph resources

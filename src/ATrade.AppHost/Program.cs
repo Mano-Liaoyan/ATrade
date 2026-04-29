@@ -9,24 +9,33 @@ const string timescaleTuneCpuCount = "2";
 var localPortContract = LocalDevelopmentPortContractLoader.Load();
 var builder = DistributedApplication.CreateBuilder(args);
 
-builder.AddPostgres("postgres")
+var postgres = builder.AddPostgres("postgres")
     .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
 
 // TimescaleDB runs the Postgres protocol, so model it as a dedicated Postgres server
 // resource that uses the TimescaleDB container image in the local Aspire graph.
-builder.AddPostgres("timescaledb")
+var timescaledb = builder.AddPostgres("timescaledb")
     .WithImage("timescale/timescaledb", "latest-pg17")
     .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
     .WithEnvironment("TS_TUNE_MEMORY", timescaleTuneMemory)
     .WithEnvironment("TS_TUNE_NUM_CPUS", timescaleTuneCpuCount);
 
-builder.AddRedis("redis")
+var redis = builder.AddRedis("redis")
     .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
-builder.AddNats("nats")
+var nats = builder.AddNats("nats")
     .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
 
 builder.AddProject<Projects.ATrade_Api>("api")
+    .WithReference(postgres)
+    .WithReference(timescaledb)
+    .WithReference(redis)
+    .WithReference(nats)
     .WithExternalHttpEndpoints();
+
+builder.AddProject<Projects.ATrade_Ibkr_Worker>("ibkr-worker")
+    .WithReference(postgres)
+    .WithReference(redis)
+    .WithReference(nats);
 
 builder.AddJavaScriptApp("frontend", localPortContract.FrontendDirectory, "dev")
     .WithNpm()
