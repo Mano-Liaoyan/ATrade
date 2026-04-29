@@ -1,6 +1,6 @@
 # TP-013: Wire the IBKR worker and AppHost resource consumers — Status
 
-**Current Step:** Step 2: Add manifest verification for the new runtime graph
+**Current Step:** Step 3: Update docs and milestone state
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -35,18 +35,18 @@
 ---
 
 ### Step 2: Add manifest verification for the new runtime graph
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/apphost-worker-resource-wiring-tests.sh`
-- [ ] Verify manifest contains `ibkr-worker` plus the existing graph resources
-- [ ] Verify manifest proves expected resource references for `api` and `ibkr-worker`
-- [ ] Keep new verification engine-independent
-- [ ] Targeted manifest test passes
+- [x] Create `tests/apphost/apphost-worker-resource-wiring-tests.sh`
+- [x] Verify manifest contains `ibkr-worker` plus the existing graph resources
+- [x] Verify manifest proves expected resource references for `api` and `ibkr-worker`
+- [x] Keep new verification engine-independent
+- [x] Targeted manifest test passes
 
 ---
 
 ### Step 3: Update docs and milestone state
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `scripts/README.md` updated for worker/resource-consumer wiring
 - [ ] `docs/architecture/overview.md` current-slice wording updated
