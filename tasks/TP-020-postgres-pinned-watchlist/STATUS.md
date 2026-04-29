@@ -1,6 +1,6 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 1: Add the workspace persistence module and schema
+**Current Step:** Step 2: Expose backend watchlist API endpoints
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -34,13 +34,13 @@
 ---
 
 ### Step 2: Expose backend watchlist API endpoints
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Workspaces module registered in API
-- [ ] Read/write/pin/unpin watchlist endpoints mapped
-- [ ] Symbol validation and normalization added
-- [ ] Stable error handling for invalid requests/database unavailability added
-- [ ] Existing API endpoints preserved
+- [x] Workspaces module registered in API
+- [x] Read/write/pin/unpin watchlist endpoints mapped
+- [x] Symbol validation and normalization added
+- [x] Stable error handling for invalid requests/database unavailability added
+- [x] Existing API endpoints preserved
 
 ---
 
@@ -119,6 +119,8 @@
 | 2026-04-29 22:15 | Step 0 complete | Required paths verified; TP-018/TP-019 outputs confirmed; current frontend watchlist localStorage authority and AppHost API Postgres reference confirmed. |
 | 2026-04-29 22:15 | Step 1 started | Workspace persistence module and schema |
 | 2026-04-29 21:34 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-29 22:20 | Step 1 complete | Workspaces module/schema/repository/tests added; targeted tests/build passed (17 tests). |
+| 2026-04-29 22:20 | Step 2 started | Backend watchlist API endpoints. |
 
 ---
 
