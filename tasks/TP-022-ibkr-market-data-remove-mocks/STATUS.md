@@ -125,6 +125,8 @@
 | 2026-04-29 22:21 | Step 0 started | Preflight |
 | 2026-04-30 | Step 2 source audit | `git grep -n -E 'MockMarketData|mock-deterministic|Mocked' -- src frontend` returned no matches |
 | 2026-04-30 | Step 6 source audit | `git grep -n -E 'MockMarketData|mock-deterministic|Mocked' -- src frontend` and broad mocked-market-data audit returned no production matches |
+| 2026-04-29 22:46 | Worker iter 1 | done in 1490s, tools: 271 |
+| 2026-04-29 22:46 | Task complete | .DONE created |
 
 ---
 
