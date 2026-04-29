@@ -36,14 +36,18 @@ assert_file_contains() {
   fi
 }
 
-assert_no_lean_references() {
-  local search_path
-  for search_path in "$repo_root/src/ATrade.Api" "$repo_root/src/ATrade.Analysis"; do
-    if grep -RIn --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git -E 'QuantConnect|LEAN|Lean' "$search_path"; then
-      printf 'API and core analysis contracts must not reference LEAN yet: %s\n' "$search_path" >&2
-      return 1
-    fi
-  done
+assert_provider_neutral_contract_boundaries() {
+  if grep -RIn --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git -E 'QuantConnect|LEAN|Lean' "$repo_root/src/ATrade.Analysis"; then
+    printf 'core analysis contracts must remain provider-neutral and must not reference LEAN.\n' >&2
+    return 1
+  fi
+
+  if grep -RIn --exclude-dir=bin --exclude-dir=obj --exclude-dir=.git -E 'QuantConnect|LeanAnalysisResult|LeanAnalysisRequest|QuantConnect' "$repo_root/src/ATrade.Api"; then
+    printf 'API contracts must not expose LEAN-specific DTOs or QuantConnect types.\n' >&2
+    return 1
+  fi
+
+  assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'AddLeanAnalysisEngine(builder.Configuration)'
 }
 
 cleanup() {
@@ -211,7 +215,7 @@ main() {
   fi
 
   assert_contract_sources
-  assert_no_lean_references
+  assert_provider_neutral_contract_boundaries
   dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
   start_api_without_analysis_engine
   assert_analysis_discovery_response

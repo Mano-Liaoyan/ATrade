@@ -1,6 +1,6 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
-**Current Step:** Step 4: Add LEAN verification
+**Current Step:** Step 5: Update docs for LEAN analysis
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -57,19 +57,19 @@
 ---
 
 ### Step 4: Add LEAN verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] LEAN analysis shell test added
-- [ ] Provider/configuration registration verified
-- [ ] Provider-neutral API/frontend contracts verified
-- [ ] Runtime execution or clean skip verified
-- [ ] No order-routing/live-trading invocation verified
-- [ ] Frontend analysis markers tested
+- [x] LEAN analysis shell test added
+- [x] Provider/configuration registration verified
+- [x] Provider-neutral API/frontend contracts verified
+- [x] Runtime execution or clean skip verified
+- [x] No order-routing/live-trading invocation verified
+- [x] Frontend analysis markers tested
 
 ---
 
 ### Step 5: Update docs for LEAN analysis
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Analysis engines doc updated for LEAN implementation
 - [ ] Paper-trading workspace doc updated
