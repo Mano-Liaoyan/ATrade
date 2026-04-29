@@ -1,6 +1,6 @@
 # TP-019: Introduce provider-neutral broker and market-data abstractions — Status
 
-**Current Step:** Step 3: Wire provider composition through the API and tests
+**Current Step:** Step 4: Document the provider abstraction contract
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -45,18 +45,18 @@
 ---
 
 ### Step 3: Wire provider composition through the API and tests
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] API composition depends on provider-neutral services
-- [ ] Provider swapability tests added
-- [ ] Provider abstraction shell test added
-- [ ] Existing health/accounts/broker/orders/market-data behavior preserved
-- [ ] Targeted provider abstraction tests pass
+- [x] API composition depends on provider-neutral services
+- [x] Provider swapability tests added
+- [x] Provider abstraction shell test added
+- [x] Existing health/accounts/broker/orders/market-data behavior preserved
+- [x] Targeted provider abstraction tests pass
 
 ---
 
 ### Step 4: Document the provider abstraction contract
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Provider abstraction architecture doc created and indexed
 - [ ] Module docs updated for broker and market-data seams
@@ -111,6 +111,8 @@
 | 2026-04-29 20:50 | Step 2 started | Market-data provider abstractions |
 | 2026-04-29 21:05 | Step 2 complete | Added market-data provider contracts, compatibility facades over temporary mock providers, unavailable/not-configured states, and passing targeted MarketData build. |
 | 2026-04-29 21:05 | Step 3 started | API provider composition and tests |
+| 2026-04-29 21:25 | Step 3 complete | API broker endpoint now uses `IBrokerProvider`; provider swapability tests and provider abstraction shell tests pass; endpoint behavior smoke tests pass. |
+| 2026-04-29 21:25 | Step 4 started | Provider abstraction documentation |
 
 ---
 
