@@ -1,6 +1,6 @@
 # TP-014: Add the first read-only Accounts backend slice — Status
 
-**Current Step:** Step 1: Implement the read-only Accounts module behavior
+**Current Step:** Step 2: Expose the Accounts overview through the API
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -23,19 +23,19 @@
 ---
 
 ### Step 1: Implement the read-only Accounts module behavior
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add deterministic Accounts overview response types
-- [ ] Add bootstrap-safe Accounts overview service/provider
-- [ ] Add minimal Accounts module DI registration
-- [ ] Preserve a compile-time module anchor if useful
-- [ ] Keep persistence, broker/data clients, and fake trading data out of scope
-- [ ] Targeted Accounts project build passes
+- [x] Add deterministic Accounts overview response types
+- [x] Add bootstrap-safe Accounts overview service/provider
+- [x] Add minimal Accounts module DI registration
+- [x] Preserve a compile-time module anchor if useful
+- [x] Keep persistence, broker/data clients, and fake trading data out of scope
+- [x] Targeted Accounts project build passes
 
 ---
 
 ### Step 2: Expose the Accounts overview through the API
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add API project reference to `ATrade.Accounts`
 - [ ] Register Accounts module during API startup
@@ -109,6 +109,7 @@
 | 2026-04-29 00:22 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 00:22 | Step 0 started | Preflight |
 | 2026-04-29 00:24 | Step 0 completed | Preflight checks verified current shell state and TP-013 dependency |
+| 2026-04-29 00:29 | Step 1 completed | Added deterministic Accounts overview types, bootstrap provider, DI registration, and successful project build |
 
 ---
 
