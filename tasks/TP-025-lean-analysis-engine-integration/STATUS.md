@@ -1,7 +1,7 @@
 # TP-025: Integrate LEAN as the first analysis engine provider — Status
 
 **Current Step:** Step 7: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 3
 **Review Counter:** 0
@@ -91,11 +91,11 @@
 ---
 
 ### Step 7: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -110,7 +110,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
-| Selected LEAN integration approach: invoke the official LEAN runtime through a configured LEAN CLI command or Docker-backed CLI/container workspace. The provider will generate a temporary analysis-only LEAN workspace from ATrade normalized bars, return provider-neutral results, and report unavailable/skip states when the runtime is absent instead of faking production output. Local check found Docker installed and `lean` CLI absent. | Implement in `ATrade.Analysis.Lean`; document runtime/config placeholders. | Step 0 preflight |
+| Selected LEAN integration approach: invoke the official LEAN runtime through a configured LEAN CLI command or Docker-backed CLI/container workspace. The provider will generate a temporary analysis-only LEAN workspace from ATrade normalized bars, return provider-neutral results, and report unavailable/skip states when the runtime is absent instead of faking production output. Local check found Docker installed and `lean` CLI absent. | Implemented in `ATrade.Analysis.Lean`; documented runtime/config placeholders. | Step 0 preflight |
+| Local verification environment does not have the official `lean` CLI installed. LEAN adapter tests exercise the generated-workspace path with a deterministic runtime fixture, and `tests/apphost/lean-analysis-engine-tests.sh` emits a clean optional-runtime skip. | Expected local-runtime gap; no blocker because committed tests do not require LEAN credentials/runtime. | Step 4/6 verification |
 
 ---
 
@@ -132,4 +133,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+Verification completed 2026-04-30: full repository test command passed, optional LEAN runtime check cleanly skipped because `lean` CLI is absent, frontend build passed, and `dotnet build ATrade.sln --nologo --verbosity minimal` passed with 0 warnings/errors.
