@@ -22,10 +22,11 @@ see_also:
 > `workers/ATrade.Ibkr.Worker` now exist.
 > `ATrade.Accounts` provides the deterministic bootstrap overview endpoint,
 > `ATrade.Brokers` defines the provider-neutral broker contract,
-> `ATrade.Brokers.Ibkr` implements that contract with the paper-only IBKR
+> `ATrade.Brokers.Ibkr` implements that contract with the paper-only IBKR/iBeam
 > status adapter, `ATrade.Orders` now owns deterministic paper-order
-> simulation, and `ATrade.Ibkr.Worker` now reports safe disabled/paper/rejected
-> status while remaining intentionally light on broker-side state.
+> simulation, and `ATrade.Ibkr.Worker` now reports safe disabled,
+> credentials-missing, configured-iBeam, connecting/authenticated/degraded,
+> and rejected-live statuses while remaining intentionally light on broker-side state.
 > `ATrade.MarketData` now provides provider-neutral market-data contracts,
 > compatibility services, deterministic temporary provider implementations,
 > and SignalR snapshot contracts for the first workspace slice. `ATrade.Workspaces`
@@ -41,8 +42,9 @@ see_also:
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
 > `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as managed infrastructure
-> resources; forwards the safe IBKR paper-trading environment contract into
-> `api` / `ibkr-worker`; and keeps the browser-facing backend slice focused on
+> resources; forwards the safe IBKR/iBeam paper-trading environment contract into
+> `api` / `ibkr-worker`; can add the optional `ibkr-gateway` `voyz/ibeam:latest`
+> container only when ignored `.env` credentials enable integration; and keeps the browser-facing backend slice focused on
 > `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/{symbol}/candles`,
@@ -87,10 +89,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.Api`, `ATrade.Ibkr.Worker`, and the bootstrap Next.js frontend home
   page; declares the four shared infrastructure resources; sends `api` the
   full backend infrastructure set; sends `ibkr-worker` its current
-  `Postgres` / `Redis` / `NATS` references; forwards the safe paper-mode IBKR
-  environment contract to the API and worker; and only declares an
-  `ibkr-gateway` container when a non-placeholder official image is supplied
-  locally — see `src/ATrade.AppHost/Program.cs`.
+  `Postgres` / `Redis` / `NATS` references; forwards the safe paper-mode IBKR/iBeam
+  environment contract to the API and worker through redacted Aspire parameters;
+  and only declares the optional `ibkr-gateway` `voyz/ibeam:latest` container when
+  broker integration is enabled and fake credential placeholders have been replaced
+  in ignored `.env` — see `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 
@@ -119,8 +122,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `DELETE /api/workspace/watchlist/{symbol}`, and `/hubs/market-data`. The overview endpoint still returns deterministic
   bootstrap JSON from `ATrade.Accounts` (`module`, `status`,
   `brokerConnection`, `accounts`); the broker status endpoint resolves the
-  provider-neutral `IBrokerProvider` contract and projects the safe IBKR status
-  shape without leaking secrets; the simulation endpoint returns deterministic
+  provider-neutral `IBrokerProvider` contract and projects the safe IBKR/iBeam status
+  shape without leaking usernames, passwords, tokens, session cookies, or account ids; the simulation endpoint returns deterministic
   paper-only fills while making live broker order placement impossible by
   construction; and the market-data endpoints/hub depend on compatibility
   services over `IMarketDataProvider` / `IMarketDataStreamingProvider` while
@@ -189,7 +192,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** Broker provider abstraction shared by API, workers, and concrete
   broker adapters.
 - **Responsibilities:** Define `IBrokerProvider`, provider identity,
-  capabilities, account-mode strings, provider states, and safe status payloads
+  capabilities, account-mode strings, provider states (including
+  `credentials-missing` and `ibeam-container-configured`), and safe status payloads
   without embedding IBKR-specific gateway types. The contract exposes session
   status and read-only capability flags while making unsupported order
   placement explicit.
@@ -253,11 +257,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 ### 2.10 `ATrade.Brokers.Ibkr` *(exists today, first broker slice)*
 
 - **Purpose:** IBKR broker adapter behind the provider-neutral broker contract.
-- **Responsibilities:** In the current slice, bind typed paper-mode broker
-  options, enforce a paper-only guard, expose the official Gateway
+- **Responsibilities:** In the current slice, bind typed paper-mode broker/iBeam
+  options, enforce a paper-only guard, expose the official Gateway/iBeam
   auth-status client boundary, implement `ATrade.Brokers.IBrokerProvider`,
-  normalize safe broker status/capability shapes, and keep order placement,
-  credential storage, unofficial SDKs, and persistence out of scope. Later
+  normalize safe broker status/capability shapes, redact credential-bearing env
+  values, and keep order placement, credential storage, unofficial SDKs, and persistence out of scope. Later
   explicitly reviewed slices may translate
   approved paper-only order intents into IBKR API calls and surface the
   results back onto NATS.
@@ -297,9 +301,9 @@ references.
   `ATrade.Brokers.Ibkr`.
 - **Responsibilities:** In the current slice, start a hosted background
   service that composes `ATrade.Brokers.Ibkr`, reports safe disabled /
-  not-configured / connecting / authenticated / degraded / error states,
-  and fails fast on rejected live-mode requests before any broker call. When
-  paper mode is enabled, it polls the official auth-status endpoint through
+  credentials-missing / not-configured / iBeam-container-configured / connecting /
+  authenticated / degraded / error states, and fails fast on rejected live-mode
+  requests before any broker call. When paper mode is enabled and credentials are present, it polls the official auth-status endpoint through
   the broker adapter; when disabled, it remains idle. The AppHost now wires
   `Postgres`, `Redis`, and `NATS` connection info into the process so the
   runtime graph matches the worker's planned dependencies before any broker

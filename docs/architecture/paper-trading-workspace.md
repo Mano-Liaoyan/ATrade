@@ -147,9 +147,13 @@ The paper-trading slice extends existing planned responsibilities as follows:
 The worker may surface broker connectivity and capability information from the
 official IBKR Gateway APIs, but the browser never binds to the worker directly.
 
-## 4. IBKR Gateway Session And Connectivity Model
+## 4. IBKR Gateway / iBeam Session And Connectivity Model
 
-IBKR integration for this slice is **session-aware and paper-only**.
+IBKR integration for this slice is **session-aware and paper-only**. The approved
+local runtime for user-driven IBKR API login is the AppHost-managed
+iBeam/Gateway container image `voyz/ibeam:latest`, which is disabled by default
+and only starts when ignored local `.env` values enable broker integration and
+replace the fake credential placeholders.
 
 ### 4.1 Authentication and session status
 
@@ -157,25 +161,33 @@ IBKR integration for this slice is **session-aware and paper-only**.
 responsibilities are:
 
 - read paper-mode broker configuration from the ignored local `.env`
-- establish or verify a session against the official IBKR Gateway APIs
+- rely on AppHost to map `ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` to
+  the iBeam container variables `IBEAM_ACCOUNT` and `IBEAM_PASSWORD`
+- establish or verify a session against the official IBKR Gateway/iBeam APIs
 - publish normalized session state changes onto NATS
 - expose the provider-neutral `BrokerProviderStatus` shape that `ATrade.Api`
   can project to the frontend
 
 In the currently implemented backend slice, the worker and API share the same
-`ATrade.Brokers.Ibkr` status service so disabled and rejected-live outcomes are
-normalized before any broker call is attempted.
+`ATrade.Brokers.Ibkr` status service so disabled, credentials-missing, configured-iBeam,
+and rejected-live outcomes are normalized before any unsafe broker action is attempted.
+Raw usernames, passwords, tokens, session cookies, and account ids never appear in
+status payloads; account presence is exposed only as a boolean.
 
 The normalized session states are:
 
 - `disabled` — broker integration is not enabled locally
-- `not-configured` — required local paper settings are missing
+- `credentials-missing` — integration is enabled, but the ignored `.env` still
+  lacks real paper-login username, password, or paper account id values
+- `not-configured` — required local paper/iBeam settings such as URL, port, or
+  image contract are inconsistent
+- `ibeam-container-configured` — the local iBeam container contract and
+  credentials are present, but the auth status endpoint is not reachable yet
 - `rejected-live-mode` — local configuration requested `Live` mode and the
   backend refused it before any broker action
-- `connecting` — the worker is attempting to reach the paper gateway
-- `authenticated` — the worker has an active paper session
-- `degraded` — the gateway is reachable but market/account features are
-  partially unavailable
+- `connecting` — iBeam is reachable and waiting for paper IBKR authentication
+- `authenticated` — the worker has an active paper iBeam session
+- `degraded` — iBeam is reachable but market/account features are partially unavailable
 - `error` — the worker failed to establish or maintain a safe paper session
 
 The frontend uses those states to render connection banners, not to infer that
@@ -400,8 +412,8 @@ redesigned.
 
 ## 11. Configuration Contract Summary
 
-The committed `.env.example` for this feature family must expose only paper-safe
-placeholders:
+The committed `.env.example` and synchronized `.env.template` for this feature
+family must expose only paper-safe placeholders:
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED`
 - `ATRADE_BROKER_ACCOUNT_MODE`
@@ -409,6 +421,8 @@ placeholders:
 - `ATRADE_IBKR_GATEWAY_PORT`
 - `ATRADE_IBKR_GATEWAY_IMAGE`
 - `ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS`
+- `ATRADE_IBKR_USERNAME`
+- `ATRADE_IBKR_PASSWORD`
 - `ATRADE_IBKR_PAPER_ACCOUNT_ID`
 - `ATRADE_FRONTEND_API_BASE_URL`
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL`
@@ -416,12 +430,14 @@ placeholders:
 Rules:
 
 - committed defaults remain disabled and paper-only
-- usernames, passwords, tokens, and real account identifiers stay out of git
+- `ATRADE_IBKR_GATEWAY_IMAGE` is the approved `voyz/ibeam:latest` local runtime
+  contract, but AppHost still does not start it until integration is enabled and
+  fake credentials have been replaced in ignored `.env`
+- usernames, passwords, tokens, session cookies, and real account identifiers stay out of git
 - any real local secret belongs only in the ignored repo-root `.env`
-- `ATRADE_IBKR_GATEWAY_IMAGE` stays a placeholder in committed files and only
-  enables an optional AppHost-managed Gateway container when a non-placeholder
-  official image is provided locally
-- changing these variables must never create a live-trading path
+- AppHost passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to iBeam via secret
+  parameters and never passes the paper account id to the container
+- changing these variables must never create a live-trading or real-order path
 
 ## 12. Change Control
 

@@ -32,9 +32,11 @@ see_also:
 > `ATrade.MarketData` supplies provider-neutral market-data contracts plus the
 > current temporary deterministic provider until TP-022 replaces production
 > mocks with IBKR/iBeam data, and `ATrade.Workspaces` persists pinned watchlist
-> symbols in Postgres. The AppHost graph forwards the safe IBKR paper-mode
-> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker` and provides
-> the `postgres` connection string consumed by the API/workspaces slice.
+> symbols in Postgres. The AppHost graph forwards the safe IBKR/iBeam
+> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`,
+> provides the `postgres` connection string consumed by the API/workspaces
+> slice, and can start an optional `ibkr-gateway` `voyz/ibeam:latest` container
+> only when ignored local `.env` credentials enable integration.
 
 ## 1. Shape Of The System
 
@@ -123,9 +125,11 @@ architecture the AppHost is responsible for:
   services that need them. The current runnable slice already declares those
   resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
   four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
-  forwards the safe paper-trading IBKR environment contract into both .NET
-  processes, and only declares an optional `ibkr-gateway` container when a
-  non-placeholder official image is provided locally.
+  forwards the safe paper-trading IBKR/iBeam environment contract into both .NET
+  processes using redacted Aspire parameters for credential-bearing values, and
+  only declares an optional `ibkr-gateway` `voyz/ibeam:latest` container when
+  broker integration is enabled and fake credential placeholders have been
+  replaced in ignored `.env`.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 
@@ -186,7 +190,7 @@ so that workers can be restarted and scaled without surprising the API.
 The first delivery phase of the new ATrade codebase targets two external
 integrations, and only those two:
 
-- **IBKR** — brokerage (accounts, orders, executions, positions)
+- **IBKR through local iBeam (`voyz/ibeam:latest`)** — brokerage/session status first, then paper-safe accounts, orders, executions, positions, and data in later tasks
 - **Polygon** — market data (historical bars and real-time streams)
 
 Both integrations live behind provider-agnostic module boundaries on the
@@ -197,15 +201,16 @@ the rest of the monolith.
 The next staged feature direction is a **paper-trading workspace** inside the
 Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
 and trending symbols. The backend and UI halves of that direction are now
-started: safe IBKR session status, deterministic paper-order simulation,
-deterministic market-data/trending surfaces, SignalR chart updates, and
-Postgres-backed watchlist preferences already route through `ATrade.Api`. The
-slice keeps the current modular-monolith and Aspire contracts intact by routing
-browser traffic through `ATrade.Api`, using SignalR for browser-facing
-real-time updates, using NATS for internal fan-out, keeping orders simulated
-rather than live, and treating official IBKR Gateway / iBeam connectivity plus
-the future LEAN signal source as plug-ins behind provider-neutral contracts
-rather than as reasons to add new runtime surfaces or API/UI assumptions.
+started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
+states, deterministic paper-order simulation, deterministic market-data/trending
+surfaces, SignalR chart updates, and Postgres-backed watchlist preferences
+already route through `ATrade.Api`. The slice keeps the current
+modular-monolith and Aspire contracts intact by routing browser traffic through
+`ATrade.Api`, using SignalR for browser-facing real-time updates, using NATS for
+internal fan-out, keeping orders simulated rather than live, and treating
+official IBKR Gateway / iBeam connectivity plus the future LEAN signal source
+as plug-ins behind provider-neutral contracts rather than as reasons to add new
+runtime surfaces or API/UI assumptions.
 
 Until those modules, workers, and infrastructure integrations become
 functional rather than scaffolded, the rest of this document is aspirational

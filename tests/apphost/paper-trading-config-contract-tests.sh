@@ -75,9 +75,11 @@ required = {
     'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
     'ATRADE_IBKR_GATEWAY_URL': 'http://127.0.0.1:5000',
     'ATRADE_IBKR_GATEWAY_PORT': '5000',
-    'ATRADE_IBKR_GATEWAY_IMAGE': 'example.invalid/ibkr-gateway-paper:local',
+    'ATRADE_IBKR_GATEWAY_IMAGE': 'voyz/ibeam:latest',
     'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS': '15',
-    'ATRADE_IBKR_PAPER_ACCOUNT_ID': 'PAPER_ACCOUNT_ID',
+    'ATRADE_IBKR_USERNAME': 'IBKR_USERNAME',
+    'ATRADE_IBKR_PASSWORD': 'IBKR_PASSWORD',
+    'ATRADE_IBKR_PAPER_ACCOUNT_ID': 'IBKR_ACCOUNT_ID',
     'ATRADE_FRONTEND_API_BASE_URL': 'http://127.0.0.1:5181',
     'NEXT_PUBLIC_ATRADE_API_BASE_URL': 'http://127.0.0.1:5181',
 }
@@ -87,9 +89,15 @@ for key, expected in required.items():
     if actual != expected:
         raise SystemExit(f'{key} expected {expected!r}, found {actual!r}')
 
+if values['ATRADE_IBKR_USERNAME'] != 'IBKR_USERNAME':
+    raise SystemExit('ATRADE_IBKR_USERNAME must stay an obvious fake placeholder')
+
+if values['ATRADE_IBKR_PASSWORD'] != 'IBKR_PASSWORD':
+    raise SystemExit('ATRADE_IBKR_PASSWORD must stay an obvious fake placeholder')
+
 for key in values:
-    if re.search(r'(USERNAME|PASSWORD|TOKEN|SECRET)', key):
-        raise SystemExit(f'unexpected secret-bearing key committed to .env.example: {key}')
+    if re.search(r'(TOKEN|SECRET|COOKIE|SESSION)', key):
+        raise SystemExit(f'unexpected token/session/secret-bearing key committed to .env.example: {key}')
 
 if values['ATRADE_BROKER_ACCOUNT_MODE'] != 'Paper':
     raise SystemExit('ATRADE_BROKER_ACCOUNT_MODE must remain Paper in committed defaults')
@@ -97,7 +105,7 @@ if values['ATRADE_BROKER_ACCOUNT_MODE'] != 'Paper':
 if values['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
     raise SystemExit('ATRADE_BROKER_INTEGRATION_ENABLED must remain false in committed defaults')
 
-if re.fullmatch(r'(DU|U)\d+', values['ATRADE_IBKR_PAPER_ACCOUNT_ID']):
+if values['ATRADE_IBKR_PAPER_ACCOUNT_ID'] != 'IBKR_ACCOUNT_ID' or re.fullmatch(r'(DU|U)\d+', values['ATRADE_IBKR_PAPER_ACCOUNT_ID']):
     raise SystemExit('ATRADE_IBKR_PAPER_ACCOUNT_ID must stay a placeholder, not a real-looking account id')
 
 for key, value in values.items():
@@ -117,6 +125,9 @@ assert_docs_capture_paper_trading_contract() {
   assert_file_contains "$doc_path" 'LEAN'
   assert_file_contains "$doc_path" 'Real trades are forbidden'
   assert_file_contains "$doc_path" 'paper-only'
+  assert_file_contains "$doc_path" 'voyz/ibeam:latest'
+  assert_file_contains "$doc_path" 'credentials-missing'
+  assert_file_contains "$doc_path" 'IBEAM_ACCOUNT'
 
   assert_file_contains "$index_path" '| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | maintainer | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.   |'
   assert_file_contains "$overview_path" 'paper-trading workspace'
@@ -125,6 +136,7 @@ assert_docs_capture_paper_trading_contract() {
   assert_file_contains "$modules_path" 'paper-only'
   assert_file_contains "$modules_path" 'LEAN'
   assert_file_contains "$readme_path" 'paper-trading workspace contract'
+  assert_file_contains "$readme_path" 'voyz/ibeam:latest'
 }
 
 main() {

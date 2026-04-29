@@ -43,6 +43,7 @@ The current bootstrap slice now implements the first infrastructure-aware runnab
 - an AppHost-managed `ATrade.Ibkr.Worker` shell process managed by Aspire
 - the first real Next.js frontend slice managed by Aspire
 - Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources declared in the AppHost graph
+- an optional AppHost-managed `ibkr-gateway` iBeam container using `voyz/ibeam:latest` when broker integration is enabled locally with real ignored `.env` credentials
 - explicit AppHost resource references from `api` to `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, plus matching worker references from `ibkr-worker` to `Postgres`, `Redis`, and `NATS`
 - explicit container-runtime `--pids-limit 2048` settings for the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` resources so Podman-backed Docker API runs do not collapse to an effective `pids.max=1`
 - deterministic `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` inputs for the `timescaledb` resource so its init-time tuning script does not crash in the rootless Podman environment used here
@@ -100,10 +101,10 @@ The AppHost-managed frontend must preserve the same core runtime assumptions as 
 Developer-controlled local bind ports and paper-trading workspace placeholders
 now come from a repo-level `.env` contract.
 
-- Commit the shared defaults in `.env.example`.
-- Keep developer-specific overrides in a repo-root `.env` file, which stays ignored by git.
-- Store any real broker usernames, passwords, tokens, or real account identifiers only in that ignored `.env` (or a separate local secret source), never in committed files.
-- When `.env` is absent, AppHost, direct API startup, and the shell test helpers fall back to `.env.example`.
+- Commit the shared defaults in `.env.example` and keep `.env.template` synchronized as the user-facing copy template.
+- To configure a local machine, copy `.env.template` to repo-root `.env`; keep `.env` ignored by git.
+- Store any real broker usernames, passwords, tokens, session cookies, or real account identifiers only in that ignored `.env` (or a separate local secret source), never in committed files.
+- When `.env` is absent, AppHost, direct API startup, and the shell test helpers fall back to `.env.example` with broker integration disabled.
 
 ### Current local port variables
 
@@ -111,26 +112,37 @@ now come from a repo-level `.env` contract.
 - `ATRADE_FRONTEND_DIRECT_HTTP_PORT` — direct `frontend/` `npm run dev` verification path
 - `ATRADE_APPHOST_FRONTEND_HTTP_PORT` — AppHost-managed Next.js frontend port
 
-### Paper-trading workspace placeholders
+### Paper-trading and iBeam runtime placeholders
 
-These placeholders exist so follow-on paper-trading tasks can share one safe
-configuration shape before any real broker behavior lands.
+These placeholders define the safe local IBKR/iBeam contract without committing
+real credentials or enabling broker behavior by default.
 
-- `ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker wiring; committed default stays `false`
-- `ATRADE_BROKER_ACCOUNT_MODE` — committed default stays `Paper`; live mode is out of scope
-- `ATRADE_IBKR_GATEWAY_URL` — local paper IBKR Gateway base URL placeholder
-- `ATRADE_IBKR_GATEWAY_PORT` — local paper IBKR Gateway port placeholder
-- `ATRADE_IBKR_GATEWAY_IMAGE` — local paper-only Gateway image/tag placeholder; AppHost only declares the optional `ibkr-gateway` resource when this is replaced locally with a non-placeholder official image
-- `ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS` — optional timeout for the official Gateway status client; committed default stays a paper-safe low value
-- `ATRADE_IBKR_PAPER_ACCOUNT_ID` — placeholder for a paper account identifier; real values stay only in ignored `.env`
+- `ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker/iBeam wiring; committed default stays `false`
+- `ATRADE_BROKER_ACCOUNT_MODE` — committed default stays `Paper`; live mode remains rejected by the API, worker, and simulation guardrails
+- `ATRADE_IBKR_GATEWAY_URL` — local iBeam/IBKR Gateway API base URL; committed default is `http://127.0.0.1:5000`
+- `ATRADE_IBKR_GATEWAY_PORT` — local iBeam container/API port; committed default is `5000`
+- `ATRADE_IBKR_GATEWAY_IMAGE` — local iBeam image/tag; committed default is the user-approved `voyz/ibeam:latest`
+- `ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS` — optional timeout for the official iBeam/Gateway status client; committed default stays a paper-safe low value
+- `ATRADE_IBKR_USERNAME` — fake `IBKR_USERNAME` placeholder; replace only in ignored `.env` with the IBKR paper-login username, which AppHost maps to iBeam `IBEAM_ACCOUNT`
+- `ATRADE_IBKR_PASSWORD` — fake `IBKR_PASSWORD` placeholder; replace only in ignored `.env` with the IBKR paper-login password, which AppHost maps to iBeam `IBEAM_PASSWORD`
+- `ATRADE_IBKR_PAPER_ACCOUNT_ID` — fake `IBKR_ACCOUNT_ID` placeholder for a paper account identifier; real values stay only in ignored `.env` and surface only as redacted booleans in status payloads
 - `ATRADE_FRONTEND_API_BASE_URL` — legacy/frontend-to-API base URL for the paper-trading workspace
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL` — browser-safe Next.js public API base URL used by the trading workspace HTTP and SignalR clients; committed default mirrors `ATRADE_FRONTEND_API_BASE_URL`
+
+To start local iBeam for user-driven IBKR API login, copy `.env.template` to
+`.env`, set `ATRADE_BROKER_INTEGRATION_ENABLED=true`, keep
+`ATRADE_BROKER_ACCOUNT_MODE=Paper`, and replace only the fake
+`ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`, and
+`ATRADE_IBKR_PAPER_ACCOUNT_ID` placeholders in ignored `.env`. The AppHost then
+adds `ibkr-gateway` with `voyz/ibeam:latest`, passes only `IBEAM_ACCOUNT` and
+`IBEAM_PASSWORD` to that container via Aspire secret parameters, and keeps the
+raw username, password, and account id out of manifests and status payloads.
 
 This contract intentionally does **not** move everything into `.env`.
 
 - AppHost internal host/dashboard bindings stay intentionally ephemeral on `127.0.0.1:0`.
 - Service/container target ports such as `5432`, `6379`, and `4222` remain fixed where the protocol or container image expects them.
-- Real broker credentials or any value that would create a live-trading path must never appear in `.env.example`.
+- Real broker credentials, session cookies, tokens, real account identifiers, or any value that would create a live-trading path must never appear in `.env.example` or `.env.template`.
 
 ## Reserved Commands
 
@@ -163,7 +175,8 @@ Behavior must stay semantically identical across platforms.
 - the AppHost-managed frontend runtime path is verified via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, including `NODE_ENV=development`, preserved AppHost frontend logs, and warning-free startup even when a temporary repo-root lockfile exists
 - `tests/apphost/local-port-contract-tests.sh` writes a temporary repo `.env` and verifies that direct API startup, direct frontend startup, and the AppHost frontend/manifest checks all honor changed local port values
 - the AppHost manifest now verifies `Postgres`, `TimescaleDB`, `Redis`, `NATS`, `api`, and `frontend` without requiring a container engine via `tests/apphost/apphost-infrastructure-manifest-tests.sh`, including the deterministic `TS_TUNE_*` inputs for `timescaledb`
-- `tests/apphost/apphost-worker-resource-wiring-tests.sh` publishes the AppHost manifest without starting containers and verifies that `ibkr-worker` is part of the graph while `api` and `ibkr-worker` receive the expected managed-resource references
+- `tests/apphost/apphost-worker-resource-wiring-tests.sh` publishes the AppHost manifest without starting containers and verifies that `ibkr-worker` is part of the graph while `api` and `ibkr-worker` receive the expected managed-resource references and the optional iBeam container stays disabled until broker integration and real credentials are configured
+- `tests/apphost/ibeam-runtime-contract-tests.sh` verifies the synchronized `.env.example`/`.env.template` iBeam contract, redacted AppHost secret-parameter wiring, default-disabled behavior, and redacted broker status payloads
 - when a local Docker-compatible engine is available, `tests/apphost/apphost-infrastructure-runtime-tests.sh` starts `./start run`, verifies the AppHost-managed infra containers get a real process limit (`pids.max > 1`), and confirms `postgres` / `timescaledb` no longer die in their entrypoint scripts
 - `./start.ps1 run` and `./start.cmd run` are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`
 
@@ -177,11 +190,11 @@ The `run` contract is now bootstrapped in the repository. This covers the first 
 - GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
 - the current graph hosts `ATrade.Api` with its `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `POST /api/orders/simulate`, `GET /api/market-data/trending`, candle/indicator, and `/hubs/market-data` SignalR slice, an `ATrade.Ibkr.Worker` background service that reports safe paper-session states, the first Next.js trading workspace route set, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
 - the AppHost now wires explicit managed-resource references into the application graph: `api` receives `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, while `ibkr-worker` receives `Postgres`, `Redis`, and `NATS`
-- developer-controlled local bind ports, safe IBKR paper-mode placeholders, and the browser-safe `NEXT_PUBLIC_ATRADE_API_BASE_URL` frontend API base URL now come from the repo-level `.env` contract (`.env.example` defaults + optional ignored `.env` overrides)
+- developer-controlled local bind ports, safe IBKR/iBeam paper-mode placeholders, and the browser-safe `NEXT_PUBLIC_ATRADE_API_BASE_URL` frontend API base URL now come from the repo-level `.env` contract (`.env.example`/`.env.template` defaults + optional ignored `.env` overrides)
 - the AppHost graph now applies explicit runtime safeguards for the local Podman-backed Docker API path: `--pids-limit 2048` on the four managed infra containers plus deterministic `TS_TUNE_MEMORY=512MB` / `TS_TUNE_NUM_CPUS=2` values for `timescaledb`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh` verifies the direct frontend startup path, stable visible markers for the home page, and the AppHost-managed frontend runtime contract (`NODE_ENV=development` + warning-free Turbopack root resolution)
 - `tests/apphost/apphost-infrastructure-manifest-tests.sh` verifies that the published AppHost manifest preserves `api` / `frontend`, declares the four managed infrastructure resources, and carries the `timescaledb` tuning inputs in an engine-independent way
 - `tests/apphost/apphost-infrastructure-runtime-tests.sh` verifies the live AppHost-managed infra startup path when a local engine is available, including effective `pids.max > 1` and clean `postgres` / `timescaledb` startup
-- `tests/apphost/ibkr-paper-safety-tests.sh` verifies the broker/project references, safe paper-only config defaults, redacted broker status payloads, deterministic simulated orders, and rejected live-mode behavior
+- `tests/apphost/ibkr-paper-safety-tests.sh` verifies the broker/project references, safe paper-only iBeam config defaults, redacted broker status payloads, deterministic simulated orders, credentials-missing/configured-iBeam states, and rejected live-mode behavior
 
 Reserved subcommands such as `test`, `build`, and `lint` remain future work.

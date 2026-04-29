@@ -65,6 +65,98 @@ public sealed class IbkrBrokerStatusServiceTests
     }
 
     [Fact]
+    public async Task GetStatusAsync_ReturnsCredentialsMissingWithoutCallingGateway()
+    {
+        var fakeGatewayClient = new FakeGatewayClient();
+        var service = CreateService(
+            new IbkrGatewayOptions
+            {
+                IntegrationEnabled = true,
+                AccountMode = IbkrAccountMode.Paper,
+                GatewayBaseUrl = new Uri("https://gateway.paper.local"),
+                PaperAccountId = IbkrGatewayPlaceholderValues.PaperAccountId,
+                Username = IbkrGatewayPlaceholderValues.Username,
+                Password = IbkrGatewayPlaceholderValues.Password,
+                GatewayContainer = new IbkrGatewayContainerOptions
+                {
+                    Image = IbkrGatewayContainerOptions.DefaultIbeamImage,
+                    Port = 5000,
+                },
+            },
+            fakeGatewayClient);
+
+        var status = await service.GetStatusAsync();
+
+        Assert.Equal(BrokerProviderStates.CredentialsMissing, status.State);
+        Assert.Equal("paper", status.Mode);
+        Assert.False(status.HasPaperAccountId);
+        Assert.Contains("ignored local .env", status.Message);
+        Assert.DoesNotContain(IbkrGatewayPlaceholderValues.PaperAccountId, status.Message);
+        Assert.Equal(0, fakeGatewayClient.CallCount);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_ReturnsNotConfiguredWhenIbeamContainerContractIsMissing()
+    {
+        var fakeGatewayClient = new FakeGatewayClient();
+        var service = CreateService(
+            new IbkrGatewayOptions
+            {
+                IntegrationEnabled = true,
+                AccountMode = IbkrAccountMode.Paper,
+                GatewayBaseUrl = new Uri("https://gateway.paper.local"),
+                PaperAccountId = "DU1234567",
+                Username = "paper-user",
+                Password = "paper-password",
+                GatewayContainer = new IbkrGatewayContainerOptions
+                {
+                    Image = "example.invalid/ibkr-gateway-paper:local",
+                    Port = 5000,
+                },
+            },
+            fakeGatewayClient);
+
+        var status = await service.GetStatusAsync();
+
+        Assert.Equal(BrokerProviderStates.NotConfigured, status.State);
+        Assert.Contains(IbkrGatewayContainerOptions.DefaultIbeamImage, status.Message);
+        Assert.Equal(0, fakeGatewayClient.CallCount);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_MapsConfiguredIbeamWhenEndpointIsNotReachableYet()
+    {
+        var fakeGatewayClient = new FakeGatewayClient
+        {
+            Exception = new HttpRequestException("connection refused for paper-user with paper-password"),
+        };
+        var service = CreateService(
+            new IbkrGatewayOptions
+            {
+                IntegrationEnabled = true,
+                AccountMode = IbkrAccountMode.Paper,
+                GatewayBaseUrl = new Uri("https://gateway.paper.local"),
+                PaperAccountId = "DU1234567",
+                Username = "paper-user",
+                Password = "paper-password",
+                GatewayContainer = new IbkrGatewayContainerOptions
+                {
+                    Image = IbkrGatewayContainerOptions.DefaultIbeamImage,
+                    Port = 5000,
+                },
+            },
+            fakeGatewayClient);
+
+        var status = await service.GetStatusAsync();
+
+        Assert.Equal(BrokerProviderStates.IbeamContainerConfigured, status.State);
+        Assert.Contains("waiting", status.Message);
+        Assert.DoesNotContain("paper-user", status.Message);
+        Assert.DoesNotContain("paper-password", status.Message);
+        Assert.Equal(1, fakeGatewayClient.CallCount);
+    }
+
+    [Fact]
     public async Task GetStatusAsync_MapsAuthenticatedGatewaySessions()
     {
         var fakeGatewayClient = new FakeGatewayClient
@@ -85,6 +177,13 @@ public sealed class IbkrBrokerStatusServiceTests
                 AccountMode = IbkrAccountMode.Paper,
                 GatewayBaseUrl = new Uri("https://gateway.paper.local"),
                 PaperAccountId = "DU1234567",
+                Username = "paper-user",
+                Password = "paper-password",
+                GatewayContainer = new IbkrGatewayContainerOptions
+                {
+                    Image = IbkrGatewayContainerOptions.DefaultIbeamImage,
+                    Port = 5000,
+                },
             },
             fakeGatewayClient);
 
@@ -98,11 +197,11 @@ public sealed class IbkrBrokerStatusServiceTests
     }
 
     [Fact]
-    public async Task GetStatusAsync_ReturnsErrorWhenGatewayStatusFails()
+    public async Task GetStatusAsync_ReturnsRedactedErrorWhenGatewayStatusFailsUnexpectedly()
     {
         var fakeGatewayClient = new FakeGatewayClient
         {
-            Exception = new HttpRequestException("gateway unavailable"),
+            Exception = new InvalidOperationException("unexpected paper-user paper-password DU1234567 failure"),
         };
 
         var service = CreateService(
@@ -111,13 +210,24 @@ public sealed class IbkrBrokerStatusServiceTests
                 IntegrationEnabled = true,
                 AccountMode = IbkrAccountMode.Paper,
                 GatewayBaseUrl = new Uri("https://gateway.paper.local"),
+                PaperAccountId = "DU1234567",
+                Username = "paper-user",
+                Password = "paper-password",
+                GatewayContainer = new IbkrGatewayContainerOptions
+                {
+                    Image = IbkrGatewayContainerOptions.DefaultIbeamImage,
+                    Port = 5000,
+                },
             },
             fakeGatewayClient);
 
         var status = await service.GetStatusAsync();
 
-        Assert.Equal("error", status.State);
-        Assert.Contains("gateway unavailable", status.Message);
+        Assert.Equal(BrokerProviderStates.Error, status.State);
+        Assert.Contains("[redacted]", status.Message);
+        Assert.DoesNotContain("paper-user", status.Message);
+        Assert.DoesNotContain("paper-password", status.Message);
+        Assert.DoesNotContain("DU1234567", status.Message);
         Assert.Equal(1, fakeGatewayClient.CallCount);
     }
 
