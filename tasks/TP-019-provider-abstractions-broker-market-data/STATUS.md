@@ -1,11 +1,11 @@
 # TP-019: Introduce provider-neutral broker and market-data abstractions — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 1: Add provider-neutral broker contracts
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,17 +13,17 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
-- [ ] Current broker and market-data endpoints pass before refactoring
-- [ ] No real iBeam/IBKR/LEAN connection is introduced
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
+- [x] Current broker and market-data endpoints pass before refactoring
+- [x] No real iBeam/IBKR/LEAN connection is introduced
 
 ---
 
 ### Step 1: Add provider-neutral broker contracts
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create broker abstraction project and add it to the solution
 - [ ] Define provider identity, capabilities, session/status, and account-mode contracts
@@ -103,6 +103,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-29 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-29 20:15 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-29 20:15 | Step 0 started | Preflight |
+| 2026-04-29 20:30 | Step 0 preflight complete | Required files verified; restore succeeded; baseline `ibkr-paper-safety-tests.sh` and `market-data-feature-tests.sh` passed; unsafe direct iBeam/LEAN/live-order references not found. |
+| 2026-04-29 20:30 | Step 1 started | Broker provider abstractions |
 
 ---
 
