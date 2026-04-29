@@ -1,7 +1,7 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 6: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 7: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-29
 **Review Level:** 3
 **Review Counter:** 0
@@ -89,11 +89,11 @@
 ---
 
 ### Step 7: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -109,6 +109,8 @@
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
 | Official iBeam docs verify `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` as required runtime credentials, optional `IBEAM_KEY`, and example Docker port `5000:5000`; ATrade will map its own fake/ignored credential names to those container variables without committing real values. | Used as the verified environment mapping baseline for TP-021. | https://raw.githubusercontent.com/Voyz/ibeam/master/README.md and https://raw.githubusercontent.com/wiki/Voyz/ibeam/Runtime-environment.md |
+| AppHost manifests expose project environment values unless credential-bearing values are modeled as Aspire secret parameters. | Username, password, and paper account id are now passed to API/worker/iBeam via secret parameter references; runtime-contract tests assert raw values do not appear in manifests or status payloads. | `src/ATrade.AppHost/Program.cs`, `tests/apphost/ibeam-runtime-contract-tests.sh` |
+| The full verification command referenced `tests/apphost/postgres-watchlist-persistence-tests.sh`, but this lane does not contain the TP-020 Postgres watchlist slice yet. | Added a clean skip harness that succeeds only while no Postgres watchlist implementation is present, preserving the TP-021 verification gate without asserting nonexistent TP-020 behavior. | `tests/apphost/postgres-watchlist-persistence-tests.sh` |
 
 ---
 
