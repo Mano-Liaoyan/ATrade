@@ -1,6 +1,6 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 5: Update docs for backend-owned preferences
+**Current Step:** Step 6: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -78,13 +78,13 @@
 ---
 
 ### Step 6: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Docker-dependent Postgres/runtime tests pass or cleanly skip
-- [ ] All failures fixed
-- [ ] Frontend build passes
-- [ ] Solution build passes
+- [x] FULL test suite passing
+- [x] Docker-dependent Postgres/runtime tests pass or cleanly skip
+- [x] All failures fixed
+- [x] Frontend build passes
+- [x] Solution build passes
 
 ---
 
@@ -131,6 +131,8 @@
 | 2026-04-29 23:58 | Step 4 complete | Added disposable-Postgres restart persistence test; verified schema initialization, duplicate/invalid handling, API restart survival, and updated frontend workspace smoke tests. |
 | 2026-04-29 23:59 | Step 5 started | Updating active architecture docs for backend-owned watchlist preferences. |
 | 2026-04-30 00:05 | Step 5 complete | Updated paper workspace, modules, overview, and README docs for Postgres-backed watchlists and the temporary local workspace identity seam. |
+| 2026-04-30 00:06 | Step 6 started | Running full repository verification suite. |
+| 2026-04-30 00:18 | Step 6 complete | Full suite command passed; Docker-backed Postgres/runtime checks passed; explicit frontend build and solution build passed. |
 
 ---
 
