@@ -1,3 +1,4 @@
+using ATrade.Brokers;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ATrade.Brokers.Ibkr.Tests;
@@ -20,7 +21,27 @@ public sealed class IbkrBrokerStatusServiceTests
 
         Assert.Equal("disabled", status.State);
         Assert.Equal("paper", status.Mode);
+        Assert.Equal("ibkr", status.Provider);
         Assert.Equal(0, fakeGatewayClient.CallCount);
+    }
+
+    [Fact]
+    public void Service_ExposesProviderNeutralIdentityAndCapabilities()
+    {
+        var service = CreateService(
+            new IbkrGatewayOptions
+            {
+                IntegrationEnabled = false,
+                AccountMode = IbkrAccountMode.Paper,
+            },
+            new FakeGatewayClient());
+
+        Assert.IsAssignableFrom<IBrokerProvider>(service);
+        Assert.Equal("ibkr", service.Identity.Provider);
+        Assert.Equal("Interactive Brokers", service.Identity.DisplayName);
+        Assert.True(service.Capabilities.SupportsSessionStatus);
+        Assert.False(service.Capabilities.SupportsReadOnlyMarketData);
+        Assert.False(service.Capabilities.SupportsBrokerOrderPlacement);
     }
 
     [Fact]

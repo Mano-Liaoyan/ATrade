@@ -1,6 +1,6 @@
 # TP-019: Introduce provider-neutral broker and market-data abstractions — Status
 
-**Current Step:** Step 1: Add provider-neutral broker contracts
+**Current Step:** Step 2: Add provider-neutral market-data contracts
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -23,18 +23,18 @@
 ---
 
 ### Step 1: Add provider-neutral broker contracts
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create broker abstraction project and add it to the solution
-- [ ] Define provider identity, capabilities, session/status, and account-mode contracts
-- [ ] Adapt current IBKR broker status implementation to the neutral contracts
-- [ ] Preserve existing broker status endpoint and paper-only no-real-orders guardrails
-- [ ] Targeted broker tests/build pass
+- [x] Create broker abstraction project and add it to the solution
+- [x] Define provider identity, capabilities, session/status, and account-mode contracts
+- [x] Adapt current IBKR broker status implementation to the neutral contracts
+- [x] Preserve existing broker status endpoint and paper-only no-real-orders guardrails
+- [x] Targeted broker tests/build pass
 
 ---
 
 ### Step 2: Add provider-neutral market-data contracts
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Separate market-data contracts from the concrete mocked provider
 - [ ] Preserve current HTTP payload behavior through a swappable provider layer
@@ -107,6 +107,8 @@
 | 2026-04-29 20:15 | Step 0 started | Preflight |
 | 2026-04-29 20:30 | Step 0 preflight complete | Required files verified; restore succeeded; baseline `ibkr-paper-safety-tests.sh` and `market-data-feature-tests.sh` passed; unsafe direct iBeam/LEAN/live-order references not found. |
 | 2026-04-29 20:30 | Step 1 started | Broker provider abstractions |
+| 2026-04-29 20:50 | Step 1 complete | Added `ATrade.Brokers`, neutral broker contracts, IBKR adapter implementation, and passing targeted broker test/build. |
+| 2026-04-29 20:50 | Step 2 started | Market-data provider abstractions |
 
 ---
 

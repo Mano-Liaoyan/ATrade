@@ -1,3 +1,4 @@
+using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 
 namespace ATrade.Ibkr.Worker;
@@ -38,7 +39,7 @@ public sealed class IbkrWorkerShell(
         }
     }
 
-    private void LogStatus(IbkrBrokerStatus status)
+    private void LogStatus(BrokerProviderStatus status)
     {
         switch (status.State)
         {
