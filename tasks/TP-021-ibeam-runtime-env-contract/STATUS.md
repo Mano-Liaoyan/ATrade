@@ -1,6 +1,6 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Update the committed environment templates without secrets
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -24,13 +24,13 @@
 ---
 
 ### Step 1: Update the committed environment templates without secrets
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `.env.example` updated with safe iBeam/IBKR placeholders
-- [ ] `.env.template` created or synchronized
-- [ ] `voyz/ibeam:latest` and gateway placeholders added safely
-- [ ] Credential placeholders are obviously fake and no real values are committed
-- [ ] `.gitignore` reviewed for `.env`
+- [x] `.env.example` updated with safe iBeam/IBKR placeholders
+- [x] `.env.template` created or synchronized
+- [x] `voyz/ibeam:latest` and gateway placeholders added safely
+- [x] Credential placeholders are obviously fake and no real values are committed
+- [x] `.gitignore` reviewed for `.env`
 
 ---
 
