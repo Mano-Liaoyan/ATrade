@@ -1,6 +1,6 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 1: Update the committed environment templates without secrets
+**Current Step:** Step 2: Wire `voyz/ibeam:latest` into AppHost safely
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -35,12 +35,13 @@
 ---
 
 ### Step 2: Wire `voyz/ibeam:latest` into AppHost safely
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Environment contract loads new iBeam variables safely
 - [ ] AppHost declares iBeam container when integration is enabled
 - [ ] Secrets are not exposed in logs/status/resource names
 - [ ] Existing AppHost resource wiring preserved
+- [ ] Disabled-by-default and missing-credential behavior remains safe
 - [ ] Targeted AppHost resource tests pass
 
 ---
