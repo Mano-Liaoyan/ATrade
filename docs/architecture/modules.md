@@ -7,6 +7,7 @@ see_also:
   - ../INDEX.md
   - overview.md
   - provider-abstractions.md
+  - analysis-engines.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -19,7 +20,8 @@ see_also:
 > `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`,
 > `src/ATrade.Brokers`, `src/ATrade.Brokers.Ibkr`, `src/ATrade.Orders`,
 > `src/ATrade.MarketData`, `src/ATrade.MarketData.Ibkr`,
-> `src/ATrade.Workspaces`, and `workers/ATrade.Ibkr.Worker` now exist.
+> `src/ATrade.Analysis`, `src/ATrade.Workspaces`, and
+> `workers/ATrade.Ibkr.Worker` now exist.
 > `ATrade.Accounts` provides the deterministic bootstrap overview endpoint,
 > `ATrade.Brokers` defines the provider-neutral broker contract,
 > `ATrade.Brokers.Ibkr` implements that contract with the paper-only IBKR/iBeam
@@ -31,9 +33,12 @@ see_also:
 > compatibility services, provider status/error shapes, stock search contracts,
 > and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
 > first real IBKR/iBeam market-data provider including secdef search/detail
-> mapping. `ATrade.Workspaces` owns the first backend-persisted workspace
-> preference: Postgres-backed pinned watchlists with provider/IBKR metadata
-> columns, provider/conid duplicate handling, and a temporary local user /
+> mapping. `ATrade.Analysis` now defines the provider-neutral analysis engine
+> seam, API-facing registry, normalized request/result shapes, engine/source
+> metadata, and no-configured-engine fallback that future LEAN or alternate
+> engines must implement. `ATrade.Workspaces` owns the first backend-persisted
+> workspace preference: Postgres-backed pinned watchlists with provider/IBKR
+> metadata columns, provider/conid duplicate handling, and a temporary local user /
 > workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
 > `frontend/` directory now hosts the first paper-trading workspace UI slice:
@@ -50,7 +55,8 @@ see_also:
 > `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`,
-> `GET /api/market-data/{symbol}/indicators`, `GET` / `PUT` / `POST`
+> `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
+> `POST /api/analysis/run`, `GET` / `PUT` / `POST`
 > `/api/workspace/watchlist`, `DELETE /api/workspace/watchlist/{symbol}`, and
 > `/hubs/market-data` while the worker limits itself to paper-safe
 > session/status monitoring.
@@ -115,12 +121,13 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   any future external clients.
 - **Responsibilities:** In the current slice, provide an ASP.NET Core host
   that uses `ATrade.ServiceDefaults`, composes the Accounts, Orders, IBKR
-  broker, MarketData, and Workspaces modules, and exposes stable `GET /health`,
+  broker, MarketData, Analysis, and Workspaces modules, and exposes stable `GET /health`,
   `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
   `POST /api/orders/simulate`, `GET /api/market-data/trending`,
   `GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
   `GET /api/market-data/{symbol}/candles?timeframe=...`,
-  `GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
+  `GET /api/market-data/{symbol}/indicators?timeframe=...`,
+  `GET /api/analysis/engines`, `POST /api/analysis/run`, `GET /api/workspace/watchlist`,
   `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
   `DELETE /api/workspace/watchlist/{symbol}`, and `/hubs/market-data`. The overview endpoint still returns deterministic
   bootstrap JSON from `ATrade.Accounts` (`module`, `status`,
@@ -132,7 +139,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   services over `IMarketDataProvider` / `IMarketDataStreamingProvider` while
   returning IBKR/iBeam scanner, stock search, snapshot, historical candle,
   indicator, source metadata, and provider-unavailable/authentication-required
-  payloads without a production fallback provider. The watchlist endpoints resolve the temporary local workspace identity, initialize
+  payloads without a production fallback provider. The analysis endpoints
+  resolve `IAnalysisEngineRegistry`, expose provider-neutral engine
+  discovery/run payloads, and return explicit `analysis-engine-not-configured`
+  responses until a concrete engine is registered. The watchlist endpoints resolve the temporary local workspace identity, initialize
   the `ATrade.Workspaces` schema idempotently, persist pinned symbols in
   Postgres, return stable metadata payloads, and surface validation/storage
   failures as stable JSON errors. The AppHost now injects runtime connection
@@ -143,14 +153,16 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   module calls and NATS publications.
 - **Expected dependencies:** `ATrade.ServiceDefaults`, `ATrade.Accounts`,
   `ATrade.Brokers`, `ATrade.Brokers.Ibkr`, `ATrade.Orders`,
-  `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, and `ATrade.Workspaces` today for functional behavior;
+  `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, `ATrade.Analysis`, and
+  `ATrade.Workspaces` today for functional behavior;
   the current AppHost graph also provides `Postgres`, `TimescaleDB`, `Redis`,
   and `NATS` connection info. `Postgres` is consumed by `ATrade.Workspaces`
   now; the other infrastructure references remain ready for later slices.
 - **First-phase focus:** The backend now proves the paper-safe composition
   pattern: official IBKR session status, deterministic order simulation,
   IBKR/iBeam-backed market-data HTTP/SignalR surfaces with safe unavailable
-  states, and Postgres-backed workspace watchlists for the frontend workspace.
+  states, provider-neutral analysis discovery/run contracts with an explicit
+  no-engine fallback, and Postgres-backed workspace watchlists for the frontend workspace.
 
 ### 2.4 `ATrade.Accounts` *(exists today, first read-only slice)*
 
@@ -227,7 +239,26 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Keep HTTP/SignalR payloads provider-neutral while the
   current workspace uses the IBKR/iBeam provider behind this boundary.
 
-### 2.8 `ATrade.Workspaces` *(exists today, first backend-owned preference slice)*
+### 2.8 `ATrade.Analysis` *(exists today, provider-neutral analysis engine seam)*
+
+- **Purpose:** Analysis engine abstraction for strategy analysis, signals,
+  metrics, and backtest summaries without coupling API/frontend contracts to a
+  concrete runtime.
+- **Responsibilities:** Define `IAnalysisEngine`, `IAnalysisEngineRegistry`,
+  engine metadata/capability/status shapes, normalized `AnalysisRequest` and
+  `AnalysisResult` records, signal/metric/backtest output contracts, and the
+  `NoConfiguredAnalysisEngine` fallback. The current API surface exposes
+  `GET /api/analysis/engines` and `POST /api/analysis/run`; with no concrete
+  provider, run requests return `analysis-engine-not-configured` with empty
+  signals, metrics, and backtest output.
+- **Expected dependencies:** `ATrade.MarketData` for normalized
+  `MarketDataSymbolIdentity` and `OhlcvCandle` inputs; composed by
+  `ATrade.Api`. Concrete providers such as a future LEAN adapter may depend on
+  external runtimes, but this contract module must remain provider-neutral.
+- **First-phase focus:** Provide the seam that TP-025 can use to add LEAN as a
+  provider without making LEAN an API, frontend, or core contract assumption.
+
+### 2.9 `ATrade.Workspaces` *(exists today, first backend-owned preference slice)*
 
 - **Purpose:** Workspace preference and personalization persistence.
 - **Responsibilities:** Own the local user/workspace identity abstraction,
@@ -247,7 +278,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Persist backend-owned pinned stock watchlists across
   API/server restarts while keeping symbol metadata provider-neutral.
 
-### 2.9 `ATrade.Strategies` *(planned)*
+### 2.10 `ATrade.Strategies` *(planned)*
 
 - **Purpose:** Strategy definition, evaluation, and signal generation.
 - **Responsibilities:** Persist strategy definitions and parameters;
@@ -257,10 +288,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   (evaluation traces), `NATS` (signal publication), `ATrade.MarketData`,
   `ATrade.ServiceDefaults`.
 - **First-phase focus:** Swing/position strategies evaluated against
-  Polygon bars. Any future LEAN adoption plugs into this area as a
-  signal-source seam, not as a first-slice dependency.
+  Polygon bars or provider-neutral analysis requests. Any future LEAN adoption
+  plugs in through `ATrade.Analysis` as a signal/backtest provider seam, not as
+  an API or frontend dependency.
 
-### 2.10 `ATrade.Brokers.Ibkr` *(exists today, first broker slice)*
+### 2.11 `ATrade.Brokers.Ibkr` *(exists today, first broker slice)*
 
 - **Purpose:** IBKR broker adapter behind the provider-neutral broker contract.
 - **Responsibilities:** In the current slice, bind typed paper-mode broker/iBeam
@@ -278,7 +310,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Provide the paper-only broker seam: session status
   first, paper-safe data next, and no live-trading behavior.
 
-### 2.11 `ATrade.MarketData.Ibkr` *(exists today, first real market-data provider)*
+### 2.12 `ATrade.MarketData.Ibkr` *(exists today, first real market-data provider)*
 
 - **Purpose:** IBKR/iBeam market-data adapter behind the provider-neutral
   market-data contract.
@@ -295,7 +327,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Real paper-safe market data for the paper-trading
   workspace without production mock fallback.
 
-### 2.12 `ATrade.MarketData.Polygon` *(planned)*
+### 2.13 `ATrade.MarketData.Polygon` *(planned)*
 
 - **Purpose:** Polygon market-data adapter.
 - **Responsibilities:** Pull historical bars into TimescaleDB; maintain
@@ -399,6 +431,7 @@ ATrade.Api ──► ATrade.Accounts
           ├──► ATrade.Brokers ◄──── ATrade.Brokers.Ibkr ◄── ATrade.Ibkr.Worker
           ├──► ATrade.Orders ─────────────────────────────┘
           ├──► ATrade.Workspaces ──► Postgres
+          ├──► ATrade.Analysis ──► ATrade.MarketData
           ├──► ATrade.Strategies ◄── strategy-worker
           └──► ATrade.MarketData ◄──── ATrade.MarketData.Ibkr
                               └──► ATrade.MarketData.Polygon ◄── polygon-worker
@@ -410,7 +443,8 @@ All modules ──► Postgres / TimescaleDB / Redis / NATS (as noted above)
 No backend module may reach "up" into `ATrade.Api` or "sideways" between
 brokers and data providers directly — broker modules normalize through
 `ATrade.Brokers`, market-data modules normalize through `ATrade.MarketData`,
-and cross-module events publish and consume provider-neutral shapes on `NATS`.
+analysis engines normalize through `ATrade.Analysis`, and cross-module events
+publish and consume provider-neutral shapes on `NATS`.
 
 ## 6. Relationship To Other Documents
 

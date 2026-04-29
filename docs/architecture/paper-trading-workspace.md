@@ -8,6 +8,7 @@ see_also:
   - overview.md
   - modules.md
   - provider-abstractions.md
+  - analysis-engines.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -24,8 +25,9 @@ see_also:
 > `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`, and
-> `GET /api/market-data/{symbol}/indicators`, a `/hubs/market-data` SignalR
-> hub, backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
+> `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
+> `POST /api/analysis/run`, a `/hubs/market-data` SignalR hub,
+> backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
 > endpoints backed by the AppHost-managed Postgres resource, AppHost-driven
 > paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
 > IBKR scanner-driven trending symbols, IBKR stock search, Postgres-backed
@@ -112,19 +114,23 @@ The current backend slice exposes `GET /api/broker/ibkr/status`,
 `GET /api/market-data/{symbol}/candles?timeframe=...`,
 `GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
 `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
-`DELETE /api/workspace/watchlist/{symbol}`, and the `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
+`DELETE /api/workspace/watchlist/{symbol}`, `GET /api/analysis/engines`,
+`POST /api/analysis/run`, and the `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
 `IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`
 and the `ATrade.MarketData.Ibkr` provider to translate IBKR Client Portal/iBeam
-contract search/detail, scanner, snapshot, and historical bar responses into
-provider-neutral stock search, trending, OHLCV candle, moving-average, RSI,
+contract search/detail lookup, scanner, snapshot, and historical bar responses
+into provider-neutral stock search, trending, OHLCV candle, moving-average, RSI,
 MACD, and source metadata payloads for `1m`, `5m`, `1h`, and `1D`. The search
 endpoint enforces a minimum query length, stock-only asset class, and a capped
 result limit before returning provider-neutral `symbol`, `name`, `assetClass`,
 `exchange`, `currency`, `provider`, and provider-symbol-id metadata (IBKR
 `conid` for the current provider). SignalR is the outward-facing streaming layer
 for browsers and creates provider-backed snapshots when the IBKR/iBeam provider
-is available; NATS remains the internal event backbone between API and workers.
+is available. The analysis endpoints resolve `IAnalysisEngineRegistry` and
+currently return explicit `analysis-engine-not-configured` metadata until a
+concrete provider is added; NATS remains the internal event backbone between API
+and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -148,6 +154,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
   mapping, snapshots, historical bars, indicator inputs, source metadata, and
   safe not-configured/unavailable/authentication-required responses without
   reading credentials directly
+- `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
+  request/result contracts, engine/source metadata, API-facing registry, and
+  no-configured-engine fallback for future LEAN or alternate analysis runtimes
 - `ATrade.Workspaces` owns backend workspace preferences, including the current
   Postgres schema/repository for pinned watchlist symbols and metadata fields
   (`provider`, optional provider id / IBKR `conid`, name, exchange, currency,
@@ -430,23 +439,31 @@ stable provider error payload instead of fake results.
 
 ## 10. Future LEAN Seam
 
-LEAN is a **future plug-in seam**, not a dependency of the first
-paper-trading slice.
+LEAN is a **future analysis engine provider**, not an API/frontend dependency.
+The current repository now has the `ATrade.Analysis` seam and HTTP contracts
+that LEAN should implement later: `GET /api/analysis/engines` for discovery and
+`POST /api/analysis/run` for provider-neutral request/result payloads. Until a
+provider is registered, those endpoints return explicit
+`analysis-engine-not-configured` metadata rather than fake signals.
 
-The architecture should therefore preserve provider-neutral market-data and
-signal contracts:
+The architecture should therefore preserve provider-neutral market-data,
+analysis, and signal contracts:
 
 - market/trending signals are normalized before they reach the UI
+- analysis requests consume `MarketDataSymbolIdentity` plus normalized
+  `OhlcvCandle` bars instead of LEAN runtime types
+- analysis results include engine/source metadata so the frontend can display
+  whether output came from a future LEAN provider or another engine
 - NATS events and persisted factor/signal records should not assume LEAN types
 - the frontend should render signal source metadata without caring whether the
-  source is IBKR/iBeam, internal analytics, or future LEAN integration
-- future LEAN work belongs behind analysis-engine contracts that consume the
+  source is IBKR/iBeam, internal analytics, LEAN, or another analysis engine
+- future LEAN work belongs behind `ATrade.Analysis` contracts that consume the
   normalized market-data/provider shapes rather than becoming an API or UI
   assumption
 
-When LEAN is introduced later, it should plug into the existing market-data /
-strategy signal boundary rather than forcing the paper-trading workspace to be
-redesigned.
+When LEAN is introduced later, it should plug into the existing analysis /
+market-data / strategy signal boundary rather than forcing the paper-trading
+workspace to be redesigned.
 
 ## 11. Configuration Contract Summary
 
@@ -482,5 +499,5 @@ Rules:
 This document is `status: active` and authoritative for the paper-trading
 workspace direction. Any change that weakens the paper-only guardrails,
 introduces live trading, changes the charting-library decision, or makes LEAN
-an immediate dependency requires a maintainer-approved update to this file and
+an API/frontend dependency requires a maintainer-approved update to this file and
 matching updates to the active repository docs that summarize the same area.
