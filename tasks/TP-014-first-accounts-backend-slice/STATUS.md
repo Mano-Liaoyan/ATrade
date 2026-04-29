@@ -1,7 +1,7 @@
 # TP-014: Add the first read-only Accounts backend slice — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-29
 **Review Level:** 2
 **Review Counter:** 0
@@ -79,11 +79,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -98,6 +98,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Parallel worktrees can leave direct `ATrade.Api` processes bound to the shared default API port, so the new Accounts feature shell test now overrides the API port ephemerally before loading the local-port contract defaults. | Retained in the targeted feature bootstrap harness to keep direct API verification isolated while still using `atrade_load_local_port_contract`. | `tests/apphost/accounts-feature-bootstrap-tests.sh` |
 
 ---
 
@@ -114,6 +115,8 @@
 | 2026-04-29 00:38 | Step 3 completed | Added accounts feature bootstrap test covering solution build, health, overview JSON, and infrastructure-free startup |
 | 2026-04-29 00:44 | Step 4 completed | Synced architecture, README, plan, and startup-contract docs to the first Accounts overview slice |
 | 2026-04-29 00:47 | Step 5 completed | Full repository verification suite and runtime infrastructure checks passed cleanly |
+| 2026-04-29 00:52 | Step 6 completed | Delivery notes and discoveries recorded; must-update and check-if-affected docs confirmed |
+| 2026-04-29 00:52 | Task completed | TP-014 finished with the first read-only Accounts backend slice |
 
 ---
 
@@ -125,4 +128,5 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Must-update docs changed in this task: `docs/architecture/modules.md`, `docs/architecture/overview.md`, `README.md`, and `PLAN.md`.
+- Checked-if-affected docs reviewed: `scripts/README.md` updated for the new API verification surface; `docs/INDEX.md` required no change because no new indexed document was added.

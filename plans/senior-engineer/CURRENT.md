@@ -11,11 +11,11 @@ see_also:
 
 # Senior Engineer Current Plan
 
-**Last updated:** 2026-04-24
+**Last updated:** 2026-04-29
 
 ## Current Focus
 
-Implement the first application scaffolds on top of the bootstrapped `start run` contract and minimal Aspire AppHost.
+Extend the first real backend feature behavior on top of the infrastructure-aware `start run` AppHost graph.
 
 ## Active Checklist
 
@@ -29,10 +29,12 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Resume From Here
 
-- TP-012 externalized the developer-controlled local port allocation into the repo-level `.env` contract; the next implementation slice should either wire architect-approved runtime resource consumers into the AppHost graph or start filling one of the new backend/worker modules with real behavior.
+- TP-014 landed the first real backend feature slice by turning `ATrade.Accounts` into a deterministic bootstrap overview module, exposing `GET /api/accounts/overview` from `ATrade.Api`, adding `tests/apphost/accounts-feature-bootstrap-tests.sh`, and syncing the active docs and milestone state.
+- TP-012 externalized the developer-controlled local port allocation into the repo-level `.env` contract; the next implementation slice should deepen backend/worker feature behavior without regressing the runtime graph or local-port contract.
 
 ## Recent Progress
 
+- Completed TP-014 by turning `ATrade.Accounts` from a marker-only shell into the first read-only backend slice, wiring `ATrade.Api` to expose `GET /api/accounts/overview`, adding `tests/apphost/accounts-feature-bootstrap-tests.sh`, and syncing `README.md`, `PLAN.md`, and the active architecture/startup docs
 - Completed TP-012 by adding the repo-level `.env.example` port contract, wiring AppHost/API startup plus shell tests to the shared `ATRADE_*` variables, adding `tests/apphost/local-port-contract-tests.sh`, and syncing the startup docs
 - Completed TP-011 by adding explicit AppHost infra `--pids-limit 2048` runtime args, deterministic `timescaledb` tuning inputs, `tests/apphost/apphost-infrastructure-runtime-tests.sh`, and truthful runtime docs for the Podman-backed Docker API startup path
 - Completed TP-010 by pinning the AppHost-managed frontend `NODE_ENV` to `development`, adding `frontend/next.config.ts` to pin `turbopack.root`, extending `tests/apphost/frontend-nextjs-bootstrap-tests.sh` to verify AppHost-managed warning-free startup, and syncing `scripts/README.md`
@@ -45,6 +47,8 @@ Implement the first application scaffolds on top of the bootstrapped `start run`
 
 ## Verification
 
+- `dotnet build ATrade.sln --nologo --verbosity minimal && bash tests/start-contract/start-wrapper-tests.sh && bash tests/scaffolding/project-shells-tests.sh && bash tests/apphost/api-bootstrap-tests.sh && bash tests/apphost/accounts-feature-bootstrap-tests.sh && bash tests/apphost/frontend-nextjs-bootstrap-tests.sh && bash tests/apphost/apphost-infrastructure-manifest-tests.sh && bash tests/apphost/apphost-worker-resource-wiring-tests.sh && bash tests/apphost/local-port-contract-tests.sh && bash tests/apphost/apphost-infrastructure-runtime-tests.sh`
+- `bash tests/apphost/accounts-feature-bootstrap-tests.sh`
 - `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`
 - `bash tests/apphost/apphost-infrastructure-runtime-tests.sh`
