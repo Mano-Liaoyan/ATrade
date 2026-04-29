@@ -1,11 +1,11 @@
 # TP-023: Add IBKR stock search and pin-any-symbol workflow — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-04-29
+**Current Step:** Step 1: Add backend IBKR stock search contracts and endpoints
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,17 +13,17 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
-- [ ] Production mocked symbol catalog removal confirmed
-- [ ] Watchlist schema provider metadata support confirmed
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
+- [x] Production mocked symbol catalog removal confirmed
+- [x] Watchlist schema provider metadata support confirmed
 
 ---
 
 ### Step 1: Add backend IBKR stock search contracts and endpoints
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Provider-neutral search contract added or extended
 - [ ] IBKR/iBeam search maps provider-neutral results
@@ -115,6 +115,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-29 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-29 22:46 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-29 22:46 | Step 0 started | Preflight |
+| 2026-04-30 | Step 0 completed | Required paths present; TP-020 and TP-022 complete; production source has no mocked symbol catalog; watchlist schema includes provider metadata columns. |
+| 2026-04-30 | Step 1 started | Backend IBKR search contracts and endpoint work |
 
 ---
 
