@@ -6,10 +6,12 @@ import type { TrendingSymbol } from '../types/marketData';
 type TrendingListProps = {
   symbols: TrendingSymbol[];
   pinnedSymbols: string[];
-  onTogglePin: (symbol: string) => void;
+  onTogglePin: (symbol: TrendingSymbol) => void;
+  actionsDisabled?: boolean;
+  savingSymbol?: string | null;
 };
 
-export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingListProps) {
+export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisabled = false, savingSymbol = null }: TrendingListProps) {
   const pinnedSet = new Set(pinnedSymbols.map((symbol) => symbol.toUpperCase()));
 
   return (
@@ -25,6 +27,7 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingLi
       <div className="symbol-grid">
         {symbols.map((symbol) => {
           const pinned = pinnedSet.has(symbol.symbol);
+          const isSaving = savingSymbol === symbol.symbol.toUpperCase();
 
           return (
             <article className="symbol-card" key={symbol.symbol}>
@@ -39,9 +42,10 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingLi
                   className={pinned ? 'pin-button pin-button--active' : 'pin-button'}
                   type="button"
                   aria-pressed={pinned}
-                  onClick={() => onTogglePin(symbol.symbol)}
+                  disabled={actionsDisabled || isSaving}
+                  onClick={() => onTogglePin(symbol)}
                 >
-                  {pinned ? 'Pinned' : 'Pin'}
+                  {isSaving ? (pinned ? 'Removing…' : 'Saving…') : pinned ? 'Pinned' : 'Pin'}
                 </button>
               </div>
 

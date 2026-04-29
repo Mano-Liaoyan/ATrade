@@ -1,6 +1,8 @@
 const WATCHLIST_STORAGE_KEY = 'atrade.paperTrading.watchlist.v1';
+const WATCHLIST_BACKEND_MIGRATION_KEY = 'atrade.paperTrading.watchlist.backendMigrated.v1';
+const SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,31}$/;
 
-export function readWatchlist(): string[] {
+export function readCachedWatchlist(): string[] {
   if (typeof window === 'undefined') {
     return [];
   }
@@ -22,7 +24,7 @@ export function readWatchlist(): string[] {
   }
 }
 
-export function writeWatchlist(symbols: string[]): string[] {
+export function writeCachedWatchlist(symbols: string[]): string[] {
   const normalizedSymbols = normalizeSymbols(symbols);
 
   if (typeof window !== 'undefined') {
@@ -32,20 +34,26 @@ export function writeWatchlist(symbols: string[]): string[] {
   return normalizedSymbols;
 }
 
-export function toggleWatchlistSymbol(currentSymbols: string[], symbol: string): string[] {
-  const normalizedSymbol = symbol.trim().toUpperCase();
-  if (!normalizedSymbol) {
-    return writeWatchlist(currentSymbols);
+export function hasCompletedWatchlistMigration(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
   }
 
-  const normalizedCurrent = normalizeSymbols(currentSymbols);
-  const nextSymbols = normalizedCurrent.includes(normalizedSymbol)
-    ? normalizedCurrent.filter((candidate) => candidate !== normalizedSymbol)
-    : [...normalizedCurrent, normalizedSymbol];
+  return window.localStorage.getItem(WATCHLIST_BACKEND_MIGRATION_KEY) === 'true';
+}
 
-  return writeWatchlist(nextSymbols);
+export function markWatchlistMigrationCompleted(): void {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(WATCHLIST_BACKEND_MIGRATION_KEY, 'true');
+  }
 }
 
 function normalizeSymbols(symbols: string[]): string[] {
-  return Array.from(new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))).sort();
+  return Array.from(
+    new Set(
+      symbols
+        .map((symbol) => symbol.trim().toUpperCase())
+        .filter((symbol) => SYMBOL_PATTERN.test(symbol)),
+    ),
+  ).sort();
 }

@@ -45,14 +45,14 @@
 ---
 
 ### Step 3: Move the frontend watchlist to the backend source of truth
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Frontend watchlist API client added
-- [ ] Pin/unpin UI calls backend API
-- [ ] localStorage demoted to cache or one-time migration source
-- [ ] Existing localStorage pins migrated once after successful backend load
-- [ ] Backend unavailable/error states handled honestly
-- [ ] Frontend build passes
+- [x] Frontend watchlist API client added
+- [x] Pin/unpin UI calls backend API
+- [x] localStorage demoted to cache or one-time migration source
+- [x] Existing localStorage pins migrated once after successful backend load
+- [x] Backend unavailable/error states handled honestly
+- [x] Frontend build passes
 
 ---
 
@@ -125,6 +125,7 @@
 | 2026-04-29 22:25 | Step 2 complete | Backend watchlist endpoints already committed in checkpoint; status reconciled before frontend step. |
 | 2026-04-29 21:43 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 21:43 | Step 3 started | Move the frontend watchlist to the backend source of truth |
+| 2026-04-29 23:50 | Step 3 complete | Frontend now loads/persists pins through backend watchlist API, migrates cached localStorage pins once, shows backend/cache/error states, and `npm run build` passed after `npm ci`. |
 
 ---
 
