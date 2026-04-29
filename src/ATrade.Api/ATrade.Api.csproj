@@ -12,5 +12,6 @@
     <ProjectReference Include="..\ATrade.MarketData\ATrade.MarketData.csproj" />
     <ProjectReference Include="..\ATrade.Orders\ATrade.Orders.csproj" />
     <ProjectReference Include="..\ATrade.ServiceDefaults\ATrade.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\ATrade.Workspaces\ATrade.Workspaces.csproj" />
   </ItemGroup>
 </Project>

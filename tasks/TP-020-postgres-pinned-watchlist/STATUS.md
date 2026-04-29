@@ -1,6 +1,6 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Add the workspace persistence module and schema
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -23,13 +23,13 @@
 ---
 
 ### Step 1: Add the workspace persistence module and schema
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Workspaces project added to solution and referenced by API
-- [ ] Postgres watchlist repository and schema initializer added
-- [ ] Schema supports future provider/IBKR symbol metadata
-- [ ] Temporary local user/workspace seam documented in code
-- [ ] Targeted Workspaces tests/build pass
+- [x] Workspaces project added to solution and referenced by API
+- [x] Postgres watchlist repository and schema initializer added
+- [x] Schema supports future provider/IBKR symbol metadata
+- [x] Temporary local user/workspace seam documented in code
+- [x] Targeted Workspaces tests/build pass
 
 ---
 
@@ -117,6 +117,8 @@
 | 2026-04-29 20:42 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 20:42 | Step 0 started | Preflight |
 | 2026-04-29 22:15 | Step 0 complete | Required paths verified; TP-018/TP-019 outputs confirmed; current frontend watchlist localStorage authority and AppHost API Postgres reference confirmed. |
+| 2026-04-29 22:15 | Step 1 started | Workspace persistence module and schema |
+| 2026-04-29 21:34 | Task started | Runtime V2 lane-runner execution |
 
 ---
 
