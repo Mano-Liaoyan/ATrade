@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ATrade.Accounts\ATrade.Accounts.csproj" />
     <ProjectReference Include="..\ATrade.ServiceDefaults\ATrade.ServiceDefaults.csproj" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,6 @@
 # TP-014: Add the first read-only Accounts backend slice — Status
 
-**Current Step:** Step 2: Expose the Accounts overview through the API
+**Current Step:** Step 3: Add feature-slice verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -35,18 +35,18 @@
 ---
 
 ### Step 2: Expose the Accounts overview through the API
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add API project reference to `ATrade.Accounts`
-- [ ] Register Accounts module during API startup
-- [ ] Map `GET /api/accounts/overview`
-- [ ] Preserve `GET /health`
-- [ ] Targeted API smoke check passes
+- [x] Add API project reference to `ATrade.Accounts`
+- [x] Register Accounts module during API startup
+- [x] Map `GET /api/accounts/overview`
+- [x] Preserve `GET /health`
+- [x] Targeted API smoke check passes
 
 ---
 
 ### Step 3: Add feature-slice verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/accounts-feature-bootstrap-tests.sh`
 - [ ] Verify API references Accounts and solution builds
@@ -110,6 +110,7 @@
 | 2026-04-29 00:22 | Step 0 started | Preflight |
 | 2026-04-29 00:24 | Step 0 completed | Preflight checks verified current shell state and TP-013 dependency |
 | 2026-04-29 00:29 | Step 1 completed | Added deterministic Accounts overview types, bootstrap provider, DI registration, and successful project build |
+| 2026-04-29 00:33 | Step 2 completed | Wired Accounts into API startup, preserved health, and verified both endpoints via API smoke check |
 
 ---
 
