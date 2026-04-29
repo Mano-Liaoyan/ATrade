@@ -1,4 +1,5 @@
 using ATrade.Accounts;
+using ATrade.Analysis;
 using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 using ATrade.MarketData;
@@ -15,6 +16,7 @@ builder.Services.AddIbkrBrokerAdapter(builder.Configuration);
 builder.Services.AddAccountsModule();
 builder.Services.AddOrdersModule();
 builder.Services.AddMarketDataModule();
+builder.Services.AddAnalysisModule();
 builder.Services.AddIbkrMarketDataProvider();
 builder.Services.AddWorkspacesModule(builder.Configuration);
 builder.Services.AddSignalR();
@@ -60,6 +62,16 @@ app.MapGet(
         }
 
         return ToMarketDataErrorResult(error);
+    });
+app.MapGet(
+    "/api/analysis/engines",
+    (IAnalysisEngineRegistry analysisEngines) => Results.Ok(analysisEngines.GetEngines()));
+app.MapPost(
+    "/api/analysis/run",
+    async (AnalysisRequest request, IAnalysisEngineRegistry analysisEngines, CancellationToken cancellationToken) =>
+    {
+        var result = await analysisEngines.AnalyzeAsync(request, cancellationToken);
+        return ToAnalysisResult(result);
     });
 app.MapGet(
     "/api/broker/ibkr/status",
@@ -128,6 +140,17 @@ static IResult ToMarketDataErrorResult(MarketDataError? error)
         _ => Results.BadRequest(error),
     };
 }
+
+static IResult ToAnalysisResult(AnalysisResult result) => result.Error?.Code switch
+{
+    AnalysisEngineErrorCodes.EngineNotConfigured or AnalysisEngineErrorCodes.EngineUnavailable => Results.Json(
+        result,
+        statusCode: StatusCodes.Status503ServiceUnavailable),
+    AnalysisEngineErrorCodes.InvalidRequest => Results.BadRequest(result),
+    _ => string.Equals(result.Status, AnalysisResultStatuses.Failed, StringComparison.OrdinalIgnoreCase)
+        ? Results.BadRequest(result)
+        : Results.Ok(result),
+};
 
 static Task<IResult> GetWorkspaceWatchlistAsync(
     IWorkspaceIdentityProvider identityProvider,

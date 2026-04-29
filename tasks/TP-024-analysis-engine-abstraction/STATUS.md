@@ -1,6 +1,6 @@
 # TP-024: Add provider-neutral analysis engine abstraction and API contract — Status
 
-**Current Step:** Step 1: Create the analysis module contracts
+**Current Step:** Step 2: Add analysis API contracts without LEAN runtime coupling
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -35,13 +35,13 @@
 ---
 
 ### Step 2: Add analysis API contracts without LEAN runtime coupling
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Analysis module registered in API
-- [ ] Engine discovery/run endpoints added
-- [ ] Default not-configured response added
-- [ ] API/core contracts have no LEAN references
-- [ ] Existing API behavior preserved
+- [x] Analysis module registered in API
+- [x] Engine discovery/run endpoints added
+- [x] Default not-configured response added
+- [x] API/core contracts have no LEAN references
+- [x] Existing API behavior preserved
 
 ---
 

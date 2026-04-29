@@ -4,7 +4,7 @@ public sealed class NoConfiguredAnalysisEngine : IAnalysisEngine
 {
     public const string EngineId = "not-configured";
 
-    private const string Message = "No analysis engine is configured. Configure a provider such as LEAN before requesting production analysis.";
+    private const string Message = "No analysis engine is configured. Configure an analysis provider before requesting production analysis.";
 
     public AnalysisEngineMetadata Metadata { get; } = new(
         EngineId,
