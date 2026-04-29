@@ -1,7 +1,7 @@
 # TP-013: Wire the IBKR worker and AppHost resource consumers — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-29
 **Review Level:** 2
 **Review Counter:** 0
@@ -98,6 +98,8 @@
 | 2026-04-29 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-04-29 00:08 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 00:08 | Step 0 started | Preflight |
+| 2026-04-29 00:20 | Worker iter 1 | done in 731s, tools: 120 |
+| 2026-04-29 00:20 | Task complete | .DONE created |
 
 ---
 
