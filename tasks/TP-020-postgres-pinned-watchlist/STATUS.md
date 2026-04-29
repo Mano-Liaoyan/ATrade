@@ -1,6 +1,6 @@
 # TP-020: Persist pinned stock watchlists in Postgres — Status
 
-**Current Step:** Step 3: Move the frontend watchlist to the backend source of truth
+**Current Step:** Step 4: Add restart-persistence verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -57,9 +57,10 @@
 ---
 
 ### Step 4: Add restart-persistence verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Postgres persistence shell test added
+- [ ] API schema initialization verified against Postgres
 - [ ] API restart persistence verified against same database
 - [ ] Duplicate and invalid-symbol behavior verified
 - [ ] Frontend trading workspace tests updated for backend-owned pins
@@ -126,6 +127,7 @@
 | 2026-04-29 21:43 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-29 21:43 | Step 3 started | Move the frontend watchlist to the backend source of truth |
 | 2026-04-29 23:50 | Step 3 complete | Frontend now loads/persists pins through backend watchlist API, migrates cached localStorage pins once, shows backend/cache/error states, and `npm run build` passed after `npm ci`. |
+| 2026-04-29 23:51 | Step 4 started | Restart-persistence verification hydrated with explicit schema initialization coverage. |
 
 ---
 
