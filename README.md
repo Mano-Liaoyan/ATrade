@@ -55,15 +55,23 @@ The current runnable slice includes:
   - `GET /api/market-data/trending`
   - `GET /api/market-data/{symbol}/candles`
   - `GET /api/market-data/{symbol}/indicators`
+  - `GET /api/workspace/watchlist`
+  - `PUT /api/workspace/watchlist`
+  - `POST /api/workspace/watchlist`
+  - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
+- `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell.
-- `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and an MVP watchlist.
+- `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and backend-saved watchlists.
 
-The current market-data and watchlist behavior is still the MVP baseline:
-market data is deterministic temporary provider data behind `ATrade.MarketData`
-contracts and pinned symbols are browser-local. The active task queue replaces
-those pieces with Postgres persistence, real IBKR/iBeam data, IBKR search, and
-LEAN analysis while keeping API/frontend payloads provider-neutral.
+The current market-data behavior is still the MVP baseline: market data is
+deterministic temporary provider data behind `ATrade.MarketData` contracts.
+Pinned symbols are now backend-owned workspace preferences persisted in the
+AppHost-managed Postgres database through `ATrade.Workspaces` and surfaced to
+the frontend through `/api/workspace/watchlist`; browser `localStorage` is only
+a non-authoritative cache / one-time migration source. The active task queue
+continues replacing temporary market data with real IBKR/iBeam data, IBKR
+search, and LEAN analysis while keeping API/frontend payloads provider-neutral.
 
 ## Active Task Queue
 
@@ -118,6 +126,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/ibkr-paper-safety-tests.sh`
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/provider-abstraction-contract-tests.sh`
+- `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 

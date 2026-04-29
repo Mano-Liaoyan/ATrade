@@ -4,6 +4,7 @@ using ATrade.Brokers.Ibkr;
 using ATrade.MarketData;
 using ATrade.Orders;
 using ATrade.ServiceDefaults;
+using ATrade.Workspaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,7 @@ builder.Services.AddIbkrBrokerAdapter(builder.Configuration);
 builder.Services.AddAccountsModule();
 builder.Services.AddOrdersModule();
 builder.Services.AddMarketDataModule();
+builder.Services.AddWorkspacesModule(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
 {
@@ -89,6 +91,105 @@ app.MapPost(
         }
     });
 
+app.MapGet("/api/workspace/watchlist", GetWorkspaceWatchlistAsync);
+app.MapPut("/api/workspace/watchlist", ReplaceWorkspaceWatchlistAsync);
+app.MapPost("/api/workspace/watchlist", PinWorkspaceWatchlistSymbolAsync);
+app.MapDelete("/api/workspace/watchlist/{symbol}", UnpinWorkspaceWatchlistSymbolAsync);
+
 app.MapHub<MarketDataHub>("/hubs/market-data");
 
 app.Run();
+
+static Task<IResult> GetWorkspaceWatchlistAsync(
+    IWorkspaceIdentityProvider identityProvider,
+    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
+    IWorkspaceWatchlistRepository repository,
+    CancellationToken cancellationToken) =>
+    ExecuteWatchlistRequestAsync(async () =>
+    {
+        await schemaInitializer.InitializeAsync(cancellationToken);
+        var response = await repository.GetAsync(identityProvider.Current, cancellationToken);
+        return Results.Ok(response);
+    });
+
+static Task<IResult> ReplaceWorkspaceWatchlistAsync(
+    ReplaceWorkspaceWatchlistRequest? request,
+    IWorkspaceIdentityProvider identityProvider,
+    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
+    IWorkspaceWatchlistRepository repository,
+    CancellationToken cancellationToken) =>
+    ExecuteWatchlistRequestAsync(async () =>
+    {
+        var symbols = NormalizeReplacementWatchlistRequest(request);
+        await schemaInitializer.InitializeAsync(cancellationToken);
+        var response = await repository.ReplaceAsync(identityProvider.Current, symbols, cancellationToken);
+        return Results.Ok(response);
+    });
+
+static Task<IResult> PinWorkspaceWatchlistSymbolAsync(
+    WorkspaceWatchlistSymbolInput? symbol,
+    IWorkspaceIdentityProvider identityProvider,
+    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
+    IWorkspaceWatchlistRepository repository,
+    CancellationToken cancellationToken) =>
+    ExecuteWatchlistRequestAsync(async () =>
+    {
+        var normalizedSymbol = NormalizePinnedSymbolRequest(symbol);
+        await schemaInitializer.InitializeAsync(cancellationToken);
+        var response = await repository.PinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
+        return Results.Ok(response);
+    });
+
+static Task<IResult> UnpinWorkspaceWatchlistSymbolAsync(
+    string symbol,
+    IWorkspaceIdentityProvider identityProvider,
+    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
+    IWorkspaceWatchlistRepository repository,
+    CancellationToken cancellationToken) =>
+    ExecuteWatchlistRequestAsync(async () =>
+    {
+        var normalizedSymbol = WorkspaceSymbolNormalizer.Normalize(symbol);
+        await schemaInitializer.InitializeAsync(cancellationToken);
+        var response = await repository.UnpinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
+        return Results.Ok(response);
+    });
+
+static async Task<IResult> ExecuteWatchlistRequestAsync(Func<Task<IResult>> operation)
+{
+    try
+    {
+        return await operation();
+    }
+    catch (WorkspaceWatchlistValidationException exception)
+    {
+        return Results.BadRequest(new WorkspaceWatchlistErrorResponse(exception.Code, exception.Message));
+    }
+    catch (WorkspaceStorageUnavailableException exception)
+    {
+        return Results.Json(
+            new WorkspaceWatchlistErrorResponse(exception.Code, "Watchlist storage is unavailable."),
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}
+
+static WorkspaceWatchlistSymbolInput NormalizePinnedSymbolRequest(WorkspaceWatchlistSymbolInput? symbol)
+{
+    if (symbol is null)
+    {
+        throw new WorkspaceWatchlistValidationException(
+            WorkspaceWatchlistErrorCodes.InvalidSymbol,
+            "A watchlist symbol payload is required.");
+    }
+
+    return symbol with { Symbol = WorkspaceSymbolNormalizer.Normalize(symbol.Symbol) };
+}
+
+static IReadOnlyList<WorkspaceWatchlistSymbolInput> NormalizeReplacementWatchlistRequest(ReplaceWorkspaceWatchlistRequest? request)
+{
+    var symbols = request?.Symbols ?? Array.Empty<WorkspaceWatchlistSymbolInput>();
+    return symbols.Select(NormalizePinnedSymbolRequest).ToArray();
+}
+
+public sealed record ReplaceWorkspaceWatchlistRequest(IReadOnlyList<WorkspaceWatchlistSymbolInput>? Symbols);
+
+public sealed record WorkspaceWatchlistErrorResponse(string Code, string Error);

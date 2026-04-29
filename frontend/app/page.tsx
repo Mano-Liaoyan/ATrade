@@ -8,7 +8,7 @@ export default function HomePage() {
         <h1>ATrade Frontend Home</h1>
         <p className="hero-copy">Aspire AppHost Frontend Contract</p>
         <p>
-          Trading workspace MVP for trending stocks and ETFs, local watchlists, symbol navigation, and the
+          Trading workspace MVP for trending stocks and ETFs, backend-saved watchlists, symbol navigation, and the
           upcoming interactive paper-trading chart view.
         </p>
       </section>

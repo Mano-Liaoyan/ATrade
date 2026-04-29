@@ -23,15 +23,18 @@ see_also:
 >
 > **Current backend slice:** `ATrade.Api` provides stable `GET /health`,
 > `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
-> `POST /api/orders/simulate`, market-data HTTP endpoints, and a market-data
+> `POST /api/orders/simulate`, market-data HTTP endpoints, backend-owned
+> watchlist endpoints under `/api/workspace/watchlist`, and a market-data
 > SignalR hub. `ATrade.Accounts` returns bootstrap-safe overview JSON,
 > `ATrade.Brokers` defines the provider-neutral broker contract,
 > `ATrade.Brokers.Ibkr` supplies the paper-only IBKR implementation,
-> `ATrade.Orders` owns deterministic paper-order simulation, and
+> `ATrade.Orders` owns deterministic paper-order simulation,
 > `ATrade.MarketData` supplies provider-neutral market-data contracts plus the
 > current temporary deterministic provider until TP-022 replaces production
-> mocks with IBKR/iBeam data. The AppHost graph forwards the safe IBKR
-> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`.
+> mocks with IBKR/iBeam data, and `ATrade.Workspaces` persists pinned watchlist
+> symbols in Postgres. The AppHost graph forwards the safe IBKR paper-mode
+> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker` and provides
+> the `postgres` connection string consumed by the API/workspaces slice.
 
 ## 1. Shape Of The System
 
@@ -146,6 +149,12 @@ audit trails. Any durable entity with a lifecycle owned by ATrade lives
 here unless it is explicitly a time-series observation. Schema migrations
 are owned by the backend module that owns the entity.
 
+Current implementation note: `ATrade.Workspaces` now initializes and owns the
+Postgres schema for pinned workspace watchlists through the AppHost-provided
+`ConnectionStrings:postgres` reference. Watchlist rows use a temporary
+`local-user` / `paper-trading` identity seam until authentication and named
+workspaces exist.
+
 ### 4.2 TimescaleDB — time-series workloads
 
 TimescaleDB hosts market-data hypertables and any other strictly
@@ -187,16 +196,16 @@ the rest of the monolith.
 
 The next staged feature direction is a **paper-trading workspace** inside the
 Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
-and trending symbols. The backend half of that direction is now started: safe
-IBKR session status and deterministic paper-order simulation already route
-through `ATrade.Api`, while the broader UI, SignalR fan-out, and market/trending
-surfaces remain future work. The slice keeps the current modular-monolith and
-Aspire contracts intact by routing browser traffic through `ATrade.Api`, using
-SignalR for browser-facing real-time updates, using NATS for internal fan-out,
-keeping orders simulated rather than live, and treating official IBKR Gateway /
-iBeam connectivity plus the future LEAN signal source as plug-ins behind
-provider-neutral contracts rather than as reasons to add new runtime surfaces
-or API/UI assumptions.
+and trending symbols. The backend and UI halves of that direction are now
+started: safe IBKR session status, deterministic paper-order simulation,
+deterministic market-data/trending surfaces, SignalR chart updates, and
+Postgres-backed watchlist preferences already route through `ATrade.Api`. The
+slice keeps the current modular-monolith and Aspire contracts intact by routing
+browser traffic through `ATrade.Api`, using SignalR for browser-facing
+real-time updates, using NATS for internal fan-out, keeping orders simulated
+rather than live, and treating official IBKR Gateway / iBeam connectivity plus
+the future LEAN signal source as plug-ins behind provider-neutral contracts
+rather than as reasons to add new runtime surfaces or API/UI assumptions.
 
 Until those modules, workers, and infrastructure integrations become
 functional rather than scaffolded, the rest of this document is aspirational
