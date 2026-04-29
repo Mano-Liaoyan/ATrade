@@ -1,8 +1,12 @@
 namespace ATrade.MarketData;
 
-public sealed class MockMarketDataService(IndicatorService indicatorService, TrendingService trendingService) : IMarketDataService
+public sealed class MockMarketDataService(IndicatorService indicatorService, TrendingService trendingService) : IMarketDataProvider
 {
     private static readonly DateTimeOffset AnchorTime = new(2026, 4, 29, 20, 0, 0, TimeSpan.Zero);
+
+    public MarketDataProviderIdentity Identity { get; } = MarketDataProviderIdentity.Create("mock", "Deterministic mock market data");
+
+    public MarketDataProviderCapabilities Capabilities => MarketDataProviderCapabilities.DeterministicMock;
 
     private static readonly IReadOnlyList<MarketDataSymbol> SymbolCatalog = new[]
     {
@@ -14,6 +18,8 @@ public sealed class MockMarketDataService(IndicatorService indicatorService, Tre
         new MarketDataSymbol("IWM", "iShares Russell 2000 ETF", "ETF", "NYSEARCA", "Small Cap ETF", 202.31m, -0.21m, 31_000_000),
     };
 
+    public MarketDataProviderStatus GetStatus() => MarketDataProviderStatus.Available(Identity, Capabilities);
+
     public TrendingSymbolsResponse GetTrendingSymbols()
     {
         var symbols = SymbolCatalog
@@ -22,6 +28,15 @@ public sealed class MockMarketDataService(IndicatorService indicatorService, Tre
             .ToArray();
 
         return new TrendingSymbolsResponse(AnchorTime, symbols);
+    }
+
+    public bool TrySearchSymbols(string query, out MarketDataSymbolSearchResponse? response, out MarketDataError? error)
+    {
+        response = null;
+        error = new MarketDataError(
+            MarketDataProviderErrorCodes.SearchNotSupported,
+            "Symbol search is not supported by the temporary mocked market-data provider.");
+        return false;
     }
 
     public bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol)

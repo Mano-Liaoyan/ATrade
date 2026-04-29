@@ -1,6 +1,7 @@
+using ATrade.Brokers;
+
 namespace ATrade.Brokers.Ibkr;
 
-public interface IIbkrBrokerStatusService
+public interface IIbkrBrokerStatusService : IBrokerProvider
 {
-    Task<IbkrBrokerStatus> GetStatusAsync(CancellationToken cancellationToken = default);
 }

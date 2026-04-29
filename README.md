@@ -9,6 +9,7 @@ see_also:
   - scripts/README.md
   - docs/architecture/overview.md
   - docs/architecture/modules.md
+  - docs/architecture/provider-abstractions.md
   - docs/architecture/paper-trading-workspace.md
 ---
 
@@ -26,7 +27,7 @@ queue for the next provider-backed trading workspace increment.
 - Frontend: `Next.js`
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
-- Broker/data direction: `IBKR` through local iBeam/Gateway work queued in `TP-021` and `TP-022`
+- Broker/data direction: provider-neutral contracts with `IBKR` through local iBeam/Gateway work queued in `TP-021` and `TP-022`
 - Analysis direction: provider-neutral analysis contracts plus LEAN integration queued in `TP-024` and `TP-025`
 
 ## Run Contract
@@ -45,6 +46,7 @@ API, worker, frontend, and local infrastructure.
 The current runnable slice includes:
 
 - `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, and NATS.
+- `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
 - `src/ATrade.Api` — browser-facing backend with:
   - `GET /health`
   - `GET /api/accounts/overview`
@@ -58,9 +60,10 @@ The current runnable slice includes:
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and an MVP watchlist.
 
 The current market-data and watchlist behavior is still the MVP baseline:
-market data is deterministic mocked data and pinned symbols are browser-local.
-The active task queue replaces those pieces with provider abstractions,
-Postgres persistence, real IBKR/iBeam data, IBKR search, and LEAN analysis.
+market data is deterministic temporary provider data behind `ATrade.MarketData`
+contracts and pinned symbols are browser-local. The active task queue replaces
+those pieces with Postgres persistence, real IBKR/iBeam data, IBKR search, and
+LEAN analysis while keeping API/frontend payloads provider-neutral.
 
 ## Active Task Queue
 
@@ -100,6 +103,7 @@ agents used by the orchestrator.
 
 - Use `docs/INDEX.md` as the documentation discovery layer.
 - Only documents marked `active` are implementation authority.
+- `docs/architecture/provider-abstractions.md` and `docs/architecture/paper-trading-workspace.md` define the provider seams and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
 - No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
@@ -113,6 +117,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/accounts-feature-bootstrap-tests.sh`
 - `tests/apphost/ibkr-paper-safety-tests.sh`
 - `tests/apphost/market-data-feature-tests.sh`
+- `tests/apphost/provider-abstraction-contract-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 

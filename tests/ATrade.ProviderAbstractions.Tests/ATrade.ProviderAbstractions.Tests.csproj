@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -20,7 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ATrade.Brokers\ATrade.Brokers.csproj" />
-    <ProjectReference Include="..\..\src\ATrade.Brokers.Ibkr\ATrade.Brokers.Ibkr.csproj" />
+    <ProjectReference Include="..\..\src\ATrade.MarketData\ATrade.MarketData.csproj" />
   </ItemGroup>
 
 </Project>

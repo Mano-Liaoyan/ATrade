@@ -118,7 +118,7 @@ assert_docs_capture_paper_trading_contract() {
   assert_file_contains "$doc_path" 'Real trades are forbidden'
   assert_file_contains "$doc_path" 'paper-only'
 
-  assert_file_contains "$index_path" '| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | architect | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice. |'
+  assert_file_contains "$index_path" '| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | maintainer | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.   |'
   assert_file_contains "$overview_path" 'paper-trading workspace'
   assert_file_contains "$overview_path" 'SignalR'
   assert_file_contains "$modules_path" 'lightweight-charts'

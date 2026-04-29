@@ -1,3 +1,4 @@
+using ATrade.Brokers;
 using Microsoft.Extensions.Logging;
 
 namespace ATrade.Brokers.Ibkr;
@@ -6,10 +7,14 @@ public sealed class IbkrBrokerStatusService(
     IbkrGatewayOptions gatewayOptions,
     IIbkrPaperTradingGuard paperTradingGuard,
     IIbkrGatewayClient gatewayClient,
-    IbkrBrokerAdapterCapabilities capabilities,
+    BrokerProviderCapabilities capabilities,
     ILogger<IbkrBrokerStatusService> logger) : IIbkrBrokerStatusService
 {
-    public async Task<IbkrBrokerStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+    public BrokerProviderIdentity Identity => IbkrBrokerStatus.Identity;
+
+    public BrokerProviderCapabilities Capabilities => capabilities;
+
+    public async Task<BrokerProviderStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         var guardResult = paperTradingGuard.Evaluate();
         if (!guardResult.IsAllowed)

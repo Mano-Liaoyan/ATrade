@@ -1,4 +1,5 @@
 using ATrade.Accounts;
+using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 using ATrade.MarketData;
 using ATrade.Orders;
@@ -60,8 +61,8 @@ app.MapGet(
     });
 app.MapGet(
     "/api/broker/ibkr/status",
-    async (IIbkrBrokerStatusService brokerStatusService, CancellationToken cancellationToken) =>
-        Results.Ok(await brokerStatusService.GetStatusAsync(cancellationToken)));
+    async (IBrokerProvider brokerProvider, CancellationToken cancellationToken) =>
+        Results.Ok(await brokerProvider.GetStatusAsync(cancellationToken)));
 app.MapPost(
     "/api/orders/simulate",
     (OrderSimulationRequest request, IOrderSimulationService simulationService) =>

@@ -1,52 +1,45 @@
+using ATrade.Brokers;
+
 namespace ATrade.Brokers.Ibkr;
 
-public sealed record IbkrBrokerStatus(
-    string Provider,
-    string State,
-    string Mode,
-    bool IntegrationEnabled,
-    bool HasPaperAccountId,
-    bool Authenticated,
-    bool Connected,
-    bool Competing,
-    string? Message,
-    DateTimeOffset ObservedAtUtc,
-    IbkrBrokerAdapterCapabilities Capabilities)
+public static class IbkrBrokerStatus
 {
-    public static IbkrBrokerStatus Disabled(IbkrGatewayOptions options, IbkrBrokerAdapterCapabilities capabilities) => Create(
+    public static BrokerProviderIdentity Identity { get; } = BrokerProviderIdentity.Create("ibkr", "Interactive Brokers");
+
+    public static BrokerProviderStatus Disabled(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities) => Create(
         options,
         capabilities,
-        state: "disabled",
+        state: BrokerProviderStates.Disabled,
         message: "IBKR integration is disabled.");
 
-    public static IbkrBrokerStatus Rejected(IbkrGatewayOptions options, IbkrBrokerAdapterCapabilities capabilities, string message) => Create(
+    public static BrokerProviderStatus Rejected(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities, string message) => Create(
         options,
         capabilities,
-        state: "rejected-live-mode",
+        state: BrokerProviderStates.RejectedLiveMode,
         message: message);
 
-    public static IbkrBrokerStatus NotConfigured(IbkrGatewayOptions options, IbkrBrokerAdapterCapabilities capabilities, string message) => Create(
+    public static BrokerProviderStatus NotConfigured(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities, string message) => Create(
         options,
         capabilities,
-        state: "not-configured",
+        state: BrokerProviderStates.NotConfigured,
         message: message);
 
-    public static IbkrBrokerStatus Error(IbkrGatewayOptions options, IbkrBrokerAdapterCapabilities capabilities, string message) => Create(
+    public static BrokerProviderStatus Error(IbkrGatewayOptions options, BrokerProviderCapabilities capabilities, string message) => Create(
         options,
         capabilities,
-        state: "error",
+        state: BrokerProviderStates.Error,
         message: message);
 
-    public static IbkrBrokerStatus FromSession(
+    public static BrokerProviderStatus FromSession(
         IbkrGatewayOptions options,
-        IbkrBrokerAdapterCapabilities capabilities,
+        BrokerProviderCapabilities capabilities,
         IbkrGatewaySessionStatus sessionStatus)
     {
         var state = sessionStatus.Authenticated
-            ? "authenticated"
+            ? BrokerProviderStates.Authenticated
             : sessionStatus.Connected
-                ? "connecting"
-                : "degraded";
+                ? BrokerProviderStates.Connecting
+                : BrokerProviderStates.Degraded;
 
         return Create(
             options,
@@ -58,19 +51,19 @@ public sealed record IbkrBrokerStatus(
             sessionStatus.Competing);
     }
 
-    private static IbkrBrokerStatus Create(
+    private static BrokerProviderStatus Create(
         IbkrGatewayOptions options,
-        IbkrBrokerAdapterCapabilities capabilities,
+        BrokerProviderCapabilities capabilities,
         string state,
         string? message,
         bool authenticated = false,
         bool connected = false,
         bool competing = false)
     {
-        return new IbkrBrokerStatus(
-            Provider: "ibkr",
+        return new BrokerProviderStatus(
+            Provider: Identity.Provider,
             State: state,
-            Mode: options.AccountMode.ToString().ToLowerInvariant(),
+            Mode: ToBrokerAccountMode(options.AccountMode),
             IntegrationEnabled: options.IntegrationEnabled,
             HasPaperAccountId: !string.IsNullOrWhiteSpace(options.PaperAccountId),
             Authenticated: authenticated,
@@ -80,4 +73,11 @@ public sealed record IbkrBrokerStatus(
             ObservedAtUtc: DateTimeOffset.UtcNow,
             Capabilities: capabilities);
     }
+
+    private static string ToBrokerAccountMode(IbkrAccountMode accountMode) => accountMode switch
+    {
+        IbkrAccountMode.Paper => BrokerAccountModes.Paper,
+        IbkrAccountMode.Live => BrokerAccountModes.Live,
+        _ => BrokerAccountModes.Unknown,
+    };
 }

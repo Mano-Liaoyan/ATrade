@@ -108,6 +108,7 @@ public sealed class IbkrGatewayClientTests
         var capabilities = IbkrBrokerAdapterCapabilities.PaperSafeReadOnly;
 
         Assert.True(capabilities.SupportsSessionStatus);
+        Assert.False(capabilities.SupportsReadOnlyMarketData);
         Assert.False(capabilities.SupportsBrokerOrderPlacement);
         Assert.False(capabilities.SupportsCredentialPersistence);
         Assert.False(capabilities.SupportsExecutionPersistence);
