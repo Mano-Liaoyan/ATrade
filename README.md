@@ -66,15 +66,15 @@ Postgres persistence, real IBKR/iBeam data, IBKR search, and LEAN analysis.
 
 Active Taskplane packets live directly under `tasks/`:
 
-| Task | Purpose |
-|------|---------|
-| `TP-019` | Provider-neutral broker and market-data abstractions |
-| `TP-020` | Postgres-persisted pinned stock/watchlist state |
+| Task     | Purpose                                                            |
+| -------- | ------------------------------------------------------------------ |
+| `TP-019` | Provider-neutral broker and market-data abstractions               |
+| `TP-020` | Postgres-persisted pinned stock/watchlist state                    |
 | `TP-021` | `voyz/ibeam:latest` runtime and ignored `.env` IBKR login contract |
-| `TP-022` | IBKR/iBeam market-data provider and production mock removal |
-| `TP-023` | IBKR stock search and pin-any-symbol workflow |
-| `TP-024` | Provider-neutral analysis engine abstraction |
-| `TP-025` | LEAN as the first analysis engine provider |
+| `TP-022` | IBKR/iBeam market-data provider and production mock removal        |
+| `TP-023` | IBKR stock search and pin-any-symbol workflow                      |
+| `TP-024` | Provider-neutral analysis engine abstraction                       |
+| `TP-025` | LEAN as the first analysis engine provider                         |
 
 Completed Taskplane packets have been moved to `tasks/archive/`.
 
@@ -90,12 +90,11 @@ ATrade/
 ├── workers/              # Long-running worker processes
 ├── frontend/             # Next.js application
 ├── tasks/                # Active Taskplane packets and archive
-└── .pi/                  # Taskplane/Pi runtime configuration and runtime agents
+└── .pi/                  # Taskplane/Pi runtime config, runtime agents, and skill symlinks
 ```
 
-The old role-based `plans/` folder, repo-local workforce agent files, and
-repo-local workforce skills have been removed. Remaining `.pi/agents/` files are
-Taskplane runtime agents used by the orchestrator.
+Reusable `.pi/skills/` entries are opt-in Pi skills. `.pi/agents/` files are Taskplane runtime
+agents used by the orchestrator.
 
 ## Documentation Rules
 

@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-04-29
-summary: Repository guidance after removal of the old role-based autonomous workforce files.
+summary: Repository guidance and introduction of repo-local Pi skills.
 see_also:
   - README.md
   - PLAN.md
@@ -12,9 +12,8 @@ see_also:
 
 # ATrade Agent Guidance
 
-The old role-based autonomous workforce has been removed from this repository.
-Do not look for per-role plans, repo-local workforce skills, or role charters;
-those files intentionally no longer exist.
+In the `.pi/agents/` directory , thereare Taskplane runtime agents used by the
+orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
 
 ## Current Coordination Model
 
@@ -22,6 +21,30 @@ those files intentionally no longer exist.
 - Active tasks currently start at `TP-019` and run through `TP-025`.
 - Completed task packets are archived under `tasks/archive/`.
 - The next task ID is recorded in `tasks/CONTEXT.md`.
+
+## Repo-local Pi Skills
+
+Reusable prompt skills are intentionally available under `.pi/skills/`. These are opt-in
+skills for the current agent session, while implementation work remains coordinated
+through Taskplane packets.
+
+- `.pi/skills/*` entries are symlinks to committed skill definitions under
+  `.agents/skills/`.
+- `skills-lock.json` records their upstream source and hashes.
+- Keep `.pi/skills/`, `.agents/skills/`, and `skills-lock.json` in sync when
+  adding, updating, or removing skills.
+
+Current installed skills include:
+
+- `setup-matt-pocock-skills` — configure issue-tracker, triage-label, and
+  domain-doc context before using engineering or issue-workflow skills.
+- `grill-with-docs` and `zoom-out` — domain/documentation-aware planning and
+  codebase orientation.
+- `diagnose`, `tdd`, and `improve-codebase-architecture` — bug investigation,
+  test-first changes, and architecture refactoring support.
+- `to-prd`, `to-issues`, and `triage` — PRD, issue, and triage workflow helpers.
+- `caveman`, `grill-me`, and `write-a-skill` — productivity and skill-authoring
+  helpers.
 
 ## Startup Order For Coding Sessions
 
@@ -39,9 +62,3 @@ those files intentionally no longer exist.
 - Do not add real order placement or live-trading behavior in the current queued work.
 - Durable code/runtime changes must update active documentation in the same change.
 - Use `docs/INDEX.md` as the documentation discovery layer; only `active` docs are implementation authority.
-
-## Remaining `.pi/agents` Files
-
-The remaining `.pi/agents/` files are Taskplane runtime agents used by the
-orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
-They are not the removed role-based ATrade workforce.

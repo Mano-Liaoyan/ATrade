@@ -16,17 +16,17 @@ documents listed as `active` should guide implementation work.
 
 ## Active Documents
 
-| Document | Owner | Summary |
-|----------|-------|---------|
-| [`../README.md`](../README.md) | maintainer | Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue. |
-| [`../AGENTS.md`](../AGENTS.md) | maintainer | Repository guidance after removal of the old role-based autonomous workforce files. |
-| [`../PLAN.md`](../PLAN.md) | maintainer | Current implementation plan for the provider-backed ATrade paper-trading workspace upgrade. |
-| [`../scripts/README.md`](../scripts/README.md) | maintainer | Bootstrap status and contract for the cross-platform `start run` entrypoints. |
-| [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md) | maintainer | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored. |
-| [`architecture/overview.md`](architecture/overview.md) | maintainer | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract. |
-| [`architecture/modules.md`](architecture/modules.md) | maintainer | Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus. |
-| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | maintainer | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice. |
-| [`process/github-coordination.md`](process/github-coordination.md) | maintainer | Lightweight GitHub and Taskplane coordination contract after removal of the old role-based workforce. |
+| Document                                                                             | Owner      | Summary                                                                                                                                 |
+| ------------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [`../README.md`](../README.md)                                                       | maintainer | Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.                                 |
+| [`../AGENTS.md`](../AGENTS.md)                                                       | maintainer | Repository guidance and introduction of repo-local Pi skills.                                                                           |
+| [`../PLAN.md`](../PLAN.md)                                                           | maintainer | Current implementation plan for the provider-backed ATrade paper-trading workspace upgrade.                                             |
+| [`../scripts/README.md`](../scripts/README.md)                                       | maintainer | Bootstrap status and contract for the cross-platform `start run` entrypoints.                                                           |
+| [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md)   | maintainer | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts, including repo-local Pi skills.       |
+| [`architecture/overview.md`](architecture/overview.md)                               | maintainer | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract.                |
+| [`architecture/modules.md`](architecture/modules.md)                                 | maintainer | Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with first-phase IBKR and Polygon focus. |
+| [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | maintainer | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.   |
+| [`process/github-coordination.md`](process/github-coordination.md)                   | maintainer | Lightweight GitHub and Taskplane coordination contract after removal of the old role-based workforce.                                   |
 
 ## Legacy-Review-Pending Documents
 

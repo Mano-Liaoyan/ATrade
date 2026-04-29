@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-04-29
-summary: Defines which Taskplane and Pi files are committed project config versus local runtime artifacts that must stay ignored.
+summary: Defines which Taskplane and Pi files are committed project config versus local runtime artifacts, including repo-local Pi skills.
 see_also:
   - ../INDEX.md
   - ../../README.md
@@ -28,16 +28,17 @@ These files are part of the repository contract and should remain tracked:
 - `.pi/agents/task-merger.md` — Taskplane merge prompt
 - `.pi/agents/supervisor.md` — Taskplane supervisor prompt
 - `.pi/agents/README.md` — notes for the remaining runtime agents
+- `.pi/skills/*` — symlinks exposing repo-local reusable prompt skills to Pi
 - `.pi/taskplane-config.json` — project-specific Taskplane execution config
+- `.agents/skills/` — committed source copies for repo-local reusable prompt skills
+- `skills-lock.json` — upstream source/hash lockfile for installed skills
 - `tasks/CONTEXT.md` — task area context and next ID counter
 - `tasks/<TASK-ID>-<slug>/PROMPT.md` — active task packets
 - `tasks/<TASK-ID>-<slug>/STATUS.md` — durable execution/resume state for a task
 - `tasks/<TASK-ID>-<slug>/.DONE` — durable completion marker when present
 - `tasks/archive/<TASK-ID>-<slug>/` — archived completed task packets
 
-The old role-based `.pi/skills/` folder and old role-agent prompts were removed
-and should not be recreated unless a future human request reintroduces that
-operating model.
+The current `.pi/skills/` directory contains reusable prompt skill symlinks to `.agents/skills/`.
 
 ## Ignore These Files
 
