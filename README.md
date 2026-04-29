@@ -27,7 +27,7 @@ queue for the next provider-backed trading workspace increment.
 - Frontend: `Next.js`
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
-- Broker/data direction: provider-neutral contracts with `IBKR` through local iBeam/Gateway work queued in `TP-021` and `TP-022`
+- Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract and follow-on market-data work queued in `TP-022`
 - Analysis direction: provider-neutral analysis contracts plus LEAN integration queued in `TP-024` and `TP-025`
 
 ## Run Contract
@@ -45,7 +45,7 @@ API, worker, frontend, and local infrastructure.
 
 The current runnable slice includes:
 
-- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, and NATS.
+- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, NATS, and the optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env` credentials enable broker integration.
 - `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
 - `src/ATrade.Api` — browser-facing backend with:
   - `GET /health`
@@ -56,7 +56,7 @@ The current runnable slice includes:
   - `GET /api/market-data/{symbol}/candles`
   - `GET /api/market-data/{symbol}/indicators`
   - `/hubs/market-data`
-- `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell.
+- `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, and an MVP watchlist.
 
 The current market-data and watchlist behavior is still the MVP baseline:
@@ -116,6 +116,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/api-bootstrap-tests.sh`
 - `tests/apphost/accounts-feature-bootstrap-tests.sh`
 - `tests/apphost/ibkr-paper-safety-tests.sh`
+- `tests/apphost/ibeam-runtime-contract-tests.sh`
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/provider-abstraction-contract-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`

@@ -30,8 +30,10 @@ see_also:
 > `ATrade.Orders` owns deterministic paper-order simulation, and
 > `ATrade.MarketData` supplies provider-neutral market-data contracts plus the
 > current temporary deterministic provider until TP-022 replaces production
-> mocks with IBKR/iBeam data. The AppHost graph forwards the safe IBKR
-> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`.
+> mocks with IBKR/iBeam data. The AppHost graph forwards the safe IBKR/iBeam
+> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`,
+> and can start an optional `ibkr-gateway` `voyz/ibeam:latest` container only
+> when ignored local `.env` credentials enable integration.
 
 ## 1. Shape Of The System
 
@@ -120,9 +122,11 @@ architecture the AppHost is responsible for:
   services that need them. The current runnable slice already declares those
   resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
   four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
-  forwards the safe paper-trading IBKR environment contract into both .NET
-  processes, and only declares an optional `ibkr-gateway` container when a
-  non-placeholder official image is provided locally.
+  forwards the safe paper-trading IBKR/iBeam environment contract into both .NET
+  processes using redacted Aspire parameters for credential-bearing values, and
+  only declares an optional `ibkr-gateway` `voyz/ibeam:latest` container when
+  broker integration is enabled and fake credential placeholders have been
+  replaced in ignored `.env`.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 
@@ -177,7 +181,7 @@ so that workers can be restarted and scaled without surprising the API.
 The first delivery phase of the new ATrade codebase targets two external
 integrations, and only those two:
 
-- **IBKR** — brokerage (accounts, orders, executions, positions)
+- **IBKR through local iBeam (`voyz/ibeam:latest`)** — brokerage/session status first, then paper-safe accounts, orders, executions, positions, and data in later tasks
 - **Polygon** — market data (historical bars and real-time streams)
 
 Both integrations live behind provider-agnostic module boundaries on the
@@ -188,7 +192,7 @@ the rest of the monolith.
 The next staged feature direction is a **paper-trading workspace** inside the
 Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
 and trending symbols. The backend half of that direction is now started: safe
-IBKR session status and deterministic paper-order simulation already route
+IBKR/iBeam session status, credentials-missing/configured-iBeam states, and deterministic paper-order simulation already route
 through `ATrade.Api`, while the broader UI, SignalR fan-out, and market/trending
 surfaces remain future work. The slice keeps the current modular-monolith and
 Aspire contracts intact by routing browser traffic through `ATrade.Api`, using

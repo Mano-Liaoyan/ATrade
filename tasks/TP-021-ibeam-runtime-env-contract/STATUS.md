@@ -1,6 +1,6 @@
 # TP-021: Wire iBeam runtime and `.env` credential contract for IBKR API login — Status
 
-**Current Step:** Step 4: Add iBeam runtime contract verification
+**Current Step:** Step 5: Update runtime and safety documentation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 3
@@ -70,11 +70,11 @@
 ---
 
 ### Step 5: Update runtime and safety documentation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Startup docs updated for ignored `.env` and iBeam
-- [ ] Paper-trading architecture updated for user-approved iBeam runtime
-- [ ] Modules/overview/README reviewed and updated if stale
+- [x] Startup docs updated for ignored `.env` and iBeam
+- [x] Paper-trading architecture updated for user-approved iBeam runtime
+- [x] Modules/overview/README reviewed and updated if stale
 
 ---
 
