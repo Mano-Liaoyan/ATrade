@@ -20,19 +20,19 @@ see_also:
 > "hosts", or "orchestrates" the reader should understand "will, once the
 > corresponding milestone in `PLAN.md` is complete". The runnable slice today
 > is the Aspire AppHost bootstrap described in `scripts/README.md`, which now
-> launches the first minimal `ATrade.Api` service alongside the first real
-> Next.js home page and declares Aspire-managed `Postgres`, `TimescaleDB`,
-> `Redis`, and `NATS` resources.
+> launches `ATrade.Api`, the first real Next.js home page, and an inert
+> `ATrade.Ibkr.Worker` shell while declaring Aspire-managed `Postgres`,
+> `TimescaleDB`, `Redis`, and `NATS` resources.
 >
-> **Current backend slice:** `ATrade.Api` presently provides only a stable
-> `GET /health` smoke endpoint and shared hosting defaults. The infrastructure
-> layer is now declared in the AppHost graph, and the first compileable shells
-> for `ATrade.Accounts`, `ATrade.Orders`, `ATrade.MarketData`, and
-> `ATrade.Ibkr.Worker` now exist. `ATrade.Ibkr.Worker` is now an
-> AppHost-managed project resource that receives `Postgres`, `Redis`, and
-> `NATS` references, but it remains intentionally inert; the domain modules
-> and worker still do not implement broker, market-data, or database
-> behavior.
+> **Current backend slice:** `ATrade.Api` now provides a stable `GET /health`
+> smoke endpoint plus the first read-only feature endpoint,
+> `GET /api/accounts/overview`, which returns deterministic bootstrap JSON
+> from `ATrade.Accounts`. The infrastructure layer is declared in the AppHost
+> graph, and `ATrade.Orders`, `ATrade.MarketData`, and `ATrade.Ibkr.Worker`
+> remain intentionally early: the worker is an AppHost-managed project
+> resource that receives `Postgres`, `Redis`, and `NATS` references but still
+> runs only an inert hosted-service shell, while the remaining domain modules
+> do not yet implement broker, market-data, or database behavior.
 
 ## 1. Shape Of The System
 

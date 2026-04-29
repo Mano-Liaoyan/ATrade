@@ -11,11 +11,11 @@ see_also:
 
 # ATrade Bootstrap Plan
 
-**Last updated:** 2026-04-23
+**Last updated:** 2026-04-29
 
 ## Current Focus
 
-Build the first real backend feature behavior on top of the AppHost graph that now includes the first worker/resource-consumer wiring.
+Use the first Accounts overview slice as the baseline for deeper backend feature increments while preserving the current AppHost graph.
 
 ## Milestones
 
@@ -30,7 +30,7 @@ Build the first real backend feature behavior on top of the AppHost graph that n
 - [x] ~~Declare managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources in the AppHost graph~~
 - [x] ~~Add the first backend feature-module shells and the inert `ATrade.Ibkr.Worker` shell~~
 - [x] ~~Extend the AppHost graph with real worker wiring and application resource consumers~~
-- [ ] Add the first backend feature behavior on top of the bootstrap slice
+- [x] ~~Add the first backend feature behavior on top of the bootstrap slice~~
 
 ## Active Cross-Role Dependencies
 
@@ -41,5 +41,5 @@ Build the first real backend feature behavior on top of the AppHost graph that n
 
 - Only indexed `active` docs are authoritative. Legacy docs must be explicitly reintroduced and marked before use.
 - The single-command local startup contract is `start run` on both Unix and Windows.
-- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api`, `ATrade.Ibkr.Worker`, the Next.js home page, and named `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources, with explicit AppHost resource references wired into the API and worker graph.
+- Aspire 13.2 remains the preferred orchestrator and currently manages `ATrade.Api`, `ATrade.Ibkr.Worker`, the Next.js home page, and named `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources, with explicit AppHost resource references wired into the API and worker graph. The first backend feature behavior is now live as the read-only Accounts overview endpoint at `GET /api/accounts/overview` alongside `GET /health`.
 - `.worktrees/` is now available for isolated parallel feature delivery.

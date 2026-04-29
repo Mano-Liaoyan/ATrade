@@ -15,26 +15,28 @@ see_also:
 
 > **Status note:** This document describes the **target** module layout of
 > the ATrade codebase, not a finished implementation. `src/ATrade.AppHost`,
-> `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, and the first compileable
-> shells for `src/ATrade.Accounts`, `src/ATrade.Orders`,
-> `src/ATrade.MarketData`, and `workers/ATrade.Ibkr.Worker` now exist.
-> `ATrade.Accounts`, `ATrade.Orders`, and `ATrade.MarketData` remain
-> structural scaffolding only. `ATrade.Ibkr.Worker` is now wired into the
-> AppHost runtime graph and receives `Postgres`, `Redis`, and `NATS`
-> references, but it still runs only an inert background-service shell with
-> no broker or data behavior. The remaining modules and workers listed below
-> stay aspirational and will land in later milestones tracked by `PLAN.md`.
-> The `frontend/` directory now hosts the first real Next.js slice: a minimal
-> home page that proves Aspire can orchestrate a real frontend runtime, while
-> broader UI routes remain later work.
+> `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`, the
+> compileable shells for `src/ATrade.Orders` and `src/ATrade.MarketData`, and
+> `workers/ATrade.Ibkr.Worker` now exist. `ATrade.Accounts` now provides the
+> first real backend feature behavior: a deterministic bootstrap overview
+> service that `ATrade.Api` exposes at `GET /api/accounts/overview`.
+> `ATrade.Orders` and `ATrade.MarketData` remain structural scaffolding only.
+> `ATrade.Ibkr.Worker` is now wired into the AppHost runtime graph and
+> receives `Postgres`, `Redis`, and `NATS` references, but it still runs only
+> an inert background-service shell with no broker or data behavior. The
+> remaining modules and workers listed below stay aspirational and will land
+> in later milestones tracked by `PLAN.md`. The `frontend/` directory now
+> hosts the first real Next.js slice: a minimal home page that proves Aspire
+> can orchestrate a real frontend runtime, while broader UI routes remain
+> later work.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
 > `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as managed infrastructure
 > resources; and wires the `api` / `ibkr-worker` resources to their expected
-> managed infrastructure while keeping `ATrade.Api` limited to a stable
-> `GET /health` smoke endpoint and the worker limited to its inert hosted
-> service shell.
+> managed infrastructure while keeping `ATrade.Api` limited to stable
+> `GET /health` and `GET /api/accounts/overview` bootstrap endpoints and the
+> worker limited to its inert hosted service shell.
 
 ## 1. How To Read This Document
 
@@ -87,39 +89,51 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   .NET module.
 - **First-phase focus:** None directly — infrastructure module.
 
-### 2.3 `ATrade.Api` *(exists today, first slice only)*
+### 2.3 `ATrade.Api` *(exists today, first feature slice)*
 
 - **Purpose:** The single public HTTP surface for the Next.js frontend and
   any future external clients.
 - **Responsibilities:** In the current slice, provide a minimal ASP.NET
-  Core host that uses `ATrade.ServiceDefaults` and exposes a stable
-  `GET /health` smoke endpoint. The AppHost now also injects the runtime
-  connection information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`
-  so the local graph matches the API's planned infrastructure shape, even
-  though the API does not consume those stores functionally yet. Later
-  slices add authenticated REST/streaming endpoints for accounts,
-  portfolios, strategies, orders, and market-data queries plus translation
-  of HTTP requests into module calls and NATS publications.
-- **Expected dependencies:** `ATrade.ServiceDefaults` today for functional
-  behavior; the current AppHost graph also provides `Postgres`,
-  `TimescaleDB`, `Redis`, and `NATS` connection info so later slices can
-  begin consuming them without reshaping the runtime topology.
-- **First-phase focus:** The scaffold proves the backend/AppHost bootstrap
-  path. Functional IBKR account/order and Polygon market-data surfaces land
-  in later slices.
+  Core host that uses `ATrade.ServiceDefaults`, composes the Accounts
+  module, and exposes stable `GET /health` and `GET /api/accounts/overview`
+  endpoints. The overview endpoint returns deterministic bootstrap JSON from
+  `ATrade.Accounts` (`module`, `status`, `brokerConnection`, `accounts`)
+  without pretending persistence, broker connectivity, or broader domain
+  behavior exists yet. The AppHost now also injects the runtime connection
+  information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS` so the
+  local graph matches the API's planned infrastructure shape, even though
+  the API does not consume those stores functionally yet. Later slices add
+  authenticated REST/streaming endpoints for deeper accounts, portfolios,
+  strategies, orders, and market-data queries plus translation of HTTP
+  requests into module calls and NATS publications.
+- **Expected dependencies:** `ATrade.ServiceDefaults` and `ATrade.Accounts`
+  today for functional behavior; the current AppHost graph also provides
+  `Postgres`, `TimescaleDB`, `Redis`, and `NATS` connection info so later
+  slices can begin consuming them without reshaping the runtime topology.
+- **First-phase focus:** The scaffold now proves the backend/AppHost
+  bootstrap path and the first feature-module composition pattern.
+  Functional IBKR account/order and Polygon market-data surfaces land in
+  later slices.
 
-### 2.4 `ATrade.Accounts` *(exists today, shell only)*
+### 2.4 `ATrade.Accounts` *(exists today, first read-only slice)*
 
 - **Purpose:** Account, portfolio, and position bookkeeping.
-- **Responsibilities:** In the current slice, compile as a dedicated module
-  with an `AccountsAssemblyMarker` type only. Future slices own the
-  canonical account/portfolio/position schema, reconcile broker-reported
-  state with internal state, and expose query and projection APIs.
+- **Responsibilities:** In the current slice, provide deterministic,
+  bootstrap-safe `AccountOverview` response types, a minimal overview
+  provider, and DI registration used by `ATrade.Api` to serve
+  `GET /api/accounts/overview`. The response intentionally stops at module
+  markers (`module = "accounts"`, `status = "bootstrap"`,
+  `brokerConnection = "not-configured"`, `accounts = []`). Future slices
+  own the canonical account/portfolio/position schema, reconcile
+  broker-reported state with internal state, and expose richer query and
+  projection APIs.
 - **Expected dependencies:** `Postgres` (system of record), `NATS`
-  (execution events from the broker integration), `ATrade.ServiceDefaults`.
-  The current shell intentionally carries no runtime wiring yet.
+  (execution events from the broker integration), and
+  `ATrade.ServiceDefaults` in later slices. The current slice
+  intentionally avoids persistence, broker/data clients, and fake account
+  state while contributing only bootstrap-safe read-only behavior.
 - **First-phase focus:** Reconcile against IBKR account and execution
-  events.
+  events after the bootstrap overview slice proves module wiring.
 
 ### 2.5 `ATrade.Orders` *(exists today, shell only)*
 

@@ -1,6 +1,6 @@
 # TP-014: Add the first read-only Accounts backend slice — Status
 
-**Current Step:** Step 4: Update docs and milestone state
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -58,18 +58,18 @@
 ---
 
 ### Step 4: Update docs and milestone state
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `docs/architecture/modules.md` current-state notes updated
-- [ ] `docs/architecture/overview.md` current backend slice updated
-- [ ] `README.md` current status updated if stale
-- [ ] `PLAN.md` backend-feature milestone updated if implementation satisfies it
-- [ ] `scripts/README.md` checked and updated if affected
+- [x] `docs/architecture/modules.md` current-state notes updated
+- [x] `docs/architecture/overview.md` current backend slice updated
+- [x] `README.md` current status updated if stale
+- [x] `PLAN.md` backend-feature milestone updated if implementation satisfies it
+- [x] `scripts/README.md` checked and updated if affected
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Runtime infrastructure test passes or cleanly skips when no engine is available
@@ -112,6 +112,7 @@
 | 2026-04-29 00:29 | Step 1 completed | Added deterministic Accounts overview types, bootstrap provider, DI registration, and successful project build |
 | 2026-04-29 00:33 | Step 2 completed | Wired Accounts into API startup, preserved health, and verified both endpoints via API smoke check |
 | 2026-04-29 00:38 | Step 3 completed | Added accounts feature bootstrap test covering solution build, health, overview JSON, and infrastructure-free startup |
+| 2026-04-29 00:44 | Step 4 completed | Synced architecture, README, plan, and startup-contract docs to the first Accounts overview slice |
 
 ---
 

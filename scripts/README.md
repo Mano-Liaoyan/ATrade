@@ -39,7 +39,7 @@ There must not be separate mandatory commands for the frontend, workers, or infr
 The current bootstrap slice now implements the first infrastructure-aware runnable subset of that graph:
 
 - Aspire AppHost
-- a minimal `ATrade.Api` backend service managed by Aspire
+- a minimal `ATrade.Api` backend service managed by Aspire, with stable `GET /health` and `GET /api/accounts/overview` endpoints
 - an AppHost-managed `ATrade.Ibkr.Worker` shell process managed by Aspire
 - the first real Next.js frontend slice managed by Aspire
 - Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources declared in the AppHost graph
@@ -137,7 +137,7 @@ Behavior must stay semantically identical across platforms.
 ## Current Verification Scope
 
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
-- direct `ATrade.Api` startup and `GET /health` smoke coverage are verified in this repository's Linux environment
+- direct `ATrade.Api` startup, `GET /health` smoke coverage, and the read-only Accounts overview endpoint are verified in this repository's Linux environment via `tests/apphost/api-bootstrap-tests.sh` and `tests/apphost/accounts-feature-bootstrap-tests.sh`
 - direct frontend startup and the Next.js home-page markers are verified in this repository's Linux environment via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - the AppHost-managed frontend runtime path is verified via `tests/apphost/frontend-nextjs-bootstrap-tests.sh`, including `NODE_ENV=development`, preserved AppHost frontend logs, and warning-free startup even when a temporary repo-root lockfile exists
 - `tests/apphost/local-port-contract-tests.sh` writes a temporary repo `.env` and verifies that direct API startup, direct frontend startup, and the AppHost frontend/manifest checks all honor changed local port values
@@ -154,7 +154,7 @@ The `run` contract is now bootstrapped in the repository. This covers the first 
 - `./start.ps1 run` provides the PowerShell entrypoint
 - `./start.cmd run` provides the Windows command prompt entrypoint
 - GitHub Actions now runs a Windows-hosted smoke harness for both Windows wrappers
-- the current graph hosts the first minimal `ATrade.Api` service, an inert `ATrade.Ibkr.Worker` shell, the first real Next.js frontend home page, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
+- the current graph hosts `ATrade.Api` with its `GET /health` and `GET /api/accounts/overview` slice, an inert `ATrade.Ibkr.Worker` shell, the first real Next.js frontend home page, and named Aspire-managed `postgres`, `timescaledb`, `redis`, and `nats` resources
 - the AppHost now wires explicit managed-resource references into the application graph: `api` receives `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, while `ibkr-worker` receives `Postgres`, `Redis`, and `NATS`
 - developer-controlled local bind ports now come from the repo-level `.env` contract (`.env.example` defaults + optional ignored `.env` overrides)
 - the AppHost graph now applies explicit runtime safeguards for the local Podman-backed Docker API path: `--pids-limit 2048` on the four managed infra containers plus deterministic `TS_TUNE_MEMORY=512MB` / `TS_TUNE_NUM_CPUS=2` values for `timescaledb`
