@@ -1,6 +1,6 @@
 # TP-024: Add provider-neutral analysis engine abstraction and API contract — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Create the analysis module contracts
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-29
 **Review Level:** 2
@@ -23,14 +23,14 @@
 ---
 
 ### Step 1: Create the analysis module contracts
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Analysis project added to solution
-- [ ] Provider-neutral engine/request/result contracts defined
-- [ ] Market-data inputs use ATrade normalized bars/symbols
-- [ ] Results include source/engine metadata
-- [ ] No-configured-engine behavior added
-- [ ] Targeted Analysis tests/build pass
+- [x] Analysis project added to solution
+- [x] Provider-neutral engine/request/result contracts defined
+- [x] Market-data inputs use ATrade normalized bars/symbols
+- [x] Results include source/engine metadata
+- [x] No-configured-engine behavior added
+- [x] Targeted Analysis tests/build pass
 
 ---
 
