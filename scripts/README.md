@@ -113,11 +113,11 @@ now come from a repo-level `.env` contract.
 - `ATRADE_FRONTEND_DIRECT_HTTP_PORT` — direct `frontend/` `npm run dev` verification path
 - `ATRADE_APPHOST_FRONTEND_HTTP_PORT` — AppHost-managed Next.js frontend port
 
-### Paper-trading, iBeam, and LEAN runtime placeholders
+### Paper-trading, iBeam, market-data cache, and LEAN runtime placeholders
 
-These placeholders define the safe local IBKR/iBeam and analysis-runtime
-contract without committing real credentials or enabling broker behavior by
-default.
+These placeholders define the safe local IBKR/iBeam, market-data cache, and
+analysis-runtime contract without committing real credentials or enabling broker
+behavior by default.
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker/iBeam wiring; committed default stays `false`
 - `ATRADE_BROKER_ACCOUNT_MODE` — committed default stays `Paper`; live mode remains rejected by the API, worker, and simulation guardrails
@@ -130,6 +130,7 @@ default.
 - `ATRADE_IBKR_PAPER_ACCOUNT_ID` — fake `IBKR_ACCOUNT_ID` placeholder for a paper account identifier; real values stay only in ignored `.env` and surface only as redacted booleans in status payloads
 - `ATRADE_FRONTEND_API_BASE_URL` — legacy/frontend-to-API base URL for the paper-trading workspace
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL` — browser-safe Next.js public API base URL used by the trading workspace HTTP and SignalR clients; committed default mirrors `ATRADE_FRONTEND_API_BASE_URL`
+- `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` — non-secret TimescaleDB market-data cache freshness window; committed default is `30`, meaning future API cache-aside reads may use provider-backed rows written within the last 30 minutes before refreshing from the provider
 - `ATRADE_ANALYSIS_ENGINE` — analysis provider selector; committed default is `none`, set ignored `.env` to `Lean` to enable the LEAN provider
 - `ATRADE_LEAN_RUNTIME_MODE` — official LEAN runtime invocation mode (`cli` by default, `docker` supported for a Docker-backed command wrapper)
 - `ATRADE_LEAN_CLI_COMMAND` — local official LEAN CLI command/path; committed default is `lean`
@@ -161,7 +162,7 @@ This contract intentionally does **not** move everything into `.env`.
 
 - AppHost internal host/dashboard bindings stay intentionally ephemeral on `127.0.0.1:0`.
 - Service/container target ports such as `5432`, `6379`, `4222`, and iBeam's internal Client Portal port `5000` remain fixed where the protocol or container image expects them; configure only their host bind ports where supported.
-- Real broker credentials, session cookies, tokens, real account identifiers, or any value that would create a live-trading path must never appear in `.env.template`. LEAN settings are non-secret local runtime settings only and must not contain broker credentials.
+- Real broker credentials, session cookies, tokens, real account identifiers, or any value that would create a live-trading path must never appear in `.env.template`. LEAN settings and `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` are non-secret local runtime settings only and must not contain broker credentials.
 
 ## Reserved Commands
 

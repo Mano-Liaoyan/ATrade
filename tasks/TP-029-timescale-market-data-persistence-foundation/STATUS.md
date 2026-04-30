@@ -1,6 +1,6 @@
 # TP-029: Add TimescaleDB market-data persistence foundation — Status
 
-**Current Step:** Step 0: Preflight and scope boundary
+**Current Step:** Step 1: Add configurable market-data freshness options
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -22,13 +22,13 @@
 ---
 
 ### Step 1: Add configurable market-data freshness options
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `.env.template` defines `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES=30`
-- [ ] Typed freshness options parse and validate configured/default values
-- [ ] Default freshness period is 30 minutes
-- [ ] Freshness option tests added
-- [ ] Non-secret config behavior documented
+- [x] `.env.template` defines `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES=30`
+- [x] Typed freshness options parse and validate configured/default values
+- [x] Default freshness period is 30 minutes
+- [x] Freshness option tests added
+- [x] Non-secret config behavior documented
 
 ---
 
@@ -90,6 +90,10 @@
 | AppHost already declares `timescaledb` as a dedicated Aspire Postgres resource using the TimescaleDB image and passes it to `ATrade.Api` via `.WithReference(timescaledb)`. | Verified as Step 0 scope input. | `src/ATrade.AppHost/Program.cs` |
 | Current API market-data endpoints resolve directly through `IMarketDataService`, which delegates to the configured provider; there is no Timescale project/reference or market-data persistence path yet. | Confirms TP-029 must add persistence foundation without changing endpoint behavior. | `src/ATrade.Api/Program.cs`, `src/ATrade.MarketData/MarketDataService.cs`, `src/ATrade.Api/ATrade.Api.csproj` |
 | Scope boundary: TP-029 adds Timescale schema/repository/options/composition only; TP-030 will wire `/api/market-data/*` cache-aside reads/writes and endpoint behavior changes. | Recorded in Step 0 and will be preserved in docs/delivery notes. | Task boundary |
+| Freshness is represented as a positive `TimeSpan` parsed from `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`; absent/blank configuration keeps the default. | Implemented in new Timescale options model. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataOptions.cs` |
+| Default market-data cache freshness is exactly 30 minutes in both the committed environment template and typed options default. | Verified by source build/inspection and will be locked with unit tests. | `.env.template`, `src/ATrade.MarketData.Timescale/TimescaleMarketDataOptions.cs` |
+| Freshness option tests cover absent/blank defaults, configured positive values, fractional boundary values, and invalid zero/negative/non-numeric values without loading ignored `.env`. | `dotnet test ... --filter FullyQualifiedName~TimescaleMarketDataOptionsTests` passed (10 tests). | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataOptionsTests.cs` |
+| `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` is documented as non-secret configuration for future Timescale cache-aside reads; it does not enable broker behavior or contain credentials. | Documented in local configuration contract. | `scripts/README.md` |
 
 ---
 
@@ -100,6 +104,7 @@
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-04-30 15:13 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-30 15:13 | Step 0 started | Preflight and scope boundary |
+| 2026-04-30 | Step 1 started | Freshness option implementation |
 
 ---
 
