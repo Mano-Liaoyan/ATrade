@@ -123,6 +123,8 @@
 | 2026-04-30 | Documentation | `scripts/README.md`, `README.md`, and `docs/architecture/overview.md` reviewed/updated; `docs/INDEX.md` unchanged because no new active docs were introduced. |
 | 2026-04-30 | Step 5 complete | Final variable/default/OTLP discoveries logged and task marked complete. |
 | 2026-04-30 | Documentation verification | `bash tests/start-contract/start-wrapper-tests.sh` and `bash tests/apphost/paper-trading-config-contract-tests.sh` passed after documentation updates. |
+| 2026-04-30 16:30 | Worker iter 1 | done in 1156s, tools: 144 |
+| 2026-04-30 16:30 | Task complete | .DONE created |
 
 ---
 
