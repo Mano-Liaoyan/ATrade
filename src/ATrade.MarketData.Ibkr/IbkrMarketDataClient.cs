@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -148,8 +149,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
 
     public async Task<IReadOnlyList<IbkrScannerResult>> GetTrendingScannerResultsAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PostAsJsonAsync(
-            ScannerPath,
+        var requestBody = JsonSerializer.SerializeToUtf8Bytes(
             new
             {
                 instrument = "STK",
@@ -157,8 +157,16 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
                 type = "TOP_PERC_GAIN",
                 filter = Array.Empty<object>(),
             },
-            JsonOptions,
-            cancellationToken).ConfigureAwait(false);
+            JsonOptions);
+        using var request = new HttpRequestMessage(HttpMethod.Post, ScannerPath)
+        {
+            Content = new ByteArrayContent(requestBody),
+        };
+        request.Headers.TransferEncodingChunked = false;
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        request.Content.Headers.ContentLength = requestBody.Length;
+
+        using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         await EnsureMarketDataSuccessAsync(response, cancellationToken).ConfigureAwait(false);
 
         using var document = await ReadJsonDocumentAsync(response, cancellationToken).ConfigureAwait(false);

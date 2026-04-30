@@ -1,6 +1,6 @@
 # TP-028: Fix IBKR scanner 411 Length Required for trending — Status
 
-**Current Step:** Step 0: Preflight and failure classification
+**Current Step:** Step 1: Send a Client Portal-compatible scanner request
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -22,13 +22,13 @@
 ---
 
 ### Step 1: Send a Client Portal-compatible scanner request
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Scanner request sends POST JSON with explicit positive `Content-Length` and no chunked transfer
-- [ ] Scanner payload semantics remain equivalent or source-evidenced corrections are documented
-- [ ] Safe provider error mapping and no-secrets diagnostics preserved
-- [ ] Scanner response parsing still maps valid fake IBKR responses to trending symbols
-- [ ] Targeted provider tests run
+- [x] Scanner request sends POST JSON with explicit positive `Content-Length` and no chunked transfer
+- [x] Scanner payload semantics remain equivalent or source-evidenced corrections are documented
+- [x] Safe provider error mapping and no-secrets diagnostics preserved
+- [x] Scanner response parsing still maps valid fake IBKR responses to trending symbols
+- [x] Targeted provider tests run
 
 ---
 
@@ -89,6 +89,8 @@
 | Sanitized observed failure: `GET /api/market-data/trending` fails when the IBKR/iBeam scanner response is `411 Length Required` with an HTML edge/Akamai-style body; no credentials, account IDs, cookies, tokens, or session values were recorded. | Classify scanner request shape and fix provider transport. | Step 0 preflight |
 | Current scanner implementation uses `HttpClient.PostAsJsonAsync` for `POST /v1/api/iserver/scanner/run` with JSON scanner payload (`instrument=STK`, `location=STK.US.MAJOR`, `type=TOP_PERC_GAIN`, empty `filter`). This preserves method/content-type/payload intent but does not guarantee a precomputed `Content-Length`; .NET may send streaming JSON with `Transfer-Encoding: chunked`, which is the likely Client Portal-incompatible shape behind the edge `411 Length Required`. | Replace scanner transport with buffered JSON content that explicitly sets a positive `Content-Length` and leaves chunked transfer disabled. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` |
 | Verification plan: fake `HttpMessageHandler` tests can capture the scanner `HttpRequestMessage`, assert method/path/content-type/body/`Content-Length`/no chunked transfer, return fake scanner payloads, and return fake `411 Length Required` HTML bodies without any real IBKR credentials. Optional real iBeam verification will use ignored local `.env` plus `./start run` only if already configured/authenticated; otherwise record a clean skip rationale. | Cover request shape and error mapping in automated fake-handler tests; defer real-runtime smoke to Step 3. | `tests/ATrade.MarketData.Ibkr.Tests` / Step 3 |
+| Scanner payload semantics were preserved while changing transport: the request still serializes `instrument=STK`, `location=STK.US.MAJOR`, `type=TOP_PERC_GAIN`, and an empty `filter` array. | No source-evidenced payload correction required for TP-028; regression coverage will assert the existing payload shape. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` |
+| Provider error mapping remains `401/403` => `authentication-required` and other scanner failures (including `411`) => `provider-unavailable`; provider diagnostics now redact configured username, password, paper account id, and gateway URL/host before logging or returning scanner/status errors. | Regression tests will cover safe `411` response mapping and secret redaction. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs` |
 
 ---
 
@@ -103,6 +105,13 @@
 | 2026-04-30 14:52 | Scanner request inspected | Found `PostAsJsonAsync` scanner transport likely omits explicit `Content-Length` / may use chunked transfer despite otherwise-correct POST JSON payload. |
 | 2026-04-30 14:52 | Verification plan recorded | Fake HTTP handlers can assert scanner request shape and safe `411` mapping; optional real iBeam smoke will be skipped unless local ignored credentials and authenticated runtime are available. |
 | 2026-04-30 14:52 | Step 0 completed | Failure classified; root cause and verification approach recorded. |
+| 2026-04-30 14:53 | Step 1 started | Implement Client Portal-compatible buffered scanner request. |
+| 2026-04-30 14:53 | Scanner transport updated | Replaced scanner `PostAsJsonAsync` with buffered `HttpRequestMessage` JSON content, explicit positive `Content-Length`, and chunked transfer disabled. |
+| 2026-04-30 14:53 | Scanner payload preserved | Kept existing top-percent-gainer stock scanner semantics while changing only request buffering/headers. |
+| 2026-04-30 14:53 | Provider diagnostics preserved | Kept auth/unavailable mapping and added configured-value redaction before provider messages are logged or returned. |
+| 2026-04-30 14:54 | Scanner parsing verified | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --filter FullyQualifiedName~Provider_MapsContractLookupSnapshotsHistoricalBarsAndScannerResults` passed (1/1). |
+| 2026-04-30 14:54 | Step 1 targeted tests run | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (8/8). |
+| 2026-04-30 14:54 | Step 1 completed | Scanner transport, payload preservation, safe error mapping, parsing, and targeted provider tests completed. |
 
 ---
 
