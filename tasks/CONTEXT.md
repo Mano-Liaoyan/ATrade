@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-04-30
 **Status:** Active
-**Next Task ID:** TP-028
+**Next Task ID:** TP-033
 
 ---
 
@@ -30,8 +30,15 @@ implementation queue.
 
 ## Active Task Queue
 
-No ready implementation task is currently queued. The next new Taskplane packet
-should use `TP-028`.
+Ready implementation tasks now queued:
+
+- `TP-028` — fix IBKR/iBeam scanner request `411 Length Required` failures on `/api/market-data/trending`
+- `TP-029` — add the TimescaleDB market-data persistence foundation and configurable freshness option
+- `TP-030` — wire market-data endpoints through a Timescale-first cache-aside flow after `TP-028` and `TP-029`
+- `TP-031` — fix watchlist restart persistence and market-specific search-result pinning with market badges
+- `TP-032` — make the Aspire dashboard UI port configurable through the repo-local `.env` contract
+
+The next new Taskplane packet should use `TP-033`.
 
 Completed task packets `TP-019` through `TP-027` currently remain under
 `tasks/` with `.DONE` markers pending archival. Older completed packets live
@@ -43,7 +50,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-028`
+- New tasks should use the next ID: `TP-033`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -71,7 +78,7 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                 |
 | Documentation index | `docs/INDEX.md`                           |
 | Startup contract    | `scripts/README.md`                       |
-| Active tasks        | None currently queued                     |
+| Active tasks        | `tasks/TP-028-*` through `tasks/TP-032-*` |
 | Completed pending archival | `tasks/TP-019-*` through `tasks/TP-027-*` |
 | Archived tasks      | `tasks/archive/`                          |
 | Taskplane config    | `.pi/taskplane-config.json`               |

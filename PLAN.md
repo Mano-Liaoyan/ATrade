@@ -16,18 +16,27 @@ see_also:
 
 ## Current Focus
 
-The provider-backed paper-trading workspace batch (`TP-019` through `TP-025`)
-and follow-up runtime cleanup tasks (`TP-026` / `TP-027`) have landed. Current
-repository contracts are:
+A new follow-up batch (`TP-028` through `TP-032`) is queued to harden the
+provider-backed paper-trading workspace around real IBKR/iBeam market data,
+TimescaleDB persistence, durable/exact watchlist pins, and local AppHost
+configuration. Current repository contracts are:
 
 - use `ATrade.slnx` as the authoritative solution reference for active build/test guidance
 - keep the local IBKR/iBeam refresh transport on the HTTPS Client Portal contract
 - keep credentials, account identifiers, tokens, cookies, and live-trading behavior out of committed files and active defaults
+- keep frontend/browser data access behind `ATrade.Api`; the frontend must not connect directly to Postgres or TimescaleDB
 
 ## Active Task Queue
 
-No ready implementation task is currently queued. The next new Taskplane packet
-should use `TP-028`.
+Ready implementation tasks:
+
+- `TP-028` — fix IBKR/iBeam scanner request `411 Length Required` failures on `/api/market-data/trending`
+- `TP-029` — add the TimescaleDB market-data persistence foundation and configurable freshness option
+- `TP-030` — serve market-data endpoints from fresh TimescaleDB rows first, then refresh from IBKR/iBeam and persist on miss/stale data
+- `TP-031` — fix watchlist restart persistence and make search pins exact to provider/market identity with market badges
+- `TP-032` — make the Aspire dashboard UI port configurable through `.env`
+
+The next new Taskplane packet should use `TP-033`.
 
 Completed task packets `TP-019` through `TP-027` remain under `tasks/` with
 `.DONE` markers pending archival. Older completed packets are archived under
@@ -35,9 +44,10 @@ Completed task packets `TP-019` through `TP-027` remain under `tasks/` with
 
 ## Execution Order
 
-The `TP-019` through `TP-027` batch is complete. Archive completed task packets
-when orchestration cleanup time allows, then queue follow-up work starting at
-`TP-028`.
+Recommended orchestration order:
+
+1. Wave 1 can run in parallel where file scopes allow: `TP-028`, `TP-029`, `TP-031`, and `TP-032`.
+2. Wave 2: `TP-030` after both `TP-028` and `TP-029` are complete.
 
 The orchestrator dependency sections in each `PROMPT.md` are the machine-readable
 source for batch ordering.
@@ -54,4 +64,4 @@ source for batch ordering.
 
 ## Next Task ID
 
-`TP-028`
+`TP-033`

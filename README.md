@@ -108,9 +108,15 @@ timeouts surface as safe `analysis-engine-unavailable` responses.
 
 Taskplane packets live directly under `tasks/` while pending archival.
 
-No ready implementation task is currently queued. Completed Taskplane packets
-`TP-019` through `TP-027` currently remain under `tasks/` with `.DONE` markers
-pending archival; older completed packets live under `tasks/archive/`.
+Ready implementation tasks are queued as `TP-028` through `TP-032` for IBKR
+scanner/trending reliability, TimescaleDB market-data persistence, exact
+Postgres-backed watchlist pins, market-specific search badges, and configurable
+Aspire dashboard binding. `TP-030` depends on both `TP-028` and `TP-029`; the
+other new tasks can run in parallel where file scopes allow.
+
+Completed Taskplane packets `TP-019` through `TP-027` currently remain under
+`tasks/` with `.DONE` markers pending archival; older completed packets live
+under `tasks/archive/`.
 
 ## Repository Map
 
