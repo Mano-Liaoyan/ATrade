@@ -1,7 +1,7 @@
 # TP-026: Migrate solution references from ATrade.sln to ATrade.slnx — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
@@ -67,12 +67,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Reference audit results and historical exceptions logged
-- [ ] Delivery notes explain whether `ATrade.sln` was retained or removed
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Reference audit results and historical exceptions logged
+- [x] Delivery notes explain whether `ATrade.sln` was retained or removed
 
 ---
 
@@ -130,6 +130,11 @@
 | 2026-04-30 | Step 4 start-contract | `bash tests/start-contract/start-wrapper-tests.sh` passed. |
 | 2026-04-30 | Step 4 active reference audit | Wrote `audits/final-active-reference-audit.txt` and reran `tests/scaffolding/solution-reference-contract-tests.sh`; remaining active `ATrade.sln` mentions are explicit compatibility/fallback exceptions only. |
 | 2026-04-30 | Step 4 failures fixed | Earlier targeted-script failure from missing `.env.example` was fixed by restoring the safe template; the regression-guard self-audit message was corrected; all Step 4 commands now pass. |
+| 2026-04-30 | Step 5 started | Final documentation and delivery notes for the `ATrade.slnx` migration. |
+| 2026-04-30 | Step 5 must-update docs | Verified `scripts/README.md` and `tasks/CONTEXT.md` were modified; active docs discovered by the audit (`README.md`, `PLAN.md`) were also updated with `ATrade.slnx` authority/compatibility wording. |
+| 2026-04-30 | Step 5 affected docs reviewed | Reviewed `README.md`, `PLAN.md`, `docs/INDEX.md`, and `docs/architecture/*`: README/PLAN required updates; `docs/INDEX.md` and architecture docs needed no changes because no new docs were added and no active solution-file guidance was present there. |
+| 2026-04-30 | Step 5 audit results logged | STATUS Notes/Discoveries now capture the initial/final audit files, active migration counts, and completed-task historical exceptions. |
+| 2026-04-30 | Step 5 delivery notes | Recorded that `ATrade.slnx` is authoritative and `ATrade.sln` was retained only as a non-authoritative compatibility artifact. |
 
 ---
 
@@ -142,3 +147,7 @@
 ## Notes
 
 Created after integrating batch `20260429T221511`. The integration kept both `ATrade.sln` and `ATrade.slnx`, with both solution files listing 20 projects and both builds passing. This task should make `ATrade.slnx` the active authoritative solution reference while handling `ATrade.sln` as either a temporary compatibility artifact or a removed legacy file.
+
+Reference audit summary: initial audit captured 128 `ATrade.sln` references (24 active code/script/test refs migrated, 30 TP-026 current-task refs, 74 completed-task historical refs). Final active audit is stored at `tasks/TP-026-migrate-solution-references-to-slnx/audits/final-active-reference-audit.txt`; remaining active mentions are compatibility/fallback exceptions. Completed `tasks/TP-019-*` through `TP-025-*` and `tasks/archive/*` references remain untouched as historical records.
+
+Delivery note: `ATrade.slnx` is now the authoritative active solution reference. The root `ATrade.sln` file was retained, not removed, solely as a documented non-authoritative compatibility artifact for older tooling; active scripts/tests/docs/future task guidance prefer `ATrade.slnx`.
