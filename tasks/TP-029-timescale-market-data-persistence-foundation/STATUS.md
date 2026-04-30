@@ -1,7 +1,7 @@
 # TP-029: Add TimescaleDB market-data persistence foundation — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
@@ -68,11 +68,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged with schema choices, freshness behavior, and TP-030 handoff notes
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged with schema choices, freshness behavior, and TP-030 handoff notes
 
 ---
 
@@ -111,6 +111,9 @@
 | Step 4 full solution test gate passed. | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed with zero failures. | Testing gate |
 | Step 4 full solution build gate passed. | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with zero warnings/errors. | Testing gate |
 | No Step 4 failures remain to fix or document. | All targeted, integration, full test, and solution build commands passed. | Testing gate |
+| Must-update documentation now describes the Timescale market-data persistence foundation and `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`. | Updated `.env.template`, `scripts/README.md`, `docs/architecture/paper-trading-workspace.md`, and `docs/architecture/modules.md`. | Documentation gate |
+| Check-if-affected docs were reviewed: `overview`, `provider-abstractions`, and `README` were updated for the new Timescale foundation; `docs/INDEX.md` needed no change because no new active docs were introduced. | Reviewed and updated where relevant. | `docs/architecture/overview.md`, `docs/architecture/provider-abstractions.md`, `README.md`, `docs/INDEX.md` |
+| Final delivery handoff: schema uses `atrade_market_data.candles` keyed by provider/source/symbol/timeframe/candle time and `atrade_market_data.trending_snapshots` keyed by provider/source/symbol/generated time; freshness defaults to 30 minutes from `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`; TP-030 owns API cache-aside wiring. | Logged for dependent task handoff. | Delivery notes |
 
 ---
 
@@ -125,6 +128,7 @@
 | 2026-04-30 | Step 2 started | Timescale schema and repository contracts |
 | 2026-04-30 | Step 3 started | Composition and optional integration verification |
 | 2026-04-30 | Step 4 started | Testing and verification gate |
+| 2026-04-30 | Step 5 started | Documentation and delivery notes |
 
 ---
 

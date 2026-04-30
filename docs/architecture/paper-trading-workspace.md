@@ -28,7 +28,8 @@ see_also:
 > `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
 > `POST /api/analysis/run`, a `/hubs/market-data` SignalR hub,
 > backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
-> endpoints backed by the AppHost-managed Postgres resource, AppHost-driven
+> endpoints backed by the AppHost-managed Postgres resource, a TimescaleDB
+> market-data persistence foundation in `ATrade.MarketData.Timescale`, AppHost-driven
 > paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
 > IBKR scanner-driven trending symbols, IBKR stock search, Postgres-backed
 > watchlists, `lightweight-charts` candlesticks, timeframe switching,
@@ -132,7 +133,10 @@ is available. The analysis endpoints resolve `IAnalysisEngineRegistry`; they
 return explicit `analysis-engine-not-configured` metadata when no engine is
 selected and run the configured LEAN provider over `IMarketDataService` candles
 when `ATRADE_ANALYSIS_ENGINE=Lean`; NATS remains the internal event backbone
-between API and workers.
+between API and workers. The Timescale-backed market-data repository and schema
+foundation now exists, but these endpoints intentionally continue to read through
+the provider path directly until the TP-030 cache-aside task wires fresh
+Timescale rows into `/api/market-data/*` behavior.
 
 ### 3.3 Backend modules and workers
 
@@ -156,6 +160,11 @@ The paper-trading slice extends existing planned responsibilities as follows:
   mapping, snapshots, historical bars, indicator inputs, source metadata, and
   safe not-configured/unavailable/authentication-required responses without
   reading credentials directly
+- `ATrade.MarketData.Timescale` owns the provider-neutral TimescaleDB persistence
+  foundation for provider-backed OHLCV candle series and scanner/trending
+  snapshots. It creates the `atrade_market_data` schema, stores provider metadata
+  as generic `provider` / `provider_symbol_id` values, and exposes freshness-aware
+  repository contracts without changing API endpoint behavior yet.
 - `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
   request/result contracts, engine/source metadata, API-facing registry, and
   no-configured-engine fallback for LEAN or alternate analysis runtimes
@@ -316,11 +325,22 @@ and named workspaces exist, the API deliberately uses the temporary
 
 ### 6.2 TimescaleDB
 
-TimescaleDB stores time-series data needed by the workspace:
+TimescaleDB stores time-series data needed by the workspace. The current
+foundation creates an `atrade_market_data` schema with hypertable-ready candle
+and scanner/trending snapshot tables for provider-backed market data:
 
-- historical OHLCV bars for charts
-- intraday paper-market snapshots when retained for analysis
+- historical OHLCV bars for charts, keyed by provider, source, symbol, timeframe,
+  and candle timestamp
+- scanner/trending snapshots with provider-neutral symbol identity, source,
+  generated timestamp, score/factor details, and reasons metadata
 - derived factor time series used by trending calculations
+
+`ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` controls the non-secret freshness
+window for future API cache-aside reads. The committed default is `30`, meaning
+TP-030 may use Timescale rows generated in the last 30 minutes before refreshing
+from the provider. This task only establishes storage/options; the browser still
+reaches market data through `ATrade.Api`, and endpoint cache-aside behavior is
+deferred to TP-030.
 
 ### 6.3 Redis
 

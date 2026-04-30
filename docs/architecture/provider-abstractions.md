@@ -95,7 +95,10 @@ Core types:
   `symbol`, `provider`, `providerSymbolId`, `assetClass`, `exchange`, and
   `currency`; for IBKR the provider symbol id is the Client Portal `conid`.
   Other payloads include source metadata such as `ibkr-ibeam-history`,
-  `ibkr-ibeam-snapshot`, or scanner source ids.
+  `ibkr-ibeam-snapshot`, or scanner source ids. The Timescale persistence
+  foundation stores the same metadata generically as `provider`,
+  `provider_symbol_id`, symbol, exchange, currency, asset class, source, and
+  timestamps; it must not persist frontend-only or IBKR-only API types.
 
 Compatibility layer:
 
@@ -107,6 +110,9 @@ Compatibility layer:
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`.
 - Production provider composition is now `ATrade.MarketData.Ibkr`; the former
   production market-data mock providers and catalog fallback have been removed.
+- `ATrade.MarketData.Timescale` is a storage foundation, not a provider. TP-030
+  will wire cache-aside behavior on top of it without changing provider-neutral
+  endpoint payloads.
 
 Unavailable handling:
 
@@ -155,7 +161,8 @@ Core rules:
   frontend type names. The current API composes `AddMarketDataModule()` plus
   `AddIbkrMarketDataProvider()`, `AddAnalysisModule()`, and
   `AddLeanAnalysisEngine(...)`; LEAN only becomes active when configuration
-  selects it.
+  selects it. The Timescale storage extension is available for cache-aside wiring
+  but is not currently registered into `ATrade.Api` endpoint behavior.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.
@@ -213,7 +220,9 @@ Future plug-ins:
   pin-any-symbol workflows while persisting provider metadata through
   `ATrade.Workspaces`.
 - Polygon or another market-data provider may be added later behind the same
-  contracts and source metadata rules.
+  contracts and source metadata rules, reusing the Timescale storage fields for
+  provider/source/symbol identity instead of introducing provider-specific
+  persistence columns.
 - LEAN is now the first analysis-engine provider behind `ATrade.Analysis`; it
   consumes normalized market-data/signal contracts and must not become an API or
   UI type assumption. Runtime-unavailable or timeout states surface as explicit

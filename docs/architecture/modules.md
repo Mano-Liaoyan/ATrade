@@ -20,7 +20,7 @@ see_also:
 > `src/ATrade.ServiceDefaults`, `src/ATrade.Api`, `src/ATrade.Accounts`,
 > `src/ATrade.Brokers`, `src/ATrade.Brokers.Ibkr`, `src/ATrade.Orders`,
 > `src/ATrade.MarketData`, `src/ATrade.MarketData.Ibkr`,
-> `src/ATrade.Analysis`, `src/ATrade.Analysis.Lean`,
+> `src/ATrade.MarketData.Timescale`, `src/ATrade.Analysis`, `src/ATrade.Analysis.Lean`,
 > `src/ATrade.Workspaces`, and `workers/ATrade.Ibkr.Worker` now exist.
 > `ATrade.Accounts` provides the deterministic bootstrap overview endpoint,
 > `ATrade.Brokers` defines the provider-neutral broker contract,
@@ -33,8 +33,10 @@ see_also:
 > compatibility services, provider status/error shapes, stock search contracts,
 > and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
 > first real IBKR/iBeam market-data provider including secdef search/detail
-> mapping. `ATrade.Analysis` now defines the provider-neutral analysis engine
-> seam, API-facing registry, normalized request/result shapes, engine/source
+> mapping. `ATrade.MarketData.Timescale` now provides the TimescaleDB persistence
+> foundation for provider-backed candles and scanner/trending snapshots without
+> changing API endpoint behavior yet. `ATrade.Analysis` now defines the
+> provider-neutral analysis engine seam, API-facing registry, normalized request/result shapes, engine/source
 > metadata, and no-configured-engine fallback. `ATrade.Analysis.Lean` now
 > implements LEAN as the first analysis engine provider behind that seam using
 > a generated analysis-only LEAN workspace and safe runtime-unavailable states.
@@ -62,7 +64,9 @@ see_also:
 > `POST /api/analysis/run`, `GET` / `PUT` / `POST`
 > `/api/workspace/watchlist`, `DELETE /api/workspace/watchlist/{symbol}`, and
 > `/hubs/market-data` while the worker limits itself to paper-safe
-> session/status monitoring.
+> session/status monitoring. Timescale market-data storage contracts are present
+> for TP-030 cache-aside wiring, but `/api/market-data/*` still reads through the
+> provider path directly in this slice.
 
 ## 1. How To Read This Document
 
@@ -237,15 +241,36 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.Api`. Search results include provider, provider symbol id, asset
   class, exchange, currency, and name so UI/watchlist payloads remain provider-neutral.
   Concrete providers are registered by composition; production no
-  longer ships a deterministic market-data provider or catalog fallback. Future
-  slices may persist historical chart queries in TimescaleDB, publish real-time
-  updates onto NATS for API / SignalR projection, and cache hot reads in Redis.
+  longer ships a deterministic market-data provider or catalog fallback. The
+  Timescale persistence foundation now lives in `ATrade.MarketData.Timescale`;
+  TP-030 will decide when API cache-aside reads can use fresh stored rows before
+  refreshing from providers. Future slices may publish real-time updates onto
+  NATS for API / SignalR projection and cache hot reads in Redis.
 - **Expected dependencies:** No external runtime services in the contract module
   beyond composition into `ATrade.Api`; concrete providers such as
   `ATrade.MarketData.Ibkr` depend on broker/iBeam configuration and gateway
   clients.
 - **First-phase focus:** Keep HTTP/SignalR payloads provider-neutral while the
   current workspace uses the IBKR/iBeam provider behind this boundary.
+
+#### 2.7.1 `ATrade.MarketData.Timescale` *(exists today, Timescale persistence foundation)*
+
+- **Purpose:** Provider-neutral TimescaleDB storage for market-data time series.
+- **Responsibilities:** Own the `atrade_market_data` schema, idempotent
+  Timescale initialization for candle and scanner/trending snapshot hypertables,
+  repository contracts for upserting/reading fresh candle series and trending
+  snapshots, and typed cache freshness options from
+  `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`. Storage records provider metadata
+  as generic `provider` / `provider_symbol_id` fields plus symbol, exchange,
+  currency, asset class, source, generated/observed timestamps, and write
+  timestamps.
+- **Expected dependencies:** `ATrade.MarketData`, `TimescaleDB` via
+  AppHost-provided `ConnectionStrings:timescaledb`, .NET configuration/DI
+  abstractions, and `Npgsql`. It intentionally does not depend on
+  `ATrade.Api`, frontend types, or concrete provider modules such as
+  `ATrade.MarketData.Ibkr`.
+- **First-phase focus:** Establish storage/options and verification hooks only;
+  TP-030 wires API cache-aside behavior.
 
 ### 2.8 `ATrade.Analysis` *(exists today, provider-neutral analysis engine seam)*
 
@@ -460,6 +485,7 @@ ATrade.Api ──► ATrade.Accounts
           ├──► ATrade.Analysis ──► ATrade.MarketData
           ├──► ATrade.Strategies ◄── strategy-worker
           └──► ATrade.MarketData ◄──── ATrade.MarketData.Ibkr
+                              ├──► ATrade.MarketData.Timescale ──► TimescaleDB
                               └──► ATrade.MarketData.Polygon ◄── polygon-worker
 
 All modules ──► ATrade.ServiceDefaults
