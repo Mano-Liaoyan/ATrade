@@ -1,7 +1,7 @@
 # TP-027: Fix authenticated iBeam refresh transport failures — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 3
 **Review Counter:** 0
@@ -143,6 +143,8 @@
 | 2026-04-30 | Step 5 must-update docs | Updated `.env.template`, restored/synchronized `.env.example`, `scripts/README.md`, `docs/architecture/paper-trading-workspace.md`, and `docs/architecture/provider-abstractions.md` for HTTPS iBeam URL, loopback self-signed certificate scope, and retry/readiness guidance. `paper-trading-config-contract-tests.sh` and `ibeam-runtime-contract-tests.sh` passed after doc/template updates. |
 | 2026-04-30 | Step 5 check-if-affected docs | Reviewed/updated `README.md`, `PLAN.md`, `tasks/CONTEXT.md`, and `docs/architecture/modules.md` for the current TP-026/TP-027 queue and shared HTTPS iBeam transport responsibilities. `docs/INDEX.md` was reviewed and left unchanged because no new docs were introduced. |
 | 2026-04-30 | Step 5 complete | Documentation/templates, discoveries, and delivery retry notes completed for the iBeam HTTPS transport fix. |
+| 2026-04-30 08:18 | Worker iter 1 | done in 1747s, tools: 208 |
+| 2026-04-30 08:18 | Task complete | .DONE created |
 
 ---
 
