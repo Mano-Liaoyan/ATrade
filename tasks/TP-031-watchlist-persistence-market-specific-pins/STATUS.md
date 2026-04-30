@@ -1,11 +1,11 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Diagnose current restart and symbol-only pin behavior
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,12 +13,12 @@
 ---
 
 ### Step 0: Diagnose current restart and symbol-only pin behavior
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Service-restart persistence path reproduced or inspected
-- [ ] Symbol-only schema/API/frontend pin behavior recorded
-- [ ] Durable provider/market instrument identity chosen and recorded
-- [ ] localStorage confirmed non-authoritative and unable to mask persistence failure
+- [x] Service-restart persistence path reproduced or inspected
+- [x] Symbol-only schema/API/frontend pin behavior recorded
+- [x] Durable provider/market instrument identity chosen and recorded
+- [x] localStorage confirmed non-authoritative and unable to mask persistence failure
 
 ---
 
@@ -101,6 +101,10 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Existing `postgres-watchlist-persistence-tests.sh` successfully pins via API, restarts `ATrade.Api` against the same disposable Postgres container, and verifies AAPL/MSFT survive; restart persistence path itself passes before identity changes. | Use as baseline; extend later for duplicate provider/market pins. | `tests/apphost/postgres-watchlist-persistence-tests.sh`; run `bash tests/apphost/postgres-watchlist-persistence-tests.sh` |
+| Current identity collapses duplicate instruments to bare symbols: Postgres primary key and upsert conflict are `(user_id, workspace_id, symbol)`, replacement normalization merges same-symbol rows, API unpin is `DELETE /api/workspace/watchlist/{symbol}`, and frontend `pinnedSymbolNames`/`savingSymbol`/search pinned set use uppercased symbol strings. | Backend and frontend must move to exact `instrumentKey`/provider-market identity; symbol-only delete can remain only as unambiguous legacy fallback. | `src/ATrade.Workspaces/PostgresWorkspaceWatchlistSql.cs`; `WorkspaceWatchlistNormalizer.cs`; `WorkspaceWatchlistRepository.cs`; `src/ATrade.Api/Program.cs`; `frontend/components/TradingWorkspace.tsx`; `SymbolSearch.tsx` |
+| Chosen durable identity: expose `instrumentKey`/`pinKey` as the normalized tuple `provider=<provider>|providerSymbolId=<id>|ibkrConid=<conid>|symbol=<symbol>|exchange=<exchange>|currency=<currency>|assetClass=<assetClass>`. Provider is lower-case; symbol/exchange/currency/assetClass are upper-case; IBKR `conid` is mirrored into `providerSymbolId` when only `ibkrConid` is supplied. Same symbol/name on a different exchange/currency/provider id yields a different key. | Implement in backend normalizer/model/API JSON, Postgres unique key, frontend exact pin state, and docs. | `WorkspaceWatchlistModels.cs`; `WorkspaceWatchlistNormalizer.cs`; frontend exact-key helpers |
+| Browser `localStorage` is currently a symbol-only cache/migration source: backend responses write symbols into it, initial backend load migrates unmigrated cached manual symbols, and backend failures show cached rows with `source='cache'`, a watchlist error, and disabled actions. It should remain legacy/manual only and must not infer provider-market pinned state. | Preserve/strengthen read-only cache behavior; database failures must surface as errors instead of being presented as persisted pins. | `frontend/lib/watchlistStorage.ts`; `frontend/components/TradingWorkspace.tsx`; `frontend/components/Watchlist.tsx` |
 
 ---
 
@@ -109,6 +113,12 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-30 15:40 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-30 15:40 | Step 0 started | Diagnose current restart and symbol-only pin behavior |
+| 2026-04-30 15:45 | Restart persistence baseline | `bash tests/apphost/postgres-watchlist-persistence-tests.sh` passed; pins persisted across API restart with same Postgres DB. |
+| 2026-04-30 15:48 | Symbol-only pin behavior inspected | Schema, repository/API unpin, normalizer duplicate merge, and frontend pinned-state all key off bare symbol, so same-symbol market results appear pinned together. |
+| 2026-04-30 15:51 | Instrument identity chosen | Durable watchlist key will be the normalized provider/providerSymbolId/ibkrConid/symbol/exchange/currency/assetClass tuple, exposed as `instrumentKey` and `pinKey`. |
+| 2026-04-30 15:53 | localStorage behavior inspected | Cache is symbol-only, loaded only as read-only fallback with an error on backend failure, and used as one-time manual migration after backend load. |
 
 ---
 
