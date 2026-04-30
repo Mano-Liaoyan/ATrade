@@ -33,6 +33,8 @@ var nats = builder.AddNats("nats")
 
 if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out var gatewayTag))
 {
+    var gatewayHostPort = paperTradingContract.GetGatewayPort();
+
     builder.AddContainer("ibkr-gateway", gatewayImage, gatewayTag)
         .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
         .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamAccount, ibkrUsername)
@@ -40,8 +42,8 @@ if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out v
         .WithEndpoint(
             name: "https",
             scheme: "https",
-            targetPort: paperTradingContract.GetGatewayPort(),
-            port: paperTradingContract.GetGatewayPort(),
+            targetPort: IbkrGatewayContainerOptions.DefaultIbeamClientPortalPort,
+            port: gatewayHostPort,
             isProxied: false);
 }
 

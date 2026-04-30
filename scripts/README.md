@@ -121,8 +121,8 @@ default.
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker/iBeam wiring; committed default stays `false`
 - `ATRADE_BROKER_ACCOUNT_MODE` — committed default stays `Paper`; live mode remains rejected by the API, worker, and simulation guardrails
-- `ATRADE_IBKR_GATEWAY_URL` — local iBeam/IBKR Gateway Client Portal API base URL; committed default is `https://127.0.0.1:5000` because `voyz/ibeam:latest` serves HTTPS on the local gateway port
-- `ATRADE_IBKR_GATEWAY_PORT` — local iBeam container/API port; committed default is `5000`
+- `ATRADE_IBKR_GATEWAY_URL` — local iBeam/IBKR Gateway Client Portal API base URL; committed default is `https://127.0.0.1:5000` because `voyz/ibeam:latest` serves HTTPS on the local gateway host port
+- `ATRADE_IBKR_GATEWAY_PORT` — local host bind port for the iBeam Client Portal API; committed default is `5000`; AppHost maps this host port to the container's internal Client Portal port `5000`
 - `ATRADE_IBKR_GATEWAY_IMAGE` — local iBeam image/tag; committed default is the user-approved `voyz/ibeam:latest`
 - `ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS` — optional timeout for the official iBeam/Gateway status client; committed default stays a paper-safe low value
 - `ATRADE_IBKR_USERNAME` — fake `IBKR_USERNAME` placeholder; replace only in ignored `.env` with the IBKR paper-login username, which AppHost maps to iBeam `IBEAM_ACCOUNT`
@@ -145,10 +145,11 @@ To start local iBeam for user-driven IBKR API login, copy `.env.template` to
 HTTPS gateway URL (`https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>`), and replace
 only the fake `ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`, and
 `ATRADE_IBKR_PAPER_ACCOUNT_ID` placeholders in ignored `.env`. The AppHost then
-adds `ibkr-gateway` with `voyz/ibeam:latest`, exposes the container endpoint as
-HTTPS, passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to that container via
-Aspire secret parameters, and keeps the raw username, password, and account id
-out of manifests and status payloads. The Client Portal certificate is a local
+adds `ibkr-gateway` with `voyz/ibeam:latest`, publishes the container's
+internal Client Portal port `5000` on the configured HTTPS host port, passes
+only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to that container via Aspire secret
+parameters, and keeps the raw username, password, and account id out of
+manifests and status payloads. The Client Portal certificate is a local
 development/self-signed certificate; ATrade's HTTP clients trust that condition
 only for loopback/local iBeam HTTPS traffic and never disable certificate
 validation globally or for arbitrary hosts.
@@ -156,7 +157,7 @@ validation globally or for arbitrary hosts.
 This contract intentionally does **not** move everything into `.env`.
 
 - AppHost internal host/dashboard bindings stay intentionally ephemeral on `127.0.0.1:0`.
-- Service/container target ports such as `5432`, `6379`, and `4222` remain fixed where the protocol or container image expects them.
+- Service/container target ports such as `5432`, `6379`, `4222`, and iBeam's internal Client Portal port `5000` remain fixed where the protocol or container image expects them; configure only their host bind ports where supported.
 - Real broker credentials, session cookies, tokens, real account identifiers, or any value that would create a live-trading path must never appear in `.env.example` or `.env.template`. LEAN settings are non-secret local runtime settings only and must not contain broker credentials.
 
 ## Reserved Commands

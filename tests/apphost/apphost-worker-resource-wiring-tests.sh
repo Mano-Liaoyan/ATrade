@@ -27,11 +27,13 @@ publish_apphost_manifest() {
   local integration_enabled="$2"
   local username="$3"
   local password="$4"
+  local gateway_url="${5:-https://127.0.0.1:5000}"
+  local gateway_port="${6:-5000}"
 
   ATRADE_BROKER_INTEGRATION_ENABLED="$integration_enabled" \
   ATRADE_BROKER_ACCOUNT_MODE=Paper \
-  ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000 \
-  ATRADE_IBKR_GATEWAY_PORT=5000 \
+  ATRADE_IBKR_GATEWAY_URL="$gateway_url" \
+  ATRADE_IBKR_GATEWAY_PORT="$gateway_port" \
   ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest \
   ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15 \
   ATRADE_IBKR_USERNAME="$username" \
@@ -250,10 +252,44 @@ for resource_name in ("api", "ibkr-worker"):
 PY
 }
 
+assert_manifest_maps_custom_ibeam_host_port_to_client_port() {
+  enabled_manifest_path="$(mktemp --suffix=.json)"
+  publish_apphost_manifest \
+    "$enabled_manifest_path" \
+    true \
+    REAL_IBKR_USERNAME_SHOULD_NOT_SURFACE \
+    REAL_IBKR_PASSWORD_SHOULD_NOT_SURFACE \
+    https://127.0.0.1:15000 \
+    15000
+  assert_secret_parameters_are_redacted "$enabled_manifest_path"
+
+  python3 - <<'PY' "$enabled_manifest_path"
+import json
+import sys
+from pathlib import Path
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+resources = manifest.get("resources", {})
+container = resources.get("ibkr-gateway")
+if container is None:
+    raise SystemExit("custom-port manifest must include ibkr-gateway")
+https_binding = container.get("bindings", {}).get("https", {})
+if https_binding.get("scheme") != "https" or https_binding.get("targetPort") != 5000:
+    raise SystemExit(f"custom host gateway port must still map to iBeam Client Portal target port 5000: {https_binding!r}")
+for resource_name in ("api", "ibkr-worker"):
+    env = resources[resource_name].get("env", {})
+    if env.get("ATRADE_IBKR_GATEWAY_URL") != "https://127.0.0.1:15000":
+        raise SystemExit(f"{resource_name} must receive the configured custom host gateway URL")
+    if env.get("ATRADE_IBKR_GATEWAY_PORT") != "15000":
+        raise SystemExit(f"{resource_name} must receive the configured custom host gateway port")
+PY
+}
+
 main() {
   assert_manifest_wires_worker_and_application_resources
   assert_manifest_does_not_start_ibeam_with_placeholder_credentials
   assert_manifest_wires_ibeam_container_when_enabled
+  assert_manifest_maps_custom_ibeam_host_port_to_client_port
 }
 
 main "$@"

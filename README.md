@@ -47,7 +47,7 @@ API, worker, frontend, and local infrastructure.
 
 The current runnable slice includes:
 
-- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, NATS, and the optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env` credentials enable broker integration; the local iBeam Client Portal URL is HTTPS on the configured gateway port.
+- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, NATS, and the optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env` credentials enable broker integration; the local iBeam Client Portal URL is HTTPS on the configured host gateway port, mapped to the container's internal Client Portal port `5000`.
 - `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
 - `src/ATrade.Api` — browser-facing backend with:
   - `GET /health`

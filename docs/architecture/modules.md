@@ -105,7 +105,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   and only declares the optional `ibkr-gateway` `voyz/ibeam:latest` container when
   broker integration is enabled and fake credential placeholders have been replaced
   in ignored `.env`; the iBeam endpoint is modeled as HTTPS on the configured
-  gateway port — see `src/ATrade.AppHost/Program.cs`.
+  host gateway port while targeting the container's fixed Client Portal port `5000`
+  — see `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 

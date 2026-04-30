@@ -182,11 +182,14 @@ IBKR integration for this slice is **session-aware and paper-only**. The approve
 local runtime for user-driven IBKR API login is the AppHost-managed
 iBeam/Gateway container image `voyz/ibeam:latest`, which is disabled by default
 and only starts when ignored local `.env` values enable broker integration and
-replace the fake credential placeholders. The Client Portal API on that local
-container port uses HTTPS, so the committed gateway URL default is
-`https://127.0.0.1:5000`; `http://127.0.0.1:<port>` is the known-bad transport
-shape that can reset authenticated refresh requests before application logic
-sees an auth response.
+replace the fake credential placeholders. The Client Portal API uses HTTPS on
+iBeam's internal container port `5000`; AppHost publishes that internal port on
+the configured local host port from `ATRADE_IBKR_GATEWAY_PORT`. The committed
+gateway URL default is `https://127.0.0.1:5000`, and custom local ports must keep
+`ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>` while
+still mapping to container target port `5000`. `http://127.0.0.1:<port>` is the
+known-bad transport shape that can reset authenticated refresh requests before
+application logic sees an auth response.
 
 ### 4.1 Authentication and session status
 
@@ -517,6 +520,9 @@ family must expose only paper-safe placeholders:
 Rules:
 
 - committed defaults remain disabled and paper-only
+- `ATRADE_IBKR_GATEWAY_URL` and `ATRADE_IBKR_GATEWAY_PORT` describe the local
+  HTTPS host endpoint clients call; AppHost publishes that host port to iBeam's
+  fixed internal Client Portal target port `5000`
 - `ATRADE_IBKR_GATEWAY_IMAGE` is the approved `voyz/ibeam:latest` local runtime
   contract, but AppHost still does not start it until integration is enabled and
   fake credentials have been replaced in ignored `.env`
