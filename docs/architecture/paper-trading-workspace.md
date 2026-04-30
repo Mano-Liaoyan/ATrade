@@ -27,12 +27,15 @@ see_also:
 > `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
 > `POST /api/analysis/run`, a `/hubs/market-data` SignalR hub,
-> backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
-> endpoints backed by the AppHost-managed Postgres resource, a TimescaleDB
-> market-data persistence foundation in `ATrade.MarketData.Timescale`, AppHost-driven
-> paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
-> IBKR scanner-driven trending symbols, IBKR stock search, Postgres-backed
-> watchlists, `lightweight-charts` candlesticks, timeframe switching,
+> backend-owned `GET` / `PUT` / `POST` / legacy symbol `DELETE`
+> `/api/workspace/watchlist` endpoints plus exact
+> `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
+> AppHost-managed Postgres resource, a TimescaleDB market-data persistence
+> foundation in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
+> broker/iBeam configuration wiring, and a Next.js workspace with IBKR
+> scanner-driven trending symbols, IBKR stock search, exact market-specific
+> Postgres-backed watchlists, local market badges, `lightweight-charts`
+> candlesticks, timeframe switching,
 > indicators, source metadata, an analysis panel that can run LEAN when the
 > analysis runtime is configured, and SignalR-to-HTTP fallback behavior.
 > Production mocked market-data providers have been removed; missing iBeam
@@ -116,8 +119,10 @@ The current backend slice exposes `GET /api/broker/ibkr/status`,
 `GET /api/market-data/{symbol}/candles?timeframe=...`,
 `GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
 `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
-`DELETE /api/workspace/watchlist/{symbol}`, `GET /api/analysis/engines`,
-`POST /api/analysis/run`, and the `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
+exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
+`DELETE /api/workspace/watchlist/{symbol}` for unambiguous symbol-only rows,
+`GET /api/analysis/engines`, `POST /api/analysis/run`, and the
+`/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
 `IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`
 and the `ATrade.MarketData.Ibkr` provider to translate IBKR Client Portal/iBeam
@@ -174,11 +179,12 @@ The paper-trading slice extends existing planned responsibilities as follows:
   CLI or Docker-backed runtime, parses provider-neutral signals/metrics, and
   rejects brokerage/order-routing source tokens.
 - `ATrade.Workspaces` owns backend workspace preferences, including the current
-  Postgres schema/repository for pinned watchlist symbols and metadata fields
-  (`provider`, optional provider id / IBKR `conid`, name, exchange, currency,
-  asset class, sort order, and timestamps). Pins can be enriched from search
-  results and duplicate handling prefers provider/conid identity when present,
-  falling back to normalized symbols otherwise.
+  Postgres schema/repository for exact pinned watchlist instruments. Rows store
+  a durable `instrument_key` / API `instrumentKey` and `pinKey` derived from the
+  normalized provider, provider symbol id / IBKR `conid`, symbol, exchange,
+  currency, and asset class tuple, plus display name, sort order, and timestamps.
+  Duplicate handling merges only exact instrument keys so the same symbol or
+  company name can be pinned separately for different markets.
 - `ATrade.Ibkr.Worker` owns IBKR Gateway session management and any future
   paper-safe broker polling/streaming work
 
@@ -318,10 +324,11 @@ Postgres remains the canonical relational store for:
 
 Current implementation note: pinned workspace watchlists are already stored in
 Postgres by `ATrade.Workspaces` under the AppHost-provided `postgres`
-connection string. Rows carry `user_id` and `workspace_id`; until authentication
-and named workspaces exist, the API deliberately uses the temporary
-`local-user` / `paper-trading` identity seam documented in
-`LocalWorkspaceIdentityProvider`.
+connection string. Rows carry `user_id`, `workspace_id`, and a durable
+`instrument_key` primary key so duplicate same-symbol instruments can coexist
+when provider/market identity differs; until authentication and named workspaces
+exist, the API deliberately uses the temporary `local-user` / `paper-trading`
+identity seam documented in `LocalWorkspaceIdentityProvider`.
 
 ### 6.2 TimescaleDB
 
@@ -408,13 +415,17 @@ frontend loads, pins, and unpins through the backend watchlist API, then updates
 its browser cache from the backend response. Search-result pins send the
 provider-neutral metadata returned by `GET /api/market-data/search`: provider,
 provider symbol id (IBKR `conid` today), optional `ibkrConid`, name, exchange,
-currency, and asset class. Re-pinning a previously manual row enriches the
-stored metadata without requiring an API restart or table rewrite. The
-`localStorage` key `atrade.paperTrading.watchlist.v1` is intentionally
-non-authoritative: it may seed a one-time migration into Postgres and may render
-a clearly labeled read-only cached snapshot when the backend/database is
-unavailable, but it must not be treated as saved state and must not contain
-secrets, broker account identifiers, or tokens.
+currency, and asset class. The backend normalizes those fields into a stable
+`instrumentKey`/`pinKey` tuple and uses it as the Postgres identity; pinning
+`AAPL` on NASDAQ and `AAPL` on LSE creates two rows, and unpinning one exact key
+must not remove the other. Legacy `DELETE /api/workspace/watchlist/{symbol}` is
+kept only for unambiguous symbol-only rows; exact removals use
+`DELETE /api/workspace/watchlist/pins/{instrumentKey}`. The `localStorage` key
+`atrade.paperTrading.watchlist.v1` is intentionally non-authoritative and
+symbol-only: it may seed a one-time manual-symbol migration into Postgres and
+may render a clearly labeled read-only cached snapshot when the backend/database
+is unavailable, but it must not be treated as saved state and must not contain
+secrets, broker account identifiers, provider ids, or tokens.
 
 ## 8. Charting Library Decision
 
@@ -477,12 +488,17 @@ states when local iBeam is not ready.
 
 Users are no longer constrained to a trending/default list. The reusable
 `SymbolSearch` component calls `GET /api/market-data/search` through
-`frontend/lib/marketDataClient.ts`, renders IBKR/iBeam stock results, links each
-result to `/symbols/{symbol}`, and can pin/unpin the selected result through the
-backend watchlist API. The frontend uses provider-neutral fields (`provider`,
-`providerSymbolId`, `assetClass`, `exchange`, `currency`, and display `name`) and
-only derives `ibkrConid` for persisted metadata when the provider is `ibkr` and
-the provider symbol id is numeric.
+`frontend/lib/marketDataClient.ts`, renders IBKR/iBeam stock results with local
+non-proprietary market/exchange badges and explicit provider, market/exchange,
+currency, asset class, and provider id/IBKR `conid` metadata, links each result
+to `/symbols/{symbol}`, and can pin/unpin the selected exact provider-market
+instrument through the backend watchlist API. The frontend uses provider-neutral
+fields (`provider`, `providerSymbolId`, `assetClass`, `exchange`, `currency`,
+and display `name`) to compute the same instrument key as the backend and only
+derives `ibkrConid` for persisted metadata when the provider is `ibkr` and the
+provider symbol id is numeric. Duplicate search results sharing a symbol or
+company name are keyed and rendered by exact instrument identity, not by bare
+symbol.
 
 The backend search path uses IBKR Client Portal `/iserver/secdef/search` plus
 `/iserver/secdef/info` enrichment when Client Portal accepts the detail request;

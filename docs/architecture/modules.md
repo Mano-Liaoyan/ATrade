@@ -41,9 +41,10 @@ see_also:
 > implements LEAN as the first analysis engine provider behind that seam using
 > a generated analysis-only LEAN workspace and safe runtime-unavailable states.
 > `ATrade.Workspaces` owns the first backend-persisted
-> workspace preference: Postgres-backed pinned watchlists with provider/IBKR
-> metadata columns, provider/conid duplicate handling, and a temporary local user /
-> workspace identity seam. The remaining modules and workers listed below stay
+> workspace preference: Postgres-backed exact instrument watchlists with stable
+> `instrumentKey`/`pinKey` payloads derived from provider, provider id / IBKR
+> `conid`, symbol, exchange, currency, and asset class, plus a temporary local
+> user / workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
 > `frontend/` directory now hosts the first paper-trading workspace UI slice:
 > a Next.js home route with backend-driven trending symbols, IBKR stock search,
@@ -62,8 +63,9 @@ see_also:
 > `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`,
 > `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
 > `POST /api/analysis/run`, `GET` / `PUT` / `POST`
-> `/api/workspace/watchlist`, `DELETE /api/workspace/watchlist/{symbol}`, and
-> `/hubs/market-data` while the worker limits itself to paper-safe
+> `/api/workspace/watchlist`, exact `DELETE`
+> `/api/workspace/watchlist/pins/{instrumentKey}`, legacy `DELETE`
+> `/api/workspace/watchlist/{symbol}`, and `/hubs/market-data` while the worker limits itself to paper-safe
 > session/status monitoring. Timescale market-data storage contracts are present
 > for TP-030 cache-aside wiring, but `/api/market-data/*` still reads through the
 > provider path directly in this slice.
@@ -139,7 +141,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `GET /api/market-data/{symbol}/candles?timeframe=...`,
   `GET /api/market-data/{symbol}/indicators?timeframe=...`,
   `GET /api/analysis/engines`, `POST /api/analysis/run`, `GET /api/workspace/watchlist`,
-  `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
+  `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`, exact
+  `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
   `DELETE /api/workspace/watchlist/{symbol}`, and `/hubs/market-data`. The overview endpoint still returns deterministic
   bootstrap JSON from `ATrade.Accounts` (`module`, `status`,
   `brokerConnection`, `accounts`); the broker status endpoint resolves the
@@ -155,9 +158,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   discovery/run payloads, return explicit `analysis-engine-not-configured`
   responses when no engine is selected, and invoke the LEAN provider over
   market-data-provider candles when configured. The watchlist endpoints resolve the temporary local workspace identity, initialize
-  the `ATrade.Workspaces` schema idempotently, persist pinned symbols in
-  Postgres, return stable metadata payloads, and surface validation/storage
-  failures as stable JSON errors. The AppHost now injects runtime connection
+  the `ATrade.Workspaces` schema idempotently, persist exact provider/market
+  instrument pins in Postgres, return stable `instrumentKey`/`pinKey` metadata
+  payloads, and surface validation/storage failures as stable JSON errors. The AppHost now injects runtime connection
   information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`; the API
   consumes `Postgres` functionally for workspace watchlists today. Later slices
   add authenticated REST/streaming endpoints for deeper accounts, charts,
@@ -312,20 +315,20 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** Workspace preference and personalization persistence.
 - **Responsibilities:** Own the local user/workspace identity abstraction,
   symbol normalization/validation, idempotent Postgres schema initialization,
-  and repository operations for pinned watchlist symbols. The current schema
-  stores `user_id`, `workspace_id`, normalized symbol, provider, optional
-  provider symbol id / IBKR `conid`, display name, exchange, currency, asset
-  class, sort order, and timestamps. It enriches existing manual pins when a
-  user pins a searched result and deduplicates by provider/conid when available,
-  falling back to normalized symbol identity otherwise. The local identity
-  provider is explicitly temporary until authentication and named workspaces are
-  introduced.
+  and repository operations for pinned watchlist instruments. The current schema
+  stores `user_id`, `workspace_id`, durable `instrument_key`, normalized symbol,
+  provider, optional provider symbol id / IBKR `conid`, display name, exchange,
+  currency, asset class, sort order, and timestamps. It deduplicates only exact
+  provider/market instrument keys, allowing the same symbol or company name to
+  be pinned for multiple exchanges/currencies, and rejects legacy symbol deletes
+  when they would be ambiguous. The local identity provider is explicitly
+  temporary until authentication and named workspaces are introduced.
 - **Expected dependencies:** `Postgres` via the AppHost-provided
   `ConnectionStrings:postgres`, `Microsoft.Extensions.Configuration`,
   `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. It is composed by
   `ATrade.Api`; it does not call brokers or market-data providers directly.
-- **First-phase focus:** Persist backend-owned pinned stock watchlists across
-  API/server restarts while keeping symbol metadata provider-neutral.
+- **First-phase focus:** Persist backend-owned exact stock/instrument watchlists
+  across API/server restarts while keeping symbol metadata provider-neutral.
 
 ### 2.10 `ATrade.Strategies` *(planned)*
 

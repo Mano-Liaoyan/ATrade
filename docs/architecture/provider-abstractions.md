@@ -94,7 +94,10 @@ Core types:
   payload-safe domain shapes providers must emit. Search identity includes
   `symbol`, `provider`, `providerSymbolId`, `assetClass`, `exchange`, and
   `currency`; for IBKR the provider symbol id is the Client Portal `conid`.
-  Other payloads include source metadata such as `ibkr-ibeam-history`,
+  Downstream watchlist pins must treat this provider/market tuple as the exact
+  instrument identity rather than collapsing results to a bare symbol or display
+  name; `ATrade.Workspaces` exposes the normalized tuple as `instrumentKey` and
+  `pinKey` when a result is persisted. Other payloads include source metadata such as `ibkr-ibeam-history`,
   `ibkr-ibeam-snapshot`, or scanner source ids. The Timescale persistence
   foundation stores the same metadata generically as `provider`,
   `provider_symbol_id`, symbol, exchange, currency, asset class, source, and
@@ -196,7 +199,9 @@ Current implementation:
   the search contract payload instead of failing the provider request.
 - Search returns stock results with symbol, display name, asset class, exchange,
   currency, provider id, and provider symbol id/IBKR `conid`; no production
-  hard-coded stock allowlist is used.
+  hard-coded stock allowlist is used. Search UIs and watchlist persistence must
+  preserve enough provider/market identity to distinguish same-symbol or
+  same-name results from different exchanges.
 - Trending uses the scanner source `ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`
   rather than a hard-coded symbol catalog. The scanner call must be a buffered
   `POST /v1/api/iserver/scanner/run` JSON request with `Content-Type:
@@ -217,8 +222,9 @@ Current implementation:
 Future plug-ins:
 
 - The current Next.js workspace uses the market-data search hook for
-  pin-any-symbol workflows while persisting provider metadata through
-  `ATrade.Workspaces`.
+  pin-any-symbol workflows while persisting exact provider/market instrument
+  metadata through `ATrade.Workspaces`; browser cache state remains a legacy
+  symbol-only migration/read-only fallback and is not an identity authority.
 - Polygon or another market-data provider may be added later behind the same
   contracts and source metadata rules, reusing the Timescale storage fields for
   provider/source/symbol identity instead of introducing provider-specific

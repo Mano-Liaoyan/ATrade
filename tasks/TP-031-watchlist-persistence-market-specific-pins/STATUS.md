@@ -1,7 +1,7 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
@@ -82,11 +82,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged with persistence root cause, identity semantics, and migration caveats
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged with persistence root cause, identity semantics, and migration caveats
 
 ---
 
@@ -105,6 +105,7 @@
 | Current identity collapses duplicate instruments to bare symbols: Postgres primary key and upsert conflict are `(user_id, workspace_id, symbol)`, replacement normalization merges same-symbol rows, API unpin is `DELETE /api/workspace/watchlist/{symbol}`, and frontend `pinnedSymbolNames`/`savingSymbol`/search pinned set use uppercased symbol strings. | Backend and frontend must move to exact `instrumentKey`/provider-market identity; symbol-only delete can remain only as unambiguous legacy fallback. | `src/ATrade.Workspaces/PostgresWorkspaceWatchlistSql.cs`; `WorkspaceWatchlistNormalizer.cs`; `WorkspaceWatchlistRepository.cs`; `src/ATrade.Api/Program.cs`; `frontend/components/TradingWorkspace.tsx`; `SymbolSearch.tsx` |
 | Chosen durable identity: expose `instrumentKey`/`pinKey` as the normalized tuple `provider=<provider>|providerSymbolId=<id>|ibkrConid=<conid>|symbol=<symbol>|exchange=<exchange>|currency=<currency>|assetClass=<assetClass>`. Provider is lower-case; symbol/exchange/currency/assetClass are upper-case; IBKR `conid` is mirrored into `providerSymbolId` when only `ibkrConid` is supplied. Same symbol/name on a different exchange/currency/provider id yields a different key. | Implement in backend normalizer/model/API JSON, Postgres unique key, frontend exact pin state, and docs. | `WorkspaceWatchlistModels.cs`; `WorkspaceWatchlistNormalizer.cs`; frontend exact-key helpers |
 | Browser `localStorage` is currently a symbol-only cache/migration source: backend responses write symbols into it, initial backend load migrates unmigrated cached manual symbols, and backend failures show cached rows with `source='cache'`, a watchlist error, and disabled actions. It should remain legacy/manual only and must not infer provider-market pinned state. | Preserve/strengthen read-only cache behavior; database failures must surface as errors instead of being presented as persisted pins. | `frontend/lib/watchlistStorage.ts`; `frontend/components/TradingWorkspace.tsx`; `frontend/components/Watchlist.tsx` |
+| Migration caveat: schema initialization backfills existing rows to `instrument_key` using normalized persisted metadata and rebuilds the primary key on `(user_id, workspace_id, instrument_key)`. Existing symbol-only rows become manual/default USD/STK instrument keys; future same-symbol provider/market pins can coexist instead of enriching/overwriting those manual rows. Legacy symbol delete now returns `ambiguous-symbol` when more than one exact instrument shares a symbol. | Documented and covered by Workspaces unit tests plus Postgres restart/duplicate-market script. | `src/ATrade.Workspaces/PostgresWorkspaceWatchlistSql.cs`; `tests/apphost/postgres-watchlist-persistence-tests.sh`; docs architecture updates |
 
 ---
 
@@ -154,6 +155,10 @@
 | 2026-04-30 17:43 | Full test suite | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed across all listed test projects. |
 | 2026-04-30 17:44 | Solution build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors. |
 | 2026-04-30 17:45 | Verification failures review | No verification failures remain; initial missing frontend dependencies were resolved with `npm ci`, and later scripts/builds/tests passed. |
+| 2026-04-30 17:46 | Step 6 started | Documentation and delivery notes. |
+| 2026-04-30 17:53 | Must-update docs modified | Updated `paper-trading-workspace.md`, `modules.md`, and `provider-abstractions.md` for exact provider/market watchlist identity, Postgres instrument keys, localStorage caveats, and market-badge search UI. |
+| 2026-04-30 17:54 | Check-if-affected docs reviewed | Updated affected `README.md` and `docs/architecture/overview.md`; `docs/INDEX.md` needed no change because no new active docs were added. |
+| 2026-04-30 17:55 | Discoveries finalized | STATUS Discoveries now record restart baseline, symbol-only root cause, final identity semantics, localStorage behavior, and migration caveats. |
 
 ---
 

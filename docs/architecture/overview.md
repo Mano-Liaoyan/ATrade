@@ -33,7 +33,7 @@ see_also:
 > `ATrade.MarketData.Ibkr` supplies provider-backed IBKR/iBeam market data,
 > `ATrade.MarketData.Timescale` supplies the TimescaleDB persistence foundation
 > for candles and scanner/trending snapshots, and `ATrade.Workspaces` persists
-> pinned watchlist symbols in Postgres. The AppHost graph forwards the safe
+> exact provider/market watchlist pins in Postgres. The AppHost graph forwards the safe
 > IBKR/iBeam paper-mode environment contract into `ATrade.Api` and
 > `ATrade.Ibkr.Worker`, provides the `postgres` connection string consumed by
 > the API/workspaces slice plus the `timescaledb` connection string prepared for
@@ -161,9 +161,10 @@ are owned by the backend module that owns the entity.
 
 Current implementation note: `ATrade.Workspaces` now initializes and owns the
 Postgres schema for pinned workspace watchlists through the AppHost-provided
-`ConnectionStrings:postgres` reference. Watchlist rows use a temporary
-`local-user` / `paper-trading` identity seam until authentication and named
-workspaces exist.
+`ConnectionStrings:postgres` reference. Watchlist rows use a durable
+`instrument_key` derived from provider, provider id / IBKR `conid`, symbol,
+exchange, currency, and asset class, plus a temporary `local-user` /
+`paper-trading` identity seam until authentication and named workspaces exist.
 
 ### 4.2 TimescaleDB — time-series workloads
 
@@ -213,8 +214,8 @@ Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
 and trending symbols. The backend and UI halves of that direction are now
 started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
 states, deterministic paper-order simulation, provider-backed market-data
-surfaces, SignalR chart updates, Postgres-backed watchlist preferences, and the
-optional LEAN analysis provider already route through `ATrade.Api`. The slice
+surfaces, SignalR chart updates, exact Postgres-backed watchlist preferences,
+and the optional LEAN analysis provider already route through `ATrade.Api`. The slice
 keeps the current modular-monolith and Aspire contracts intact by routing
 browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
 updates, using NATS for internal fan-out, keeping orders simulated rather than
