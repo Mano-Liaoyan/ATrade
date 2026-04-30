@@ -58,6 +58,14 @@ s.close()
 PY
 }
 
+urlencode() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import quote
+print(quote(sys.argv[1], safe=""))
+PY
+}
+
 fail_with_logs() {
   printf '%s\n' "$1" >&2
 
@@ -198,55 +206,76 @@ assert_schema_initialized() {
   fi
 }
 
-assert_symbols_exactly() {
+assert_watchlist_keys_exactly() {
   local response_file="$1"
   shift
 
   python3 - "$response_file" "$@" <<'PY'
 import json
 import sys
-from collections import Counter
 
 response_path = sys.argv[1]
 expected = sys.argv[2:]
 with open(response_path, "r", encoding="utf-8") as handle:
     payload = json.load(handle)
 
-symbols = [entry.get("symbol") for entry in payload.get("symbols", [])]
-if sorted(symbols) != sorted(expected):
-    raise SystemExit(f"expected symbols {expected}, got {symbols}")
-
-counts = Counter(symbols)
-duplicates = [symbol for symbol, count in counts.items() if count != 1]
-if duplicates:
-    raise SystemExit(f"expected de-duplicated symbols, duplicate counts found for {duplicates}")
+entries = payload.get("symbols", [])
+keys = [entry.get("instrumentKey") for entry in entries]
+if sorted(keys) != sorted(expected):
+    raise SystemExit(f"expected instrument keys {expected}, got {keys} in {entries!r}")
+for entry in entries:
+    if not entry.get("instrumentKey") or not entry.get("pinKey"):
+        raise SystemExit(f"expected instrumentKey and pinKey in {entry!r}")
+    if entry.get("instrumentKey") != entry.get("pinKey"):
+        raise SystemExit(f"pinKey must alias instrumentKey in {entry!r}")
 PY
 }
 
-assert_symbol_metadata() {
+assert_symbol_count() {
   local response_file="$1"
   local symbol="$2"
-  local provider="$3"
-  local provider_symbol_id="$4"
-  local ibkr_conid="$5"
-  local name="$6"
-  local exchange="$7"
-  local currency="$8"
-  local asset_class="$9"
+  local expected_count="$3"
 
-  python3 - "$response_file" "$symbol" "$provider" "$provider_symbol_id" "$ibkr_conid" "$name" "$exchange" "$currency" "$asset_class" <<'PY'
+  python3 - "$response_file" "$symbol" "$expected_count" <<'PY'
 import json
 import sys
 
-response_path, expected_symbol, expected_provider, expected_provider_symbol_id, expected_ibkr_conid, expected_name, expected_exchange, expected_currency, expected_asset_class = sys.argv[1:]
+response_path, expected_symbol, expected_count = sys.argv[1:]
+with open(response_path, "r", encoding="utf-8") as handle:
+    payload = json.load(handle)
+count = sum(1 for entry in payload.get("symbols", []) if entry.get("symbol") == expected_symbol)
+if count != int(expected_count):
+    raise SystemExit(f"expected {expected_count} {expected_symbol} entries, got {count}: {payload!r}")
+PY
+}
+
+assert_symbol_metadata_by_key() {
+  local response_file="$1"
+  local instrument_key="$2"
+  local symbol="$3"
+  local provider="$4"
+  local provider_symbol_id="$5"
+  local ibkr_conid="$6"
+  local name="$7"
+  local exchange="$8"
+  local currency="$9"
+  local asset_class="${10}"
+
+  python3 - "$response_file" "$instrument_key" "$symbol" "$provider" "$provider_symbol_id" "$ibkr_conid" "$name" "$exchange" "$currency" "$asset_class" <<'PY'
+import json
+import sys
+
+response_path, expected_key, expected_symbol, expected_provider, expected_provider_symbol_id, expected_ibkr_conid, expected_name, expected_exchange, expected_currency, expected_asset_class = sys.argv[1:]
 with open(response_path, "r", encoding="utf-8") as handle:
     payload = json.load(handle)
 
-matches = [entry for entry in payload.get("symbols", []) if entry.get("symbol") == expected_symbol]
+matches = [entry for entry in payload.get("symbols", []) if entry.get("instrumentKey") == expected_key]
 if len(matches) != 1:
-    raise SystemExit(f"expected one {expected_symbol} entry, got {matches!r}")
+    raise SystemExit(f"expected one entry for {expected_key}, got {matches!r} in {payload!r}")
 entry = matches[0]
 expected = {
+    "symbol": expected_symbol,
+    "pinKey": expected_key,
     "provider": expected_provider,
     "providerSymbolId": expected_provider_symbol_id,
     "ibkrConid": int(expected_ibkr_conid),
@@ -257,22 +286,23 @@ expected = {
 }
 for key, value in expected.items():
     if entry.get(key) != value:
-        raise SystemExit(f"expected {expected_symbol}.{key}={value!r}, got {entry.get(key)!r} in {entry!r}")
+        raise SystemExit(f"expected {expected_key}.{key}={value!r}, got {entry.get(key)!r} in {entry!r}")
 PY
 }
 
-assert_invalid_symbol_error() {
+assert_error_code() {
   local response_file="$1"
+  local expected_code="$2"
 
-  python3 - "$response_file" <<'PY'
+  python3 - "$response_file" "$expected_code" <<'PY'
 import json
 import sys
 
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     payload = json.load(handle)
 
-if payload.get("code") != "invalid-symbol":
-    raise SystemExit(f"expected invalid-symbol code, got {payload!r}")
+if payload.get("code") != sys.argv[2]:
+    raise SystemExit(f"expected {sys.argv[2]} code, got {payload!r}")
 if not payload.get("error"):
     raise SystemExit(f"expected non-empty validation error message, got {payload!r}")
 PY
@@ -289,43 +319,66 @@ main() {
   local api_port
   local response_file
   local invalid_response_file
+  local ambiguous_response_file
   postgres_port="$(free_port)"
   api_port="$(free_port)"
   response_file="$(mktemp "$temp_dir/watchlist-XXXXXX.json")"
   invalid_response_file="$(mktemp "$temp_dir/invalid-XXXXXX.json")"
+  ambiguous_response_file="$(mktemp "$temp_dir/ambiguous-XXXXXX.json")"
+
+  local aapl_nasdaq_key='provider=ibkr|providerSymbolId=265598|ibkrConid=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK'
+  local aapl_lse_key='provider=ibkr|providerSymbolId=493546048|ibkrConid=493546048|symbol=AAPL|exchange=LSE|currency=GBP|assetClass=STK'
+  local msft_nasdaq_key='provider=ibkr|providerSymbolId=272093|ibkrConid=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK'
 
   start_postgres "$postgres_port"
   start_api "$api_port" "$postgres_port"
 
   request_json GET '/api/workspace/watchlist' '' "$response_file" 200
   assert_schema_initialized
-  assert_symbols_exactly "$response_file"
-
-  request_json POST '/api/workspace/watchlist' '{"symbol":"AAPL","provider":"manual","name":"Apple Inc.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
-  assert_symbols_exactly "$response_file" AAPL
+  assert_watchlist_keys_exactly "$response_file"
 
   request_json POST '/api/workspace/watchlist' '{"symbol":"AAPL","provider":"ibkr","providerSymbolId":"265598","ibkrConid":265598,"name":"Apple Inc.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
-  assert_symbols_exactly "$response_file" AAPL
-  assert_symbol_metadata "$response_file" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
+  assert_watchlist_keys_exactly "$response_file" "$aapl_nasdaq_key"
+  assert_symbol_metadata_by_key "$response_file" "$aapl_nasdaq_key" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
 
-  request_json POST '/api/workspace/watchlist' '{"symbol":"MSFT","provider":"manual","name":"Microsoft Corp.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
-  assert_symbols_exactly "$response_file" AAPL MSFT
+  request_json POST '/api/workspace/watchlist' '{"symbol":"AAPL","provider":"ibkr","providerSymbolId":"493546048","ibkrConid":493546048,"name":"Apple Inc.","exchange":"LSE","currency":"GBP","assetClass":"STK"}' "$response_file" 200
+  assert_watchlist_keys_exactly "$response_file" "$aapl_nasdaq_key" "$aapl_lse_key"
+  assert_symbol_count "$response_file" AAPL 2
+  assert_symbol_metadata_by_key "$response_file" "$aapl_lse_key" AAPL ibkr 493546048 493546048 'Apple Inc.' LSE GBP STK
 
-  request_json POST '/api/workspace/watchlist' '{"symbol":" aapl ","provider":"manual"}' "$response_file" 200
-  assert_symbols_exactly "$response_file" AAPL MSFT
-  assert_symbol_metadata "$response_file" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
+  request_json DELETE '/api/workspace/watchlist/AAPL' '' "$ambiguous_response_file" 400
+  assert_error_code "$ambiguous_response_file" ambiguous-symbol
+  request_json GET '/api/workspace/watchlist' '' "$response_file" 200
+  assert_watchlist_keys_exactly "$response_file" "$aapl_nasdaq_key" "$aapl_lse_key"
+
+  request_json DELETE "/api/workspace/watchlist/pins/$(urlencode "$aapl_lse_key")" '' "$response_file" 200
+  assert_watchlist_keys_exactly "$response_file" "$aapl_nasdaq_key"
+  assert_symbol_count "$response_file" AAPL 1
+
+  request_json POST '/api/workspace/watchlist' '{"symbol":"AAPL","provider":"ibkr","providerSymbolId":"493546048","ibkrConid":493546048,"name":"Apple Inc.","exchange":"LSE","currency":"GBP","assetClass":"STK"}' "$response_file" 200
+  request_json POST '/api/workspace/watchlist' '{"symbol":"MSFT","provider":"ibkr","providerSymbolId":"272093","ibkrConid":272093,"name":"Microsoft Corp.","exchange":"NASDAQ","currency":"USD","assetClass":"STK"}' "$response_file" 200
+  assert_watchlist_keys_exactly "$response_file" "$aapl_nasdaq_key" "$aapl_lse_key" "$msft_nasdaq_key"
 
   request_json POST '/api/workspace/watchlist' '{"symbol":"not a valid symbol"}' "$invalid_response_file" 400
-  assert_invalid_symbol_error "$invalid_response_file"
+  assert_error_code "$invalid_response_file" invalid-symbol
 
   stop_api
   start_api "$api_port" "$postgres_port"
 
   request_json GET '/api/workspace/watchlist' '' "$response_file" 200
-  assert_symbols_exactly "$response_file" AAPL MSFT
-  assert_symbol_metadata "$response_file" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
+  assert_watchlist_keys_exactly "$response_file" "$aapl_nasdaq_key" "$aapl_lse_key" "$msft_nasdaq_key"
+  assert_symbol_metadata_by_key "$response_file" "$aapl_nasdaq_key" AAPL ibkr 265598 265598 'Apple Inc.' NASDAQ USD STK
+  assert_symbol_metadata_by_key "$response_file" "$aapl_lse_key" AAPL ibkr 493546048 493546048 'Apple Inc.' LSE GBP STK
+  assert_symbol_metadata_by_key "$response_file" "$msft_nasdaq_key" MSFT ibkr 272093 272093 'Microsoft Corp.' NASDAQ USD STK
 
-  printf 'Postgres watchlist persistence verified across API restart.\n'
+  request_json DELETE "/api/workspace/watchlist/pins/$(urlencode "$aapl_nasdaq_key")" '' "$response_file" 200
+  assert_watchlist_keys_exactly "$response_file" "$aapl_lse_key" "$msft_nasdaq_key"
+  assert_symbol_count "$response_file" AAPL 1
+
+  request_json DELETE '/api/workspace/watchlist/MSFT' '' "$response_file" 200
+  assert_watchlist_keys_exactly "$response_file" "$aapl_lse_key"
+
+  printf 'Postgres watchlist exact instrument persistence verified across API restart.\n'
 }
 
 main "$@"

@@ -1,6 +1,6 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Step 3: Show market/exchange logos and explicit market metadata in search
+**Current Step:** Step 4: Add restart and duplicate-market regression coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -57,13 +57,13 @@
 ---
 
 ### Step 4: Add restart and duplicate-market regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Postgres watchlist persistence script verifies provider-backed pins survive restart
-- [ ] Duplicate-market fixtures/tests prove pin/remove affects only one exact instrument
-- [ ] Frontend tests detect symbol-only pinned-state regressions
-- [ ] Database-unavailable behavior does not claim cached pins were persisted
-- [ ] Targeted backend/frontend tests/scripts run
+- [x] Postgres watchlist persistence script verifies provider-backed pins survive restart
+- [x] Duplicate-market fixtures/tests prove pin/remove affects only one exact instrument
+- [x] Frontend tests detect symbol-only pinned-state regressions
+- [x] Database-unavailable behavior does not claim cached pins were persisted
+- [x] Targeted backend/frontend tests/scripts run
 
 ---
 
@@ -139,6 +139,12 @@
 | 2026-04-30 16:54 | Duplicate result accessibility hardened | Search and watchlist list items now key by exact instrument key and include market/provider identity in `aria-label` text. |
 | 2026-04-30 16:55 | Saved watchlist market identity rendered | Backend-loaded watchlist rows display market badge, `Market <exchange>`, provider, currency, asset class, and provider id/conid metadata; this uses persisted API fields after restart. |
 | 2026-04-30 17:02 | Frontend tests updated and run | Updated apphost frontend/search assertions for `MarketLogo`, exact keys, and conid metadata; `cd frontend && npm run build`, `bash tests/apphost/frontend-trading-workspace-tests.sh`, and `bash tests/apphost/ibkr-symbol-search-tests.sh` passed. |
+| 2026-04-30 17:04 | Step 4 started | Restart and duplicate-market regression coverage. |
+| 2026-04-30 17:15 | Postgres restart regression extended | Persistence script now pins provider-backed AAPL/MSFT instruments, restarts API on the same Postgres DB, and verifies exact `instrumentKey` rows/metadata survive; script passed. |
+| 2026-04-30 17:16 | Duplicate-market regression covered | Workspaces normalizer tests and Postgres script cover duplicate AAPL rows on NASDAQ/LSE; legacy symbol delete is ambiguous and exact key delete removes only one market. |
+| 2026-04-30 17:18 | Frontend symbol-only regression assertions added | Apphost frontend/search scripts assert `pinnedInstrumentKeys`, `savingPinKey`, `key={pinKey}`, and `pinnedSet.has(pinKey)`, and reject `pinnedSymbolNames`/`savingSymbol`/symbol-set checks. |
+| 2026-04-30 17:20 | Cache failure regression assertions added | Frontend apphost script asserts legacy symbol-only storage, cache-source labeling, read-only cached-pin error text, and disabled actions while `watchlistError` is set. |
+| 2026-04-30 17:28 | Targeted regression suite | `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj`, `bash tests/apphost/postgres-watchlist-persistence-tests.sh`, `bash tests/apphost/frontend-trading-workspace-tests.sh`, and `bash tests/apphost/ibkr-symbol-search-tests.sh` passed. |
 
 ---
 
