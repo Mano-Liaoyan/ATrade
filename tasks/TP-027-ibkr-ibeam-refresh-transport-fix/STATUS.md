@@ -1,6 +1,6 @@
 # TP-027: Fix authenticated iBeam refresh transport failures — Status
 
-**Current Step:** Step 3: Verify API and frontend refresh behavior
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -55,18 +55,18 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj --nologo --verbosity minimal` passes
-- [ ] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passes
-- [ ] `bash tests/apphost/ibeam-runtime-contract-tests.sh` passes or cleanly skips runtime-dependent checks
-- [ ] `bash tests/apphost/ibkr-paper-safety-tests.sh` passes
-- [ ] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passes
-- [ ] `bash tests/apphost/market-data-feature-tests.sh` passes
-- [ ] `bash tests/apphost/frontend-trading-workspace-tests.sh` passes if frontend files changed
-- [ ] `dotnet test ATrade.slnx --nologo --verbosity minimal` passes
-- [ ] Optional real-runtime `./start run` / frontend retry / API trending verification recorded if local ignored `.env` and iBeam are available
-- [ ] All failures fixed or unrelated pre-existing failures documented with evidence
+- [x] `dotnet test tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj --nologo --verbosity minimal` passes
+- [x] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passes
+- [x] `bash tests/apphost/ibeam-runtime-contract-tests.sh` passes or cleanly skips runtime-dependent checks
+- [x] `bash tests/apphost/ibkr-paper-safety-tests.sh` passes
+- [x] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passes
+- [x] `bash tests/apphost/market-data-feature-tests.sh` passes
+- [x] `bash tests/apphost/frontend-trading-workspace-tests.sh` passes if frontend files changed
+- [x] `dotnet test ATrade.slnx --nologo --verbosity minimal` passes
+- [x] Optional real-runtime `./start run` / frontend retry / API trending verification recorded if local ignored `.env` and iBeam are available
+- [x] All failures fixed or unrelated pre-existing failures documented with evidence
 
 ---
 
@@ -126,6 +126,18 @@
 | 2026-04-30 | Step 3 frontend retry verification | Source assertions verified `TradingWorkspace` clears market-data errors before reload, renders `Retry IBKR market data`, and wires it to `loadTrendingSymbols`; `frontend/lib/marketDataClient.ts` retains safe provider-unavailable copy. `bash tests/apphost/frontend-trading-workspace-tests.sh` passed including `npm run build`. |
 | 2026-04-30 | Step 3 payload secrecy | `bash tests/apphost/ibeam-runtime-contract-tests.sh` passed redacted status checks; targeted grep of frontend components/libs/types and `src/ATrade.Api/Program.cs` found no gateway URL env names, IBKR credential placeholders, account-id placeholders, session-cookie, or token fields in provider-neutral UI/API payload code. |
 | 2026-04-30 | Step 3 complete | API status/trending paths, safe unavailable responses, frontend retry wiring, and provider-neutral no-secrets payload behavior verified. |
+| 2026-04-30 | Step 4 started | Running final verification gate commands in order. |
+| 2026-04-30 | Step 4 broker tests | `dotnet test tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (18/18). |
+| 2026-04-30 | Step 4 market-data IBKR tests | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (6/6). |
+| 2026-04-30 | Step 4 iBeam runtime contract | `bash tests/apphost/ibeam-runtime-contract-tests.sh` passed; default run skips the opt-in real-iBeam smoke unless `ATRADE_IBKR_REAL_SMOKE=1` is set. |
+| 2026-04-30 | Step 4 paper safety | `bash tests/apphost/ibkr-paper-safety-tests.sh` passed. |
+| 2026-04-30 | Step 4 IBKR market-data provider script | `bash tests/apphost/ibkr-market-data-provider-tests.sh` passed; transient curl connection-refused messages occurred during expected API startup polling before health was ready. |
+| 2026-04-30 | Step 4 market-data feature script | `bash tests/apphost/market-data-feature-tests.sh` passed; transient curl connection-refused messages occurred during expected API startup polling before health was ready. |
+| 2026-04-30 | Step 4 frontend workspace script | `bash tests/apphost/frontend-trading-workspace-tests.sh` passed, including `npm run build`; no frontend source files changed, but retry/refresh behavior was re-verified. |
+| 2026-04-30 | Step 4 full dotnet suite | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed: ProviderAbstractions 4/4, Workspaces 19/19, Brokers.Ibkr 18/18, Analysis 4/4, Orders 3/3, Analysis.Lean 8/8, MarketData.Ibkr 6/6. |
+| 2026-04-30 | Step 4 optional real-runtime | Repo-root ignored `.env` was absent (checked existence only, not contents); `ATRADE_IBKR_REAL_SMOKE=1 bash tests/apphost/ibeam-runtime-contract-tests.sh` passed by cleanly skipping because no loopback iBeam HTTPS endpoint responded. No `./start run` real iBeam/frontend retry was attempted without local ignored credentials/runtime. |
+| 2026-04-30 | Step 4 failure disposition | All Step 4 verification commands completed successfully; no unrelated pre-existing failures were encountered or carried forward. |
+| 2026-04-30 | Step 4 complete | Final verification gate passed with targeted tests, apphost/frontend scripts, full `.slnx` test suite, and optional real-runtime skip rationale recorded. |
 
 ---
 
