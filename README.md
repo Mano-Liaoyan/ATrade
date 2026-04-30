@@ -46,7 +46,7 @@ API, worker, frontend, and local infrastructure.
 
 The current runnable slice includes:
 
-- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, NATS, and the optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env` credentials enable broker integration.
+- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js frontend, Postgres, TimescaleDB, Redis, NATS, and the optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env` credentials enable broker integration; the local iBeam Client Portal URL is HTTPS on the configured gateway port.
 - `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
 - `src/ATrade.Api` — browser-facing backend with:
   - `GET /health`
@@ -73,8 +73,9 @@ The current runnable slice includes:
 
 Current market data is served through the `ATrade.MarketData.Ibkr` provider
 behind `ATrade.MarketData` contracts. When the local iBeam/Gateway runtime is
-configured and authenticated through ignored `.env` values, API endpoints return
-IBKR scanner, snapshot, and historical bar data with source metadata. When iBeam
+configured with the HTTPS Client Portal URL (`https://127.0.0.1:<gateway-port>`)
+and authenticated through ignored `.env` values, API endpoints return IBKR
+scanner, snapshot, and historical bar data with source metadata. When iBeam
 is disabled, missing credentials, unauthenticated, or unreachable, the API and
 frontend surface safe provider-not-configured/provider-unavailable states instead
 of falling back to production mocks. Pinned symbols are backend-owned workspace
@@ -106,8 +107,10 @@ Active Taskplane packets live directly under `tasks/`:
 | `TP-023` | IBKR stock search and pin-any-symbol workflow                      |
 | `TP-024` | Provider-neutral analysis engine abstraction                       |
 | `TP-025` | LEAN as the first analysis engine provider                         |
+| `TP-026` | Migrate solution references to `ATrade.slnx`                       |
+| `TP-027` | Fix authenticated iBeam refresh transport failures                 |
 
-Completed Taskplane packets have been moved to `tasks/archive/`.
+Completed Taskplane packets are archived under `tasks/archive/` by the orchestrator after merge.
 
 ## Repository Map
 

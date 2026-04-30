@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Current implementation plan for the provider-backed ATrade paper-trading workspace upgrade.
 see_also:
   - README.md
@@ -12,12 +12,13 @@ see_also:
 
 # ATrade Current Plan
 
-**Last updated:** 2026-04-29
+**Last updated:** 2026-04-30
 
 ## Current Focus
 
 Deliver the provider-backed paper-trading workspace upgrade queued in `TP-019`
-through `TP-025`:
+through `TP-025`, plus current maintenance follow-ups for solution metadata and
+local iBeam transport (`TP-026` / `TP-027`):
 
 - provider-neutral broker and market-data abstractions
 - Postgres-persisted pinned symbols/watchlists
@@ -37,8 +38,10 @@ through `TP-025`:
 | `TP-023` | Ready after deps | `TP-020`, `TP-022` | Add IBKR stock search and pin-any-symbol workflow. |
 | `TP-024` | Ready after deps | `TP-019`, `TP-022` | Add provider-neutral analysis engine abstraction and API contract. |
 | `TP-025` | Ready after deps | `TP-022`, `TP-024` | Integrate LEAN as the first analysis engine provider. |
+| `TP-026` | Ready | None | Migrate solution references and verification guidance to `ATrade.slnx`. |
+| `TP-027` | In progress | None | Fix authenticated local iBeam refresh transport failures by using the HTTPS Client Portal contract. |
 
-Completed task packets are archived under `tasks/archive/`.
+Completed task packets are archived under `tasks/archive/` after orchestrator merge.
 
 ## Execution Order
 
@@ -48,6 +51,7 @@ Completed task packets are archived under `tasks/archive/`.
 4. Run `TP-023` after `TP-020` and `TP-022`.
 5. Run `TP-024` after `TP-022`.
 6. Run `TP-025` after `TP-024`.
+7. Run `TP-026` / `TP-027` as maintenance follow-ups when their lanes are available.
 
 The orchestrator dependency sections in each `PROMPT.md` are the machine-readable
 source for batch ordering.
@@ -57,9 +61,10 @@ source for batch ordering.
 - Keep the repo-local startup contract as `start run` on Unix and Windows.
 - Keep secrets, IBKR credentials, account identifiers, tokens, and session cookies out of git.
 - Real IBKR/iBeam and LEAN checks must use ignored `.env` values and cleanly skip when local runtimes or credentials are unavailable.
+- Local `voyz/ibeam:latest` Client Portal traffic uses HTTPS on the configured gateway port; self-signed certificate trust must stay scoped to loopback iBeam development traffic.
 - Do not add real order placement or live-trading behavior in this queued batch.
 - Update active docs in the same change as durable code/runtime changes.
 
 ## Next Task ID
 
-`TP-026`
+`TP-028`

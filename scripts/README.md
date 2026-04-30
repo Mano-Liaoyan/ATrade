@@ -121,7 +121,7 @@ default.
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker/iBeam wiring; committed default stays `false`
 - `ATRADE_BROKER_ACCOUNT_MODE` — committed default stays `Paper`; live mode remains rejected by the API, worker, and simulation guardrails
-- `ATRADE_IBKR_GATEWAY_URL` — local iBeam/IBKR Gateway API base URL; committed default is `http://127.0.0.1:5000`
+- `ATRADE_IBKR_GATEWAY_URL` — local iBeam/IBKR Gateway Client Portal API base URL; committed default is `https://127.0.0.1:5000` because `voyz/ibeam:latest` serves HTTPS on the local gateway port
 - `ATRADE_IBKR_GATEWAY_PORT` — local iBeam container/API port; committed default is `5000`
 - `ATRADE_IBKR_GATEWAY_IMAGE` — local iBeam image/tag; committed default is the user-approved `voyz/ibeam:latest`
 - `ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS` — optional timeout for the official iBeam/Gateway status client; committed default stays a paper-safe low value
@@ -141,12 +141,17 @@ default.
 
 To start local iBeam for user-driven IBKR API login, copy `.env.template` to
 `.env`, set `ATRADE_BROKER_INTEGRATION_ENABLED=true`, keep
-`ATRADE_BROKER_ACCOUNT_MODE=Paper`, and replace only the fake
-`ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`, and
+`ATRADE_BROKER_ACCOUNT_MODE=Paper`, keep `ATRADE_IBKR_GATEWAY_URL` on the local
+HTTPS gateway URL (`https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>`), and replace
+only the fake `ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`, and
 `ATRADE_IBKR_PAPER_ACCOUNT_ID` placeholders in ignored `.env`. The AppHost then
-adds `ibkr-gateway` with `voyz/ibeam:latest`, passes only `IBEAM_ACCOUNT` and
-`IBEAM_PASSWORD` to that container via Aspire secret parameters, and keeps the
-raw username, password, and account id out of manifests and status payloads.
+adds `ibkr-gateway` with `voyz/ibeam:latest`, exposes the container endpoint as
+HTTPS, passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to that container via
+Aspire secret parameters, and keeps the raw username, password, and account id
+out of manifests and status payloads. The Client Portal certificate is a local
+development/self-signed certificate; ATrade's HTTP clients trust that condition
+only for loopback/local iBeam HTTPS traffic and never disable certificate
+validation globally or for arbitrary hosts.
 
 This contract intentionally does **not** move everything into `.env`.
 

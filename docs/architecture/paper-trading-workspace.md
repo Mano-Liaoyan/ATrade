@@ -182,7 +182,11 @@ IBKR integration for this slice is **session-aware and paper-only**. The approve
 local runtime for user-driven IBKR API login is the AppHost-managed
 iBeam/Gateway container image `voyz/ibeam:latest`, which is disabled by default
 and only starts when ignored local `.env` values enable broker integration and
-replace the fake credential placeholders.
+replace the fake credential placeholders. The Client Portal API on that local
+container port uses HTTPS, so the committed gateway URL default is
+`https://127.0.0.1:5000`; `http://127.0.0.1:<port>` is the known-bad transport
+shape that can reset authenticated refresh requests before application logic
+sees an auth response.
 
 ### 4.1 Authentication and session status
 
@@ -198,20 +202,28 @@ responsibilities are:
   can project to the frontend
 
 In the currently implemented backend slice, the worker and API share the same
-`ATrade.Brokers.Ibkr` status service so disabled, credentials-missing, configured-iBeam,
-and rejected-live outcomes are normalized before any unsafe broker action is attempted.
-Raw usernames, passwords, tokens, session cookies, and account ids never appear in
-status payloads; account presence is exposed only as a boolean.
+`ATrade.Brokers.Ibkr` status service and shared gateway transport helper so
+broker status and market-data refreshes use the same HTTPS base URL, timeout,
+and local-certificate policy. Disabled, credentials-missing, configured-iBeam,
+unauthenticated, and rejected-live outcomes are normalized before any unsafe
+broker action is attempted. Raw usernames, passwords, tokens, session cookies,
+and account ids never appear in status payloads; account presence is exposed
+only as a boolean. The iBeam self-signed certificate exception is intentionally
+narrow: it applies only to loopback/local HTTPS traffic for the configured
+`voyz/ibeam:latest` runtime and does not disable certificate validation for
+arbitrary hosts.
 
 The normalized session states are:
 
 - `disabled` — broker integration is not enabled locally
 - `credentials-missing` — integration is enabled, but the ignored `.env` still
   lacks real paper-login username, password, or paper account id values
-- `not-configured` — required local paper/iBeam settings such as URL, port, or
-  image contract are inconsistent
+- `not-configured` — required local paper/iBeam settings such as URL, HTTPS
+  scheme, port, or image contract are inconsistent
 - `ibeam-container-configured` — the local iBeam container contract and
-  credentials are present, but the auth status endpoint is not reachable yet
+  credentials are present, but the HTTPS auth status endpoint is not reachable
+  yet; verify the local iBeam URL uses `https://`, authenticate iBeam, and retry
+  the workspace refresh
 - `rejected-live-mode` — local configuration requested `Live` mode and the
   backend refused it before any broker action
 - `connecting` — iBeam is reachable and waiting for paper IBKR authentication
@@ -233,9 +245,9 @@ source**:
   which compose swappable provider contracts under `ATrade.MarketData`
 - the backend now sources market data from the official IBKR Client Portal /
   iBeam APIs when the local paper iBeam session is configured and authenticated
-- local runtime, credential, authentication, or gateway gaps are reported as
-  provider `not-configured` / `unavailable` states rather than as automatic
-  fallback data
+- local runtime, credential, authentication, HTTPS transport/certificate, or
+  gateway gaps are reported as provider `not-configured` / `unavailable` states
+  rather than as automatic fallback data
 
 This keeps the UI contract stable while making the current market-data source
 explicitly real-provider backed and safely unavailable when iBeam is not ready.

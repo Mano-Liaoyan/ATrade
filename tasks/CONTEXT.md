@@ -1,8 +1,8 @@
 # General — Context
 
-**Last Updated:** 2026-04-29
+**Last Updated:** 2026-04-30
 **Status:** Active
-**Next Task ID:** TP-026
+**Next Task ID:** TP-028
 
 ---
 
@@ -23,9 +23,10 @@ implementation queue.
 - `frontend/` contains the Next.js paper-trading workspace.
 - AppHost-managed local infrastructure includes Postgres, TimescaleDB, Redis,
   and NATS.
-- The MVP workspace still uses deterministic mocked market data and a
-  browser-local watchlist; active tasks replace these with real provider-backed
-  behavior.
+- The current workspace uses provider-backed IBKR/iBeam market data when local
+  paper iBeam is configured and authenticated, Postgres-backed watchlists, and
+  explicit provider-unavailable states when runtime/credentials/authentication
+  are missing.
 
 ## Active Task Queue
 
@@ -40,8 +41,10 @@ Active task packets live directly under `tasks/`:
 | `TP-023` | IBKR stock search and pin-any-symbol workflow                      |
 | `TP-024` | Provider-neutral analysis engine abstraction                       |
 | `TP-025` | LEAN as the first analysis engine provider                         |
+| `TP-026` | Migrate solution references and verification guidance to `ATrade.slnx` |
+| `TP-027` | Fix authenticated local iBeam refresh transport failures           |
 
-Completed task packets have been moved to `tasks/archive/`.
+Completed task packets are archived under `tasks/archive/` by the orchestrator after merge.
 
 ## Taskplane Usage
 
@@ -49,7 +52,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-026`
+- New tasks should use the next ID: `TP-028`
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
 
@@ -71,7 +74,7 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                 |
 | Documentation index | `docs/INDEX.md`                           |
 | Startup contract    | `scripts/README.md`                       |
-| Active tasks        | `tasks/TP-019-*` through `tasks/TP-025-*` |
+| Active tasks        | `tasks/TP-019-*` through `tasks/TP-027-*` |
 | Archived tasks      | `tasks/archive/`                          |
 | Taskplane config    | `.pi/taskplane-config.json`               |
 | AppHost             | `src/ATrade.AppHost/Program.cs`           |
@@ -89,5 +92,6 @@ All variants delegate to the Aspire AppHost.
 ## Technical Debt / Future Work
 
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
-- [ ] Execute `TP-019` through `TP-025` in dependency order.
+- [ ] Execute/merge active Taskplane packets through `TP-027` and archive completed packets after orchestrator merge.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
+- [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.

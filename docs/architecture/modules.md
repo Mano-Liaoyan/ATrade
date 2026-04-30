@@ -104,7 +104,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   environment contract to the API and worker through redacted Aspire parameters;
   and only declares the optional `ibkr-gateway` `voyz/ibeam:latest` container when
   broker integration is enabled and fake credential placeholders have been replaced
-  in ignored `.env` — see `src/ATrade.AppHost/Program.cs`.
+  in ignored `.env`; the iBeam endpoint is modeled as HTTPS on the configured
+  gateway port — see `src/ATrade.AppHost/Program.cs`.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 
@@ -317,9 +318,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** IBKR broker adapter behind the provider-neutral broker contract.
 - **Responsibilities:** In the current slice, bind typed paper-mode broker/iBeam
   options, enforce a paper-only guard, expose the official Gateway/iBeam
-  auth-status client boundary, implement `ATrade.Brokers.IBrokerProvider`,
-  normalize safe broker status/capability shapes, redact credential-bearing env
-  values, and keep order placement, credential storage, unofficial SDKs, and persistence out of scope. Later
+  auth-status client boundary over the shared HTTPS/local-certificate transport,
+  implement `ATrade.Brokers.IBrokerProvider`, normalize safe broker
+  status/capability shapes, redact credential-bearing env values, and keep order
+  placement, credential storage, unofficial SDKs, and persistence out of scope. Later
   explicitly reviewed slices may translate
   approved paper-only order intents into IBKR API calls and surface the
   results back onto NATS.
@@ -338,7 +340,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   contract search/detail, snapshot, historical bar, and scanner responses into
   ATrade market-data payloads; expose `ibkr-ibeam-*` source metadata; implement
   `IMarketDataProvider` and `IMarketDataStreamingProvider`; reuse broker/iBeam
-  gateway configuration without reading credentials directly; and return safe
+  gateway configuration and the shared HTTPS/local-certificate transport without
+  reading credentials directly; and return safe
   provider-not-configured/provider-unavailable/authentication-required errors
   when iBeam is disabled, missing credentials, unauthenticated, degraded, or unreachable.
 - **Expected dependencies:** `ATrade.MarketData`, `ATrade.Brokers.Ibkr`, and

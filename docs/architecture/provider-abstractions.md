@@ -167,6 +167,11 @@ Current implementation:
 - `ATrade.MarketData.Ibkr` implements `IMarketDataProvider` and
   `IMarketDataStreamingProvider` using the local iBeam/Client Portal Gateway
   base URL and session configuration supplied by `ATrade.Brokers.Ibkr`.
+- The shared IBKR gateway transport contract uses HTTPS for the local
+  `voyz/ibeam:latest` Client Portal port (committed default
+  `https://127.0.0.1:5000`). Legacy loopback HTTP URLs are normalized to HTTPS
+  for local iBeam traffic, and self-signed certificate acceptance is scoped to
+  loopback iBeam HTTPS only; remote hosts keep normal certificate validation.
 - It does not read credential environment variables directly. Credential and
   paper-account presence is evaluated through typed gateway configuration and
   the paper-only guard.
@@ -181,9 +186,13 @@ Current implementation:
 - Trending uses the scanner source `ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`
   rather than a hard-coded symbol catalog.
 - Missing local runtime, placeholder credentials, unauthenticated sessions,
-  unreachable gateway, or rejected live mode return `not-configured` /
-  `unavailable` states and `provider-not-configured` / `provider-unavailable` /
-  `authentication-required` errors rather than fallback data.
+  HTTPS transport/certificate failures, unreachable gateway, or rejected live
+  mode return `not-configured` / `unavailable` states and
+  `provider-not-configured` / `provider-unavailable` /
+  `authentication-required` errors rather than fallback data. Diagnostics may
+  tell developers to verify local HTTPS iBeam transport and authentication, but
+  must not echo gateway URLs, usernames, passwords, account ids, session ids,
+  cookies, or tokens.
 
 Future plug-ins:
 

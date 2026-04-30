@@ -1,6 +1,6 @@
 # TP-027: Fix authenticated iBeam refresh transport failures — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -71,12 +71,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs/templates modified
-- [ ] "Check If Affected" docs reviewed and updated where relevant
-- [ ] Root cause, chosen fix, and skipped real-runtime checks logged in Discoveries
-- [ ] Delivery notes explain safe local iBeam retry/refresh steps
+- [x] "Must Update" docs/templates modified
+- [x] "Check If Affected" docs reviewed and updated where relevant
+- [x] Root cause, chosen fix, and skipped real-runtime checks logged in Discoveries
+- [x] Delivery notes explain safe local iBeam retry/refresh steps
 
 ---
 
@@ -99,6 +99,7 @@
 | Self-signed certificate handling is scoped to local iBeam HTTPS only: the handler accepts certificate errors only when the configured gateway and request URI are HTTPS loopback endpoints on the same port, the configured image is `voyz/ibeam:latest`, and the certificate is self-signed; arbitrary remote hosts and non-iBeam images keep default failure behavior for TLS errors. | Implemented in Step 1; focused regression tests will lock this down in Step 2. | `src/ATrade.Brokers.Ibkr/IbkrGatewayTransport.cs` |
 | AppHost/template transport defaults now use HTTPS for iBeam: the `ibkr-gateway` resource is declared with an HTTPS endpoint, `.env.template` defaults `ATRADE_IBKR_GATEWAY_URL` to `https://127.0.0.1:5000`, and `.env.example` was restored from the synchronized template. | Implemented in Step 1; shell contract tests will be updated in Step 2 for the new expected scheme. | `src/ATrade.AppHost/Program.cs`, `.env.template`, `.env.example` |
 | Transport diagnostics now avoid echoing exception text or configured gateway values for unreachable/reset cases and instead tell developers to verify local iBeam HTTPS transport, authentication, and retry; credential/account/session fields are still omitted from broker and market-data payloads. | Implemented in Step 1; redaction/safe-response tests will verify in Steps 2-4. | `IbkrBrokerStatusService.cs`, `IbkrMarketDataProvider.cs`, `IbkrGatewayTransport.cs` |
+| Root cause/fix/real-runtime disposition: the observed authenticated refresh failed because ATrade used plain HTTP against a TLS-only local iBeam Client Portal port. The chosen fix is shared HTTPS gateway transport, legacy loopback HTTP-to-HTTPS normalization, AppHost/template HTTPS metadata/defaults, and self-signed certificate acceptance scoped only to loopback `voyz/ibeam:latest` HTTPS traffic. Full real `./start run`/frontend retry was skipped because repo-root ignored `.env` was absent (existence checked only), but fake HTTPS iBeam API simulation and opt-in no-runtime smoke skip verified the transport path without secrets. | Completed and verified by Step 3/4 simulations and tests; no secrets or ignored `.env` values read. | `IbkrGatewayTransport.cs`, `.env.template`, `.env.example`, `STATUS.md` |
 
 ---
 
@@ -138,6 +139,10 @@
 | 2026-04-30 | Step 4 optional real-runtime | Repo-root ignored `.env` was absent (checked existence only, not contents); `ATRADE_IBKR_REAL_SMOKE=1 bash tests/apphost/ibeam-runtime-contract-tests.sh` passed by cleanly skipping because no loopback iBeam HTTPS endpoint responded. No `./start run` real iBeam/frontend retry was attempted without local ignored credentials/runtime. |
 | 2026-04-30 | Step 4 failure disposition | All Step 4 verification commands completed successfully; no unrelated pre-existing failures were encountered or carried forward. |
 | 2026-04-30 | Step 4 complete | Final verification gate passed with targeted tests, apphost/frontend scripts, full `.slnx` test suite, and optional real-runtime skip rationale recorded. |
+| 2026-04-30 | Step 5 started | Updating docs/templates and delivery notes for HTTPS iBeam transport fix. |
+| 2026-04-30 | Step 5 must-update docs | Updated `.env.template`, restored/synchronized `.env.example`, `scripts/README.md`, `docs/architecture/paper-trading-workspace.md`, and `docs/architecture/provider-abstractions.md` for HTTPS iBeam URL, loopback self-signed certificate scope, and retry/readiness guidance. `paper-trading-config-contract-tests.sh` and `ibeam-runtime-contract-tests.sh` passed after doc/template updates. |
+| 2026-04-30 | Step 5 check-if-affected docs | Reviewed/updated `README.md`, `PLAN.md`, `tasks/CONTEXT.md`, and `docs/architecture/modules.md` for the current TP-026/TP-027 queue and shared HTTPS iBeam transport responsibilities. `docs/INDEX.md` was reviewed and left unchanged because no new docs were introduced. |
+| 2026-04-30 | Step 5 complete | Documentation/templates, discoveries, and delivery retry notes completed for the iBeam HTTPS transport fix. |
 
 ---
 
@@ -154,3 +159,5 @@ User-observed failure summary for implementer: refreshing IBKR market data in As
 Step 0 sanitized failure evidence: reviewed PROMPT/STATUS and retained only endpoint path, loopback host placeholder, exception family, and high-level iBeam authenticated/running state; no raw credentials, session ids, cookies, account ids, tokens, or ignored `.env` values were read or recorded.
 
 Step 0 real-runtime/simulation note: a no-secret probe against the default loopback gateway port (`http://127.0.0.1:5000/...` and `https://127.0.0.1:5000/...` with response bodies discarded) found no local listener (`curl exit=7` for both), so no real iBeam session was exercised. An automated local TLS simulation using a temporary self-signed certificate showed plain HTTP to a TLS-only loopback port returns an empty reply/reset-style transport failure, while `https://127.0.0.1:<temp-port>/...` with local certificate trust reaches an HTTPS response. This supports the HTTP-vs-HTTPS/TLS classification without real credentials.
+
+Delivery notes for local developers: copy the updated `.env.template` to ignored `.env`, set `ATRADE_BROKER_INTEGRATION_ENABLED=true`, keep `ATRADE_BROKER_ACCOUNT_MODE=Paper`, keep `ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>`, replace only the fake username/password/paper-account placeholders with local paper values, run `./start run`, complete the iBeam/IBKR paper authentication flow, then use the workspace's **Retry IBKR market data** button or call `GET /api/market-data/trending` again. If the gateway is still unavailable, the API/frontend should show safe provider-unavailable copy telling you to verify local HTTPS iBeam transport/authentication without printing credentials, account ids, gateway URLs, session ids, cookies, or tokens.
