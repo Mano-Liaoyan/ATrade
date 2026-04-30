@@ -37,6 +37,37 @@ function Get-CombinedOutput {
     return @($stdout, $stderr) -join [Environment]::NewLine
 }
 
+function Assert-FileContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Needle
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Expected file to exist: $Path"
+    }
+
+    $text = [System.IO.File]::ReadAllText($Path)
+    if (-not $text.Contains($Needle)) {
+        throw "Expected $Path to contain $Needle"
+    }
+}
+
+function Assert-WrapperContractFiles {
+    $runScriptPath = Join-Path $RepoRoot 'scripts/start.run.ps1'
+    $envLoaderPath = Join-Path $RepoRoot 'scripts/local-env.ps1'
+    $templatePath = Join-Path $RepoRoot '.env.template'
+
+    Assert-FileContains -Path $runScriptPath -Needle 'Import-ATradeLocalPortContract -RepoRoot $RepoRoot'
+    Assert-FileContains -Path $runScriptPath -Needle '$env:ASPNETCORE_URLS = "http://127.0.0.1:$AspireDashboardHttpPort"'
+    Assert-FileContains -Path $runScriptPath -Needle '--no-launch-profile -- @args'
+    Assert-FileContains -Path $envLoaderPath -Needle 'ATRADE_PORT_CONTRACT_PATH'
+    Assert-FileContains -Path $templatePath -Needle 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=0'
+}
+
 function Stop-ProcessTree {
     param(
         [Parameter(Mandatory = $true)]
@@ -109,6 +140,7 @@ function Invoke-WrapperSmoke {
 
 Push-Location $RepoRoot
 try {
+    Assert-WrapperContractFiles
     Invoke-WrapperSmoke -Name 'start-ps1' -CommandText './start.ps1 run'
     Invoke-WrapperSmoke -Name 'start-cmd' -CommandText './start.cmd run'
 

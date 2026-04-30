@@ -1,6 +1,6 @@
 # TP-032: Make Aspire dashboard port configurable from .env — Status
 
-**Current Step:** Step 2: Apply the dashboard port in Unix and Windows start wrappers
+**Current Step:** Step 3: Add configuration and runtime regression coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 1
@@ -45,13 +45,13 @@
 ---
 
 ### Step 3: Add configuration and runtime regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Local-port contract test covers non-zero dashboard port
-- [ ] Start-wrapper tests assert new variable/wrapper loading/safe launch defaults
-- [ ] Bounded AppHost dashboard-port smoke check added if feasible
-- [ ] Windows wrapper smoke expectations updated if needed
-- [ ] Targeted startup/config tests run
+- [x] Local-port contract test covers non-zero dashboard port
+- [x] Start-wrapper tests assert new variable/wrapper loading/safe launch defaults
+- [x] Bounded AppHost dashboard-port smoke check added if feasible
+- [x] Windows wrapper smoke expectations updated if needed
+- [x] Targeted startup/config tests run
 
 ---
 
@@ -107,6 +107,8 @@
 | 2026-04-30 | Step 1 targeted tests | `bash tests/apphost/local-port-contract-tests.sh` and `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
 | 2026-04-30 | Step 2 started | Start wrapper implementation started; existing Step 2 checklist is sufficiently hydrated. |
 | 2026-04-30 | Step 2 targeted tests | `bash -n` wrapper syntax checks and `bash tests/start-contract/start-wrapper-tests.sh` passed; PowerShell syntax smoke skipped because `pwsh` is unavailable in this environment. |
+| 2026-04-30 | Step 3 started | Runtime regression coverage started; existing Step 3 checklist is sufficiently hydrated. |
+| 2026-04-30 | Step 3 targeted tests | `bash -n` startup/config scripts, `bash tests/start-contract/start-wrapper-tests.sh`, `bash tests/apphost/local-port-contract-tests.sh`, and `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
 
 ---
 

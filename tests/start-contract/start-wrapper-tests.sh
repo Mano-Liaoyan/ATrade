@@ -6,6 +6,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 atrade_load_local_port_contract "$repo_root"
 
 run_script_backup=''
+env_backup=''
+restore_original_env=0
+dashboard_smoke_pid=''
+dashboard_smoke_log=''
 
 assert_contains() {
   local haystack="$1"
@@ -80,6 +84,82 @@ restore_run_script() {
   fi
 }
 
+restore_local_env() {
+  if [[ -n "$env_backup" && -f "$env_backup" ]]; then
+    mv "$env_backup" "$repo_root/.env"
+    env_backup=''
+    restore_original_env=0
+  elif [[ "$restore_original_env" == '0' ]]; then
+    rm -f "$repo_root/.env"
+  fi
+}
+
+cleanup() {
+  if [[ -n "$dashboard_smoke_pid" ]] && kill -0 "$dashboard_smoke_pid" 2>/dev/null; then
+    kill "$dashboard_smoke_pid" 2>/dev/null || true
+    wait "$dashboard_smoke_pid" 2>/dev/null || true
+  fi
+
+  restore_run_script
+  restore_local_env
+
+  if [[ -n "$dashboard_smoke_log" && -f "$dashboard_smoke_log" ]]; then
+    rm -f "$dashboard_smoke_log"
+  fi
+}
+
+trap cleanup EXIT
+
+capture_original_env() {
+  if [[ -n "$env_backup" || "$restore_original_env" == '1' ]]; then
+    return
+  fi
+
+  if [[ -f "$repo_root/.env" ]]; then
+    env_backup="$(mktemp)"
+    cp "$repo_root/.env" "$env_backup"
+    restore_original_env=1
+  fi
+}
+
+write_local_port_contract() {
+  local api_port="$1"
+  local frontend_direct_port="$2"
+  local apphost_frontend_port="$3"
+  local dashboard_port="$4"
+
+  capture_original_env
+
+  cat >"$repo_root/.env" <<EOF
+ATRADE_API_HTTP_PORT=$api_port
+ATRADE_FRONTEND_DIRECT_HTTP_PORT=$frontend_direct_port
+ATRADE_APPHOST_FRONTEND_HTTP_PORT=$apphost_frontend_port
+ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=$dashboard_port
+EOF
+}
+
+free_port() {
+  python3 - <<'PY'
+import socket
+
+with socket.socket() as sock:
+    sock.bind(("127.0.0.1", 0))
+    print(sock.getsockname()[1])
+PY
+}
+
+run_with_local_contract_environment() {
+  env \
+    -u ATRADE_API_HTTP_PORT \
+    -u ATRADE_FRONTEND_DIRECT_HTTP_PORT \
+    -u ATRADE_APPHOST_FRONTEND_HTTP_PORT \
+    -u ATRADE_ASPIRE_DASHBOARD_HTTP_PORT \
+    -u ASPNETCORE_URLS \
+    -u ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL \
+    -u ASPIRE_ALLOW_UNSECURED_TRANSPORT \
+    "$@"
+}
+
 install_run_stub() {
   local run_script_path="$repo_root/scripts/start.run.sh"
 
@@ -87,7 +167,6 @@ install_run_stub() {
 
   run_script_backup="$(mktemp)"
   cp "$run_script_path" "$run_script_backup"
-  trap restore_run_script EXIT
 
   printf '%s\n' \
     '#!/usr/bin/env bash' \
@@ -157,6 +236,107 @@ assert_start_run_script_failure_paths() {
   assert_contains "$missing_project_output" '__STATUS__=1'
 }
 
+assert_start_run_script_loads_dashboard_port_contract() {
+  local fake_bin
+  fake_bin="$(mktemp -d)"
+
+  cat >"$fake_bin/dotnet" <<'EOF'
+#!/usr/bin/env bash
+printf '__FAKE_DOTNET__\n'
+printf '__ASPNETCORE_URLS__=%s\n' "${ASPNETCORE_URLS-}"
+printf '__ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL__=%s\n' "${ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL-}"
+printf '__ASPIRE_ALLOW_UNSECURED_TRANSPORT__=%s\n' "${ASPIRE_ALLOW_UNSECURED_TRANSPORT-}"
+for arg in "$@"; do
+  printf '__DOTNET_ARG__=%s\n' "$arg"
+done
+EOF
+  chmod +x "$fake_bin/dotnet"
+
+  write_local_port_contract 5198 3118 3018 5018
+
+  local run_output
+  run_output="$(PATH="$fake_bin:$PATH" run_and_capture run_with_local_contract_environment /usr/bin/bash "$repo_root/scripts/start.run.sh" alpha beta)"
+
+  rm -rf "$fake_bin"
+
+  assert_contains "$run_output" '__FAKE_DOTNET__'
+  assert_contains "$run_output" '__ASPNETCORE_URLS__=http://127.0.0.1:5018'
+  assert_contains "$run_output" '__ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL__=http://127.0.0.1:0'
+  assert_contains "$run_output" '__ASPIRE_ALLOW_UNSECURED_TRANSPORT__=true'
+  assert_contains "$run_output" '__DOTNET_ARG__=run'
+  assert_contains "$run_output" '__DOTNET_ARG__=--project'
+  assert_contains "$run_output" "__DOTNET_ARG__=$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj"
+  assert_contains "$run_output" '__DOTNET_ARG__=--no-launch-profile'
+  assert_contains "$run_output" '__DOTNET_ARG__=--'
+  assert_contains "$run_output" '__DOTNET_ARG__=alpha'
+  assert_contains "$run_output" '__DOTNET_ARG__=beta'
+  assert_contains "$run_output" '__STATUS__=0'
+}
+
+dashboard_port_is_open() {
+  local dashboard_port="$1"
+
+  python3 - "$dashboard_port" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+with socket.socket() as sock:
+    sock.settimeout(0.25)
+    raise SystemExit(0 if sock.connect_ex(("127.0.0.1", port)) == 0 else 1)
+PY
+}
+
+assert_start_run_dashboard_port_smoke() {
+  local ports
+  ports="$(python3 - <<'PY'
+import socket
+
+sockets = [socket.socket() for _ in range(4)]
+try:
+    for sock in sockets:
+        sock.bind(("127.0.0.1", 0))
+    print(" ".join(str(sock.getsockname()[1]) for sock in sockets))
+finally:
+    for sock in sockets:
+        sock.close()
+PY
+)"
+
+  local api_port frontend_direct_port apphost_frontend_port dashboard_port
+  read -r api_port frontend_direct_port apphost_frontend_port dashboard_port <<<"$ports"
+  write_local_port_contract "$api_port" "$frontend_direct_port" "$apphost_frontend_port" "$dashboard_port"
+
+  dashboard_smoke_log="$(mktemp)"
+  (
+    cd "$repo_root"
+    run_with_local_contract_environment "$repo_root/scripts/start.run.sh"
+  ) >"$dashboard_smoke_log" 2>&1 &
+  dashboard_smoke_pid=$!
+
+  local attempt
+  for attempt in {1..90}; do
+    if dashboard_port_is_open "$dashboard_port"; then
+      kill "$dashboard_smoke_pid" 2>/dev/null || true
+      wait "$dashboard_smoke_pid" 2>/dev/null || true
+      dashboard_smoke_pid=''
+      return
+    fi
+
+    if ! kill -0 "$dashboard_smoke_pid" 2>/dev/null; then
+      printf 'AppHost exited before dashboard port %s opened.\n' "$dashboard_port" >&2
+      cat "$dashboard_smoke_log" >&2
+      return 1
+    fi
+
+    sleep 0.5
+  done
+
+  printf 'expected Aspire dashboard port %s to accept loopback connections.\n' "$dashboard_port" >&2
+  cat "$dashboard_smoke_log" >&2
+  return 1
+}
+
 assert_apphost_launch_profile_bootstraps_runtime() {
   local launch_settings_path="$repo_root/src/ATrade.AppHost/Properties/launchSettings.json"
 
@@ -219,9 +399,21 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.ps1" "\$ErrorActionPreference = 'Stop'"
   assert_file_contains "$repo_root/scripts/start.run.sh" 'src/ATrade.AppHost/ATrade.AppHost.csproj'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'atrade_load_local_port_contract'
+  assert_file_contains "$repo_root/scripts/start.run.sh" 'ASPNETCORE_URLS="http://127.0.0.1:$aspire_dashboard_http_port"'
+  assert_file_contains "$repo_root/scripts/start.run.sh" 'ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL:-http://127.0.0.1:0'
+  assert_file_contains "$repo_root/scripts/start.run.sh" '--no-launch-profile -- "$@"'
   assert_file_contains "$repo_root/scripts/local-env.sh" 'ATRADE_PORT_CONTRACT_PATH'
+  assert_file_contains "$repo_root/scripts/local-env.ps1" 'Import-ATradeLocalPortContract'
+  assert_file_contains "$repo_root/scripts/local-env.ps1" 'ATRADE_PORT_CONTRACT_PATH'
+  assert_file_not_contains "$repo_root/scripts/local-env.ps1" 'Write-Host'
+  assert_file_not_contains "$repo_root/scripts/local-env.ps1" 'Write-Output'
   assert_file_contains "$repo_root/.env.template" 'ATRADE_APPHOST_FRONTEND_HTTP_PORT=3000'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=0'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'src/ATrade.AppHost/ATrade.AppHost.csproj'
+  assert_file_contains "$repo_root/scripts/start.run.ps1" 'Import-ATradeLocalPortContract -RepoRoot $RepoRoot'
+  assert_file_contains "$repo_root/scripts/start.run.ps1" '$env:ASPNETCORE_URLS = "http://127.0.0.1:$AspireDashboardHttpPort"'
+  assert_file_contains "$repo_root/scripts/start.run.ps1" '$env:ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL = '\''http://127.0.0.1:0'\'''
+  assert_file_contains "$repo_root/scripts/start.run.ps1" '--no-launch-profile -- @args'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'Missing AppHost project at %s'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'dotnet is required to run the ATrade AppHost.'
@@ -270,7 +462,9 @@ main() {
 
   assert_start_run_dispatches
   assert_start_run_script_failure_paths
+  assert_start_run_script_loads_dashboard_port_contract
   assert_apphost_launch_profile_bootstraps_runtime
+  assert_start_run_dashboard_port_smoke
   assert_apphost_manifest_preserves_nextjs_frontend
 }
 
