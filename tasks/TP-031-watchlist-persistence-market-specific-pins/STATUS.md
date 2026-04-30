@@ -159,6 +159,8 @@
 | 2026-04-30 17:53 | Must-update docs modified | Updated `paper-trading-workspace.md`, `modules.md`, and `provider-abstractions.md` for exact provider/market watchlist identity, Postgres instrument keys, localStorage caveats, and market-badge search UI. |
 | 2026-04-30 17:54 | Check-if-affected docs reviewed | Updated affected `README.md` and `docs/architecture/overview.md`; `docs/INDEX.md` needed no change because no new active docs were added. |
 | 2026-04-30 17:55 | Discoveries finalized | STATUS Discoveries now record restart baseline, symbol-only root cause, final identity semantics, localStorage behavior, and migration caveats. |
+| 2026-04-30 16:10 | Worker iter 1 | done in 1791s, tools: 225 |
+| 2026-04-30 16:10 | Task complete | .DONE created |
 
 ---
 
