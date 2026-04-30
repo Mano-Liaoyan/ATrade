@@ -149,6 +149,8 @@
 | 2026-04-30 15:15 | Delivery discoveries finalized | Root cause, regression coverage, verification commands, and real-iBeam skip rationale recorded in Discoveries. |
 | 2026-04-30 15:15 | Step 5 completed | Documentation and delivery notes finalized. |
 | 2026-04-30 15:15 | Task completed | All TP-028 steps complete; STATUS marked complete. |
+| 2026-04-30 15:13 | Worker iter 1 | done in 1288s, tools: 144 |
+| 2026-04-30 15:13 | Task complete | .DONE created |
 
 ---
 
