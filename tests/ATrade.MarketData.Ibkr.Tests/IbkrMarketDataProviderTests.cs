@@ -120,6 +120,56 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
+    public void Provider_UsesSearchContractWhenStockDetailEndpointRequiresMonth()
+    {
+        var handler = new RecordingHttpMessageHandler((request, _) =>
+        {
+            return Task.FromResult(request.RequestUri?.AbsolutePath switch
+            {
+                IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+                {
+                    authenticated = true,
+                    connected = true,
+                    competing = false,
+                    message = "ready",
+                }),
+                IbkrMarketDataClient.ContractSearchPath => JsonResponse(new[]
+                {
+                    new
+                    {
+                        conid = "4815747",
+                        companyHeader = "NVIDIA CORP (NASDAQ)",
+                        symbol = "NVDA",
+                        secType = "STK",
+                        sections = Array.Empty<object>(),
+                    },
+                }),
+                IbkrMarketDataClient.ContractInfoPath => new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        error = "Bad Request: month required",
+                        statusCode = 400,
+                    }),
+                },
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            });
+        });
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var result = provider.TrySearchSymbols("NVDA", out var search, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+        var match = Assert.Single(search!.Results);
+        Assert.Equal("NVDA", match.Identity.Symbol);
+        Assert.Equal("4815747", match.Identity.ProviderSymbolId);
+        Assert.Equal("NVIDIA CORP", match.Name);
+        Assert.Equal("NASDAQ", match.Identity.Exchange);
+        Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath == IbkrMarketDataClient.ContractInfoPath);
+    }
+
+    [Fact]
     public void Provider_MapsContractLookupSnapshotsHistoricalBarsAndScannerResults()
     {
         var handler = new RecordingHttpMessageHandler(RespondWithIbkrPayloads);

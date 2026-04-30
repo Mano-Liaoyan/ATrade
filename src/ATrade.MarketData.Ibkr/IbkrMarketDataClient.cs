@@ -81,7 +81,14 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
     {
         var path = $"{ContractInfoPath}?conid={Uri.EscapeDataString(contract.Conid)}&secType={Uri.EscapeDataString(ToIbkrSecType(contract.AssetClass))}";
         using var response = await httpClient.GetAsync(path, cancellationToken).ConfigureAwait(false);
-        await EnsureMarketDataSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await EnsureMarketDataSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IbkrMarketDataProviderException exception) when (CanUseSearchContractWhenDetailEndpointRequiresMonth(exception))
+        {
+            return contract;
+        }
 
         using var document = await ReadJsonDocumentAsync(response, cancellationToken).ConfigureAwait(false);
         var detail = EnumerateResultItems(document.RootElement)
@@ -235,6 +242,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
             return null;
         }
 
+        var companyHeader = element.GetStringValue("companyHeader");
         var assetClass = element.GetStringValue("secType", "assetClass", "asset_class")
             ?? element.GetNestedStringValue("contract", "secType")
             ?? TryReadFirstSectionString(element, "secType", "assetClass")
@@ -242,9 +250,11 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
             ?? "Stock";
         var exchange = element.GetStringValue("exchange", "listingExchange", "listing_exchange", "primaryExchange")
             ?? element.GetNestedStringValue("contract", "exchange")
+            ?? TryParseExchangeFromCompanyHeader(companyHeader)
             ?? fallback?.Exchange
             ?? "SMART";
-        var name = element.GetStringValue("companyName", "companyHeader", "description", "contract_description_1", "name")
+        var name = element.GetStringValue("companyName", "description", "contract_description_1", "name")
+            ?? TryParseNameFromCompanyHeader(companyHeader)
             ?? fallback?.Name
             ?? symbol;
         var sector = element.GetStringValue("sector", "industry", "category") ?? fallback?.Sector ?? assetClass;
@@ -358,6 +368,11 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
             IbkrMarketDataSource.Scanner);
     }
 
+    private static bool CanUseSearchContractWhenDetailEndpointRequiresMonth(IbkrMarketDataProviderException exception) =>
+        exception.Code == MarketDataProviderErrorCodes.ProviderUnavailable &&
+        exception.Message.Contains("400", StringComparison.OrdinalIgnoreCase) &&
+        exception.Message.Contains("month required", StringComparison.OrdinalIgnoreCase);
+
     private static string? TryReadFirstSectionString(JsonElement element, params string[] names)
     {
         if (!element.TryGetPropertyIgnoreCase("sections", out var sections) || sections.ValueKind != JsonValueKind.Array)
@@ -375,6 +390,47 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         }
 
         return null;
+    }
+
+    private static string? TryParseExchangeFromCompanyHeader(string? companyHeader)
+    {
+        var exchange = TryParseParenthesizedCompanyHeaderSuffix(companyHeader);
+        return string.IsNullOrWhiteSpace(exchange) ? null : exchange;
+    }
+
+    private static string? TryParseNameFromCompanyHeader(string? companyHeader)
+    {
+        if (string.IsNullOrWhiteSpace(companyHeader))
+        {
+            return null;
+        }
+
+        var trimmed = companyHeader.Trim();
+        var suffix = TryParseParenthesizedCompanyHeaderSuffix(trimmed);
+        if (string.IsNullOrWhiteSpace(suffix))
+        {
+            return trimmed;
+        }
+
+        var suffixStart = trimmed.LastIndexOf(" (", StringComparison.Ordinal);
+        return suffixStart <= 0 ? trimmed : trimmed[..suffixStart].Trim();
+    }
+
+    private static string? TryParseParenthesizedCompanyHeaderSuffix(string? companyHeader)
+    {
+        if (string.IsNullOrWhiteSpace(companyHeader))
+        {
+            return null;
+        }
+
+        var trimmed = companyHeader.Trim();
+        var open = trimmed.LastIndexOf('(');
+        if (open < 0 || !trimmed.EndsWith(')') || open == trimmed.Length - 2)
+        {
+            return null;
+        }
+
+        return trimmed[(open + 1)..^1].Trim();
     }
 
     private static DateTimeOffset ToDateTimeOffset(long value)

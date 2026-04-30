@@ -181,10 +181,12 @@ Current implementation:
   paper-account presence is evaluated through typed gateway configuration and
   the paper-only guard.
 - It translates Client Portal contract search (`/iserver/secdef/search`) plus
-  contract detail (`/iserver/secdef/info`), snapshots
+  contract detail (`/iserver/secdef/info`) when available, snapshots
   (`/iserver/marketdata/snapshot`), historical bars (`/iserver/marketdata/history`),
   and scanner results (`/iserver/scanner/run`) into provider-neutral ATrade
-  payloads.
+  payloads. If Client Portal returns the stock detail endpoint's
+  derivative-oriented `month required` validation error, search falls back to
+  the search contract payload instead of failing the provider request.
 - Search returns stock results with symbol, display name, asset class, exchange,
   currency, provider id, and provider symbol id/IBKR `conid`; no production
   hard-coded stock allowlist is used.

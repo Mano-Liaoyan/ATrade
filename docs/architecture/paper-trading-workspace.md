@@ -460,10 +460,13 @@ only derives `ibkrConid` for persisted metadata when the provider is `ibkr` and
 the provider symbol id is numeric.
 
 The backend search path uses IBKR Client Portal `/iserver/secdef/search` plus
-`/iserver/secdef/info` enrichment. Automated tests use fake IBKR HTTP responses;
-production search never falls back to a committed symbol allowlist. If iBeam is
-disabled, missing credentials, unauthenticated, or unreachable, search returns a
-stable provider error payload instead of fake results.
+`/iserver/secdef/info` enrichment when Client Portal accepts the detail request;
+if the stock detail endpoint returns the derivative-oriented `month required`
+validation error, search uses the search contract payload rather than failing or
+falling back to a committed symbol allowlist. Automated tests use fake IBKR HTTP
+responses; production search never falls back to a committed symbol allowlist.
+If iBeam is disabled, missing credentials, unauthenticated, or unreachable,
+search returns a stable provider error payload instead of fake results.
 
 ## 10. LEAN Analysis Provider
 
