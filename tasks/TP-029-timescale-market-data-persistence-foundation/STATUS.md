@@ -1,6 +1,6 @@
 # TP-029: Add TimescaleDB market-data persistence foundation — Status
 
-**Current Step:** Step 2: Create Timescale schema and repository contracts
+**Current Step:** Step 3: Add composition and optional integration verification hooks
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -44,13 +44,13 @@
 ---
 
 ### Step 3: Add composition and optional integration verification hooks
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Timescale service-registration extensions added for `ConnectionStrings:timescaledb`
-- [ ] New source/test projects added to `ATrade.slnx` and compatibility solution only if needed
-- [ ] Optional Timescale integration script added or explicit rationale recorded
-- [ ] API cache-aside behavior intentionally left untouched for TP-030
-- [ ] Targeted build/tests run
+- [x] Timescale service-registration extensions added for `ConnectionStrings:timescaledb`
+- [x] New source/test projects added to `ATrade.slnx` and compatibility solution only if needed
+- [x] Optional Timescale integration script added or explicit rationale recorded
+- [x] API cache-aside behavior intentionally left untouched for TP-030
+- [x] Targeted build/tests run
 
 ---
 
@@ -99,6 +99,11 @@
 | Repository contract exposes upsert/read methods for fresh candle series and trending snapshots, with caller-provided freshness cutoffs and no direct API endpoint behavior changes. | Source module build passed after repository/model implementation. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataRepository.cs`, `TimescaleMarketDataModels.cs` |
 | Timescale storage contracts use neutral `provider`/`provider_symbol_id` metadata and do not reference IBKR-specific types, conids, frontend payload types, or API behavior. | Verified with source grep for IBKR/conid/API/frontend terms. | `src/ATrade.MarketData.Timescale/*` |
 | SQL/unit coverage asserts Timescale schema shape, hypertable calls, freshness predicates, upsert conflict keys, workspace-schema avoidance, and `timescaledb` connection guardrails. | `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed (17 tests). | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataSqlTests.cs`, `TimescaleMarketDataRepositoryTests.cs` |
+| Timescale composition extension registers options, data source provider, schema initializer, and repository against `ConnectionStrings:timescaledb`; missing connection strings surface as `TimescaleMarketDataStorageUnavailableException`. | Targeted service-registration tests passed. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataServiceCollectionExtensions.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataServiceCollectionExtensionsTests.cs` |
+| New Timescale source and test projects are included in authoritative `ATrade.slnx`; compatibility `ATrade.sln` was left unchanged because no required tooling needed it. | `dotnet sln ATrade.slnx list` shows both projects. | `ATrade.slnx` |
+| Optional Timescale integration script starts a local TimescaleDB container when Docker/Podman is available, initializes schema, and round-trips fake candle/trending rows; it exits 0 with SKIP when no runtime is available. | `bash tests/apphost/market-data-timescale-persistence-tests.sh` passed in this environment. | `tests/apphost/market-data-timescale-persistence-tests.sh`, `TimescaleMarketDataIntegrationTests.cs` |
+| API cache-aside behavior remains deferred: no `ATrade.Api` or core `ATrade.MarketData` source/project changes reference the new Timescale module. | Verified with git diff and source grep before checking Step 3 item. | `src/ATrade.Api`, `src/ATrade.MarketData` |
+| Targeted Timescale module verification passed after composition and integration-hook changes. | `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed (20 tests); `dotnet build src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj --nologo --verbosity minimal` passed. | Timescale source/test projects |
 
 ---
 
@@ -111,6 +116,7 @@
 | 2026-04-30 15:13 | Step 0 started | Preflight and scope boundary |
 | 2026-04-30 | Step 1 started | Freshness option implementation |
 | 2026-04-30 | Step 2 started | Timescale schema and repository contracts |
+| 2026-04-30 | Step 3 started | Composition and optional integration verification |
 
 ---
 
