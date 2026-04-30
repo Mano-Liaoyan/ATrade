@@ -1,6 +1,6 @@
 # TP-030: Serve market data through TimescaleDB cache-aside — Status
 
-**Current Step:** Step 1: Compose a cache-aware market-data service
+**Current Step:** Step 2: Cache-aside `/api/market-data/trending`
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -33,13 +33,13 @@
 ---
 
 ### Step 2: Cache-aside `/api/market-data/trending`
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Fresh Timescale trending/scanner snapshot read before IBKR/iBeam call
-- [ ] Fresh persisted snapshot returned with honest source metadata
-- [ ] Missing/stale snapshot triggers provider fetch, persistence write, and provider response
-- [ ] Provider-unavailable with fresh cache returns cache; provider-unavailable with stale-only cache returns safe error
-- [ ] Tests cover hit, miss, stale refresh, write-after-fetch, and fresh-cache unavailable behavior
+- [x] Fresh Timescale trending/scanner snapshot read before IBKR/iBeam call
+- [x] Fresh persisted snapshot returned with honest source metadata
+- [x] Missing/stale snapshot triggers provider fetch, persistence write, and provider response
+- [x] Provider-unavailable with fresh cache returns cache; provider-unavailable with stale-only cache returns safe error
+- [x] Tests cover hit, miss, stale refresh, write-after-fetch, and fresh-cache unavailable behavior
 
 ---
 
@@ -112,6 +112,11 @@
 | `TimescaleCachedMarketDataService` initializes schema once via a guarded semaphore before cache reads/writes, retries after failed initialization, and catches `TimescaleMarketDataStorageUnavailableException` so storage outages skip cache reads/writes while provider responses/errors continue to flow. | Step 1 schema/unavailable item complete; later tests exercise cache and fallback paths. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs` |
 | Freshness is consumed through the typed `TimescaleMarketDataOptions` singleton created by `AddTimescaleMarketDataPersistence`; cache reads compute `timeProvider.GetUtcNow() - options.CacheFreshnessPeriod`, preserving the TP-029 `.env`/configuration override for `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`. | Step 1 freshness option item complete. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataServiceCollectionExtensions.cs`, `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs` |
 | Targeted Step 1 verification passed: `dotnet build src/ATrade.Api/ATrade.Api.csproj --nologo --verbosity minimal` succeeded, and `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed 20/20. | Step 1 targeted build/tests complete. | `src/ATrade.Api/ATrade.Api.csproj`, `tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj` |
+| Added cache-aside coverage proving `TimescaleCachedMarketDataService.GetTrendingSymbols()` queries `GetFreshTrendingSnapshotAsync` with the configured freshness cutoff before any provider scanner call. | Step 2 fresh-read-before-provider item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Fresh trending cache hits are reconstructed as frontend-compatible `TrendingSymbolsResponse` values and identify their source as `timescale-cache:{originalSource}`. | Step 2 source metadata item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Trending cache misses/stale repository results call the provider-backed service, persist the provider response as a Timescale snapshot, and return the original provider response/source. | Step 2 miss/refresh/write item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Provider-unavailable trending behavior is cache-safe: a fresh Timescale snapshot is returned without provider scanner access, while no fresh cache surfaces the provider-unavailable error and writes nothing. | Step 2 unavailable item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Step 2 targeted tests passed: `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal --filter FullyQualifiedName~TimescaleMarketDataCacheAsideTests` passed 5/5, covering trending cache hit, freshness cutoff query, miss/stale refresh, write-after-fetch, source metadata, and fresh-cache provider-unavailable fallback. | Step 2 test coverage item complete. | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
 
 ---
 
@@ -133,6 +138,12 @@
 | 2026-04-30 16:39 | Freshness option wired | Cache service now uses typed Timescale options for freshness cutoffs, preserving `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` configuration. |
 | 2026-04-30 16:54 | Worker iter 1 | done in 1468s, tools: 77 |
 | 2026-04-30 17:04 | Step 1 targeted verification passed | API project build succeeded and Timescale market-data tests passed 20/20. |
+| 2026-04-30 17:05 | Step 2 started | Trending cache-aside implementation and tests resumed. |
+| 2026-04-30 17:11 | Trending fresh-read-before-provider verified | Targeted Timescale cache-aside test passed, proving a fresh Timescale snapshot is read before provider scanner calls. |
+| 2026-04-30 17:12 | Trending source metadata verified | Targeted Timescale cache-aside test passed for `timescale-cache:{originalSource}` trending responses. |
+| 2026-04-30 17:14 | Trending miss refresh verified | Targeted Timescale cache-aside test passed for provider fetch, Timescale write, and provider response on cache miss/stale result. |
+| 2026-04-30 17:18 | Trending provider-unavailable behavior verified | Targeted Timescale cache-aside tests passed for fresh-cache fallback and stale/no-cache provider-unavailable errors. |
+| 2026-04-30 17:19 | Step 2 targeted coverage passed | Timescale cache-aside test class passed 5/5 for trending hit/miss/stale/write/unavailable paths. |
 
 ---
 
