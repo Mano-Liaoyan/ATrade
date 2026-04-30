@@ -35,7 +35,7 @@ Active task packets live directly under `tasks/`:
 
 | Task     | Summary                                                            |
 | -------- | ------------------------------------------------------------------ |
-| `TP-026` | Migrate active solution references from `ATrade.sln` to `ATrade.slnx` |
+| `TP-026` | Migrate active solution references to authoritative `ATrade.slnx` |
 | `TP-027` | Fix the local IBKR/iBeam refresh transport contract                |
 
 Completed task packets `TP-019` through `TP-025` currently remain under

@@ -100,7 +100,7 @@ Active Taskplane packets live directly under `tasks/`:
 
 | Task     | Purpose                                                                        |
 | -------- | ------------------------------------------------------------------------------ |
-| `TP-026` | Migrate active repository solution references from `ATrade.sln` to `ATrade.slnx` |
+| `TP-026` | Migrate active repository solution references to authoritative `ATrade.slnx` |
 | `TP-027` | Fix the local IBKR/iBeam refresh transport contract                            |
 
 Completed Taskplane packets `TP-019` through `TP-025` currently remain under

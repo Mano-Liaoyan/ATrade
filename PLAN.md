@@ -27,7 +27,7 @@ has landed. Current follow-up work keeps the repository contracts aligned:
 
 | Task | Status | Depends on | Summary |
 |------|--------|------------|---------|
-| `TP-026` | In progress | `TP-025` | Migrate active solution references from `ATrade.sln` to `ATrade.slnx`. |
+| `TP-026` | In progress | `TP-025` | Migrate active solution references to authoritative `ATrade.slnx`. |
 | `TP-027` | Ready after deps | `TP-026` | Fix the local IBKR/iBeam refresh transport contract. |
 
 Completed task packets `TP-019` through `TP-025` remain under `tasks/` with

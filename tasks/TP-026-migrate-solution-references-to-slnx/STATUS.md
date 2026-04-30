@@ -1,6 +1,6 @@
 # TP-026: Migrate solution references from ATrade.sln to ATrade.slnx — Status
 
-**Current Step:** Step 2: Migrate active docs and future-facing prompt material
+**Current Step:** Step 3: Finalize solution-file contract
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -45,12 +45,12 @@
 ---
 
 ### Step 3: Finalize solution-file contract
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `ATrade.slnx` contains all required projects
-- [ ] `ATrade.sln` retained/removed according to recorded decision
-- [ ] Active scripts/docs no longer prefer `ATrade.sln`
-- [ ] Regression check for stale active solution references added or updated where appropriate
+- [x] `ATrade.slnx` contains all required projects
+- [x] `ATrade.sln` retained/removed according to recorded decision
+- [x] Active scripts/docs no longer prefer `ATrade.sln`
+- [x] Regression check for stale active solution references added or updated where appropriate
 
 ---
 
@@ -118,6 +118,11 @@
 | 2026-04-30 | Step 2 pending prompt audit | `rg -n "ATrade\\.sln\\b" tasks/TP-027-ibkr-ibeam-refresh-transport-fix` returned no matches, so no pending/future task prompt edits were needed beyond `tasks/CONTEXT.md`. |
 | 2026-04-30 | Step 2 historical exceptions recorded | Audited completed packets: 31 root completed-task refs plus 43 archived refs remain intentionally untouched as historical records. |
 | 2026-04-30 | Step 2 compatibility wording added | `README.md`, `PLAN.md`, `scripts/README.md`, and `tasks/CONTEXT.md` explain that `ATrade.sln` is retained only as a temporary non-authoritative compatibility artifact while `ATrade.slnx` is authoritative. |
+| 2026-04-30 | Step 3 started | Finalizing the solution-file contract and adding an active-reference regression guard. |
+| 2026-04-30 | Step 3 solution membership verified | `dotnet sln ATrade.slnx list` produced 20 projects matching all 20 `src/`, `tests/`, and `workers/` `.csproj` files (`diff` clean). |
+| 2026-04-30 | Step 3 legacy solution retained | Verified root `ATrade.sln` still exists and lists 20 projects; retained only as the documented compatibility artifact. |
+| 2026-04-30 | Step 3 active preference audit | `rg -n "ATrade\\.sln\\b" README.md PLAN.md scripts docs tasks/CONTEXT.md tests src AGENTS.md` found only TP-026 descriptions, explicit compatibility wording, and the `LocalDevelopmentPortContract` fallback; no active script/test/build command prefers `ATrade.sln`. |
+| 2026-04-30 | Step 3 regression guard added | Added and ran `tests/scaffolding/solution-reference-contract-tests.sh`; it verifies `ATrade.slnx` membership matches all active projects and fails on stale active `ATrade.sln` build/test/list guidance unless explicitly classified as compatibility. |
 
 ---
 
