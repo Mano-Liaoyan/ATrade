@@ -1,6 +1,6 @@
 # TP-032: Make Aspire dashboard port configurable from .env — Status
 
-**Current Step:** Step 3: Add configuration and runtime regression coverage
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 1
@@ -56,16 +56,16 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `bash tests/start-contract/start-wrapper-tests.sh` passing
-- [ ] `bash tests/apphost/local-port-contract-tests.sh` passing
-- [ ] `bash tests/apphost/paper-trading-config-contract-tests.sh` passing
-- [ ] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh` passing
-- [ ] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passing
-- [ ] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
-- [ ] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
-- [ ] All failures fixed or unrelated pre-existing failures documented
+- [x] `bash tests/start-contract/start-wrapper-tests.sh` passing
+- [x] `bash tests/apphost/local-port-contract-tests.sh` passing
+- [x] `bash tests/apphost/paper-trading-config-contract-tests.sh` passing
+- [x] `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh` passing
+- [x] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passing
+- [x] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
+- [x] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
+- [x] All failures fixed or unrelated pre-existing failures documented
 
 ---
 
@@ -109,6 +109,15 @@
 | 2026-04-30 | Step 2 targeted tests | `bash -n` wrapper syntax checks and `bash tests/start-contract/start-wrapper-tests.sh` passed; PowerShell syntax smoke skipped because `pwsh` is unavailable in this environment. |
 | 2026-04-30 | Step 3 started | Runtime regression coverage started; existing Step 3 checklist is sufficiently hydrated. |
 | 2026-04-30 | Step 3 targeted tests | `bash -n` startup/config scripts, `bash tests/start-contract/start-wrapper-tests.sh`, `bash tests/apphost/local-port-contract-tests.sh`, and `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
+| 2026-04-30 | Step 4 started | Verification gate started. |
+| 2026-04-30 | Verification | `bash tests/start-contract/start-wrapper-tests.sh` passed. |
+| 2026-04-30 | Verification | `bash tests/apphost/local-port-contract-tests.sh` passed. |
+| 2026-04-30 | Verification | `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
+| 2026-04-30 | Verification | `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh` passed. |
+| 2026-04-30 | Verification | `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passed. |
+| 2026-04-30 | Verification | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed (91 tests). |
+| 2026-04-30 | Verification | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings and 0 errors. |
+| 2026-04-30 | Verification | No unexpected failures observed; no pre-existing failures required documentation. |
 
 ---
 
