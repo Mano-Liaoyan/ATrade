@@ -1,11 +1,11 @@
 # TP-030: Serve market data through TimescaleDB cache-aside — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Dependency preflight and data-path plan
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,11 +13,11 @@
 ---
 
 ### Step 0: Dependency preflight and data-path plan
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] TP-028 completion and scanner content-length regression coverage confirmed
-- [ ] TP-029 completion and Timescale repository/options confirmed
-- [ ] Cache-aside plan for trending, candles, indicators, and unavailable states recorded
+- [x] TP-028 completion and scanner content-length regression coverage confirmed
+- [x] TP-029 completion and Timescale repository/options confirmed
+- [x] Cache-aside plan for trending, candles, indicators, and unavailable states recorded
 
 ---
 
@@ -101,6 +101,12 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| TP-028 is complete and includes `IbkrScannerRequestContractTests.GetTrendingScannerResultsAsync_SendsBufferedJsonWithContentLengthAndNoChunkedTransfer`; `IbkrMarketDataClient.GetTrendingScannerResultsAsync` now sends buffered JSON with explicit positive `Content-Length` and `TransferEncodingChunked = false`. | Dependency satisfied for TP-030; cache-aside trending can rely on provider scanner transport regression coverage. | `tasks/TP-028-ibkr-scanner-content-length-fix/STATUS.md`, `tests/ATrade.MarketData.Ibkr.Tests/IbkrScannerRequestContractTests.cs`, `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` |
+| TP-029 is complete and the Timescale module compiles/tests: `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed 20/20. The module exposes idempotent schema initialization, repository read/upsert methods, `ConnectionStrings:timescaledb` composition, storage-unavailable exceptions, and `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` typed options with a 30-minute default. | Dependency satisfied for TP-030; implementation can compose Timescale persistence instead of creating a new storage foundation. | `tasks/TP-029-timescale-market-data-persistence-foundation/STATUS.md`, `src/ATrade.MarketData.Timescale/*`, `tests/ATrade.MarketData.Timescale.Tests/*` |
+| Cache-aside plan: register `ATrade.MarketData.Timescale` in `ATrade.Api`, expose the provider-backed `MarketDataService` as a concrete inner service, and register a Timescale-backed `IMarketDataService` decorator that uses provider identity plus typed freshness options. Reads initialize schema idempotently, compute `now - CacheFreshnessPeriod`, try fresh Timescale rows first, and tolerate `TimescaleMarketDataStorageUnavailableException` by falling back to the provider path. | Implementation plan for Step 1 composition and safe storage-unavailable behavior. | `src/ATrade.Api/Program.cs`, `src/ATrade.MarketData/MarketDataModuleServiceCollectionExtensions.cs`, `src/ATrade.MarketData.Timescale/*` |
+| Trending plan: query latest fresh snapshot by provider before any provider call, allowing source-agnostic repository reads so the cache can store the original provider source (`response.Source`) and return cached responses with source like `timescale-cache:{originalSource}`. On miss/stale data, call the provider-backed service, persist the full `TrendingSymbolsResponse` into Timescale, and return the provider response. If the provider is unavailable but a fresh cache exists, return the cache; if only stale/no cache exists, surface the provider-safe error. | Implementation plan for Step 2 cache-hit, miss, write-after-fetch, and unavailable semantics. | `src/ATrade.MarketData.Timescale/*`, `src/ATrade.MarketData/MarketDataService.cs` or cache-aware equivalent |
+| Candle/indicator plan: normalize supported timeframes, read fresh candle series by provider/symbol/timeframe before provider calls, return cached candles with `timescale-cache:{originalSource}` source, and on miss/stale fetch provider candles, persist them, and return the provider response. Indicators should call the cache-aware candle path and calculate with `IndicatorService`, so fresh cached candles serve indicators after restart and cache misses fetch/persist candles once. Unsupported symbol/timeframe and provider-unavailable errors remain provider-safe; stale rows are never returned as fresh after a failed refresh. | Implementation plan for Step 3 candle and indicator cache-aside semantics. | `src/ATrade.MarketData.Timescale/*`, `src/ATrade.MarketData/IndicatorService.cs` only if needed |
+| Source/identity caveat: current endpoint payloads do not carry provider symbol ids for candles/trending, so TP-030 should persist provider-neutral identity using provider name, symbol, optional metadata, and original response source; richer provider-symbol identity can be future work rather than blocking cache-aside behavior. | Records future-work boundary before endpoint behavior changes. | `src/ATrade.MarketData/MarketDataModels.cs`, `src/ATrade.MarketData.Timescale/TimescaleMarketDataModels.cs` |
 
 ---
 
@@ -109,6 +115,12 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-30 16:30 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-30 16:30 | Step 0 started | Dependency preflight and data-path plan |
+| 2026-04-30 16:31 | TP-028 dependency confirmed | TP-028 STATUS is complete; scanner request regression asserts POST JSON, positive content length, no chunked transfer, and safe `411` mapping. |
+| 2026-04-30 16:32 | TP-029 dependency confirmed | TP-029 STATUS is complete; Timescale test project passed 20/20 and exposes schema, repository, connection, unavailable-state, and freshness option contracts. |
+| 2026-04-30 16:33 | Cache-aside plan recorded | Documented Timescale-first/decorator composition, source-agnostic fresh reads, provider miss writes, indicator reuse of cached candles, storage-unavailable fallback, and stale-data rejection. |
+| 2026-04-30 16:33 | Step 0 completed | Dependencies and data-path plan confirmed before endpoint behavior changes. |
 
 ---
 
