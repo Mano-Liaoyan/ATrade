@@ -67,14 +67,14 @@ main() {
   local accounts_project="$repo_root/src/ATrade.Accounts/ATrade.Accounts.csproj"
   local accounts_service="$repo_root/src/ATrade.Accounts/AccountOverviewService.cs"
 
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Accounts'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Accounts'
   assert_file_contains "$api_project" 'ATrade.Accounts.csproj'
   assert_file_contains "$api_program" 'builder.Services.AddAccountsModule();'
   assert_file_contains "$api_program" 'app.MapGet("/api/accounts/overview"'
   assert_file_contains "$accounts_project" 'Microsoft.AspNetCore.App'
   assert_file_contains "$accounts_service" 'AccountOverview.Bootstrap'
 
-  dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
+  dotnet build "$repo_root/ATrade.slnx" --nologo --verbosity minimal >/dev/null
 
   api_log="$(mktemp)"
   health_file="$(mktemp)"

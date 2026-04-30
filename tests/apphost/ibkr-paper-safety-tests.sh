@@ -132,15 +132,15 @@ assert_default_contract_and_references() {
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_USERNAME=IBKR_USERNAME'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_PASSWORD=IBKR_PASSWORD'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_PAPER_ACCOUNT_ID=IBKR_ACCOUNT_ID'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Brokers.Ibkr'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Orders.Tests'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Brokers.Ibkr'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Orders.Tests'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.Brokers.Ibkr.csproj'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.Orders.csproj'
   assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/ATrade.Ibkr.Worker.csproj" 'ATrade.Brokers.Ibkr.csproj'
 }
 
 run_build_and_unit_checks() {
-  dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
+  dotnet build "$repo_root/ATrade.slnx" --nologo --verbosity minimal >/dev/null
   dotnet test "$repo_root/tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj" --nologo --verbosity minimal >/dev/null
   dotnet test "$repo_root/tests/ATrade.Orders.Tests/ATrade.Orders.Tests.csproj" --nologo --verbosity minimal >/dev/null
 }

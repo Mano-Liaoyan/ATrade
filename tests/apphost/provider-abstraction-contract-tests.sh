@@ -68,8 +68,8 @@ main() {
   assert_path_exists "$repo_root/src/ATrade.MarketData/MarketDataProviderModels.cs"
   assert_path_exists "$provider_tests_project"
 
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Brokers'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.ProviderAbstractions.Tests'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Brokers'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.ProviderAbstractions.Tests'
   assert_file_contains "$ibkr_project" 'ATrade.Brokers.csproj'
   assert_file_contains "$api_project" 'ATrade.Brokers.csproj'
   assert_file_contains "$api_project" 'ATrade.MarketData.Ibkr.csproj'

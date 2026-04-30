@@ -1,6 +1,6 @@
 # TP-026: Migrate solution references from ATrade.sln to ATrade.slnx — Status
 
-**Current Step:** Step 0: Preflight and reference classification
+**Current Step:** Step 1: Migrate active scripts and verification commands
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -23,13 +23,13 @@
 ---
 
 ### Step 1: Migrate active scripts and verification commands
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Active build/test scripts use `ATrade.slnx`
-- [ ] Solution membership assertions validate `ATrade.slnx`
-- [ ] Solution-root detection supports `ATrade.slnx`
-- [ ] Runtime skip behavior preserved
-- [ ] Targeted modified script checks pass
+- [x] Active build/test scripts use `ATrade.slnx`
+- [x] Solution membership assertions validate `ATrade.slnx`
+- [x] Solution-root detection supports `ATrade.slnx`
+- [x] Runtime skip behavior preserved
+- [x] Targeted modified script checks pass
 
 ---
 
@@ -89,6 +89,7 @@
 |-----------|-------------|----------|
 | Initial `ATrade.sln` references totaled 128: 24 active code/script/test references to migrate, 30 current-task instruction/status references, 74 completed-task historical references, and no non-completed future task prompt references. | Active references will be migrated; current-task and completed-task references are historical/current-task exceptions; no TP-027 update needed. | `tasks/TP-026-migrate-solution-references-to-slnx/audits/initial-classification.md` |
 | Decision: retain root `ATrade.sln` for now as a non-authoritative compatibility artifact. | Active scripts/docs/tests will prefer `ATrade.slnx`; Step 2/3 will document compatibility wording and verify no active guidance prefers `.sln`. | Repo root solution files |
+| `.env.example` was missing even though active startup docs/tests require it as the fallback local-port/env contract. | Restored `.env.example` by copying the safe committed `.env.template`; no real credentials or account identifiers added. | `.env.example`, `.env.template`, `scripts/local-env.sh` |
 
 ---
 
@@ -103,6 +104,13 @@
 | 2026-04-30 | Step 0 reference inventory | Captured 128 `ATrade.sln` references from `rg -n "ATrade\\.sln\\b"` into `tasks/TP-026-migrate-solution-references-to-slnx/audits/initial-ATrade-sln-references.txt`. |
 | 2026-04-30 | Step 0 classification | Wrote `audits/initial-classification.md`: 24 active references, 30 current-task references, 74 completed-task historical references, no TP-027/future prompt references. |
 | 2026-04-30 | Step 0 retain/remove decision | `ATrade.sln` will remain temporarily as non-authoritative compatibility; `ATrade.slnx` is the active authoritative build/test target. |
+| 2026-04-30 | Step 1 started | Migrating active shell scripts, membership checks, and root detection to prefer `ATrade.slnx`. |
+| 2026-04-30 | Step 1 build commands migrated | Updated active shell-script `dotnet build` solution invocations to `ATrade.slnx`; `rg -n "dotnet (build|test).*ATrade\\.sln\\b" tests scripts --glob '*.sh'` returned no matches. |
+| 2026-04-30 | Step 1 membership assertions migrated | Updated active shell scripts to inspect `ATrade.slnx`; `rg -n "ATrade\\.sln\\b" tests --glob '*.sh'` returned no matches. |
+| 2026-04-30 | Step 1 root detection migrated | `LocalDevelopmentPortContract` now recognizes `ATrade.slnx` before the retained legacy `.sln` compatibility file and `.env.example`. |
+| 2026-04-30 | Step 1 runtime skips preserved | `git diff -U0 -- tests/*.sh tests/**/*.sh | grep -E '^[+-].*(SKIP:|command -v (docker|lean)|exit 0)'` had no matches; modified scripts only changed solution references. |
+| 2026-04-30 | Step 1 targeted script triage | First targeted script sweep passed `project-shells` and `provider-abstraction`, then failed `market-data-feature` before solution use because `.env.example` was missing; restored `.env.example` from `.env.template` and will rerun modified scripts. |
+| 2026-04-30 | Step 1 targeted checks passed | Reran all modified scripts successfully: `project-shells`, `provider-abstraction`, `market-data-feature`, `lean-analysis-engine` (unit tests pass; LEAN CLI cleanly skipped), `analysis-engine-contract`, `ibkr-paper-safety`, `accounts-feature-bootstrap`, `ibkr-market-data-provider`, and `api-bootstrap`. |
 
 ---
 

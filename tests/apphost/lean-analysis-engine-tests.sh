@@ -29,8 +29,8 @@ assert_file_not_contains() {
 }
 
 assert_lean_provider_registration() {
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Analysis.Lean'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Analysis.Lean.Tests'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Analysis.Lean'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Analysis.Lean.Tests'
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/ATrade.Analysis.Lean.csproj" 'ATrade.Analysis.csproj'
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" 'options.CliCommand'
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" 'options.DockerCommand'

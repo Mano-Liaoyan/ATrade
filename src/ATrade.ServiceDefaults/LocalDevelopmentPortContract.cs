@@ -68,7 +68,8 @@ public static class LocalDevelopmentPortContractLoader
         var current = new DirectoryInfo(Path.GetFullPath(startPath));
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, "ATrade.sln")) ||
+            if (File.Exists(Path.Combine(current.FullName, "ATrade.slnx")) ||
+                File.Exists(Path.Combine(current.FullName, "ATrade.sln")) ||
                 File.Exists(Path.Combine(current.FullName, ".env.example")))
             {
                 return current.FullName;

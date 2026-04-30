@@ -61,14 +61,14 @@ main() {
   assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/IbkrWorkerShell.cs" 'BrokerProviderStates.RejectedLiveMode'
   assert_file_contains "$repo_root/workers/ATrade.Ibkr.Worker/IbkrWorkerShell.cs" 'BrokerProviderStates.CredentialsMissing'
 
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Accounts'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Brokers'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Brokers.Ibkr'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Orders'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.MarketData'
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Ibkr.Worker'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Accounts'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Brokers'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Brokers.Ibkr'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Orders'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.MarketData'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Ibkr.Worker'
 
-  dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
+  dotnet build "$repo_root/ATrade.slnx" --nologo --verbosity minimal >/dev/null
 }
 
 main "$@"
