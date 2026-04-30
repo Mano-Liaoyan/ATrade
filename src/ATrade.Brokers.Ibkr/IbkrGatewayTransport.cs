@@ -9,6 +9,7 @@ public static class IbkrGatewayTransport
 {
     public const string DefaultLoopbackGatewayUrl = "https://127.0.0.1:5000";
     public const string RequiredLoopbackScheme = "https";
+    public const string ClientPortalUserAgent = "ATrade/1.0";
 
     public static Uri DefaultGatewayBaseUri { get; } = new(DefaultLoopbackGatewayUrl, UriKind.Absolute);
 
@@ -48,6 +49,8 @@ public static class IbkrGatewayTransport
         ArgumentNullException.ThrowIfNull(options);
 
         client.Timeout = options.RequestTimeout;
+        // Client Portal returns 403 for anonymous/no-user-agent requests even after iBeam authenticates.
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(ClientPortalUserAgent);
         if (options.GatewayBaseUrl is not null)
         {
             client.BaseAddress = options.GatewayBaseUrl;

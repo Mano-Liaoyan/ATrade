@@ -170,10 +170,13 @@ Current implementation:
 - The shared IBKR gateway transport contract uses HTTPS for the local
   `voyz/ibeam:latest` Client Portal host port (committed default
   `https://127.0.0.1:5000`). AppHost maps the configured host port to iBeam's
-  fixed internal Client Portal target port `5000`; legacy loopback HTTP URLs
-  are normalized to HTTPS for local iBeam traffic, and self-signed certificate
-  acceptance is scoped to loopback iBeam HTTPS only; remote hosts keep normal
-  certificate validation.
+  fixed internal Client Portal target port `5000` and mounts a repo-local
+  non-secret iBeam inputs `conf.yaml` so Client Portal accepts loopback/private
+  Docker bridge source addresses used by Aspire published-port requests; legacy
+  loopback HTTP URLs are normalized to HTTPS for local iBeam traffic, shared
+  broker/market-data HTTP clients send a stable Client Portal-compatible user
+  agent, and self-signed certificate acceptance is scoped to loopback iBeam
+  HTTPS only; remote hosts keep normal certificate validation.
 - It does not read credential environment variables directly. Credential and
   paper-account presence is evaluated through typed gateway configuration and
   the paper-only guard.

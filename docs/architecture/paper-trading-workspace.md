@@ -184,8 +184,12 @@ iBeam/Gateway container image `voyz/ibeam:latest`, which is disabled by default
 and only starts when ignored local `.env` values enable broker integration and
 replace the fake credential placeholders. The Client Portal API uses HTTPS on
 iBeam's internal container port `5000`; AppHost publishes that internal port on
-the configured local host port from `ATRADE_IBKR_GATEWAY_PORT`. The committed
-gateway URL default is `https://127.0.0.1:5000`, and custom local ports must keep
+the configured local host port from `ATRADE_IBKR_GATEWAY_PORT` and mounts the
+repo-local non-secret `src/ATrade.AppHost/ibeam-inputs/conf.yaml` into
+`/srv/inputs` read-only. That inputs file keeps Client Portal locked to
+loopback/private local-development callers while allowing the Docker bridge
+source addresses that Aspire published-port requests use. The committed gateway
+URL default is `https://127.0.0.1:5000`, and custom local ports must keep
 `ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>` while
 still mapping to container target port `5000`. `http://127.0.0.1:<port>` is the
 known-bad transport shape that can reset authenticated refresh requests before
@@ -211,10 +215,12 @@ and local-certificate policy. Disabled, credentials-missing, configured-iBeam,
 unauthenticated, and rejected-live outcomes are normalized before any unsafe
 broker action is attempted. Raw usernames, passwords, tokens, session cookies,
 and account ids never appear in status payloads; account presence is exposed
-only as a boolean. The iBeam self-signed certificate exception is intentionally
-narrow: it applies only to loopback/local HTTPS traffic for the configured
-`voyz/ibeam:latest` runtime and does not disable certificate validation for
-arbitrary hosts.
+only as a boolean. The shared Gateway HTTP transport also sends a stable Client
+Portal-compatible user agent because the local Client Portal runtime rejects
+anonymous/no-user-agent status requests with `403`. The iBeam self-signed
+certificate exception is intentionally narrow: it applies only to loopback/local
+HTTPS traffic for the configured `voyz/ibeam:latest` runtime and does not
+disable certificate validation for arbitrary hosts.
 
 The normalized session states are:
 
@@ -522,7 +528,8 @@ Rules:
 - committed defaults remain disabled and paper-only
 - `ATRADE_IBKR_GATEWAY_URL` and `ATRADE_IBKR_GATEWAY_PORT` describe the local
   HTTPS host endpoint clients call; AppHost publishes that host port to iBeam's
-  fixed internal Client Portal target port `5000`
+  fixed internal Client Portal target port `5000` and mounts the non-secret
+  iBeam inputs config required for local/private Docker bridge callers
 - `ATRADE_IBKR_GATEWAY_IMAGE` is the approved `voyz/ibeam:latest` local runtime
   contract, but AppHost still does not start it until integration is enabled and
   fake credentials have been replaced in ignored `.env`

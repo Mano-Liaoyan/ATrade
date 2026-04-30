@@ -55,6 +55,21 @@ public sealed class IbkrGatewayTransportContractTests
     }
 
     [Fact]
+    public void ConfigureHttpClient_SendsClientPortalCompatibleUserAgent()
+    {
+        var options = CreateOptions("https://127.0.0.1:5000", IbkrGatewayContainerOptions.DefaultIbeamImage);
+        using var httpClient = new HttpClient();
+
+        IbkrGatewayTransport.ConfigureHttpClient(httpClient, options);
+
+        Assert.Equal(options.GatewayBaseUrl, httpClient.BaseAddress);
+        Assert.Equal(options.RequestTimeout, httpClient.Timeout);
+        Assert.Contains(
+            httpClient.DefaultRequestHeaders.UserAgent,
+            value => string.Equals(value.ToString(), IbkrGatewayTransport.ClientPortalUserAgent, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ValidateLocalIbeamCertificate_AllowsSelfSignedCertificateOnlyForLoopbackIbeamHttps()
     {
         using var certificate = CreateSelfSignedCertificate();

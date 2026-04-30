@@ -146,13 +146,16 @@ HTTPS gateway URL (`https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>`), and replace
 only the fake `ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`, and
 `ATRADE_IBKR_PAPER_ACCOUNT_ID` placeholders in ignored `.env`. The AppHost then
 adds `ibkr-gateway` with `voyz/ibeam:latest`, publishes the container's
-internal Client Portal port `5000` on the configured HTTPS host port, passes
-only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to that container via Aspire secret
-parameters, and keeps the raw username, password, and account id out of
-manifests and status payloads. The Client Portal certificate is a local
-development/self-signed certificate; ATrade's HTTP clients trust that condition
-only for loopback/local iBeam HTTPS traffic and never disable certificate
-validation globally or for arbitrary hosts.
+internal Client Portal port `5000` on the configured HTTPS host port, mounts the
+repo-local non-secret `src/ATrade.AppHost/ibeam-inputs/conf.yaml` into
+`/srv/inputs` read-only so Client Portal accepts loopback/private Docker bridge
+callers used by Aspire, passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to that
+container via Aspire secret parameters, and keeps the raw username, password,
+and account id out of manifests and status payloads. The Client Portal
+certificate is a local development/self-signed certificate; ATrade's HTTP
+clients send a stable Client Portal-compatible user agent and trust that
+certificate condition only for loopback/local iBeam HTTPS traffic, never
+disabling certificate validation globally or for arbitrary hosts.
 
 This contract intentionally does **not** move everything into `.env`.
 

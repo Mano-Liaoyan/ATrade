@@ -171,7 +171,7 @@ assert_apphost_ibeam_manifest_contract() {
   publish_manifest "$manifest_path" false IBKR_USERNAME IBKR_PASSWORD IBKR_ACCOUNT_ID
   publish_manifest "$enabled_manifest_path" true REAL_USERNAME_SHOULD_NOT_SURFACE REAL_PASSWORD_SHOULD_NOT_SURFACE DU1234567
 
-  python3 - <<'PY' "$manifest_path" "$enabled_manifest_path" "$repo_root/src/ATrade.AppHost/Program.cs"
+  python3 - <<'PY' "$manifest_path" "$enabled_manifest_path" "$repo_root/src/ATrade.AppHost/Program.cs" "$repo_root/src/ATrade.AppHost/ibeam-inputs/conf.yaml"
 from pathlib import Path
 import json
 import sys
@@ -181,6 +181,7 @@ enabled_manifest_path = Path(sys.argv[2])
 enabled_text = enabled_manifest_path.read_text(encoding='utf-8')
 enabled_manifest = json.loads(enabled_text)
 program_text = Path(sys.argv[3]).read_text(encoding='utf-8')
+ibeam_conf_text = Path(sys.argv[4]).read_text(encoding='utf-8')
 
 if 'AddContainer("ibkr-gateway"' not in program_text:
     raise SystemExit('AppHost must declare the ibkr-gateway container resource')
@@ -200,6 +201,15 @@ if container.get('image') != 'voyz/ibeam:latest':
     raise SystemExit(f'ibkr-gateway image must be voyz/ibeam:latest: {container!r}')
 if container.get('env') != {'IBEAM_ACCOUNT': '{ibkr-username.value}', 'IBEAM_PASSWORD': '{ibkr-password.value}'}:
     raise SystemExit(f'ibkr-gateway must receive only required redacted iBeam env vars: {container.get("env")!r}')
+bind_mounts = container.get('bindMounts', [])
+if not any(mount.get('target') == '/srv/inputs' and mount.get('readOnly') is True and 'ibeam-inputs' in mount.get('source', '') for mount in bind_mounts):
+    raise SystemExit(f'ibkr-gateway must mount the repo-local iBeam inputs directory read-only: {bind_mounts!r}')
+for required in ('172.16.*', '172.31.*', '192.168.*', '10.*', '127.0.0.1'):
+    if required not in ibeam_conf_text:
+        raise SystemExit(f'iBeam custom conf.yaml must allow local/private Docker caller range {required}')
+for forbidden in ('IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'REAL_USERNAME', 'REAL_PASSWORD', 'DU1234567'):
+    if forbidden in ibeam_conf_text:
+        raise SystemExit(f'iBeam custom conf.yaml must not contain credential/account placeholders: {forbidden}')
 https_binding = container.get('bindings', {}).get('https')
 if https_binding is None:
     raise SystemExit(f'ibkr-gateway must expose an HTTPS binding, found {container.get("bindings")!r}')

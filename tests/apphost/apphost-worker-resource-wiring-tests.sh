@@ -237,6 +237,15 @@ expected_container_env = {
 if container_env != expected_container_env:
     raise SystemExit(f"ibkr-gateway should receive only required iBeam env vars: {container_env!r}")
 
+bind_mounts = container.get("bindMounts", [])
+if not any(
+    mount.get("target") == "/srv/inputs"
+    and mount.get("readOnly") is True
+    and "ibeam-inputs" in mount.get("source", "")
+    for mount in bind_mounts
+):
+    raise SystemExit(f"ibkr-gateway must mount the repo-local iBeam inputs directory read-only: {bind_mounts!r}")
+
 https_binding = container.get("bindings", {}).get("https", {})
 if https_binding.get("scheme") != "https" or https_binding.get("targetPort") != 5000:
     raise SystemExit(f"ibkr-gateway HTTPS target port should be 5000, found {https_binding!r}")
@@ -273,6 +282,14 @@ resources = manifest.get("resources", {})
 container = resources.get("ibkr-gateway")
 if container is None:
     raise SystemExit("custom-port manifest must include ibkr-gateway")
+bind_mounts = container.get("bindMounts", [])
+if not any(
+    mount.get("target") == "/srv/inputs"
+    and mount.get("readOnly") is True
+    and "ibeam-inputs" in mount.get("source", "")
+    for mount in bind_mounts
+):
+    raise SystemExit(f"custom-port ibkr-gateway must mount iBeam inputs read-only: {bind_mounts!r}")
 https_binding = container.get("bindings", {}).get("https", {})
 if https_binding.get("scheme") != "https" or https_binding.get("targetPort") != 5000:
     raise SystemExit(f"custom host gateway port must still map to iBeam Client Portal target port 5000: {https_binding!r}")

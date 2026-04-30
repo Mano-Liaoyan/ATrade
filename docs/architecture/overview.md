@@ -129,7 +129,9 @@ architecture the AppHost is responsible for:
   processes using redacted Aspire parameters for credential-bearing values, and
   only declares an optional `ibkr-gateway` `voyz/ibeam:latest` container when
   broker integration is enabled and fake credential placeholders have been
-  replaced in ignored `.env`.
+  replaced in ignored `.env`. The optional iBeam container also receives a
+  read-only repo-local inputs config so Client Portal accepts the loopback/private
+  Docker bridge caller addresses used by Aspire published-port requests.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 

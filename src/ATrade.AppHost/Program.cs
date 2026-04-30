@@ -7,6 +7,8 @@ using Aspire.Hosting.JavaScript;
 const string safeInfraContainerPidsLimit = "2048";
 const string timescaleTuneMemory = "512MB";
 const string timescaleTuneCpuCount = "2";
+const string ibeamInputsMountSource = "./ibeam-inputs";
+const string ibeamInputsMountTarget = "/srv/inputs";
 
 var localPortContract = LocalDevelopmentPortContractLoader.Load();
 var paperTradingContract = PaperTradingEnvironmentContract.Load(localPortContract.LoadedFromPath);
@@ -37,6 +39,7 @@ if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out v
 
     builder.AddContainer("ibkr-gateway", gatewayImage, gatewayTag)
         .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
+        .WithBindMount(ibeamInputsMountSource, ibeamInputsMountTarget, isReadOnly: true)
         .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamAccount, ibkrUsername)
         .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamPassword, ibkrPassword)
         .WithEndpoint(
