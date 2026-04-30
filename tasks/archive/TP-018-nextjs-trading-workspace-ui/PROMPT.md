@@ -38,7 +38,7 @@ Build the Next.js frontend slice for the paper-trading workspace. Users should s
 - `docs/architecture/paper-trading-workspace.md` — UI/data-flow, charting, SignalR, and preference-storage contract
 - `docs/architecture/modules.md` — frontend and API module boundaries
 - `scripts/README.md` — frontend/AppHost startup contract and environment rules
-- `.env.example` — frontend API base URL placeholder from TP-015
+- `.env.template` — frontend API base URL placeholder from TP-015
 - `frontend/package.json` — current frontend scripts and dependency baseline
 - `frontend/package-lock.json` — npm lockfile to update when dependencies are added
 - `frontend/app/page.tsx` — current home page slice
@@ -64,7 +64,7 @@ Build the Next.js frontend slice for the paper-trading workspace. Users should s
 - `frontend/lib/*` (new)
 - `frontend/types/*` (new if useful)
 - `frontend/next.config.ts` (only if environment/runtime config requires it)
-- `.env.example` (only if frontend-safe public variables need adjustment)
+- `.env.template` (only if frontend-safe public variables need adjustment)
 - `tests/apphost/frontend-trading-workspace-tests.sh` (new)
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh` (only if shared frontend smoke markers change)
 - `docs/architecture/paper-trading-workspace.md`
@@ -188,7 +188,7 @@ Build the Next.js frontend slice for the paper-trading workspace. Users should s
 - `scripts/README.md` — update if frontend environment/startup verification changes
 - `README.md` — update if current-status wording becomes stale
 - `docs/INDEX.md` — update only if new indexed docs are added (none expected)
-- `.env.example` — update only if frontend-safe public variable names change
+- `.env.template` — update only if frontend-safe public variable names change
 
 ## Completion Criteria
 

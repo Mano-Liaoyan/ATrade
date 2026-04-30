@@ -37,9 +37,9 @@ assert_lean_provider_registration() {
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanAnalysisOptions.cs" 'quantconnect/lean:foundation'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.Analysis.Lean.csproj'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'AddLeanAnalysisEngine(builder.Configuration)'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_ANALYSIS_ENGINE=none'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_LEAN_CLI_COMMAND=lean'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_ANALYSIS_ENGINE=none'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_CLI_COMMAND=lean'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation'
   assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_TIMEOUT_SECONDS=45'
 }
 

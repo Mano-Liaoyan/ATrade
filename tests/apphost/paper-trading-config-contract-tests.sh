@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 doc_path="$repo_root/docs/architecture/paper-trading-workspace.md"
 index_path="$repo_root/docs/INDEX.md"
-env_path="$repo_root/.env.example"
+env_path="$repo_root/.env.template"
 overview_path="$repo_root/docs/architecture/overview.md"
 modules_path="$repo_root/docs/architecture/modules.md"
 readme_path="$repo_root/README.md"
@@ -97,7 +97,7 @@ if values['ATRADE_IBKR_PASSWORD'] != 'IBKR_PASSWORD':
 
 for key in values:
     if re.search(r'(TOKEN|SECRET|COOKIE|SESSION)', key):
-        raise SystemExit(f'unexpected token/session/secret-bearing key committed to .env.example: {key}')
+        raise SystemExit(f'unexpected token/session/secret-bearing key committed to .env.template: {key}')
 
 if values['ATRADE_BROKER_ACCOUNT_MODE'] != 'Paper':
     raise SystemExit('ATRADE_BROKER_ACCOUNT_MODE must remain Paper in committed defaults')

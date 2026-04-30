@@ -129,7 +129,7 @@ ATRADE_LEAN_TIMEOUT_SECONDS=45
 ATRADE_LEAN_KEEP_WORKSPACE=false
 ```
 
-To enable LEAN locally, copy `.env.example` or `.env.template` to ignored
+To enable LEAN locally, copy `.env.template` to ignored
 `.env`, set `ATRADE_ANALYSIS_ENGINE=Lean`, install/configure the official LEAN
 CLI or a compatible Docker runtime, and adjust workspace/timeout values if
 needed. No LEAN setting may contain broker credentials or account identifiers.

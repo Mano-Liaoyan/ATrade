@@ -107,14 +107,13 @@ stop_api() {
   api_pid=''
 }
 
-assert_templates_are_safe_and_synchronized() {
-  python3 - <<'PY' "$repo_root/.env.example" "$repo_root/.env.template"
+assert_template_is_safe() {
+  python3 - <<'PY' "$repo_root/.env.template"
 from pathlib import Path
 import re
 import sys
 
-example_path = Path(sys.argv[1])
-template_path = Path(sys.argv[2])
+template_path = Path(sys.argv[1])
 
 def parse(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
@@ -128,12 +127,7 @@ def parse(path: Path) -> dict[str, str]:
         values[key] = value
     return values
 
-example = parse(example_path)
-template = parse(template_path)
-if example != template:
-    missing = sorted(set(example) ^ set(template))
-    changed = sorted(key for key in set(example) & set(template) if example[key] != template[key])
-    raise SystemExit(f'.env.example and .env.template must stay synchronized; missing={missing}, changed={changed}')
+values = parse(template_path)
 
 required = {
     'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
@@ -147,11 +141,11 @@ required = {
     'ATRADE_IBKR_PAPER_ACCOUNT_ID': 'IBKR_ACCOUNT_ID',
 }
 for key, expected in required.items():
-    actual = example.get(key)
+    actual = values.get(key)
     if actual != expected:
         raise SystemExit(f'{key} expected {expected!r}, found {actual!r}')
 
-for key, value in example.items():
+for key, value in values.items():
     upper_key = key.upper()
     upper_value = value.upper()
     if any(token in upper_key for token in ('TOKEN', 'SESSION', 'COOKIE', 'SECRET')):
@@ -161,11 +155,11 @@ for key, value in example.items():
     if any(token in upper_value for token in ('PASSWORD', 'TOKEN', 'SESSION', 'COOKIE', 'SECRET')):
         raise SystemExit(f'committed env template contains suspicious credential-like value for {key}')
 
-if re.fullmatch(r'(DU|U)\d+', example['ATRADE_IBKR_PAPER_ACCOUNT_ID']):
+if re.fullmatch(r'(DU|U)\d+', values['ATRADE_IBKR_PAPER_ACCOUNT_ID']):
     raise SystemExit('committed paper account id must remain an obvious placeholder')
-if example['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
+if values['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
     raise SystemExit('broker integration must stay disabled by default')
-if any(value.lower() == 'live' for key, value in example.items() if key != 'ATRADE_BROKER_ACCOUNT_MODE'):
+if any(value.lower() == 'live' for key, value in values.items() if key != 'ATRADE_BROKER_ACCOUNT_MODE'):
     raise SystemExit('committed defaults must not enable live behavior')
 PY
 }
@@ -312,7 +306,7 @@ PY
 }
 
 main() {
-  assert_templates_are_safe_and_synchronized
+  assert_template_is_safe
   assert_apphost_ibeam_manifest_contract
   assert_status_payloads_are_redacted
   assert_optional_real_ibeam_https_smoke

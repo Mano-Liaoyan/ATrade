@@ -178,7 +178,7 @@
 | 2026-04-29 20:46 | Step 4 targeted test | `bash tests/apphost/frontend-trading-workspace-tests.sh` passed as the targeted trading-workspace verification gate. |
 | 2026-04-29 20:53 | Step 5 paper workspace doc | Updated `docs/architecture/paper-trading-workspace.md` with current market-data endpoints, `/hubs/market-data`, `lightweight-charts` chart behavior, localStorage watchlist cache, SignalR fallback, and no-real-trades guardrails. |
 | 2026-04-29 20:59 | Step 5 module map doc | Updated `docs/architecture/modules.md` current-state notes for `ATrade.Api`, `ATrade.MarketData`, and the Next.js frontend workspace slice without overstating real providers, DB preferences, or live trading. |
-| 2026-04-29 21:05 | Step 5 startup docs/env | Added `NEXT_PUBLIC_ATRADE_API_BASE_URL` to `.env.example`, AppHost frontend environment wiring, `scripts/README.md`, and the paper-trading config contract test; `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
+| 2026-04-29 21:05 | Step 5 startup docs/env | Added `NEXT_PUBLIC_ATRADE_API_BASE_URL` to `.env.template`, AppHost frontend environment wiring, `scripts/README.md`, and the paper-trading config contract test; `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
 | 2026-04-29 21:08 | Step 5 README | Updated `README.md` current runnable slice/status with mocked market-data endpoints, SignalR hub, Next.js trading workspace, localStorage watchlists, chart/indicator behavior, and new frontend trading-workspace verification. |
 | 2026-04-29 21:10 | Step 6 started | Running the full repository verification suite for TP-018. |
 | 2026-04-29 21:18 | Step 6 full suite | Full repository verification command passed after fixing the README phrase expected by `paper-trading-config-contract-tests.sh`. The suite included solution build, start/scaffolding tests, API/accounts/IBKR/market-data/frontend/bootstrap/trading workspace tests, AppHost manifest/worker/local-port/paper-config tests, and runtime infra verification. |
@@ -188,7 +188,7 @@
 | 2026-04-29 21:22 | Step 6 solution build | `dotnet build ATrade.sln --nologo --verbosity minimal` passed with 0 warnings and 0 errors. |
 | 2026-04-29 21:24 | Step 7 started | Reviewing documentation delivery requirements, discoveries, and role/root plans before final handoff. |
 | 2026-04-29 21:25 | Step 7 must-update docs | Verified Step 5 commit `33c8879` modified required docs `docs/architecture/paper-trading-workspace.md` and `docs/architecture/modules.md`. |
-| 2026-04-29 21:26 | Step 7 affected docs | Reviewed check-if-affected docs: `scripts/README.md`, `README.md`, and `.env.example` were updated for frontend API env/startup and current status; `docs/INDEX.md` did not need changes because no new indexed docs were added. |
+| 2026-04-29 21:26 | Step 7 affected docs | Reviewed check-if-affected docs: `scripts/README.md`, `README.md`, and `.env.template` were updated for frontend API env/startup and current status; `docs/INDEX.md` did not need changes because no new indexed docs were added. |
 | 2026-04-29 21:27 | Step 7 discoveries | Logged discoveries for the recovered TP-017 contract/stale TP-017 task state and the npm moderate advisory notice. |
 | 2026-04-29 21:31 | Delivery complete | Updated `PLAN.md`, `plans/senior-engineer/CURRENT.md`, and `tasks/CONTEXT.md`; all TP-018 steps are checked and task status is complete. |
 | 2026-04-29 17:36 | Worker iter 5 | done in 1979s, tools: 283 |

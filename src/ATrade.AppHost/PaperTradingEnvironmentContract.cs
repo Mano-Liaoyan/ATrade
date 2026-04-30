@@ -92,12 +92,13 @@ public sealed record PaperTradingEnvironmentContract(
     {
         var contractDirectory = Path.GetDirectoryName(contractPath)
             ?? throw new InvalidOperationException($"Failed to resolve the local paper-trading contract directory for '{contractPath}'.");
-        var examplePath = Path.Combine(contractDirectory, ".env.example");
+        var templatePath = Path.Combine(contractDirectory, ".env.template");
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        if (File.Exists(examplePath))
+        if (File.Exists(templatePath) &&
+            !Path.GetFullPath(templatePath).Equals(Path.GetFullPath(contractPath), StringComparison.OrdinalIgnoreCase))
         {
-            Overlay(values, ParseEnvironmentFile(examplePath));
+            Overlay(values, ParseEnvironmentFile(templatePath));
         }
 
         Overlay(values, ParseEnvironmentFile(contractPath));

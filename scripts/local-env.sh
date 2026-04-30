@@ -3,7 +3,7 @@
 atrade_load_local_port_contract() {
   local repo_root="${1:?repo root is required}"
   local preferred_path="$repo_root/.env"
-  local fallback_path="$repo_root/.env.example"
+  local fallback_path="$repo_root/.env.template"
   local contract_path="$fallback_path"
   local raw_line=''
   local key=''

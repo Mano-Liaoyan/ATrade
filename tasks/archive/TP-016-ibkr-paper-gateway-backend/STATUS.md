@@ -78,7 +78,7 @@
 - [x] Update paper-trading workspace architecture doc
 - [x] Update module map current-state notes
 - [x] Update overview if runtime graph changed
-- [x] Update startup/config docs and `.env.example` if affected
+- [x] Update startup/config docs and `.env.template` if affected
 - [x] Update README if current status changed materially
 
 ---
@@ -113,7 +113,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
-| AppHost paper-trading contract loading needs committed safe defaults plus ignored local overrides so partial `.env` files do not drop required safe placeholder values. | Implemented by overlaying ignored `.env` values on `.env.example` defaults in the AppHost contract loader and verified by the full suite. | `src/ATrade.AppHost/PaperTradingEnvironmentContract.cs` |
+| AppHost paper-trading contract loading needs committed safe defaults plus ignored local overrides so partial `.env` files do not drop required safe placeholder values. | Implemented by overlaying ignored `.env` values on `.env.template` defaults in the AppHost contract loader and verified by the full suite. | `src/ATrade.AppHost/PaperTradingEnvironmentContract.cs` |
 | API smoke scripts can print transient curl connection-refused lines while waiting for a local test host to bind. | Treated as expected retry noise when the script exits 0; no action required. | `tests/apphost/*` smoke harnesses |
 
 ---
@@ -127,7 +127,7 @@
 | 2026-04-29 10:37 | Step 0 started | Preflight |
 | 2026-04-29 12:38 | Preflight files verified | Required task/context/project paths from PROMPT all exist |
 | 2026-04-29 12:39 | Dependency check complete | TP-015 outputs and test scaffold are present in plan and repo files |
-| 2026-04-29 12:39 | TP-015 contract confirmed | Active architecture doc is indexed and `.env.example` exposes the paper-only IBKR placeholders |
+| 2026-04-29 12:39 | TP-015 contract confirmed | Active architecture doc is indexed and `.env.template` exposes the paper-only IBKR placeholders |
 | 2026-04-29 12:39 | Worker shell baseline confirmed | `ATrade.Ibkr.Worker` only registers `IbkrWorkerShell`, which logs an inert no-broker message and waits |
 | 2026-04-29 12:40 | Credential scan complete | No tracked file matches real-looking IBKR account IDs; committed IBKR values remain documented placeholders only |
 | 2026-04-29 12:40 | Step 0 completed | Preflight verified prerequisite docs, worker shell baseline, and safe placeholder-only IBKR config |
@@ -154,7 +154,7 @@
 | 2026-04-29 13:07 | Step 3 completed | API now exposes safe broker status plus deterministic paper-order simulation without routing real orders |
 | 2026-04-29 13:10 | Paper-safety harness created | Added `tests/apphost/ibkr-paper-safety-tests.sh` to build, unit-test, and smoke-test the paper-only backend slice |
 | 2026-04-29 13:11 | Paper-safety build/reference check passed | The new harness verified `ATrade.sln` wiring, project references, and a clean solution build before endpoint checks |
-| 2026-04-29 13:11 | Default paper-only contract verified | The harness asserted `.env.example` stays disabled by default and API status resolves to `disabled` + `paper` under the safe contract |
+| 2026-04-29 13:11 | Default paper-only contract verified | The harness asserted `.env.template` stays disabled by default and API status resolves to `disabled` + `paper` under the safe contract |
 | 2026-04-29 13:11 | Safe status payload verified | The new apphost harness enforced the exact safe broker status field set and rejected leaked account IDs or gateway URLs |
 | 2026-04-29 13:11 | Deterministic simulation verified | Repeated paper-order requests now return byte-for-byte identical payloads with `brokerOrderPlacementAttempted=false` |
 | 2026-04-29 13:11 | Live-mode rejection verified | The harness proved `Live` mode returns `rejected-live-mode` status and a 409 simulation rejection before any broker activity |
@@ -163,7 +163,7 @@
 | 2026-04-29 13:12 | Paper-trading architecture doc updated | Documented the implemented backend slice, rejected-live state, deterministic simulation subset, and optional Gateway image behavior |
 | 2026-04-29 13:13 | Module map synced | Updated AppHost, API, Orders, broker-adapter, and worker current-state notes to match the implemented paper-only backend slice |
 | 2026-04-29 13:14 | Overview updated | Recorded the new broker status/simulation endpoints plus AppHost paper-config forwarding and optional Gateway-container behavior |
-| 2026-04-29 13:15 | Startup/config docs updated | Added the gateway-timeout placeholder to `.env.example`, synced startup docs, and re-verified the paper-trading/AppHost contract tests |
+| 2026-04-29 13:15 | Startup/config docs updated | Added the gateway-timeout placeholder to `.env.template`, synced startup docs, and re-verified the paper-trading/AppHost contract tests |
 | 2026-04-29 13:16 | README refreshed | Synced the human-facing status summary with the live broker-status + paper-simulation backend slice |
 | 2026-04-29 13:16 | Step 5 completed | Architecture, startup, config, and repository status docs now match the implemented paper-only backend slice |
 | 2026-04-29 16:43 | Task started | Runtime V2 lane-runner execution |
@@ -171,11 +171,11 @@
 | 2026-04-29 16:50 | Runtime infrastructure verification passed | `bash tests/apphost/apphost-infrastructure-runtime-tests.sh` exited 0 (`RUNTIME_INFRA_STATUS:0`) |
 | 2026-04-29 16:50 | Failure triage complete | No remaining verification failures after rerunning the full suite and runtime infrastructure test; earlier curl connection-refused lines were expected smoke-test polling retries and final exit statuses were 0 |
 | 2026-04-29 16:51 | Solution build passed | `dotnet build ATrade.sln --nologo --verbosity minimal` exited 0 with 0 warnings and 0 errors (`SOLUTION_BUILD_STATUS:0`) |
-| 2026-04-29 16:51 | Verification hardening retained | AppHost paper-trading contract loading now overlays ignored `.env` values on committed `.env.example` defaults, and scaffolding checks now cover the broker adapter/worker safety markers exercised by the full suite |
+| 2026-04-29 16:51 | Verification hardening retained | AppHost paper-trading contract loading now overlays ignored `.env` values on committed `.env.template` defaults, and scaffolding checks now cover the broker adapter/worker safety markers exercised by the full suite |
 | 2026-04-29 16:51 | Step 6 completed | Full verification suite, runtime infrastructure verification, failure triage, and solution build are all green |
 | 2026-04-29 16:52 | Must-update docs verified | `git diff --name-only 0152b92..HEAD` confirms updates to `docs/architecture/paper-trading-workspace.md`, `docs/architecture/modules.md`, and `scripts/README.md` |
-| 2026-04-29 16:53 | Check-if-affected docs reviewed | `docs/architecture/overview.md`, `.env.example`, and `README.md` were updated; `docs/INDEX.md` was reviewed and needs no change because no new indexed docs were added |
-| 2026-04-29 16:54 | Discoveries logged | Recorded the AppHost `.env.example` fallback/ignored `.env` overlay requirement and expected smoke-test curl retry noise in the Discoveries table |
+| 2026-04-29 16:53 | Check-if-affected docs reviewed | `docs/architecture/overview.md`, `.env.template`, and `README.md` were updated; `docs/INDEX.md` was reviewed and needs no change because no new indexed docs were added |
+| 2026-04-29 16:54 | Discoveries logged | Recorded the AppHost `.env.template` fallback/ignored `.env` overlay requirement and expected smoke-test curl retry noise in the Discoveries table |
 | 2026-04-29 16:54 | Step 7 completed | Documentation and delivery checks are complete; STATUS marked complete |
 | 2026-04-29 16:54 | Worker iter 1 | done in 659s, tools: 50 |
 | 2026-04-29 16:54 | Task complete | .DONE created |

@@ -494,7 +494,7 @@ strategy signal boundary without redesigning the paper-trading workspace.
 
 ## 11. Configuration Contract Summary
 
-The committed `.env.example` and synchronized `.env.template` for this feature
+The committed `.env.template` for this feature
 family must expose only paper-safe placeholders:
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED`

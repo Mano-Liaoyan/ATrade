@@ -35,7 +35,7 @@ Implement the safe backend half of the paper-trading workspace by adding an IBKR
 
 **Tier 3 (load only if needed):**
 - `docs/architecture/paper-trading-workspace.md` — authoritative safety/data-flow contract from TP-015
-- `.env.example` — paper-mode configuration placeholders from TP-015
+- `.env.template` — paper-mode configuration placeholders from TP-015
 - `docs/architecture/modules.md` — module boundary authority
 - `docs/architecture/overview.md` — runtime topology and infrastructure authority
 - `scripts/README.md` — startup and ignored `.env` contract
@@ -64,7 +64,7 @@ Implement the safe backend half of the paper-trading workspace by adding an IBKR
 - `src/ATrade.Orders/*`
 - `workers/ATrade.Ibkr.Worker/*`
 - `src/ATrade.AppHost/Program.cs`
-- `.env.example`
+- `.env.template`
 - `tests/apphost/ibkr-paper-safety-tests.sh` (new)
 - `tests/apphost/apphost-worker-resource-wiring-tests.sh` (only if manifest expectations change)
 - `docs/architecture/paper-trading-workspace.md`
@@ -152,7 +152,7 @@ Implement the safe backend half of the paper-trading workspace by adding an IBKR
 - [ ] Update `docs/architecture/paper-trading-workspace.md` with the implemented backend API/worker/config shape and any discovered official Gateway constraints
 - [ ] Update `docs/architecture/modules.md` so `ATrade.Brokers.Ibkr`, `ATrade.Orders`, `ATrade.Api`, and `ATrade.Ibkr.Worker` current-state notes reflect the paper-only backend slice
 - [ ] Update `docs/architecture/overview.md` if the AppHost graph or runtime surface changed
-- [ ] Update `scripts/README.md` and `.env.example` if implementation reveals additional safe configuration placeholders
+- [ ] Update `scripts/README.md` and `.env.template` if implementation reveals additional safe configuration placeholders
 - [ ] Update `README.md` only if current-status text would otherwise be stale
 
 **Artifacts:**
@@ -160,7 +160,7 @@ Implement the safe backend half of the paper-trading workspace by adding an IBKR
 - `docs/architecture/modules.md` (modified)
 - `docs/architecture/overview.md` (modified if affected)
 - `scripts/README.md` (modified if affected)
-- `.env.example` (modified if affected)
+- `.env.template` (modified if affected)
 - `README.md` (modified if affected)
 
 ### Step 6: Testing & Verification
@@ -189,7 +189,7 @@ Implement the safe backend half of the paper-trading workspace by adding an IBKR
 - `docs/architecture/overview.md` — update if AppHost graph/runtime surface changes
 - `README.md` — update if current runnable slice changes materially
 - `docs/INDEX.md` — update only if new indexed docs are added (none expected)
-- `.env.example` — update only for safe additional placeholders discovered during implementation
+- `.env.template` — update only for safe additional placeholders discovered during implementation
 
 ## Completion Criteria
 

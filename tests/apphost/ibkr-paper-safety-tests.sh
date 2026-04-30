@@ -125,14 +125,14 @@ wait_for_api() {
 }
 
 assert_default_contract_and_references() {
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_BROKER_INTEGRATION_ENABLED=false'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_BROKER_ACCOUNT_MODE=Paper'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_USERNAME=IBKR_USERNAME'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_PASSWORD=IBKR_PASSWORD'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_PAPER_ACCOUNT_ID=IBKR_ACCOUNT_ID'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_BROKER_INTEGRATION_ENABLED=false'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_BROKER_ACCOUNT_MODE=Paper'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_IBKR_USERNAME=IBKR_USERNAME'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_IBKR_PASSWORD=IBKR_PASSWORD'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_IBKR_PAPER_ACCOUNT_ID=IBKR_ACCOUNT_ID'
   assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Brokers.Ibkr'
   assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Orders.Tests'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.Brokers.Ibkr.csproj'

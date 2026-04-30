@@ -39,7 +39,7 @@ Replace the optional placeholder IBKR Gateway image/configuration with a real iB
 - `docs/architecture/modules.md` — AppHost/API/worker/broker module boundaries
 - `docs/architecture/overview.md` — AppHost resource graph and infrastructure authority
 - `scripts/README.md` — local `.env` contract and startup rules
-- `.env.example` — current committed env template
+- `.env.template` — current committed env template
 - `.gitignore` — confirm repo-root `.env` remains ignored
 - `src/ATrade.AppHost/PaperTradingEnvironmentContract.cs` — current env-file loader
 - `src/ATrade.AppHost/Program.cs` — current optional gateway container wiring
@@ -59,7 +59,7 @@ Replace the optional placeholder IBKR Gateway image/configuration with a real iB
 
 > This task owns the iBeam/env runtime contract. Market-data endpoint replacement happens in TP-022.
 
-- `.env.example`
+- `.env.template`
 - `.env.template` (new if absent)
 - `.gitignore` (only if `.env` is not ignored)
 - `src/ATrade.AppHost/PaperTradingEnvironmentContract.cs`
@@ -92,14 +92,14 @@ Replace the optional placeholder IBKR Gateway image/configuration with a real iB
 
 ### Step 1: Update the committed environment templates without secrets
 
-- [ ] Update `.env.example` with safe placeholders for iBeam/IBKR login and data access while keeping broker integration disabled by default
-- [ ] Create or update `.env.template` as the user-facing copy template; keep it synchronized with `.env.example` or document which one is canonical
+- [ ] Update `.env.template` with safe placeholders for iBeam/IBKR login and data access while keeping broker integration disabled by default
+- [ ] Create or update `.env.template` as the user-facing copy template and canonical committed contract
 - [ ] Include `ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest`, gateway URL/port, timeout, paper/live account-mode guard, and ATrade-owned placeholders for IBKR username/password/account id that belong only in ignored `.env`
 - [ ] Ensure all credential placeholder values are obviously fake (`IBKR_USERNAME`, `IBKR_PASSWORD`, `IBKR_ACCOUNT_ID`) and no real account ids, usernames, passwords, session cookies, or tokens are committed
 - [ ] Confirm `.gitignore` ignores repo-root `.env`; update only if missing
 
 **Artifacts:**
-- `.env.example` (modified)
+- `.env.template` (modified)
 - `.env.template` (new or modified)
 - `.gitignore` (modified only if required)
 
@@ -137,7 +137,7 @@ Replace the optional placeholder IBKR Gateway image/configuration with a real iB
 
 - [ ] Create `tests/apphost/ibeam-runtime-contract-tests.sh`
 - [ ] Verify committed env templates include `voyz/ibeam:latest`, safe placeholders, and no credential-like real values
-- [ ] Verify `.env.template` and `.env.example` are synchronized where they overlap
+- [ ] Verify `.env.template` contains the canonical safe placeholders
 - [ ] Verify AppHost references the iBeam image and does not require credentials for normal test startup/default disabled mode
 - [ ] Verify API/worker status payloads never include username, password, token, session cookie, or raw account id values
 - [ ] Run targeted test: `bash tests/apphost/ibeam-runtime-contract-tests.sh`
@@ -147,7 +147,7 @@ Replace the optional placeholder IBKR Gateway image/configuration with a real iB
 
 ### Step 5: Update runtime and safety documentation
 
-- [ ] Update `scripts/README.md` with the ignored `.env` flow, `.env.template`/`.env.example` relationship, iBeam startup instructions, and secret-handling rules
+- [ ] Update `scripts/README.md` with the ignored `.env` flow, `.env.template` contract, iBeam startup instructions, and secret-handling rules
 - [ ] Update `docs/architecture/paper-trading-workspace.md` to record that the user-approved local IBKR data runtime is `voyz/ibeam:latest` while no-real-orders guardrails remain in force
 - [ ] Update `docs/architecture/modules.md` and `docs/architecture/overview.md` if AppHost/API/worker current-state notes change
 - [ ] Update `README.md` only if current-status or run-contract text would otherwise be stale
@@ -179,7 +179,7 @@ Replace the optional placeholder IBKR Gateway image/configuration with a real iB
 **Must Update:**
 - `scripts/README.md` — document `.env`, `.env.template`, iBeam, and secret-handling startup flow
 - `docs/architecture/paper-trading-workspace.md` — update the IBKR data runtime and safety contract
-- `.env.example` and `.env.template` — expose safe placeholders only
+- `.env.template` — expose safe placeholders only
 
 **Check If Affected:**
 - `docs/architecture/modules.md` — update if API/worker/broker current state changes

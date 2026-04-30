@@ -18,7 +18,7 @@
 - [x] Required files and paths exist
 - [x] Dependencies satisfied
 - [x] Current docs/index state confirmed
-- [x] Current `.env.example` baseline confirmed
+- [x] Current `.env.template` baseline confirmed
 
 ---
 
@@ -36,7 +36,7 @@
 ### Step 2: Define the paper-only `.env` configuration contract
 **Status:** ✅ Complete
 
-- [x] Add safe IBKR paper-mode and frontend API placeholders to `.env.example`
+- [x] Add safe IBKR paper-mode and frontend API placeholders to `.env.template`
 - [x] Keep defaults disabled/paper-only and free of real secrets
 - [x] Update startup/config docs for ignored `.env` secret handling
 - [x] Confirm or repair repo-root `.env` ignore coverage
@@ -59,7 +59,7 @@
 
 - [x] Create `tests/apphost/paper-trading-config-contract-tests.sh`
 - [x] Verify architecture doc frontmatter and index entry
-- [x] Verify `.env.example` safe placeholders and no live/default secrets
+- [x] Verify `.env.template` safe placeholders and no live/default secrets
 - [x] Verify docs mention charting, SignalR, trending, LEAN seam, and paper-only guardrails
 - [x] Targeted config-contract test passes
 

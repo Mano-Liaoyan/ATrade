@@ -40,7 +40,7 @@ Use the open-source LEAN algorithmic trading engine (https://www.lean.io/) as AT
 - `docs/architecture/paper-trading-workspace.md` — LEAN seam and no-real-trades rules
 - `docs/architecture/modules.md` — Analysis/API/frontend module responsibilities
 - `scripts/README.md` — `.env` and local startup contract
-- `.env.example` — committed environment template
+- `.env.template` — committed environment template
 - `.env.template` — user-facing environment template from TP-021
 - `src/ATrade.Analysis/*` — provider-neutral analysis contracts
 - `src/ATrade.MarketData/*` and `src/ATrade.MarketData.Ibkr/*` — normalized bars/data provider
@@ -63,7 +63,7 @@ Use the open-source LEAN algorithmic trading engine (https://www.lean.io/) as AT
 - `src/ATrade.Analysis.Lean/*` (new)
 - `src/ATrade.Api/ATrade.Api.csproj`
 - `src/ATrade.Api/Program.cs`
-- `.env.example`
+- `.env.template`
 - `.env.template`
 - `frontend/components/AnalysisPanel.tsx` (new)
 - `frontend/components/SymbolChartView.tsx`
@@ -96,7 +96,7 @@ Use the open-source LEAN algorithmic trading engine (https://www.lean.io/) as AT
 
 - [ ] Create `src/ATrade.Analysis.Lean/ATrade.Analysis.Lean.csproj`, add it to `ATrade.sln`, and reference the core Analysis project
 - [ ] Integrate with the official open-source LEAN engine/runtime using a documented approach (package, CLI, or container), not a hand-written fake engine
-- [ ] Add safe config placeholders to `.env.example` and `.env.template` for selecting the analysis engine (`Lean`), LEAN workspace/runtime path or image if needed, timeout, and any non-secret local settings
+- [ ] Add safe config placeholders to `.env.template` for selecting the analysis engine (`Lean`), LEAN workspace/runtime path or image if needed, timeout, and any non-secret local settings
 - [ ] Register the LEAN provider through the TP-024 analysis engine abstraction without coupling API/frontend contracts to LEAN-specific types
 - [ ] Run targeted build: `dotnet build src/ATrade.Analysis.Lean/ATrade.Analysis.Lean.csproj --nologo --verbosity minimal`
 
@@ -105,7 +105,7 @@ Use the open-source LEAN algorithmic trading engine (https://www.lean.io/) as AT
 - `src/ATrade.Analysis.Lean/LeanAnalysisEngine.cs` (new or equivalent)
 - `src/ATrade.Analysis.Lean/LeanAnalysisOptions.cs` (new or equivalent)
 - `src/ATrade.Analysis.Lean/LeanModuleServiceCollectionExtensions.cs` (new or equivalent)
-- `.env.example` (modified)
+- `.env.template` (modified)
 - `.env.template` (modified)
 - `ATrade.sln` (modified)
 
@@ -192,7 +192,7 @@ Use the open-source LEAN algorithmic trading engine (https://www.lean.io/) as AT
 - `docs/architecture/paper-trading-workspace.md` — update LEAN from future seam to implemented analysis provider
 - `docs/architecture/modules.md` — update Analysis/LEAN/API/frontend current state
 - `docs/architecture/provider-abstractions.md` — record LEAN as first analysis provider
-- `.env.example` and `.env.template` — add safe LEAN runtime placeholders if needed
+- `.env.template` — add safe LEAN runtime placeholders if needed
 
 **Check If Affected:**
 - `scripts/README.md` — update if LEAN startup/configuration changes the local setup contract

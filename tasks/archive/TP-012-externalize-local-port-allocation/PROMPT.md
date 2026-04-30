@@ -45,7 +45,7 @@ Deliver a durable env-driven port contract for local development:
 1. Inventory the current port usage across AppHost, launch settings, and test
    harnesses.
 2. Create a repo-level `.env` contract for developer-controlled local ports
-   (and a committed template such as `.env.example` if that is the safest shape).
+   (and a committed template such as `.env.template` if that is the safest shape).
 3. Update AppHost and related test harnesses to read from that env contract.
 4. Keep protocol-internal/default container ports where they belong unless there
    is a real reason to externalize them.
@@ -99,7 +99,7 @@ The implementation must distinguish between:
 
 - `src/ATrade.AppHost/Program.cs`
 - `src/ATrade.AppHost/Properties/launchSettings.json` (only if the right solution requires it)
-- `.env.example` or equivalent committed template (new)
+- `.env.template` or equivalent committed template (new)
 - `.gitignore` (if a developer-local `.env` file should be ignored)
 - `tests/apphost/api-bootstrap-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
@@ -118,7 +118,7 @@ The implementation must distinguish between:
 
 ### Step 1: Define the `.env` contract
 
-- [ ] Choose the correct committed shape (`.env.example`, `.env.template`, or equivalent) plus developer-local file behavior
+- [ ] Choose the correct committed shape (`.env.template` or equivalent) plus developer-local file behavior
 - [ ] Define clear variable names for the ports developers are expected to control
 - [ ] Keep intentionally ephemeral internal ports dynamic unless there is a real product reason to pin them
 - [ ] Document fallback behavior when the `.env` file is absent

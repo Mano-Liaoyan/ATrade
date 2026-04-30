@@ -40,7 +40,7 @@ Create the architecture and configuration contract for the next ATrade feature s
 - `docs/architecture/overview.md` — high-level runtime and infrastructure authority
 - `docs/architecture/modules.md` — module map and current backend/frontend/worker boundaries
 - `scripts/README.md` — startup and `.env` contract authority
-- `.env.example` — committed local configuration template
+- `.env.template` — committed local configuration template
 - `.gitignore` — confirm repo-root `.env` remains ignored
 - `frontend/package.json` — current frontend dependency baseline for chart-library decision context
 
@@ -58,7 +58,7 @@ Create the architecture and configuration contract for the next ATrade feature s
 - `docs/architecture/overview.md`
 - `docs/architecture/modules.md`
 - `scripts/README.md`
-- `.env.example`
+- `.env.template`
 - `README.md`
 - `PLAN.md`
 - `tests/apphost/paper-trading-config-contract-tests.sh` (new)
@@ -72,7 +72,7 @@ Create the architecture and configuration contract for the next ATrade feature s
 - [ ] Required files and paths exist
 - [ ] Dependencies satisfied
 - [ ] Confirm `docs/INDEX.md` currently has no paper-trading workspace architecture document
-- [ ] Confirm `.env.example` contains only the existing local port contract before adding new placeholders
+- [ ] Confirm `.env.template` contains only the existing local port contract before adding new placeholders
 
 ### Step 1: Add the paper-trading workspace architecture document
 
@@ -87,13 +87,13 @@ Create the architecture and configuration contract for the next ATrade feature s
 
 ### Step 2: Define the paper-only `.env` configuration contract
 
-- [ ] Extend `.env.example` with safe placeholder variables for the IBKR Gateway URL/image/port, paper account mode, paper account identifier, broker feature enablement, and frontend API base URL
+- [ ] Extend `.env.template` with safe placeholder variables for the IBKR Gateway URL/image/port, paper account mode, paper account identifier, broker feature enablement, and frontend API base URL
 - [ ] Ensure the defaults are safe: broker integration disabled unless explicitly enabled, `Paper` mode only, no live-trading flag enabled, no real account IDs, no usernames, no passwords, and no tokens committed
 - [ ] Update `scripts/README.md` so the local configuration contract explains which values belong in ignored `.env` and why secrets must never be committed
 - [ ] Confirm `.gitignore` still ignores repo-root `.env`; update only if the ignore rule is missing
 
 **Artifacts:**
-- `.env.example` (modified)
+- `.env.template` (modified)
 - `scripts/README.md` (modified)
 - `.gitignore` (modified only if required)
 
@@ -116,7 +116,7 @@ Create the architecture and configuration contract for the next ATrade feature s
 
 - [ ] Create `tests/apphost/paper-trading-config-contract-tests.sh`
 - [ ] Verify the new architecture document exists, has required frontmatter, and is indexed as active
-- [ ] Verify `.env.example` contains only safe placeholders for IBKR paper-mode configuration and does not contain real-looking credentials or live-trading defaults
+- [ ] Verify `.env.template` contains only safe placeholders for IBKR paper-mode configuration and does not contain real-looking credentials or live-trading defaults
 - [ ] Verify the docs mention `lightweight-charts`, SignalR, mocked trending factors, future LEAN integration, and paper-only/no-real-trades guardrails
 - [ ] Run targeted test: `bash tests/apphost/paper-trading-config-contract-tests.sh`
 
@@ -146,7 +146,7 @@ Create the architecture and configuration contract for the next ATrade feature s
 - `docs/architecture/overview.md` — add the paper-trading workspace direction without changing core topology
 - `docs/architecture/modules.md` — align module responsibilities and future LEAN seam
 - `scripts/README.md` — document new `.env` placeholders and secret-handling rules
-- `.env.example` — add safe paper-mode placeholders only
+- `.env.template` — add safe paper-mode placeholders only
 - `PLAN.md` — add the staged paper-trading workspace milestone
 
 **Check If Affected:**
@@ -156,7 +156,7 @@ Create the architecture and configuration contract for the next ATrade feature s
 ## Completion Criteria
 
 - [ ] A new indexed active architecture doc defines the paper-trading workspace, safety model, data flow, chart-library choice, trending logic, and future LEAN seam
-- [ ] `.env.example` contains safe IBKR paper-mode and frontend API placeholders with no real secrets and no live-trading defaults
+- [ ] `.env.template` contains safe IBKR paper-mode and frontend API placeholders with no real secrets and no live-trading defaults
 - [ ] Verification script proves the doc/config contract is present and safe
 - [ ] Active docs and `PLAN.md` clearly stage follow-on implementation work without claiming the feature is already complete
 

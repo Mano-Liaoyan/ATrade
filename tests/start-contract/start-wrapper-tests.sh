@@ -220,7 +220,7 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.sh" 'src/ATrade.AppHost/ATrade.AppHost.csproj'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'atrade_load_local_port_contract'
   assert_file_contains "$repo_root/scripts/local-env.sh" 'ATRADE_PORT_CONTRACT_PATH'
-  assert_file_contains "$repo_root/.env.example" 'ATRADE_APPHOST_FRONTEND_HTTP_PORT=3000'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_APPHOST_FRONTEND_HTTP_PORT=3000'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'src/ATrade.AppHost/ATrade.AppHost.csproj'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'Missing AppHost project at %s'

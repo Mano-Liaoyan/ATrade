@@ -26,8 +26,8 @@
 ### Step 1: Update the committed environment templates without secrets
 **Status:** ✅ Complete
 
-- [x] `.env.example` updated with safe iBeam/IBKR placeholders
-- [x] `.env.template` created or synchronized
+- [x] `.env.template` updated with safe iBeam/IBKR placeholders
+- [x] `.env.template` created/updated
 - [x] `voyz/ibeam:latest` and gateway placeholders added safely
 - [x] Credential placeholders are obviously fake and no real values are committed
 - [x] `.gitignore` reviewed for `.env`
@@ -62,7 +62,7 @@
 
 - [x] iBeam runtime shell test added
 - [x] Env template safety verified
-- [x] `.env.template` and `.env.example` synchronization verified
+- [x] `.env.template` contract verified
 - [x] AppHost iBeam image/default-disabled behavior verified
 - [x] Status redaction verified
 - [x] Targeted iBeam runtime contract test passes

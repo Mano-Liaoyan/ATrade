@@ -54,7 +54,7 @@ Fix the failure where clicking **Retry/Refresh IBKR market data** in the Aspire-
 - `frontend/components/TradingWorkspace.tsx`
 - `frontend/lib/marketDataClient.ts`
 - Existing IBKR/AppHost tests under `tests/ATrade.Brokers.Ibkr.Tests/`, `tests/ATrade.MarketData.Ibkr.Tests/`, and `tests/apphost/`
-- `.env.template` and `.env.example` (committed templates only; never read ignored `.env`)
+- `.env.template` (committed templates only; never read ignored `.env`)
 
 ## Environment
 
@@ -84,7 +84,7 @@ Fix the failure where clicking **Retry/Refresh IBKR market data** in the Aspire-
 - `tests/apphost/market-data-feature-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh` (only if frontend retry behavior changes)
 - `.env.template`
-- `.env.example` (restore/update only as a committed template synchronized with `.env.template`; never copy from ignored `.env`)
+- `.env.template` (update only as the committed template; never copy from ignored `.env`)
 - `README.md`
 - `PLAN.md`
 - `tasks/CONTEXT.md`
@@ -124,7 +124,7 @@ Fix the failure where clicking **Retry/Refresh IBKR market data** in the Aspire-
 - `src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs` (modified)
 - `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` (modified if diagnostics or request behavior change)
 - `src/ATrade.AppHost/Program.cs` (modified if endpoint scheme/metadata changes)
-- `.env.template` and `.env.example` (modified/restored if committed defaults change)
+- `.env.template` (modified/restored if committed defaults change)
 
 ### Step 2: Add regression coverage for the transport contract
 
@@ -182,7 +182,7 @@ Fix the failure where clicking **Retry/Refresh IBKR market data** in the Aspire-
 
 **Must Update:**
 - `.env.template` — update the committed gateway URL/scheme/defaults if the transport contract changes
-- `.env.example` — keep synchronized with `.env.template` if present or restored as part of the committed environment-template contract
+- `.env.template` — keep as the committed environment-template contract
 - `scripts/README.md` — document the working local iBeam URL/scheme and any self-signed-certificate/runtime caveats
 - `docs/architecture/paper-trading-workspace.md` — update the iBeam session/connectivity contract and troubleshooting language
 - `docs/architecture/provider-abstractions.md` — update provider-unavailable/authentication-required behavior if diagnostics or transport handling changes

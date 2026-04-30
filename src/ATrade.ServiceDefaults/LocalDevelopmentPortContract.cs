@@ -70,7 +70,7 @@ public static class LocalDevelopmentPortContractLoader
         {
             if (File.Exists(Path.Combine(current.FullName, "ATrade.slnx")) ||
                 File.Exists(Path.Combine(current.FullName, "ATrade.sln")) ||
-                File.Exists(Path.Combine(current.FullName, ".env.example")))
+                File.Exists(Path.Combine(current.FullName, ".env.template")))
             {
                 return current.FullName;
             }
@@ -89,7 +89,7 @@ public static class LocalDevelopmentPortContractLoader
             return preferredPath;
         }
 
-        return Path.Combine(repositoryRoot, ".env.example");
+        return Path.Combine(repositoryRoot, ".env.template");
     }
 
     private static bool HasExplicitAspNetCoreUrlConfiguration(IConfiguration configuration)
