@@ -48,7 +48,7 @@ main() {
   local apphost_project="$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj"
   local apphost_program="$repo_root/src/ATrade.AppHost/Program.cs"
 
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Api'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Api'
   assert_file_contains "$api_project" 'Microsoft.NET.Sdk.Web'
   assert_file_contains "$api_project" 'ATrade.ServiceDefaults.csproj'
   assert_file_contains "$api_program" 'builder.AddServiceDefaults()'
@@ -56,7 +56,7 @@ main() {
   assert_file_contains "$apphost_project" 'ATrade.Api.csproj'
   assert_file_contains "$apphost_program" 'AddProject<Projects.ATrade_Api>("api")'
 
-  dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
+  dotnet build "$repo_root/ATrade.slnx" --nologo --verbosity minimal >/dev/null
 
   api_log="$(mktemp)"
   ASPNETCORE_URLS="$api_url" dotnet run --project "$api_project" >"$api_log" 2>&1 &

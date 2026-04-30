@@ -66,7 +66,7 @@ cleanup() {
 trap cleanup EXIT
 
 assert_contract_sources() {
-  local solution_path="$repo_root/ATrade.sln"
+  local solution_path="$repo_root/ATrade.slnx"
   local analysis_project="$repo_root/src/ATrade.Analysis/ATrade.Analysis.csproj"
   local api_project="$repo_root/src/ATrade.Api/ATrade.Api.csproj"
   local api_program="$repo_root/src/ATrade.Api/Program.cs"
@@ -216,7 +216,7 @@ main() {
 
   assert_contract_sources
   assert_provider_neutral_contract_boundaries
-  dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
+  dotnet build "$repo_root/ATrade.slnx" --nologo --verbosity minimal >/dev/null
   start_api_without_analysis_engine
   assert_analysis_discovery_response
   assert_analysis_run_not_configured_response

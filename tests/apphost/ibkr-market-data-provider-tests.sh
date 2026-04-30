@@ -103,7 +103,7 @@ start_api_without_ibkr_credentials() {
 }
 
 assert_market_data_provider_source_contract() {
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.MarketData.Ibkr'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.MarketData.Ibkr'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.MarketData.Ibkr.csproj'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'AddIbkrMarketDataProvider'
   assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs" '/v1/api/iserver/secdef/search'

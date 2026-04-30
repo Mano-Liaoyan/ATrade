@@ -1,0 +1,8 @@
+PLAN.md:48:- Use `ATrade.slnx` for repo-level .NET build/test/list guidance; retain `ATrade.sln` only as a temporary non-authoritative compatibility artifact.
+tasks/CONTEXT.md:60:`ATrade.sln` file is retained only as a temporary non-authoritative
+README.md:147:The legacy `ATrade.sln` remains temporarily as a non-authoritative compatibility
+scripts/README.md:189:`ATrade.sln` remains temporarily as a non-authoritative compatibility artifact
+scripts/README.md:191:and test `ATrade.slnx` instead of adding new active `ATrade.sln` guidance.
+tests/scaffolding/solution-reference-contract-tests.sh:64:    'File.Exists(Path.Combine(current.FullName, "ATrade.sln"))',
+tests/scaffolding/solution-reference-contract-tests.sh:102:  assert_path_exists "$repo_root/ATrade.sln" # legacy compatibility artifact
+src/ATrade.ServiceDefaults/LocalDevelopmentPortContract.cs:72:                File.Exists(Path.Combine(current.FullName, "ATrade.sln")) ||

@@ -141,7 +141,7 @@ assert_market_data_source_contract() {
   local market_data_project="$repo_root/src/ATrade.MarketData/ATrade.MarketData.csproj"
   local ibkr_project="$repo_root/src/ATrade.MarketData.Ibkr/ATrade.MarketData.Ibkr.csproj"
 
-  assert_file_contains "$repo_root/ATrade.sln" 'ATrade.MarketData.Ibkr'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.MarketData.Ibkr'
   assert_file_contains "$api_project" 'ATrade.MarketData.Ibkr.csproj'
   assert_file_contains "$api_project" 'ATrade.MarketData.csproj'
   assert_file_contains "$market_data_project" 'Microsoft.AspNetCore.App'
@@ -164,7 +164,7 @@ main() {
   fi
 
   assert_market_data_source_contract
-  dotnet build "$repo_root/ATrade.sln" --nologo --verbosity minimal >/dev/null
+  dotnet build "$repo_root/ATrade.slnx" --nologo --verbosity minimal >/dev/null
   start_api_without_real_credentials
   assert_provider_unavailable_response '/api/market-data/trending'
   assert_provider_unavailable_response '/api/market-data/UNCONFIGURED/candles?timeframe=1D'

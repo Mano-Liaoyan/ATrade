@@ -20,7 +20,8 @@ ATrade is a personal swing and position trading platform built as a modular
 monolith with .NET 10, Next.js, and Aspire 13.2.
 
 The repository currently contains a runnable local stack and a Taskplane work
-queue for the next provider-backed trading workspace increment.
+queue for solution-reference cleanup and the next provider-backed trading
+workspace runtime fix.
 
 ## Current Stack
 
@@ -97,17 +98,14 @@ timeouts surface as safe `analysis-engine-unavailable` responses.
 
 Active Taskplane packets live directly under `tasks/`:
 
-| Task     | Purpose                                                            |
-| -------- | ------------------------------------------------------------------ |
-| `TP-019` | Provider-neutral broker and market-data abstractions               |
-| `TP-020` | Postgres-persisted pinned stock/watchlist state                    |
-| `TP-021` | `voyz/ibeam:latest` runtime and ignored `.env` IBKR login contract |
-| `TP-022` | IBKR/iBeam market-data provider and production mock removal        |
-| `TP-023` | IBKR stock search and pin-any-symbol workflow                      |
-| `TP-024` | Provider-neutral analysis engine abstraction                       |
-| `TP-025` | LEAN as the first analysis engine provider                         |
+| Task     | Purpose                                                                        |
+| -------- | ------------------------------------------------------------------------------ |
+| `TP-026` | Migrate active repository solution references to authoritative `ATrade.slnx` |
+| `TP-027` | Fix the local IBKR/iBeam refresh transport contract                            |
 
-Completed Taskplane packets have been moved to `tasks/archive/`.
+Completed Taskplane packets `TP-019` through `TP-025` currently remain under
+`tasks/` with `.DONE` markers pending archival; older completed packets live
+under `tasks/archive/`.
 
 ## Repository Map
 
@@ -135,6 +133,20 @@ agents used by the orchestrator.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
 - No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
+
+## Solution File Contract
+
+`ATrade.slnx` is the authoritative solution file for repo-level .NET build,
+test, and solution-list commands:
+
+```bash
+dotnet test ATrade.slnx --nologo --verbosity minimal
+dotnet build ATrade.slnx --nologo --verbosity minimal
+```
+
+The legacy `ATrade.sln` remains temporarily as a non-authoritative compatibility
+artifact for tools that have not adopted `.slnx`; active scripts, tests, docs,
+and new Taskplane prompts should prefer `ATrade.slnx`.
 
 ## Verification Entry Points
 
