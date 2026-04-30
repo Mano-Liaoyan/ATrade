@@ -91,7 +91,7 @@ if command_violations:
     raise SystemExit(1)
 
 if violations:
-    print("Unclassified active ATrade.sln references found; use ATrade.slnx or document an explicit compatibility exception:", file=sys.stderr)
+    print("Unclassified active legacy-solution references found; use ATrade.slnx or document an explicit compatibility exception:", file=sys.stderr)
     print("\n".join(violations), file=sys.stderr)
     raise SystemExit(1)
 PY

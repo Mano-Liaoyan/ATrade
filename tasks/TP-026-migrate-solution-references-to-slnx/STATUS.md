@@ -1,6 +1,6 @@
 # TP-026: Migrate solution references from ATrade.sln to ATrade.slnx — Status
 
-**Current Step:** Step 3: Finalize solution-file contract
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -55,14 +55,14 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test ATrade.slnx --nologo --verbosity minimal` passes
-- [ ] `dotnet build ATrade.slnx --nologo --verbosity minimal` passes
-- [ ] Targeted modified scripts pass or cleanly skip
-- [ ] `bash tests/start-contract/start-wrapper-tests.sh` passes
-- [ ] Active reference audit has no unexplained stale `ATrade.sln` guidance
-- [ ] All failures fixed
+- [x] `dotnet test ATrade.slnx --nologo --verbosity minimal` passes
+- [x] `dotnet build ATrade.slnx --nologo --verbosity minimal` passes
+- [x] Targeted modified scripts pass or cleanly skip
+- [x] `bash tests/start-contract/start-wrapper-tests.sh` passes
+- [x] Active reference audit has no unexplained stale `ATrade.sln` guidance
+- [x] All failures fixed
 
 ---
 
@@ -123,6 +123,13 @@
 | 2026-04-30 | Step 3 legacy solution retained | Verified root `ATrade.sln` still exists and lists 20 projects; retained only as the documented compatibility artifact. |
 | 2026-04-30 | Step 3 active preference audit | `rg -n "ATrade\\.sln\\b" README.md PLAN.md scripts docs tasks/CONTEXT.md tests src AGENTS.md` found only TP-026 descriptions, explicit compatibility wording, and the `LocalDevelopmentPortContract` fallback; no active script/test/build command prefers `ATrade.sln`. |
 | 2026-04-30 | Step 3 regression guard added | Added and ran `tests/scaffolding/solution-reference-contract-tests.sh`; it verifies `ATrade.slnx` membership matches all active projects and fails on stale active `ATrade.sln` build/test/list guidance unless explicitly classified as compatibility. |
+| 2026-04-30 | Step 4 started | Running full testing and verification gate for the `ATrade.slnx` migration. |
+| 2026-04-30 | Step 4 dotnet test | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed (all listed test projects green). |
+| 2026-04-30 | Step 4 dotnet build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors. |
+| 2026-04-30 | Step 4 targeted scripts | Modified scripts passed: `project-shells`, `solution-reference-contract`, `provider-abstraction`, `market-data-feature`, `lean-analysis-engine` (LEAN runtime cleanly skipped after unit tests), `analysis-engine-contract`, `ibkr-paper-safety`, `accounts-feature-bootstrap`, `ibkr-market-data-provider`, and `api-bootstrap`. |
+| 2026-04-30 | Step 4 start-contract | `bash tests/start-contract/start-wrapper-tests.sh` passed. |
+| 2026-04-30 | Step 4 active reference audit | Wrote `audits/final-active-reference-audit.txt` and reran `tests/scaffolding/solution-reference-contract-tests.sh`; remaining active `ATrade.sln` mentions are explicit compatibility/fallback exceptions only. |
+| 2026-04-30 | Step 4 failures fixed | Earlier targeted-script failure from missing `.env.example` was fixed by restoring the safe template; the regression-guard self-audit message was corrected; all Step 4 commands now pass. |
 
 ---
 
