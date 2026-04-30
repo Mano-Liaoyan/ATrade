@@ -1,6 +1,6 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Step 4: Add restart and duplicate-market regression coverage
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -68,16 +68,16 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj --nologo --verbosity minimal` passing
-- [ ] `bash tests/apphost/postgres-watchlist-persistence-tests.sh` passing or cleanly skipped where appropriate
-- [ ] `bash tests/apphost/ibkr-symbol-search-tests.sh` passing
-- [ ] `bash tests/apphost/frontend-trading-workspace-tests.sh` passing
-- [ ] Frontend build passing: `cd frontend && npm run build`
-- [ ] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
-- [ ] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
-- [ ] All failures fixed or unrelated pre-existing failures documented
+- [x] `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj --nologo --verbosity minimal` passing
+- [x] `bash tests/apphost/postgres-watchlist-persistence-tests.sh` passing or cleanly skipped where appropriate
+- [x] `bash tests/apphost/ibkr-symbol-search-tests.sh` passing
+- [x] `bash tests/apphost/frontend-trading-workspace-tests.sh` passing
+- [x] Frontend build passing: `cd frontend && npm run build`
+- [x] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
+- [x] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
+- [x] All failures fixed or unrelated pre-existing failures documented
 
 ---
 
@@ -145,6 +145,15 @@
 | 2026-04-30 17:18 | Frontend symbol-only regression assertions added | Apphost frontend/search scripts assert `pinnedInstrumentKeys`, `savingPinKey`, `key={pinKey}`, and `pinnedSet.has(pinKey)`, and reject `pinnedSymbolNames`/`savingSymbol`/symbol-set checks. |
 | 2026-04-30 17:20 | Cache failure regression assertions added | Frontend apphost script asserts legacy symbol-only storage, cache-source labeling, read-only cached-pin error text, and disabled actions while `watchlistError` is set. |
 | 2026-04-30 17:28 | Targeted regression suite | `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj`, `bash tests/apphost/postgres-watchlist-persistence-tests.sh`, `bash tests/apphost/frontend-trading-workspace-tests.sh`, and `bash tests/apphost/ibkr-symbol-search-tests.sh` passed. |
+| 2026-04-30 17:30 | Step 5 started | Full task verification gate. |
+| 2026-04-30 17:31 | Workspaces tests | `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj --nologo --verbosity minimal` passed: 23 tests. |
+| 2026-04-30 17:34 | Postgres watchlist script | `bash tests/apphost/postgres-watchlist-persistence-tests.sh` passed and verified exact instrument persistence across API restart. |
+| 2026-04-30 17:36 | IBKR symbol search script | `bash tests/apphost/ibkr-symbol-search-tests.sh` passed; startup curl retries logged transient connection warnings before success. |
+| 2026-04-30 17:38 | Frontend trading workspace script | `bash tests/apphost/frontend-trading-workspace-tests.sh` passed, including frontend build/runtime source checks. |
+| 2026-04-30 17:40 | Frontend build | `cd frontend && npm run build` passed. |
+| 2026-04-30 17:43 | Full test suite | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed across all listed test projects. |
+| 2026-04-30 17:44 | Solution build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors. |
+| 2026-04-30 17:45 | Verification failures review | No verification failures remain; initial missing frontend dependencies were resolved with `npm ci`, and later scripts/builds/tests passed. |
 
 ---
 
