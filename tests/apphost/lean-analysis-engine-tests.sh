@@ -34,13 +34,26 @@ assert_lean_provider_registration() {
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/ATrade.Analysis.Lean.csproj" 'ATrade.Analysis.csproj'
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" 'options.CliCommand'
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" 'options.DockerCommand'
+  assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" '"exec"'
+  assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" 'MapHostPathToManagedContainerPath'
+  assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" 'LeanAnalysisEnvironmentVariables.ManagedContainerName'
+  assert_file_not_contains "$repo_root/src/ATrade.Analysis.Lean/LeanRuntimeExecutor.cs" '"run",'
   assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanAnalysisOptions.cs" 'quantconnect/lean:foundation'
+  assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanAnalysisOptions.cs" 'DefaultManagedContainerName'
+  assert_file_contains "$repo_root/src/ATrade.Analysis.Lean/LeanAnalysisOptions.cs" 'ContainerWorkspaceRoot'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.Analysis.Lean.csproj'
   assert_file_contains "$repo_root/src/ATrade.Api/Program.cs" 'AddLeanAnalysisEngine(builder.Configuration)'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddContainer("lean-engine"'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'LeanAnalysisRuntimeContract.Load'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'WithContainerName(leanRuntimeContract.ManagedContainerName)'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'WithBindMount(leanRuntimeContract.WorkspaceRoot, leanRuntimeContract.ContainerWorkspaceRoot, isReadOnly: false)'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/LeanAnalysisRuntimeContract.cs" 'ManagedContainerNameVariableName'
   assert_file_contains "$repo_root/.env.template" 'ATRADE_ANALYSIS_ENGINE=none'
   assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_CLI_COMMAND=lean'
   assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation'
   assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_TIMEOUT_SECONDS=45'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_MANAGED_CONTAINER_NAME=atrade-lean-engine'
+  assert_file_contains "$repo_root/.env.template" 'ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=/workspace'
 }
 
 assert_provider_neutral_contracts() {
@@ -77,7 +90,7 @@ assert_adapter_tests_and_runtime_skip() {
     fi
   fi
 
-  printf 'SKIP: official LEAN CLI is not installed or not executable; runtime execution is optional and adapter tests cover the LEAN workspace path without requiring local LEAN/Docker credentials.\n'
+  printf 'SKIP: official LEAN CLI is not installed or not executable; runtime execution is optional and adapter tests cover the LEAN workspace path and managed Docker command construction without requiring local LEAN/Docker credentials.\n'
 }
 
 main() {

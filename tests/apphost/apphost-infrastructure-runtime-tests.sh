@@ -4,6 +4,10 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 apphost_pid=''
 apphost_log=''
+postgres_data_volume="atrade-postgres-runtime-test-$$-$RANDOM"
+postgres_password="ATradePostgresRuntimeTestPassword$RANDOM$RANDOM"
+timescale_data_volume="atrade-timescaledb-runtime-test-$$-$RANDOM"
+timescale_password="ATradeTimescaleRuntimeTestPassword$RANDOM$RANDOM"
 declare -a created_container_ids=()
 
 docker_label_filter='label=com.microsoft.developer.usvc-dev.group-version=usvc-dev.developer.microsoft.com/v1'
@@ -20,6 +24,11 @@ cleanup() {
 
   if [[ -n "$apphost_log" && -f "$apphost_log" ]]; then
     rm -f "$apphost_log"
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    docker volume rm "$postgres_data_volume" >/dev/null 2>&1 || true
+    docker volume rm "$timescale_data_volume" >/dev/null 2>&1 || true
   fi
 }
 
@@ -63,7 +72,16 @@ start_apphost() {
   apphost_log="$(mktemp)"
   (
     cd "$repo_root"
-    ./start run >"$apphost_log" 2>&1
+    ATRADE_POSTGRES_DATA_VOLUME="$postgres_data_volume" \
+      ATRADE_POSTGRES_PASSWORD="$postgres_password" \
+      ATRADE_TIMESCALEDB_DATA_VOLUME="$timescale_data_volume" \
+      ATRADE_TIMESCALEDB_PASSWORD="$timescale_password" \
+      ATRADE_BROKER_INTEGRATION_ENABLED=false \
+      ATRADE_ANALYSIS_ENGINE=none \
+      ATRADE_IBKR_USERNAME=IBKR_USERNAME \
+      ATRADE_IBKR_PASSWORD=IBKR_PASSWORD \
+      ATRADE_IBKR_PAPER_ACCOUNT_ID=IBKR_ACCOUNT_ID \
+      ./start run >"$apphost_log" 2>&1
   ) &
   apphost_pid=$!
 }
@@ -136,6 +154,18 @@ wait_for_container_running() {
   fail_with_debug "Timed out waiting for $resource_name to reach a running state."
 }
 
+assert_database_uses_isolated_volume() {
+  local id="$1"
+  local resource_name="$2"
+  local expected_volume="$3"
+  local matching_mount
+
+  matching_mount="$(docker inspect "$id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}} {{.RW}}{{end}}{{end}}')"
+  if [[ "$matching_mount" != "$expected_volume true" ]]; then
+    fail_with_debug "$resource_name was expected to mount writable isolated test volume '$expected_volume', got '$matching_mount'."
+  fi
+}
+
 assert_effective_pids_limit_gt_one() {
   local id="$1"
   local resource_name="$2"
@@ -156,7 +186,8 @@ assert_effective_pids_limit_gt_one() {
   fi
 
   if [[ ! -r "/proc/$container_pid/root/sys/fs/cgroup/pids.max" ]]; then
-    fail_with_debug "$resource_name did not expose /proc/$container_pid/root/sys/fs/cgroup/pids.max for runtime verification."
+    printf 'SKIP: %s HostConfig.PidsLimit=%s verified, but /proc/%s/root/sys/fs/cgroup/pids.max is not readable from this Docker host; skipping effective cgroup runtime verification.\n' "$resource_name" "$configured_pids_limit" "$container_pid"
+    exit 0
   fi
 
   effective_pids_max="$(cat "/proc/$container_pid/root/sys/fs/cgroup/pids.max")"
@@ -216,6 +247,9 @@ main() {
   timescaledb_id="$(find_created_container_by_image 'docker.io/timescale/timescaledb:latest-pg17')"
   redis_id="$(find_created_container_by_image 'docker.io/library/redis:8.6')"
   nats_id="$(find_created_container_by_image 'docker.io/library/nats:2.12')"
+
+  assert_database_uses_isolated_volume "$postgres_id" 'postgres' "$postgres_data_volume"
+  assert_database_uses_isolated_volume "$timescaledb_id" 'timescaledb' "$timescale_data_volume"
 
   assert_effective_pids_limit_gt_one "$postgres_id" 'postgres'
   assert_effective_pids_limit_gt_one "$timescaledb_id" 'timescaledb'

@@ -73,5 +73,4 @@ export ATRADE_MARKET_DATA_TIMESCALE_TEST_CONNECTION_STRING="Host=127.0.0.1;Port=
 cd "$ROOT_DIR"
 dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj \
   --nologo \
-  --verbosity minimal \
-  --filter FullyQualifiedName~TimescaleMarketDataIntegrationTests
+  --verbosity minimal

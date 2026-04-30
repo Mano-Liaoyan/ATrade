@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-05-01
 summary: Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract.
 see_also:
   - ../INDEX.md
@@ -37,11 +37,15 @@ see_also:
 > forwards the safe IBKR/iBeam paper-mode environment contract into `ATrade.Api`
 > and `ATrade.Ibkr.Worker`, provides the `postgres` connection string consumed by
 > the API/workspaces slice plus the `timescaledb` connection string consumed by
-> market-data cache-aside, and can start an optional `ibkr-gateway`
-> `voyz/ibeam:latest` container only when ignored local `.env` credentials enable
-> integration. Production market-data mocks remain removed; fresh Timescale rows
-> can serve market-data HTTP reads, while missing/stale rows refresh from
-> IBKR/iBeam and persist the provider response.
+> market-data cache-aside, backs both database resources with stable named data
+> volumes/password parameters, forwards safe LEAN analysis-runtime settings to the
+> API, can start an optional `ibkr-gateway` `voyz/ibeam:latest` container only
+> when ignored local `.env` credentials enable integration, and can declare an
+> Aspire-visible `lean-engine` container only when ignored local `.env` selects
+> LEAN Docker mode. Production market-data mocks remain removed; fresh Timescale
+> rows can survive full AppHost reboot on the named TimescaleDB data volume and
+> serve market-data HTTP reads while still fresh, while missing/stale rows refresh
+> from IBKR/iBeam and persist the provider response.
 
 ## 1. Shape Of The System
 
@@ -132,14 +136,24 @@ architecture the AppHost is responsible for:
   infrastructure resources and wiring their connection strings into the
   services that need them. The current runnable slice already declares those
   resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
-  four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
-  forwards the safe paper-trading IBKR/iBeam environment contract into both .NET
+  four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`, backs
+  the primary `postgres` data directory with the named
+  `ATRADE_POSTGRES_DATA_VOLUME` volume plus a stable `ATRADE_POSTGRES_PASSWORD`
+  secret parameter so local workspace preferences survive AppHost reboots, backs
+  the `timescaledb` data directory with `ATRADE_TIMESCALEDB_DATA_VOLUME` plus a
+  stable `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data
+  cache rows survive AppHost reboots, forwards the safe paper-trading IBKR/iBeam
+  environment contract into both .NET
   processes using redacted Aspire parameters for credential-bearing values, and
   only declares an optional `ibkr-gateway` `voyz/ibeam:latest` container when
   broker integration is enabled and fake credential placeholders have been
   replaced in ignored `.env`. The optional iBeam container also receives a
   read-only repo-local inputs config so Client Portal accepts the loopback/private
-  Docker bridge caller addresses used by Aspire published-port requests.
+  Docker bridge caller addresses used by Aspire published-port requests. When
+  `ATRADE_ANALYSIS_ENGINE=Lean` and `ATRADE_LEAN_RUNTIME_MODE=docker`, the
+  AppHost also declares `lean-engine` from the configured LEAN image, mounts the
+  generated-workspace root, and passes managed-container metadata to `api` so
+  analysis execution uses that dashboard-visible runtime.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 
@@ -165,10 +179,14 @@ are owned by the backend module that owns the entity.
 
 Current implementation note: `ATrade.Workspaces` now initializes and owns the
 Postgres schema for pinned workspace watchlists through the AppHost-provided
-`ConnectionStrings:postgres` reference. Watchlist rows use a durable
-`instrument_key` derived from provider, provider id / IBKR `conid`, symbol,
-exchange, currency, and asset class, plus a temporary `local-user` /
-`paper-trading` identity seam until authentication and named workspaces exist.
+`ConnectionStrings:postgres` reference. The AppHost `postgres` data directory is
+backed by `ATRADE_POSTGRES_DATA_VOLUME` (default `atrade-postgres-data`) and a
+stable local-dev `ATRADE_POSTGRES_PASSWORD` secret parameter, so watchlist rows
+survive a full local `start run` stop/start cycle when the same volume is reused.
+Rows use a durable `instrument_key` derived from provider, provider id / IBKR
+`conid`, symbol, exchange, currency, and asset class, plus a temporary
+`local-user` / `paper-trading` identity seam until authentication and named
+workspaces exist.
 
 ### 4.2 TimescaleDB — time-series workloads
 
@@ -180,9 +198,13 @@ OHLCV candles and scanner/trending snapshots through
 `ATrade.MarketData.Timescale`; API cache-aside reads decide whether rows are
 fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, return cache
 hits with `timescale-cache:{originalSource}` source metadata, and refresh from
-the provider when rows are missing or stale. TimescaleDB is logically distinct from Postgres even though it runs the Postgres
-protocol: schemas, retention policies, and continuous aggregates live here and
-do not mix with transactional OLTP data.
+the provider when rows are missing or stale. The AppHost-managed `timescaledb`
+data directory is volume-backed with `ATRADE_TIMESCALEDB_DATA_VOLUME` (default
+`atrade-timescaledb-data`) and a stable `ATRADE_TIMESCALEDB_PASSWORD`, so fresh
+market-data cache rows survive a full local `start run` stop/start cycle when
+the same volume is reused. TimescaleDB is logically distinct from Postgres even
+though it runs the Postgres protocol: schemas, retention policies, and
+continuous aggregates live here and do not mix with transactional OLTP data.
 
 ### 4.3 Redis — low-latency cache and ephemeral state
 
@@ -220,9 +242,10 @@ and trending symbols. The backend and UI halves of that direction are now
 started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
 states, deterministic paper-order simulation, provider-backed market-data
 surfaces, SignalR chart updates, exact Postgres-backed watchlist preferences,
-and the optional LEAN analysis provider already route through `ATrade.Api`. The slice
-keeps the current modular-monolith and Aspire contracts intact by routing
-browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
+and the optional LEAN analysis provider already route through `ATrade.Api`; in
+Docker mode LEAN uses the AppHost-managed `lean-engine` resource rather than a
+hidden ad-hoc container. The slice keeps the current modular-monolith and Aspire
+contracts intact by routing browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
 updates, using NATS for internal fan-out, keeping orders simulated rather than
 live, and treating official IBKR Gateway / iBeam connectivity plus LEAN analysis
 as plug-ins behind provider-neutral contracts rather than as reasons to add new

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-30
+updated: 2026-05-01
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -43,21 +43,29 @@ The repository-wide startup contract is the repo-local `start` shim:
 All variants delegate to the Aspire AppHost so one command can bring up the
 API, worker, frontend, and local infrastructure. Local bind-port overrides,
 including the optional fixed Aspire dashboard UI port
-(`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback), are
-kept in ignored `.env` and documented in `scripts/README.md`.
+(`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback) and
+AppHost Postgres/TimescaleDB data-volume/password overrides, are kept in ignored
+`.env` and documented in `scripts/README.md`.
 
 ## Current Runtime Surface
 
 The current runnable slice includes:
 
 - `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js
-  frontend, Postgres, TimescaleDB, Redis, NATS, and the optional
-  `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env`
-  credentials enable broker integration; the local iBeam Client Portal URL is
-  HTTPS on the configured host gateway port, mapped to the container's internal
-  Client Portal port `5000`, and the container receives a repo-local non-secret
-  iBeam inputs mount so Client Portal accepts loopback/private Docker bridge
-  callers used by Aspire.
+  frontend, volume-backed Postgres, volume-backed TimescaleDB, Redis, NATS, the
+  optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env`
+  credentials enable broker integration, and the optional `lean-engine` LEAN
+  runtime container when ignored local `.env` selects LEAN Docker mode; the
+  primary `postgres` data directory uses `ATRADE_POSTGRES_DATA_VOLUME` (default
+  `atrade-postgres-data`) plus a stable local-dev `ATRADE_POSTGRES_PASSWORD`
+  secret parameter so workspace preferences survive full local AppHost reboots;
+  the `timescaledb` data directory uses `ATRADE_TIMESCALEDB_DATA_VOLUME`
+  (default `atrade-timescaledb-data`) plus a stable local-dev
+  `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data cache rows
+  survive full local AppHost reboots; the local iBeam Client Portal URL is HTTPS on the configured host gateway port,
+  mapped to the container's internal Client Portal port `5000`, and the
+  container receives a repo-local non-secret iBeam inputs mount so Client Portal
+  accepts loopback/private Docker bridge callers used by Aspire.
 - `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
 - `src/ATrade.Api` — browser-facing backend with:
   - `GET /health`
@@ -79,7 +87,7 @@ The current runnable slice includes:
 - `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
 - `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence and cache-aside for OHLCV candles and scanner/trending snapshots, with configurable freshness for browser-facing market-data endpoints.
 - `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
-- `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI/Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
+- `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
@@ -94,17 +102,20 @@ through ignored `.env` values, API endpoints return IBKR scanner, snapshot, and
 historical bar data with source metadata. `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`
 (default `30`) controls whether TimescaleDB rows for trending snapshots,
 candles, and indicator candle inputs are fresh enough to serve directly as
-`timescale-cache:{originalSource}` responses; missing or stale rows refresh from
-IBKR/iBeam, persist the provider response to TimescaleDB, and return the provider
-response. When iBeam is disabled, missing credentials, unauthenticated, or
-unreachable, a fresh persisted response can still serve the request; otherwise
+`timescale-cache:{originalSource}` responses; because the AppHost TimescaleDB
+data directory is volume-backed, those fresh rows can survive a full local
+AppHost reboot and be served without another IBKR/iBeam provider call. Missing or
+stale rows refresh from IBKR/iBeam, persist the provider response to TimescaleDB,
+and return the provider response. When iBeam is disabled, missing credentials,
+unauthenticated, or unreachable, a fresh persisted response can still serve the request; otherwise
 the API and frontend surface safe provider-not-configured/provider-unavailable
 states instead of falling back to production mocks. Pinned instruments are backend-owned
-workspace preferences persisted in the AppHost-managed Postgres database through
-`ATrade.Workspaces` and surfaced to the frontend through
-`/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity;
-browser `localStorage` is only a non-authoritative symbol-only cache / one-time
-manual migration source. Users can search IBKR/iBeam stocks through
+workspace preferences persisted in the volume-backed AppHost-managed Postgres
+database through `ATrade.Workspaces` and surfaced to the frontend through
+`/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity; they
+survive full local AppHost stop/start cycles when the same Postgres data volume
+and stable password are reused. Browser `localStorage` is only a
+non-authoritative symbol-only cache / one-time manual migration source. Users can search IBKR/iBeam stocks through
 `/api/market-data/search`, see explicit provider/market/exchange/currency/asset
 class metadata with local market badges, open result chart pages, and pin exact
 provider-market metadata (`provider`, provider symbol id / IBKR `conid`, name,
@@ -114,8 +125,13 @@ production hard-coded symbol catalog. Analysis engine discovery/run contracts ar
 return explicit `analysis-engine-not-configured` metadata with no fake signals;
 when ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers
 `ATrade.Analysis.Lean`, runs LEAN over market-data-provider candles, and returns
-provider-neutral signals/metrics/backtest summaries. Missing LEAN runtime or
-timeouts surface as safe `analysis-engine-unavailable` responses.
+provider-neutral signals/metrics/backtest summaries. With
+`ATRADE_LEAN_RUNTIME_MODE=docker`, AppHost exposes a dashboard-visible
+`lean-engine` resource, bind-mounts the generated workspace root, and passes the
+managed container metadata to the API so execution uses `docker exec` against
+that resource. Missing LEAN runtime, missing managed container metadata,
+unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
+`analysis-engine-unavailable` responses without fake signals.
 
 ## Active Task Queue
 

@@ -72,6 +72,10 @@ required = {
     'ATRADE_FRONTEND_DIRECT_HTTP_PORT': '3111',
     'ATRADE_APPHOST_FRONTEND_HTTP_PORT': '3000',
     'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT': '0',
+    'ATRADE_POSTGRES_DATA_VOLUME': 'atrade-postgres-data',
+    'ATRADE_POSTGRES_PASSWORD': 'ATRADE_POSTGRES_PASSWORD',
+    'ATRADE_TIMESCALEDB_DATA_VOLUME': 'atrade-timescaledb-data',
+    'ATRADE_TIMESCALEDB_PASSWORD': 'ATRADE_TIMESCALEDB_PASSWORD',
     'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
     'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
     'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000',
@@ -106,8 +110,32 @@ if values['ATRADE_BROKER_ACCOUNT_MODE'] != 'Paper':
 if values['ATRADE_ASPIRE_DASHBOARD_HTTP_PORT'] != '0':
     raise SystemExit('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must preserve the ephemeral dashboard default')
 
+if values['ATRADE_POSTGRES_DATA_VOLUME'] != 'atrade-postgres-data':
+    raise SystemExit('ATRADE_POSTGRES_DATA_VOLUME must preserve the shared non-secret default Postgres volume name')
+
+if values['ATRADE_POSTGRES_PASSWORD'] != 'ATRADE_POSTGRES_PASSWORD':
+    raise SystemExit('ATRADE_POSTGRES_PASSWORD must stay an obvious fake local-dev placeholder')
+
+if values['ATRADE_TIMESCALEDB_DATA_VOLUME'] != 'atrade-timescaledb-data':
+    raise SystemExit('ATRADE_TIMESCALEDB_DATA_VOLUME must preserve the shared non-secret default TimescaleDB volume name')
+
+if values['ATRADE_TIMESCALEDB_PASSWORD'] != 'ATRADE_TIMESCALEDB_PASSWORD':
+    raise SystemExit('ATRADE_TIMESCALEDB_PASSWORD must stay an obvious fake local-dev placeholder')
+
 if any(token in 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
     raise SystemExit('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must remain a non-secret local port key')
+
+if any(token in 'ATRADE_POSTGRES_DATA_VOLUME' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
+    raise SystemExit('ATRADE_POSTGRES_DATA_VOLUME must remain a non-secret local Docker volume key')
+
+if any(token in 'ATRADE_TIMESCALEDB_DATA_VOLUME' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
+    raise SystemExit('ATRADE_TIMESCALEDB_DATA_VOLUME must remain a non-secret local Docker volume key')
+
+if re.fullmatch(r'(DU|U)\d+', values['ATRADE_POSTGRES_PASSWORD']):
+    raise SystemExit('ATRADE_POSTGRES_PASSWORD must not look like a broker account id')
+
+if re.fullmatch(r'(DU|U)\d+', values['ATRADE_TIMESCALEDB_PASSWORD']):
+    raise SystemExit('ATRADE_TIMESCALEDB_PASSWORD must not look like a broker account id')
 
 if values['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
     raise SystemExit('ATRADE_BROKER_INTEGRATION_ENABLED must remain false in committed defaults')

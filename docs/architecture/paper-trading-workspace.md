@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-30
+updated: 2026-05-01
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
@@ -131,10 +131,13 @@ Trending and candle requests initialize the Timescale schema idempotently, read
 fresh rows newer than `now - ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` before
 calling IBKR/iBeam, and return cache hits as the same provider-neutral payloads
 with source metadata such as `timescale-cache:ibkr-ibeam-history` or
-`timescale-cache:ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`. Missing or
-stale rows trigger the provider-backed scanner/historical-bar fetch, persist the
-provider response to TimescaleDB, and return the provider response; stale rows
-are not silently promoted to success when provider refresh fails. Indicator
+`timescale-cache:ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`. The AppHost
+`timescaledb` resource is backed by a named data volume, so those fresh rows can
+survive a full `start run` / AppHost stop-start cycle and serve the API after
+reboot without another provider call. Missing or stale rows trigger the
+provider-backed scanner/historical-bar fetch, persist the provider response to
+TimescaleDB, and return the provider response; stale rows are not silently
+promoted to success when provider refresh fails. Indicator
 requests reuse the cache-aware candle path before computing moving average, RSI,
 and MACD payloads for `1m`, `5m`, `1h`, and `1D`. The search endpoint remains
 provider-backed, enforces a minimum query length, stock-only asset class, and a
@@ -145,8 +148,10 @@ streaming layer for browsers and creates provider-backed snapshots when the
 IBKR/iBeam provider is available. The analysis endpoints resolve
 `IAnalysisEngineRegistry`; they return explicit `analysis-engine-not-configured`
 metadata when no engine is selected and run the configured LEAN provider over
-`IMarketDataService` candles when `ATRADE_ANALYSIS_ENGINE=Lean`; NATS remains
-the internal event backbone between API and workers.
+`IMarketDataService` candles when `ATRADE_ANALYSIS_ENGINE=Lean`; in Docker mode
+that provider uses the AppHost-managed `lean-engine` runtime and returns explicit
+`analysis-engine-unavailable` errors when the managed runtime is absent or
+unreachable. NATS remains the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -182,8 +187,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
 - `ATrade.Analysis.Lean` owns the first concrete analysis provider. It builds a
   temporary official-LEAN workspace from ATrade OHLCV bars, runs an
   analysis-only moving-average/backtest algorithm through the configured LEAN
-  CLI or Docker-backed runtime, parses provider-neutral signals/metrics, and
-  rejects brokerage/order-routing source tokens.
+  CLI or AppHost-managed Docker runtime (`lean-engine`), parses
+  provider-neutral signals/metrics, and rejects brokerage/order-routing source
+  tokens.
 - `ATrade.Workspaces` owns backend workspace preferences, including the current
   Postgres schema/repository for exact pinned watchlist instruments. Rows store
   a durable `instrument_key` / API `instrumentKey` and `pinKey` derived from the
@@ -274,7 +280,9 @@ source**:
 - `ATrade.Api` talks to `IMarketDataService` / `IMarketDataStreamingService`,
   which compose swappable provider contracts under `ATrade.MarketData`
 - HTTP trending, candle, and indicator requests read fresh provider-backed rows
-  from TimescaleDB before making a live IBKR/iBeam call
+  from the AppHost volume-backed TimescaleDB cache before making a live
+  IBKR/iBeam call, including after a full AppHost restart when the same
+  TimescaleDB data volume is reused
 - cache misses or stale rows refresh from the official IBKR Client Portal /
   iBeam APIs when the local paper iBeam session is configured and authenticated,
   then persist the provider response for later API reads
@@ -334,19 +342,28 @@ Postgres remains the canonical relational store for:
 - durable user workspace preferences
 - audit-friendly snapshots of broker/session capability state
 
-Current implementation note: pinned workspace watchlists are already stored in
-Postgres by `ATrade.Workspaces` under the AppHost-provided `postgres`
-connection string. Rows carry `user_id`, `workspace_id`, and a durable
-`instrument_key` primary key so duplicate same-symbol instruments can coexist
-when provider/market identity differs; until authentication and named workspaces
-exist, the API deliberately uses the temporary `local-user` / `paper-trading`
-identity seam documented in `LocalWorkspaceIdentityProvider`.
+Current implementation note: pinned workspace watchlists are stored in Postgres
+by `ATrade.Workspaces` under the AppHost-provided `postgres` connection string.
+The AppHost `postgres` resource uses a writable named data volume
+(`ATRADE_POSTGRES_DATA_VOLUME`, default `atrade-postgres-data`) plus a stable
+local-dev secret parameter (`ATRADE_POSTGRES_PASSWORD`) so rows survive a full
+`start run` / AppHost stop/start cycle, not just an API process restart. Rows
+carry `user_id`, `workspace_id`, and a durable `instrument_key` primary key so
+duplicate same-symbol instruments can coexist when provider/market identity
+differs; until authentication and named workspaces exist, the API deliberately
+uses the temporary `local-user` / `paper-trading` identity seam documented in
+`LocalWorkspaceIdentityProvider`.
 
 ### 6.2 TimescaleDB
 
-TimescaleDB stores time-series data needed by the workspace. The current
-foundation creates an `atrade_market_data` schema with hypertable-ready candle
-and scanner/trending snapshot tables for provider-backed market data:
+TimescaleDB stores time-series data needed by the workspace. The AppHost
+`timescaledb` resource uses a writable named data volume
+(`ATRADE_TIMESCALEDB_DATA_VOLUME`, default `atrade-timescaledb-data`) plus a
+stable local-dev secret parameter (`ATRADE_TIMESCALEDB_PASSWORD`) so
+provider-backed cache rows survive a full `start run` / AppHost stop-start cycle,
+not just an API process restart. The current foundation creates an
+`atrade_market_data` schema with hypertable-ready candle and scanner/trending
+snapshot tables for provider-backed market data:
 
 - historical OHLCV bars for charts, keyed by provider, source, symbol, timeframe,
   and candle timestamp
@@ -359,10 +376,14 @@ window for API cache-aside reads. The committed default is `30`, meaning
 `/api/market-data/trending`, `/api/market-data/{symbol}/candles`, and indicator
 requests may use provider-backed Timescale rows generated in the last 30 minutes
 before refreshing from the provider. Fresh hits are returned through
-`ATrade.Api` with `timescale-cache:{originalSource}` source metadata, missing or
-stale data refreshes from IBKR/iBeam and is persisted, and stale data is not
-presented as current when the refresh fails. The browser still reaches market
-data only through `ATrade.Api`; it never connects directly to TimescaleDB.
+`ATrade.Api` with `timescale-cache:{originalSource}` source metadata and can be
+served after an AppHost reboot without contacting IBKR/iBeam when the same
+TimescaleDB volume is reused. Missing or stale data refreshes from IBKR/iBeam
+and is persisted, and stale data is not presented as current when the refresh
+fails. Automated reboot tests use isolated temporary TimescaleDB volumes and do
+not remove the shared developer default cache volume. The browser still reaches
+market data only through `ATrade.Api`; it never connects directly to
+TimescaleDB.
 
 ### 6.3 Redis
 
@@ -425,22 +446,29 @@ machine changes:
 ### 7.3 Preference storage choice
 
 Durable watchlist preferences are now stored in **Postgres** as workspace-scoped
-settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. The
-frontend loads, pins, and unpins through the backend watchlist API, then updates
-its browser cache from the backend response. Search-result pins send the
-provider-neutral metadata returned by `GET /api/market-data/search`: provider,
-provider symbol id (IBKR `conid` today), optional `ibkrConid`, name, exchange,
-currency, and asset class. The backend normalizes those fields into a stable
-`instrumentKey`/`pinKey` tuple and uses it as the Postgres identity; pinning
-`AAPL` on NASDAQ and `AAPL` on LSE creates two rows, and unpinning one exact key
-must not remove the other. Legacy `DELETE /api/workspace/watchlist/{symbol}` is
-kept only for unambiguous symbol-only rows; exact removals use
+settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. Because
+the AppHost-managed Postgres data directory is backed by the named
+`ATRADE_POSTGRES_DATA_VOLUME` volume, pins survive full local application
+reboots that recreate the AppHost/Postgres container when the same volume and
+stable `ATRADE_POSTGRES_PASSWORD` value are reused. The frontend loads, pins,
+and unpins through the backend watchlist API, then updates its browser cache
+from the backend response. Search-result pins send the provider-neutral metadata
+returned by `GET /api/market-data/search`: provider, provider symbol id (IBKR
+`conid` today), optional `ibkrConid`, name, exchange, currency, and asset class.
+The backend normalizes those fields into a stable `instrumentKey`/`pinKey` tuple
+and uses it as the Postgres identity; pinning `AAPL` on NASDAQ and `AAPL` on LSE
+creates two rows, and unpinning one exact key must not remove the other. Legacy
+`DELETE /api/workspace/watchlist/{symbol}` is kept only for unambiguous
+symbol-only rows; exact removals use
 `DELETE /api/workspace/watchlist/pins/{instrumentKey}`. The `localStorage` key
 `atrade.paperTrading.watchlist.v1` is intentionally non-authoritative and
 symbol-only: it may seed a one-time manual-symbol migration into Postgres and
 may render a clearly labeled read-only cached snapshot when the backend/database
 is unavailable, but it must not be treated as saved state and must not contain
-secrets, broker account identifiers, provider ids, or tokens.
+secrets, broker account identifiers, provider ids, or tokens. Local cleanup is a
+manual developer action: stop AppHost first, then remove only a volume you own
+(for example an isolated test volume), never a shared/default volume that may
+contain desired watchlist state.
 
 ## 8. Charting Library Decision
 
@@ -539,9 +567,13 @@ When no provider is configured, those endpoints still return explicit
 `analysis-engine-not-configured` metadata rather than fake signals. When an
 ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
 LEAN provider and `POST /api/analysis/run` can fetch normalized candles through
-the cache-aware `IMarketDataService` before invoking LEAN. Runtime absence,
-timeout, or non-zero LEAN exits return `analysis-engine-unavailable` instead of
-successful synthetic results.
+the cache-aware `IMarketDataService` before invoking LEAN. CLI mode invokes the
+configured official `lean` command. Docker mode is AppHost-managed: the local
+Aspire graph shows `lean-engine`, bind-mounts the generated-workspace root, and
+passes container metadata to the API so execution uses `docker exec` against that
+resource. Runtime absence, missing managed-container metadata, missing Docker or
+image/container availability, timeout, parse failure, or non-zero LEAN exits
+return `analysis-engine-unavailable` instead of successful synthetic results.
 
 The architecture preserves provider-neutral market-data, analysis, and signal
 contracts:
@@ -585,6 +617,8 @@ family must expose only paper-safe placeholders:
 - `ATRADE_LEAN_WORKSPACE_ROOT`
 - `ATRADE_LEAN_TIMEOUT_SECONDS`
 - `ATRADE_LEAN_KEEP_WORKSPACE`
+- `ATRADE_LEAN_MANAGED_CONTAINER_NAME`
+- `ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT`
 
 Rules:
 
@@ -601,7 +635,9 @@ Rules:
 - AppHost passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to iBeam via secret
   parameters and never passes the paper account id to the container
 - LEAN placeholders are non-secret local runtime settings and stay disabled by
-  default with `ATRADE_ANALYSIS_ENGINE=none`
+  default with `ATRADE_ANALYSIS_ENGINE=none`; when Docker mode is selected, the
+  AppHost declares `lean-engine` and the managed container/workspace variables
+  must remain non-secret local runtime metadata
 - changing these variables must never create a live-trading or real-order path
 
 ## 12. Change Control

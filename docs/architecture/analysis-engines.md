@@ -99,8 +99,13 @@ integration approach is an official LEAN runtime process boundary:
    calculates a moving-average crossover signal set, risk/return metrics, and a
    backtest summary, and emits a single `ATRADE_ANALYSIS_RESULT:` JSON marker.
 3. `LeanRuntimeExecutor` invokes the configured official LEAN CLI command
-   (`lean backtest ...`) or the Docker-backed command wrapper when
-   `ATRADE_LEAN_RUNTIME_MODE=docker` is selected.
+   (`lean backtest ...`) when `ATRADE_LEAN_RUNTIME_MODE=cli` is selected. When
+   `ATRADE_LEAN_RUNTIME_MODE=docker` is selected through the AppHost contract,
+   Aspire declares a visible `lean-engine` container from
+   `ATRADE_LEAN_DOCKER_IMAGE`, mounts the shared LEAN workspace root, and passes
+   managed-container metadata into `ATrade.Api`; the executor then runs
+   `docker exec` against that managed container instead of silently starting a
+   separate hidden `docker run` container.
 4. `LeanAnalysisResultParser` maps the emitted marker into provider-neutral
    `AnalysisResult`, `AnalysisSignal`, `AnalysisMetric`, and `BacktestSummary`
    records.
@@ -124,19 +129,33 @@ ATRADE_LEAN_RUNTIME_MODE=cli
 ATRADE_LEAN_CLI_COMMAND=lean
 ATRADE_LEAN_DOCKER_COMMAND=docker
 ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation
-ATRADE_LEAN_WORKSPACE_ROOT=
+ATRADE_LEAN_WORKSPACE_ROOT=artifacts/lean-workspaces
 ATRADE_LEAN_TIMEOUT_SECONDS=45
 ATRADE_LEAN_KEEP_WORKSPACE=false
+ATRADE_LEAN_MANAGED_CONTAINER_NAME=atrade-lean-engine
+ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=/workspace
 ```
 
-To enable LEAN locally, copy `.env.template` to ignored
-`.env`, set `ATRADE_ANALYSIS_ENGINE=Lean`, install/configure the official LEAN
-CLI or a compatible Docker runtime, and adjust workspace/timeout values if
-needed. No LEAN setting may contain broker credentials or account identifiers.
+To enable LEAN locally, copy `.env.template` to ignored `.env` and set
+`ATRADE_ANALYSIS_ENGINE=Lean`. For CLI mode, keep
+`ATRADE_LEAN_RUNTIME_MODE=cli` and install/configure the official `lean` command
+(or point `ATRADE_LEAN_CLI_COMMAND` at it). For AppHost-managed Docker mode, set
+`ATRADE_LEAN_RUNTIME_MODE=docker`, keep or override
+`ATRADE_LEAN_DOCKER_IMAGE`, and start through `./start run`; the Aspire graph
+then shows a `lean-engine` resource and mounts `ATRADE_LEAN_WORKSPACE_ROOT` into
+that container at `ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT`. The API receives only
+these non-secret LEAN settings. If Docker mode is selected but the managed
+container metadata is absent, the container is not running, the Docker command is
+unavailable, or the runtime times out, `/api/analysis/run` returns HTTP 503 with
+`analysis-engine-unavailable`, empty signals/metrics, and no backtest summary.
+No LEAN setting may contain broker credentials or account identifiers.
 
 Automated tests do not require LEAN to be installed. Unit tests exercise the
-adapter through deterministic runtime fixtures; apphost verification reports a
-clean skip when the official CLI is unavailable.
+adapter through deterministic runtime fixtures; AppHost verification publishes
+LEAN-enabled manifests, verifies `GET /api/analysis/engines` from the AppHost
+configuration handoff, proves explicit unavailable failures, and reports a clean
+skip for the optional managed-runtime smoke when Docker or the configured image
+is unavailable.
 
 ## 6. Result Shape
 
@@ -178,14 +197,18 @@ in DI/configuration and `engineId`, not in endpoint paths or frontend type names
 The contract and LEAN provider are verified by:
 
 - `tests/ATrade.Analysis.Tests/` for core contract and fallback behavior
-- `tests/ATrade.Analysis.Lean.Tests/` for input conversion, option binding,
-  service registration, result parsing, timeout/error handling, and no-order
-  guardrails
+- `tests/ATrade.Analysis.Lean.Tests/` for input conversion, managed-runtime
+  option binding, CLI/managed-Docker command construction, service registration,
+  result parsing, timeout/error handling, and no-order guardrails
 - `tests/apphost/analysis-engine-contract-tests.sh` for provider-neutral API
   contract and no-engine HTTP behavior
 - `tests/apphost/lean-analysis-engine-tests.sh` for LEAN registration,
-  configuration placeholders, provider-neutral boundaries, optional runtime
-  skip behavior, and no trading side effects
+  managed-runtime configuration placeholders, provider-neutral boundaries,
+  optional runtime skip behavior, and no trading side effects
+- `tests/apphost/lean-aspire-runtime-tests.sh` for disabled-default AppHost
+  manifests, Docker-mode `lean-engine` manifest/resource assertions, API engine
+  discovery from AppHost handoff, explicit unavailable runtime responses, and
+  optional managed-runtime smoke skipping
 - `tests/apphost/frontend-trading-workspace-tests.sh` for analysis panel source
   markers in the paper-trading UI
 

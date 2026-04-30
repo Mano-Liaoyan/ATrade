@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-30
+updated: 2026-05-01
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker and market-data seams.
 see_also:
   - ../INDEX.md
@@ -39,7 +39,8 @@ see_also:
 > provider-neutral analysis engine seam, API-facing registry, normalized request/result shapes, engine/source
 > metadata, and no-configured-engine fallback. `ATrade.Analysis.Lean` now
 > implements LEAN as the first analysis engine provider behind that seam using
-> a generated analysis-only LEAN workspace and safe runtime-unavailable states.
+> a generated analysis-only LEAN workspace, AppHost-managed Docker metadata when
+> Docker mode is selected, and safe runtime-unavailable states.
 > `ATrade.Workspaces` owns the first backend-persisted
 > workspace preference: Postgres-backed exact instrument watchlists with stable
 > `instrumentKey`/`pinKey` payloads derived from provider, provider id / IBKR
@@ -68,8 +69,11 @@ see_also:
 > `/api/workspace/watchlist/{symbol}`, and `/hubs/market-data` while the worker limits itself to paper-safe
 > session/status monitoring. `/api/market-data/trending`, candle, and indicator
 > HTTP reads now use TimescaleDB first when rows are fresh under
-> `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`; misses or stale rows refresh from
-> IBKR/iBeam and persist the provider response before returning it.
+> `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`; because the AppHost `timescaledb`
+> resource is volume-backed, fresh cache rows can survive full local AppHost
+> reboots and serve `timescale-cache:*` responses without another provider call.
+> Misses or stale rows refresh from IBKR/iBeam and persist the provider response
+> before returning it.
 
 ## 1. How To Read This Document
 
@@ -107,15 +111,25 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.Api`, `ATrade.Ibkr.Worker`, and the bootstrap Next.js frontend home
   page; declares the four shared infrastructure resources; sends `api` the
   full backend infrastructure set; sends `ibkr-worker` its current
-  `Postgres` / `Redis` / `NATS` references; forwards the safe paper-mode IBKR/iBeam
-  environment contract to the API and worker through redacted Aspire parameters;
-  and only declares the optional `ibkr-gateway` `voyz/ibeam:latest` container when
-  broker integration is enabled and fake credential placeholders have been replaced
-  in ignored `.env`; the iBeam endpoint is modeled as HTTPS on the configured
-  host gateway port while targeting the container's fixed Client Portal port `5000`,
+  `Postgres` / `Redis` / `NATS` references; backs the primary `postgres` data
+  directory with the named `ATRADE_POSTGRES_DATA_VOLUME` volume and a stable
+  `ATRADE_POSTGRES_PASSWORD` secret parameter so workspace preferences survive
+  full local AppHost reboots; backs the `timescaledb` data directory with the
+  named `ATRADE_TIMESCALEDB_DATA_VOLUME` volume and stable
+  `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data cache rows
+  survive full local AppHost reboots; forwards the safe paper-mode IBKR/iBeam environment
+  contract to the API and worker through redacted Aspire parameters; and only
+  declares the optional `ibkr-gateway` `voyz/ibeam:latest` container when broker
+  integration is enabled and fake credential placeholders have been replaced in
+  ignored `.env`; the iBeam endpoint is modeled as HTTPS on the configured host
+  gateway port while targeting the container's fixed Client Portal port `5000`,
   with a read-only repo-local iBeam inputs mount for loopback/private Docker
   bridge callers — see `src/ATrade.AppHost/Program.cs` and
-  `src/ATrade.AppHost/ibeam-inputs/conf.yaml`.
+  `src/ATrade.AppHost/ibeam-inputs/conf.yaml`. It also reads the safe LEAN
+  runtime contract from the same local `.env`/`.env.template` source, forwards
+  LEAN settings into `api`, and declares the optional Aspire-visible
+  `lean-engine` container only when `ATRADE_ANALYSIS_ENGINE=Lean` and
+  `ATRADE_LEAN_RUNTIME_MODE=docker` are selected.
 - **First-phase focus:** Hosts the IBKR and Polygon integrations via the
   modules below.
 
@@ -178,7 +192,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, `ATrade.Analysis`,
   `ATrade.Analysis.Lean`, and `ATrade.Workspaces` today for functional behavior;
   the current AppHost graph also provides `Postgres`, `TimescaleDB`, `Redis`,
-  and `NATS` connection info. `Postgres` is consumed by `ATrade.Workspaces`
+  `NATS`, and optional LEAN Docker-mode environment handoff / workspace mapping
+  information. `Postgres` is consumed by `ATrade.Workspaces`
   now; the other infrastructure references remain ready for later slices.
 - **First-phase focus:** The backend now proves the paper-safe composition
   pattern: official IBKR session status, deterministic order simulation,
@@ -280,7 +295,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   indicator candle inputs; writes provider responses after cache misses or stale
   rows; returns cache hits with `timescale-cache:{originalSource}` source
   metadata; and falls back to provider behavior when Timescale storage is
-  unavailable.
+  unavailable. AppHost persists the `timescaledb` data directory in
+  `ATRADE_TIMESCALEDB_DATA_VOLUME` (default `atrade-timescaledb-data`) with a
+  stable `ATRADE_TIMESCALEDB_PASSWORD`, so fresh cache rows survive full local
+  AppHost restarts while stale rows still require provider refresh.
 - **Expected dependencies:** `ATrade.MarketData`, `TimescaleDB` via
   AppHost-provided `ConnectionStrings:timescaledb`, .NET configuration/DI
   abstractions, and `Npgsql`. The storage/repository layer intentionally does not
@@ -288,9 +306,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.MarketData.Ibkr`; only API composition wires the cache-aside decorator
   around the provider-backed service.
 - **First-phase focus:** Serve browser-facing market-data HTTP reads from fresh
-  persisted provider rows when available, refresh and persist IBKR/iBeam data on
-  miss/stale reads, and preserve safe provider-unavailable behavior when neither
-  fresh cache nor provider data is available.
+  persisted provider rows when available, including after AppHost reboot when
+  the rows remain inside the freshness window, refresh and persist IBKR/iBeam
+  data on miss/stale reads, and preserve safe provider-unavailable behavior when
+  neither fresh cache nor provider data is available.
 
 ### 2.8 `ATrade.Analysis` *(exists today, provider-neutral analysis engine seam)*
 
@@ -316,13 +335,18 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** LEAN adapter behind the provider-neutral analysis engine seam.
 - **Responsibilities:** Bind safe LEAN runtime options, generate temporary LEAN
   project workspaces from ATrade-normalized OHLCV bars, execute the configured
-  official LEAN CLI or Docker-backed runtime, parse the emitted analysis result
+  official LEAN CLI or the AppHost-managed Docker runtime (`lean-engine` via
+  `docker exec` with a shared workspace mount), parse the emitted analysis result
   marker, and return provider-neutral signals, metrics, and backtest summaries.
-  The generated algorithm is analysis-only and guardrails reject brokerage,
+  Docker mode without managed-container metadata, a missing container, runtime
+  timeouts, non-zero exits, and parse failures become explicit
+  `analysis-engine-unavailable` results rather than hidden fallback success. The
+  generated algorithm is analysis-only and guardrails reject brokerage,
   live-mode, order-placement, and ATrade order-endpoint calls.
 - **Expected dependencies:** `ATrade.Analysis`, `ATrade.MarketData`, .NET
-  hosting/configuration abstractions, and an optional local official LEAN CLI or
-  compatible Docker runtime selected through ignored `.env` values.
+  hosting/configuration abstractions, and either an optional local official LEAN
+  CLI or the AppHost-managed `lean-engine` container selected through ignored
+  `.env` values.
 - **First-phase focus:** Provide moving-average crossover analysis/backtest
   output over the same market-data-provider bars the API and frontend already
   use, while cleanly reporting runtime-unavailable/timeout states.
@@ -342,10 +366,14 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   temporary until authentication and named workspaces are introduced.
 - **Expected dependencies:** `Postgres` via the AppHost-provided
   `ConnectionStrings:postgres`, `Microsoft.Extensions.Configuration`,
-  `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. It is composed by
-  `ATrade.Api`; it does not call brokers or market-data providers directly.
+  `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. The AppHost-managed
+  Postgres data directory is volume-backed so these preferences survive full
+  local `start run` / AppHost restarts when the same volume and stable password
+  are reused. `ATrade.Workspaces` is composed by `ATrade.Api`; it does not call
+  brokers or market-data providers directly.
 - **First-phase focus:** Persist backend-owned exact stock/instrument watchlists
-  across API/server restarts while keeping symbol metadata provider-neutral.
+  across API/server restarts and full local AppHost reboots while keeping symbol
+  metadata provider-neutral.
 
 ### 2.10 `ATrade.Strategies` *(planned)*
 

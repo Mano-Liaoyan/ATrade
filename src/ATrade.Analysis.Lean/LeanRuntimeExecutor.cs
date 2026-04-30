@@ -74,25 +74,30 @@ public sealed class LeanRuntimeExecutor(
 
     private LeanRuntimeCommand BuildCommand(LeanRuntimeExecutionRequest request)
     {
-        var projectOutput = Path.GetRelativePath(request.WorkspacePath, request.OutputDirectory).Replace(Path.DirectorySeparatorChar, '/');
         if (options.RuntimeMode == LeanRuntimeMode.Docker)
         {
+            if (!options.UsesManagedDockerRuntime)
+            {
+                throw new LeanRuntimeUnavailableException(
+                    $"LEAN Docker mode requires the AppHost-managed runtime setting {LeanAnalysisEnvironmentVariables.ManagedContainerName}; start through AppHost with LEAN Docker mode enabled or use CLI mode.");
+            }
+
+            var workspacePath = MapHostPathToManagedContainerPath(request.WorkspacePath);
+            var outputDirectory = MapHostPathToManagedContainerPath(request.OutputDirectory);
+
             return new LeanRuntimeCommand(
                 options.DockerCommand,
                 new[]
                 {
-                    "run",
-                    "--rm",
-                    "-v",
-                    $"{request.WorkspacePath}:/workspace",
+                    "exec",
                     "-w",
-                    "/workspace",
-                    options.DockerImage,
+                    workspacePath,
+                    options.ManagedContainerName!,
                     options.CliCommand,
                     "backtest",
                     request.ProjectName,
                     "--output",
-                    $"/workspace/{projectOutput}",
+                    outputDirectory,
                 });
         }
 
@@ -106,6 +111,51 @@ public sealed class LeanRuntimeExecutor(
                 request.OutputDirectory,
             });
     }
+
+    private string MapHostPathToManagedContainerPath(string hostPath)
+    {
+        if (string.IsNullOrWhiteSpace(options.WorkspaceRoot))
+        {
+            throw new LeanRuntimeUnavailableException(
+                $"Managed LEAN Docker runtime requires {LeanAnalysisEnvironmentVariables.WorkspaceRoot} to map host workspaces into the container.");
+        }
+
+        var workspaceRoot = Path.GetFullPath(options.WorkspaceRoot);
+        var fullHostPath = Path.GetFullPath(hostPath);
+        var relativePath = Path.GetRelativePath(workspaceRoot, fullHostPath);
+
+        if (IsOutsideWorkspaceRoot(relativePath))
+        {
+            throw new LeanRuntimeUnavailableException(
+                $"Managed LEAN Docker runtime cannot execute workspace '{fullHostPath}' because it is outside the configured shared root '{workspaceRoot}'.");
+        }
+
+        if (string.Equals(relativePath, ".", StringComparison.Ordinal))
+        {
+            return options.ContainerWorkspaceRoot;
+        }
+
+        return CombineContainerPath(options.ContainerWorkspaceRoot, relativePath);
+    }
+
+    private static bool IsOutsideWorkspaceRoot(string relativePath) =>
+        Path.IsPathRooted(relativePath) ||
+        string.Equals(relativePath, "..", StringComparison.Ordinal) ||
+        relativePath.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal) ||
+        relativePath.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
+
+    private static string CombineContainerPath(string root, string relativePath)
+    {
+        var normalizedRoot = root.Replace('\\', '/').TrimEnd('/');
+        var normalizedRelativePath = ToContainerRelativePath(relativePath).TrimStart('/');
+        return string.IsNullOrWhiteSpace(normalizedRelativePath)
+            ? normalizedRoot
+            : $"{normalizedRoot}/{normalizedRelativePath}";
+    }
+
+    private static string ToContainerRelativePath(string path) => path
+        .Replace(Path.DirectorySeparatorChar, '/')
+        .Replace(Path.AltDirectorySeparatorChar, '/');
 
     private static async Task<string> CompleteReadAsync(Task<string> readTask)
     {

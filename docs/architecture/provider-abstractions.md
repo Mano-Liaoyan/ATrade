@@ -100,7 +100,9 @@ Core types:
   `pinKey` when a result is persisted. Other payloads include source metadata
   such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, scanner source ids, or
   `timescale-cache:{originalSource}` when a fresh persisted Timescale row serves
-  the API response. The Timescale persistence layer stores provider metadata
+  the API response, including after a full AppHost restart when the row remains
+  inside the configured freshness window on the volume-backed TimescaleDB data
+  directory. The Timescale persistence layer stores provider metadata
   generically as `provider`, `provider_symbol_id`, symbol, exchange, currency,
   asset class, source, and timestamps; it must not persist frontend-only or
   IBKR-only API types.
@@ -120,6 +122,9 @@ Compatibility layer:
   `MarketDataService` behind `IMarketDataService`, reads fresh Timescale rows
   before provider calls for trending/candle/indicator inputs, persists provider
   responses after cache misses, and preserves provider-neutral endpoint payloads.
+  AppHost supplies `ConnectionStrings:timescaledb` from a volume-backed
+  `timescaledb` resource so fresh persisted rows can survive full local AppHost
+  reboots without changing API/frontend payloads.
 
 Unavailable handling:
 
@@ -132,10 +137,10 @@ Unavailable handling:
   that already expose `MarketDataError`; provider tasks must not silently fall
   back to synthetic data when iBeam is unavailable.
 - Timescale cache-aside is allowed to return a fresh persisted response while the
-  provider is unavailable, because the payload is still within the configured
-  freshness window and its source is labeled as cache-backed. Stale or missing
-  rows must not be presented as successful fresh data when provider refresh
-  fails.
+  provider is unavailable, including after an AppHost reboot, because the payload
+  is still within the configured freshness window and its source is labeled as
+  cache-backed. Stale or missing rows must not be presented as successful fresh
+  data when provider refresh fails.
 
 ## 4. Analysis Engine Provider Family
 

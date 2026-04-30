@@ -10,4 +10,6 @@ public static class LeanAnalysisEnvironmentVariables
     public const string WorkspaceRoot = "ATRADE_LEAN_WORKSPACE_ROOT";
     public const string TimeoutSeconds = "ATRADE_LEAN_TIMEOUT_SECONDS";
     public const string KeepWorkspace = "ATRADE_LEAN_KEEP_WORKSPACE";
+    public const string ManagedContainerName = "ATRADE_LEAN_MANAGED_CONTAINER_NAME";
+    public const string ContainerWorkspaceRoot = "ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT";
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ATrade.Analysis;
 using ATrade.Analysis.Lean;
 using ATrade.MarketData;
@@ -37,6 +38,8 @@ public sealed class LeanAnalysisEngineTests
                 [LeanAnalysisEnvironmentVariables.WorkspaceRoot] = "/tmp/atrade-lean",
                 [LeanAnalysisEnvironmentVariables.TimeoutSeconds] = "12",
                 [LeanAnalysisEnvironmentVariables.KeepWorkspace] = "true",
+                [LeanAnalysisEnvironmentVariables.ManagedContainerName] = "atrade-lean-engine",
+                [LeanAnalysisEnvironmentVariables.ContainerWorkspaceRoot] = "workspace",
             })
             .Build();
 
@@ -49,6 +52,9 @@ public sealed class LeanAnalysisEngineTests
         Assert.Equal("/tmp/atrade-lean", options.WorkspaceRoot);
         Assert.Equal(TimeSpan.FromSeconds(12), options.Timeout);
         Assert.True(options.KeepWorkspace);
+        Assert.Equal("atrade-lean-engine", options.ManagedContainerName);
+        Assert.Equal("/workspace", options.ContainerWorkspaceRoot);
+        Assert.True(options.UsesManagedDockerRuntime);
     }
 
     [Fact]
@@ -81,6 +87,125 @@ public sealed class LeanAnalysisEngineTests
         Assert.Equal(LeanAnalysisOptions.EngineId, descriptor.Metadata.EngineId);
         Assert.True(descriptor.Capabilities.SupportsBacktests);
         Assert.True(descriptor.Capabilities.RequiresExternalRuntime);
+    }
+
+    [Fact]
+    public async Task RuntimeExecutorPreservesCliExecutionStrategy()
+    {
+        var command = CreateExecutableScript("printf '%s\\n' \"$@\"\n");
+        var root = Directory.CreateTempSubdirectory("atrade-lean-cli-");
+        var workspace = Path.Combine(root.FullName, "run-1");
+        var output = Path.Combine(workspace, "output");
+        Directory.CreateDirectory(output);
+        var executor = new LeanRuntimeExecutor(
+            new LeanAnalysisOptions
+            {
+                RuntimeMode = LeanRuntimeMode.Cli,
+                CliCommand = command,
+            },
+            NullLogger<LeanRuntimeExecutor>.Instance);
+
+        var result = await executor.ExecuteAsync(new LeanRuntimeExecutionRequest(
+            workspace,
+            LeanAnalysisWorkspaceFactory.ProjectName,
+            output,
+            TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(result.TimedOut);
+        Assert.Equal(
+            $"backtest\n{LeanAnalysisWorkspaceFactory.ProjectName}\n--output\n{output}\n",
+            result.StandardOutput.ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
+    public async Task RuntimeExecutorUsesManagedDockerExecWithSharedWorkspaceMapping()
+    {
+        var command = CreateExecutableScript("printf '%s\\n' \"$@\"\n");
+        var root = Directory.CreateTempSubdirectory("atrade-lean-managed-");
+        var workspace = Path.Combine(root.FullName, "run-1");
+        var output = Path.Combine(workspace, "output");
+        Directory.CreateDirectory(output);
+        var executor = new LeanRuntimeExecutor(
+            new LeanAnalysisOptions
+            {
+                RuntimeMode = LeanRuntimeMode.Docker,
+                DockerCommand = command,
+                CliCommand = "lean",
+                WorkspaceRoot = root.FullName,
+                ManagedContainerName = "atrade-lean-engine",
+                ContainerWorkspaceRoot = "/workspace",
+            },
+            NullLogger<LeanRuntimeExecutor>.Instance);
+
+        var result = await executor.ExecuteAsync(new LeanRuntimeExecutionRequest(
+            workspace,
+            LeanAnalysisWorkspaceFactory.ProjectName,
+            output,
+            TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(result.TimedOut);
+        Assert.Equal(
+            $"exec\n-w\n/workspace/run-1\natrade-lean-engine\nlean\nbacktest\n{LeanAnalysisWorkspaceFactory.ProjectName}\n--output\n/workspace/run-1/output\n",
+            result.StandardOutput.ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
+    public async Task RuntimeExecutorRejectsDockerModeWithoutManagedContainer()
+    {
+        var command = CreateExecutableScript("printf 'runtime should not be called'\n");
+        var root = Directory.CreateTempSubdirectory("atrade-lean-unmanaged-");
+        var workspace = Path.Combine(root.FullName, "run-1");
+        var output = Path.Combine(workspace, "output");
+        Directory.CreateDirectory(output);
+        var executor = new LeanRuntimeExecutor(
+            new LeanAnalysisOptions
+            {
+                RuntimeMode = LeanRuntimeMode.Docker,
+                DockerCommand = command,
+                WorkspaceRoot = root.FullName,
+            },
+            NullLogger<LeanRuntimeExecutor>.Instance);
+
+        var exception = await Assert.ThrowsAsync<LeanRuntimeUnavailableException>(() => executor.ExecuteAsync(new LeanRuntimeExecutionRequest(
+            workspace,
+            LeanAnalysisWorkspaceFactory.ProjectName,
+            output,
+            TimeSpan.FromSeconds(5))));
+
+        Assert.Contains(LeanAnalysisEnvironmentVariables.ManagedContainerName, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EngineReturnsUnavailableWhenManagedDockerContainerIsUnavailable()
+    {
+        var command = CreateExecutableScript("printf 'No such container: atrade-lean-engine\\n' >&2\nexit 1\n");
+        var root = Directory.CreateTempSubdirectory("atrade-lean-missing-container-");
+        var options = new LeanAnalysisOptions
+        {
+            SelectedAnalysisEngine = "Lean",
+            RuntimeMode = LeanRuntimeMode.Docker,
+            DockerCommand = command,
+            WorkspaceRoot = root.FullName,
+            ManagedContainerName = "atrade-lean-engine",
+            ContainerWorkspaceRoot = "/workspace",
+            Timeout = TimeSpan.FromSeconds(5),
+        };
+        var engine = new LeanAnalysisEngine(
+            options,
+            new LeanRuntimeExecutor(options, NullLogger<LeanRuntimeExecutor>.Instance),
+            new LeanAnalysisWorkspaceFactory(options),
+            NullLogger<LeanAnalysisEngine>.Instance);
+
+        var result = await engine.AnalyzeAsync(CreateRequest(barCount: 25));
+
+        Assert.Equal(AnalysisResultStatuses.Failed, result.Status);
+        Assert.Equal(AnalysisEngineErrorCodes.EngineUnavailable, result.Error?.Code);
+        Assert.Contains("No such container", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Signals);
+        Assert.Empty(result.Metrics);
+        Assert.Null(result.Backtest);
     }
 
     [Fact]
@@ -190,6 +315,36 @@ public sealed class LeanAnalysisEngineTests
         LeanAnalysisOptions.DefaultProvider,
         LeanAnalysisOptions.DefaultVersion,
         AnalysisEngineStates.Available);
+
+    private static string CreateExecutableScript(string body)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException("LEAN runtime executor command-construction tests require a Unix-like shell.");
+        }
+
+        var directory = Directory.CreateTempSubdirectory("atrade-lean-runtime-command-");
+        var path = Path.Combine(directory.FullName, "fake-runtime.sh");
+        File.WriteAllText(path, $"#!/usr/bin/env bash\nset -euo pipefail\n{body}");
+
+        var chmodStartInfo = new ProcessStartInfo
+        {
+            FileName = "chmod",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        chmodStartInfo.ArgumentList.Add("+x");
+        chmodStartInfo.ArgumentList.Add(path);
+        using var chmod = Process.Start(chmodStartInfo);
+        chmod?.WaitForExit();
+        if (chmod is null || chmod.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Failed to make fake runtime command executable at '{path}'.");
+        }
+
+        return path;
+    }
 
     private static AnalysisRequest CreateRequest(int barCount, bool reverseBars = false)
     {

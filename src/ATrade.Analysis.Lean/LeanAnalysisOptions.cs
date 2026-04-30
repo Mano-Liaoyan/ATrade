@@ -11,6 +11,8 @@ public sealed class LeanAnalysisOptions
     public const string DefaultCliCommand = "lean";
     public const string DefaultDockerCommand = "docker";
     public const string DefaultDockerImage = "quantconnect/lean:foundation";
+    public const string DefaultManagedContainerName = "atrade-lean-engine";
+    public const string DefaultContainerWorkspaceRoot = "/workspace";
     public const int DefaultTimeoutSeconds = 45;
 
     public string? SelectedAnalysisEngine { get; set; }
@@ -29,11 +31,19 @@ public sealed class LeanAnalysisOptions
 
     public bool KeepWorkspace { get; set; }
 
+    public string? ManagedContainerName { get; set; }
+
+    public string ContainerWorkspaceRoot { get; set; } = DefaultContainerWorkspaceRoot;
+
     public bool IsLeanSelected => string.Equals(SelectedAnalysisEngine, EngineId, StringComparison.OrdinalIgnoreCase)
         || string.Equals(SelectedAnalysisEngine, DefaultProvider, StringComparison.OrdinalIgnoreCase);
 
+    public bool UsesManagedDockerRuntime => RuntimeMode == LeanRuntimeMode.Docker && !string.IsNullOrWhiteSpace(ManagedContainerName);
+
     public string RuntimeDescription => RuntimeMode == LeanRuntimeMode.Docker
-        ? $"official LEAN container image '{DockerImage}' via {DockerCommand}"
+        ? UsesManagedDockerRuntime
+            ? $"Aspire-managed LEAN container '{ManagedContainerName}' using image '{DockerImage}' via {DockerCommand} exec"
+            : $"LEAN Docker mode without an AppHost-managed container"
         : $"official LEAN CLI command '{CliCommand}'";
 
     public static LeanAnalysisOptions FromConfiguration(IConfiguration configuration)
@@ -54,6 +64,9 @@ public sealed class LeanAnalysisOptions
         options.DockerCommand = NullIfWhiteSpace(configuration[LeanAnalysisEnvironmentVariables.DockerCommand]) ?? DefaultDockerCommand;
         options.DockerImage = NullIfWhiteSpace(configuration[LeanAnalysisEnvironmentVariables.DockerImage]) ?? DefaultDockerImage;
         options.WorkspaceRoot = NullIfWhiteSpace(configuration[LeanAnalysisEnvironmentVariables.WorkspaceRoot]);
+        options.ManagedContainerName = NullIfWhiteSpace(configuration[LeanAnalysisEnvironmentVariables.ManagedContainerName]);
+        options.ContainerWorkspaceRoot = NormalizeContainerWorkspaceRoot(
+            NullIfWhiteSpace(configuration[LeanAnalysisEnvironmentVariables.ContainerWorkspaceRoot]) ?? DefaultContainerWorkspaceRoot);
 
         var configuredTimeoutSeconds = configuration.GetValue<double?>(LeanAnalysisEnvironmentVariables.TimeoutSeconds);
         if (configuredTimeoutSeconds is > 0)
@@ -68,6 +81,19 @@ public sealed class LeanAnalysisOptions
         }
 
         return options;
+    }
+
+    private static string NormalizeContainerWorkspaceRoot(string value)
+    {
+        var trimmed = value.Trim().Replace('\\', '/').TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return DefaultContainerWorkspaceRoot;
+        }
+
+        return trimmed.StartsWith("/", StringComparison.Ordinal)
+            ? trimmed
+            : $"/{trimmed}";
     }
 
     private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value)
