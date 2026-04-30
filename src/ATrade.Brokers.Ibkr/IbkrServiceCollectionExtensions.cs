@@ -21,12 +21,12 @@ public static class IbkrServiceCollectionExtensions
         services.AddHttpClient<IIbkrGatewayClient, IbkrGatewayClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
-            client.Timeout = options.RequestTimeout;
-
-            if (options.GatewayBaseUrl is not null)
-            {
-                client.BaseAddress = options.GatewayBaseUrl;
-            }
+            IbkrGatewayTransport.ConfigureHttpClient(client, options);
+        })
+        .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
+            return IbkrGatewayTransport.CreateHttpMessageHandler(options);
         });
 
         return services;

@@ -62,11 +62,11 @@ public sealed class IbkrBrokerStatusService(
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Configured paper iBeam status endpoint is not reachable yet.");
+            logger.LogWarning(exception, "Configured paper iBeam status endpoint is not reachable over local HTTPS transport yet.");
             return IbkrBrokerStatus.IbeamContainerConfigured(
                 gatewayOptions,
                 capabilities,
-                "iBeam container configuration is present; waiting for the local iBeam auth status endpoint to become reachable.");
+                IbkrGatewayTransport.CreateTransportUnavailableMessage());
         }
         catch (Exception exception)
         {

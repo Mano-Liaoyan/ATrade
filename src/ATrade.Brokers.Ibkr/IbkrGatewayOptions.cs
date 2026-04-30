@@ -10,7 +10,7 @@ public sealed class IbkrGatewayOptions
 
     public IbkrAccountMode AccountMode { get; set; } = IbkrAccountMode.Paper;
 
-    public Uri? GatewayBaseUrl { get; set; } = new("http://127.0.0.1:5000", UriKind.Absolute);
+    public Uri? GatewayBaseUrl { get; set; } = IbkrGatewayTransport.DefaultGatewayBaseUri;
 
     public string? PaperAccountId { get; set; }
 
@@ -58,12 +58,6 @@ public sealed class IbkrGatewayOptions
             options.AccountMode = accountMode;
         }
 
-        if (configuredGatewayUrl is not null
-            && Uri.TryCreate(configuredGatewayUrl, UriKind.Absolute, out var gatewayBaseUrl))
-        {
-            options.GatewayBaseUrl = gatewayBaseUrl;
-        }
-
         if (configuredTimeoutSeconds is > 0)
         {
             options.RequestTimeout = TimeSpan.FromSeconds(configuredTimeoutSeconds.Value);
@@ -77,6 +71,19 @@ public sealed class IbkrGatewayOptions
         if (configuredGatewayPort is > 0)
         {
             options.GatewayContainer.Port = configuredGatewayPort.Value;
+        }
+
+        if (configuredGatewayUrl is not null)
+        {
+            options.GatewayBaseUrl = Uri.TryCreate(configuredGatewayUrl, UriKind.Absolute, out var gatewayBaseUrl)
+                ? IbkrGatewayTransport.NormalizeGatewayBaseUri(gatewayBaseUrl, options.GatewayContainer)
+                : null;
+        }
+        else
+        {
+            options.GatewayBaseUrl = IbkrGatewayTransport.NormalizeGatewayBaseUri(
+                IbkrGatewayTransport.CreateDefaultGatewayBaseUri(options.GatewayContainer.Port),
+                options.GatewayContainer);
         }
 
         return options;

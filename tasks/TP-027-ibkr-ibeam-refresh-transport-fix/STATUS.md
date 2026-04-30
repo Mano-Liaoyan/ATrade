@@ -1,6 +1,6 @@
 # TP-027: Fix authenticated iBeam refresh transport failures — Status
 
-**Current Step:** Step 0: Preflight and failure classification
+**Current Step:** Step 1: Implement the shared IBKR/iBeam transport fix
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -23,13 +23,13 @@
 ---
 
 ### Step 1: Implement the shared IBKR/iBeam transport fix
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Broker and market-data clients share corrected gateway transport configuration
-- [ ] Any self-signed certificate handling is local-loopback scoped and not global
-- [ ] AppHost endpoint metadata and committed template defaults align with actual iBeam transport behavior
-- [ ] Transport reset/scheme mismatch diagnostics are actionable and redacted
-- [ ] Targeted broker/market-data tests affected by transport changes pass
+- [x] Broker and market-data clients share corrected gateway transport configuration
+- [x] Any self-signed certificate handling is local-loopback scoped and not global
+- [x] AppHost endpoint metadata and committed template defaults align with actual iBeam transport behavior
+- [x] Transport reset/scheme mismatch diagnostics are actionable and redacted
+- [x] Targeted broker/market-data tests affected by transport changes pass
 
 ---
 
@@ -94,6 +94,10 @@
 | `tasks/CONTEXT.md` and `PLAN.md` still advertised `TP-026` as next while a `tasks/TP-026-*` packet already existed. | Task creator used the next unused ID (`TP-027`) and advanced tracking to `TP-028`. | `tasks/CONTEXT.md`, `PLAN.md` |
 | Current iBeam transport inventory: broker `IbkrGatewayOptions` defaults `GatewayBaseUrl` to `http://127.0.0.1:5000`; broker and market-data `AddHttpClient` registrations independently set `BaseAddress`/timeout from that option and do not share a handler/certificate policy; AppHost declares `ibkr-gateway` with an HTTP endpoint on the configured port and forwards `ATRADE_IBKR_GATEWAY_URL`/`PORT` to API and worker; `.env.template`, active startup docs, and apphost shell tests assert `http://127.0.0.1:5000`; `.env.example` is referenced by docs/tests but is absent in this lane; unit tests mostly use fake `https://gateway.paper.local` URLs. | Step 0 inventory recorded for transport fix; no ignored `.env` values read. | `src/ATrade.Brokers.Ibkr`, `src/ATrade.MarketData.Ibkr`, `src/ATrade.AppHost/Program.cs`, `.env.template`, `scripts/README.md`, `tests/apphost/*`, `tests/ATrade.*.Tests/*` |
 | Root cause classified as a transport scheme/TLS mismatch: authenticated `voyz/ibeam:latest` / Client Portal traffic is HTTPS on the local gateway port with a development/self-signed certificate, while the committed ATrade contract and observed backend request used plain HTTP to the same loopback port. That mismatch reaches the port but fails before auth readiness or market-data logic, producing empty-reply/reset-style transport exceptions. | Fix should move the shared gateway base URL to HTTPS and add narrowly scoped loopback iBeam certificate validation; no port-mapping or readiness race was identified as the primary issue. | `IbkrGatewayOptions`, `.env.template`, `scripts/README.md`, local TLS simulation |
+| Shared transport helper added: `IbkrGatewayTransport` normalizes local iBeam HTTP loopback URLs to HTTPS, centralizes `HttpClient` base-address/timeout configuration, and supplies the primary handler used by both `IIbkrGatewayClient` and `IIbkrMarketDataClient`. | Implemented in Step 1; broker, market-data, and AppHost projects build successfully after the change. | `src/ATrade.Brokers.Ibkr/IbkrGatewayTransport.cs`, `IbkrServiceCollectionExtensions.cs`, `IbkrMarketDataProvider.cs` |
+| Self-signed certificate handling is scoped to local iBeam HTTPS only: the handler accepts certificate errors only when the configured gateway and request URI are HTTPS loopback endpoints on the same port, the configured image is `voyz/ibeam:latest`, and the certificate is self-signed; arbitrary remote hosts and non-iBeam images keep default failure behavior for TLS errors. | Implemented in Step 1; focused regression tests will lock this down in Step 2. | `src/ATrade.Brokers.Ibkr/IbkrGatewayTransport.cs` |
+| AppHost/template transport defaults now use HTTPS for iBeam: the `ibkr-gateway` resource is declared with an HTTPS endpoint, `.env.template` defaults `ATRADE_IBKR_GATEWAY_URL` to `https://127.0.0.1:5000`, and `.env.example` was restored from the synchronized template. | Implemented in Step 1; shell contract tests will be updated in Step 2 for the new expected scheme. | `src/ATrade.AppHost/Program.cs`, `.env.template`, `.env.example` |
+| Transport diagnostics now avoid echoing exception text or configured gateway values for unreachable/reset cases and instead tell developers to verify local iBeam HTTPS transport, authentication, and retry; credential/account/session fields are still omitted from broker and market-data payloads. | Implemented in Step 1; redaction/safe-response tests will verify in Steps 2-4. | `IbkrBrokerStatusService.cs`, `IbkrMarketDataProvider.cs`, `IbkrGatewayTransport.cs` |
 
 ---
 
@@ -105,6 +109,9 @@
 | 2026-04-30 07:49 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-30 07:49 | Step 0 started | Preflight and failure classification |
 | 2026-04-30 | Step 0 complete | Sanitized failure recorded, transport inventory captured, TLS/scheme mismatch classified, and no-secret simulation/default-port probe recorded. |
+| 2026-04-30 | Step 1 started | Implement shared HTTPS/local-certificate iBeam transport behavior. |
+| 2026-04-30 | Step 1 targeted tests | `dotnet test tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (13/13) and `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (5/5). |
+| 2026-04-30 | Step 1 complete | Shared HTTPS transport, local iBeam certificate scoping, AppHost/template alignment, and safe diagnostics implemented. |
 
 ---
 
