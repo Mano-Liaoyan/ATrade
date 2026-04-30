@@ -1,5 +1,7 @@
+using ATrade.MarketData;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace ATrade.MarketData.Timescale;
@@ -17,6 +19,15 @@ public static class TimescaleMarketDataServiceCollectionExtensions
         services.AddSingleton<ITimescaleMarketDataDataSourceProvider>(_ => new TimescaleMarketDataDataSourceProvider(configuration));
         services.AddSingleton<ITimescaleMarketDataSchemaInitializer, TimescaleMarketDataSchemaInitializer>();
         services.AddSingleton<ITimescaleMarketDataRepository, TimescaleMarketDataRepository>();
+        return services;
+    }
+
+    public static IServiceCollection AddTimescaleMarketDataCacheAside(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IMarketDataService, TimescaleCachedMarketDataService>();
         return services;
     }
 }

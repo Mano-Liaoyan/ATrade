@@ -1,11 +1,11 @@
 # TP-030: Serve market data through TimescaleDB cache-aside — Status
 
-**Current Step:** Step 0: Dependency preflight and data-path plan
+**Current Step:** Step 1: Compose a cache-aware market-data service
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -22,13 +22,13 @@
 ---
 
 ### Step 1: Compose a cache-aware market-data service
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Timescale module registered in `ATrade.Api` using `ConnectionStrings:timescaledb`
-- [ ] Cache-aware `IMarketDataService` implementation/decorator added without endpoint provider coupling
-- [ ] Idempotent schema initialization and storage-unavailable behavior implemented
-- [ ] Freshness window read via typed options from `.env`/configuration
-- [ ] Targeted API/market-data build/tests run
+- [x] Timescale module registered in `ATrade.Api` using `ConnectionStrings:timescaledb`
+- [x] Cache-aware `IMarketDataService` implementation/decorator added without endpoint provider coupling
+- [x] Idempotent schema initialization and storage-unavailable behavior implemented
+- [x] Freshness window read via typed options from `.env`/configuration
+- [x] Targeted API/market-data build/tests run
 
 ---
 
@@ -107,6 +107,11 @@
 | Trending plan: query latest fresh snapshot by provider before any provider call, allowing source-agnostic repository reads so the cache can store the original provider source (`response.Source`) and return cached responses with source like `timescale-cache:{originalSource}`. On miss/stale data, call the provider-backed service, persist the full `TrendingSymbolsResponse` into Timescale, and return the provider response. If the provider is unavailable but a fresh cache exists, return the cache; if only stale/no cache exists, surface the provider-safe error. | Implementation plan for Step 2 cache-hit, miss, write-after-fetch, and unavailable semantics. | `src/ATrade.MarketData.Timescale/*`, `src/ATrade.MarketData/MarketDataService.cs` or cache-aware equivalent |
 | Candle/indicator plan: normalize supported timeframes, read fresh candle series by provider/symbol/timeframe before provider calls, return cached candles with `timescale-cache:{originalSource}` source, and on miss/stale fetch provider candles, persist them, and return the provider response. Indicators should call the cache-aware candle path and calculate with `IndicatorService`, so fresh cached candles serve indicators after restart and cache misses fetch/persist candles once. Unsupported symbol/timeframe and provider-unavailable errors remain provider-safe; stale rows are never returned as fresh after a failed refresh. | Implementation plan for Step 3 candle and indicator cache-aside semantics. | `src/ATrade.MarketData.Timescale/*`, `src/ATrade.MarketData/IndicatorService.cs` only if needed |
 | Source/identity caveat: current endpoint payloads do not carry provider symbol ids for candles/trending, so TP-030 should persist provider-neutral identity using provider name, symbol, optional metadata, and original response source; richer provider-symbol identity can be future work rather than blocking cache-aside behavior. | Records future-work boundary before endpoint behavior changes. | `src/ATrade.MarketData/MarketDataModels.cs`, `src/ATrade.MarketData.Timescale/TimescaleMarketDataModels.cs` |
+| `ATrade.Api` now references `ATrade.MarketData.Timescale` and calls `AddTimescaleMarketDataPersistence(builder.Configuration)`, which uses the TP-029 default `ConnectionStrings:timescaledb` guardrail. | Step 1 API registration item complete; compile verification remains in Step 1 targeted tests. | `src/ATrade.Api/ATrade.Api.csproj`, `src/ATrade.Api/Program.cs` |
+| Added `TimescaleCachedMarketDataService` as a provider-neutral `IMarketDataService` decorator over the concrete provider-backed `MarketDataService`; `ATrade.Api` only resolves `IMarketDataService`, and no endpoint handler gained provider-specific database/provider logic. `dotnet build src/ATrade.Api/ATrade.Api.csproj --nologo --verbosity minimal` succeeded after registration. | Step 1 cache-aware composition item complete; route-level cache-hit semantics are covered by later Step 2/3 items. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `src/ATrade.MarketData/MarketDataModuleServiceCollectionExtensions.cs`, `src/ATrade.Api/Program.cs` |
+| `TimescaleCachedMarketDataService` initializes schema once via a guarded semaphore before cache reads/writes, retries after failed initialization, and catches `TimescaleMarketDataStorageUnavailableException` so storage outages skip cache reads/writes while provider responses/errors continue to flow. | Step 1 schema/unavailable item complete; later tests exercise cache and fallback paths. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs` |
+| Freshness is consumed through the typed `TimescaleMarketDataOptions` singleton created by `AddTimescaleMarketDataPersistence`; cache reads compute `timeProvider.GetUtcNow() - options.CacheFreshnessPeriod`, preserving the TP-029 `.env`/configuration override for `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`. | Step 1 freshness option item complete. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataServiceCollectionExtensions.cs`, `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs` |
+| Targeted Step 1 verification passed: `dotnet build src/ATrade.Api/ATrade.Api.csproj --nologo --verbosity minimal` succeeded, and `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed 20/20. | Step 1 targeted build/tests complete. | `src/ATrade.Api/ATrade.Api.csproj`, `tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj` |
 
 ---
 
@@ -121,6 +126,13 @@
 | 2026-04-30 16:32 | TP-029 dependency confirmed | TP-029 STATUS is complete; Timescale test project passed 20/20 and exposes schema, repository, connection, unavailable-state, and freshness option contracts. |
 | 2026-04-30 16:33 | Cache-aside plan recorded | Documented Timescale-first/decorator composition, source-agnostic fresh reads, provider miss writes, indicator reuse of cached candles, storage-unavailable fallback, and stale-data rejection. |
 | 2026-04-30 16:33 | Step 0 completed | Dependencies and data-path plan confirmed before endpoint behavior changes. |
+| 2026-04-30 16:34 | Step 1 started | Compose Timescale module, cache-aware service, schema initialization, freshness options, and targeted composition tests. |
+| 2026-04-30 16:35 | Timescale API registration added | API project references Timescale persistence module and registers it from configuration using the default `timescaledb` connection name. |
+| 2026-04-30 16:38 | Cache-aware service decorator added | `TimescaleCachedMarketDataService` composes provider-backed `MarketDataService`, Timescale repository/initializer/options, and is registered as the final API `IMarketDataService`; API project build succeeded. |
+| 2026-04-30 16:39 | Schema initialization/fallback implemented | Cache service now initializes Timescale schema idempotently before reads/writes and falls back to provider behavior when Timescale storage is unavailable. |
+| 2026-04-30 16:39 | Freshness option wired | Cache service now uses typed Timescale options for freshness cutoffs, preserving `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` configuration. |
+| 2026-04-30 16:54 | Worker iter 1 | done in 1468s, tools: 77 |
+| 2026-04-30 17:04 | Step 1 targeted verification passed | API project build succeeded and Timescale market-data tests passed 20/20. |
 
 ---
 
