@@ -1,7 +1,7 @@
 # TP-032: Make Aspire dashboard port configurable from .env — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 1
 **Review Counter:** 0
@@ -70,11 +70,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged with variable name, default behavior, and OTLP decision
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged with variable name, default behavior, and OTLP decision
 
 ---
 
@@ -92,6 +92,7 @@
 | Dashboard UI port variable will be `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`. | Use as the committed `.env.template` non-secret setting and parse it through the local port contract. | Step 0 |
 | OTLP dashboard endpoint remains `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`. | Do not add a second `.env` variable unless tests/runtime evidence later proves it is required. | Step 0 |
 | Dashboard UI default will be `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=0`. | Preserves current ephemeral loopback dashboard binding and allows ignored `.env` to opt into a fixed non-zero local port. | Step 0 |
+| Final dashboard port contract: `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` controls only the human-facing dashboard UI, defaults to `0`, and leaves OTLP on `http://127.0.0.1:0`. | Implemented in `.env.template`, local port contract parsing, Unix/PowerShell wrappers, tests, and docs. | Step 5 |
 
 ---
 
@@ -118,6 +119,10 @@
 | 2026-04-30 | Verification | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed (91 tests). |
 | 2026-04-30 | Verification | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings and 0 errors. |
 | 2026-04-30 | Verification | No unexpected failures observed; no pre-existing failures required documentation. |
+| 2026-04-30 | Step 5 started | Documentation and delivery review started. |
+| 2026-04-30 | Documentation | `scripts/README.md`, `README.md`, and `docs/architecture/overview.md` reviewed/updated; `docs/INDEX.md` unchanged because no new active docs were introduced. |
+| 2026-04-30 | Step 5 complete | Final variable/default/OTLP discoveries logged and task marked complete. |
+| 2026-04-30 | Documentation verification | `bash tests/start-contract/start-wrapper-tests.sh` and `bash tests/apphost/paper-trading-config-contract-tests.sh` passed after documentation updates. |
 
 ---
 

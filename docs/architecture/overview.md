@@ -103,7 +103,10 @@ supported platform:
 
 All three wrappers must resolve to the same behavior: launch the Aspire
 AppHost located under `src/ATrade.AppHost`. The AppHost is the only place
-that knows how to wire processes to infrastructure.
+that knows how to wire processes to infrastructure. The human-facing Aspire
+dashboard UI keeps the safe ephemeral loopback default (`0`) unless ignored
+`.env` sets `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` to a non-zero fixed local port;
+the dashboard OTLP endpoint remains ephemeral.
 
 Reserved-but-not-yet-implemented subcommands (`test`, `build`, `lint`,
 `fmt`, `agents:dispatch`, `plans:check`, `docs:check`) are enumerated in

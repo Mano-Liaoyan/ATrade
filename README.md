@@ -41,7 +41,10 @@ The repository-wide startup contract is the repo-local `start` shim:
 - Windows Command Prompt: `./start.cmd run`
 
 All variants delegate to the Aspire AppHost so one command can bring up the
-API, worker, frontend, and local infrastructure.
+API, worker, frontend, and local infrastructure. Local bind-port overrides,
+including the optional fixed Aspire dashboard UI port
+(`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback), are
+kept in ignored `.env` and documented in `scripts/README.md`.
 
 ## Current Runtime Surface
 
