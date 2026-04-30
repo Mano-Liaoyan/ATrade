@@ -1,11 +1,11 @@
 # TP-027: Fix authenticated iBeam refresh transport failures — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Preflight and failure classification
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,12 +13,12 @@
 ---
 
 ### Step 0: Preflight and failure classification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Sanitized user-observed failure recorded without secrets/session values
-- [ ] Gateway URL scheme/port handling inventoried across code, templates, docs, and tests
-- [ ] Root cause classified as transport scheme/TLS/certificate, readiness/race, port mapping, or another issue
-- [ ] Real-runtime reproduction performed with redacted output, or automated simulation/skip rationale recorded
+- [x] Sanitized user-observed failure recorded without secrets/session values
+- [x] Gateway URL scheme/port handling inventoried across code, templates, docs, and tests
+- [x] Root cause classified as transport scheme/TLS/certificate, readiness/race, port mapping, or another issue
+- [x] Real-runtime reproduction performed with redacted output, or automated simulation/skip rationale recorded
 
 ---
 
@@ -92,6 +92,8 @@
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
 | `tasks/CONTEXT.md` and `PLAN.md` still advertised `TP-026` as next while a `tasks/TP-026-*` packet already existed. | Task creator used the next unused ID (`TP-027`) and advanced tracking to `TP-028`. | `tasks/CONTEXT.md`, `PLAN.md` |
+| Current iBeam transport inventory: broker `IbkrGatewayOptions` defaults `GatewayBaseUrl` to `http://127.0.0.1:5000`; broker and market-data `AddHttpClient` registrations independently set `BaseAddress`/timeout from that option and do not share a handler/certificate policy; AppHost declares `ibkr-gateway` with an HTTP endpoint on the configured port and forwards `ATRADE_IBKR_GATEWAY_URL`/`PORT` to API and worker; `.env.template`, active startup docs, and apphost shell tests assert `http://127.0.0.1:5000`; `.env.example` is referenced by docs/tests but is absent in this lane; unit tests mostly use fake `https://gateway.paper.local` URLs. | Step 0 inventory recorded for transport fix; no ignored `.env` values read. | `src/ATrade.Brokers.Ibkr`, `src/ATrade.MarketData.Ibkr`, `src/ATrade.AppHost/Program.cs`, `.env.template`, `scripts/README.md`, `tests/apphost/*`, `tests/ATrade.*.Tests/*` |
+| Root cause classified as a transport scheme/TLS mismatch: authenticated `voyz/ibeam:latest` / Client Portal traffic is HTTPS on the local gateway port with a development/self-signed certificate, while the committed ATrade contract and observed backend request used plain HTTP to the same loopback port. That mismatch reaches the port but fails before auth readiness or market-data logic, producing empty-reply/reset-style transport exceptions. | Fix should move the shared gateway base URL to HTTPS and add narrowly scoped loopback iBeam certificate validation; no port-mapping or readiness race was identified as the primary issue. | `IbkrGatewayOptions`, `.env.template`, `scripts/README.md`, local TLS simulation |
 
 ---
 
@@ -100,6 +102,9 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-30 07:49 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-30 07:49 | Step 0 started | Preflight and failure classification |
+| 2026-04-30 | Step 0 complete | Sanitized failure recorded, transport inventory captured, TLS/scheme mismatch classified, and no-secret simulation/default-port probe recorded. |
 
 ---
 
@@ -112,3 +117,7 @@
 ## Notes
 
 User-observed failure summary for implementer: refreshing IBKR market data in Aspire caused `GET /api/market-data/trending` to return 503 after both `IIbkrMarketDataClient` and `IIbkrGatewayClient` attempted `GET http://127.0.0.1:<gateway-port>/v1/api/iserver/auth/status` and hit `Connection reset by peer`, while iBeam reported the gateway was running/authenticated. Session/account details from the user log were intentionally omitted.
+
+Step 0 sanitized failure evidence: reviewed PROMPT/STATUS and retained only endpoint path, loopback host placeholder, exception family, and high-level iBeam authenticated/running state; no raw credentials, session ids, cookies, account ids, tokens, or ignored `.env` values were read or recorded.
+
+Step 0 real-runtime/simulation note: a no-secret probe against the default loopback gateway port (`http://127.0.0.1:5000/...` and `https://127.0.0.1:5000/...` with response bodies discarded) found no local listener (`curl exit=7` for both), so no real iBeam session was exercised. An automated local TLS simulation using a temporary self-signed certificate showed plain HTTP to a TLS-only loopback port returns an empty reply/reset-style transport failure, while `https://127.0.0.1:<temp-port>/...` with local certificate trust reaches an HTTPS response. This supports the HTTP-vs-HTTPS/TLS classification without real credentials.
