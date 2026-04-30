@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { getWatchlistPinKey, type WatchlistSymbol } from '../lib/watchlistClient';
 import type { TrendingSymbol } from '../types/marketData';
+import { MarketLogo } from './MarketLogo';
 
 type WatchlistProps = {
   symbols: WatchlistSymbol[];
@@ -72,17 +73,21 @@ export function Watchlist({
             const provider = watchlistSymbol.provider === 'ibkr' ? 'IBKR' : watchlistSymbol.provider;
             const currency = watchlistSymbol.currency ? ` · ${watchlistSymbol.currency}` : '';
             const assetClass = watchlistSymbol.assetClass ? ` · ${watchlistSymbol.assetClass}` : '';
-            const providerId = watchlistSymbol.providerSymbolId ? ` · ID ${watchlistSymbol.providerSymbolId}` : '';
+            const providerId = formatProviderId(watchlistSymbol.provider, watchlistSymbol.providerSymbolId);
             const pinKey = getWatchlistPinKey(watchlistSymbol);
             const isSaving = savingPinKey === pinKey;
+            const marketLabel = exchange ? `Market ${exchange}` : 'Market unknown';
 
             return (
-              <li key={pinKey} aria-label={`${watchlistSymbol.symbol} ${exchange ?? ''} ${provider}`}>
+              <li key={pinKey} aria-label={`${watchlistSymbol.symbol} ${marketLabel} ${provider}`}>
                 <div>
                   <Link className="symbol-link" href={`/symbols/${encodeURIComponent(watchlistSymbol.symbol)}`}>
                     {watchlistSymbol.symbol}
                   </Link>
-                  <p>{exchange ? `${name} · ${exchange} · ${provider}${currency}${assetClass}${providerId}` : `${name} · ${provider}${currency}${assetClass}${providerId}`}</p>
+                  <div className="instrument-identity-row">
+                    <MarketLogo exchange={exchange} provider={watchlistSymbol.provider} compact />
+                    <p>{exchange ? `${name} · Market ${exchange} · Provider ${provider}${currency}${assetClass}${providerId}` : `${name} · Provider ${provider}${currency}${assetClass}${providerId}`}</p>
+                  </div>
                 </div>
                 <button
                   className="text-button"
@@ -99,4 +104,12 @@ export function Watchlist({
       ) : null}
     </section>
   );
+}
+
+function formatProviderId(provider: string, providerSymbolId: string | null): string {
+  if (!providerSymbolId) {
+    return '';
+  }
+
+  return provider.toLowerCase() === 'ibkr' ? ` · IBKR conid ${providerSymbolId}` : ` · ${provider.toUpperCase()} ID ${providerSymbolId}`;
 }

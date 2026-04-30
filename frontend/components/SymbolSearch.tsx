@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { searchSymbols } from '../lib/marketDataClient';
 import { createWatchlistInstrumentKey, normalizeWatchlistAssetClass } from '../lib/watchlistClient';
 import type { MarketDataSymbolSearchResult } from '../types/marketData';
+import { MarketLogo } from './MarketLogo';
 
 type SymbolSearchProps = {
   title?: string;
@@ -141,21 +142,29 @@ export function SymbolSearch({
             const symbol = getResultSymbol(result);
             const provider = result.provider || result.identity.provider;
             const providerSymbolId = result.providerSymbolId ?? result.identity.providerSymbolId;
+            const exchange = result.exchange || result.identity.exchange;
+            const currency = result.currency || result.identity.currency;
+            const assetClass = result.assetClass || result.identity.assetClass;
             const pinKey = createSearchResultPinKey(result);
             const pinned = pinnedSet.has(pinKey);
             const isSaving = savingPinKey === pinKey;
+            const providerIdLabel = formatProviderId(provider, providerSymbolId);
+            const accessibleLabel = `${symbol} ${result.name} on ${exchange}, ${currency}, ${formatAssetClass(assetClass)}, ${provider.toUpperCase()}${providerIdLabel ? `, ${providerIdLabel}` : ''}`;
 
             return (
-              <li key={pinKey} aria-label={`${symbol} ${result.name} on ${result.exchange || result.identity.exchange}`}>
+              <li key={pinKey} aria-label={accessibleLabel}>
                 <div>
                   <Link className="symbol-link" href={`/symbols/${encodeURIComponent(symbol)}`}>
                     {symbol}
                   </Link>
                   <p>{result.name}</p>
-                  <span className="symbol-search-meta">
-                    {formatAssetClass(result.assetClass)} · {result.exchange} · {result.currency} · {provider.toUpperCase()}
-                    {providerSymbolId ? ` · ID ${providerSymbolId}` : ''}
-                  </span>
+                  <div className="instrument-identity-row">
+                    <MarketLogo exchange={exchange} provider={provider} compact />
+                    <span className="symbol-search-meta">
+                      Provider {provider.toUpperCase()} · Market {exchange} · {currency} · {formatAssetClass(assetClass)}
+                      {providerIdLabel ? ` · ${providerIdLabel}` : ''}
+                    </span>
+                  </div>
                 </div>
                 <div className="symbol-search-actions">
                   <Link className="open-chart-link" href={`/symbols/${encodeURIComponent(symbol)}`}>
@@ -206,6 +215,14 @@ function parseIbkrConid(provider: string, providerSymbolId: string | null): numb
   }
 
   return Number(providerSymbolId);
+}
+
+function formatProviderId(provider: string, providerSymbolId: string | null): string {
+  if (!providerSymbolId) {
+    return '';
+  }
+
+  return provider.toLowerCase() === 'ibkr' ? `IBKR conid ${providerSymbolId}` : `${provider.toUpperCase()} ID ${providerSymbolId}`;
 }
 
 function formatAssetClass(assetClass: string): string {

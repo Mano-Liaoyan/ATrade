@@ -1,6 +1,6 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Step 2: Update frontend pin state to use exact instrument identity
+**Current Step:** Step 3: Show market/exchange logos and explicit market metadata in search
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -46,13 +46,13 @@
 ---
 
 ### Step 3: Show market/exchange logos and explicit market metadata in search
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Local market/exchange logo or badge component added
-- [ ] Search results render provider, exchange/market, currency, asset class, and provider id/conid when available
-- [ ] Duplicate-name/symbol results use unique keys and accessible market labels
-- [ ] Saved watchlist renders market identity after restart
-- [ ] Frontend source/runtime tests updated
+- [x] Local market/exchange logo or badge component added
+- [x] Search results render provider, exchange/market, currency, asset class, and provider id/conid when available
+- [x] Duplicate-name/symbol results use unique keys and accessible market labels
+- [x] Saved watchlist renders market identity after restart
+- [x] Frontend source/runtime tests updated
 
 ---
 
@@ -133,6 +133,12 @@
 | 2026-04-30 16:42 | Frontend exact removal wired | Toggle/remove actions call `unpinWatchlistInstrument` with `pinKey`/`instrumentKey`; symbol-only unpin remains only as defensive fallback. |
 | 2026-04-30 16:43 | localStorage kept non-authoritative | Storage helper is documented as legacy symbol-only; cached symbols migrate as manual instrument keys only and remain read-only when backend watchlist calls fail. |
 | 2026-04-30 16:45 | Frontend build | Initial `npm run build` failed because `next` was not installed in the worktree; after `cd frontend && npm ci`, `npm run build` passed. |
+| 2026-04-30 16:46 | Step 3 started | Market/exchange badge UI and explicit search/watchlist metadata. |
+| 2026-04-30 16:50 | Market badge component added | Added local `MarketLogo` badge component and CSS for NASDAQ, NYSE/ARCA, LSE, TSX/TSE, HKEX, SMART/IBKR, and fallback market badges. |
+| 2026-04-30 16:53 | Search metadata rendered | Search result rows now show local market badge plus provider, market/exchange, currency, asset class, and IBKR conid/provider id text. |
+| 2026-04-30 16:54 | Duplicate result accessibility hardened | Search and watchlist list items now key by exact instrument key and include market/provider identity in `aria-label` text. |
+| 2026-04-30 16:55 | Saved watchlist market identity rendered | Backend-loaded watchlist rows display market badge, `Market <exchange>`, provider, currency, asset class, and provider id/conid metadata; this uses persisted API fields after restart. |
+| 2026-04-30 17:02 | Frontend tests updated and run | Updated apphost frontend/search assertions for `MarketLogo`, exact keys, and conid metadata; `cd frontend && npm run build`, `bash tests/apphost/frontend-trading-workspace-tests.sh`, and `bash tests/apphost/ibkr-symbol-search-tests.sh` passed. |
 
 ---
 
