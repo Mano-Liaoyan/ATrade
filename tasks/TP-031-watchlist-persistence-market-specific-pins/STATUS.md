@@ -1,6 +1,6 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Step 1: Make backend watchlist persistence durable and instrument-specific
+**Current Step:** Step 2: Update frontend pin state to use exact instrument identity
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -35,13 +35,13 @@
 ---
 
 ### Step 2: Update frontend pin state to use exact instrument identity
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `watchlistClient` types/helpers carry backend instrument key/provider-market identity
-- [ ] `TradingWorkspace`, `SymbolSearch`, `TrendingList`, and `Watchlist` use exact keys for pinned/saving state
-- [ ] Removal actions use exact unpin path where possible
-- [ ] localStorage remains legacy/manual/non-authoritative only
-- [ ] Frontend build or targeted tests run
+- [x] `watchlistClient` types/helpers carry backend instrument key/provider-market identity
+- [x] `TradingWorkspace`, `SymbolSearch`, `TrendingList`, and `Watchlist` use exact keys for pinned/saving state
+- [x] Removal actions use exact unpin path where possible
+- [x] localStorage remains legacy/manual/non-authoritative only
+- [x] Frontend build or targeted tests run
 
 ---
 
@@ -127,6 +127,12 @@
 | 2026-04-30 16:25 | Restart persistence root cause verified | Baseline restart script passed in Step 0; backend remains Postgres-authoritative with 503 storage errors, and schema migration preserves rows while moving persistence identity from symbol PK to instrument key. |
 | 2026-04-30 16:26 | Targeted Workspaces tests | `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj --nologo --verbosity minimal` passed: 23 tests. |
 | 2026-04-30 16:27 | API compile check | `dotnet build src/ATrade.Api/ATrade.Api.csproj --nologo --verbosity minimal` passed with 0 warnings/errors. |
+| 2026-04-30 16:28 | Step 2 started | Frontend exact instrument-key state implementation. |
+| 2026-04-30 16:40 | Frontend watchlist identity helpers added | `watchlistClient` types include `instrumentKey`/`pinKey`; helpers now compute backend-compatible provider-market keys and call the exact unpin route. |
+| 2026-04-30 16:41 | Frontend pin state moved off symbols | `TradingWorkspace`, `SymbolSearch`, `TrendingList`, and `Watchlist` now compare pinned/saving state by exact instrument keys instead of uppercased symbol strings. |
+| 2026-04-30 16:42 | Frontend exact removal wired | Toggle/remove actions call `unpinWatchlistInstrument` with `pinKey`/`instrumentKey`; symbol-only unpin remains only as defensive fallback. |
+| 2026-04-30 16:43 | localStorage kept non-authoritative | Storage helper is documented as legacy symbol-only; cached symbols migrate as manual instrument keys only and remain read-only when backend watchlist calls fail. |
+| 2026-04-30 16:45 | Frontend build | Initial `npm run build` failed because `next` was not installed in the worktree; after `cd frontend && npm ci`, `npm run build` passed. |
 
 ---
 
