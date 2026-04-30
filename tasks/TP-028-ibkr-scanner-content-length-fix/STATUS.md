@@ -1,7 +1,7 @@
 # TP-028: Fix IBKR scanner 411 Length Required for trending — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged with root cause, coverage, and real-runtime verification/skip rationale
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged with root cause, coverage, and real-runtime verification/skip rationale
 
 ---
 
@@ -97,6 +97,9 @@
 | A fake authenticated HTTPS iBeam server in `market-data-feature-tests.sh` returns auth-ready, scanner, and snapshot payloads; the API returns frontend-compatible `TrendingSymbolsResponse` JSON with AAPL scanner source metadata and no credential leakage. | Fake authenticated `/api/market-data/trending` flow verified by apphost script (`SCRIPT_EXIT:0`). | `tests/apphost/market-data-feature-tests.sh` |
 | Optional real iBeam smoke check skipped in this orchestrated lane because it would require ignored local `.env` credentials and an already authenticated interactive Client Portal/iBeam session; automated fake HTTPS iBeam coverage verifies the previous `411` request-shape failure without secrets. | Record skip; no real credentials were read or printed. | Step 3 verification |
 | Frontend market-data error copy already formats `provider-not-configured`, `provider-unavailable`, and `authentication-required` safe API errors and displays retryable IBKR market-data unavailable messaging; no frontend copy/source changes were needed for the backend request-shape fix. | No frontend files changed. | `frontend/lib/marketDataClient.ts`, `frontend/components/TradingWorkspace.tsx` |
+| Must-update docs now describe the scanner request/body-length contract and `/api/market-data/trending` `411 Length Required` fix. | Updated provider contract and workspace troubleshooting/runtime language. | `docs/architecture/provider-abstractions.md`, `docs/architecture/paper-trading-workspace.md` |
+| Check-if-affected docs reviewed: module boundaries did not change, no new docs were added, local iBeam startup guidance/env variables did not change, and README runtime surface remains accurate with scanner/trending reliability covered by architecture docs. | No updates needed to `docs/architecture/modules.md`, `README.md`, `scripts/README.md`, or `docs/INDEX.md`. | Step 5 docs review |
+| Delivery summary: root cause was scanner `PostAsJsonAsync` not guaranteeing `Content-Length` and possibly using chunked transfer; fix uses buffered JSON with explicit positive `Content-Length`, preserved payload semantics, safe redaction, unit/request-shape/`411` tests, source-contract assertions, apphost fake HTTPS iBeam `/trending` coverage, full .NET tests, and solution build. Real authenticated iBeam smoke was skipped because no interactive authenticated local session was available and secrets were not read. | Ready for delivery with automated fake-runtime coverage and documented real-runtime skip rationale. | TP-028 delivery |
 
 ---
 
@@ -140,6 +143,12 @@
 | 2026-04-30 15:13 | Solution build passed | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
 | 2026-04-30 15:13 | Verification failure review completed | Initial `market-data-feature-tests.sh` expectation used a shortened scanner source string; fixed to the provider constant, reran successfully, and no unrelated/pre-existing failures remain. |
 | 2026-04-30 15:13 | Step 4 completed | Required test, script, full-suite, and build verification completed; frontend-only checks skipped because no frontend files changed. |
+| 2026-04-30 15:14 | Step 5 started | Update active docs and delivery discoveries. |
+| 2026-04-30 15:15 | Must-update docs modified | Added explicit IBKR scanner JSON `Content-Length`/no-chunked contract and user-facing `411` trending fix notes. |
+| 2026-04-30 15:15 | Check-if-affected docs reviewed | Reviewed modules, README, scripts README, and docs index; no updates required because responsibilities/startup contract/index did not change. |
+| 2026-04-30 15:15 | Delivery discoveries finalized | Root cause, regression coverage, verification commands, and real-iBeam skip rationale recorded in Discoveries. |
+| 2026-04-30 15:15 | Step 5 completed | Documentation and delivery notes finalized. |
+| 2026-04-30 15:15 | Task completed | All TP-028 steps complete; STATUS marked complete. |
 
 ---
 

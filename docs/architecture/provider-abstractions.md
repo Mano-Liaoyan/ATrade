@@ -191,7 +191,13 @@ Current implementation:
   currency, provider id, and provider symbol id/IBKR `conid`; no production
   hard-coded stock allowlist is used.
 - Trending uses the scanner source `ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`
-  rather than a hard-coded symbol catalog.
+  rather than a hard-coded symbol catalog. The scanner call must be a buffered
+  `POST /v1/api/iserver/scanner/run` JSON request with `Content-Type:
+  application/json`, the top-percent-gainer stock payload (`instrument=STK`,
+  `location=STK.US.MAJOR`, `type=TOP_PERC_GAIN`, empty `filter`), an explicit
+  positive `Content-Length`, and no chunked transfer; Client Portal/iBeam edge
+  handling may reject streaming or missing-length scanner bodies with `411
+  Length Required`.
 - Missing local runtime, placeholder credentials, unauthenticated sessions,
   HTTPS transport/certificate failures, unreachable gateway, or rejected live
   mode return `not-configured` / `unavailable` states and

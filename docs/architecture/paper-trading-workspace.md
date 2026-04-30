@@ -432,7 +432,12 @@ Licensing guardrail:
 Trending symbols now come from the IBKR/iBeam provider rather than a production
 symbol catalog. `ATrade.MarketData.Ibkr` runs the IBKR scanner query documented
 in source metadata (`ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`) and enriches
-scanner rows with IBKR snapshots when available.
+scanner rows with IBKR snapshots when available. The scanner transport sends a
+buffered JSON `POST /v1/api/iserver/scanner/run` body with an explicit positive
+`Content-Length` and no chunked transfer so authenticated Client Portal/iBeam
+sessions do not fail `/api/market-data/trending` with edge `411 Length Required`
+responses. If iBeam still returns `411` or another provider failure, the API
+surfaces a safe provider error rather than fallback symbols or raw secrets.
 
 The factor model explains a symbol's score using provider-derived components:
 
@@ -445,8 +450,8 @@ The factor model explains a symbol's score using provider-derived components:
 The API exposes these as transparent factor contributions rather than a
 black-box "hotness" number via `GET /api/market-data/trending`. The Next.js
 landing workspace renders the backend-provided IBKR source metadata and clearly
-surfaces provider-not-configured/provider-unavailable states when local iBeam is
-not ready.
+surfaces provider-not-configured/provider-unavailable/authentication-required
+states when local iBeam is not ready.
 
 ### 9.1 IBKR stock search and pin-any-symbol workflow
 
