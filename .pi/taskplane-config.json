@@ -16,12 +16,12 @@
       }
     },
     "worker": {
-      "model": "deepseek/deepseek-v4-pro",
-      "thinking": "xhigh"
+      "model": "github-copilot/claude-sonnet-4.6",
+      "thinking": "high"
     },
     "reviewer": {
-      "model": "deepseek/deepseek-v4-pro",
-      "thinking": "xhigh"
+      "model": "github-copilot/claude-opus-4.7",
+      "thinking": "high"
     }
   },
   "orchestrator": {
