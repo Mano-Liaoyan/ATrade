@@ -1,11 +1,11 @@
 # TP-032: Make Aspire dashboard port configurable from .env — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Preflight and naming decision
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,12 +13,12 @@
 ---
 
 ### Step 0: Preflight and naming decision
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Current dashboard/OTLP binding behavior inspected
-- [ ] Dashboard `.env` variable name chosen and recorded
-- [ ] OTLP configurability decision recorded
-- [ ] Default ephemeral behavior confirmed
+- [x] Current dashboard/OTLP binding behavior inspected
+- [x] Dashboard `.env` variable name chosen and recorded
+- [x] OTLP configurability decision recorded
+- [x] Default ephemeral behavior confirmed
 
 ---
 
@@ -89,6 +89,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Dashboard UI port variable will be `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`. | Use as the committed `.env.template` non-secret setting and parse it through the local port contract. | Step 0 |
+| OTLP dashboard endpoint remains `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`. | Do not add a second `.env` variable unless tests/runtime evidence later proves it is required. | Step 0 |
+| Dashboard UI default will be `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=0`. | Preserves current ephemeral loopback dashboard binding and allows ignored `.env` to opt into a fixed non-zero local port. | Step 0 |
 
 ---
 
@@ -97,6 +100,9 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-30 16:10 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-30 16:10 | Step 0 started | Preflight and naming decision |
+| 2026-04-30 | Step 0 preflight | `launchSettings.json` binds Aspire dashboard UI via `ASPNETCORE_URLS=http://127.0.0.1:0` and OTLP via `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`. |
 
 ---
 
