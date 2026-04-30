@@ -72,6 +72,24 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
+    public void Provider_ReportsSafeTransportDiagnosticWhenGatewayRequestFails()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) =>
+            throw new HttpRequestException("connection reset by peer for paper-user through https://gateway.paper.local"));
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var status = provider.GetStatus();
+
+        Assert.Equal(MarketDataProviderStates.Unavailable, status.State);
+        Assert.Contains("local Client Portal HTTPS transport", status.Message);
+        Assert.Contains("retry", status.Message);
+        Assert.DoesNotContain("paper-user", status.Message);
+        Assert.DoesNotContain("paper-password", status.Message);
+        Assert.DoesNotContain("gateway.paper.local", status.Message);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
     public void Provider_ReturnsProviderUnavailableWhenMarketDataEndpointRejectsUnauthenticatedSession()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
@@ -177,7 +195,7 @@ public sealed class IbkrMarketDataProviderTests
         {
             IntegrationEnabled = true,
             AccountMode = IbkrAccountMode.Paper,
-            GatewayBaseUrl = new Uri("https://gateway.paper.local"),
+            GatewayBaseUrl = new Uri("https://127.0.0.1:5000"),
             GatewayContainer =
             {
                 Image = IbkrGatewayContainerOptions.DefaultIbeamImage,

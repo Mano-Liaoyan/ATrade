@@ -150,9 +150,11 @@ public sealed class IbkrBrokerStatusServiceTests
         var status = await service.GetStatusAsync();
 
         Assert.Equal(BrokerProviderStates.IbeamContainerConfigured, status.State);
-        Assert.Contains("waiting", status.Message);
+        Assert.Contains("local Client Portal HTTPS transport", status.Message);
+        Assert.Contains("retry", status.Message);
         Assert.DoesNotContain("paper-user", status.Message);
         Assert.DoesNotContain("paper-password", status.Message);
+        Assert.DoesNotContain("gateway.paper.local", status.Message);
         Assert.Equal(1, fakeGatewayClient.CallCount);
     }
 

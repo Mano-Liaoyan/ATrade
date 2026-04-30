@@ -79,7 +79,7 @@ start_api() {
   local ibkr_account_id="$6"
   local gateway_port="$7"
   local api_url="http://127.0.0.1:${api_port}"
-  local gateway_url="http://127.0.0.1:${gateway_port}"
+  local gateway_url="https://127.0.0.1:${gateway_port}"
 
   stop_api
   api_log="$(mktemp)"
@@ -127,6 +127,7 @@ wait_for_api() {
 assert_default_contract_and_references() {
   assert_file_contains "$repo_root/.env.example" 'ATRADE_BROKER_INTEGRATION_ENABLED=false'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_BROKER_ACCOUNT_MODE=Paper'
+  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_USERNAME=IBKR_USERNAME'

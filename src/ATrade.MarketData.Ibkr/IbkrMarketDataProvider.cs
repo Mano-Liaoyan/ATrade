@@ -81,11 +81,11 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (TaskCanceledException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data status request timed out.");
+            logger.LogWarning(exception, "IBKR iBeam market-data status request timed out over local HTTPS transport.");
             return MarketDataProviderStatus.Unavailable(
                 Identity,
                 Capabilities,
-                "IBKR iBeam market-data status request timed out.");
+                IbkrGatewayTransport.CreateTransportTimeoutMessage());
         }
         catch (OperationCanceledException)
         {
@@ -98,11 +98,11 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data status endpoint is not reachable.");
+            logger.LogWarning(exception, "IBKR iBeam market-data status endpoint is not reachable over local HTTPS transport.");
             return MarketDataProviderStatus.Unavailable(
                 Identity,
                 Capabilities,
-                "IBKR iBeam market data is configured but the local gateway is not reachable.");
+                IbkrGatewayTransport.CreateTransportUnavailableMessage());
         }
         catch (Exception exception)
         {
@@ -448,8 +448,8 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (TaskCanceledException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data request timed out.");
-            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market-data request timed out.");
+            logger.LogWarning(exception, "IBKR iBeam market-data request timed out over local HTTPS transport.");
+            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportTimeoutMessage());
             return false;
         }
         catch (OperationCanceledException)
@@ -464,8 +464,8 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data request could not reach the gateway.");
-            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market-data gateway is not reachable.");
+            logger.LogWarning(exception, "IBKR iBeam market-data request could not reach the local HTTPS gateway transport.");
+            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportUnavailableMessage());
             return false;
         }
         catch (Exception exception)
@@ -493,12 +493,12 @@ public static class IbkrMarketDataServiceCollectionExtensions
         services.AddHttpClient<IIbkrMarketDataClient, IbkrMarketDataClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
-            client.Timeout = options.RequestTimeout;
-
-            if (options.GatewayBaseUrl is not null)
-            {
-                client.BaseAddress = options.GatewayBaseUrl;
-            }
+            IbkrGatewayTransport.ConfigureHttpClient(client, options);
+        })
+        .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
+            return IbkrGatewayTransport.CreateHttpMessageHandler(options);
         });
         services.AddSingleton<IbkrMarketDataProvider>();
         services.AddSingleton<IMarketDataProvider>(static serviceProvider => serviceProvider.GetRequiredService<IbkrMarketDataProvider>());

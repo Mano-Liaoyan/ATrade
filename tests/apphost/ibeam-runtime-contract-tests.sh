@@ -42,7 +42,7 @@ publish_manifest() {
 
   ATRADE_BROKER_INTEGRATION_ENABLED="$integration_enabled" \
   ATRADE_BROKER_ACCOUNT_MODE=Paper \
-  ATRADE_IBKR_GATEWAY_URL=http://127.0.0.1:5000 \
+  ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000 \
   ATRADE_IBKR_GATEWAY_PORT=5000 \
   ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest \
   ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15 \
@@ -69,7 +69,7 @@ start_api() {
 
   ATRADE_BROKER_INTEGRATION_ENABLED=true \
   ATRADE_BROKER_ACCOUNT_MODE=Paper \
-  ATRADE_IBKR_GATEWAY_URL="http://127.0.0.1:${gateway_port}" \
+  ATRADE_IBKR_GATEWAY_URL="https://127.0.0.1:${gateway_port}" \
   ATRADE_IBKR_GATEWAY_PORT="$gateway_port" \
   ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest \
   ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=1 \
@@ -138,7 +138,7 @@ if example != template:
 required = {
     'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
     'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
-    'ATRADE_IBKR_GATEWAY_URL': 'http://127.0.0.1:5000',
+    'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000',
     'ATRADE_IBKR_GATEWAY_PORT': '5000',
     'ATRADE_IBKR_GATEWAY_IMAGE': 'voyz/ibeam:latest',
     'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS': '15',
@@ -206,6 +206,11 @@ if container.get('image') != 'voyz/ibeam:latest':
     raise SystemExit(f'ibkr-gateway image must be voyz/ibeam:latest: {container!r}')
 if container.get('env') != {'IBEAM_ACCOUNT': '{ibkr-username.value}', 'IBEAM_PASSWORD': '{ibkr-password.value}'}:
     raise SystemExit(f'ibkr-gateway must receive only required redacted iBeam env vars: {container.get("env")!r}')
+https_binding = container.get('bindings', {}).get('https')
+if https_binding is None:
+    raise SystemExit(f'ibkr-gateway must expose an HTTPS binding, found {container.get("bindings")!r}')
+if https_binding.get('scheme') != 'https' or https_binding.get('targetPort') != 5000:
+    raise SystemExit(f'ibkr-gateway HTTPS binding must target Client Portal port 5000: {https_binding!r}')
 for resource_name in ('ibkr-username', 'ibkr-password', 'ibkr-paper-account-id'):
     resource = enabled_resources.get(resource_name)
     if resource is None or resource.get('type') != 'parameter.v0':
@@ -267,10 +272,50 @@ for payload in (missing, configured):
 PY
 }
 
+assert_optional_real_ibeam_https_smoke() {
+  if [[ "${ATRADE_IBKR_REAL_SMOKE:-}" != "1" ]]; then
+    return 0
+  fi
+
+  local gateway_url="${ATRADE_IBKR_GATEWAY_URL:-https://127.0.0.1:5000}"
+  case "$gateway_url" in
+    https://127.0.0.1:*|https://localhost:*) ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  local smoke_file
+  smoke_file="$(mktemp)"
+  local status_code
+  status_code="$(curl --silent --show-error --insecure --max-time 5 --output "$smoke_file" --write-out '%{http_code}' "${gateway_url%/}/v1/api/iserver/auth/status" 2>/dev/null || true)"
+
+  if [[ "$status_code" != 2* ]]; then
+    rm -f "$smoke_file"
+    return 0
+  fi
+
+  python3 - <<'PY' "$smoke_file"
+from pathlib import Path
+import json
+import sys
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+if not isinstance(payload.get('authenticated'), bool) or not isinstance(payload.get('connected'), bool):
+    raise SystemExit('real iBeam auth-status smoke response must include boolean authenticated and connected fields')
+serialized = json.dumps(payload)
+for forbidden in ('IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'sessionCookie', 'cookie', 'token'):
+    if forbidden in serialized:
+        raise SystemExit(f'real iBeam smoke response included forbidden value marker: {forbidden}')
+PY
+  rm -f "$smoke_file"
+}
+
 main() {
   assert_templates_are_safe_and_synchronized
   assert_apphost_ibeam_manifest_contract
   assert_status_payloads_are_redacted
+  assert_optional_real_ibeam_https_smoke
 }
 
 main "$@"

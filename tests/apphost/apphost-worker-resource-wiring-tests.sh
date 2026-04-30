@@ -30,7 +30,7 @@ publish_apphost_manifest() {
 
   ATRADE_BROKER_INTEGRATION_ENABLED="$integration_enabled" \
   ATRADE_BROKER_ACCOUNT_MODE=Paper \
-  ATRADE_IBKR_GATEWAY_URL=http://127.0.0.1:5000 \
+  ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000 \
   ATRADE_IBKR_GATEWAY_PORT=5000 \
   ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest \
   ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15 \
@@ -115,7 +115,7 @@ expected_api_env = {
     "NATS_HOST": "{nats.bindings.tcp.host}",
     "ATRADE_BROKER_INTEGRATION_ENABLED": "false",
     "ATRADE_BROKER_ACCOUNT_MODE": "Paper",
-    "ATRADE_IBKR_GATEWAY_URL": "http://127.0.0.1:5000",
+    "ATRADE_IBKR_GATEWAY_URL": "https://127.0.0.1:5000",
     "ATRADE_IBKR_GATEWAY_PORT": "5000",
     "ATRADE_IBKR_GATEWAY_IMAGE": "voyz/ibeam:latest",
     "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS": "15",
@@ -133,7 +133,7 @@ expected_worker_env = {
     "NATS_HOST": "{nats.bindings.tcp.host}",
     "ATRADE_BROKER_INTEGRATION_ENABLED": "false",
     "ATRADE_BROKER_ACCOUNT_MODE": "Paper",
-    "ATRADE_IBKR_GATEWAY_URL": "http://127.0.0.1:5000",
+    "ATRADE_IBKR_GATEWAY_URL": "https://127.0.0.1:5000",
     "ATRADE_IBKR_GATEWAY_PORT": "5000",
     "ATRADE_IBKR_GATEWAY_IMAGE": "voyz/ibeam:latest",
     "ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS": "15",
@@ -235,9 +235,9 @@ expected_container_env = {
 if container_env != expected_container_env:
     raise SystemExit(f"ibkr-gateway should receive only required iBeam env vars: {container_env!r}")
 
-http_binding = container.get("bindings", {}).get("http", {})
-if http_binding.get("targetPort") != 5000:
-    raise SystemExit(f"ibkr-gateway target port should be 5000, found {http_binding!r}")
+https_binding = container.get("bindings", {}).get("https", {})
+if https_binding.get("scheme") != "https" or https_binding.get("targetPort") != 5000:
+    raise SystemExit(f"ibkr-gateway HTTPS target port should be 5000, found {https_binding!r}")
 
 for resource_name in ("api", "ibkr-worker"):
     env = resources[resource_name].get("env", {})

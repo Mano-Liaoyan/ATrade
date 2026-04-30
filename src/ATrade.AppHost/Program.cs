@@ -37,7 +37,9 @@ if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out v
         .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
         .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamAccount, ibkrUsername)
         .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamPassword, ibkrPassword)
-        .WithHttpEndpoint(
+        .WithEndpoint(
+            name: "https",
+            scheme: "https",
             targetPort: paperTradingContract.GetGatewayPort(),
             port: paperTradingContract.GetGatewayPort(),
             isProxied: false);

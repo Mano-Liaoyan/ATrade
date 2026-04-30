@@ -17,27 +17,27 @@ see_also:
 ## Current Focus
 
 The provider-backed paper-trading workspace batch (`TP-019` through `TP-025`)
-has landed. Current follow-up work keeps the repository contracts aligned:
+and follow-up runtime cleanup tasks (`TP-026` / `TP-027`) have landed. Current
+repository contracts are:
 
-- make `ATrade.slnx` the authoritative solution reference for active build/test guidance
-- fix the local IBKR/iBeam refresh transport contract
+- use `ATrade.slnx` as the authoritative solution reference for active build/test guidance
+- keep the local IBKR/iBeam refresh transport on the HTTPS Client Portal contract
 - keep credentials, account identifiers, tokens, cookies, and live-trading behavior out of committed files and active defaults
 
 ## Active Task Queue
 
-| Task | Status | Depends on | Summary |
-|------|--------|------------|---------|
-| `TP-026` | In progress | `TP-025` | Migrate active solution references to authoritative `ATrade.slnx`. |
-| `TP-027` | Ready after deps | `TP-026` | Fix the local IBKR/iBeam refresh transport contract. |
+No ready implementation task is currently queued. The next new Taskplane packet
+should use `TP-028`.
 
-Completed task packets `TP-019` through `TP-025` remain under `tasks/` with
+Completed task packets `TP-019` through `TP-027` remain under `tasks/` with
 `.DONE` markers pending archival. Older completed packets are archived under
 `tasks/archive/`.
 
 ## Execution Order
 
-1. Complete `TP-026` so active scripts, docs, and future task prompts prefer `ATrade.slnx`.
-2. Run `TP-027` after `TP-026` so the iBeam refresh transport fix lands on the updated solution-file contract.
+The `TP-019` through `TP-027` batch is complete. Archive completed task packets
+when orchestration cleanup time allows, then queue follow-up work starting at
+`TP-028`.
 
 The orchestrator dependency sections in each `PROMPT.md` are the machine-readable
 source for batch ordering.
@@ -48,6 +48,7 @@ source for batch ordering.
 - Use `ATrade.slnx` for repo-level .NET build/test/list guidance; retain `ATrade.sln` only as a temporary non-authoritative compatibility artifact.
 - Keep secrets, IBKR credentials, account identifiers, tokens, and session cookies out of git.
 - Real IBKR/iBeam and LEAN checks must use ignored `.env` values and cleanly skip when local runtimes or credentials are unavailable.
+- Local `voyz/ibeam:latest` Client Portal traffic uses HTTPS on the configured gateway port; self-signed certificate trust must stay scoped to loopback iBeam development traffic.
 - Do not add real order placement or live-trading behavior in this queued batch.
 - Update active docs in the same change as durable code/runtime changes.
 
