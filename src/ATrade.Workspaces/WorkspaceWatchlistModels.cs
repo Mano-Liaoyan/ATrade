@@ -10,6 +10,8 @@ public static class WorkspaceWatchlistDefaults
 
 public sealed record WorkspaceWatchlistSymbol(
     string Symbol,
+    string InstrumentKey,
+    string PinKey,
     string Provider,
     string? ProviderSymbolId,
     long? IbkrConid,
@@ -33,6 +35,7 @@ public sealed record WorkspaceWatchlistSymbolInput(
 
 public sealed record NormalizedWorkspaceWatchlistSymbolInput(
     string Symbol,
+    string InstrumentKey,
     string Provider,
     string? ProviderSymbolId,
     long? IbkrConid,

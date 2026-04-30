@@ -1,6 +1,6 @@
 # TP-031: Fix watchlist persistence and market-specific search pins — Status
 
-**Current Step:** Step 0: Diagnose current restart and symbol-only pin behavior
+**Current Step:** Step 1: Make backend watchlist persistence durable and instrument-specific
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -23,14 +23,14 @@
 ---
 
 ### Step 1: Make backend watchlist persistence durable and instrument-specific
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Stable `pinKey` / `instrumentKey` exposed in API JSON
-- [ ] Idempotent Postgres migration preserves existing rows and allows same-symbol market-specific rows
-- [ ] Upsert duplicate handling merges only exact instrument keys
-- [ ] Unpin removes exact instrument key/provider identity with unambiguous legacy fallback
-- [ ] Restart persistence root cause fixed or verified
-- [ ] Targeted Workspaces tests run
+- [x] Stable `pinKey` / `instrumentKey` exposed in API JSON
+- [x] Idempotent Postgres migration preserves existing rows and allows same-symbol market-specific rows
+- [x] Upsert duplicate handling merges only exact instrument keys
+- [x] Unpin removes exact instrument key/provider identity with unambiguous legacy fallback
+- [x] Restart persistence root cause fixed or verified
+- [x] Targeted Workspaces tests run
 
 ---
 
@@ -119,6 +119,14 @@
 | 2026-04-30 15:48 | Symbol-only pin behavior inspected | Schema, repository/API unpin, normalizer duplicate merge, and frontend pinned-state all key off bare symbol, so same-symbol market results appear pinned together. |
 | 2026-04-30 15:51 | Instrument identity chosen | Durable watchlist key will be the normalized provider/providerSymbolId/ibkrConid/symbol/exchange/currency/assetClass tuple, exposed as `instrumentKey` and `pinKey`. |
 | 2026-04-30 15:53 | localStorage behavior inspected | Cache is symbol-only, loaded only as read-only fallback with an error on backend failure, and used as one-time manual migration after backend load. |
+| 2026-04-30 15:55 | Step 1 started | Backend instrument-key persistence implementation. |
+| 2026-04-30 16:10 | Backend response key fields added | `WorkspaceWatchlistSymbol` now carries `instrumentKey` and `pinKey`; repository reads/stores the normalized key so minimal API JSON exposes both fields. |
+| 2026-04-30 16:12 | Instrument-key migration added | Schema initialization adds/backfills `instrument_key`, rebuilds the primary key on `(user_id, workspace_id, instrument_key)`, and keeps a symbol index for legacy fallback. |
+| 2026-04-30 16:13 | Exact duplicate handling implemented | Upserts conflict only on `instrument_key`; replacement normalization no longer merges same symbols unless the full instrument key matches. |
+| 2026-04-30 16:14 | Exact unpin path implemented | Added `DELETE /api/workspace/watchlist/pins/{instrumentKey}` and repository exact-delete; legacy symbol delete now only removes one row and raises `ambiguous-symbol` when multiple market-specific pins share a symbol. |
+| 2026-04-30 16:25 | Restart persistence root cause verified | Baseline restart script passed in Step 0; backend remains Postgres-authoritative with 503 storage errors, and schema migration preserves rows while moving persistence identity from symbol PK to instrument key. |
+| 2026-04-30 16:26 | Targeted Workspaces tests | `dotnet test tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj --nologo --verbosity minimal` passed: 23 tests. |
+| 2026-04-30 16:27 | API compile check | `dotnet build src/ATrade.Api/ATrade.Api.csproj --nologo --verbosity minimal` passed with 0 warnings/errors. |
 
 ---
 
