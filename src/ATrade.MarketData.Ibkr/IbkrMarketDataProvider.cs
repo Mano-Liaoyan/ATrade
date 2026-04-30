@@ -119,7 +119,15 @@ public sealed class IbkrMarketDataProvider(
             throw new MarketDataProviderUnavailableException(status);
         }
 
-        var scannerResults = Run(cancellationToken => marketDataClient.GetTrendingScannerResultsAsync(cancellationToken))
+        if (!TryExecute(() => marketDataClient.GetTrendingScannerResultsAsync(), out var scannerResponse, out var scannerError) || scannerResponse is null)
+        {
+            var error = scannerError ?? status.ToError();
+            throw new MarketDataProviderUnavailableException(
+                MarketDataProviderStatus.Unavailable(Identity, Capabilities, error.Message),
+                error);
+        }
+
+        var scannerResults = scannerResponse
             .Where(result => !string.IsNullOrWhiteSpace(result.Conid))
             .Take(20)
             .ToArray();

@@ -91,8 +91,8 @@ function formatMarketDataError(status: number, error: ApiErrorPayload | null): s
 
   if (error?.code === 'authentication-required') {
     return detail
-      ? `IBKR authentication is required before market data can be searched. ${detail}`
-      : 'IBKR authentication is required before market data can be searched.';
+      ? `IBKR authentication is required before market data can be loaded. ${detail}`
+      : 'IBKR authentication is required before market data can be loaded.';
   }
 
   if (error?.code === 'invalid-search-query' || error?.code === 'unsupported-asset-class' || error?.code === 'invalid-search-limit') {

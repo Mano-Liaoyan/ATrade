@@ -120,6 +120,34 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
+    public void Provider_ConvertsTrendingScannerEndpointFailureToSafeUnavailableError()
+    {
+        var handler = new RecordingHttpMessageHandler((request, _) =>
+        {
+            if (request.RequestUri?.AbsolutePath == IbkrMarketDataClient.AuthStatusPath)
+            {
+                return Task.FromResult(JsonResponse(new
+                {
+                    authenticated = true,
+                    connected = true,
+                    competing = false,
+                    message = "ready",
+                }));
+            }
+
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal(IbkrMarketDataClient.ScannerPath, request.RequestUri?.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+        });
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var exception = Assert.Throws<MarketDataProviderUnavailableException>(() => provider.GetTrendingSymbols());
+
+        Assert.Equal(MarketDataProviderErrorCodes.AuthenticationRequired, exception.Error.Code);
+        Assert.Contains("not authenticated", exception.Error.Message);
+    }
+
+    [Fact]
     public void Provider_UsesSearchContractWhenStockDetailEndpointRequiresMonth()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
