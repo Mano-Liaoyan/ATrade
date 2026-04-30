@@ -133,6 +133,146 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Empty(repository.WrittenTrendingSnapshots);
     }
 
+    [Fact]
+    public void TryGetCandlesReadsFreshTimescaleSeriesBeforeProviderCall()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 21, 0, TimeSpan.Zero);
+        var freshness = TimeSpan.FromMinutes(30);
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            CandleSeries = CreateCandleSeries(now.AddMinutes(-4), source: "ibkr-history"),
+        };
+        var provider = new RecordingMarketDataProvider
+        {
+            ThrowIfCandlesRequested = true,
+        };
+        var service = CreateService(provider, repository, now, freshness);
+
+        var ok = service.TryGetCandles(" aapl ", MarketDataTimeframes.OneDay, out var response, out var error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.NotNull(response);
+        Assert.Equal(0, provider.TryGetCandlesCalls);
+        var query = Assert.Single(repository.CandleQueries);
+        Assert.Equal(provider.Identity.Provider, query.Provider);
+        Assert.Null(query.Source);
+        Assert.Equal("AAPL", query.Symbol);
+        Assert.Equal(MarketDataTimeframes.OneDay, query.Timeframe);
+        Assert.Equal(now - freshness, query.FreshnessCutoffUtc);
+    }
+
+    [Fact]
+    public void TryGetCandlesFetchesProviderPersistsSeriesAndReturnsProviderResponseOnCacheMiss()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 23, 0, TimeSpan.Zero);
+        var providerResponse = CreateProviderCandleResponse(now.AddSeconds(-5), source: "ibkr-history");
+        var repository = new RecordingTimescaleMarketDataRepository();
+        var provider = new RecordingMarketDataProvider
+        {
+            CandleResponse = providerResponse,
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var ok = service.TryGetCandles("AAPL", MarketDataTimeframes.OneDay, out var response, out var error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.Same(providerResponse, response);
+        Assert.Equal(1, provider.TryGetCandlesCalls);
+        Assert.Single(repository.CandleQueries);
+        var written = Assert.Single(repository.WrittenCandleSeries);
+        Assert.Equal(provider.Identity.Provider, written.Symbol.Provider);
+        Assert.Equal("AAPL", written.Symbol.Symbol);
+        Assert.Equal(MarketDataTimeframes.OneDay, written.Timeframe);
+        Assert.Equal(providerResponse.Source, written.Source);
+        Assert.Equal(providerResponse.GeneratedAt, written.GeneratedAtUtc);
+        Assert.Equal(providerResponse.Candles.Count, written.Candles.Count);
+    }
+
+    [Fact]
+    public void TryGetIndicatorsComputesFromFreshCachedCandlesWithoutProviderCall()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 25, 0, TimeSpan.Zero);
+        var cachedSeries = CreateCandleSeries(now.AddMinutes(-6), source: "ibkr-history");
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            CandleSeries = cachedSeries,
+        };
+        var provider = new RecordingMarketDataProvider
+        {
+            ThrowIfCandlesRequested = true,
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var ok = service.TryGetIndicators("AAPL", MarketDataTimeframes.OneDay, out var response, out var error);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.NotNull(response);
+        Assert.Equal("AAPL", response.Symbol);
+        Assert.Equal(MarketDataTimeframes.OneDay, response.Timeframe);
+        Assert.Equal("timescale-cache:ibkr-history", response.Source);
+        Assert.Equal(cachedSeries.Candles.Count, response.MovingAverages.Count);
+        Assert.Equal(cachedSeries.Candles.Count, response.Rsi.Count);
+        Assert.Equal(cachedSeries.Candles.Count, response.Macd.Count);
+        Assert.Equal(0, provider.TryGetCandlesCalls);
+        Assert.Equal(0, provider.TryGetIndicatorsCalls);
+        Assert.Single(repository.CandleQueries);
+        Assert.Empty(repository.WrittenCandleSeries);
+    }
+
+    [Fact]
+    public void TryGetCandlesPreservesUnsupportedTimeframeErrorInsteadOfReturningCachedSeries()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 27, 0, TimeSpan.Zero);
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            CandleSeries = CreateCandleSeries(now.AddMinutes(-5), source: "ibkr-history"),
+        };
+        var provider = new RecordingMarketDataProvider
+        {
+            CandleError = new MarketDataError("unsupported-timeframe", "Timeframe '2m' is not supported."),
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var ok = service.TryGetCandles("AAPL", "2m", out var response, out var error);
+
+        Assert.False(ok);
+        Assert.Null(response);
+        Assert.NotNull(error);
+        Assert.Equal("unsupported-timeframe", error.Code);
+        Assert.Equal(1, provider.TryGetCandlesCalls);
+        Assert.Empty(repository.CandleQueries);
+        Assert.Empty(repository.WrittenCandleSeries);
+    }
+
+    [Fact]
+    public void TryGetCandlesPreservesProviderUnavailableWhenNoFreshCacheExists()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 29, 0, TimeSpan.Zero);
+        var repository = new RecordingTimescaleMarketDataRepository();
+        var provider = new RecordingMarketDataProvider
+        {
+            Status = MarketDataProviderStatus.Unavailable(
+                MarketDataProviderIdentity.Create(RecordingMarketDataProvider.ProviderName, "Interactive Brokers"),
+                RecordingMarketDataProvider.DefaultCapabilities,
+                "iBeam is not reachable."),
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var ok = service.TryGetCandles("AAPL", MarketDataTimeframes.OneDay, out var response, out var error);
+
+        Assert.False(ok);
+        Assert.Null(response);
+        Assert.NotNull(error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, error.Code);
+        Assert.Contains("iBeam", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, provider.TryGetCandlesCalls);
+        Assert.Single(repository.CandleQueries);
+        Assert.Empty(repository.WrittenCandleSeries);
+    }
+
     private static TimescaleCachedMarketDataService CreateService(
         RecordingMarketDataProvider provider,
         RecordingTimescaleMarketDataRepository repository,
@@ -190,6 +330,42 @@ public sealed class TimescaleMarketDataCacheAsideTests
         ],
         source);
 
+    private static TimescaleCandleSeries CreateCandleSeries(
+        DateTimeOffset generatedAtUtc,
+        string source,
+        string symbol = "AAPL",
+        string timeframe = MarketDataTimeframes.OneDay) => new(
+        new TimescaleMarketDataSymbol(
+            RecordingMarketDataProvider.ProviderName,
+            ProviderSymbolId: null,
+            Symbol: symbol,
+            Name: "Apple Inc.",
+            Exchange: "NASDAQ",
+            Currency: "USD",
+            AssetClass: MarketDataAssetClasses.Stock),
+        timeframe,
+        source,
+        generatedAtUtc,
+        CreateCandles(generatedAtUtc));
+
+    private static CandleSeriesResponse CreateProviderCandleResponse(
+        DateTimeOffset generatedAtUtc,
+        string source,
+        string symbol = "AAPL",
+        string timeframe = MarketDataTimeframes.OneDay) => new(
+        symbol,
+        timeframe,
+        generatedAtUtc,
+        CreateCandles(generatedAtUtc),
+        source);
+
+    private static IReadOnlyList<OhlcvCandle> CreateCandles(DateTimeOffset generatedAtUtc) =>
+    [
+        new OhlcvCandle(generatedAtUtc.AddDays(-2), 180m, 185m, 179m, 184m, 10_000_000),
+        new OhlcvCandle(generatedAtUtc.AddDays(-1), 184m, 188m, 183m, 187m, 11_000_000),
+        new OhlcvCandle(generatedAtUtc, 187m, 191m, 186m, 190m, 12_000_000),
+    ];
+
     private sealed class RecordingSchemaInitializer : ITimescaleMarketDataSchemaInitializer
     {
         public int InitializeCalls { get; private set; }
@@ -205,13 +381,27 @@ public sealed class TimescaleMarketDataCacheAsideTests
     {
         public TimescaleTrendingSnapshot? TrendingSnapshot { get; init; }
 
+        public TimescaleCandleSeries? CandleSeries { get; init; }
+
         public List<TimescaleFreshTrendingSnapshotQuery> TrendingQueries { get; } = [];
+
+        public List<TimescaleFreshCandleSeriesQuery> CandleQueries { get; } = [];
 
         public List<TimescaleTrendingSnapshot> WrittenTrendingSnapshots { get; } = [];
 
-        public Task UpsertCandleSeriesAsync(TimescaleCandleSeries series, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public List<TimescaleCandleSeries> WrittenCandleSeries { get; } = [];
 
-        public Task<TimescaleCandleSeries?> GetFreshCandleSeriesAsync(TimescaleFreshCandleSeriesQuery query, CancellationToken cancellationToken = default) => Task.FromResult<TimescaleCandleSeries?>(null);
+        public Task UpsertCandleSeriesAsync(TimescaleCandleSeries series, CancellationToken cancellationToken = default)
+        {
+            WrittenCandleSeries.Add(series);
+            return Task.CompletedTask;
+        }
+
+        public Task<TimescaleCandleSeries?> GetFreshCandleSeriesAsync(TimescaleFreshCandleSeriesQuery query, CancellationToken cancellationToken = default)
+        {
+            CandleQueries.Add(query);
+            return Task.FromResult(CandleSeries);
+        }
 
         public Task UpsertTrendingSnapshotAsync(TimescaleTrendingSnapshot snapshot, CancellationToken cancellationToken = default)
         {
@@ -244,11 +434,21 @@ public sealed class TimescaleMarketDataCacheAsideTests
 
         public bool ThrowIfTrendingRequested { get; init; }
 
+        public bool ThrowIfCandlesRequested { get; init; }
+
         public TrendingSymbolsResponse? TrendingResponse { get; init; }
+
+        public CandleSeriesResponse? CandleResponse { get; init; }
+
+        public MarketDataError? CandleError { get; init; }
 
         public MarketDataProviderStatus? Status { get; init; }
 
         public int GetTrendingSymbolsCalls { get; private set; }
+
+        public int TryGetCandlesCalls { get; private set; }
+
+        public int TryGetIndicatorsCalls { get; private set; }
 
         public MarketDataProviderStatus GetStatus() => Status ?? MarketDataProviderStatus.Available(Identity, Capabilities);
 
@@ -278,13 +478,27 @@ public sealed class TimescaleMarketDataCacheAsideTests
 
         public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error)
         {
+            TryGetCandlesCalls++;
+            if (ThrowIfCandlesRequested)
+            {
+                throw new InvalidOperationException("Provider should not be called when fresh Timescale candles are available.");
+            }
+
+            if (CandleResponse is not null)
+            {
+                response = CandleResponse;
+                error = null;
+                return true;
+            }
+
             response = null;
-            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "Candles are not needed by this test.");
+            error = CandleError ?? new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "Candles are not needed by this test.");
             return false;
         }
 
         public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error)
         {
+            TryGetIndicatorsCalls++;
             response = null;
             error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "Indicators are not needed by this test.");
             return false;

@@ -1,6 +1,6 @@
 # TP-030: Serve market data through TimescaleDB cache-aside — Status
 
-**Current Step:** Step 2: Cache-aside `/api/market-data/trending`
+**Current Step:** Step 3: Cache-aside candles and indicator inputs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -44,13 +44,13 @@
 ---
 
 ### Step 3: Cache-aside candles and indicator inputs
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Candle endpoint reads fresh Timescale candles before provider call
-- [ ] Missing/stale candle series fetches provider candles, persists them, and returns fresh response
-- [ ] Indicator endpoint computes from cached candles when fresh
-- [ ] Unsupported/timeframe/provider errors preserved without stale-as-fresh behavior
-- [ ] Tests cover candle and indicator cache paths
+- [x] Candle endpoint reads fresh Timescale candles before provider call
+- [x] Missing/stale candle series fetches provider candles, persists them, and returns fresh response
+- [x] Indicator endpoint computes from cached candles when fresh
+- [x] Unsupported/timeframe/provider errors preserved without stale-as-fresh behavior
+- [x] Tests cover candle and indicator cache paths
 
 ---
 
@@ -117,6 +117,11 @@
 | Trending cache misses/stale repository results call the provider-backed service, persist the provider response as a Timescale snapshot, and return the original provider response/source. | Step 2 miss/refresh/write item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
 | Provider-unavailable trending behavior is cache-safe: a fresh Timescale snapshot is returned without provider scanner access, while no fresh cache surfaces the provider-unavailable error and writes nothing. | Step 2 unavailable item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
 | Step 2 targeted tests passed: `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal --filter FullyQualifiedName~TimescaleMarketDataCacheAsideTests` passed 5/5, covering trending cache hit, freshness cutoff query, miss/stale refresh, write-after-fetch, source metadata, and fresh-cache provider-unavailable fallback. | Step 2 test coverage item complete. | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Candle cache hits query `GetFreshCandleSeriesAsync` with provider, normalized symbol/timeframe, nullable source, and the configured freshness cutoff before provider access; fresh hits return without calling IBKR/iBeam. | Step 3 candle-read-before-provider item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Candle cache misses/stale repository results call the provider-backed service, persist returned candles to Timescale with provider identity/source/timeframe, and return the original provider response. | Step 3 candle miss/write item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Indicators now flow through the cache-aware candle path; fresh Timescale candles compute indicator payloads locally with the cached source, without calling provider candles or provider indicators. | Step 3 indicator cached-candle item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Unsupported candle timeframes bypass cache reads and return the provider's `unsupported-timeframe` error; no-fresh-cache provider-unavailable candle requests return the safe provider error and never write stale data. | Step 3 error-preservation item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Step 3 targeted tests passed: `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal --filter FullyQualifiedName~TimescaleMarketDataCacheAsideTests` passed 10/10, covering candle hit/miss/write/error paths and indicator computation from cached candles. | Step 3 test coverage item complete. | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
 
 ---
 
@@ -144,6 +149,12 @@
 | 2026-04-30 17:14 | Trending miss refresh verified | Targeted Timescale cache-aside test passed for provider fetch, Timescale write, and provider response on cache miss/stale result. |
 | 2026-04-30 17:18 | Trending provider-unavailable behavior verified | Targeted Timescale cache-aside tests passed for fresh-cache fallback and stale/no-cache provider-unavailable errors. |
 | 2026-04-30 17:19 | Step 2 targeted coverage passed | Timescale cache-aside test class passed 5/5 for trending hit/miss/stale/write/unavailable paths. |
+| 2026-04-30 17:20 | Step 3 started | Candle and indicator cache-aside implementation/tests resumed. |
+| 2026-04-30 17:21 | Candle fresh-read-before-provider verified | Targeted Timescale cache-aside test passed for fresh candle reads before provider calls. |
+| 2026-04-30 17:23 | Candle miss refresh verified | Targeted Timescale cache-aside test passed for provider fetch, Timescale write, and provider response on candle miss/stale result. |
+| 2026-04-30 17:25 | Indicator cached-candle path verified | Targeted Timescale cache-aside test passed for computing indicators from fresh cached candles without provider calls. |
+| 2026-04-30 17:29 | Candle error preservation verified | Targeted Timescale cache-aside tests passed for unsupported timeframe and no-fresh-cache provider-unavailable behavior. |
+| 2026-04-30 17:30 | Step 3 targeted coverage passed | Timescale cache-aside test class passed 10/10 for trending, candle, and indicator paths. |
 
 ---
 
