@@ -1,6 +1,6 @@
 # TP-028: Fix IBKR scanner 411 Length Required for trending — Status
 
-**Current Step:** Step 3: Verify home-page trending behavior
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -53,16 +53,16 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passing
-- [ ] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passing
-- [ ] `bash tests/apphost/market-data-feature-tests.sh` passing
-- [ ] Frontend trading workspace tests passing if frontend files changed
-- [ ] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
-- [ ] Frontend build passing if frontend files changed
-- [ ] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
-- [ ] All failures fixed or unrelated pre-existing failures documented
+- [x] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passing
+- [x] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passing
+- [x] `bash tests/apphost/market-data-feature-tests.sh` passing
+- [x] Frontend trading workspace tests passing if frontend files changed
+- [x] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
+- [x] Frontend build passing if frontend files changed
+- [x] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
+- [x] All failures fixed or unrelated pre-existing failures documented
 
 ---
 
@@ -130,6 +130,16 @@
 | 2026-04-30 15:07 | Real iBeam smoke skipped | Skipped optional real authenticated smoke check: orchestrated lane has no confirmed interactive iBeam session and `.env` secrets must remain unread/unprinted. |
 | 2026-04-30 15:08 | Frontend error copy reviewed | Existing frontend safe-error formatting/rendering remains appropriate; no frontend files changed. |
 | 2026-04-30 15:08 | Step 3 completed | `/api/market-data/trending` safe-error states, fake authenticated scanner flow, real-runtime skip rationale, and frontend copy review completed. |
+| 2026-04-30 15:09 | Step 4 started | Begin required verification commands. |
+| 2026-04-30 15:09 | IBKR market-data unit tests passed | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (10/10). |
+| 2026-04-30 15:10 | IBKR apphost provider script passed | `bash tests/apphost/ibkr-market-data-provider-tests.sh` passed (`SCRIPT_EXIT:0`). |
+| 2026-04-30 15:12 | Market-data feature script passed | `bash tests/apphost/market-data-feature-tests.sh` passed (`SCRIPT_EXIT:0`) including fake authenticated iBeam scanner flow. |
+| 2026-04-30 15:12 | Frontend workspace tests skipped | `git diff --name-only HEAD~4..HEAD -- frontend` returned no frontend files changed, so `frontend-trading-workspace-tests.sh` was not required. |
+| 2026-04-30 15:12 | Full .NET test suite passed | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed (67 total tests across solution). |
+| 2026-04-30 15:12 | Frontend build skipped | No frontend files changed in TP-028, so `cd frontend && npm run build` was not required. |
+| 2026-04-30 15:13 | Solution build passed | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
+| 2026-04-30 15:13 | Verification failure review completed | Initial `market-data-feature-tests.sh` expectation used a shortened scanner source string; fixed to the provider constant, reran successfully, and no unrelated/pre-existing failures remain. |
+| 2026-04-30 15:13 | Step 4 completed | Required test, script, full-suite, and build verification completed; frontend-only checks skipped because no frontend files changed. |
 
 ---
 
