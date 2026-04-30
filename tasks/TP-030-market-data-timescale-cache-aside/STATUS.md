@@ -1,11 +1,11 @@
 # TP-030: Serve market data through TimescaleDB cache-aside — Status
 
-**Current Step:** Step 4: API/frontend compatibility and observability
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 2
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -66,27 +66,27 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passing
-- [ ] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passing
-- [ ] `bash tests/apphost/market-data-timescale-persistence-tests.sh` passing or cleanly skipped
-- [ ] `bash tests/apphost/market-data-feature-tests.sh` passing
-- [ ] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passing
-- [ ] Frontend trading workspace tests passing if frontend files changed
-- [ ] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
-- [ ] Frontend build passing if frontend files changed
-- [ ] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
-- [ ] All failures fixed or unrelated pre-existing failures documented
+- [x] `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passing
+- [x] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passing
+- [x] `bash tests/apphost/market-data-timescale-persistence-tests.sh` passing or cleanly skipped
+- [x] `bash tests/apphost/market-data-feature-tests.sh` passing
+- [x] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passing
+- [x] Frontend trading workspace tests passing if frontend files changed
+- [x] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
+- [x] Frontend build passing if frontend files changed
+- [x] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
+- [x] All failures fixed or unrelated pre-existing failures documented
 
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged with cache semantics, unavailable behavior, and future-work notes
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged with cache semantics, unavailable behavior, and future-work notes
 
 ---
 
@@ -127,6 +127,9 @@
 | Endpoint provider-error behavior remains safe without fresh cache: `bash tests/apphost/market-data-feature-tests.sh` exited 0 and covered trending `provider-not-configured`/`provider-unavailable` plus no-credential candle/indicator `provider-not-configured` responses. | Step 4 no-fresh-cache error item complete. | `tests/apphost/market-data-feature-tests.sh`, `src/ATrade.Api/Program.cs` |
 | Frontend files are unchanged; source/error label checks confirmed existing UI code still maps `timescale-cache:*scanner*` to the existing scanner label and `timescale-cache:*ibkr*` candle sources to the existing IBKR/iBeam label, while market-data client provider-error copy remains unchanged. | Step 4 frontend-test conditional item complete; no frontend test update required. | `frontend/components/TrendingList.tsx`, `frontend/components/SymbolChartView.tsx`, `frontend/lib/marketDataClient.ts` |
 | Targeted endpoint/apphost checks passed for Step 4: `bash tests/apphost/market-data-feature-tests.sh` exited 0 and `bash tests/apphost/ibkr-market-data-provider-tests.sh` exited 0 (including 10/10 IBKR tests); both emitted transient startup connection-refused curl retries before health checks succeeded. | Step 4 targeted endpoint/apphost item complete. | `tests/apphost/market-data-feature-tests.sh`, `tests/apphost/ibkr-market-data-provider-tests.sh` |
+| Documentation delivery updated the required architecture docs to describe the implemented Timescale-first cache-aside path: fresh trending/candle rows newer than `now - ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` return provider-neutral payloads with `timescale-cache:{originalSource}`, missing/stale rows refresh from IBKR/iBeam and persist the provider response, and indicators compute from the cache-aware candle path. | Step 6 Must Update documentation semantics recorded. | `docs/architecture/paper-trading-workspace.md`, `docs/architecture/provider-abstractions.md`, `docs/architecture/modules.md` |
+| Provider-unavailable behavior is documented as cache-safe: a fresh persisted row can serve while IBKR/iBeam is unavailable, but stale or missing rows surface the provider-safe error rather than pretending old Timescale data is current; storage-unavailable cache reads/writes fall back to provider behavior. | Step 6 unavailable behavior recorded for delivery. | `docs/architecture/paper-trading-workspace.md`, `docs/architecture/provider-abstractions.md`, `docs/architecture/overview.md` |
+| Check-if-affected docs were reviewed: `README.md`, `scripts/README.md`, and `docs/architecture/overview.md` were updated for the current cache-aside runtime and freshness wording; `docs/INDEX.md` needed no change because no new active docs were introduced. Richer provider-symbol identity for candle/trending cache rows remains future work because current endpoint payloads do not expose provider symbol ids for those responses. | Step 6 affected-doc review and future-work note recorded. | `README.md`, `scripts/README.md`, `docs/architecture/overview.md`, `docs/INDEX.md` |
 
 ---
 
@@ -166,6 +169,23 @@
 | 2026-04-30 17:39 | Endpoint provider errors verified | `bash tests/apphost/market-data-feature-tests.sh` exited 0; transient startup connection-refused curl retries occurred before health checks succeeded. |
 | 2026-04-30 17:40 | Frontend-visible copy reviewed | Git diff showed no frontend files changed; focused greps confirmed existing source/error labels continue to cover cache-prefixed source values without user-facing text changes. |
 | 2026-04-30 17:42 | Step 4 targeted apphost checks passed | `market-data-feature-tests.sh` and `ibkr-market-data-provider-tests.sh` exited 0; startup curl retries were transient. |
+| 2026-04-30 17:43 | Step 5 started | Full testing and verification gate started. |
+| 2026-04-30 17:44 | Timescale tests passed | `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed 31/31. |
+| 2026-04-30 17:45 | IBKR market-data tests passed | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed 10/10. |
+| 2026-04-30 17:46 | Timescale persistence apphost test passed | `bash tests/apphost/market-data-timescale-persistence-tests.sh` exited 0 and ran the Timescale integration test (1/1 passed). |
+| 2026-04-30 17:48 | Market-data feature apphost test passed | `bash tests/apphost/market-data-feature-tests.sh` exited 0; startup curl retries were transient before API health was ready. |
+| 2026-04-30 17:50 | IBKR provider apphost test passed | `bash tests/apphost/ibkr-market-data-provider-tests.sh` exited 0 and its embedded IBKR tests passed 10/10; startup curl retries were transient. |
+| 2026-04-30 17:51 | Frontend trading workspace test gate skipped | `git diff --name-only HEAD -- frontend` returned no files, so the conditional frontend trading workspace test was not required. |
+| 2026-04-30 17:53 | Full test suite passed | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed all 8 test assemblies (102 total tests). |
+| 2026-04-30 17:54 | Frontend build gate skipped | `git diff --name-only HEAD -- frontend` returned no files, so the conditional frontend build was not required. |
+| 2026-04-30 17:55 | Solution build passed | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
+| 2026-04-30 17:55 | Failure review complete | No test/build failures remain and no unrelated pre-existing failures required documentation. |
+| 2026-04-30 17:56 | Step 6 started | Documentation updates and delivery notes started. |
+| 2026-04-30 18:03 | Must-update docs completed | `paper-trading-workspace`, `provider-abstractions`, and `modules` now document the implemented Timescale-first cache-aside path, freshness window, cache source metadata, and stale-data guardrail. |
+| 2026-04-30 18:04 | Check-if-affected docs reviewed | `README.md`, `scripts/README.md`, and `overview.md` were updated; `docs/INDEX.md` was reviewed with no new active docs needed. |
+| 2026-04-30 18:05 | Delivery discoveries logged | Cache semantics, provider-unavailable behavior, and richer provider-symbol identity future work were added to Discoveries. |
+| 2026-04-30 18:05 | Step 6 completed | Documentation and delivery notes complete. |
+| 2026-04-30 17:28 | Task started | Runtime V2 lane-runner execution |
 
 ---
 

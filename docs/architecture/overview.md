@@ -31,16 +31,17 @@ see_also:
 > `ATrade.Orders` owns deterministic paper-order simulation,
 > `ATrade.MarketData` supplies provider-neutral market-data contracts,
 > `ATrade.MarketData.Ibkr` supplies provider-backed IBKR/iBeam market data,
-> `ATrade.MarketData.Timescale` supplies the TimescaleDB persistence foundation
-> for candles and scanner/trending snapshots, and `ATrade.Workspaces` persists
-> exact provider/market watchlist pins in Postgres. The AppHost graph forwards the safe
-> IBKR/iBeam paper-mode environment contract into `ATrade.Api` and
-> `ATrade.Ibkr.Worker`, provides the `postgres` connection string consumed by
-> the API/workspaces slice plus the `timescaledb` connection string prepared for
-> market-data persistence, and can start an optional `ibkr-gateway`
+> `ATrade.MarketData.Timescale` supplies TimescaleDB persistence plus API
+> cache-aside for candles and scanner/trending snapshots, and `ATrade.Workspaces`
+> persists exact provider/market watchlist pins in Postgres. The AppHost graph
+> forwards the safe IBKR/iBeam paper-mode environment contract into `ATrade.Api`
+> and `ATrade.Ibkr.Worker`, provides the `postgres` connection string consumed by
+> the API/workspaces slice plus the `timescaledb` connection string consumed by
+> market-data cache-aside, and can start an optional `ibkr-gateway`
 > `voyz/ibeam:latest` container only when ignored local `.env` credentials enable
-> integration. Production market-data mocks remain removed, and API cache-aside
-> use of Timescale rows is deferred to TP-030.
+> integration. Production market-data mocks remain removed; fresh Timescale rows
+> can serve market-data HTTP reads, while missing/stale rows refresh from
+> IBKR/iBeam and persist the provider response.
 
 ## 1. Shape Of The System
 
@@ -176,9 +177,10 @@ time-stamped series ATrade generates (e.g. strategy evaluation ticks,
 backtest outputs, broker event streams at observation granularity). The current
 market-data foundation owns an `atrade_market_data` schema for provider-backed
 OHLCV candles and scanner/trending snapshots through
-`ATrade.MarketData.Timescale`; future TP-030 API cache-aside reads decide whether
-rows are fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`.
-TimescaleDB is logically distinct from Postgres even though it runs the Postgres
+`ATrade.MarketData.Timescale`; API cache-aside reads decide whether rows are
+fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, return cache
+hits with `timescale-cache:{originalSource}` source metadata, and refresh from
+the provider when rows are missing or stale. TimescaleDB is logically distinct from Postgres even though it runs the Postgres
 protocol: schemas, retention policies, and continuous aggregates live here and
 do not mix with transactional OLTP data.
 

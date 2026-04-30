@@ -97,11 +97,13 @@ Core types:
   Downstream watchlist pins must treat this provider/market tuple as the exact
   instrument identity rather than collapsing results to a bare symbol or display
   name; `ATrade.Workspaces` exposes the normalized tuple as `instrumentKey` and
-  `pinKey` when a result is persisted. Other payloads include source metadata such as `ibkr-ibeam-history`,
-  `ibkr-ibeam-snapshot`, or scanner source ids. The Timescale persistence
-  foundation stores the same metadata generically as `provider`,
-  `provider_symbol_id`, symbol, exchange, currency, asset class, source, and
-  timestamps; it must not persist frontend-only or IBKR-only API types.
+  `pinKey` when a result is persisted. Other payloads include source metadata
+  such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, scanner source ids, or
+  `timescale-cache:{originalSource}` when a fresh persisted Timescale row serves
+  the API response. The Timescale persistence layer stores provider metadata
+  generically as `provider`, `provider_symbol_id`, symbol, exchange, currency,
+  asset class, source, and timestamps; it must not persist frontend-only or
+  IBKR-only API types.
 
 Compatibility layer:
 
@@ -113,9 +115,11 @@ Compatibility layer:
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`.
 - Production provider composition is now `ATrade.MarketData.Ibkr`; the former
   production market-data mock providers and catalog fallback have been removed.
-- `ATrade.MarketData.Timescale` is a storage foundation, not a provider. TP-030
-  will wire cache-aside behavior on top of it without changing provider-neutral
-  endpoint payloads.
+- `ATrade.MarketData.Timescale` is a storage/cache-aside module, not a market-data
+  provider. In `ATrade.Api` it wraps the concrete provider-backed
+  `MarketDataService` behind `IMarketDataService`, reads fresh Timescale rows
+  before provider calls for trending/candle/indicator inputs, persists provider
+  responses after cache misses, and preserves provider-neutral endpoint payloads.
 
 Unavailable handling:
 
@@ -127,6 +131,11 @@ Unavailable handling:
 - Compatibility services return these safe errors for request/response methods
   that already expose `MarketDataError`; provider tasks must not silently fall
   back to synthetic data when iBeam is unavailable.
+- Timescale cache-aside is allowed to return a fresh persisted response while the
+  provider is unavailable, because the payload is still within the configured
+  freshness window and its source is labeled as cache-backed. Stale or missing
+  rows must not be presented as successful fresh data when provider refresh
+  fails.
 
 ## 4. Analysis Engine Provider Family
 
@@ -161,11 +170,13 @@ Core rules:
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
   swapped by changing DI registration/configuration, not endpoint paths or
-  frontend type names. The current API composes `AddMarketDataModule()` plus
-  `AddIbkrMarketDataProvider()`, `AddAnalysisModule()`, and
-  `AddLeanAnalysisEngine(...)`; LEAN only becomes active when configuration
-  selects it. The Timescale storage extension is available for cache-aside wiring
-  but is not currently registered into `ATrade.Api` endpoint behavior.
+  frontend type names. The current API composes `AddMarketDataModule()`,
+  `AddTimescaleMarketDataPersistence(builder.Configuration)`,
+  `AddIbkrMarketDataProvider()`, `AddTimescaleMarketDataCacheAside()`,
+  `AddAnalysisModule()`, and `AddLeanAnalysisEngine(...)`; LEAN only becomes
+  active when configuration selects it. Endpoint handlers still depend only on
+  provider-neutral services while the Timescale decorator owns cache-aside reads,
+  writes, freshness checks, and storage-unavailable fallback.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.
