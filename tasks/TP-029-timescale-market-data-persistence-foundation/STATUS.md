@@ -1,6 +1,6 @@
 # TP-029: Add TimescaleDB market-data persistence foundation — Status
 
-**Current Step:** Step 3: Add composition and optional integration verification hooks
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -55,15 +55,15 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passing
-- [ ] `dotnet build src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj --nologo --verbosity minimal` passing
-- [ ] `bash tests/apphost/market-data-timescale-persistence-tests.sh` passing or cleanly skipped if added
-- [ ] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passing
-- [ ] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
-- [ ] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
-- [ ] All failures fixed or unrelated pre-existing failures documented
+- [x] `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passing
+- [x] `dotnet build src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj --nologo --verbosity minimal` passing
+- [x] `bash tests/apphost/market-data-timescale-persistence-tests.sh` passing or cleanly skipped if added
+- [x] `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` passing
+- [x] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
+- [x] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
+- [x] All failures fixed or unrelated pre-existing failures documented
 
 ---
 
@@ -104,6 +104,13 @@
 | Optional Timescale integration script starts a local TimescaleDB container when Docker/Podman is available, initializes schema, and round-trips fake candle/trending rows; it exits 0 with SKIP when no runtime is available. | `bash tests/apphost/market-data-timescale-persistence-tests.sh` passed in this environment. | `tests/apphost/market-data-timescale-persistence-tests.sh`, `TimescaleMarketDataIntegrationTests.cs` |
 | API cache-aside behavior remains deferred: no `ATrade.Api` or core `ATrade.MarketData` source/project changes reference the new Timescale module. | Verified with git diff and source grep before checking Step 3 item. | `src/ATrade.Api`, `src/ATrade.MarketData` |
 | Targeted Timescale module verification passed after composition and integration-hook changes. | `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed (20 tests); `dotnet build src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj --nologo --verbosity minimal` passed. | Timescale source/test projects |
+| Step 4 Timescale test gate passed. | `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed (20 tests). | Testing gate |
+| Step 4 Timescale source build passed. | `dotnet build src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj --nologo --verbosity minimal` passed. | Testing gate |
+| Step 4 optional Timescale integration hook passed with local container runtime available. | `bash tests/apphost/market-data-timescale-persistence-tests.sh` passed. | Testing gate |
+| Step 4 AppHost infrastructure manifest gate passed. | `bash tests/apphost/apphost-infrastructure-manifest-tests.sh` exited successfully. | Testing gate |
+| Step 4 full solution test gate passed. | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed with zero failures. | Testing gate |
+| Step 4 full solution build gate passed. | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with zero warnings/errors. | Testing gate |
+| No Step 4 failures remain to fix or document. | All targeted, integration, full test, and solution build commands passed. | Testing gate |
 
 ---
 
@@ -117,6 +124,7 @@
 | 2026-04-30 | Step 1 started | Freshness option implementation |
 | 2026-04-30 | Step 2 started | Timescale schema and repository contracts |
 | 2026-04-30 | Step 3 started | Composition and optional integration verification |
+| 2026-04-30 | Step 4 started | Testing and verification gate |
 
 ---
 
