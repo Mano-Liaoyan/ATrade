@@ -1,6 +1,6 @@
 # TP-029: Add TimescaleDB market-data persistence foundation — Status
 
-**Current Step:** Step 1: Add configurable market-data freshness options
+**Current Step:** Step 2: Create Timescale schema and repository contracts
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -33,13 +33,13 @@
 ---
 
 ### Step 2: Create Timescale schema and repository contracts
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] New `ATrade.MarketData.Timescale` module created
-- [ ] Idempotent Timescale schema initialization added for candles and scanner/trending snapshots
-- [ ] Repository contracts can upsert/read fresh candle series and trending snapshots
-- [ ] Provider metadata remains provider-neutral in storage contracts
-- [ ] SQL-shape/unit tests cover schema, freshness predicates, conflict keys, and connection-name guardrails
+- [x] New `ATrade.MarketData.Timescale` module created
+- [x] Idempotent Timescale schema initialization added for candles and scanner/trending snapshots
+- [x] Repository contracts can upsert/read fresh candle series and trending snapshots
+- [x] Provider metadata remains provider-neutral in storage contracts
+- [x] SQL-shape/unit tests cover schema, freshness predicates, conflict keys, and connection-name guardrails
 
 ---
 
@@ -94,6 +94,11 @@
 | Default market-data cache freshness is exactly 30 minutes in both the committed environment template and typed options default. | Verified by source build/inspection and will be locked with unit tests. | `.env.template`, `src/ATrade.MarketData.Timescale/TimescaleMarketDataOptions.cs` |
 | Freshness option tests cover absent/blank defaults, configured positive values, fractional boundary values, and invalid zero/negative/non-numeric values without loading ignored `.env`. | `dotnet test ... --filter FullyQualifiedName~TimescaleMarketDataOptionsTests` passed (10 tests). | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataOptionsTests.cs` |
 | `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` is documented as non-secret configuration for future Timescale cache-aside reads; it does not enable broker behavior or contain credentials. | Documented in local configuration contract. | `scripts/README.md` |
+| New `ATrade.MarketData.Timescale` source module targets `net10.0`, references `ATrade.MarketData`, and builds independently. | `dotnet build src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj --nologo --verbosity minimal` passed. | `src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj` |
+| Timescale schema initialization creates `atrade_market_data.candles` and `atrade_market_data.trending_snapshots` idempotently with Timescale hypertable calls and freshness-focused indexes. | Source build passed after adding SQL and initializer. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataSql.cs`, `TimescaleMarketDataSchemaInitializer.cs` |
+| Repository contract exposes upsert/read methods for fresh candle series and trending snapshots, with caller-provided freshness cutoffs and no direct API endpoint behavior changes. | Source module build passed after repository/model implementation. | `src/ATrade.MarketData.Timescale/TimescaleMarketDataRepository.cs`, `TimescaleMarketDataModels.cs` |
+| Timescale storage contracts use neutral `provider`/`provider_symbol_id` metadata and do not reference IBKR-specific types, conids, frontend payload types, or API behavior. | Verified with source grep for IBKR/conid/API/frontend terms. | `src/ATrade.MarketData.Timescale/*` |
+| SQL/unit coverage asserts Timescale schema shape, hypertable calls, freshness predicates, upsert conflict keys, workspace-schema avoidance, and `timescaledb` connection guardrails. | `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal` passed (17 tests). | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataSqlTests.cs`, `TimescaleMarketDataRepositoryTests.cs` |
 
 ---
 
@@ -105,6 +110,7 @@
 | 2026-04-30 15:13 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-30 15:13 | Step 0 started | Preflight and scope boundary |
 | 2026-04-30 | Step 1 started | Freshness option implementation |
+| 2026-04-30 | Step 2 started | Timescale schema and repository contracts |
 
 ---
 
