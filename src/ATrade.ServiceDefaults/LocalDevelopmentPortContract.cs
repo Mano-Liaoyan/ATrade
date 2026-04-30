@@ -10,13 +10,15 @@ public sealed record LocalDevelopmentPortContract(
     string LoadedFromPath,
     int ApiHttpPort,
     int FrontendDirectHttpPort,
-    int AppHostFrontendHttpPort);
+    int AppHostFrontendHttpPort,
+    int AspireDashboardHttpPort);
 
 public static class LocalDevelopmentPortContractLoader
 {
     public const string ApiHttpPortVariableName = "ATRADE_API_HTTP_PORT";
     public const string FrontendDirectHttpPortVariableName = "ATRADE_FRONTEND_DIRECT_HTTP_PORT";
     public const string AppHostFrontendHttpPortVariableName = "ATRADE_APPHOST_FRONTEND_HTTP_PORT";
+    public const string AspireDashboardHttpPortVariableName = "ATRADE_ASPIRE_DASHBOARD_HTTP_PORT";
 
     private static readonly Lazy<LocalDevelopmentPortContract> CurrentContract = new(CreateCurrentContract);
 
@@ -46,7 +48,8 @@ public static class LocalDevelopmentPortContractLoader
             loadedFromPath,
             GetRequiredPort(contractValues, ApiHttpPortVariableName, loadedFromPath),
             GetRequiredPort(contractValues, FrontendDirectHttpPortVariableName, loadedFromPath),
-            GetRequiredPort(contractValues, AppHostFrontendHttpPortVariableName, loadedFromPath));
+            GetRequiredPort(contractValues, AppHostFrontendHttpPortVariableName, loadedFromPath),
+            GetOptionalPort(contractValues, AspireDashboardHttpPortVariableName, defaultValue: 0));
     }
 
     private static string ResolveRepositoryRoot()
@@ -130,20 +133,47 @@ public static class LocalDevelopmentPortContractLoader
 
     private static int GetRequiredPort(IReadOnlyDictionary<string, string> contractValues, string variableName, string loadedFromPath)
     {
-        var configuredValue = Environment.GetEnvironmentVariable(variableName);
-        if (string.IsNullOrWhiteSpace(configuredValue) && contractValues.TryGetValue(variableName, out var fileValue))
-        {
-            configuredValue = fileValue;
-        }
+        var configuredValue = GetConfiguredValue(contractValues, variableName);
 
         if (string.IsNullOrWhiteSpace(configuredValue))
         {
             throw new InvalidOperationException($"{variableName} must be provided either through the environment or the local port contract at '{loadedFromPath}'.");
         }
 
-        if (!int.TryParse(configuredValue, out var port) || port is <= 0 or > 65535)
+        return ParsePort(variableName, configuredValue, allowZero: false);
+    }
+
+    private static int GetOptionalPort(
+        IReadOnlyDictionary<string, string> contractValues,
+        string variableName,
+        int defaultValue)
+    {
+        var configuredValue = GetConfiguredValue(contractValues, variableName);
+        if (string.IsNullOrWhiteSpace(configuredValue))
         {
-            throw new InvalidOperationException($"{variableName} must be a valid TCP port, but was '{configuredValue}'.");
+            return defaultValue;
+        }
+
+        return ParsePort(variableName, configuredValue, allowZero: true);
+    }
+
+    private static string? GetConfiguredValue(IReadOnlyDictionary<string, string> contractValues, string variableName)
+    {
+        var configuredValue = Environment.GetEnvironmentVariable(variableName);
+        if (string.IsNullOrWhiteSpace(configuredValue) && contractValues.TryGetValue(variableName, out var fileValue))
+        {
+            configuredValue = fileValue;
+        }
+
+        return configuredValue;
+    }
+
+    private static int ParsePort(string variableName, string configuredValue, bool allowZero)
+    {
+        if (!int.TryParse(configuredValue, out var port) || port > 65535 || port < (allowZero ? 0 : 1))
+        {
+            var validRange = allowZero ? "0..65535" : "1..65535";
+            throw new InvalidOperationException($"{variableName} must be a valid TCP port in the range {validRange}, but was '{configuredValue}'.");
         }
 
         return port;

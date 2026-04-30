@@ -1,6 +1,6 @@
 # TP-032: Make Aspire dashboard port configurable from .env — Status
 
-**Current Step:** Step 0: Preflight and naming decision
+**Current Step:** Step 1: Extend the local port contract
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 1
@@ -23,13 +23,13 @@
 ---
 
 ### Step 1: Extend the local port contract
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `.env.template` defines dashboard HTTP port variable with `0`/ephemeral default
-- [ ] `LocalDevelopmentPortContract` parses optional dashboard port with `0` allowed
-- [ ] Existing required port validation preserved
-- [ ] Default/fixed/invalid dashboard port tests added
-- [ ] Variable remains non-secret and independent from broker settings
+- [x] `.env.template` defines dashboard HTTP port variable with `0`/ephemeral default
+- [x] `LocalDevelopmentPortContract` parses optional dashboard port with `0` allowed
+- [x] Existing required port validation preserved
+- [x] Default/fixed/invalid dashboard port tests added
+- [x] Variable remains non-secret and independent from broker settings
 
 ---
 
@@ -103,6 +103,7 @@
 | 2026-04-30 16:10 | Task started | Runtime V2 lane-runner execution |
 | 2026-04-30 16:10 | Step 0 started | Preflight and naming decision |
 | 2026-04-30 | Step 0 preflight | `launchSettings.json` binds Aspire dashboard UI via `ASPNETCORE_URLS=http://127.0.0.1:0` and OTLP via `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`. |
+| 2026-04-30 | Step 1 started | Local port contract implementation started; existing Step 1 checklist is sufficiently hydrated. |
 
 ---
 
