@@ -1,6 +1,6 @@
 # TP-027: Fix authenticated iBeam refresh transport failures — Status
 
-**Current Step:** Step 2: Add regression coverage for the transport contract
+**Current Step:** Step 3: Verify API and frontend refresh behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 3
@@ -45,12 +45,12 @@
 ---
 
 ### Step 3: Verify API and frontend refresh behavior
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Broker status and market-data trending endpoints use corrected transport path
-- [ ] Safe disabled/missing/unauthenticated/unreachable iBeam responses are preserved
-- [ ] TradingWorkspace retry/refresh recovers after iBeam authentication, with safe error copy if still unavailable
-- [ ] Provider-neutral payloads and no-secrets output preserved
+- [x] Broker status and market-data trending endpoints use corrected transport path
+- [x] Safe disabled/missing/unauthenticated/unreachable iBeam responses are preserved
+- [x] TradingWorkspace retry/refresh recovers after iBeam authentication, with safe error copy if still unavailable
+- [x] Provider-neutral payloads and no-secrets output preserved
 
 ---
 
@@ -120,6 +120,12 @@
 | 2026-04-30 | Step 2 optional smoke | Added opt-in `ATRADE_IBKR_REAL_SMOKE=1` HTTPS auth-status smoke inside `ibeam-runtime-contract-tests.sh`; it skips unless a loopback HTTPS iBeam endpoint responds and it discards response bodies after validating safe boolean status fields. Script passed both default and opt-in/no-runtime skip modes. |
 | 2026-04-30 | Step 2 targeted suite | Changed tests/scripts passed: broker tests (18/18), market-data IBKR tests (6/6), `ibeam-runtime-contract-tests.sh`, `apphost-worker-resource-wiring-tests.sh`, `paper-trading-config-contract-tests.sh`, `ibkr-paper-safety-tests.sh`, `ibkr-market-data-provider-tests.sh`, and `market-data-feature-tests.sh`. Curl connection-refused messages during API startup polling were expected/recovered. |
 | 2026-04-30 | Step 2 complete | Regression coverage added for HTTPS URL defaults, local certificate guardrails, apphost/template scheme contract, optional real smoke skip behavior, and safe diagnostics. |
+| 2026-04-30 | Step 3 started | Verify API and frontend retry/refresh behavior over corrected iBeam transport. |
+| 2026-04-30 | Step 3 API transport simulation | Started a temporary loopback HTTPS fake iBeam with a self-signed cert, then started `ATrade.Api` with `ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:<temp-port>` and fake non-secret credentials. `GET /api/broker/ibkr/status` returned authenticated and `GET /api/market-data/trending` returned IBKR scanner source with AAPL, proving API paths use corrected HTTPS/local-cert transport. |
+| 2026-04-30 | Step 3 safe unavailable states | `bash tests/apphost/ibkr-paper-safety-tests.sh`, `bash tests/apphost/ibkr-market-data-provider-tests.sh`, and `bash tests/apphost/market-data-feature-tests.sh` passed, preserving disabled, credentials-missing, unreachable/configured iBeam, rejected-live, provider-not-configured, and provider-unavailable JSON behavior without mock fallback. |
+| 2026-04-30 | Step 3 frontend retry verification | Source assertions verified `TradingWorkspace` clears market-data errors before reload, renders `Retry IBKR market data`, and wires it to `loadTrendingSymbols`; `frontend/lib/marketDataClient.ts` retains safe provider-unavailable copy. `bash tests/apphost/frontend-trading-workspace-tests.sh` passed including `npm run build`. |
+| 2026-04-30 | Step 3 payload secrecy | `bash tests/apphost/ibeam-runtime-contract-tests.sh` passed redacted status checks; targeted grep of frontend components/libs/types and `src/ATrade.Api/Program.cs` found no gateway URL env names, IBKR credential placeholders, account-id placeholders, session-cookie, or token fields in provider-neutral UI/API payload code. |
+| 2026-04-30 | Step 3 complete | API status/trending paths, safe unavailable responses, frontend retry wiring, and provider-neutral no-secrets payload behavior verified. |
 
 ---
 
