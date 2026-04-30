@@ -1,6 +1,6 @@
 # TP-028: Fix IBKR scanner 411 Length Required for trending — Status
 
-**Current Step:** Step 2: Add scanner request-shape regression coverage
+**Current Step:** Step 3: Verify home-page trending behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -43,12 +43,12 @@
 ---
 
 ### Step 3: Verify home-page trending behavior
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Disabled/missing/unreachable/unauthenticated iBeam states still return safe provider errors
-- [ ] Fake authenticated scanner responses flow through `/api/market-data/trending`
-- [ ] Optional real authenticated iBeam smoke check run or skip rationale recorded
-- [ ] Frontend error copy updated only if needed
+- [x] Disabled/missing/unreachable/unauthenticated iBeam states still return safe provider errors
+- [x] Fake authenticated scanner responses flow through `/api/market-data/trending`
+- [x] Optional real authenticated iBeam smoke check run or skip rationale recorded
+- [x] Frontend error copy updated only if needed
 
 ---
 
@@ -93,6 +93,10 @@
 | Provider error mapping remains `401/403` => `authentication-required` and other scanner failures (including `411`) => `provider-unavailable`; provider diagnostics now redact configured username, password, paper account id, and gateway URL/host before logging or returning scanner/status errors. | Regression tests will cover safe `411` response mapping and secret redaction. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs` |
 | Fake `411 Length Required` scanner responses are now covered by a provider-level regression test that asserts `provider-unavailable` and verifies configured username/password/account id, gateway host, token, and cookie snippets are absent from the returned error. | Safe error mapping coverage added. | `tests/ATrade.MarketData.Ibkr.Tests/IbkrScannerRequestContractTests.cs` |
 | Apphost/source contract coverage now asserts the IBKR scanner client keeps buffered content, explicit `ContentLength`, `TransferEncodingChunked = false`, and the focused scanner request contract test file. | Updated `ibkr-market-data-provider-tests.sh`; `market-data-feature-tests.sh` did not need endpoint assertion changes for this source-level transport contract. | `tests/apphost/ibkr-market-data-provider-tests.sh` |
+| `/api/market-data/trending` apphost coverage now verifies disabled integration, placeholder/missing credentials, unreachable configured gateway, and fake unauthenticated iBeam states all return HTTP 503 safe provider errors without fake success symbols or credential leaks. | Endpoint state coverage added to `market-data-feature-tests.sh`. | `tests/apphost/market-data-feature-tests.sh` |
+| A fake authenticated HTTPS iBeam server in `market-data-feature-tests.sh` returns auth-ready, scanner, and snapshot payloads; the API returns frontend-compatible `TrendingSymbolsResponse` JSON with AAPL scanner source metadata and no credential leakage. | Fake authenticated `/api/market-data/trending` flow verified by apphost script (`SCRIPT_EXIT:0`). | `tests/apphost/market-data-feature-tests.sh` |
+| Optional real iBeam smoke check skipped in this orchestrated lane because it would require ignored local `.env` credentials and an already authenticated interactive Client Portal/iBeam session; automated fake HTTPS iBeam coverage verifies the previous `411` request-shape failure without secrets. | Record skip; no real credentials were read or printed. | Step 3 verification |
+| Frontend market-data error copy already formats `provider-not-configured`, `provider-unavailable`, and `authentication-required` safe API errors and displays retryable IBKR market-data unavailable messaging; no frontend copy/source changes were needed for the backend request-shape fix. | No frontend files changed. | `frontend/lib/marketDataClient.ts`, `frontend/components/TradingWorkspace.tsx` |
 
 ---
 
@@ -120,6 +124,12 @@
 | 2026-04-30 14:56 | Source contract script updated | `ibkr-market-data-provider-tests.sh` now asserts scanner buffered/content-length/no-chunked contract tokens; `bash -n` passed. |
 | 2026-04-30 14:57 | Step 2 targeted tests/scripts run | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (10/10); `bash tests/apphost/ibkr-market-data-provider-tests.sh` passed (`SCRIPT_EXIT:0`). |
 | 2026-04-30 14:57 | Step 2 completed | Added request-shape regression coverage, safe `411` coverage, source-contract assertions, and targeted script verification. |
+| 2026-04-30 14:58 | Step 3 started | Verify `/api/market-data/trending` safe errors and fake authenticated scanner flow. |
+| 2026-04-30 15:07 | Trending safe-error states verified | `market-data-feature-tests.sh` passed with disabled, missing credentials, unreachable gateway, and fake unauthenticated iBeam `/api/market-data/trending` 503 checks. |
+| 2026-04-30 15:07 | Fake authenticated trending verified | `market-data-feature-tests.sh` fake HTTPS iBeam auth/scanner/snapshot server produced HTTP 200 `TrendingSymbolsResponse` for `/api/market-data/trending`. |
+| 2026-04-30 15:07 | Real iBeam smoke skipped | Skipped optional real authenticated smoke check: orchestrated lane has no confirmed interactive iBeam session and `.env` secrets must remain unread/unprinted. |
+| 2026-04-30 15:08 | Frontend error copy reviewed | Existing frontend safe-error formatting/rendering remains appropriate; no frontend files changed. |
+| 2026-04-30 15:08 | Step 3 completed | `/api/market-data/trending` safe-error states, fake authenticated scanner flow, real-runtime skip rationale, and frontend copy review completed. |
 
 ---
 
