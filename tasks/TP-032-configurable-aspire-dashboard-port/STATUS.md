@@ -1,6 +1,6 @@
 # TP-032: Make Aspire dashboard port configurable from .env — Status
 
-**Current Step:** Step 1: Extend the local port contract
+**Current Step:** Step 2: Apply the dashboard port in Unix and Windows start wrappers
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 1
@@ -34,13 +34,13 @@
 ---
 
 ### Step 2: Apply the dashboard port in Unix and Windows start wrappers
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Unix `start.run.sh` exports dashboard `ASPNETCORE_URLS` from local contract
-- [ ] PowerShell `start.run.ps1` loads local contract and exports equivalent dashboard setting
-- [ ] PowerShell env loader added or equivalent parsing implemented without printing secrets
-- [ ] Existing wrapper errors/arguments/delegation preserved
-- [ ] OTLP default preserved unless evidence requires configurability
+- [x] Unix `start.run.sh` exports dashboard `ASPNETCORE_URLS` from local contract
+- [x] PowerShell `start.run.ps1` loads local contract and exports equivalent dashboard setting
+- [x] PowerShell env loader added or equivalent parsing implemented without printing secrets
+- [x] Existing wrapper errors/arguments/delegation preserved
+- [x] OTLP default preserved unless evidence requires configurability
 
 ---
 
@@ -104,6 +104,9 @@
 | 2026-04-30 16:10 | Step 0 started | Preflight and naming decision |
 | 2026-04-30 | Step 0 preflight | `launchSettings.json` binds Aspire dashboard UI via `ASPNETCORE_URLS=http://127.0.0.1:0` and OTLP via `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`. |
 | 2026-04-30 | Step 1 started | Local port contract implementation started; existing Step 1 checklist is sufficiently hydrated. |
+| 2026-04-30 | Step 1 targeted tests | `bash tests/apphost/local-port-contract-tests.sh` and `bash tests/apphost/paper-trading-config-contract-tests.sh` passed. |
+| 2026-04-30 | Step 2 started | Start wrapper implementation started; existing Step 2 checklist is sufficiently hydrated. |
+| 2026-04-30 | Step 2 targeted tests | `bash -n` wrapper syntax checks and `bash tests/start-contract/start-wrapper-tests.sh` passed; PowerShell syntax smoke skipped because `pwsh` is unavailable in this environment. |
 
 ---
 
