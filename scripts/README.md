@@ -176,6 +176,20 @@ Behavior must stay semantically identical across platforms.
 - same environment contract where possible
 - platform-specific wrappers may differ internally, but not conceptually
 
+## Solution File Contract
+
+Repository-level .NET verification commands use `ATrade.slnx` as the
+authoritative solution file:
+
+```bash
+dotnet test ATrade.slnx --nologo --verbosity minimal
+dotnet build ATrade.slnx --nologo --verbosity minimal
+```
+
+`ATrade.sln` remains temporarily as a non-authoritative compatibility artifact
+for older tooling only. Startup and verification scripts should inspect, build,
+and test `ATrade.slnx` instead of adding new active `ATrade.sln` guidance.
+
 ## Current Verification Scope
 
 - `./start run` and direct AppHost startup are verified in this repository's Linux environment
