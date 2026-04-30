@@ -1,11 +1,11 @@
 # TP-029: Add TimescaleDB market-data persistence foundation — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Preflight and scope boundary
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,11 +13,11 @@
 ---
 
 ### Step 0: Preflight and scope boundary
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Existing AppHost `timescaledb` resource and API reference confirmed
-- [ ] Current lack of Timescale market-data persistence confirmed
-- [ ] Scope boundary recorded: persistence/options now, API cache-aside in TP-030
+- [x] Existing AppHost `timescaledb` resource and API reference confirmed
+- [x] Current lack of Timescale market-data persistence confirmed
+- [x] Scope boundary recorded: persistence/options now, API cache-aside in TP-030
 
 ---
 
@@ -87,6 +87,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| AppHost already declares `timescaledb` as a dedicated Aspire Postgres resource using the TimescaleDB image and passes it to `ATrade.Api` via `.WithReference(timescaledb)`. | Verified as Step 0 scope input. | `src/ATrade.AppHost/Program.cs` |
+| Current API market-data endpoints resolve directly through `IMarketDataService`, which delegates to the configured provider; there is no Timescale project/reference or market-data persistence path yet. | Confirms TP-029 must add persistence foundation without changing endpoint behavior. | `src/ATrade.Api/Program.cs`, `src/ATrade.MarketData/MarketDataService.cs`, `src/ATrade.Api/ATrade.Api.csproj` |
+| Scope boundary: TP-029 adds Timescale schema/repository/options/composition only; TP-030 will wire `/api/market-data/*` cache-aside reads/writes and endpoint behavior changes. | Recorded in Step 0 and will be preserved in docs/delivery notes. | Task boundary |
 
 ---
 
@@ -95,6 +98,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-30 15:13 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-30 15:13 | Step 0 started | Preflight and scope boundary |
 
 ---
 
