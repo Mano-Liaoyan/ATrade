@@ -127,6 +127,7 @@ app.MapPost(
 app.MapGet("/api/workspace/watchlist", GetWorkspaceWatchlistAsync);
 app.MapPut("/api/workspace/watchlist", ReplaceWorkspaceWatchlistAsync);
 app.MapPost("/api/workspace/watchlist", PinWorkspaceWatchlistSymbolAsync);
+app.MapDelete("/api/workspace/watchlist/pins/{instrumentKey}", UnpinWorkspaceWatchlistInstrumentAsync);
 app.MapDelete("/api/workspace/watchlist/{symbol}", UnpinWorkspaceWatchlistSymbolAsync);
 
 app.MapHub<MarketDataHub>("/hubs/market-data");
@@ -300,6 +301,19 @@ static Task<IResult> PinWorkspaceWatchlistSymbolAsync(
         var normalizedSymbol = NormalizePinnedSymbolRequest(symbol);
         await schemaInitializer.InitializeAsync(cancellationToken);
         var response = await repository.PinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
+        return Results.Ok(response);
+    });
+
+static Task<IResult> UnpinWorkspaceWatchlistInstrumentAsync(
+    string instrumentKey,
+    IWorkspaceIdentityProvider identityProvider,
+    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
+    IWorkspaceWatchlistRepository repository,
+    CancellationToken cancellationToken) =>
+    ExecuteWatchlistRequestAsync(async () =>
+    {
+        await schemaInitializer.InitializeAsync(cancellationToken);
+        var response = await repository.UnpinByInstrumentKeyAsync(identityProvider.Current, instrumentKey, cancellationToken);
         return Results.Ok(response);
     });
 

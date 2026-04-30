@@ -93,12 +93,15 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (IbkrMarketDataProviderException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data status check failed safely.");
-            return MarketDataProviderStatus.Unavailable(Identity, Capabilities, exception.Message);
+            var message = RedactConfiguredValues(exception.Message);
+            logger.LogWarning("IBKR iBeam market-data status check failed safely: {Diagnostic}", message);
+            return MarketDataProviderStatus.Unavailable(Identity, Capabilities, message);
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data status endpoint is not reachable over local HTTPS transport.");
+            logger.LogWarning(
+                "IBKR iBeam market-data status endpoint is not reachable over local HTTPS transport: {Diagnostic}",
+                RedactConfiguredValues(exception.Message));
             return MarketDataProviderStatus.Unavailable(
                 Identity,
                 Capabilities,
@@ -466,13 +469,16 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (IbkrMarketDataProviderException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data request failed safely.");
-            error = new MarketDataError(exception.Code, exception.Message);
+            var message = RedactConfiguredValues(exception.Message);
+            logger.LogWarning("IBKR iBeam market-data request failed safely: {Diagnostic}", message);
+            error = new MarketDataError(exception.Code, message);
             return false;
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data request could not reach the local HTTPS gateway transport.");
+            logger.LogWarning(
+                "IBKR iBeam market-data request could not reach the local HTTPS gateway transport: {Diagnostic}",
+                RedactConfiguredValues(exception.Message));
             error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportUnavailableMessage());
             return false;
         }
@@ -482,6 +488,27 @@ public sealed class IbkrMarketDataProvider(
             error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market-data request failed safely.");
             return false;
         }
+    }
+
+    private string RedactConfiguredValues(string message)
+    {
+        var redactedMessage = message;
+        foreach (var value in new[]
+        {
+            gatewayOptions.Username,
+            gatewayOptions.Password,
+            gatewayOptions.PaperAccountId,
+            gatewayOptions.GatewayBaseUrl?.ToString(),
+            gatewayOptions.GatewayBaseUrl?.Host,
+        })
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                redactedMessage = redactedMessage.Replace(value, "[redacted]", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        return redactedMessage;
     }
 
     private static T Run<T>(Func<CancellationToken, Task<T>> operation) =>

@@ -3,9 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getTrendingSymbols } from '../lib/marketDataClient';
 import {
+  createWatchlistInstrumentKey,
   getWatchlist,
+  getWatchlistPinKey,
+  normalizeWatchlistAssetClass,
   pinWatchlistSymbol,
+  unpinWatchlistInstrument,
   unpinWatchlistSymbol,
+  type WatchlistInstrumentIdentity,
   type WatchlistResponse,
   type WatchlistSymbol,
   type WatchlistSymbolInput,
@@ -32,7 +37,7 @@ export function TradingWorkspace() {
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [watchlistSource, setWatchlistSource] = useState<WatchlistSource>('backend');
-  const [savingSymbol, setSavingSymbol] = useState<string | null>(null);
+  const [savingPinKey, setSavingPinKey] = useState<string | null>(null);
 
   const applyWatchlistResponse = useCallback((response: WatchlistResponse) => {
     setWatchlistSymbols(response.symbols);
@@ -85,76 +90,81 @@ export function TradingWorkspace() {
     [trendingSymbols],
   );
 
-  const pinnedSymbolNames = useMemo(() => watchlistSymbols.map((symbol) => symbol.symbol.toUpperCase()), [watchlistSymbols]);
+  const pinnedInstrumentKeys = useMemo(() => watchlistSymbols.map(getWatchlistPinKey), [watchlistSymbols]);
+  const pinnedInstrumentKeySet = useMemo(() => new Set(pinnedInstrumentKeys), [pinnedInstrumentKeys]);
 
   const handleTogglePin = useCallback(
     async (symbol: TrendingSymbol) => {
-      if (watchlistLoading || watchlistError || savingSymbol) {
+      if (watchlistLoading || watchlistError || savingPinKey) {
         return;
       }
 
-      const normalizedSymbol = symbol.symbol.toUpperCase();
-      setSavingSymbol(normalizedSymbol);
+      const input = createWatchlistInput(symbol);
+      const pinKey = createWatchlistInstrumentKey(input);
+      setSavingPinKey(pinKey);
 
       try {
-        const response = pinnedSymbolNames.includes(normalizedSymbol)
-          ? await unpinWatchlistSymbol(normalizedSymbol)
-          : await pinWatchlistSymbol(createWatchlistInput(symbol));
+        const response = pinnedInstrumentKeySet.has(pinKey)
+          ? await unpinWatchlistInstrument(pinKey)
+          : await pinWatchlistSymbol(input);
         applyWatchlistResponse(response);
       } catch (caughtError) {
         setWatchlistError(formatWatchlistError(caughtError, false));
       } finally {
-        setSavingSymbol(null);
+        setSavingPinKey(null);
       }
     },
-    [applyWatchlistResponse, pinnedSymbolNames, savingSymbol, watchlistError, watchlistLoading],
+    [applyWatchlistResponse, pinnedInstrumentKeySet, savingPinKey, watchlistError, watchlistLoading],
   );
 
   const handleToggleSearchPin = useCallback(
     async (result: MarketDataSymbolSearchResult) => {
-      if (watchlistLoading || watchlistError || savingSymbol) {
+      if (watchlistLoading || watchlistError || savingPinKey) {
         return;
       }
 
-      const normalizedSymbol = getSearchResultSymbol(result);
-      setSavingSymbol(normalizedSymbol);
+      const input = createSearchResultWatchlistInput(result);
+      const pinKey = createWatchlistInstrumentKey(input);
+      setSavingPinKey(pinKey);
 
       try {
-        const response = pinnedSymbolNames.includes(normalizedSymbol)
-          ? await unpinWatchlistSymbol(normalizedSymbol)
-          : await pinWatchlistSymbol(createSearchResultWatchlistInput(result));
+        const response = pinnedInstrumentKeySet.has(pinKey)
+          ? await unpinWatchlistInstrument(pinKey)
+          : await pinWatchlistSymbol(input);
         applyWatchlistResponse(response);
       } catch (caughtError) {
         setWatchlistError(formatWatchlistError(caughtError, false));
       } finally {
-        setSavingSymbol(null);
+        setSavingPinKey(null);
       }
     },
-    [applyWatchlistResponse, pinnedSymbolNames, savingSymbol, watchlistError, watchlistLoading],
+    [applyWatchlistResponse, pinnedInstrumentKeySet, savingPinKey, watchlistError, watchlistLoading],
   );
 
   const handleRemovePin = useCallback(
-    async (symbol: string) => {
-      if (watchlistLoading || watchlistError || savingSymbol) {
+    async (symbol: WatchlistSymbol) => {
+      if (watchlistLoading || watchlistError || savingPinKey) {
         return;
       }
 
-      const normalizedSymbol = symbol.trim().toUpperCase();
-      setSavingSymbol(normalizedSymbol);
+      const pinKey = getWatchlistPinKey(symbol);
+      setSavingPinKey(pinKey);
 
       try {
-        const response = await unpinWatchlistSymbol(normalizedSymbol);
+        const response = pinKey
+          ? await unpinWatchlistInstrument(pinKey)
+          : await unpinWatchlistSymbol(symbol.symbol);
         applyWatchlistResponse(response);
       } catch (caughtError) {
         setWatchlistError(formatWatchlistError(caughtError, false));
       } finally {
-        setSavingSymbol(null);
+        setSavingPinKey(null);
       }
     },
-    [applyWatchlistResponse, savingSymbol, watchlistError, watchlistLoading],
+    [applyWatchlistResponse, savingPinKey, watchlistError, watchlistLoading],
   );
 
-  const watchlistActionsDisabled = watchlistLoading || Boolean(watchlistError) || savingSymbol !== null;
+  const watchlistActionsDisabled = watchlistLoading || Boolean(watchlistError) || savingPinKey !== null;
 
   return (
     <section className="workspace-stack" data-testid="trading-workspace">
@@ -164,9 +174,9 @@ export function TradingWorkspace() {
       </div>
 
       <SymbolSearch
-        pinnedSymbols={pinnedSymbolNames}
+        pinnedInstrumentKeys={pinnedInstrumentKeys}
         actionsDisabled={watchlistActionsDisabled}
-        savingSymbol={savingSymbol}
+        savingPinKey={savingPinKey}
         onTogglePin={handleToggleSearchPin}
       />
 
@@ -198,11 +208,11 @@ export function TradingWorkspace() {
           {!marketDataError && sortedTrendingSymbols.length > 0 ? (
             <TrendingList
               symbols={sortedTrendingSymbols}
-              pinnedSymbols={pinnedSymbolNames}
+              pinnedInstrumentKeys={pinnedInstrumentKeys}
               source={marketDataSource}
               onTogglePin={handleTogglePin}
               actionsDisabled={watchlistActionsDisabled}
-              savingSymbol={savingSymbol}
+              savingPinKey={savingPinKey}
             />
           ) : null}
 
@@ -213,7 +223,7 @@ export function TradingWorkspace() {
             error={watchlistError}
             source={watchlistSource}
             actionsDisabled={watchlistActionsDisabled}
-            savingSymbol={savingSymbol}
+            savingPinKey={savingPinKey}
             onRetry={() => void loadWatchlist()}
             onRemove={handleRemovePin}
           />
@@ -232,11 +242,13 @@ async function migrateCachedWatchlistAfterBackendLoad(response: WatchlistRespons
   let nextResponse = response;
 
   if (cachedSymbols.length > 0) {
-    const backendSymbols = new Set(response.symbols.map((symbol) => symbol.symbol.toUpperCase()));
+    const backendInstrumentKeys = new Set(response.symbols.map(getWatchlistPinKey));
     for (const cachedSymbol of cachedSymbols) {
-      if (!backendSymbols.has(cachedSymbol)) {
-        nextResponse = await pinWatchlistSymbol(createManualWatchlistInput(cachedSymbol));
-        backendSymbols.add(cachedSymbol);
+      const manualInput = createManualWatchlistInput(cachedSymbol);
+      const manualPinKey = createWatchlistInstrumentKey(manualInput);
+      if (!backendInstrumentKeys.has(manualPinKey)) {
+        nextResponse = await pinWatchlistSymbol(manualInput);
+        backendInstrumentKeys.add(manualPinKey);
       }
     }
   }
@@ -252,21 +264,22 @@ function createWatchlistInput(symbol: TrendingSymbol): WatchlistSymbolInput {
     name: symbol.name,
     exchange: symbol.exchange,
     currency: 'USD',
-    assetClass: normalizeAssetClass(symbol.assetClass),
+    assetClass: normalizeWatchlistAssetClass(symbol.assetClass),
   };
 }
 
 function createSearchResultWatchlistInput(result: MarketDataSymbolSearchResult): WatchlistSymbolInput {
+  const provider = result.provider || result.identity.provider;
   const providerSymbolId = result.providerSymbolId ?? result.identity.providerSymbolId;
   return {
     symbol: getSearchResultSymbol(result),
-    provider: result.provider || result.identity.provider,
+    provider,
     providerSymbolId,
-    ibkrConid: parseIbkrConid(result.provider || result.identity.provider, providerSymbolId),
+    ibkrConid: parseIbkrConid(provider, providerSymbolId),
     name: result.name,
     exchange: result.exchange || result.identity.exchange,
     currency: result.currency || result.identity.currency,
-    assetClass: normalizeAssetClass(result.assetClass || result.identity.assetClass),
+    assetClass: normalizeWatchlistAssetClass(result.assetClass || result.identity.assetClass),
   };
 }
 
@@ -283,10 +296,6 @@ function getSearchResultSymbol(result: MarketDataSymbolSearchResult): string {
   return (result.symbol || result.identity.symbol).toUpperCase();
 }
 
-function normalizeAssetClass(assetClass: string): string {
-  return assetClass.toUpperCase() === 'STOCK' ? 'STK' : assetClass.toUpperCase();
-}
-
 function parseIbkrConid(provider: string, providerSymbolId: string | null): number | null {
   if (provider.toLowerCase() !== 'ibkr' || !providerSymbolId || !/^\d+$/.test(providerSymbolId)) {
     return null;
@@ -296,8 +305,18 @@ function parseIbkrConid(provider: string, providerSymbolId: string | null): numb
 }
 
 function createCachedWatchlistSymbol(symbol: string, sortOrder: number): WatchlistSymbol {
+  const identity: WatchlistInstrumentIdentity = {
+    symbol,
+    provider: 'cache',
+    currency: 'USD',
+    assetClass: 'STK',
+  };
+  const instrumentKey = createWatchlistInstrumentKey(identity);
+
   return {
     symbol,
+    instrumentKey,
+    pinKey: instrumentKey,
     provider: 'cache',
     providerSymbolId: null,
     ibkrConid: null,
@@ -313,5 +332,5 @@ function createCachedWatchlistSymbol(symbol: string, sortOrder: number): Watchli
 
 function formatWatchlistError(caughtError: unknown, cachedSymbolsVisible: boolean): string {
   const message = caughtError instanceof Error ? caughtError.message : 'The watchlist backend is unavailable.';
-  return cachedSymbolsVisible ? `${message} Cached pins are shown read-only until the backend returns.` : message;
+  return cachedSymbolsVisible ? `${message} Cached legacy pins are shown read-only until the backend returns.` : message;
 }

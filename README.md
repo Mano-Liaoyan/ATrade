@@ -41,7 +41,10 @@ The repository-wide startup contract is the repo-local `start` shim:
 - Windows Command Prompt: `./start.cmd run`
 
 All variants delegate to the Aspire AppHost so one command can bring up the
-API, worker, frontend, and local infrastructure.
+API, worker, frontend, and local infrastructure. Local bind-port overrides,
+including the optional fixed Aspire dashboard UI port
+(`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback), are
+kept in ignored `.env` and documented in `scripts/README.md`.
 
 ## Current Runtime Surface
 
@@ -70,12 +73,14 @@ The current runnable slice includes:
   - `GET /api/workspace/watchlist`
   - `PUT /api/workspace/watchlist`
   - `POST /api/workspace/watchlist`
+  - `DELETE /api/workspace/watchlist/pins/{instrumentKey}`
   - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
 - `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
+- `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence foundation for OHLCV candles and scanner/trending snapshots, with configurable freshness options for TP-030 cache-aside wiring.
 - `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI/Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
-- `src/ATrade.Workspaces` — Postgres-backed workspace preference module for pinned watchlists and provider-ready symbol metadata, including IBKR search-result pins.
+- `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
 
@@ -85,18 +90,23 @@ configured with the HTTPS Client Portal URL (`https://127.0.0.1:<gateway-port>`)
 the AppHost-mounted iBeam inputs config allows the local/private Docker bridge
 source addresses that published-port requests use, and iBeam is authenticated
 through ignored `.env` values, API endpoints return IBKR scanner, snapshot, and
-historical bar data with source metadata. When iBeam
-is disabled, missing credentials, unauthenticated, or unreachable, the API and
-frontend surface safe provider-not-configured/provider-unavailable states instead
-of falling back to production mocks. Pinned symbols are backend-owned workspace
-preferences persisted in the AppHost-managed Postgres database through
+historical bar data with source metadata. Timescale market-data schema and
+repository contracts now exist for provider-backed candles and scanner/trending
+snapshots, but `/api/market-data/*` continues to use the provider path directly
+until TP-030 wires cache-aside behavior with `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`
+(default `30`). When iBeam is disabled, missing credentials, unauthenticated, or
+unreachable, the API and frontend surface safe provider-not-configured/provider-unavailable states instead
+of falling back to production mocks. Pinned instruments are backend-owned
+workspace preferences persisted in the AppHost-managed Postgres database through
 `ATrade.Workspaces` and surfaced to the frontend through
-`/api/workspace/watchlist`; browser `localStorage` is only a non-authoritative
-cache / one-time migration source. Users can search IBKR/iBeam stocks through
-`/api/market-data/search`, open result chart pages, and pin provider metadata
-(`provider`, provider symbol id / IBKR `conid`, name, exchange, currency, and
-asset class) into the backend watchlist without a production hard-coded symbol
-catalog. Analysis engine discovery/run contracts are available through
+`/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity;
+browser `localStorage` is only a non-authoritative symbol-only cache / one-time
+manual migration source. Users can search IBKR/iBeam stocks through
+`/api/market-data/search`, see explicit provider/market/exchange/currency/asset
+class metadata with local market badges, open result chart pages, and pin exact
+provider-market metadata (`provider`, provider symbol id / IBKR `conid`, name,
+exchange, currency, and asset class) into the backend watchlist without a
+production hard-coded symbol catalog. Analysis engine discovery/run contracts are available through
 `/api/analysis/engines` and `/api/analysis/run`. With no provider selected they
 return explicit `analysis-engine-not-configured` metadata with no fake signals;
 when ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers

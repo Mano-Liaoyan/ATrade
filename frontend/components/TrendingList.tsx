@@ -1,19 +1,20 @@
 'use client';
 
 import Link from 'next/link';
+import { createWatchlistInstrumentKey, normalizeWatchlistAssetClass } from '../lib/watchlistClient';
 import type { TrendingSymbol } from '../types/marketData';
 
 type TrendingListProps = {
   symbols: TrendingSymbol[];
-  pinnedSymbols: string[];
+  pinnedInstrumentKeys: string[];
   onTogglePin: (symbol: TrendingSymbol) => void;
   actionsDisabled?: boolean;
-  savingSymbol?: string | null;
+  savingPinKey?: string | null;
   source?: string | null;
 };
 
-export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisabled = false, savingSymbol = null, source = null }: TrendingListProps) {
-  const pinnedSet = new Set(pinnedSymbols.map((symbol) => symbol.toUpperCase()));
+export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actionsDisabled = false, savingPinKey = null, source = null }: TrendingListProps) {
+  const pinnedSet = new Set(pinnedInstrumentKeys);
 
   return (
     <section className="workspace-panel" aria-labelledby="trending-title" data-testid="trending-list">
@@ -27,11 +28,12 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisab
 
       <div className="symbol-grid">
         {symbols.map((symbol) => {
-          const pinned = pinnedSet.has(symbol.symbol);
-          const isSaving = savingSymbol === symbol.symbol.toUpperCase();
+          const pinKey = createTrendingPinKey(symbol);
+          const pinned = pinnedSet.has(pinKey);
+          const isSaving = savingPinKey === pinKey;
 
           return (
-            <article className="symbol-card" key={symbol.symbol}>
+            <article className="symbol-card" key={pinKey}>
               <div className="symbol-card__topline">
                 <div>
                   <Link className="symbol-link" href={`/symbols/${encodeURIComponent(symbol.symbol)}`}>
@@ -80,6 +82,16 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisab
       </div>
     </section>
   );
+}
+
+function createTrendingPinKey(symbol: TrendingSymbol): string {
+  return createWatchlistInstrumentKey({
+    symbol: symbol.symbol,
+    provider: 'ibkr',
+    exchange: symbol.exchange,
+    currency: 'USD',
+    assetClass: normalizeWatchlistAssetClass(symbol.assetClass),
+  });
 }
 
 function formatSourceLabel(source: string | null): string {

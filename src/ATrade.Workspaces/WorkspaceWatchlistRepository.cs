@@ -23,6 +23,11 @@ public interface IWorkspaceWatchlistRepository
         WorkspaceIdentity identity,
         string symbol,
         CancellationToken cancellationToken = default);
+
+    Task<WorkspaceWatchlistResponse> UnpinByInstrumentKeyAsync(
+        WorkspaceIdentity identity,
+        string instrumentKey,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class WorkspaceStorageUnavailableException : InvalidOperationException

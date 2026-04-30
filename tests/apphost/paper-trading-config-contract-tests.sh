@@ -71,6 +71,7 @@ required = {
     'ATRADE_API_HTTP_PORT': '5181',
     'ATRADE_FRONTEND_DIRECT_HTTP_PORT': '3111',
     'ATRADE_APPHOST_FRONTEND_HTTP_PORT': '3000',
+    'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT': '0',
     'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
     'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
     'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000',
@@ -101,6 +102,12 @@ for key in values:
 
 if values['ATRADE_BROKER_ACCOUNT_MODE'] != 'Paper':
     raise SystemExit('ATRADE_BROKER_ACCOUNT_MODE must remain Paper in committed defaults')
+
+if values['ATRADE_ASPIRE_DASHBOARD_HTTP_PORT'] != '0':
+    raise SystemExit('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must preserve the ephemeral dashboard default')
+
+if any(token in 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
+    raise SystemExit('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must remain a non-secret local port key')
 
 if values['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
     raise SystemExit('ATRADE_BROKER_INTEGRATION_ENABLED must remain false in committed defaults')

@@ -5,6 +5,8 @@ namespace ATrade.Workspaces;
 public static partial class WorkspaceWatchlistErrorCodes
 {
     public const string InvalidSymbol = "invalid-symbol";
+    public const string InvalidInstrumentKey = "invalid-instrument-key";
+    public const string AmbiguousSymbol = "ambiguous-symbol";
     public const string StorageUnavailable = "watchlist-storage-unavailable";
 }
 

@@ -1,11 +1,11 @@
 # TP-028: Fix IBKR scanner 411 Length Required for trending — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-04-30
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code changes. Workers expand steps when runtime discoveries warrant it — aim for 2-5 outcome-level items per step, not exhaustive implementation scripts.
@@ -13,65 +13,65 @@
 ---
 
 ### Step 0: Preflight and failure classification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Sanitized `/api/market-data/trending` 411 failure recorded without secrets
-- [ ] Current scanner request shape inspected and likely root cause recorded
-- [ ] Fake-handler and optional real-iBeam verification plan recorded
+- [x] Sanitized `/api/market-data/trending` 411 failure recorded without secrets
+- [x] Current scanner request shape inspected and likely root cause recorded
+- [x] Fake-handler and optional real-iBeam verification plan recorded
 
 ---
 
 ### Step 1: Send a Client Portal-compatible scanner request
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Scanner request sends POST JSON with explicit positive `Content-Length` and no chunked transfer
-- [ ] Scanner payload semantics remain equivalent or source-evidenced corrections are documented
-- [ ] Safe provider error mapping and no-secrets diagnostics preserved
-- [ ] Scanner response parsing still maps valid fake IBKR responses to trending symbols
-- [ ] Targeted provider tests run
+- [x] Scanner request sends POST JSON with explicit positive `Content-Length` and no chunked transfer
+- [x] Scanner payload semantics remain equivalent or source-evidenced corrections are documented
+- [x] Safe provider error mapping and no-secrets diagnostics preserved
+- [x] Scanner response parsing still maps valid fake IBKR responses to trending symbols
+- [x] Targeted provider tests run
 
 ---
 
 ### Step 2: Add scanner request-shape regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] New focused scanner request contract test file added
-- [ ] Fake `411 Length Required` error mapping covered safely
-- [ ] Apphost/source contract scripts updated if needed
-- [ ] Targeted tests/scripts run
+- [x] New focused scanner request contract test file added
+- [x] Fake `411 Length Required` error mapping covered safely
+- [x] Apphost/source contract scripts updated if needed
+- [x] Targeted tests/scripts run
 
 ---
 
 ### Step 3: Verify home-page trending behavior
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Disabled/missing/unreachable/unauthenticated iBeam states still return safe provider errors
-- [ ] Fake authenticated scanner responses flow through `/api/market-data/trending`
-- [ ] Optional real authenticated iBeam smoke check run or skip rationale recorded
-- [ ] Frontend error copy updated only if needed
+- [x] Disabled/missing/unreachable/unauthenticated iBeam states still return safe provider errors
+- [x] Fake authenticated scanner responses flow through `/api/market-data/trending`
+- [x] Optional real authenticated iBeam smoke check run or skip rationale recorded
+- [x] Frontend error copy updated only if needed
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passing
-- [ ] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passing
-- [ ] `bash tests/apphost/market-data-feature-tests.sh` passing
-- [ ] Frontend trading workspace tests passing if frontend files changed
-- [ ] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
-- [ ] Frontend build passing if frontend files changed
-- [ ] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
-- [ ] All failures fixed or unrelated pre-existing failures documented
+- [x] `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passing
+- [x] `bash tests/apphost/ibkr-market-data-provider-tests.sh` passing
+- [x] `bash tests/apphost/market-data-feature-tests.sh` passing
+- [x] Frontend trading workspace tests passing if frontend files changed
+- [x] FULL test suite passing: `dotnet test ATrade.slnx --nologo --verbosity minimal`
+- [x] Frontend build passing if frontend files changed
+- [x] Solution build passing: `dotnet build ATrade.slnx --nologo --verbosity minimal`
+- [x] All failures fixed or unrelated pre-existing failures documented
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged with root cause, coverage, and real-runtime verification/skip rationale
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged with root cause, coverage, and real-runtime verification/skip rationale
 
 ---
 
@@ -86,6 +86,20 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Sanitized observed failure: `GET /api/market-data/trending` fails when the IBKR/iBeam scanner response is `411 Length Required` with an HTML edge/Akamai-style body; no credentials, account IDs, cookies, tokens, or session values were recorded. | Classify scanner request shape and fix provider transport. | Step 0 preflight |
+| Current scanner implementation uses `HttpClient.PostAsJsonAsync` for `POST /v1/api/iserver/scanner/run` with JSON scanner payload (`instrument=STK`, `location=STK.US.MAJOR`, `type=TOP_PERC_GAIN`, empty `filter`). This preserves method/content-type/payload intent but does not guarantee a precomputed `Content-Length`; .NET may send streaming JSON with `Transfer-Encoding: chunked`, which is the likely Client Portal-incompatible shape behind the edge `411 Length Required`. | Replace scanner transport with buffered JSON content that explicitly sets a positive `Content-Length` and leaves chunked transfer disabled. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` |
+| Verification plan: fake `HttpMessageHandler` tests can capture the scanner `HttpRequestMessage`, assert method/path/content-type/body/`Content-Length`/no chunked transfer, return fake scanner payloads, and return fake `411 Length Required` HTML bodies without any real IBKR credentials. Optional real iBeam verification will use ignored local `.env` plus `./start run` only if already configured/authenticated; otherwise record a clean skip rationale. | Cover request shape and error mapping in automated fake-handler tests; defer real-runtime smoke to Step 3. | `tests/ATrade.MarketData.Ibkr.Tests` / Step 3 |
+| Scanner payload semantics were preserved while changing transport: the request still serializes `instrument=STK`, `location=STK.US.MAJOR`, `type=TOP_PERC_GAIN`, and an empty `filter` array. | No source-evidenced payload correction required for TP-028; regression coverage will assert the existing payload shape. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` |
+| Provider error mapping remains `401/403` => `authentication-required` and other scanner failures (including `411`) => `provider-unavailable`; provider diagnostics now redact configured username, password, paper account id, and gateway URL/host before logging or returning scanner/status errors. | Regression tests will cover safe `411` response mapping and secret redaction. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs` |
+| Fake `411 Length Required` scanner responses are now covered by a provider-level regression test that asserts `provider-unavailable` and verifies configured username/password/account id, gateway host, token, and cookie snippets are absent from the returned error. | Safe error mapping coverage added. | `tests/ATrade.MarketData.Ibkr.Tests/IbkrScannerRequestContractTests.cs` |
+| Apphost/source contract coverage now asserts the IBKR scanner client keeps buffered content, explicit `ContentLength`, `TransferEncodingChunked = false`, and the focused scanner request contract test file. | Updated `ibkr-market-data-provider-tests.sh`; `market-data-feature-tests.sh` did not need endpoint assertion changes for this source-level transport contract. | `tests/apphost/ibkr-market-data-provider-tests.sh` |
+| `/api/market-data/trending` apphost coverage now verifies disabled integration, placeholder/missing credentials, unreachable configured gateway, and fake unauthenticated iBeam states all return HTTP 503 safe provider errors without fake success symbols or credential leaks. | Endpoint state coverage added to `market-data-feature-tests.sh`. | `tests/apphost/market-data-feature-tests.sh` |
+| A fake authenticated HTTPS iBeam server in `market-data-feature-tests.sh` returns auth-ready, scanner, and snapshot payloads; the API returns frontend-compatible `TrendingSymbolsResponse` JSON with AAPL scanner source metadata and no credential leakage. | Fake authenticated `/api/market-data/trending` flow verified by apphost script (`SCRIPT_EXIT:0`). | `tests/apphost/market-data-feature-tests.sh` |
+| Optional real iBeam smoke check skipped in this orchestrated lane because it would require ignored local `.env` credentials and an already authenticated interactive Client Portal/iBeam session; automated fake HTTPS iBeam coverage verifies the previous `411` request-shape failure without secrets. | Record skip; no real credentials were read or printed. | Step 3 verification |
+| Frontend market-data error copy already formats `provider-not-configured`, `provider-unavailable`, and `authentication-required` safe API errors and displays retryable IBKR market-data unavailable messaging; no frontend copy/source changes were needed for the backend request-shape fix. | No frontend files changed. | `frontend/lib/marketDataClient.ts`, `frontend/components/TradingWorkspace.tsx` |
+| Must-update docs now describe the scanner request/body-length contract and `/api/market-data/trending` `411 Length Required` fix. | Updated provider contract and workspace troubleshooting/runtime language. | `docs/architecture/provider-abstractions.md`, `docs/architecture/paper-trading-workspace.md` |
+| Check-if-affected docs reviewed: module boundaries did not change, no new docs were added, local iBeam startup guidance/env variables did not change, and README runtime surface remains accurate with scanner/trending reliability covered by architecture docs. | No updates needed to `docs/architecture/modules.md`, `README.md`, `scripts/README.md`, or `docs/INDEX.md`. | Step 5 docs review |
+| Delivery summary: root cause was scanner `PostAsJsonAsync` not guaranteeing `Content-Length` and possibly using chunked transfer; fix uses buffered JSON with explicit positive `Content-Length`, preserved payload semantics, safe redaction, unit/request-shape/`411` tests, source-contract assertions, apphost fake HTTPS iBeam `/trending` coverage, full .NET tests, and solution build. Real authenticated iBeam smoke was skipped because no interactive authenticated local session was available and secrets were not read. | Ready for delivery with automated fake-runtime coverage and documented real-runtime skip rationale. | TP-028 delivery |
 
 ---
 
@@ -94,6 +108,49 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-04-30 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-04-30 14:52 | Task started | Runtime V2 lane-runner execution |
+| 2026-04-30 14:52 | Step 0 started | Preflight and failure classification |
+| 2026-04-30 14:52 | Sanitized failure recorded | `/api/market-data/trending` scanner failure classified as safe `411 Length Required` HTML edge response without secrets. |
+| 2026-04-30 14:52 | Scanner request inspected | Found `PostAsJsonAsync` scanner transport likely omits explicit `Content-Length` / may use chunked transfer despite otherwise-correct POST JSON payload. |
+| 2026-04-30 14:52 | Verification plan recorded | Fake HTTP handlers can assert scanner request shape and safe `411` mapping; optional real iBeam smoke will be skipped unless local ignored credentials and authenticated runtime are available. |
+| 2026-04-30 14:52 | Step 0 completed | Failure classified; root cause and verification approach recorded. |
+| 2026-04-30 14:53 | Step 1 started | Implement Client Portal-compatible buffered scanner request. |
+| 2026-04-30 14:53 | Scanner transport updated | Replaced scanner `PostAsJsonAsync` with buffered `HttpRequestMessage` JSON content, explicit positive `Content-Length`, and chunked transfer disabled. |
+| 2026-04-30 14:53 | Scanner payload preserved | Kept existing top-percent-gainer stock scanner semantics while changing only request buffering/headers. |
+| 2026-04-30 14:53 | Provider diagnostics preserved | Kept auth/unavailable mapping and added configured-value redaction before provider messages are logged or returned. |
+| 2026-04-30 14:54 | Scanner parsing verified | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --filter FullyQualifiedName~Provider_MapsContractLookupSnapshotsHistoricalBarsAndScannerResults` passed (1/1). |
+| 2026-04-30 14:54 | Step 1 targeted tests run | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (8/8). |
+| 2026-04-30 14:54 | Step 1 completed | Scanner transport, payload preservation, safe error mapping, parsing, and targeted provider tests completed. |
+| 2026-04-30 14:55 | Step 2 started | Add scanner request-shape and `411` regression coverage. |
+| 2026-04-30 14:55 | Scanner request contract test added | Added `IbkrScannerRequestContractTests` and verified the request-shape test passes with explicit JSON content length and no chunked transfer. |
+| 2026-04-30 14:56 | Safe `411` mapping test added | `Provider_ConvertsScannerLengthRequiredToSafeUnavailableErrorWithoutLeakingConfiguredSecrets` passed and covers sanitized provider-unavailable mapping. |
+| 2026-04-30 14:56 | Source contract script updated | `ibkr-market-data-provider-tests.sh` now asserts scanner buffered/content-length/no-chunked contract tokens; `bash -n` passed. |
+| 2026-04-30 14:57 | Step 2 targeted tests/scripts run | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (10/10); `bash tests/apphost/ibkr-market-data-provider-tests.sh` passed (`SCRIPT_EXIT:0`). |
+| 2026-04-30 14:57 | Step 2 completed | Added request-shape regression coverage, safe `411` coverage, source-contract assertions, and targeted script verification. |
+| 2026-04-30 14:58 | Step 3 started | Verify `/api/market-data/trending` safe errors and fake authenticated scanner flow. |
+| 2026-04-30 15:07 | Trending safe-error states verified | `market-data-feature-tests.sh` passed with disabled, missing credentials, unreachable gateway, and fake unauthenticated iBeam `/api/market-data/trending` 503 checks. |
+| 2026-04-30 15:07 | Fake authenticated trending verified | `market-data-feature-tests.sh` fake HTTPS iBeam auth/scanner/snapshot server produced HTTP 200 `TrendingSymbolsResponse` for `/api/market-data/trending`. |
+| 2026-04-30 15:07 | Real iBeam smoke skipped | Skipped optional real authenticated smoke check: orchestrated lane has no confirmed interactive iBeam session and `.env` secrets must remain unread/unprinted. |
+| 2026-04-30 15:08 | Frontend error copy reviewed | Existing frontend safe-error formatting/rendering remains appropriate; no frontend files changed. |
+| 2026-04-30 15:08 | Step 3 completed | `/api/market-data/trending` safe-error states, fake authenticated scanner flow, real-runtime skip rationale, and frontend copy review completed. |
+| 2026-04-30 15:09 | Step 4 started | Begin required verification commands. |
+| 2026-04-30 15:09 | IBKR market-data unit tests passed | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (10/10). |
+| 2026-04-30 15:10 | IBKR apphost provider script passed | `bash tests/apphost/ibkr-market-data-provider-tests.sh` passed (`SCRIPT_EXIT:0`). |
+| 2026-04-30 15:12 | Market-data feature script passed | `bash tests/apphost/market-data-feature-tests.sh` passed (`SCRIPT_EXIT:0`) including fake authenticated iBeam scanner flow. |
+| 2026-04-30 15:12 | Frontend workspace tests skipped | `git diff --name-only HEAD~4..HEAD -- frontend` returned no frontend files changed, so `frontend-trading-workspace-tests.sh` was not required. |
+| 2026-04-30 15:12 | Full .NET test suite passed | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed (67 total tests across solution). |
+| 2026-04-30 15:12 | Frontend build skipped | No frontend files changed in TP-028, so `cd frontend && npm run build` was not required. |
+| 2026-04-30 15:13 | Solution build passed | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
+| 2026-04-30 15:13 | Verification failure review completed | Initial `market-data-feature-tests.sh` expectation used a shortened scanner source string; fixed to the provider constant, reran successfully, and no unrelated/pre-existing failures remain. |
+| 2026-04-30 15:13 | Step 4 completed | Required test, script, full-suite, and build verification completed; frontend-only checks skipped because no frontend files changed. |
+| 2026-04-30 15:14 | Step 5 started | Update active docs and delivery discoveries. |
+| 2026-04-30 15:15 | Must-update docs modified | Added explicit IBKR scanner JSON `Content-Length`/no-chunked contract and user-facing `411` trending fix notes. |
+| 2026-04-30 15:15 | Check-if-affected docs reviewed | Reviewed modules, README, scripts README, and docs index; no updates required because responsibilities/startup contract/index did not change. |
+| 2026-04-30 15:15 | Delivery discoveries finalized | Root cause, regression coverage, verification commands, and real-iBeam skip rationale recorded in Discoveries. |
+| 2026-04-30 15:15 | Step 5 completed | Documentation and delivery notes finalized. |
+| 2026-04-30 15:15 | Task completed | All TP-028 steps complete; STATUS marked complete. |
+| 2026-04-30 15:13 | Worker iter 1 | done in 1288s, tools: 144 |
+| 2026-04-30 15:13 | Task complete | .DONE created |
 
 ---
 

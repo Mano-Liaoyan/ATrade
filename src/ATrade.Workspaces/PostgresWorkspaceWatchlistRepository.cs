@@ -113,11 +113,45 @@ public sealed class PostgresWorkspaceWatchlistRepository(IWorkspacePostgresDataS
             await using var command = dataSourceProvider.GetDataSource().CreateCommand(PostgresWorkspaceWatchlistSql.DeletePinnedSymbol);
             AddIdentityParameters(command, identity);
             command.Parameters.AddWithValue("symbol", NpgsqlDbType.Text, normalizedSymbol);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                var candidateCount = reader.GetInt32(0);
+                if (candidateCount > 1)
+                {
+                    throw new WorkspaceWatchlistValidationException(
+                        WorkspaceWatchlistErrorCodes.AmbiguousSymbol,
+                        $"Symbol '{normalizedSymbol}' has multiple market-specific pins. Remove one by instrumentKey instead.",
+                        nameof(symbol));
+                }
+            }
         }
         catch (NpgsqlException exception)
         {
             throw new WorkspaceStorageUnavailableException("Postgres workspace watchlist unpin failed.", exception);
+        }
+
+        return await GetAsync(identity, cancellationToken);
+    }
+
+    public async Task<WorkspaceWatchlistResponse> UnpinByInstrumentKeyAsync(
+        WorkspaceIdentity identity,
+        string instrumentKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        var normalizedInstrumentKey = WorkspaceWatchlistInstrumentKey.NormalizeExistingKey(instrumentKey);
+
+        try
+        {
+            await using var command = dataSourceProvider.GetDataSource().CreateCommand(PostgresWorkspaceWatchlistSql.DeletePinnedInstrumentKey);
+            AddIdentityParameters(command, identity);
+            command.Parameters.AddWithValue("instrument_key", NpgsqlDbType.Text, normalizedInstrumentKey);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (NpgsqlException exception)
+        {
+            throw new WorkspaceStorageUnavailableException("Postgres workspace watchlist exact unpin failed.", exception);
         }
 
         return await GetAsync(identity, cancellationToken);
@@ -131,6 +165,7 @@ public sealed class PostgresWorkspaceWatchlistRepository(IWorkspacePostgresDataS
 
     private static void AddSymbolParameters(NpgsqlCommand command, NormalizedWorkspaceWatchlistSymbolInput symbol, DateTimeOffset observedAtUtc)
     {
+        command.Parameters.AddWithValue("instrument_key", NpgsqlDbType.Text, symbol.InstrumentKey);
         command.Parameters.AddWithValue("symbol", NpgsqlDbType.Text, symbol.Symbol);
         command.Parameters.AddWithValue("provider", NpgsqlDbType.Text, symbol.Provider);
         command.Parameters.AddWithValue("provider_symbol_id", NpgsqlDbType.Text, NullableValue(symbol.ProviderSymbolId));
@@ -148,16 +183,24 @@ public sealed class PostgresWorkspaceWatchlistRepository(IWorkspacePostgresDataS
 
     private static object NullableValue(string? value) => value is null ? DBNull.Value : value;
 
-    private static WorkspaceWatchlistSymbol ReadSymbol(NpgsqlDataReader reader) => new(
-        reader.GetString(0),
-        reader.GetString(1),
-        reader.IsDBNull(2) ? null : reader.GetString(2),
-        reader.IsDBNull(3) ? null : reader.GetInt64(3),
-        reader.IsDBNull(4) ? null : reader.GetString(4),
-        reader.IsDBNull(5) ? null : reader.GetString(5),
-        reader.IsDBNull(6) ? null : reader.GetString(6),
-        reader.IsDBNull(7) ? null : reader.GetString(7),
-        reader.GetInt32(8),
-        reader.GetFieldValue<DateTimeOffset>(9),
-        reader.GetFieldValue<DateTimeOffset>(10));
+    private static WorkspaceWatchlistSymbol ReadSymbol(NpgsqlDataReader reader)
+    {
+        var symbol = reader.GetString(0);
+        var instrumentKey = reader.GetString(1);
+
+        return new WorkspaceWatchlistSymbol(
+            symbol,
+            instrumentKey,
+            instrumentKey,
+            reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetInt64(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6),
+            reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.IsDBNull(8) ? null : reader.GetString(8),
+            reader.GetInt32(9),
+            reader.GetFieldValue<DateTimeOffset>(10),
+            reader.GetFieldValue<DateTimeOffset>(11));
+    }
 }

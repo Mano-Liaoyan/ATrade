@@ -2,6 +2,9 @@ const WATCHLIST_STORAGE_KEY = 'atrade.paperTrading.watchlist.v1';
 const WATCHLIST_BACKEND_MIGRATION_KEY = 'atrade.paperTrading.watchlist.backendMigrated.v1';
 const SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,31}$/;
 
+// Legacy browser storage is intentionally symbol-only. It is used only as a
+// read-only fallback and one-time manual-symbol migration source; provider /
+// market-specific pinned state always comes from the backend watchlist API.
 export function readCachedWatchlist(): string[] {
   if (typeof window === 'undefined') {
     return [];

@@ -14,6 +14,7 @@
     <Project Path="src/ATrade.Brokers.Ibkr/ATrade.Brokers.Ibkr.csproj" />
     <Project Path="src/ATrade.MarketData/ATrade.MarketData.csproj" />
     <Project Path="src/ATrade.MarketData.Ibkr/ATrade.MarketData.Ibkr.csproj" />
+    <Project Path="src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj" />
     <Project Path="src/ATrade.Orders/ATrade.Orders.csproj" />
     <Project Path="src/ATrade.ServiceDefaults/ATrade.ServiceDefaults.csproj" />
     <Project Path="src/ATrade.Workspaces/ATrade.Workspaces.csproj" />
@@ -23,6 +24,7 @@
     <Project Path="tests/ATrade.Analysis.Lean.Tests/ATrade.Analysis.Lean.Tests.csproj" />
     <Project Path="tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj" />
     <Project Path="tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj" />
+    <Project Path="tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj" />
     <Project Path="tests/ATrade.Orders.Tests/ATrade.Orders.Tests.csproj" />
     <Project Path="tests/ATrade.ProviderAbstractions.Tests/ATrade.ProviderAbstractions.Tests.csproj" />
     <Project Path="tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj" />

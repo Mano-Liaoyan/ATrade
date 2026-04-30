@@ -29,14 +29,18 @@ see_also:
 > `ATrade.Brokers` defines the provider-neutral broker contract,
 > `ATrade.Brokers.Ibkr` supplies the paper-only IBKR implementation,
 > `ATrade.Orders` owns deterministic paper-order simulation,
-> `ATrade.MarketData` supplies provider-neutral market-data contracts plus the
-> current temporary deterministic provider until TP-022 replaces production
-> mocks with IBKR/iBeam data, and `ATrade.Workspaces` persists pinned watchlist
-> symbols in Postgres. The AppHost graph forwards the safe IBKR/iBeam
-> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`,
-> provides the `postgres` connection string consumed by the API/workspaces
-> slice, and can start an optional `ibkr-gateway` `voyz/ibeam:latest` container
-> only when ignored local `.env` credentials enable integration.
+> `ATrade.MarketData` supplies provider-neutral market-data contracts,
+> `ATrade.MarketData.Ibkr` supplies provider-backed IBKR/iBeam market data,
+> `ATrade.MarketData.Timescale` supplies the TimescaleDB persistence foundation
+> for candles and scanner/trending snapshots, and `ATrade.Workspaces` persists
+> exact provider/market watchlist pins in Postgres. The AppHost graph forwards the safe
+> IBKR/iBeam paper-mode environment contract into `ATrade.Api` and
+> `ATrade.Ibkr.Worker`, provides the `postgres` connection string consumed by
+> the API/workspaces slice plus the `timescaledb` connection string prepared for
+> market-data persistence, and can start an optional `ibkr-gateway`
+> `voyz/ibeam:latest` container only when ignored local `.env` credentials enable
+> integration. Production market-data mocks remain removed, and API cache-aside
+> use of Timescale rows is deferred to TP-030.
 
 ## 1. Shape Of The System
 
@@ -99,7 +103,10 @@ supported platform:
 
 All three wrappers must resolve to the same behavior: launch the Aspire
 AppHost located under `src/ATrade.AppHost`. The AppHost is the only place
-that knows how to wire processes to infrastructure.
+that knows how to wire processes to infrastructure. The human-facing Aspire
+dashboard UI keeps the safe ephemeral loopback default (`0`) unless ignored
+`.env` sets `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` to a non-zero fixed local port;
+the dashboard OTLP endpoint remains ephemeral.
 
 Reserved-but-not-yet-implemented subcommands (`test`, `build`, `lint`,
 `fmt`, `agents:dispatch`, `plans:check`, `docs:check`) are enumerated in
@@ -157,18 +164,23 @@ are owned by the backend module that owns the entity.
 
 Current implementation note: `ATrade.Workspaces` now initializes and owns the
 Postgres schema for pinned workspace watchlists through the AppHost-provided
-`ConnectionStrings:postgres` reference. Watchlist rows use a temporary
-`local-user` / `paper-trading` identity seam until authentication and named
-workspaces exist.
+`ConnectionStrings:postgres` reference. Watchlist rows use a durable
+`instrument_key` derived from provider, provider id / IBKR `conid`, symbol,
+exchange, currency, and asset class, plus a temporary `local-user` /
+`paper-trading` identity seam until authentication and named workspaces exist.
 
 ### 4.2 TimescaleDB — time-series workloads
 
 TimescaleDB hosts market-data hypertables and any other strictly
 time-stamped series ATrade generates (e.g. strategy evaluation ticks,
-backtest outputs, broker event streams at observation granularity). It is
-logically distinct from Postgres even though it runs the Postgres protocol:
-schemas, retention policies, and continuous aggregates live here and do not
-mix with transactional OLTP data.
+backtest outputs, broker event streams at observation granularity). The current
+market-data foundation owns an `atrade_market_data` schema for provider-backed
+OHLCV candles and scanner/trending snapshots through
+`ATrade.MarketData.Timescale`; future TP-030 API cache-aside reads decide whether
+rows are fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`.
+TimescaleDB is logically distinct from Postgres even though it runs the Postgres
+protocol: schemas, retention policies, and continuous aggregates live here and
+do not mix with transactional OLTP data.
 
 ### 4.3 Redis — low-latency cache and ephemeral state
 
@@ -205,8 +217,8 @@ Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
 and trending symbols. The backend and UI halves of that direction are now
 started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
 states, deterministic paper-order simulation, provider-backed market-data
-surfaces, SignalR chart updates, Postgres-backed watchlist preferences, and the
-optional LEAN analysis provider already route through `ATrade.Api`. The slice
+surfaces, SignalR chart updates, exact Postgres-backed watchlist preferences,
+and the optional LEAN analysis provider already route through `ATrade.Api`. The slice
 keeps the current modular-monolith and Aspire contracts intact by routing
 browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
 updates, using NATS for internal fan-out, keeping orders simulated rather than

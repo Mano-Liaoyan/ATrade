@@ -5,12 +5,12 @@ namespace ATrade.Workspaces.Tests;
 public sealed class WorkspaceWatchlistNormalizerTests
 {
     [Fact]
-    public void NormalizeReplacement_DeduplicatesAndEnrichesCaseInsensitiveSymbolsWhilePreservingFirstSeenOrder()
+    public void NormalizeReplacement_DeduplicatesOnlyExactInstrumentKeysWhilePreservingFirstSeenOrder()
     {
         var normalized = WorkspaceWatchlistNormalizer.NormalizeReplacement(
             new[]
             {
-                new WorkspaceWatchlistSymbolInput(" aapl ", Provider: "manual", Name: "Apple Inc."),
+                new WorkspaceWatchlistSymbolInput(" aapl ", Provider: "manual", Name: "Apple manual"),
                 new WorkspaceWatchlistSymbolInput("MSFT"),
                 new WorkspaceWatchlistSymbolInput(
                     "AAPL",
@@ -21,6 +21,15 @@ public sealed class WorkspaceWatchlistNormalizerTests
                     Exchange: "nasdaq",
                     Currency: "usd",
                     AssetClass: "stk"),
+                new WorkspaceWatchlistSymbolInput(
+                    "aapl",
+                    Provider: "ibkr",
+                    ProviderSymbolId: " 265598 ",
+                    IbkrConid: 265598,
+                    Name: "Apple Inc. Class A",
+                    Exchange: "NASDAQ",
+                    Currency: "USD",
+                    AssetClass: "STK"),
                 new WorkspaceWatchlistSymbolInput("brk.b"),
             });
 
@@ -30,13 +39,10 @@ public sealed class WorkspaceWatchlistNormalizerTests
             {
                 Assert.Equal("AAPL", symbol.Symbol);
                 Assert.Equal(0, symbol.SortOrder);
-                Assert.Equal("ibkr", symbol.Provider);
-                Assert.Equal("265598", symbol.ProviderSymbolId);
-                Assert.Equal(265598, symbol.IbkrConid);
-                Assert.Equal("Apple Inc.", symbol.Name);
-                Assert.Equal("NASDAQ", symbol.Exchange);
-                Assert.Equal("USD", symbol.Currency);
-                Assert.Equal("STK", symbol.AssetClass);
+                Assert.Equal("manual", symbol.Provider);
+                Assert.Null(symbol.ProviderSymbolId);
+                Assert.Null(symbol.IbkrConid);
+                Assert.Equal("Apple manual", symbol.Name);
             },
             symbol =>
             {
@@ -45,40 +51,37 @@ public sealed class WorkspaceWatchlistNormalizerTests
             },
             symbol =>
             {
-                Assert.Equal("BRK.B", symbol.Symbol);
+                Assert.Equal("AAPL", symbol.Symbol);
                 Assert.Equal(2, symbol.SortOrder);
+                Assert.Equal("ibkr", symbol.Provider);
+                Assert.Equal("265598", symbol.ProviderSymbolId);
+                Assert.Equal(265598, symbol.IbkrConid);
+                Assert.Equal("Apple Inc. Class A", symbol.Name);
+                Assert.Equal("NASDAQ", symbol.Exchange);
+                Assert.Equal("USD", symbol.Currency);
+                Assert.Equal("STK", symbol.AssetClass);
+            },
+            symbol =>
+            {
+                Assert.Equal("BRK.B", symbol.Symbol);
+                Assert.Equal(3, symbol.SortOrder);
             });
     }
 
     [Fact]
-    public void NormalizeReplacement_DeduplicatesProviderConidsBeforeFallingBackToSymbols()
+    public void NormalizeReplacement_KeepsSameSymbolDifferentMarketsAsSeparatePins()
     {
         var normalized = WorkspaceWatchlistNormalizer.NormalizeReplacement(
             new[]
             {
-                new WorkspaceWatchlistSymbolInput("ABC", Provider: "ibkr", ProviderSymbolId: "123", IbkrConid: 123, Name: "ABC Common", Exchange: "nyse"),
-                new WorkspaceWatchlistSymbolInput("ABC.W", Provider: "ibkr", ProviderSymbolId: "123", IbkrConid: 123, Name: "ABC Alias", Exchange: "nyse"),
-                new WorkspaceWatchlistSymbolInput("abc", Provider: "manual", Name: "ABC Manual"),
-                new WorkspaceWatchlistSymbolInput("XYZ"),
-                new WorkspaceWatchlistSymbolInput("xyz"),
+                new WorkspaceWatchlistSymbolInput("BHP", Provider: "ibkr", ProviderSymbolId: "1001", IbkrConid: 1001, Name: "BHP Group", Exchange: "NYSE", Currency: "USD"),
+                new WorkspaceWatchlistSymbolInput("BHP", Provider: "ibkr", ProviderSymbolId: "2002", IbkrConid: 2002, Name: "BHP Group", Exchange: "LSE", Currency: "GBP"),
+                new WorkspaceWatchlistSymbolInput("BHP", Provider: "ibkr", ProviderSymbolId: "3003", IbkrConid: 3003, Name: "BHP Group", Exchange: "ASX", Currency: "AUD"),
             });
 
-        Assert.Collection(
-            normalized,
-            symbol =>
-            {
-                Assert.Equal("ABC", symbol.Symbol);
-                Assert.Equal("ibkr", symbol.Provider);
-                Assert.Equal("123", symbol.ProviderSymbolId);
-                Assert.Equal(123, symbol.IbkrConid);
-                Assert.Equal(0, symbol.SortOrder);
-            },
-            symbol =>
-            {
-                Assert.Equal("XYZ", symbol.Symbol);
-                Assert.Equal("manual", symbol.Provider);
-                Assert.Equal(1, symbol.SortOrder);
-            });
+        Assert.Equal(3, normalized.Count);
+        Assert.Equal(new[] { "NYSE", "LSE", "ASX" }, normalized.Select(symbol => symbol.Exchange));
+        Assert.Equal(3, normalized.Select(symbol => symbol.InstrumentKey).Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]
@@ -105,6 +108,7 @@ public sealed class WorkspaceWatchlistNormalizerTests
         Assert.Equal("USD", normalized.Currency);
         Assert.Equal("STK", normalized.AssetClass);
         Assert.Equal(7, normalized.SortOrder);
+        Assert.Equal("provider=ibkr|providerSymbolId=272093|ibkrConid=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK", normalized.InstrumentKey);
     }
 
     [Fact]
@@ -139,5 +143,6 @@ public sealed class WorkspaceWatchlistNormalizerTests
         Assert.Null(normalized.Exchange);
         Assert.Equal("USD", normalized.Currency);
         Assert.Equal("STK", normalized.AssetClass);
+        Assert.Equal("provider=manual|providerSymbolId=|ibkrConid=|symbol=NVDA|exchange=|currency=USD|assetClass=STK", normalized.InstrumentKey);
     }
 }
