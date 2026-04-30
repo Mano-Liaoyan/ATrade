@@ -34,8 +34,8 @@ see_also:
 > and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
 > first real IBKR/iBeam market-data provider including secdef search/detail
 > mapping. `ATrade.MarketData.Timescale` now provides the TimescaleDB persistence
-> foundation for provider-backed candles and scanner/trending snapshots without
-> changing API endpoint behavior yet. `ATrade.Analysis` now defines the
+> foundation plus the API cache-aside decorator for provider-backed candles and
+> scanner/trending snapshots. `ATrade.Analysis` now defines the
 > provider-neutral analysis engine seam, API-facing registry, normalized request/result shapes, engine/source
 > metadata, and no-configured-engine fallback. `ATrade.Analysis.Lean` now
 > implements LEAN as the first analysis engine provider behind that seam using
@@ -66,9 +66,10 @@ see_also:
 > `/api/workspace/watchlist`, exact `DELETE`
 > `/api/workspace/watchlist/pins/{instrumentKey}`, legacy `DELETE`
 > `/api/workspace/watchlist/{symbol}`, and `/hubs/market-data` while the worker limits itself to paper-safe
-> session/status monitoring. Timescale market-data storage contracts are present
-> for TP-030 cache-aside wiring, but `/api/market-data/*` still reads through the
-> provider path directly in this slice.
+> session/status monitoring. `/api/market-data/trending`, candle, and indicator
+> HTTP reads now use TimescaleDB first when rows are fresh under
+> `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`; misses or stale rows refresh from
+> IBKR/iBeam and persist the provider response before returning it.
 
 ## 1. How To Read This Document
 
@@ -153,19 +154,25 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   services over `IMarketDataProvider` / `IMarketDataStreamingProvider` while
   returning IBKR/iBeam scanner, stock search, snapshot, historical candle,
   indicator, source metadata, and provider-unavailable/authentication-required
-  payloads without a production fallback provider. The analysis endpoints
+  payloads without a production fallback provider. For trending, candle, and
+  indicator HTTP paths, API composition wraps the provider-backed service with
+  `ATrade.MarketData.Timescale`, reads fresh Timescale rows before provider
+  access, persists provider responses on cache misses, and labels cache hits with
+  `timescale-cache:{originalSource}` source metadata. The analysis endpoints
   resolve `IAnalysisEngineRegistry`, expose provider-neutral engine
   discovery/run payloads, return explicit `analysis-engine-not-configured`
   responses when no engine is selected, and invoke the LEAN provider over
-  market-data-provider candles when configured. The watchlist endpoints resolve the temporary local workspace identity, initialize
-  the `ATrade.Workspaces` schema idempotently, persist exact provider/market
+  cache-aware `IMarketDataService` candles when configured. The watchlist
+  endpoints resolve the temporary local workspace identity, initialize the
+  `ATrade.Workspaces` schema idempotently, persist exact provider/market
   instrument pins in Postgres, return stable `instrumentKey`/`pinKey` metadata
   payloads, and surface validation/storage failures as stable JSON errors. The AppHost now injects runtime connection
   information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`; the API
-  consumes `Postgres` functionally for workspace watchlists today. Later slices
-  add authenticated REST/streaming endpoints for deeper accounts, charts,
-  strategies, and market-data queries plus translation of HTTP requests into
-  module calls and NATS publications.
+  consumes `Postgres` for workspace watchlists and `TimescaleDB` for fresh
+  market-data cache-aside reads today. Later slices add authenticated
+  REST/streaming endpoints for deeper accounts, charts, strategies, and broader
+  market-data queries plus translation of HTTP requests into module calls and
+  NATS publications.
 - **Expected dependencies:** `ATrade.ServiceDefaults`, `ATrade.Accounts`,
   `ATrade.Brokers`, `ATrade.Brokers.Ibkr`, `ATrade.Orders`,
   `ATrade.MarketData`, `ATrade.MarketData.Ibkr`, `ATrade.Analysis`,
@@ -245,10 +252,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   class, exchange, currency, and name so UI/watchlist payloads remain provider-neutral.
   Concrete providers are registered by composition; production no
   longer ships a deterministic market-data provider or catalog fallback. The
-  Timescale persistence foundation now lives in `ATrade.MarketData.Timescale`;
-  TP-030 will decide when API cache-aside reads can use fresh stored rows before
-  refreshing from providers. Future slices may publish real-time updates onto
-  NATS for API / SignalR projection and cache hot reads in Redis.
+  Timescale persistence and cache-aside integration now live in
+  `ATrade.MarketData.Timescale`; API trending, candle, and indicator reads can
+  use fresh stored rows before refreshing from providers. Future slices may
+  publish real-time updates onto NATS for API / SignalR projection and cache hot
+  reads in Redis.
 - **Expected dependencies:** No external runtime services in the contract module
   beyond composition into `ATrade.Api`; concrete providers such as
   `ATrade.MarketData.Ibkr` depend on broker/iBeam configuration and gateway
@@ -256,24 +264,33 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **First-phase focus:** Keep HTTP/SignalR payloads provider-neutral while the
   current workspace uses the IBKR/iBeam provider behind this boundary.
 
-#### 2.7.1 `ATrade.MarketData.Timescale` *(exists today, Timescale persistence foundation)*
+#### 2.7.1 `ATrade.MarketData.Timescale` *(exists today, Timescale persistence and cache-aside)*
 
-- **Purpose:** Provider-neutral TimescaleDB storage for market-data time series.
+- **Purpose:** Provider-neutral TimescaleDB storage and API cache-aside for
+  market-data time series.
 - **Responsibilities:** Own the `atrade_market_data` schema, idempotent
   Timescale initialization for candle and scanner/trending snapshot hypertables,
   repository contracts for upserting/reading fresh candle series and trending
-  snapshots, and typed cache freshness options from
-  `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`. Storage records provider metadata
-  as generic `provider` / `provider_symbol_id` fields plus symbol, exchange,
-  currency, asset class, source, generated/observed timestamps, and write
-  timestamps.
+  snapshots, typed cache freshness options from
+  `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, and the `IMarketDataService`
+  decorator used by `ATrade.Api`. Storage records provider metadata as generic
+  `provider` / `provider_symbol_id` fields plus symbol, exchange, currency,
+  asset class, source, generated/observed timestamps, and write timestamps.
+  The decorator reads fresh rows before provider calls for trending, candles, and
+  indicator candle inputs; writes provider responses after cache misses or stale
+  rows; returns cache hits with `timescale-cache:{originalSource}` source
+  metadata; and falls back to provider behavior when Timescale storage is
+  unavailable.
 - **Expected dependencies:** `ATrade.MarketData`, `TimescaleDB` via
   AppHost-provided `ConnectionStrings:timescaledb`, .NET configuration/DI
-  abstractions, and `Npgsql`. It intentionally does not depend on
-  `ATrade.Api`, frontend types, or concrete provider modules such as
-  `ATrade.MarketData.Ibkr`.
-- **First-phase focus:** Establish storage/options and verification hooks only;
-  TP-030 wires API cache-aside behavior.
+  abstractions, and `Npgsql`. The storage/repository layer intentionally does not
+  depend on `ATrade.Api`, frontend types, or concrete provider modules such as
+  `ATrade.MarketData.Ibkr`; only API composition wires the cache-aside decorator
+  around the provider-backed service.
+- **First-phase focus:** Serve browser-facing market-data HTTP reads from fresh
+  persisted provider rows when available, refresh and persist IBKR/iBeam data on
+  miss/stale reads, and preserve safe provider-unavailable behavior when neither
+  fresh cache nor provider data is available.
 
 ### 2.8 `ATrade.Analysis` *(exists today, provider-neutral analysis engine seam)*
 
@@ -461,14 +478,15 @@ references.
 - **Expected dependencies:** `ATrade.Api` for all data; the Aspire
   AppHost for process lifecycle and environment wiring.
 - **First-phase focus:** UI surfaces for paper-only IBKR connection /
-  account views, simulated orders, IBKR/iBeam-backed market data, clear
+  account views, simulated orders, API-served IBKR/iBeam market data with fresh
+  Timescale cache hits when available, clear
   provider-not-configured/provider-unavailable/authentication-required states,
   and transparent trending-factor/source explanations. The current slice
   preserves the stable home-page markers (`ATrade Frontend Home` / `Next.js
   Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding the first
-  workspace route: IBKR scanner-backed trending stocks/ETFs, reusable IBKR stock
-  search controls, symbol navigation to `/symbols/[symbol]`, backend watchlist
-  API reads/writes with provider metadata and a non-authoritative localStorage
+  workspace route: Timescale-first/IBKR scanner-backed trending stocks/ETFs,
+  reusable IBKR stock search controls, symbol navigation to `/symbols/[symbol]`,
+  backend watchlist API reads/writes with provider metadata and a non-authoritative localStorage
   cache/migration source, `lightweight-charts` candlesticks with `1m` / `5m` /
   `1h` / `1D` timeframe switching, moving-average / RSI / MACD panels, SignalR
   updates with HTTP fallback, and explicit no-real-orders messaging.

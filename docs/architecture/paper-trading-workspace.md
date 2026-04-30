@@ -30,10 +30,10 @@ see_also:
 > backend-owned `GET` / `PUT` / `POST` / legacy symbol `DELETE`
 > `/api/workspace/watchlist` endpoints plus exact
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
-> AppHost-managed Postgres resource, a TimescaleDB market-data persistence
-> foundation in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
+> AppHost-managed Postgres resource, a TimescaleDB-backed market-data
+> cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js workspace with IBKR
-> scanner-driven trending symbols, IBKR stock search, exact market-specific
+> scanner-driven or fresh persisted trending symbols, IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, `lightweight-charts`
 > candlesticks, timeframe switching,
 > indicators, source metadata, an analysis panel that can run LEAN when the
@@ -124,24 +124,29 @@ exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
 `GET /api/analysis/engines`, `POST /api/analysis/run`, and the
 `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
-`IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`
-and the `ATrade.MarketData.Ibkr` provider to translate IBKR Client Portal/iBeam
-contract search/detail lookup, scanner, snapshot, and historical bar responses
-into provider-neutral stock search, trending, OHLCV candle, moving-average, RSI,
-MACD, and source metadata payloads for `1m`, `5m`, `1h`, and `1D`. The search
-endpoint enforces a minimum query length, stock-only asset class, and a capped
-result limit before returning provider-neutral `symbol`, `name`, `assetClass`,
-`exchange`, `currency`, `provider`, and provider-symbol-id metadata (IBKR
-`conid` for the current provider). SignalR is the outward-facing streaming layer
-for browsers and creates provider-backed snapshots when the IBKR/iBeam provider
-is available. The analysis endpoints resolve `IAnalysisEngineRegistry`; they
-return explicit `analysis-engine-not-configured` metadata when no engine is
-selected and run the configured LEAN provider over `IMarketDataService` candles
-when `ATRADE_ANALYSIS_ENGINE=Lean`; NATS remains the internal event backbone
-between API and workers. The Timescale-backed market-data repository and schema
-foundation now exists, but these endpoints intentionally continue to read through
-the provider path directly until the TP-030 cache-aside task wires fresh
-Timescale rows into `/api/market-data/*` behavior.
+`IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`; in the current API
+composition that contract is a Timescale-backed cache-aside service over the
+provider-backed `MarketDataService` and the `ATrade.MarketData.Ibkr` provider.
+Trending and candle requests initialize the Timescale schema idempotently, read
+fresh rows newer than `now - ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` before
+calling IBKR/iBeam, and return cache hits as the same provider-neutral payloads
+with source metadata such as `timescale-cache:ibkr-ibeam-history` or
+`timescale-cache:ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`. Missing or
+stale rows trigger the provider-backed scanner/historical-bar fetch, persist the
+provider response to TimescaleDB, and return the provider response; stale rows
+are not silently promoted to success when provider refresh fails. Indicator
+requests reuse the cache-aware candle path before computing moving average, RSI,
+and MACD payloads for `1m`, `5m`, `1h`, and `1D`. The search endpoint remains
+provider-backed, enforces a minimum query length, stock-only asset class, and a
+capped result limit before returning provider-neutral `symbol`, `name`,
+`assetClass`, `exchange`, `currency`, `provider`, and provider-symbol-id
+metadata (IBKR `conid` for the current provider). SignalR is the outward-facing
+streaming layer for browsers and creates provider-backed snapshots when the
+IBKR/iBeam provider is available. The analysis endpoints resolve
+`IAnalysisEngineRegistry`; they return explicit `analysis-engine-not-configured`
+metadata when no engine is selected and run the configured LEAN provider over
+`IMarketDataService` candles when `ATRADE_ANALYSIS_ENGINE=Lean`; NATS remains
+the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -165,11 +170,12 @@ The paper-trading slice extends existing planned responsibilities as follows:
   mapping, snapshots, historical bars, indicator inputs, source metadata, and
   safe not-configured/unavailable/authentication-required responses without
   reading credentials directly
-- `ATrade.MarketData.Timescale` owns the provider-neutral TimescaleDB persistence
-  foundation for provider-backed OHLCV candle series and scanner/trending
-  snapshots. It creates the `atrade_market_data` schema, stores provider metadata
-  as generic `provider` / `provider_symbol_id` values, and exposes freshness-aware
-  repository contracts without changing API endpoint behavior yet.
+- `ATrade.MarketData.Timescale` owns provider-neutral TimescaleDB persistence
+  and the API cache-aside decorator for provider-backed OHLCV candle series and
+  scanner/trending snapshots. It creates the `atrade_market_data` schema, stores
+  provider metadata as generic `provider` / `provider_symbol_id` values, exposes
+  freshness-aware repository contracts, and wraps the provider-backed market-data
+  service so fresh rows can serve HTTP trending, candle, and indicator requests.
 - `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
   request/result contracts, engine/source metadata, API-facing registry, and
   no-configured-engine fallback for LEAN or alternate analysis runtimes
@@ -267,14 +273,20 @@ source**:
   `ATrade.Api` over HTTP + SignalR
 - `ATrade.Api` talks to `IMarketDataService` / `IMarketDataStreamingService`,
   which compose swappable provider contracts under `ATrade.MarketData`
-- the backend now sources market data from the official IBKR Client Portal /
-  iBeam APIs when the local paper iBeam session is configured and authenticated
+- HTTP trending, candle, and indicator requests read fresh provider-backed rows
+  from TimescaleDB before making a live IBKR/iBeam call
+- cache misses or stale rows refresh from the official IBKR Client Portal /
+  iBeam APIs when the local paper iBeam session is configured and authenticated,
+  then persist the provider response for later API reads
 - local runtime, credential, authentication, HTTPS transport/certificate, or
   gateway gaps are reported as provider `not-configured` / `unavailable` states
-  rather than as automatic fallback data
+  rather than as automatic fallback data; if a fresh Timescale row already
+  exists, the API can still serve that fresh persisted payload with cache source
+  metadata while iBeam is unavailable
 
 This keeps the UI contract stable while making the current market-data source
-explicitly real-provider backed and safely unavailable when iBeam is not ready.
+explicitly provider-backed, Timescale-first for fresh persisted data, and safely
+unavailable when neither a fresh cache entry nor iBeam is ready.
 
 ## 5. No-Real-Trades Order Model
 
@@ -343,11 +355,14 @@ and scanner/trending snapshot tables for provider-backed market data:
 - derived factor time series used by trending calculations
 
 `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` controls the non-secret freshness
-window for future API cache-aside reads. The committed default is `30`, meaning
-TP-030 may use Timescale rows generated in the last 30 minutes before refreshing
-from the provider. This task only establishes storage/options; the browser still
-reaches market data through `ATrade.Api`, and endpoint cache-aside behavior is
-deferred to TP-030.
+window for API cache-aside reads. The committed default is `30`, meaning
+`/api/market-data/trending`, `/api/market-data/{symbol}/candles`, and indicator
+requests may use provider-backed Timescale rows generated in the last 30 minutes
+before refreshing from the provider. Fresh hits are returned through
+`ATrade.Api` with `timescale-cache:{originalSource}` source metadata, missing or
+stale data refreshes from IBKR/iBeam and is persisted, and stale data is not
+presented as current when the refresh fails. The browser still reaches market
+data only through `ATrade.Api`; it never connects directly to TimescaleDB.
 
 ### 6.3 Redis
 
@@ -460,15 +475,18 @@ Licensing guardrail:
 
 ## 9. IBKR Scanner Trending Factors Now
 
-Trending symbols now come from the IBKR/iBeam provider rather than a production
-symbol catalog. `ATrade.MarketData.Ibkr` runs the IBKR scanner query documented
-in source metadata (`ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`) and enriches
-scanner rows with IBKR snapshots when available. The scanner transport sends a
-buffered JSON `POST /v1/api/iserver/scanner/run` body with an explicit positive
+Trending symbols now come from fresh TimescaleDB scanner snapshots first, then
+from the IBKR/iBeam provider when the persisted snapshot is missing or stale;
+there is no production symbol catalog fallback. `ATrade.MarketData.Ibkr` runs
+the IBKR scanner query documented in source metadata
+(`ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`) and enriches scanner rows with
+IBKR snapshots when available. The scanner transport sends a buffered JSON
+`POST /v1/api/iserver/scanner/run` body with an explicit positive
 `Content-Length` and no chunked transfer so authenticated Client Portal/iBeam
 sessions do not fail `/api/market-data/trending` with edge `411 Length Required`
 responses. If iBeam still returns `411` or another provider failure, the API
-surfaces a safe provider error rather than fallback symbols or raw secrets.
+serves a fresh persisted snapshot when one exists; otherwise it surfaces a safe
+provider error rather than fallback symbols or raw secrets.
 
 The factor model explains a symbol's score using provider-derived components:
 
@@ -480,9 +498,10 @@ The factor model explains a symbol's score using provider-derived components:
 
 The API exposes these as transparent factor contributions rather than a
 black-box "hotness" number via `GET /api/market-data/trending`. The Next.js
-landing workspace renders the backend-provided IBKR source metadata and clearly
+landing workspace renders the backend-provided source metadata, including
+`timescale-cache:{originalSource}` for fresh persisted snapshots, and clearly
 surfaces provider-not-configured/provider-unavailable/authentication-required
-states when local iBeam is not ready.
+states when no fresh cache entry is available and local iBeam is not ready.
 
 ### 9.1 IBKR stock search and pin-any-symbol workflow
 
@@ -519,10 +538,10 @@ execution: `GET /api/analysis/engines` and `POST /api/analysis/run`.
 When no provider is configured, those endpoints still return explicit
 `analysis-engine-not-configured` metadata rather than fake signals. When an
 ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
-LEAN provider and `POST /api/analysis/run` can fetch normalized candles from the
-current market-data provider before invoking LEAN. Runtime absence, timeout, or
-non-zero LEAN exits return `analysis-engine-unavailable` instead of successful
-synthetic results.
+LEAN provider and `POST /api/analysis/run` can fetch normalized candles through
+the cache-aware `IMarketDataService` before invoking LEAN. Runtime absence,
+timeout, or non-zero LEAN exits return `analysis-engine-unavailable` instead of
+successful synthetic results.
 
 The architecture preserves provider-neutral market-data, analysis, and signal
 contracts:

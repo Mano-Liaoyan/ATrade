@@ -34,12 +34,15 @@ public sealed class TimescaleMarketDataSqlTests
     {
         Assert.Contains("ON CONFLICT (provider, source, symbol, timeframe, candle_time_utc) DO UPDATE", TimescaleMarketDataSql.UpsertCandle, StringComparison.Ordinal);
         Assert.Contains("updated_at_utc = EXCLUDED.updated_at_utc", TimescaleMarketDataSql.UpsertCandle, StringComparison.Ordinal);
+        Assert.Contains("WITH latest_series AS", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("WHERE provider = @provider", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
-        Assert.Contains("AND source = @source", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("AND (@source IS NULL OR source = @source)", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("AND symbol = @symbol", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("AND timeframe = @timeframe", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("AND generated_at_utc >= @freshness_cutoff_utc", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
-        Assert.Contains("ORDER BY candle_time_utc ASC", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("GROUP BY source, generated_at_utc", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("ORDER BY generated_at_utc DESC, source ASC", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("ORDER BY candle.candle_time_utc ASC", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -48,9 +51,12 @@ public sealed class TimescaleMarketDataSqlTests
         Assert.Contains("ON CONFLICT (provider, source, symbol, generated_at_utc) DO UPDATE", TimescaleMarketDataSql.UpsertTrendingSnapshotSymbol, StringComparison.Ordinal);
         Assert.Contains("reasons jsonb NOT NULL DEFAULT '[]'::jsonb", TimescaleMarketDataSql.Initialize, StringComparison.Ordinal);
         Assert.Contains("WITH latest_snapshot AS", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("AND (@source IS NULL OR source = @source)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("AND generated_at_utc >= @freshness_cutoff_utc", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("AND (@symbol IS NULL OR symbol = @symbol)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
-        Assert.Contains("ORDER BY generated_at_utc DESC", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("GROUP BY source, generated_at_utc", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("ORDER BY generated_at_utc DESC, source ASC", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("ON snapshot.source = latest_snapshot.source", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("ORDER BY snapshot.score DESC, snapshot.symbol ASC", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
     }
 

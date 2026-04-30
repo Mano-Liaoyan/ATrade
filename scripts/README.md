@@ -135,7 +135,7 @@ behavior by default.
 - `ATRADE_IBKR_PAPER_ACCOUNT_ID` — fake `IBKR_ACCOUNT_ID` placeholder for a paper account identifier; real values stay only in ignored `.env` and surface only as redacted booleans in status payloads
 - `ATRADE_FRONTEND_API_BASE_URL` — legacy/frontend-to-API base URL for the paper-trading workspace
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL` — browser-safe Next.js public API base URL used by the trading workspace HTTP and SignalR clients; committed default mirrors `ATRADE_FRONTEND_API_BASE_URL`
-- `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` — non-secret TimescaleDB market-data cache freshness window; committed default is `30`, meaning future API cache-aside reads may use provider-backed rows written within the last 30 minutes before refreshing from the provider
+- `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` — non-secret TimescaleDB market-data cache freshness window; committed default is `30`, meaning API cache-aside reads for trending, candles, and indicator candle inputs may use provider-backed rows written within the last 30 minutes before refreshing from the provider
 - `ATRADE_ANALYSIS_ENGINE` — analysis provider selector; committed default is `none`, set ignored `.env` to `Lean` to enable the LEAN provider
 - `ATRADE_LEAN_RUNTIME_MODE` — official LEAN runtime invocation mode (`cli` by default, `docker` supported for a Docker-backed command wrapper)
 - `ATRADE_LEAN_CLI_COMMAND` — local official LEAN CLI command/path; committed default is `lean`

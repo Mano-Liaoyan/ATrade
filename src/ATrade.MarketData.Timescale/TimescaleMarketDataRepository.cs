@@ -79,7 +79,7 @@ public sealed class TimescaleMarketDataRepository(ITimescaleMarketDataDataSource
         {
             await using var command = dataSourceProvider.GetDataSource().CreateCommand(TimescaleMarketDataSql.SelectFreshCandles);
             command.Parameters.AddWithValue("provider", NpgsqlDbType.Text, NormalizeRequired(query.Provider, nameof(query.Provider)));
-            command.Parameters.AddWithValue("source", NpgsqlDbType.Text, NormalizeRequired(query.Source, nameof(query.Source)));
+            command.Parameters.AddWithValue("source", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Source)));
             command.Parameters.AddWithValue("symbol", NpgsqlDbType.Text, NormalizeRequired(query.Symbol, nameof(query.Symbol)));
             command.Parameters.AddWithValue("timeframe", NpgsqlDbType.Text, NormalizeRequired(query.Timeframe, nameof(query.Timeframe)));
             command.Parameters.AddWithValue("freshness_cutoff_utc", NpgsqlDbType.TimestampTz, ToUtc(query.FreshnessCutoffUtc));
@@ -182,7 +182,7 @@ public sealed class TimescaleMarketDataRepository(ITimescaleMarketDataDataSource
         {
             await using var command = dataSourceProvider.GetDataSource().CreateCommand(TimescaleMarketDataSql.SelectFreshTrendingSnapshot);
             command.Parameters.AddWithValue("provider", NpgsqlDbType.Text, NormalizeRequired(query.Provider, nameof(query.Provider)));
-            command.Parameters.AddWithValue("source", NpgsqlDbType.Text, NormalizeRequired(query.Source, nameof(query.Source)));
+            command.Parameters.AddWithValue("source", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Source)));
             command.Parameters.AddWithValue("freshness_cutoff_utc", NpgsqlDbType.TimestampTz, ToUtc(query.FreshnessCutoffUtc));
             command.Parameters.AddWithValue("symbol", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Symbol)));
 

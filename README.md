@@ -77,26 +77,29 @@ The current runnable slice includes:
   - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
 - `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
-- `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence foundation for OHLCV candles and scanner/trending snapshots, with configurable freshness options for TP-030 cache-aside wiring.
+- `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence and cache-aside for OHLCV candles and scanner/trending snapshots, with configurable freshness for browser-facing market-data endpoints.
 - `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI/Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
 
-Current market data is served through the `ATrade.MarketData.Ibkr` provider
-behind `ATrade.MarketData` contracts. When the local iBeam/Gateway runtime is
+Current market data is served through `ATrade.Api` using a Timescale-first
+cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
+`ATrade.MarketData` contracts. When the local iBeam/Gateway runtime is
 configured with the HTTPS Client Portal URL (`https://127.0.0.1:<gateway-port>`),
 the AppHost-mounted iBeam inputs config allows the local/private Docker bridge
 source addresses that published-port requests use, and iBeam is authenticated
 through ignored `.env` values, API endpoints return IBKR scanner, snapshot, and
-historical bar data with source metadata. Timescale market-data schema and
-repository contracts now exist for provider-backed candles and scanner/trending
-snapshots, but `/api/market-data/*` continues to use the provider path directly
-until TP-030 wires cache-aside behavior with `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`
-(default `30`). When iBeam is disabled, missing credentials, unauthenticated, or
-unreachable, the API and frontend surface safe provider-not-configured/provider-unavailable states instead
-of falling back to production mocks. Pinned instruments are backend-owned
+historical bar data with source metadata. `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`
+(default `30`) controls whether TimescaleDB rows for trending snapshots,
+candles, and indicator candle inputs are fresh enough to serve directly as
+`timescale-cache:{originalSource}` responses; missing or stale rows refresh from
+IBKR/iBeam, persist the provider response to TimescaleDB, and return the provider
+response. When iBeam is disabled, missing credentials, unauthenticated, or
+unreachable, a fresh persisted response can still serve the request; otherwise
+the API and frontend surface safe provider-not-configured/provider-unavailable
+states instead of falling back to production mocks. Pinned instruments are backend-owned
 workspace preferences persisted in the AppHost-managed Postgres database through
 `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity;

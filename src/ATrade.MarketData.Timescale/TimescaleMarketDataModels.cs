@@ -20,7 +20,7 @@ public sealed record TimescaleCandleSeries(
 
 public sealed record TimescaleFreshCandleSeriesQuery(
     string Provider,
-    string Source,
+    string? Source,
     string Symbol,
     string Timeframe,
     DateTimeOffset FreshnessCutoffUtc);
@@ -42,6 +42,6 @@ public sealed record TimescaleTrendingSnapshotSymbol(
 
 public sealed record TimescaleFreshTrendingSnapshotQuery(
     string Provider,
-    string Source,
+    string? Source,
     DateTimeOffset FreshnessCutoffUtc,
     string? Symbol = null);

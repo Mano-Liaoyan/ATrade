@@ -133,29 +133,43 @@ internal static class TimescaleMarketDataSql
         """;
 
     public const string SelectFreshCandles = """
-        SELECT provider,
-               source,
-               provider_symbol_id,
-               symbol,
-               name,
-               exchange,
-               currency,
-               asset_class,
-               timeframe,
-               candle_time_utc,
-               generated_at_utc,
-               open,
-               high,
-               low,
-               close,
-               volume
-          FROM atrade_market_data.candles
-         WHERE provider = @provider
-           AND source = @source
-           AND symbol = @symbol
-           AND timeframe = @timeframe
-           AND generated_at_utc >= @freshness_cutoff_utc
-         ORDER BY candle_time_utc ASC;
+        WITH latest_series AS (
+            SELECT source,
+                   generated_at_utc
+              FROM atrade_market_data.candles
+             WHERE provider = @provider
+               AND (@source IS NULL OR source = @source)
+               AND symbol = @symbol
+               AND timeframe = @timeframe
+               AND generated_at_utc >= @freshness_cutoff_utc
+             GROUP BY source, generated_at_utc
+             ORDER BY generated_at_utc DESC, source ASC
+             LIMIT 1
+        )
+        SELECT candle.provider,
+               candle.source,
+               candle.provider_symbol_id,
+               candle.symbol,
+               candle.name,
+               candle.exchange,
+               candle.currency,
+               candle.asset_class,
+               candle.timeframe,
+               candle.candle_time_utc,
+               candle.generated_at_utc,
+               candle.open,
+               candle.high,
+               candle.low,
+               candle.close,
+               candle.volume
+          FROM atrade_market_data.candles candle
+          JOIN latest_series
+            ON candle.source = latest_series.source
+           AND candle.generated_at_utc = latest_series.generated_at_utc
+         WHERE candle.provider = @provider
+           AND candle.symbol = @symbol
+           AND candle.timeframe = @timeframe
+         ORDER BY candle.candle_time_utc ASC;
         """;
 
     public const string UpsertTrendingSnapshotSymbol = """
@@ -221,13 +235,15 @@ internal static class TimescaleMarketDataSql
 
     public const string SelectFreshTrendingSnapshot = """
         WITH latest_snapshot AS (
-            SELECT generated_at_utc
+            SELECT source,
+                   generated_at_utc
               FROM atrade_market_data.trending_snapshots
              WHERE provider = @provider
-               AND source = @source
+               AND (@source IS NULL OR source = @source)
                AND generated_at_utc >= @freshness_cutoff_utc
                AND (@symbol IS NULL OR symbol = @symbol)
-             ORDER BY generated_at_utc DESC
+             GROUP BY source, generated_at_utc
+             ORDER BY generated_at_utc DESC, source ASC
              LIMIT 1
         )
         SELECT snapshot.provider,
@@ -250,9 +266,9 @@ internal static class TimescaleMarketDataSql
                snapshot.reasons
           FROM atrade_market_data.trending_snapshots snapshot
           JOIN latest_snapshot
-            ON snapshot.generated_at_utc = latest_snapshot.generated_at_utc
+            ON snapshot.source = latest_snapshot.source
+           AND snapshot.generated_at_utc = latest_snapshot.generated_at_utc
          WHERE snapshot.provider = @provider
-           AND snapshot.source = @source
            AND (@symbol IS NULL OR snapshot.symbol = @symbol)
          ORDER BY snapshot.score DESC, snapshot.symbol ASC;
         """;
