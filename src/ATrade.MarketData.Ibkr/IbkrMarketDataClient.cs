@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using ATrade.Brokers.Ibkr;
 
 namespace ATrade.MarketData.Ibkr;
@@ -198,7 +199,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         var body = response.Content is null
             ? string.Empty
             : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        var redactedBody = body.Length > 512 ? body[..512] : body;
+        var redactedBody = SanitizeResponseBody(body.Length > 512 ? body[..512] : body);
 
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
@@ -210,6 +211,20 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         throw new IbkrMarketDataProviderException(
             MarketDataProviderErrorCodes.ProviderUnavailable,
             $"IBKR iBeam market-data endpoint returned {(int)response.StatusCode} {response.ReasonPhrase}: {redactedBody}".Trim());
+    }
+
+    private static string SanitizeResponseBody(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return string.Empty;
+        }
+
+        var redacted = Regex.Replace(body, @"(?i)(set-cookie\s*:\s*)[^\r\n<]+", "$1[redacted]");
+        return Regex.Replace(
+            redacted,
+            @"(?i)\b(password|passwd|pwd|token|session|sessionid|cookie|authorization|api[_-]?key)\b(\s*[:=]\s*)['""']?[^'""'\s<>&;]+",
+            "$1$2[redacted]");
     }
 
     private static IEnumerable<JsonElement> EnumerateResultItems(JsonElement root)

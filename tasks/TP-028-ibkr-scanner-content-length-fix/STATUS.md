@@ -1,6 +1,6 @@
 # TP-028: Fix IBKR scanner 411 Length Required for trending — Status
 
-**Current Step:** Step 1: Send a Client Portal-compatible scanner request
+**Current Step:** Step 2: Add scanner request-shape regression coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Add scanner request-shape regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] New focused scanner request contract test file added
-- [ ] Fake `411 Length Required` error mapping covered safely
-- [ ] Apphost/source contract scripts updated if needed
-- [ ] Targeted tests/scripts run
+- [x] New focused scanner request contract test file added
+- [x] Fake `411 Length Required` error mapping covered safely
+- [x] Apphost/source contract scripts updated if needed
+- [x] Targeted tests/scripts run
 
 ---
 
@@ -91,6 +91,8 @@
 | Verification plan: fake `HttpMessageHandler` tests can capture the scanner `HttpRequestMessage`, assert method/path/content-type/body/`Content-Length`/no chunked transfer, return fake scanner payloads, and return fake `411 Length Required` HTML bodies without any real IBKR credentials. Optional real iBeam verification will use ignored local `.env` plus `./start run` only if already configured/authenticated; otherwise record a clean skip rationale. | Cover request shape and error mapping in automated fake-handler tests; defer real-runtime smoke to Step 3. | `tests/ATrade.MarketData.Ibkr.Tests` / Step 3 |
 | Scanner payload semantics were preserved while changing transport: the request still serializes `instrument=STK`, `location=STK.US.MAJOR`, `type=TOP_PERC_GAIN`, and an empty `filter` array. | No source-evidenced payload correction required for TP-028; regression coverage will assert the existing payload shape. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataClient.cs` |
 | Provider error mapping remains `401/403` => `authentication-required` and other scanner failures (including `411`) => `provider-unavailable`; provider diagnostics now redact configured username, password, paper account id, and gateway URL/host before logging or returning scanner/status errors. | Regression tests will cover safe `411` response mapping and secret redaction. | `src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs` |
+| Fake `411 Length Required` scanner responses are now covered by a provider-level regression test that asserts `provider-unavailable` and verifies configured username/password/account id, gateway host, token, and cookie snippets are absent from the returned error. | Safe error mapping coverage added. | `tests/ATrade.MarketData.Ibkr.Tests/IbkrScannerRequestContractTests.cs` |
+| Apphost/source contract coverage now asserts the IBKR scanner client keeps buffered content, explicit `ContentLength`, `TransferEncodingChunked = false`, and the focused scanner request contract test file. | Updated `ibkr-market-data-provider-tests.sh`; `market-data-feature-tests.sh` did not need endpoint assertion changes for this source-level transport contract. | `tests/apphost/ibkr-market-data-provider-tests.sh` |
 
 ---
 
@@ -112,6 +114,12 @@
 | 2026-04-30 14:54 | Scanner parsing verified | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --filter FullyQualifiedName~Provider_MapsContractLookupSnapshotsHistoricalBarsAndScannerResults` passed (1/1). |
 | 2026-04-30 14:54 | Step 1 targeted tests run | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (8/8). |
 | 2026-04-30 14:54 | Step 1 completed | Scanner transport, payload preservation, safe error mapping, parsing, and targeted provider tests completed. |
+| 2026-04-30 14:55 | Step 2 started | Add scanner request-shape and `411` regression coverage. |
+| 2026-04-30 14:55 | Scanner request contract test added | Added `IbkrScannerRequestContractTests` and verified the request-shape test passes with explicit JSON content length and no chunked transfer. |
+| 2026-04-30 14:56 | Safe `411` mapping test added | `Provider_ConvertsScannerLengthRequiredToSafeUnavailableErrorWithoutLeakingConfiguredSecrets` passed and covers sanitized provider-unavailable mapping. |
+| 2026-04-30 14:56 | Source contract script updated | `ibkr-market-data-provider-tests.sh` now asserts scanner buffered/content-length/no-chunked contract tokens; `bash -n` passed. |
+| 2026-04-30 14:57 | Step 2 targeted tests/scripts run | `dotnet test tests/ATrade.MarketData.Ibkr.Tests/ATrade.MarketData.Ibkr.Tests.csproj --nologo --verbosity minimal` passed (10/10); `bash tests/apphost/ibkr-market-data-provider-tests.sh` passed (`SCRIPT_EXIT:0`). |
+| 2026-04-30 14:57 | Step 2 completed | Added request-shape regression coverage, safe `411` coverage, source-contract assertions, and targeted script verification. |
 
 ---
 
