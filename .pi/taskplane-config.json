@@ -16,22 +16,26 @@
       }
     },
     "worker": {
-      "model": "github-copilot/claude-sonnet-4.6",
-      "thinking": "high"
+      "model": "deepseek/deepseek-v4-pro",
+      "thinking": "xhigh"
     },
     "reviewer": {
-      "model": "github-copilot/gpt-5.5",
+      "model": "deepseek/deepseek-v4-pro",
       "thinking": "xhigh"
     }
   },
   "orchestrator": {
     "supervisor": {
       "model": "github-copilot/gpt-5.5",
-      "thinking": "high"
+      "thinking": "xhigh"
     },
     "merge": {
-      "model": "github-copilot/gpt-5.5",
+      "model": "github-copilot/gpt-5.4",
       "thinking": "off"
+    },
+    "orchestrator": {
+      "maxLanes": 5,
+      "integration": "auto"
     }
   }
 }
