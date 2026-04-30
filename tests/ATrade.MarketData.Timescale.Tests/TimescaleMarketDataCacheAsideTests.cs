@@ -134,6 +134,41 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
+    public void GetTrendingSymbolsServesPersistedSnapshotAcrossServiceInstances()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 32, 0, TimeSpan.Zero);
+        var providerResponse = CreateProviderTrendingResponse(now.AddMinutes(-1), source: "ibkr-scanner");
+        var repository = new RecordingTimescaleMarketDataRepository();
+        var firstProvider = new RecordingMarketDataProvider
+        {
+            TrendingResponse = providerResponse,
+        };
+        var firstService = CreateService(firstProvider, repository, now, TimeSpan.FromMinutes(30));
+
+        var providerResult = firstService.GetTrendingSymbols();
+        repository.TrendingQueries.Clear();
+
+        var restartedProvider = new RecordingMarketDataProvider
+        {
+            Status = MarketDataProviderStatus.Unavailable(
+                MarketDataProviderIdentity.Create(RecordingMarketDataProvider.ProviderName, "Interactive Brokers"),
+                RecordingMarketDataProvider.DefaultCapabilities,
+                "iBeam is not reachable after restart."),
+            ThrowIfTrendingRequested = true,
+        };
+        var restartedService = CreateService(restartedProvider, repository, now.AddMinutes(1), TimeSpan.FromMinutes(30));
+
+        var homePageTrending = restartedService.GetTrendingSymbols();
+
+        Assert.Same(providerResponse, providerResult);
+        Assert.Equal("timescale-cache:ibkr-scanner", homePageTrending.Source);
+        Assert.Equal(providerResponse.GeneratedAt, homePageTrending.GeneratedAt);
+        Assert.Equal("AAPL", Assert.Single(homePageTrending.Symbols).Symbol);
+        Assert.Equal(0, restartedProvider.GetTrendingSymbolsCalls);
+        Assert.Single(repository.TrendingQueries);
+    }
+
+    [Fact]
     public void TryGetCandlesReadsFreshTimescaleSeriesBeforeProviderCall()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 21, 0, TimeSpan.Zero);
@@ -379,9 +414,9 @@ public sealed class TimescaleMarketDataCacheAsideTests
 
     private sealed class RecordingTimescaleMarketDataRepository : ITimescaleMarketDataRepository
     {
-        public TimescaleTrendingSnapshot? TrendingSnapshot { get; init; }
+        public TimescaleTrendingSnapshot? TrendingSnapshot { get; set; }
 
-        public TimescaleCandleSeries? CandleSeries { get; init; }
+        public TimescaleCandleSeries? CandleSeries { get; set; }
 
         public List<TimescaleFreshTrendingSnapshotQuery> TrendingQueries { get; } = [];
 
@@ -394,6 +429,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
         public Task UpsertCandleSeriesAsync(TimescaleCandleSeries series, CancellationToken cancellationToken = default)
         {
             WrittenCandleSeries.Add(series);
+            CandleSeries = series;
             return Task.CompletedTask;
         }
 
@@ -406,6 +442,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
         public Task UpsertTrendingSnapshotAsync(TimescaleTrendingSnapshot snapshot, CancellationToken cancellationToken = default)
         {
             WrittenTrendingSnapshots.Add(snapshot);
+            TrendingSnapshot = snapshot;
             return Task.CompletedTask;
         }
 

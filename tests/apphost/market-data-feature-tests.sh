@@ -378,16 +378,29 @@ assert_market_data_source_contract() {
   local api_program="$repo_root/src/ATrade.Api/Program.cs"
   local market_data_project="$repo_root/src/ATrade.MarketData/ATrade.MarketData.csproj"
   local ibkr_project="$repo_root/src/ATrade.MarketData.Ibkr/ATrade.MarketData.Ibkr.csproj"
+  local timescale_project="$repo_root/src/ATrade.MarketData.Timescale/ATrade.MarketData.Timescale.csproj"
+  local market_data_client="$repo_root/frontend/lib/marketDataClient.ts"
 
   assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.MarketData.Ibkr'
+  assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.MarketData.Timescale'
   assert_file_contains "$api_project" 'ATrade.MarketData.Ibkr.csproj'
+  assert_file_contains "$api_project" 'ATrade.MarketData.Timescale.csproj'
   assert_file_contains "$api_project" 'ATrade.MarketData.csproj'
   assert_file_contains "$market_data_project" 'Microsoft.AspNetCore.App'
   assert_file_contains "$ibkr_project" 'ATrade.Brokers.Ibkr.csproj'
+  assert_file_contains "$timescale_project" 'ATrade.MarketData.csproj'
   assert_file_contains "$api_program" 'builder.Services.AddMarketDataModule();'
+  assert_file_contains "$api_program" 'builder.Services.AddTimescaleMarketDataPersistence(builder.Configuration);'
   assert_file_contains "$api_program" 'builder.Services.AddIbkrMarketDataProvider();'
+  assert_file_contains "$api_program" 'builder.Services.AddTimescaleMarketDataCacheAside();'
   assert_file_contains "$api_program" '/api/market-data/trending'
+  assert_file_contains "$api_program" '/api/market-data/{symbol}/candles'
+  assert_file_contains "$api_program" '/api/market-data/{symbol}/indicators'
   assert_file_contains "$api_program" 'app.MapHub<MarketDataHub>("/hubs/market-data");'
+  assert_file_contains "$market_data_client" '/api/market-data/trending'
+  assert_file_contains "$market_data_client" '/api/market-data/${encodedSymbol}/candles'
+  assert_file_contains "$market_data_client" '/api/market-data/${encodedSymbol}/indicators'
+  assert_file_not_contains "$market_data_client" 'timescale'
   assert_file_contains "$repo_root/src/ATrade.MarketData/MarketDataModels.cs" 'string Source = "provider"'
   assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs" 'IbkrMarketDataSource.History'
   assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs" 'IbkrMarketDataSource.Snapshot'

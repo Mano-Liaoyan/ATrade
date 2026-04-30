@@ -1,6 +1,6 @@
 # TP-030: Serve market data through TimescaleDB cache-aside — Status
 
-**Current Step:** Step 3: Cache-aside candles and indicator inputs
+**Current Step:** Step 4: API/frontend compatibility and observability
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-04-30
 **Review Level:** 2
@@ -55,13 +55,13 @@
 ---
 
 ### Step 4: API/frontend compatibility and observability
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Existing routes and frontend clients remain stable unless minimal metadata is required
-- [ ] Home page can load from fresh Timescale data after service restart
-- [ ] No-fresh-cache provider errors remain safe and actionable
-- [ ] Frontend tests updated only if visible source/error text changes
-- [ ] Targeted endpoint/apphost tests run
+- [x] Existing routes and frontend clients remain stable unless minimal metadata is required
+- [x] Home page can load from fresh Timescale data after service restart
+- [x] No-fresh-cache provider errors remain safe and actionable
+- [x] Frontend tests updated only if visible source/error text changes
+- [x] Targeted endpoint/apphost tests run
 
 ---
 
@@ -122,6 +122,11 @@
 | Indicators now flow through the cache-aware candle path; fresh Timescale candles compute indicator payloads locally with the cached source, without calling provider candles or provider indicators. | Step 3 indicator cached-candle item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
 | Unsupported candle timeframes bypass cache reads and return the provider's `unsupported-timeframe` error; no-fresh-cache provider-unavailable candle requests return the safe provider error and never write stale data. | Step 3 error-preservation item complete. | `src/ATrade.MarketData.Timescale/TimescaleCachedMarketDataService.cs`, `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
 | Step 3 targeted tests passed: `dotnet test tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj --nologo --verbosity minimal --filter FullyQualifiedName~TimescaleMarketDataCacheAsideTests` passed 10/10, covering candle hit/miss/write/error paths and indicator computation from cached candles. | Step 3 test coverage item complete. | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Apphost market-data source contract now asserts API route names remain stable, Timescale cache-aside is composed only in `ATrade.Api`, frontend clients still call `/api/market-data/*`, and the frontend market-data client has no Timescale reference. `bash -n tests/apphost/market-data-feature-tests.sh` and focused grep checks passed. | Step 4 route/frontend stability item complete. | `tests/apphost/market-data-feature-tests.sh`, `frontend/lib/marketDataClient.ts`, `src/ATrade.Api/Program.cs` |
+| A cache-aside restart test now persists a provider trending response, constructs a new service instance with an unavailable provider, and serves the fresh Timescale snapshot as `timescale-cache:{source}` for the home-page trending data path. | Step 4 restart/home-page item complete. | `tests/ATrade.MarketData.Timescale.Tests/TimescaleMarketDataCacheAsideTests.cs` |
+| Endpoint provider-error behavior remains safe without fresh cache: `bash tests/apphost/market-data-feature-tests.sh` exited 0 and covered trending `provider-not-configured`/`provider-unavailable` plus no-credential candle/indicator `provider-not-configured` responses. | Step 4 no-fresh-cache error item complete. | `tests/apphost/market-data-feature-tests.sh`, `src/ATrade.Api/Program.cs` |
+| Frontend files are unchanged; source/error label checks confirmed existing UI code still maps `timescale-cache:*scanner*` to the existing scanner label and `timescale-cache:*ibkr*` candle sources to the existing IBKR/iBeam label, while market-data client provider-error copy remains unchanged. | Step 4 frontend-test conditional item complete; no frontend test update required. | `frontend/components/TrendingList.tsx`, `frontend/components/SymbolChartView.tsx`, `frontend/lib/marketDataClient.ts` |
+| Targeted endpoint/apphost checks passed for Step 4: `bash tests/apphost/market-data-feature-tests.sh` exited 0 and `bash tests/apphost/ibkr-market-data-provider-tests.sh` exited 0 (including 10/10 IBKR tests); both emitted transient startup connection-refused curl retries before health checks succeeded. | Step 4 targeted endpoint/apphost item complete. | `tests/apphost/market-data-feature-tests.sh`, `tests/apphost/ibkr-market-data-provider-tests.sh` |
 
 ---
 
@@ -155,6 +160,12 @@
 | 2026-04-30 17:25 | Indicator cached-candle path verified | Targeted Timescale cache-aside test passed for computing indicators from fresh cached candles without provider calls. |
 | 2026-04-30 17:29 | Candle error preservation verified | Targeted Timescale cache-aside tests passed for unsupported timeframe and no-fresh-cache provider-unavailable behavior. |
 | 2026-04-30 17:30 | Step 3 targeted coverage passed | Timescale cache-aside test class passed 10/10 for trending, candle, and indicator paths. |
+| 2026-04-30 17:31 | Step 4 started | API/frontend compatibility and endpoint observability checks resumed. |
+| 2026-04-30 17:34 | Route/frontend source contract extended | Apphost script syntax and focused route/client grep checks passed for API-only Timescale composition and unchanged frontend API clients. |
+| 2026-04-30 17:35 | Restart cache-hit path verified | Targeted Timescale cache-aside test passed for serving persisted trending data across service instances when the provider is unavailable. |
+| 2026-04-30 17:39 | Endpoint provider errors verified | `bash tests/apphost/market-data-feature-tests.sh` exited 0; transient startup connection-refused curl retries occurred before health checks succeeded. |
+| 2026-04-30 17:40 | Frontend-visible copy reviewed | Git diff showed no frontend files changed; focused greps confirmed existing source/error labels continue to cover cache-prefixed source values without user-facing text changes. |
+| 2026-04-30 17:42 | Step 4 targeted apphost checks passed | `market-data-feature-tests.sh` and `ibkr-market-data-provider-tests.sh` exited 0; startup curl retries were transient. |
 
 ---
 
