@@ -85,8 +85,10 @@ public sealed class IbkrGatewayClientTests
                     [IbkrGatewayEnvironmentVariables.AccountMode] = nameof(IbkrAccountMode.Paper),
                     [IbkrGatewayEnvironmentVariables.GatewayUrl] = "https://gateway.paper.local:5001",
                     [IbkrGatewayEnvironmentVariables.GatewayPort] = "5001",
-                    [IbkrGatewayEnvironmentVariables.GatewayImage] = "registry.example/official-ibkr-gateway:latest",
+                    [IbkrGatewayEnvironmentVariables.GatewayImage] = IbkrGatewayContainerOptions.DefaultIbeamImage,
                     [IbkrGatewayEnvironmentVariables.PaperAccountId] = "DU1234567",
+                    [IbkrGatewayEnvironmentVariables.Username] = "paper-user",
+                    [IbkrGatewayEnvironmentVariables.Password] = "paper-password",
                     [IbkrGatewayEnvironmentVariables.GatewayTimeoutSeconds] = "42",
                 })
             .Build();
@@ -98,8 +100,41 @@ public sealed class IbkrGatewayClientTests
         Assert.Equal(new Uri("https://gateway.paper.local:5001"), options.GatewayBaseUrl);
         Assert.Equal(TimeSpan.FromSeconds(42), options.RequestTimeout);
         Assert.Equal(5001, options.GatewayContainer.Port);
-        Assert.Equal("registry.example/official-ibkr-gateway:latest", options.GatewayContainer.Image);
+        Assert.Equal(IbkrGatewayContainerOptions.DefaultIbeamImage, options.GatewayContainer.Image);
         Assert.Equal("DU1234567", options.PaperAccountId);
+        Assert.Equal("paper-user", options.Username);
+        Assert.Equal("paper-password", options.Password);
+        Assert.True(options.HasConfiguredCredentials);
+        Assert.True(options.HasConfiguredPaperAccountId);
+        Assert.True(options.HasConfiguredIbeamContainer);
+        Assert.Equal("IBEAM_ACCOUNT", IbkrGatewayContainerOptions.IbeamAccountEnvironmentVariable);
+        Assert.Equal("IBEAM_PASSWORD", IbkrGatewayContainerOptions.IbeamPasswordEnvironmentVariable);
+    }
+
+    [Fact]
+    public void FromConfiguration_TreatsCommittedPlaceholdersAsMissingCredentials()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    [IbkrGatewayEnvironmentVariables.IntegrationEnabled] = "true",
+                    [IbkrGatewayEnvironmentVariables.AccountMode] = nameof(IbkrAccountMode.Paper),
+                    [IbkrGatewayEnvironmentVariables.GatewayUrl] = "https://gateway.paper.local:5001",
+                    [IbkrGatewayEnvironmentVariables.GatewayPort] = "5001",
+                    [IbkrGatewayEnvironmentVariables.GatewayImage] = IbkrGatewayContainerOptions.DefaultIbeamImage,
+                    [IbkrGatewayEnvironmentVariables.PaperAccountId] = IbkrGatewayPlaceholderValues.PaperAccountId,
+                    [IbkrGatewayEnvironmentVariables.Username] = IbkrGatewayPlaceholderValues.Username,
+                    [IbkrGatewayEnvironmentVariables.Password] = IbkrGatewayPlaceholderValues.Password,
+                })
+            .Build();
+
+        var options = IbkrGatewayOptions.FromConfiguration(configuration);
+
+        Assert.True(options.IntegrationEnabled);
+        Assert.False(options.HasConfiguredCredentials);
+        Assert.False(options.HasConfiguredPaperAccountId);
+        Assert.True(options.HasConfiguredIbeamContainer);
     }
 
     [Fact]
@@ -108,6 +143,7 @@ public sealed class IbkrGatewayClientTests
         var capabilities = IbkrBrokerAdapterCapabilities.PaperSafeReadOnly;
 
         Assert.True(capabilities.SupportsSessionStatus);
+        Assert.False(capabilities.SupportsReadOnlyMarketData);
         Assert.False(capabilities.SupportsBrokerOrderPlacement);
         Assert.False(capabilities.SupportsCredentialPersistence);
         Assert.False(capabilities.SupportsExecutionPersistence);

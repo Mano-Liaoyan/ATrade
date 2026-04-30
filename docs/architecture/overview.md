@@ -6,6 +6,7 @@ summary: Target high-level architecture for the ATrade modular monolith, Aspire 
 see_also:
   - ../INDEX.md
   - modules.md
+  - provider-abstractions.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -22,13 +23,20 @@ see_also:
 >
 > **Current backend slice:** `ATrade.Api` provides stable `GET /health`,
 > `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
-> `POST /api/orders/simulate`, market-data HTTP endpoints, and a market-data
+> `POST /api/orders/simulate`, market-data HTTP endpoints, backend-owned
+> watchlist endpoints under `/api/workspace/watchlist`, and a market-data
 > SignalR hub. `ATrade.Accounts` returns bootstrap-safe overview JSON,
-> `ATrade.Brokers.Ibkr` supplies the paper-only broker seam, `ATrade.Orders`
-> owns deterministic paper-order simulation, and `ATrade.MarketData` supplies
-> the current MVP market-data provider until TP-022 replaces production mocks
-> with IBKR/iBeam data. The AppHost graph forwards the safe IBKR paper-mode
-> environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`.
+> `ATrade.Brokers` defines the provider-neutral broker contract,
+> `ATrade.Brokers.Ibkr` supplies the paper-only IBKR implementation,
+> `ATrade.Orders` owns deterministic paper-order simulation,
+> `ATrade.MarketData` supplies provider-neutral market-data contracts plus the
+> current temporary deterministic provider until TP-022 replaces production
+> mocks with IBKR/iBeam data, and `ATrade.Workspaces` persists pinned watchlist
+> symbols in Postgres. The AppHost graph forwards the safe IBKR/iBeam
+> paper-mode environment contract into `ATrade.Api` and `ATrade.Ibkr.Worker`,
+> provides the `postgres` connection string consumed by the API/workspaces
+> slice, and can start an optional `ibkr-gateway` `voyz/ibeam:latest` container
+> only when ignored local `.env` credentials enable integration.
 
 ## 1. Shape Of The System
 
@@ -117,9 +125,11 @@ architecture the AppHost is responsible for:
   services that need them. The current runnable slice already declares those
   resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
   four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`,
-  forwards the safe paper-trading IBKR environment contract into both .NET
-  processes, and only declares an optional `ibkr-gateway` container when a
-  non-placeholder official image is provided locally.
+  forwards the safe paper-trading IBKR/iBeam environment contract into both .NET
+  processes using redacted Aspire parameters for credential-bearing values, and
+  only declares an optional `ibkr-gateway` `voyz/ibeam:latest` container when
+  broker integration is enabled and fake credential placeholders have been
+  replaced in ignored `.env`.
 - Emitting OpenTelemetry traces, metrics, and logs via the shared defaults
   so every process reports into the same Aspire dashboard
 
@@ -142,6 +152,12 @@ executions, positions snapshots, configuration, user/session state, and
 audit trails. Any durable entity with a lifecycle owned by ATrade lives
 here unless it is explicitly a time-series observation. Schema migrations
 are owned by the backend module that owns the entity.
+
+Current implementation note: `ATrade.Workspaces` now initializes and owns the
+Postgres schema for pinned workspace watchlists through the AppHost-provided
+`ConnectionStrings:postgres` reference. Watchlist rows use a temporary
+`local-user` / `paper-trading` identity seam until authentication and named
+workspaces exist.
 
 ### 4.2 TimescaleDB — time-series workloads
 
@@ -174,24 +190,27 @@ so that workers can be restarted and scaled without surprising the API.
 The first delivery phase of the new ATrade codebase targets two external
 integrations, and only those two:
 
-- **IBKR** — brokerage (accounts, orders, executions, positions)
+- **IBKR through local iBeam (`voyz/ibeam:latest`)** — brokerage/session status first, then paper-safe accounts, orders, executions, positions, and data in later tasks
 - **Polygon** — market data (historical bars and real-time streams)
 
 Both integrations live behind provider-agnostic module boundaries on the
-backend side (see `modules.md` → *Broker* and *Market Data*), so additional
-providers can be added later without reshaping the rest of the monolith.
+backend side (see `provider-abstractions.md` and `modules.md` → *Broker* /
+*Market Data*), so additional providers can be added later without reshaping
+the rest of the monolith.
 
 The next staged feature direction is a **paper-trading workspace** inside the
 Next.js frontend: watchlists, TradingView-like charts, paper-only order entry,
-and trending symbols. The backend half of that direction is now started: safe
-IBKR session status and deterministic paper-order simulation already route
-through `ATrade.Api`, while the broader UI, SignalR fan-out, and market/trending
-surfaces remain future work. The slice keeps the current modular-monolith and
-Aspire contracts intact by routing browser traffic through `ATrade.Api`, using
-SignalR for browser-facing real-time updates, using NATS for internal fan-out,
-keeping orders simulated rather than live, and treating official IBKR Gateway
-session / paper-market connectivity plus the future LEAN signal source as seams
-rather than as reasons to add new runtime surfaces.
+and trending symbols. The backend and UI halves of that direction are now
+started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
+states, deterministic paper-order simulation, provider-backed market-data
+surfaces, SignalR chart updates, Postgres-backed watchlist preferences, and the
+optional LEAN analysis provider already route through `ATrade.Api`. The slice
+keeps the current modular-monolith and Aspire contracts intact by routing
+browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
+updates, using NATS for internal fan-out, keeping orders simulated rather than
+live, and treating official IBKR Gateway / iBeam connectivity plus LEAN analysis
+as plug-ins behind provider-neutral contracts rather than as reasons to add new
+runtime surfaces or API/UI assumptions.
 
 Until those modules, workers, and infrastructure integrations become
 functional rather than scaffolded, the rest of this document is aspirational
@@ -206,8 +225,10 @@ in the way called out at the top.
   bootstrap status of the AppHost.
 - `modules.md` — module-by-module map of the backend, workers, and
   frontend surfaces referenced throughout this document.
+- `provider-abstractions.md` — broker and market-data provider switching
+  contract.
 - `paper-trading-workspace.md` — paper-only workspace architecture,
-  streaming boundaries, charting-library decision, and future LEAN seam.
+  streaming boundaries, charting-library decision, and LEAN analysis seam.
 - `../INDEX.md` — documentation discovery layer; the architecture docs
   are indexed there with `status: active`.
 

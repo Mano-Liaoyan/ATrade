@@ -19,7 +19,7 @@ export type TrendingFactorBreakdown = {
   volumeSpike: number;
   priceMomentum: number;
   volatility: number;
-  newsSentimentPlaceholder: number;
+  externalSignal: number;
 };
 
 export type TrendingSymbol = MarketDataSymbol & {
@@ -31,6 +31,34 @@ export type TrendingSymbol = MarketDataSymbol & {
 export type TrendingSymbolsResponse = {
   generatedAt: string;
   symbols: TrendingSymbol[];
+  source: string;
+};
+
+export type MarketDataSymbolIdentity = {
+  symbol: string;
+  provider: string;
+  providerSymbolId: string | null;
+  assetClass: string;
+  exchange: string;
+  currency: string;
+};
+
+export type MarketDataSymbolSearchResult = {
+  identity: MarketDataSymbolIdentity;
+  name: string;
+  sector: string;
+  symbol: string;
+  provider: string;
+  providerSymbolId: string | null;
+  assetClass: string;
+  exchange: string;
+  currency: string;
+};
+
+export type MarketDataSymbolSearchResponse = {
+  generatedAt: string;
+  results: MarketDataSymbolSearchResult[];
+  source: string;
 };
 
 export type OhlcvCandle = {
@@ -47,6 +75,7 @@ export type CandleSeriesResponse = {
   timeframe: Timeframe;
   generatedAt: string;
   candles: OhlcvCandle[];
+  source: string;
 };
 
 export type MovingAveragePoint = {
@@ -73,6 +102,7 @@ export type IndicatorResponse = {
   movingAverages: MovingAveragePoint[];
   rsi: RsiPoint[];
   macd: MacdPoint[];
+  source: string;
 };
 
 export type MarketDataUpdate = {

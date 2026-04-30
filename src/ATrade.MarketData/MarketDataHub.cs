@@ -8,7 +8,7 @@ public sealed class MarketDataHub(IMarketDataStreamingService streamingService) 
     {
         if (!streamingService.TryCreateSnapshot(symbol, timeframe, out var update, out var error) || update is null)
         {
-            throw new HubException(error?.Message ?? "Unable to create mocked market-data update.");
+            throw new HubException(error?.Message ?? "Unable to create market-data update.");
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, streamingService.GetGroupName(update.Symbol, update.Timeframe));

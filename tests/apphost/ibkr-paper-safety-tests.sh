@@ -12,6 +12,8 @@ overview_file=''
 status_file=''
 simulation_file=''
 second_simulation_file=''
+missing_status_file=''
+configured_status_file=''
 live_status_file=''
 live_simulation_file=''
 
@@ -32,7 +34,8 @@ assert_file_contains() {
 
 cleanup_files() {
   rm -f "$health_file" "$overview_file" "$status_file" "$simulation_file" \
-    "$second_simulation_file" "$live_status_file" "$live_simulation_file"
+    "$second_simulation_file" "$missing_status_file" "$configured_status_file" \
+    "$live_status_file" "$live_simulation_file"
 }
 
 stop_api() {
@@ -71,17 +74,25 @@ start_api() {
   local integration_enabled="$1"
   local account_mode="$2"
   local api_port="$3"
+  local ibkr_username="$4"
+  local ibkr_password="$5"
+  local ibkr_account_id="$6"
+  local gateway_port="$7"
   local api_url="http://127.0.0.1:${api_port}"
+  local gateway_url="http://127.0.0.1:${gateway_port}"
 
   stop_api
   api_log="$(mktemp)"
 
   ATRADE_BROKER_INTEGRATION_ENABLED="$integration_enabled" \
   ATRADE_BROKER_ACCOUNT_MODE="$account_mode" \
-  ATRADE_IBKR_GATEWAY_URL="http://127.0.0.1:5000" \
-  ATRADE_IBKR_GATEWAY_PORT="5000" \
-  ATRADE_IBKR_GATEWAY_IMAGE="example.invalid/ibkr-gateway-paper:local" \
-  ATRADE_IBKR_PAPER_ACCOUNT_ID="PAPER_ACCOUNT_ID" \
+  ATRADE_IBKR_GATEWAY_URL="$gateway_url" \
+  ATRADE_IBKR_GATEWAY_PORT="$gateway_port" \
+  ATRADE_IBKR_GATEWAY_IMAGE="voyz/ibeam:latest" \
+  ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS="1" \
+  ATRADE_IBKR_USERNAME="$ibkr_username" \
+  ATRADE_IBKR_PASSWORD="$ibkr_password" \
+  ATRADE_IBKR_PAPER_ACCOUNT_ID="$ibkr_account_id" \
   ASPNETCORE_URLS="$api_url" \
   dotnet run --project "$api_project" >"$api_log" 2>&1 &
   api_pid=$!
@@ -116,7 +127,11 @@ wait_for_api() {
 assert_default_contract_and_references() {
   assert_file_contains "$repo_root/.env.example" 'ATRADE_BROKER_INTEGRATION_ENABLED=false'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_BROKER_ACCOUNT_MODE=Paper'
+  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_IMAGE=voyz/ibeam:latest'
   assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS=15'
+  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_USERNAME=IBKR_USERNAME'
+  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_PASSWORD=IBKR_PASSWORD'
+  assert_file_contains "$repo_root/.env.example" 'ATRADE_IBKR_PAPER_ACCOUNT_ID=IBKR_ACCOUNT_ID'
   assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Brokers.Ibkr'
   assert_file_contains "$repo_root/ATrade.sln" 'ATrade.Orders.Tests'
   assert_file_contains "$repo_root/src/ATrade.Api/ATrade.Api.csproj" 'ATrade.Brokers.Ibkr.csproj'
@@ -186,14 +201,64 @@ if status['provider'] != 'ibkr' or status['state'] != 'disabled' or status['mode
 capabilities = status['capabilities']
 if capabilities.get('supportsBrokerOrderPlacement') is not False or capabilities.get('usesOfficialApisOnly') is not True:
     raise SystemExit(f'unexpected broker capability flags: {status!r}')
-if 'paperAccountId' in status or 'gatewayUrl' in status:
+if 'paperAccountId' in status or 'gatewayUrl' in status or 'username' in status or 'password' in status:
     raise SystemExit(f'broker status leaked unsafe fields: {status!r}')
+serialized_status = json.dumps(status)
+for forbidden in ('IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID'):
+    if forbidden in serialized_status:
+        raise SystemExit(f'disabled status leaked placeholder credential value: {forbidden}')
 if simulation != second_simulation:
     raise SystemExit('simulation payload must be deterministic across repeated identical requests')
 if simulation.get('simulated') is not True or simulation.get('brokerOrderPlacementAttempted') is not False:
     raise SystemExit(f'unexpected simulation payload: {simulation!r}')
 if simulation.get('module') != 'orders' or simulation.get('status') != 'simulated-filled':
     raise SystemExit(f'unexpected simulation payload: {simulation!r}')
+PY
+}
+
+assert_credentials_missing_status_is_safe() {
+  local api_port="$1"
+  local api_url="http://127.0.0.1:${api_port}"
+  local status_code
+
+  status_code="$(curl --silent --output "$missing_status_file" --write-out '%{http_code}' "$api_url/api/broker/ibkr/status")"
+  [[ "$status_code" == '200' ]]
+
+  python3 - <<'PY' "$missing_status_file"
+import json, sys
+from pathlib import Path
+status = json.loads(Path(sys.argv[1]).read_text())
+if status.get('state') != 'credentials-missing' or status.get('mode') != 'paper':
+    raise SystemExit(f'missing credentials must produce safe status: {status!r}')
+if status.get('hasPaperAccountId') is not False:
+    raise SystemExit(f'placeholder account id must not count as configured: {status!r}')
+serialized_status = json.dumps(status)
+for forbidden in ('IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID'):
+    if forbidden in serialized_status:
+        raise SystemExit(f'credentials-missing status leaked placeholder credential value: {forbidden}')
+PY
+}
+
+assert_configured_ibeam_status_is_redacted() {
+  local api_port="$1"
+  local api_url="http://127.0.0.1:${api_port}"
+  local status_code
+
+  status_code="$(curl --silent --output "$configured_status_file" --write-out '%{http_code}' "$api_url/api/broker/ibkr/status")"
+  [[ "$status_code" == '200' ]]
+
+  python3 - <<'PY' "$configured_status_file"
+import json, sys
+from pathlib import Path
+status = json.loads(Path(sys.argv[1]).read_text())
+if status.get('state') != 'ibeam-container-configured':
+    raise SystemExit(f'unreachable configured iBeam should report safe configured state: {status!r}')
+serialized_status = json.dumps(status)
+for forbidden in ('REAL_USERNAME_SHOULD_NOT_LEAK', 'REAL_PASSWORD_SHOULD_NOT_LEAK', 'DU1234567'):
+    if forbidden in serialized_status:
+        raise SystemExit(f'configured iBeam status leaked credential/account value: {forbidden}')
+if status.get('hasPaperAccountId') is not True:
+    raise SystemExit(f'real-looking paper placeholder should only surface as a boolean: {status!r}')
 PY
 }
 
@@ -218,6 +283,11 @@ if status.get('state') != 'rejected-live-mode' or status.get('mode') != 'live':
     raise SystemExit(f'live mode must be rejected before any broker action: {status!r}')
 if simulation.get('simulated') is not False or 'Only Paper is supported' not in simulation.get('error', ''):
     raise SystemExit(f'live mode simulation must reject cleanly: {simulation!r}')
+for payload in (status, simulation):
+    serialized = json.dumps(payload)
+    for forbidden in ('LIVE_USERNAME_SHOULD_NOT_LEAK', 'LIVE_PASSWORD_SHOULD_NOT_LEAK', 'DU9999999'):
+        if forbidden in serialized:
+            raise SystemExit(f'live-mode payload leaked credential/account value: {forbidden}')
 PY
 }
 
@@ -227,6 +297,8 @@ main() {
   status_file="$(mktemp)"
   simulation_file="$(mktemp)"
   second_simulation_file="$(mktemp)"
+  missing_status_file="$(mktemp)"
+  configured_status_file="$(mktemp)"
   live_status_file="$(mktemp)"
   live_simulation_file="$(mktemp)"
 
@@ -236,13 +308,27 @@ main() {
 
   local default_port
   default_port="$(allocate_api_port)"
-  start_api false Paper "$default_port"
+  start_api false Paper "$default_port" IBKR_USERNAME IBKR_PASSWORD IBKR_ACCOUNT_ID 5000
   assert_default_mode_endpoints "$default_port"
+  stop_api
+
+  local missing_port
+  missing_port="$(allocate_api_port)"
+  start_api true Paper "$missing_port" IBKR_USERNAME IBKR_PASSWORD IBKR_ACCOUNT_ID 5000
+  assert_credentials_missing_status_is_safe "$missing_port"
+  stop_api
+
+  local configured_port
+  local closed_gateway_port
+  configured_port="$(allocate_api_port)"
+  closed_gateway_port="$(allocate_api_port)"
+  start_api true Paper "$configured_port" REAL_USERNAME_SHOULD_NOT_LEAK REAL_PASSWORD_SHOULD_NOT_LEAK DU1234567 "$closed_gateway_port"
+  assert_configured_ibeam_status_is_redacted "$configured_port"
   stop_api
 
   local live_port
   live_port="$(allocate_api_port)"
-  start_api true Live "$live_port"
+  start_api true Live "$live_port" LIVE_USERNAME_SHOULD_NOT_LEAK LIVE_PASSWORD_SHOULD_NOT_LEAK DU9999999 5000
   assert_live_mode_rejection "$live_port"
 }
 

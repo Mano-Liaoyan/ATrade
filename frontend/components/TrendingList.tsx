@@ -6,10 +6,13 @@ import type { TrendingSymbol } from '../types/marketData';
 type TrendingListProps = {
   symbols: TrendingSymbol[];
   pinnedSymbols: string[];
-  onTogglePin: (symbol: string) => void;
+  onTogglePin: (symbol: TrendingSymbol) => void;
+  actionsDisabled?: boolean;
+  savingSymbol?: string | null;
+  source?: string | null;
 };
 
-export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingListProps) {
+export function TrendingList({ symbols, pinnedSymbols, onTogglePin, actionsDisabled = false, savingSymbol = null, source = null }: TrendingListProps) {
   const pinnedSet = new Set(pinnedSymbols.map((symbol) => symbol.toUpperCase()));
 
   return (
@@ -19,12 +22,13 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingLi
           <p className="eyebrow">Backend-driven market data</p>
           <h2 id="trending-title">Trending stocks and ETFs</h2>
         </div>
-        <span className="pill">Mocked factors</span>
+        <span className="pill">{formatSourceLabel(source)}</span>
       </div>
 
       <div className="symbol-grid">
         {symbols.map((symbol) => {
           const pinned = pinnedSet.has(symbol.symbol);
+          const isSaving = savingSymbol === symbol.symbol.toUpperCase();
 
           return (
             <article className="symbol-card" key={symbol.symbol}>
@@ -39,9 +43,10 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingLi
                   className={pinned ? 'pin-button pin-button--active' : 'pin-button'}
                   type="button"
                   aria-pressed={pinned}
-                  onClick={() => onTogglePin(symbol.symbol)}
+                  disabled={actionsDisabled || isSaving}
+                  onClick={() => onTogglePin(symbol)}
                 >
-                  {pinned ? 'Pinned' : 'Pin'}
+                  {isSaving ? (pinned ? 'Removing…' : 'Saving…') : pinned ? 'Pinned' : 'Pin'}
                 </button>
               </div>
 
@@ -75,6 +80,18 @@ export function TrendingList({ symbols, pinnedSymbols, onTogglePin }: TrendingLi
       </div>
     </section>
   );
+}
+
+function formatSourceLabel(source: string | null): string {
+  if (!source) {
+    return 'IBKR market-data factors';
+  }
+
+  if (source.includes('scanner')) {
+    return 'IBKR scanner factors';
+  }
+
+  return `IBKR source: ${source}`;
 }
 
 function formatCurrency(value: number): string {

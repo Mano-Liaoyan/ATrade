@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\ATrade.Brokers\ATrade.Brokers.csproj" />
     <ProjectReference Include="..\..\src\ATrade.Brokers.Ibkr\ATrade.Brokers.Ibkr.csproj" />
   </ItemGroup>
 

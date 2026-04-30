@@ -11,6 +11,9 @@ const string timescaleTuneCpuCount = "2";
 var localPortContract = LocalDevelopmentPortContractLoader.Load();
 var paperTradingContract = PaperTradingEnvironmentContract.Load(localPortContract.LoadedFromPath);
 var builder = DistributedApplication.CreateBuilder(args);
+var ibkrUsername = builder.AddParameter("ibkr-username", () => paperTradingContract.IbkrUsername, secret: true);
+var ibkrPassword = builder.AddParameter("ibkr-password", () => paperTradingContract.IbkrPassword, secret: true);
+var ibkrPaperAccountId = builder.AddParameter("ibkr-paper-account-id", () => paperTradingContract.PaperAccountId, secret: true);
 
 var postgres = builder.AddPostgres("postgres")
     .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
@@ -32,6 +35,8 @@ if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out v
 {
     builder.AddContainer("ibkr-gateway", gatewayImage, gatewayTag)
         .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
+        .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamAccount, ibkrUsername)
+        .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamPassword, ibkrPassword)
         .WithHttpEndpoint(
             targetPort: paperTradingContract.GetGatewayPort(),
             port: paperTradingContract.GetGatewayPort(),
@@ -49,7 +54,9 @@ var api = builder.AddProject<Projects.ATrade_Api>("api")
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayUrl, paperTradingContract.GatewayUrl)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayPort, paperTradingContract.GatewayPort)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayImage, paperTradingContract.GatewayImage)
-    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, paperTradingContract.PaperAccountId);
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, ibkrPaperAccountId)
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.Username, ibkrUsername)
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.Password, ibkrPassword);
 
 var ibkrWorker = builder.AddProject<Projects.ATrade_Ibkr_Worker>("ibkr-worker")
     .WithReference(postgres)
@@ -60,7 +67,9 @@ var ibkrWorker = builder.AddProject<Projects.ATrade_Ibkr_Worker>("ibkr-worker")
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayUrl, paperTradingContract.GatewayUrl)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayPort, paperTradingContract.GatewayPort)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayImage, paperTradingContract.GatewayImage)
-    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, paperTradingContract.PaperAccountId);
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, ibkrPaperAccountId)
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.Username, ibkrUsername)
+    .WithEnvironment(IbkrGatewayEnvironmentVariables.Password, ibkrPassword);
 
 if (!string.IsNullOrWhiteSpace(paperTradingContract.GatewayTimeoutSeconds))
 {

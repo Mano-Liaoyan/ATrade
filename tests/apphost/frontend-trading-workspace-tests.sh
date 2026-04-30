@@ -123,15 +123,49 @@ assert_frontend_dependencies_and_source() {
     return 1
   fi
 
-  assert_file_contains "$repo_root/frontend/lib/watchlistStorage.ts" 'localStorage'
+  assert_file_contains "$repo_root/frontend/lib/watchlistClient.ts" '/api/workspace/watchlist'
+  assert_file_contains "$repo_root/frontend/lib/watchlistClient.ts" 'buildApiUrl'
   assert_file_contains "$repo_root/frontend/lib/watchlistStorage.ts" 'atrade.paperTrading.watchlist.v1'
+  assert_file_contains "$repo_root/frontend/lib/watchlistStorage.ts" 'backendMigrated'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'getWatchlist'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'IBKR/iBeam market data'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'IBKR market data unavailable'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'pinWatchlistSymbol'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'unpinWatchlistSymbol'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'createSearchResultWatchlistInput(result)'
+  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'onTogglePin={handleToggleSearchPin}'
+  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'data-testid="symbol-search"'
+  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'Search IBKR stocks'
+  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'No local fallback catalog is used.'
+  assert_file_contains "$repo_root/frontend/lib/marketDataClient.ts" '/api/market-data/search'
+  assert_file_contains "$repo_root/frontend/types/marketData.ts" 'MarketDataSymbolSearchResult'
   assert_file_contains "$repo_root/frontend/components/TrendingList.tsx" 'data-testid="trending-list"'
+  assert_file_contains "$repo_root/frontend/components/TrendingList.tsx" 'IBKR scanner factors'
+  assert_file_not_contains "$repo_root/frontend/components/TrendingList.tsx" 'Mocked factors'
   assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'data-testid="watchlist-panel"'
+  assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'Backend workspace preference'
+  assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'Postgres'
+  assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'Use IBKR stock search'
+  assert_file_not_contains "$repo_root/frontend/components/Watchlist.tsx" 'localStorage'
+  assert_file_not_contains "$repo_root/frontend/components/Watchlist.tsx" 'Local browser preference'
   assert_file_contains "$repo_root/frontend/components/CandlestickChart.tsx" 'data-testid="candlestick-chart"'
   assert_file_contains "$repo_root/frontend/types/marketData.ts" "'1m', '5m', '1h', '1D'"
+  assert_file_contains "$repo_root/frontend/types/marketData.ts" 'externalSignal'
+  assert_file_contains "$repo_root/frontend/types/marketData.ts" 'source: string'
   assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'connectMarketDataStream'
   assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'fallbackTimer = window.setInterval'
+  assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'Search another IBKR stock'
   assert_file_contains "$repo_root/frontend/components/BrokerPaperStatus.tsx" 'No real orders'
+  assert_file_contains "$repo_root/frontend/types/analysis.ts" 'AnalysisResult'
+  assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/engines'
+  assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/run'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-panel"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-run-button"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-unavailable"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-no-automation-note"'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'analysis-timeout'
+  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'Analysis only — no brokerage routing or automatic order placement.'
+  assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" '<AnalysisPanel'
 }
 
 assert_frontend_build() {
@@ -155,8 +189,8 @@ start_api() {
 
   local trending_code
   trending_code="$(curl --silent --output /dev/null --write-out '%{http_code}' "$api_url/api/market-data/trending")"
-  if [[ "$trending_code" != '200' ]]; then
-    printf 'expected market-data trending endpoint to return HTTP 200, got %s\n' "$trending_code" >&2
+  if [[ "$trending_code" != '503' ]]; then
+    printf 'expected market-data trending endpoint without IBKR credentials to return HTTP 503, got %s\n' "$trending_code" >&2
     cat "$api_log" >&2
     return 1
   fi
@@ -178,7 +212,12 @@ start_frontend_and_assert_markers() {
   assert_file_contains "$root_response" 'Next.js Bootstrap Slice'
   assert_file_contains "$root_response" 'Aspire AppHost Frontend Contract'
   assert_file_contains "$root_response" 'Trading workspace MVP'
-  assert_file_contains "$root_response" 'Loading backend-driven trending'
+  assert_file_contains "$root_response" 'backend-saved watchlists'
+  assert_file_contains "$root_response" 'Postgres-backed workspace watchlists'
+  assert_file_contains "$root_response" 'Search IBKR stocks'
+  assert_file_contains "$root_response" 'IBKR instrument search'
+  assert_file_contains "$root_response" 'Loading IBKR/iBeam trending'
+  assert_file_not_contains "$root_response" 'Mocked factors'
 
   wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$chart_response" 'AAPL'
@@ -190,6 +229,12 @@ start_frontend_and_assert_markers() {
   assert_file_contains "$chart_response" '1h'
   assert_file_contains "$chart_response" '1D'
   assert_file_contains "$chart_response" 'SignalR'
+  assert_file_contains "$chart_response" 'IBKR/iBeam'
+  assert_file_contains "$chart_response" 'Search another IBKR stock'
+  assert_file_contains "$chart_response" 'Analysis engine'
+  assert_file_contains "$chart_response" 'Provider-neutral signals'
+  assert_file_contains "$chart_response" 'Analysis only'
+  assert_file_not_contains "$chart_response" 'mocked'
   assert_file_contains "$chart_response" 'No real orders'
 }
 

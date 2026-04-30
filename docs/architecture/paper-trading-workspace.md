@@ -1,12 +1,14 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-04-30
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
   - overview.md
   - modules.md
+  - provider-abstractions.md
+  - analysis-engines.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -14,20 +16,29 @@ see_also:
 
 # Paper-Trading Workspace Architecture
 
-> **Status note:** This document still defines the staged architecture and
-> safety contract for the broader paper-trading workspace, and the first
-> paper-trading UI slice is now implemented against deterministic mocked data.
-> The current repository ships `ATrade.Brokers.Ibkr` as a paper-only broker
-> adapter, `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
+> **Status note:** This document defines the staged architecture and safety
+> contract for the broader paper-trading workspace. The current repository now
+> uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
+> first real market-data provider behind API/frontend-stable seams. The current
+> repository ships `ATrade.Brokers.Ibkr` as a paper-only broker adapter,
+> `ATrade.MarketData.Ibkr` as the IBKR/iBeam market-data provider,
+> `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
-> `GET /api/market-data/{symbol}/candles`, and
-> `GET /api/market-data/{symbol}/indicators`, a `/hubs/market-data` SignalR
-> hub, deterministic mocked market-data services, AppHost-driven paper-safe
-> broker configuration wiring, and a Next.js workspace with trending symbols,
-> local browser watchlists, `lightweight-charts` candlesticks, timeframe
-> switching, indicators, and SignalR-to-HTTP fallback behavior. Durable
-> paper-order storage, backend-owned user preferences, provider-backed market
-> data, and real broker order placement remain future work.
+> `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`, and
+> `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
+> `POST /api/analysis/run`, a `/hubs/market-data` SignalR hub,
+> backend-owned `GET` / `PUT` / `POST` / `DELETE /api/workspace/watchlist`
+> endpoints backed by the AppHost-managed Postgres resource, AppHost-driven
+> paper-safe broker/iBeam configuration wiring, and a Next.js workspace with
+> IBKR scanner-driven trending symbols, IBKR stock search, Postgres-backed
+> watchlists, `lightweight-charts` candlesticks, timeframe switching,
+> indicators, source metadata, an analysis panel that can run LEAN when the
+> analysis runtime is configured, and SignalR-to-HTTP fallback behavior.
+> Production mocked market-data providers have been removed; missing iBeam
+> runtime, credentials, or authentication returns safe
+> provider-not-configured/provider-unavailable/authentication-required errors
+> rather than fallback data. Durable paper-order storage and real broker order
+> placement remain future work.
 
 ## 1. Scope And Non-Negotiable Safety Rules
 
@@ -47,9 +58,11 @@ The slice is governed by five non-negotiable rules:
    contract.
 4. **Secrets stay in ignored local `.env` only.** Usernames, passwords,
    tokens, and real account identifiers must never be committed.
-5. **Mocked market/trending data is acceptable now; unsafe realism is not.**
-   Until the follow-on provider work lands, the UI may rely on deterministic
-   mocked quotes, bars, watchlists, and trending signals.
+5. **Market/trending data must be honest about provider state.** Production
+   market data now comes from the IBKR/iBeam provider through the provider
+   abstraction layer. Missing local runtime, credentials, authentication, or
+   degraded provider state must surface as safe not-configured/unavailable
+   responses rather than silently falling back to synthetic data.
 
 ## 2. Product Shape
 
@@ -78,8 +91,8 @@ The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
 - watchlist, chart, order-ticket, and account widgets
-- browser-side session state for active tabs, open panels, and optimistic UI
-  interactions
+- browser-side session state for active tabs, open panels, non-authoritative
+  watchlist cache/migration state, and optimistic UI interactions
 - SignalR subscriptions for real-time account, order, and market updates
 
 The frontend does **not** talk directly to IBKR, Redis, NATS, Postgres, or
@@ -89,8 +102,8 @@ TimescaleDB. All durable and broker-aware behavior goes through the API.
 
 `ATrade.Api` remains the only browser-facing backend surface and expands with:
 
-- HTTP endpoints for workspace bootstrap data, watchlists, account state,
-  paper orders, and chart history
+- HTTP endpoints for workspace bootstrap data, Postgres-backed watchlists,
+  account state, paper orders, and chart history
 - SignalR hubs that push account, order, quote, bar, and trending updates to
   the browser
 - translation between browser commands and internal module calls / NATS events
@@ -98,14 +111,28 @@ TimescaleDB. All durable and broker-aware behavior goes through the API.
 
 The current backend slice exposes `GET /api/broker/ibkr/status`,
 `POST /api/orders/simulate`, `GET /api/market-data/trending`,
+`GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
 `GET /api/market-data/{symbol}/candles?timeframe=...`,
-`GET /api/market-data/{symbol}/indicators?timeframe=...`, and the
-`/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
-strictly server-side. The market-data endpoints serve deterministic mocked
-stocks/ETFs, OHLCV candles for `1m`, `5m`, `1h`, and `1D`, and moving-average /
-RSI / MACD payloads without external providers. SignalR is the outward-facing
-streaming layer for browsers; NATS remains the internal event backbone between
-API and workers.
+`GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
+`PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
+`DELETE /api/workspace/watchlist/{symbol}`, `GET /api/analysis/engines`,
+`POST /api/analysis/run`, and the `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
+strictly server-side. The broker endpoint resolves the provider-neutral
+`IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`
+and the `ATrade.MarketData.Ibkr` provider to translate IBKR Client Portal/iBeam
+contract search/detail lookup, scanner, snapshot, and historical bar responses
+into provider-neutral stock search, trending, OHLCV candle, moving-average, RSI,
+MACD, and source metadata payloads for `1m`, `5m`, `1h`, and `1D`. The search
+endpoint enforces a minimum query length, stock-only asset class, and a capped
+result limit before returning provider-neutral `symbol`, `name`, `assetClass`,
+`exchange`, `currency`, `provider`, and provider-symbol-id metadata (IBKR
+`conid` for the current provider). SignalR is the outward-facing streaming layer
+for browsers and creates provider-backed snapshots when the IBKR/iBeam provider
+is available. The analysis endpoints resolve `IAnalysisEngineRegistry`; they
+return explicit `analysis-engine-not-configured` metadata when no engine is
+selected and run the configured LEAN provider over `IMarketDataService` candles
+when `ATRADE_ANALYSIS_ENGINE=Lean`; NATS remains the internal event backbone
+between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -113,25 +140,49 @@ The paper-trading slice extends existing planned responsibilities as follows:
 
 - `ATrade.Accounts` owns paper account projections, balances, positions, and
   broker-session summaries
+- `ATrade.Brokers` owns the provider-neutral broker identity, capability,
+  account-mode, and status contracts shared by API, worker, and adapters
 - `ATrade.Brokers.Ibkr` owns typed paper-mode configuration, the official
   Gateway session/status client boundary, paper-only guardrails, and the safe
-  broker status shape shared by the API and worker
+  `IBrokerProvider` implementation shared by the API and worker
 - `ATrade.Orders` owns paper-order validation, lifecycle state, and simulated
   fills; the current backend slice already returns deterministic simulated
   fills directly from this module
-- `ATrade.MarketData` owns provider-neutral quote/bar contracts and historical
-  chart queries; the current slice provides deterministic mocked symbol,
-  candle, indicator, trending-factor, and SignalR snapshot contracts without
-  Polygon, TimescaleDB, Redis, NATS, LEAN, or paid news/data services
+- `ATrade.MarketData` owns provider-neutral quote/bar contracts, provider
+  status/error states, symbol-search readiness hooks, historical chart queries,
+  compatibility services, and SignalR snapshot contracts
+- `ATrade.MarketData.Ibkr` owns the first real market-data provider: IBKR/iBeam
+  Client Portal contract search/detail lookup, scanner/trending-equivalent
+  mapping, snapshots, historical bars, indicator inputs, source metadata, and
+  safe not-configured/unavailable/authentication-required responses without
+  reading credentials directly
+- `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
+  request/result contracts, engine/source metadata, API-facing registry, and
+  no-configured-engine fallback for LEAN or alternate analysis runtimes
+- `ATrade.Analysis.Lean` owns the first concrete analysis provider. It builds a
+  temporary official-LEAN workspace from ATrade OHLCV bars, runs an
+  analysis-only moving-average/backtest algorithm through the configured LEAN
+  CLI or Docker-backed runtime, parses provider-neutral signals/metrics, and
+  rejects brokerage/order-routing source tokens.
+- `ATrade.Workspaces` owns backend workspace preferences, including the current
+  Postgres schema/repository for pinned watchlist symbols and metadata fields
+  (`provider`, optional provider id / IBKR `conid`, name, exchange, currency,
+  asset class, sort order, and timestamps). Pins can be enriched from search
+  results and duplicate handling prefers provider/conid identity when present,
+  falling back to normalized symbols otherwise.
 - `ATrade.Ibkr.Worker` owns IBKR Gateway session management and any future
   paper-safe broker polling/streaming work
 
 The worker may surface broker connectivity and capability information from the
 official IBKR Gateway APIs, but the browser never binds to the worker directly.
 
-## 4. IBKR Gateway Session And Connectivity Model
+## 4. IBKR Gateway / iBeam Session And Connectivity Model
 
-IBKR integration for this slice is **session-aware and paper-only**.
+IBKR integration for this slice is **session-aware and paper-only**. The approved
+local runtime for user-driven IBKR API login is the AppHost-managed
+iBeam/Gateway container image `voyz/ibeam:latest`, which is disabled by default
+and only starts when ignored local `.env` values enable broker integration and
+replace the fake credential placeholders.
 
 ### 4.1 Authentication and session status
 
@@ -139,25 +190,33 @@ IBKR integration for this slice is **session-aware and paper-only**.
 responsibilities are:
 
 - read paper-mode broker configuration from the ignored local `.env`
-- establish or verify a session against the official IBKR Gateway APIs
+- rely on AppHost to map `ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` to
+  the iBeam container variables `IBEAM_ACCOUNT` and `IBEAM_PASSWORD`
+- establish or verify a session against the official IBKR Gateway/iBeam APIs
 - publish normalized session state changes onto NATS
-- expose a provider-neutral status shape that `ATrade.Api` can project to the
-  frontend
+- expose the provider-neutral `BrokerProviderStatus` shape that `ATrade.Api`
+  can project to the frontend
 
 In the currently implemented backend slice, the worker and API share the same
-`ATrade.Brokers.Ibkr` status service so disabled and rejected-live outcomes are
-normalized before any broker call is attempted.
+`ATrade.Brokers.Ibkr` status service so disabled, credentials-missing, configured-iBeam,
+and rejected-live outcomes are normalized before any unsafe broker action is attempted.
+Raw usernames, passwords, tokens, session cookies, and account ids never appear in
+status payloads; account presence is exposed only as a boolean.
 
 The normalized session states are:
 
 - `disabled` — broker integration is not enabled locally
-- `not-configured` — required local paper settings are missing
+- `credentials-missing` — integration is enabled, but the ignored `.env` still
+  lacks real paper-login username, password, or paper account id values
+- `not-configured` — required local paper/iBeam settings such as URL, port, or
+  image contract are inconsistent
+- `ibeam-container-configured` — the local iBeam container contract and
+  credentials are present, but the auth status endpoint is not reachable yet
 - `rejected-live-mode` — local configuration requested `Live` mode and the
   backend refused it before any broker action
-- `connecting` — the worker is attempting to reach the paper gateway
-- `authenticated` — the worker has an active paper session
-- `degraded` — the gateway is reachable but market/account features are
-  partially unavailable
+- `connecting` — iBeam is reachable and waiting for paper IBKR authentication
+- `authenticated` — the worker has an active paper iBeam session
+- `degraded` — iBeam is reachable but market/account features are partially unavailable
 - `error` — the worker failed to establish or maintain a safe paper session
 
 The frontend uses those states to render connection banners, not to infer that
@@ -170,13 +229,16 @@ source**:
 
 - the frontend consumes provider-neutral quotes/bars/trending updates from
   `ATrade.Api` over HTTP + SignalR
-- the backend may later source market data from the official IBKR Gateway APIs
-  when paper-safe subscriptions are wired in
-- until that provider work lands, the API may serve deterministic mocked quote
-  and bar streams with the same payload shape
+- `ATrade.Api` talks to `IMarketDataService` / `IMarketDataStreamingService`,
+  which compose swappable provider contracts under `ATrade.MarketData`
+- the backend now sources market data from the official IBKR Client Portal /
+  iBeam APIs when the local paper iBeam session is configured and authenticated
+- local runtime, credential, authentication, or gateway gaps are reported as
+  provider `not-configured` / `unavailable` states rather than as automatic
+  fallback data
 
-This keeps the UI contract stable while allowing the market-data source to move
-from mocked data to real paper-safe streaming later.
+This keeps the UI contract stable while making the current market-data source
+explicitly real-provider backed and safely unavailable when iBeam is not ready.
 
 ## 5. No-Real-Trades Order Model
 
@@ -191,8 +253,8 @@ The order flow is:
 3. The order is stored as a paper order owned by ATrade, not as a live broker
    order.
 4. A simulation component publishes lifecycle updates (`accepted`, `working`,
-   `partially-filled`, `filled`, `cancelled`, `rejected`) using mocked or
-   paper-safe market inputs.
+   `partially-filled`, `filled`, `cancelled`, `rejected`) using paper-safe
+   provider market inputs.
 5. `ATrade.Api` projects those updates to the frontend through SignalR.
 
 Current implementation note: the backend now ships the safe first subset of
@@ -224,6 +286,13 @@ Postgres remains the canonical relational store for:
 - durable user workspace preferences
 - audit-friendly snapshots of broker/session capability state
 
+Current implementation note: pinned workspace watchlists are already stored in
+Postgres by `ATrade.Workspaces` under the AppHost-provided `postgres`
+connection string. Rows carry `user_id` and `workspace_id`; until authentication
+and named workspaces exist, the API deliberately uses the temporary
+`local-user` / `paper-trading` identity seam documented in
+`LocalWorkspaceIdentityProvider`.
+
 ### 6.2 TimescaleDB
 
 TimescaleDB stores time-series data needed by the workspace:
@@ -252,7 +321,7 @@ portfolio state.
 The intended data path is:
 
 ```text
-IBKR session / mocked market events / paper-order simulation
+IBKR session / IBKR market-data events / paper-order simulation
         ▼
       NATS
         ▼
@@ -273,8 +342,9 @@ server-owned.
 The Next.js frontend may own short-lived UI state such as:
 
 - active tab and panel arrangement during a browser session
-- the current MVP watchlist stored under `atrade.paperTrading.watchlist.v1` in
-  browser `localStorage` as a convenience cache until backend preferences land
+- a non-authoritative cached copy of backend watchlist symbols under
+  `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
+  and one-time migration of pre-Postgres pins
 - unsaved chart drawing state that is not yet persisted
 - optimistic rendering between command submission and SignalR confirmation
 
@@ -291,11 +361,19 @@ machine changes:
 
 ### 7.3 Preference storage choice
 
-Durable user preferences are stored in **Postgres** as user-scoped workspace
-settings in the target architecture. In the current MVP, the frontend persists
-only a local browser watchlist in `localStorage` to survive refreshes on the
-same machine. That cache is intentionally not authoritative, not shared across
-machines, and must not contain secrets, broker account identifiers, or tokens.
+Durable watchlist preferences are now stored in **Postgres** as workspace-scoped
+settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. The
+frontend loads, pins, and unpins through the backend watchlist API, then updates
+its browser cache from the backend response. Search-result pins send the
+provider-neutral metadata returned by `GET /api/market-data/search`: provider,
+provider symbol id (IBKR `conid` today), optional `ibkrConid`, name, exchange,
+currency, and asset class. Re-pinning a previously manual row enriches the
+stored metadata without requiring an API restart or table rewrite. The
+`localStorage` key `atrade.paperTrading.watchlist.v1` is intentionally
+non-authoritative: it may seed a one-time migration into Postgres and may render
+a clearly labeled read-only cached snapshot when the backend/database is
+unavailable, but it must not be treated as saved state and must not contain
+secrets, broker account identifiers, or tokens.
 
 ## 8. Charting Library Decision
 
@@ -313,9 +391,13 @@ Current implementation:
 - `frontend/components/CandlestickChart.tsx` uses `lightweight-charts` for
   OHLC candlesticks, volume, moving-average overlays, crosshair legend,
   zooming, and panning
+- `frontend/components/SymbolSearch.tsx` provides reusable IBKR stock search
+  controls for the workspace and symbol pages, including loading, validation,
+  no-results, and provider/authentication error states
 - `frontend/components/SymbolChartView.tsx` combines HTTP candle/indicator
-  fetches with SignalR updates from `/hubs/market-data` and falls back to HTTP
-  polling when streaming is unavailable
+  fetches with SignalR updates from `/hubs/market-data`, embeds the compact
+  symbol search control, and falls back to HTTP polling when streaming is
+  unavailable
 
 Licensing guardrail:
 
@@ -324,44 +406,81 @@ Licensing guardrail:
 - if that approval is ever granted, this document, `README.md`, and the docs
   index must be updated in the same change
 
-## 9. Mocked Trending Factors Now
+## 9. IBKR Scanner Trending Factors Now
 
-Trending symbols are intentionally mocked in the first slice so the UI can be
-built without waiting for real provider ingestion.
+Trending symbols now come from the IBKR/iBeam provider rather than a production
+symbol catalog. `ATrade.MarketData.Ibkr` runs the IBKR scanner query documented
+in source metadata (`ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`) and enriches
+scanner rows with IBKR snapshots when available.
 
-The mocked factor model should explain a symbol's score using four explicit
-components:
+The factor model explains a symbol's score using provider-derived components:
 
-- **volume spike** — unusual volume relative to the symbol's recent baseline
-- **price momentum** — directional move across the selected lookback window
-- **volatility** — realized intraday or short-window range expansion
-- **news-sentiment placeholder** — a clearly labeled placeholder factor until a
-  real news/sentiment source exists
+- **volume spike** — day volume / scanner volume contribution from IBKR data
+- **price momentum** — percentage move from IBKR scanner or snapshot data
+- **volatility** — absolute move contribution derived from provider values
+- **external signal** — currently neutral until a dedicated news/sentiment
+  provider exists
 
 The API exposes these as transparent factor contributions rather than a
 black-box "hotness" number via `GET /api/market-data/trending`. The Next.js
-landing workspace renders those backend-provided stock/ETF factors and never
-pretends they came from a real provider.
+landing workspace renders the backend-provided IBKR source metadata and clearly
+surfaces provider-not-configured/provider-unavailable states when local iBeam is
+not ready.
 
-## 10. Future LEAN Seam
+### 9.1 IBKR stock search and pin-any-symbol workflow
 
-LEAN is a **future seam**, not a dependency of the first paper-trading slice.
+Users are no longer constrained to a trending/default list. The reusable
+`SymbolSearch` component calls `GET /api/market-data/search` through
+`frontend/lib/marketDataClient.ts`, renders IBKR/iBeam stock results, links each
+result to `/symbols/{symbol}`, and can pin/unpin the selected result through the
+backend watchlist API. The frontend uses provider-neutral fields (`provider`,
+`providerSymbolId`, `assetClass`, `exchange`, `currency`, and display `name`) and
+only derives `ibkrConid` for persisted metadata when the provider is `ibkr` and
+the provider symbol id is numeric.
 
-The architecture should therefore preserve a provider-neutral signal contract:
+The backend search path uses IBKR Client Portal `/iserver/secdef/search` plus
+`/iserver/secdef/info` enrichment. Automated tests use fake IBKR HTTP responses;
+production search never falls back to a committed symbol allowlist. If iBeam is
+disabled, missing credentials, unauthenticated, or unreachable, search returns a
+stable provider error payload instead of fake results.
+
+## 10. LEAN Analysis Provider
+
+LEAN is now the first **analysis engine provider**, not an API/frontend
+dependency. The repository has the `ATrade.Analysis` seam, the
+`ATrade.Analysis.Lean` provider module, and HTTP contracts for discovery and
+execution: `GET /api/analysis/engines` and `POST /api/analysis/run`.
+
+When no provider is configured, those endpoints still return explicit
+`analysis-engine-not-configured` metadata rather than fake signals. When an
+ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
+LEAN provider and `POST /api/analysis/run` can fetch normalized candles from the
+current market-data provider before invoking LEAN. Runtime absence, timeout, or
+non-zero LEAN exits return `analysis-engine-unavailable` instead of successful
+synthetic results.
+
+The architecture preserves provider-neutral market-data, analysis, and signal
+contracts:
 
 - market/trending signals are normalized before they reach the UI
-- NATS events and persisted factor/signal records should not assume LEAN types
-- the frontend should render signal source metadata without caring whether the
-  source is mocked logic, internal analytics, or future LEAN integration
+- analysis requests consume `MarketDataSymbolIdentity` plus normalized
+  `OhlcvCandle` bars instead of LEAN runtime types
+- analysis results include engine/source metadata so the frontend can display
+  whether output came from LEAN or another engine
+- NATS events and persisted factor/signal records must not assume LEAN types
+- the frontend renders signal source metadata through `AnalysisPanel` without
+  binding its types to QuantConnect/LEAN classes
+- LEAN remains behind `ATrade.Analysis` contracts and the generated algorithm is
+  analysis-only: no brokerage model, no live mode, no order placement, and no
+  calls to ATrade order endpoints
 
-When LEAN is introduced later, it should plug into the existing market-data /
-strategy signal boundary rather than forcing the paper-trading workspace to be
-redesigned.
+Future analysis engines should plug into the same analysis / market-data /
+strategy signal boundary without redesigning the paper-trading workspace.
 
 ## 11. Configuration Contract Summary
 
-The committed `.env.example` for this feature family must expose only paper-safe
-placeholders:
+The committed `.env.example` and synchronized `.env.template` for this feature
+family must expose only paper-safe placeholders:
 
 - `ATRADE_BROKER_INTEGRATION_ENABLED`
 - `ATRADE_BROKER_ACCOUNT_MODE`
@@ -369,24 +488,38 @@ placeholders:
 - `ATRADE_IBKR_GATEWAY_PORT`
 - `ATRADE_IBKR_GATEWAY_IMAGE`
 - `ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS`
+- `ATRADE_IBKR_USERNAME`
+- `ATRADE_IBKR_PASSWORD`
 - `ATRADE_IBKR_PAPER_ACCOUNT_ID`
 - `ATRADE_FRONTEND_API_BASE_URL`
 - `NEXT_PUBLIC_ATRADE_API_BASE_URL`
+- `ATRADE_ANALYSIS_ENGINE`
+- `ATRADE_LEAN_RUNTIME_MODE`
+- `ATRADE_LEAN_CLI_COMMAND`
+- `ATRADE_LEAN_DOCKER_COMMAND`
+- `ATRADE_LEAN_DOCKER_IMAGE`
+- `ATRADE_LEAN_WORKSPACE_ROOT`
+- `ATRADE_LEAN_TIMEOUT_SECONDS`
+- `ATRADE_LEAN_KEEP_WORKSPACE`
 
 Rules:
 
 - committed defaults remain disabled and paper-only
-- usernames, passwords, tokens, and real account identifiers stay out of git
+- `ATRADE_IBKR_GATEWAY_IMAGE` is the approved `voyz/ibeam:latest` local runtime
+  contract, but AppHost still does not start it until integration is enabled and
+  fake credentials have been replaced in ignored `.env`
+- usernames, passwords, tokens, session cookies, and real account identifiers stay out of git
 - any real local secret belongs only in the ignored repo-root `.env`
-- `ATRADE_IBKR_GATEWAY_IMAGE` stays a placeholder in committed files and only
-  enables an optional AppHost-managed Gateway container when a non-placeholder
-  official image is provided locally
-- changing these variables must never create a live-trading path
+- AppHost passes only `IBEAM_ACCOUNT` and `IBEAM_PASSWORD` to iBeam via secret
+  parameters and never passes the paper account id to the container
+- LEAN placeholders are non-secret local runtime settings and stay disabled by
+  default with `ATRADE_ANALYSIS_ENGINE=none`
+- changing these variables must never create a live-trading or real-order path
 
 ## 12. Change Control
 
 This document is `status: active` and authoritative for the paper-trading
 workspace direction. Any change that weakens the paper-only guardrails,
 introduces live trading, changes the charting-library decision, or makes LEAN
-an immediate dependency requires a maintainer-approved update to this file and
+an API/frontend dependency requires a maintainer-approved update to this file and
 matching updates to the active repository docs that summarize the same area.

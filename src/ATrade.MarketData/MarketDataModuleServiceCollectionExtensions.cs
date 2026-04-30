@@ -8,8 +8,8 @@ public static class MarketDataModuleServiceCollectionExtensions
     {
         services.AddSingleton<IndicatorService>();
         services.AddSingleton<TrendingService>();
-        services.AddSingleton<IMarketDataService, MockMarketDataService>();
-        services.AddSingleton<IMarketDataStreamingService, MockMarketDataStreamingService>();
+        services.AddSingleton<IMarketDataService, MarketDataService>();
+        services.AddSingleton<IMarketDataStreamingService, MarketDataStreamingService>();
 
         return services;
     }
