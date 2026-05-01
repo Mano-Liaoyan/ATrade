@@ -257,6 +257,33 @@ public sealed class LeanAnalysisEngineTests
     }
 
     [Fact]
+    public async Task EngineExplainsCommandNotFoundRuntimeExit()
+    {
+        var options = new LeanAnalysisOptions
+        {
+            SelectedAnalysisEngine = "Lean",
+            RuntimeMode = LeanRuntimeMode.Docker,
+            CliCommand = "lean",
+            DockerImage = "quantconnect/lean:foundation",
+            ManagedContainerName = "atrade-lean-engine",
+            Timeout = TimeSpan.FromSeconds(1),
+        };
+        var engine = new LeanAnalysisEngine(
+            options,
+            new FakeLeanRuntimeExecutor(_ => new LeanRuntimeExecutionResult(127, string.Empty, string.Empty, TimedOut: false)),
+            new LeanAnalysisWorkspaceFactory(options),
+            NullLogger<LeanAnalysisEngine>.Instance);
+
+        var result = await engine.AnalyzeAsync(CreateRequest(barCount: 25));
+
+        Assert.Equal(AnalysisResultStatuses.Failed, result.Status);
+        Assert.Equal(AnalysisEngineErrorCodes.EngineUnavailable, result.Error?.Code);
+        Assert.Contains("command not found", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(LeanAnalysisEnvironmentVariables.CliCommand, result.Error?.Message, StringComparison.Ordinal);
+        Assert.Contains(LeanAnalysisEnvironmentVariables.DockerImage, result.Error?.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task EngineReturnsProviderNeutralResultFromLeanRuntimeMarker()
     {
         var options = new LeanAnalysisOptions

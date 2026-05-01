@@ -13,6 +13,9 @@ s.close()
 PY
 )"
 atrade_load_local_port_contract "$repo_root"
+# This contract test verifies the no-engine fallback. Keep it deterministic even
+# when an ignored local .env opts into LEAN for manual runtime testing.
+export ATRADE_ANALYSIS_ENGINE=none
 
 api_pid=''
 api_log=''

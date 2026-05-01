@@ -57,13 +57,14 @@ public sealed class LeanAnalysisEngine(
 
             if (execution.ExitCode != 0)
             {
+                var exitMessage = CreateRuntimeExitMessage(execution);
                 logger.LogWarning("LEAN runtime exited with code {ExitCode}: {StandardError}", execution.ExitCode, Truncate(execution.StandardError));
                 return CreateErrorResult(
                     request,
                     source,
                     AnalysisResultStatuses.Failed,
                     AnalysisEngineErrorCodes.EngineUnavailable,
-                    $"LEAN runtime exited with code {execution.ExitCode}. {Truncate(execution.StandardError)}".Trim());
+                    exitMessage);
             }
 
             return LeanAnalysisResultParser.Parse(execution, request, workspace.Input, Metadata, source);
@@ -110,6 +111,27 @@ public sealed class LeanAnalysisEngine(
         LeanAnalysisOptions.DefaultProvider,
         $"{options.RuntimeDescription}; project={LeanAnalysisWorkspaceFactory.ProjectName}",
         DateTimeOffset.UtcNow);
+
+    private string CreateRuntimeExitMessage(LeanRuntimeExecutionResult execution)
+    {
+        var standardError = Truncate(execution.StandardError);
+        var message = $"LEAN runtime exited with code {execution.ExitCode}. {standardError}".Trim();
+
+        if (execution.ExitCode != 127)
+        {
+            return message;
+        }
+
+        var commandNotFoundHint = options.RuntimeMode == LeanRuntimeMode.Docker
+            ? $"Exit code 127 usually means '{options.CliCommand}' was not found inside the managed LEAN container '{options.ManagedContainerName ?? "<unset>"}'. " +
+                $"Verify {LeanAnalysisEnvironmentVariables.DockerImage} provides that executable, set {LeanAnalysisEnvironmentVariables.CliCommand} to the executable available in the container, or switch to CLI mode with the official LEAN CLI installed on the host."
+            : $"Exit code 127 usually means '{options.CliCommand}' or one of its dependencies was not found. " +
+                $"Install the official LEAN CLI or set {LeanAnalysisEnvironmentVariables.CliCommand} to its executable path.";
+
+        return string.IsNullOrWhiteSpace(standardError)
+            ? $"LEAN runtime exited with code 127 (command not found). {commandNotFoundHint}"
+            : $"{message} {commandNotFoundHint}";
+    }
 
     private AnalysisResult CreateErrorResult(
         AnalysisRequest request,
