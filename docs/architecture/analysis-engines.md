@@ -124,11 +124,11 @@ Committed templates keep analysis disabled by default and expose only safe,
 non-secret placeholders:
 
 ```text
-ATRADE_ANALYSIS_ENGINE=none
-ATRADE_LEAN_RUNTIME_MODE=cli
+ATRADE_ANALYSIS_ENGINE=Lean
+ATRADE_LEAN_RUNTIME_MODE=docker
 ATRADE_LEAN_CLI_COMMAND=lean
 ATRADE_LEAN_DOCKER_COMMAND=docker
-ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation
+ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:latest
 ATRADE_LEAN_WORKSPACE_ROOT=artifacts/lean-workspaces
 ATRADE_LEAN_TIMEOUT_SECONDS=45
 ATRADE_LEAN_KEEP_WORKSPACE=false
