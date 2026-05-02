@@ -122,6 +122,7 @@
 | 2026-05-02 17:25 | Build retry cleanup | Initial `dotnet build ATrade.slnx --nologo --verbosity minimal` attempts hit transient MSBuild child-node exits while stale AppHost/MSBuild node-reuse processes from contract smoke tests were still running; cleaned worktree AppHost/API/worker processes and ran `dotnet build-server shutdown`. |
 | 2026-05-02 17:26 | Build gate | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings and 0 errors after cleanup. |
 | 2026-05-02 17:27 | Step 4 completed | Full test suite, required integration/contract scripts, failure cleanup, and solution build gate passed. |
+| 2026-05-02 17:29 | Start-contract fixture cleanup fix | Fixed `tests/start-contract/start-wrapper-tests.sh` so repeated local `.env` writes do not treat a test-created `.env` as the user's original file; reran `bash tests/start-contract/start-wrapper-tests.sh` and confirmed no `.env` remains afterward. |
 
 ---
 

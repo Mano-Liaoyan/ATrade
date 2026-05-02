@@ -8,6 +8,7 @@ atrade_load_local_port_contract "$repo_root"
 run_script_backup=''
 env_backup=''
 restore_original_env=0
+env_state_captured=0
 dashboard_smoke_pid=''
 dashboard_smoke_log=''
 
@@ -89,8 +90,10 @@ restore_local_env() {
     mv "$env_backup" "$repo_root/.env"
     env_backup=''
     restore_original_env=0
+    env_state_captured=0
   elif [[ "$restore_original_env" == '0' ]]; then
     rm -f "$repo_root/.env"
+    env_state_captured=0
   fi
 }
 
@@ -111,9 +114,11 @@ cleanup() {
 trap cleanup EXIT
 
 capture_original_env() {
-  if [[ -n "$env_backup" || "$restore_original_env" == '1' ]]; then
+  if [[ "$env_state_captured" == '1' ]]; then
     return
   fi
+
+  env_state_captured=1
 
   if [[ -f "$repo_root/.env" ]]; then
     env_backup="$(mktemp)"
@@ -195,6 +200,10 @@ EOF
   assert_contains "$loader_output" '__ATRADE_APPHOST_FRONTEND_HTTP_PORT__=3000'
   assert_contains "$loader_output" '__ATRADE_ASPIRE_DASHBOARD_HTTP_PORT__=6098'
   assert_contains "$loader_output" '__ATRADE_BROKER_INTEGRATION_ENABLED__=false'
+
+  if [[ -z "$env_backup" && "$restore_original_env" == '0' ]]; then
+    rm -f "$repo_root/.env"
+  fi
 }
 
 install_run_stub() {
