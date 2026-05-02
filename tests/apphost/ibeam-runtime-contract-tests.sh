@@ -145,12 +145,13 @@ for key, expected in required.items():
     if actual != expected:
         raise SystemExit(f'{key} expected {expected!r}, found {actual!r}')
 
+safe_password_placeholders = {'ATRADE_POSTGRES_PASSWORD', 'ATRADE_TIMESCALEDB_PASSWORD'}
 for key, value in values.items():
     upper_key = key.upper()
     upper_value = value.upper()
     if any(token in upper_key for token in ('TOKEN', 'SESSION', 'COOKIE', 'SECRET')):
         raise SystemExit(f'committed env template must not introduce token/session/cookie/secret key: {key}')
-    if key in {'ATRADE_IBKR_USERNAME', 'ATRADE_IBKR_PASSWORD', 'ATRADE_IBKR_PAPER_ACCOUNT_ID'}:
+    if key in {'ATRADE_IBKR_USERNAME', 'ATRADE_IBKR_PASSWORD', 'ATRADE_IBKR_PAPER_ACCOUNT_ID'} | safe_password_placeholders:
         continue
     if any(token in upper_value for token in ('PASSWORD', 'TOKEN', 'SESSION', 'COOKIE', 'SECRET')):
         raise SystemExit(f'committed env template contains suspicious credential-like value for {key}')

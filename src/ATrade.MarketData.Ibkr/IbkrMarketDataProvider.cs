@@ -491,7 +491,8 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (TaskCanceledException exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data request timed out over local HTTPS transport.");
+            var message = RedactConfiguredValues(exception.Message);
+            logger.LogWarning("IBKR iBeam market-data request timed out over local HTTPS transport: {Diagnostic}", message);
             return ProviderRead<T>.Failure(new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportTimeoutMessage()));
         }
         catch (IbkrMarketDataProviderException exception)
@@ -509,7 +510,8 @@ public sealed class IbkrMarketDataProvider(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "IBKR iBeam market-data request failed safely.");
+            var message = RedactConfiguredValues(exception.Message);
+            logger.LogWarning("IBKR iBeam market-data request failed safely: {Diagnostic}", message);
             return ProviderRead<T>.Failure(new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market-data request failed safely."));
         }
     }
@@ -518,26 +520,7 @@ public sealed class IbkrMarketDataProvider(
         MarketDataProviderErrorCodes.MarketDataRequestFailed,
         "IBKR iBeam market-data request failed safely.");
 
-    private string RedactConfiguredValues(string message)
-    {
-        var redactedMessage = message;
-        foreach (var value in new[]
-        {
-            gatewayOptions.Username,
-            gatewayOptions.Password,
-            gatewayOptions.PaperAccountId,
-            gatewayOptions.GatewayBaseUrl?.ToString(),
-            gatewayOptions.GatewayBaseUrl?.Host,
-        })
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                redactedMessage = redactedMessage.Replace(value, "[redacted]", StringComparison.OrdinalIgnoreCase);
-            }
-        }
-
-        return redactedMessage;
-    }
+    private string RedactConfiguredValues(string? message) => IbkrGatewayDiagnostics.RedactConfiguredValues(message, gatewayOptions);
 
     private static MarketDataSymbolIdentity CreateIdentity(IbkrContract contract) => MarketDataSymbolIdentity.Create(
         contract.Symbol,

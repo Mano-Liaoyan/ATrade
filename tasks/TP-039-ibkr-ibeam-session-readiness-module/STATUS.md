@@ -1,6 +1,6 @@
 # TP-039: Deepen the IBKR/iBeam session readiness module — Status
 
-**Current Step:** Step 2: Adapt broker, market-data, and worker callers
+**Current Step:** Step 3: Preserve transport, auth, and redaction safety
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -45,12 +45,12 @@
 ---
 
 ### Step 3: Preserve transport, auth, and redaction safety
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Loopback HTTPS iBeam certificate handling remains narrow
-- [ ] Client Portal user-agent and scanner content-length behavior remain intact
-- [ ] Diagnostics and logs remain secret/account safe
-- [ ] Targeted iBeam runtime and paper-safety scripts passing
+- [x] Loopback HTTPS iBeam certificate handling remains narrow
+- [x] Client Portal user-agent and scanner content-length behavior remain intact
+- [x] Diagnostics and logs remain secret/account safe
+- [x] Targeted iBeam runtime and paper-safety scripts passing
 
 ---
 
