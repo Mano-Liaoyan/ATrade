@@ -109,9 +109,9 @@ now come from a repo-level `.env` contract.
 
 ### Current local port variables
 
-- `ATRADE_API_HTTP_PORT` — direct `ATrade.Api` startup and smoke coverage
-- `ATRADE_FRONTEND_DIRECT_HTTP_PORT` — direct `frontend/` `npm run dev` verification path
-- `ATRADE_APPHOST_FRONTEND_HTTP_PORT` — AppHost-managed Next.js frontend port
+- `ATRADE_API_HTTP_PORT` — direct `ATrade.Api` startup and smoke coverage; committed default `5181`
+- `ATRADE_FRONTEND_DIRECT_HTTP_PORT` — direct `frontend/` `npm run dev` verification path; committed default `3111`
+- `ATRADE_APPHOST_FRONTEND_HTTP_PORT` — AppHost-managed Next.js frontend port; committed default `3000`
 - `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` — Aspire dashboard UI bind port used by `./start run`, `./start.ps1 run`, and `./start.cmd run`; the committed default `0` preserves an ephemeral loopback dashboard URL, while a non-zero value in ignored `.env` pins the dashboard UI to `http://127.0.0.1:<port>`
 
 The dashboard OTLP endpoint remains intentionally ephemeral on

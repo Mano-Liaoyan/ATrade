@@ -1,6 +1,6 @@
 # TP-036: Deepen the local runtime contract module — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Inventory and fix committed contract drift
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 3
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Inventory and fix committed contract drift
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Runtime defaults compared across template, shims, docs, and tests
-- [ ] Safe paper-only committed defaults restored and documented
-- [ ] New runtime-contract drift test added
-- [ ] Targeted startup/config contract tests passing
+- [x] Runtime defaults compared across template, shims, docs, and tests
+- [x] Safe paper-only committed defaults restored and documented
+- [x] New runtime-contract drift test added
+- [x] Targeted startup/config contract tests passing
 
 ---
 
@@ -84,6 +84,7 @@
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
 | Prompt/file-scope references `scripts/start.run.cmd`, but the repository's committed Windows cmd shim is root `start.cmd`; `scripts/start.run.ps1` is the delegated Windows script. | Treat root `start.cmd` plus `scripts/start.run.ps1` as the Windows cmd/PowerShell startup surface unless implementation discovers a real need for a new delegated cmd script. | Preflight / `scripts/README.md` planned layout |
+| Default drift found in `.env.template`: ports use high lane values (`15181`/`13111`/`13000`/dashboard `10001`), broker integration defaults `true`, iBeam host URL/port use `15000`, frontend API URLs use `15181`, and cache freshness is `10`; docs and tests expect safe shared defaults (`5181`/`3111`/`3000`/dashboard `0`, broker `false`, iBeam `https://127.0.0.1:5000`, cache freshness `30`). | Restore `.env.template` to documented/tested paper-safe defaults and add a drift test so future changes fail fast. | `.env.template`, `README.md`, `scripts/README.md`, `tests/start-contract/start-wrapper-tests.sh`, `tests/apphost/paper-trading-config-contract-tests.sh`, architecture docs |
 
 ---
 
@@ -95,6 +96,12 @@
 | 2026-05-02 13:51 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-02 13:51 | Step 0 started | Preflight |
 | 2026-05-02 16:00 | Step 0 completed | Preflight files/dependencies verified; `scripts/start.run.cmd` prompt mismatch logged as discovery. |
+| 2026-05-02 16:01 | Step 1 started | Inventorying committed runtime defaults across template, startup shims, tests, and active docs. |
+| 2026-05-02 16:04 | Runtime drift inventory | Compared `.env.template`, startup shims, existing contract tests, README/PLAN/scripts docs, and active architecture docs; drift isolated to committed template defaults while docs/tests already describe the paper-safe contract. |
+| 2026-05-02 16:07 | Paper-safe defaults restored | `.env.template` now matches documented defaults: API `5181`, direct frontend `3111`, AppHost frontend `3000`, dashboard `0`, broker integration `false`, iBeam HTTPS port `5000`, frontend API `5181`, and cache freshness `30`; `scripts/README.md` now documents the committed port defaults. |
+| 2026-05-02 16:12 | Drift test added | Added `tests/apphost/local-runtime-contract-module-tests.sh`; `bash -n` and the new test passed locally. |
+| 2026-05-02 16:16 | Step 1 targeted tests | `bash tests/apphost/paper-trading-config-contract-tests.sh && bash tests/start-contract/start-wrapper-tests.sh` passed. |
+| 2026-05-02 16:17 | Step 1 completed | Committed defaults, docs, drift test, and targeted startup/config contract tests are aligned on paper-safe runtime defaults. |
 
 ---
 
