@@ -1,7 +1,7 @@
 # TP-040: Deepen analysis and workspace intake modules — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-02
 **Review Level:** 2
 **Review Counter:** 0
@@ -66,11 +66,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -85,6 +85,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Analysis and workspace intake moves did not require HTTP path or payload changes; README endpoint summary remains current. | Logged; no README edit needed. | README.md / Step 5 docs review |
+| No out-of-scope technical debt discovered during TP-040. | No action required. | TP-040 |
 
 ---
 
@@ -104,6 +106,9 @@
 | 2026-05-02 16:22 | Step 3 completed | Analysis/watchlist AppHost contract scripts passed; API maps intake errors explicitly; identity seam contained in Workspaces |
 | 2026-05-02 16:23 | Step 4 started | Full suite, integration scripts, and build verification begun |
 | 2026-05-02 16:34 | Step 4 completed | `dotnet test ATrade.slnx`, affected AppHost scripts, frontend build script, and `dotnet build ATrade.slnx` passed; LEAN runtime script cleanly skipped optional CLI execution |
+| 2026-05-02 16:35 | Step 5 started | Documentation updates and delivery notes begun |
+| 2026-05-02 16:43 | Step 5 completed | Architecture docs updated; affected docs reviewed; discoveries logged |
+| 2026-05-02 16:43 | Task completed | All TP-040 steps complete |
 
 ---
 
@@ -115,4 +120,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Step 5 docs review: `docs/architecture/provider-abstractions.md` was affected and updated for analysis/workspace intake seams; `README.md` endpoint summary was reviewed and left unchanged because HTTP paths/payloads remain compatible.

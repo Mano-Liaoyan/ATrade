@@ -180,14 +180,17 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.MarketData.Timescale`, reads fresh Timescale rows before provider
   access, persists provider responses on cache misses, and labels cache hits with
   `timescale-cache:{originalSource}` source metadata. The analysis endpoints
-  resolve `IAnalysisEngineRegistry`, expose provider-neutral engine
-  discovery/run payloads, return explicit `analysis-engine-not-configured`
-  responses when no engine is selected, and invoke the LEAN provider over
-  cache-aware `IMarketDataService` candles when configured. The watchlist
-  endpoints resolve the temporary local workspace identity, initialize the
-  `ATrade.Workspaces` schema idempotently, persist exact provider/market
-  instrument pins in Postgres, return stable `instrumentKey`/`pinKey` metadata
-  payloads, and surface validation/storage failures as stable JSON errors. The AppHost now injects runtime connection
+  resolve `IAnalysisEngineRegistry` for discovery and `IAnalysisRequestIntake`
+  for runs, so `ATrade.Analysis` owns symbol/timeframe defaults, candle
+  acquisition through the cache-aware `IMarketDataService` seam, symbol identity
+  resolution, invalid-request/provider-error mapping, and engine handoff before
+  the API projects the HTTP result. The watchlist endpoints resolve
+  `IWorkspaceWatchlistIntake`, so `ATrade.Workspaces` owns the temporary local
+  workspace identity, idempotent schema initialization ordering, exact
+  provider/market pin normalization, exact unpin validation, Postgres
+  persistence, stable `instrumentKey`/`pinKey` metadata payloads, and stable
+  validation/storage error shapes while the API only binds HTTP requests and
+  projects HTTP responses. The AppHost now injects runtime connection
   information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`; the API
   consumes `Postgres` for workspace watchlists and `TimescaleDB` for fresh
   market-data cache-aside reads today. Later slices add authenticated
@@ -333,12 +336,17 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   metrics, and backtest summaries without coupling API/frontend contracts to a
   concrete runtime.
 - **Responsibilities:** Define `IAnalysisEngine`, `IAnalysisEngineRegistry`,
-  engine metadata/capability/status shapes, normalized `AnalysisRequest` and
-  `AnalysisResult` records, signal/metric/backtest output contracts, and the
-  `NoConfiguredAnalysisEngine` fallback. The current API surface exposes
-  `GET /api/analysis/engines` and `POST /api/analysis/run`; with no selected
-  provider, run requests return `analysis-engine-not-configured` with empty
-  signals, metrics, and backtest output.
+  `IAnalysisRequestIntake`, engine metadata/capability/status shapes,
+  HTTP-facing provider-neutral `AnalysisRunRequest` / `AnalysisRunIntakeResult`
+  intake records, normalized `AnalysisRequest` and `AnalysisResult` records,
+  signal/metric/backtest output contracts, and the `NoConfiguredAnalysisEngine`
+  fallback. The intake owns symbol/timeframe defaults, direct-bar validation,
+  cache-aware candle acquisition through `IMarketDataService`, symbol identity
+  resolution/fallback, invalid-request and provider-error propagation, and
+  engine handoff. The current API surface exposes `GET /api/analysis/engines`
+  and `POST /api/analysis/run`; with no selected provider, run requests return
+  `analysis-engine-not-configured` with empty signals, metrics, and backtest
+  output.
 - **Expected dependencies:** `ATrade.MarketData` for normalized
   `MarketDataSymbolIdentity` and `OhlcvCandle` inputs; composed by
   `ATrade.Api`. Concrete providers such as `ATrade.Analysis.Lean` may depend on
@@ -371,9 +379,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 
 - **Purpose:** Workspace preference and personalization persistence.
 - **Responsibilities:** Own the local user/workspace identity abstraction,
-  symbol normalization/validation delegated to `ATrade.MarketData.ExactInstrumentIdentity`,
-  idempotent Postgres schema initialization, and repository operations for pinned
-  watchlist instruments. The current schema
+  `IWorkspaceWatchlistIntake` request orchestration, symbol
+  normalization/validation delegated to
+  `ATrade.MarketData.ExactInstrumentIdentity`, exact instrument-key validation,
+  idempotent Postgres schema initialization ordering, stable watchlist error
+  shapes, and repository operations for pinned watchlist instruments. The current schema
   stores `user_id`, `workspace_id`, durable `instrument_key`, normalized symbol,
   provider, optional provider symbol id / IBKR `conid`, display name, exchange,
   currency, asset class, sort order, and timestamps. It deduplicates only exact

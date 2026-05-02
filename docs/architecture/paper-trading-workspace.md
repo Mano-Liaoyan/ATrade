@@ -153,13 +153,20 @@ trending, candle, indicator, and latest-update payloads carry
 `MarketDataSymbolIdentity` where available. SignalR is the outward-facing
 streaming layer for browsers and awaits `IMarketDataStreamingService`, which
 owns provider-status checks and creates provider-backed snapshots when the
-IBKR/iBeam provider is available. The analysis endpoints resolve
-`IAnalysisEngineRegistry`; they return explicit `analysis-engine-not-configured`
-metadata when no engine is selected and run the configured LEAN provider over
-async `IMarketDataService` candle reads when `ATRADE_ANALYSIS_ENGINE=Lean`; in Docker mode
-that provider uses the AppHost-managed `lean-engine` runtime and returns explicit
-`analysis-engine-unavailable` errors when the managed runtime is absent or
-unreachable. NATS remains the internal event backbone between API and workers.
+IBKR/iBeam provider is available. The analysis endpoints use
+`IAnalysisEngineRegistry` for discovery and `IAnalysisRequestIntake` for runs;
+the intake owns direct-bar validation, symbol/timeframe defaults, async
+`IMarketDataService` candle reads, symbol identity resolution, invalid-request /
+market-data error propagation, and engine handoff. With no engine selected the
+HTTP projection still returns explicit `analysis-engine-not-configured` metadata,
+and when `ATRADE_ANALYSIS_ENGINE=Lean` the configured LEAN provider analyzes the
+normalized bars; in Docker mode that provider uses the AppHost-managed
+`lean-engine` runtime and returns explicit `analysis-engine-unavailable` errors
+when the managed runtime is absent or unreachable. Watchlist endpoints use
+`IWorkspaceWatchlistIntake`; Workspaces owns local identity use, schema
+initialization ordering, pin/replace/unpin normalization, exact instrument-key
+validation, and storage/validation error shapes while the API only binds and
+projects HTTP requests. NATS remains the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
 
@@ -195,8 +202,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
   market-data service so fresh rows can serve HTTP trending, candle, and
   indicator requests without collapsing provider-backed instruments to a bare
   symbol.
-- `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
-  request/result contracts, engine/source metadata, API-facing registry, and
+- `ATrade.Analysis` owns the provider-neutral analysis engine seam, analysis run
+  intake, normalized request/result contracts, engine/source metadata,
+  API-facing registry, cache-aware candle acquisition for analysis runs, and
   no-configured-engine fallback for LEAN or alternate analysis runtimes
 - `ATrade.Analysis.Lean` owns the first concrete analysis provider. It builds a
   temporary official-LEAN workspace from ATrade OHLCV bars, runs an
@@ -204,13 +212,15 @@ The paper-trading slice extends existing planned responsibilities as follows:
   CLI or AppHost-managed Docker runtime (`lean-engine`), parses
   provider-neutral signals/metrics, and rejects brokerage/order-routing source
   tokens.
-- `ATrade.Workspaces` owns backend workspace preferences, including the current
-  Postgres schema/repository for exact pinned watchlist instruments. Rows store
-  a durable `instrument_key` / API `instrumentKey` and `pinKey` derived from the
-  normalized provider, provider symbol id / IBKR `conid`, symbol, exchange,
-  currency, and asset class tuple, plus display name, sort order, and timestamps.
-  Duplicate handling merges only exact instrument keys so the same symbol or
-  company name can be pinned separately for different markets.
+- `ATrade.Workspaces` owns backend workspace preferences and watchlist request
+  intake, including the current Postgres schema/repository for exact pinned
+  watchlist instruments. Rows store a durable `instrument_key` / API
+  `instrumentKey` and `pinKey` derived from the normalized provider, provider
+  symbol id / IBKR `conid`, symbol, exchange, currency, and asset class tuple,
+  plus display name, sort order, and timestamps. Duplicate handling merges only
+  exact instrument keys so the same symbol or company name can be pinned
+  separately for different markets; exact unpins validate the supplied
+  `instrumentKey`, while legacy symbol unpins remain limited to unambiguous rows.
 - `ATrade.Ibkr.Worker` owns IBKR Gateway readiness monitoring through the shared
   IBKR/iBeam readiness module and any future paper-safe broker polling/streaming
   work
@@ -477,10 +487,11 @@ and unpins through the backend watchlist API, then updates its browser cache
 from the backend response. Search-result pins send the provider-neutral metadata
 returned by `GET /api/market-data/search`: provider, provider symbol id (IBKR
 `conid` today), optional `ibkrConid`, name, exchange, currency, and asset class.
-The backend normalizes those fields through `ATrade.MarketData.ExactInstrumentIdentity`
-into a stable `instrumentKey`/`pinKey` tuple and uses it as the Postgres
-identity; pinning `AAPL` on NASDAQ and `AAPL` on LSE
-creates two rows, and unpinning one exact key must not remove the other. Legacy
+The Workspaces watchlist intake normalizes those fields through
+`ATrade.MarketData.ExactInstrumentIdentity` into a stable
+`instrumentKey`/`pinKey` tuple before repository persistence and uses it as the
+Postgres identity; pinning `AAPL` on NASDAQ and `AAPL` on LSE creates two rows,
+and unpinning one exact key must not remove the other. Legacy
 `DELETE /api/workspace/watchlist/{symbol}` is kept only for unambiguous
 symbol-only rows; exact removals use
 `DELETE /api/workspace/watchlist/pins/{instrumentKey}`. The `localStorage` key
@@ -591,9 +602,10 @@ execution: `GET /api/analysis/engines` and `POST /api/analysis/run`.
 When no provider is configured, those endpoints still return explicit
 `analysis-engine-not-configured` metadata rather than fake signals. When an
 ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
-LEAN provider and `POST /api/analysis/run` can fetch normalized candles through
-the async cache-aware `IMarketDataService` before invoking LEAN. Docker mode is the
-no-paid-account local path: the local Aspire graph shows `lean-engine`,
+LEAN provider and `POST /api/analysis/run` delegates to `ATrade.Analysis`
+intake, which can fetch normalized candles through the async cache-aware
+`IMarketDataService` before invoking LEAN. Docker mode is the no-paid-account
+local path: the local Aspire graph shows `lean-engine`,
 bind-mounts the generated-workspace root, and passes container metadata to the
 API so execution uses `docker exec` to invoke `dotnet
 QuantConnect.Lean.Launcher.dll` with a generated local engine config inside that
