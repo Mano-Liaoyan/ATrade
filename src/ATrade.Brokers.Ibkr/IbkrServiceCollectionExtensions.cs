@@ -15,6 +15,7 @@ public static class IbkrServiceCollectionExtensions
         services.AddSingleton<IOptions<IbkrGatewayOptions>>(_ => Options.Create(IbkrGatewayOptions.FromConfiguration(configuration)));
         services.AddSingleton(static serviceProvider => serviceProvider.GetRequiredService<IOptions<IbkrGatewayOptions>>().Value);
         services.AddSingleton<IIbkrPaperTradingGuard, IbkrPaperTradingGuard>();
+        services.AddSingleton<IIbkrSessionReadinessService, IbkrSessionReadinessService>();
         services.AddSingleton(IbkrBrokerAdapterCapabilities.PaperSafeReadOnly);
         services.AddSingleton<IIbkrBrokerStatusService, IbkrBrokerStatusService>();
         services.AddSingleton<IBrokerProvider>(static serviceProvider => serviceProvider.GetRequiredService<IIbkrBrokerStatusService>());

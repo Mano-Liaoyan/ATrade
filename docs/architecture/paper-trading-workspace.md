@@ -170,8 +170,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
 - `ATrade.Brokers` owns the provider-neutral broker identity, capability,
   account-mode, and status contracts shared by API, worker, and adapters
 - `ATrade.Brokers.Ibkr` owns typed paper-mode configuration, the official
-  Gateway session/status client boundary, paper-only guardrails, and the safe
-  `IBrokerProvider` implementation shared by the API and worker
+  Gateway session/status client boundary, paper-only guardrails, the normalized
+  IBKR/iBeam readiness result, and the safe `IBrokerProvider` projection used by
+  the API
 - `ATrade.Orders` owns paper-order validation, lifecycle state, and simulated
   fills; the current backend slice already returns deterministic simulated
   fills directly from this module
@@ -182,8 +183,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
 - `ATrade.MarketData.Ibkr` owns the first real market-data provider: IBKR/iBeam
   Client Portal contract search/detail lookup, scanner/trending-equivalent
   mapping, snapshots, historical bars, indicator inputs, source metadata, and
-  safe not-configured/unavailable/authentication-required responses without
-  reading credentials directly
+  safe not-configured/unavailable/authentication-required responses projected
+  from the shared IBKR/iBeam readiness result without reading credentials
+  directly
 - `ATrade.MarketData.Timescale` owns provider-neutral TimescaleDB persistence
   and the API cache-aside decorator for provider-backed OHLCV candle series and
   scanner/trending snapshots. It creates the `atrade_market_data` schema, stores
@@ -209,8 +211,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
   currency, and asset class tuple, plus display name, sort order, and timestamps.
   Duplicate handling merges only exact instrument keys so the same symbol or
   company name can be pinned separately for different markets.
-- `ATrade.Ibkr.Worker` owns IBKR Gateway session management and any future
-  paper-safe broker polling/streaming work
+- `ATrade.Ibkr.Worker` owns IBKR Gateway readiness monitoring through the shared
+  IBKR/iBeam readiness module and any future paper-safe broker polling/streaming
+  work
 
 The worker may surface broker connectivity and capability information from the
 official IBKR Gateway APIs, but the browser never binds to the worker directly.
@@ -250,13 +253,15 @@ responsibilities are:
 - expose the provider-neutral `BrokerProviderStatus` shape that `ATrade.Api`
   can project to the frontend
 
-In the currently implemented backend slice, the worker and API share the same
-`ATrade.Brokers.Ibkr` status service and shared gateway transport helper so
-broker status and market-data refreshes use the same HTTPS base URL, timeout,
-and local-certificate policy. Disabled, credentials-missing, configured-iBeam,
-unauthenticated, and rejected-live outcomes are normalized before any unsafe
-broker action is attempted. Raw usernames, passwords, tokens, session cookies,
-and account ids never appear in status payloads; account presence is exposed
+In the currently implemented backend slice, broker status, market-data
+status/read guards, and the worker share the same `ATrade.Brokers.Ibkr`
+readiness service and shared gateway transport helper so broker status and
+market-data refreshes use the same HTTPS base URL, timeout, and
+local-certificate policy. Disabled, credentials-missing, configured-iBeam,
+timeout/unreachable transport, unauthenticated, authenticated, degraded, error,
+and rejected-live outcomes are normalized before any unsafe broker action is
+attempted. Raw usernames, passwords, tokens, session cookies, gateway URLs, and
+account ids never appear in status payloads or logs; account presence is exposed
 only as a boolean. The shared Gateway HTTP transport also sends a stable Client
 Portal-compatible user agent because the local Client Portal runtime rejects
 anonymous/no-user-agent status requests with `403`. The iBeam self-signed

@@ -63,6 +63,23 @@ public static class IbkrBrokerStatus
             sessionStatus.Competing);
     }
 
+    public static BrokerProviderStatus FromReadiness(
+        IbkrGatewayOptions options,
+        BrokerProviderCapabilities capabilities,
+        IbkrSessionReadinessResult readiness)
+    {
+        ArgumentNullException.ThrowIfNull(readiness);
+
+        return Create(
+            options,
+            capabilities,
+            readiness.State,
+            readiness.Message,
+            readiness.Authenticated,
+            readiness.Connected,
+            readiness.Competing);
+    }
+
     private static BrokerProviderStatus Create(
         IbkrGatewayOptions options,
         BrokerProviderCapabilities capabilities,

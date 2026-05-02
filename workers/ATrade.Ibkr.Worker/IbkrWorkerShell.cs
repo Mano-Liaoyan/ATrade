@@ -1,10 +1,9 @@
-using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 
 namespace ATrade.Ibkr.Worker;
 
 public sealed class IbkrWorkerShell(
-    IIbkrBrokerStatusService brokerStatusService,
+    IIbkrSessionReadinessService readinessService,
     ILogger<IbkrWorkerShell> logger) : BackgroundService
 {
     private static readonly TimeSpan StatusPollInterval = TimeSpan.FromSeconds(30);
@@ -15,22 +14,22 @@ public sealed class IbkrWorkerShell(
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var status = await brokerStatusService.GetStatusAsync(stoppingToken);
+            var readiness = await readinessService.CheckReadinessAsync(stoppingToken);
 
-            if (!string.Equals(previousState, status.State, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(previousState, readiness.State, StringComparison.OrdinalIgnoreCase))
             {
-                LogStatus(status);
-                previousState = status.State;
+                LogStatus(readiness);
+                previousState = readiness.State;
             }
 
-            if (string.Equals(status.State, BrokerProviderStates.RejectedLiveMode, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(readiness.State, IbkrSessionReadinessStates.RejectedLiveMode, StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException(status.Message ?? "ATrade.Ibkr.Worker rejects non-paper IBKR modes.");
+                throw new InvalidOperationException(readiness.Message ?? "ATrade.Ibkr.Worker rejects non-paper IBKR modes.");
             }
 
-            if (string.Equals(status.State, BrokerProviderStates.Disabled, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(status.State, BrokerProviderStates.NotConfigured, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(status.State, BrokerProviderStates.CredentialsMissing, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(readiness.State, IbkrSessionReadinessStates.Disabled, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(readiness.State, IbkrSessionReadinessStates.NotConfigured, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(readiness.State, IbkrSessionReadinessStates.CredentialsMissing, StringComparison.OrdinalIgnoreCase))
             {
                 await WaitUntilStoppedAsync(stoppingToken);
                 return;
@@ -40,39 +39,39 @@ public sealed class IbkrWorkerShell(
         }
     }
 
-    private void LogStatus(BrokerProviderStatus status)
+    private void LogStatus(IbkrSessionReadinessResult readiness)
     {
-        switch (status.State)
+        switch (readiness.State)
         {
-            case BrokerProviderStates.Disabled:
+            case IbkrSessionReadinessStates.Disabled:
                 logger.LogInformation("ATrade.Ibkr.Worker is disabled and will remain idle until local configuration enables paper mode.");
                 break;
-            case BrokerProviderStates.NotConfigured:
-                logger.LogWarning("ATrade.Ibkr.Worker is enabled for paper mode but not fully configured yet: {Message}", status.Message);
+            case IbkrSessionReadinessStates.NotConfigured:
+                logger.LogWarning("ATrade.Ibkr.Worker is enabled for paper mode but not fully configured yet: {Message}", readiness.Message);
                 break;
-            case BrokerProviderStates.CredentialsMissing:
-                logger.LogWarning("ATrade.Ibkr.Worker is enabled for paper iBeam but credentials are missing from the ignored local .env: {Message}", status.Message);
+            case IbkrSessionReadinessStates.CredentialsMissing:
+                logger.LogWarning("ATrade.Ibkr.Worker is enabled for paper iBeam but credentials are missing from the ignored local .env: {Message}", readiness.Message);
                 break;
-            case BrokerProviderStates.RejectedLiveMode:
-                logger.LogCritical("ATrade.Ibkr.Worker rejected an unsafe IBKR configuration: {Message}", status.Message);
+            case IbkrSessionReadinessStates.RejectedLiveMode:
+                logger.LogCritical("ATrade.Ibkr.Worker rejected an unsafe IBKR configuration: {Message}", readiness.Message);
                 break;
-            case BrokerProviderStates.IbeamContainerConfigured:
+            case IbkrSessionReadinessStates.IbeamContainerConfigured:
                 logger.LogInformation("ATrade.Ibkr.Worker found local iBeam configuration and is waiting for the auth status endpoint.");
                 break;
-            case BrokerProviderStates.Authenticated:
+            case IbkrSessionReadinessStates.Authenticated:
                 logger.LogInformation("ATrade.Ibkr.Worker confirmed an authenticated paper iBeam session.");
                 break;
-            case BrokerProviderStates.Connecting:
+            case IbkrSessionReadinessStates.Connecting:
                 logger.LogInformation("ATrade.Ibkr.Worker reached iBeam and is waiting for paper IBKR authentication.");
                 break;
-            case BrokerProviderStates.Degraded:
-                logger.LogWarning("ATrade.Ibkr.Worker reached iBeam but the session is degraded: {Message}", status.Message);
+            case IbkrSessionReadinessStates.Degraded:
+                logger.LogWarning("ATrade.Ibkr.Worker reached iBeam but the session is degraded: {Message}", readiness.Message);
                 break;
-            case BrokerProviderStates.Error:
-                logger.LogWarning("ATrade.Ibkr.Worker could not read the paper iBeam status safely: {Message}", status.Message);
+            case IbkrSessionReadinessStates.Error:
+                logger.LogWarning("ATrade.Ibkr.Worker could not read the paper iBeam status safely: {Message}", readiness.Message);
                 break;
             default:
-                logger.LogInformation("ATrade.Ibkr.Worker observed IBKR state {State}.", status.State);
+                logger.LogInformation("ATrade.Ibkr.Worker observed IBKR state {State}.", readiness.State);
                 break;
         }
     }

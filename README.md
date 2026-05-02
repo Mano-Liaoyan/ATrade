@@ -87,12 +87,12 @@ The current runnable slice includes:
   - `DELETE /api/workspace/watchlist/pins/{instrumentKey}`
   - `DELETE /api/workspace/watchlist/{symbol}`
   - `/hubs/market-data`
-- `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states.
+- `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states projected from the shared IBKR/iBeam readiness module.
 - `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence and cache-aside for OHLCV candles and scanner/trending snapshots, with configurable freshness for browser-facing market-data endpoints.
 - `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
-- `workers/ATrade.Ibkr.Worker` — safe paper-session/status monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
+- `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
@@ -115,9 +115,9 @@ data directory is volume-backed, those fresh rows can survive a full local
 AppHost reboot and be served without another IBKR/iBeam provider call. Missing or
 stale rows refresh from IBKR/iBeam, persist the provider response to TimescaleDB,
 and return the provider response. When iBeam is disabled, missing credentials,
-unauthenticated, or unreachable, a fresh persisted response can still serve the request; otherwise
+unauthenticated, timed out, or unreachable, a fresh persisted response can still serve the request; otherwise
 the API and frontend surface safe provider-not-configured/provider-unavailable
-states instead of falling back to production mocks. Pinned instruments are backend-owned
+states projected from the shared IBKR/iBeam readiness module instead of falling back to production mocks. Pinned instruments are backend-owned
 workspace preferences persisted in the volume-backed AppHost-managed Postgres
 database through `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity; they

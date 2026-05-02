@@ -413,7 +413,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Responsibilities:** In the current slice, bind typed paper-mode broker/iBeam
   options, enforce a paper-only guard, expose the official Gateway/iBeam
   auth-status client boundary over the shared HTTPS/local-certificate transport,
-  implement `ATrade.Brokers.IBrokerProvider`, normalize safe broker
+  own the normalized IBKR/iBeam readiness result, implement
+  `ATrade.Brokers.IBrokerProvider` by projecting that readiness into safe broker
   status/capability shapes, redact credential-bearing env values, and keep order
   placement, credential storage, unofficial SDKs, and persistence out of scope. Later
   explicitly reviewed slices may translate
@@ -434,10 +435,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   contract search/detail, snapshot, historical bar, and scanner responses into
   ATrade market-data payloads; expose `ibkr-ibeam-*` source metadata; implement
   `IMarketDataProvider` and `IMarketDataStreamingProvider`; reuse broker/iBeam
-  gateway configuration and the shared HTTPS/local-certificate transport without
-  reading credentials directly; and return safe
-  provider-not-configured/provider-unavailable/authentication-required errors
-  when iBeam is disabled, missing credentials, unauthenticated, degraded, or unreachable.
+  gateway configuration, the shared readiness module, and the shared
+  HTTPS/local-certificate transport without reading credentials directly; and
+  return safe provider-not-configured/provider-unavailable/authentication-required
+  errors when iBeam is disabled, missing credentials, unauthenticated, degraded,
+  timed out, or unreachable.
 - **Expected dependencies:** `ATrade.MarketData`, `ATrade.Brokers.Ibkr`, and
   the local `voyz/ibeam:latest` Client Portal runtime when integration is
   enabled through ignored `.env` values.
@@ -474,9 +476,11 @@ references.
 - **Responsibilities:** In the current slice, start a hosted background
   service that composes `ATrade.Brokers.Ibkr`, reports safe disabled /
   credentials-missing / not-configured / iBeam-container-configured / connecting /
-  authenticated / degraded / error states, and fails fast on rejected live-mode
-  requests before any broker call. When paper mode is enabled and credentials are present, it polls the official auth-status endpoint through
-  the broker adapter; when disabled, it remains idle. The AppHost now wires
+  authenticated / degraded / error states from the shared IBKR/iBeam readiness
+  module, and fails fast on rejected live-mode requests before any broker call.
+  When paper mode is enabled and credentials are present, it polls the official
+  auth-status endpoint through that readiness module; when disabled, it remains
+  idle. The AppHost now wires
   `Postgres`, `Redis`, and `NATS` connection info into the process so the
   runtime graph matches the worker's planned dependencies before any broker
   messaging or database behavior lands.

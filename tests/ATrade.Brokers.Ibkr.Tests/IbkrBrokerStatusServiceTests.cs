@@ -1,5 +1,6 @@
 using ATrade.Brokers;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace ATrade.Brokers.Ibkr.Tests;
 
@@ -235,13 +236,16 @@ public sealed class IbkrBrokerStatusServiceTests
 
     private static IbkrBrokerStatusService CreateService(IbkrGatewayOptions options, FakeGatewayClient fakeGatewayClient)
     {
-        var paperTradingGuard = new IbkrPaperTradingGuard(Microsoft.Extensions.Options.Options.Create(options));
-        return new IbkrBrokerStatusService(
+        var paperTradingGuard = new IbkrPaperTradingGuard(Options.Create(options));
+        var readinessService = new IbkrSessionReadinessService(
             options,
             paperTradingGuard,
             fakeGatewayClient,
-            IbkrBrokerAdapterCapabilities.PaperSafeReadOnly,
-            NullLogger<IbkrBrokerStatusService>.Instance);
+            NullLogger<IbkrSessionReadinessService>.Instance);
+        return new IbkrBrokerStatusService(
+            options,
+            readinessService,
+            IbkrBrokerAdapterCapabilities.PaperSafeReadOnly);
     }
 
     private sealed class FakeGatewayClient : IIbkrGatewayClient

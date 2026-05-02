@@ -313,15 +313,26 @@ public sealed class IbkrMarketDataProviderTests
 
     private static IbkrMarketDataProvider CreateProvider(HttpMessageHandler handler, IbkrGatewayOptions options)
     {
-        var httpClient = new HttpClient(handler)
+        var gatewayHttpClient = new HttpClient(handler)
         {
             BaseAddress = options.GatewayBaseUrl,
             Timeout = options.RequestTimeout,
         };
-        var client = new IbkrMarketDataClient(httpClient);
+        var marketDataHttpClient = new HttpClient(handler)
+        {
+            BaseAddress = options.GatewayBaseUrl,
+            Timeout = options.RequestTimeout,
+        };
+        var paperTradingGuard = new IbkrPaperTradingGuard(Options.Create(options));
+        var readinessService = new IbkrSessionReadinessService(
+            options,
+            paperTradingGuard,
+            new IbkrGatewayClient(gatewayHttpClient, paperTradingGuard),
+            NullLogger<IbkrSessionReadinessService>.Instance);
+        var client = new IbkrMarketDataClient(marketDataHttpClient);
         return new IbkrMarketDataProvider(
             options,
-            new IbkrPaperTradingGuard(Options.Create(options)),
+            readinessService,
             client,
             new IndicatorService(),
             NullLogger<IbkrMarketDataProvider>.Instance);
