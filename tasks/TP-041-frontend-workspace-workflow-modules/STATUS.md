@@ -46,12 +46,12 @@
 ---
 
 ### Step 3: Preserve workspace behavior and test surface
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Home workspace and symbol page behavior verified stable
-- [ ] Exact pins, cached fallback, provider-unavailable messages, and SignalR-to-HTTP fallback verified
-- [ ] New workflow module test assertions added
-- [ ] Targeted frontend tests passing
+- [x] Home workspace and symbol page behavior verified stable
+- [x] Exact pins, cached fallback, provider-unavailable messages, and SignalR-to-HTTP fallback verified
+- [x] New workflow module test assertions added
+- [x] Targeted frontend tests passing
 
 ---
 
@@ -101,6 +101,7 @@
 | 2026-05-02 16:17 | Step 1 completed | Watchlist workflow hook added; rendering components delegate pin state/commands; new workflow shell test and frontend build passed |
 | 2026-05-02 16:18 | Step 2 started | Search and chart workflow extraction begun |
 | 2026-05-02 16:29 | Step 2 completed | Symbol search and chart data workflow hooks added; SymbolSearch/SymbolChartView render hook state; frontend build and workflow shell test passed |
+| 2026-05-02 16:43 | Step 3 completed | Existing frontend workspace script updated for workflow seams and passed; workflow module shell assertions verify exact pins, cached fallback, provider messages, API boundary, and SignalR-to-HTTP fallback |
 
 ---
 
