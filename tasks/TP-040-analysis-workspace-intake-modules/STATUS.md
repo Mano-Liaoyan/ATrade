@@ -1,6 +1,6 @@
 # TP-040: Deepen analysis and workspace intake modules — Status
 
-**Current Step:** Step 2: Move watchlist request handling into Workspaces intake
+**Current Step:** Step 3: Keep HTTP behavior stable and simplify route code
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -46,12 +46,12 @@
 ---
 
 ### Step 3: Keep HTTP behavior stable and simplify route code
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Existing analysis/watchlist paths, status codes, and payload fields verified compatible
-- [ ] Provider/analysis/storage error mapping remains stable and explicit
-- [ ] Temporary local workspace identity seam remains contained and documented
-- [ ] Targeted AppHost analysis/watchlist scripts passing
+- [x] Existing analysis/watchlist paths, status codes, and payload fields verified compatible
+- [x] Provider/analysis/storage error mapping remains stable and explicit
+- [x] Temporary local workspace identity seam remains contained and documented
+- [x] Targeted AppHost analysis/watchlist scripts passing
 
 ---
 
@@ -100,6 +100,8 @@
 | 2026-05-02 15:58 | Step 1 completed | Analysis intake seam implemented; API analysis route delegated; targeted Analysis/LEAN tests passed |
 | 2026-05-02 16:00 | Step 2 started | Workspaces watchlist intake implementation begun |
 | 2026-05-02 16:12 | Step 2 completed | Workspaces watchlist intake seam implemented; API watchlist routes delegated; targeted Workspaces tests passed |
+| 2026-05-02 16:13 | Step 3 started | HTTP compatibility and AppHost script verification begun |
+| 2026-05-02 16:22 | Step 3 completed | Analysis/watchlist AppHost contract scripts passed; API maps intake errors explicitly; identity seam contained in Workspaces |
 
 ---
 

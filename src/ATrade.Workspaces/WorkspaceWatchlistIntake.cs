@@ -47,6 +47,12 @@ public sealed record WorkspaceWatchlistIntakeResult(
         new WorkspaceWatchlistIntakeError(code, error, WorkspaceWatchlistIntakeErrorKind.StorageUnavailable));
 }
 
+/// <summary>
+/// Coordinates watchlist requests inside the Workspaces module. The temporary
+/// local-paper identity seam is deliberately consumed here, not in the HTTP API,
+/// so a future authenticated workspace resolver can replace
+/// <see cref="IWorkspaceIdentityProvider" /> without changing route handlers.
+/// </summary>
 public sealed class WorkspaceWatchlistIntake(
     IWorkspaceIdentityProvider identityProvider,
     IWorkspaceWatchlistSchemaInitializer schemaInitializer,
