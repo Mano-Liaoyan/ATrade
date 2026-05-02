@@ -1,6 +1,6 @@
 # TP-039: Deepen the IBKR/iBeam session readiness module — Status
 
-**Current Step:** Step 1: Create the shared IBKR/iBeam readiness interface
+**Current Step:** Step 2: Adapt broker, market-data, and worker callers
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -35,12 +35,12 @@
 ---
 
 ### Step 2: Adapt broker, market-data, and worker callers
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Broker status projects shared readiness result
-- [ ] Market-data status/request guards project shared readiness result
-- [ ] Worker monitoring uses readiness module without duplicating tree
-- [ ] Targeted broker, worker, and market-data tests passing
+- [x] Broker status projects shared readiness result
+- [x] Market-data status/request guards project shared readiness result
+- [x] Worker monitoring uses readiness module without duplicating tree
+- [x] Targeted broker, worker, and market-data tests passing
 
 ---
 

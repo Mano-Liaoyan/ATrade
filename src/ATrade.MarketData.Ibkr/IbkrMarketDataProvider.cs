@@ -8,7 +8,7 @@ namespace ATrade.MarketData.Ibkr;
 
 public sealed class IbkrMarketDataProvider(
     IbkrGatewayOptions gatewayOptions,
-    IIbkrPaperTradingGuard paperTradingGuard,
+    IIbkrSessionReadinessService readinessService,
     IIbkrMarketDataClient marketDataClient,
     IndicatorService indicatorService,
     ILogger<IbkrMarketDataProvider> logger) : IMarketDataProvider, IMarketDataStreamingProvider
@@ -33,90 +33,8 @@ public sealed class IbkrMarketDataProvider(
     public async Task<MarketDataProviderStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var guardResult = paperTradingGuard.Evaluate();
-        if (!guardResult.IsAllowed)
-        {
-            return MarketDataProviderStatus.Unavailable(Identity, Capabilities, guardResult.Message);
-        }
-
-        if (!gatewayOptions.IntegrationEnabled)
-        {
-            return MarketDataProviderStatus.NotConfigured(
-                Identity,
-                Capabilities,
-                "IBKR iBeam market data is disabled. Enable ATRADE_BROKER_INTEGRATION_ENABLED and configure the ignored local .env to use real market data.");
-        }
-
-        if (!gatewayOptions.HasConfiguredCredentials || !gatewayOptions.HasConfiguredPaperAccountId)
-        {
-            return MarketDataProviderStatus.NotConfigured(
-                Identity,
-                Capabilities,
-                "IBKR iBeam market data requires the ATrade IBKR username, password, and paper account id variables in the ignored local .env.");
-        }
-
-        if (!gatewayOptions.HasConfiguredIbeamContainer)
-        {
-            return MarketDataProviderStatus.NotConfigured(
-                Identity,
-                Capabilities,
-                $"IBKR iBeam market data requires {IbkrGatewayEnvironmentVariables.GatewayImage}={IbkrGatewayContainerOptions.DefaultIbeamImage} and a valid {IbkrGatewayEnvironmentVariables.GatewayPort}.");
-        }
-
-        if (gatewayOptions.GatewayBaseUrl is null)
-        {
-            return MarketDataProviderStatus.NotConfigured(
-                Identity,
-                Capabilities,
-                $"IBKR iBeam market data requires an absolute {IbkrGatewayEnvironmentVariables.GatewayUrl}.");
-        }
-
-        try
-        {
-            var authStatus = await marketDataClient.GetAuthStatusAsync(cancellationToken).ConfigureAwait(false);
-            if (!authStatus.Authenticated || !authStatus.Connected)
-            {
-                var message = string.IsNullOrWhiteSpace(authStatus.Message)
-                    ? "IBKR iBeam is reachable but the Client Portal session is not authenticated."
-                    : $"IBKR iBeam is reachable but is not authenticated: {authStatus.Message}";
-                return MarketDataProviderStatus.Unavailable(Identity, Capabilities, message);
-            }
-
-            return MarketDataProviderStatus.Available(Identity, Capabilities);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (TaskCanceledException exception)
-        {
-            logger.LogWarning(exception, "IBKR iBeam market-data status request timed out over local HTTPS transport.");
-            return MarketDataProviderStatus.Unavailable(
-                Identity,
-                Capabilities,
-                IbkrGatewayTransport.CreateTransportTimeoutMessage());
-        }
-        catch (IbkrMarketDataProviderException exception)
-        {
-            var message = RedactConfiguredValues(exception.Message);
-            logger.LogWarning("IBKR iBeam market-data status check failed safely: {Diagnostic}", message);
-            return MarketDataProviderStatus.Unavailable(Identity, Capabilities, message);
-        }
-        catch (HttpRequestException exception)
-        {
-            logger.LogWarning(
-                "IBKR iBeam market-data status endpoint is not reachable over local HTTPS transport: {Diagnostic}",
-                RedactConfiguredValues(exception.Message));
-            return MarketDataProviderStatus.Unavailable(
-                Identity,
-                Capabilities,
-                IbkrGatewayTransport.CreateTransportUnavailableMessage());
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "IBKR iBeam market-data status check failed safely.");
-            return MarketDataProviderStatus.Unavailable(Identity, Capabilities, "IBKR iBeam market-data status check failed safely.");
-        }
+        var readiness = await readinessService.CheckReadinessAsync(cancellationToken).ConfigureAwait(false);
+        return ToMarketDataStatus(readiness);
     }
 
     public TrendingSymbolsResponse GetTrendingSymbols() =>
@@ -361,6 +279,43 @@ public sealed class IbkrMarketDataProvider(
         GetLatestUpdateAsync(symbol, timeframe, identity: null, cancellationToken);
 
     public string GetGroupName(string symbol, string timeframe) => $"market-data:ibkr:{symbol.Trim().ToUpperInvariant()}:{timeframe}";
+
+    private static MarketDataProviderStatus ToMarketDataStatus(IbkrSessionReadinessResult readiness) => readiness.State switch
+    {
+        IbkrSessionReadinessStates.Authenticated when readiness.IsReady => MarketDataProviderStatus.Available(ProviderIdentity, ProviderCapabilities),
+        IbkrSessionReadinessStates.Disabled => MarketDataProviderStatus.NotConfigured(
+            ProviderIdentity,
+            ProviderCapabilities,
+            "IBKR iBeam market data is disabled. Enable ATRADE_BROKER_INTEGRATION_ENABLED and configure the ignored local .env to use real market data."),
+        IbkrSessionReadinessStates.CredentialsMissing => MarketDataProviderStatus.NotConfigured(
+            ProviderIdentity,
+            ProviderCapabilities,
+            "IBKR iBeam market data requires the ATrade IBKR username, password, and paper account id variables in the ignored local .env."),
+        IbkrSessionReadinessStates.NotConfigured when !readiness.HasGatewayBaseUrl => MarketDataProviderStatus.NotConfigured(
+            ProviderIdentity,
+            ProviderCapabilities,
+            $"IBKR iBeam market data requires an absolute {IbkrGatewayEnvironmentVariables.GatewayUrl}."),
+        IbkrSessionReadinessStates.NotConfigured => MarketDataProviderStatus.NotConfigured(
+            ProviderIdentity,
+            ProviderCapabilities,
+            $"IBKR iBeam market data requires {IbkrGatewayEnvironmentVariables.GatewayImage}={IbkrGatewayContainerOptions.DefaultIbeamImage} and a valid {IbkrGatewayEnvironmentVariables.GatewayPort}."),
+        IbkrSessionReadinessStates.Connecting or IbkrSessionReadinessStates.Degraded => MarketDataProviderStatus.Unavailable(
+            ProviderIdentity,
+            ProviderCapabilities,
+            CreateUnauthenticatedStatusMessage(readiness.Message)),
+        IbkrSessionReadinessStates.Error => MarketDataProviderStatus.Unavailable(
+            ProviderIdentity,
+            ProviderCapabilities,
+            "IBKR iBeam market-data status check failed safely."),
+        _ => MarketDataProviderStatus.Unavailable(
+            ProviderIdentity,
+            ProviderCapabilities,
+            readiness.Message ?? IbkrGatewayTransport.CreateTransportUnavailableMessage()),
+    };
+
+    private static string CreateUnauthenticatedStatusMessage(string? message) => string.IsNullOrWhiteSpace(message)
+        ? "IBKR iBeam is reachable but the Client Portal session is not authenticated."
+        : $"IBKR iBeam is reachable but is not authenticated: {message}";
 
     private async Task<MarketDataError?> GetAvailabilityErrorAsync(CancellationToken cancellationToken)
     {
@@ -623,6 +578,17 @@ public static class IbkrMarketDataServiceCollectionExtensions
 
         services.TryAddSingleton<IndicatorService>();
         services.TryAddSingleton<IIbkrPaperTradingGuard, IbkrPaperTradingGuard>();
+        services.TryAddSingleton<IIbkrSessionReadinessService, IbkrSessionReadinessService>();
+        services.AddHttpClient<IIbkrGatewayClient, IbkrGatewayClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
+            IbkrGatewayTransport.ConfigureHttpClient(client, options);
+        })
+        .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
+            return IbkrGatewayTransport.CreateHttpMessageHandler(options);
+        });
         services.AddHttpClient<IIbkrMarketDataClient, IbkrMarketDataClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
