@@ -1,6 +1,6 @@
 # TP-038: Deepen the async market-data read module — Status
 
-**Current Step:** Step 2: Convert Timescale cache-aside and IBKR provider adapters
+**Current Step:** Step 3: Update HTTP, SignalR, and analysis callers
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -47,12 +47,12 @@
 ---
 
 ### Step 3: Update HTTP, SignalR, and analysis callers
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] HTTP route handlers await the deepened read interface and keep payloads stable
-- [ ] SignalR snapshot path uses async read/streaming seam without duplicate provider status logic
-- [ ] Analysis candle acquisition uses the new seam
-- [ ] Targeted AppHost/analysis/market-data scripts passing
+- [x] HTTP route handlers await the deepened read interface and keep payloads stable
+- [x] SignalR snapshot path uses async read/streaming seam without duplicate provider status logic
+- [x] Analysis candle acquisition uses the new seam
+- [x] Targeted AppHost/analysis/market-data scripts passing
 
 ---
 
@@ -101,6 +101,8 @@
 | 2026-05-02 14:56 | Step 1 completed | Async read-result contract added; provider-abstraction tests passed (12/12) |
 | 2026-05-02 14:57 | Step 2 started | Converting Timescale cache-aside and IBKR adapter read paths to async end-to-end |
 | 2026-05-02 15:08 | Step 2 completed | Removed sync-over-async, converted Timescale and IBKR adapters, targeted IBKR/Timescale tests passed (46/46) |
+| 2026-05-02 15:09 | Step 3 started | Updating API, SignalR, and analysis callers to await async market-data reads |
+| 2026-05-02 15:24 | Step 3 completed | API, SignalR, and analysis callers await async read seam; targeted apphost scripts passed |
 
 ---
 

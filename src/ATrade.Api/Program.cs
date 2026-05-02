@@ -45,43 +45,25 @@ app.MapGet("/health", () => Results.Text("ok", "text/plain"));
 app.MapGet("/api/accounts/overview", (IAccountOverviewProvider overviewProvider) => Results.Ok(overviewProvider.GetOverview()));
 app.MapGet(
     "/api/market-data/trending",
-    (IMarketDataService marketDataService) => ExecuteMarketDataRequest(() => Results.Ok(marketDataService.GetTrendingSymbols())));
+    async (IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+        ToMarketDataResult(await marketDataService.GetTrendingSymbolsAsync(cancellationToken)));
 app.MapGet(
     "/api/market-data/search",
-    (string? query, string? assetClass, int? limit, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (marketDataService.TrySearchSymbols(query, assetClass, limit, out var response, out var error))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Results.Ok(response);
-        }
-
-        return ToMarketDataErrorResult(error);
-    });
+    async (string? query, string? assetClass, int? limit, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+        ToMarketDataResult(await marketDataService.SearchSymbolsAsync(query, assetClass, limit, cancellationToken)));
 app.MapGet(
     "/api/market-data/{symbol}/candles",
-    (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService) =>
+    async (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
         var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
-        if (marketDataService.TryGetCandles(symbol, timeframe, out var response, out var error, identity))
-        {
-            return Results.Ok(response);
-        }
-
-        return ToMarketDataErrorResult(error);
+        return ToMarketDataResult(await marketDataService.GetCandlesAsync(symbol, timeframe, identity, cancellationToken));
     });
 app.MapGet(
     "/api/market-data/{symbol}/indicators",
-    (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService) =>
+    async (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
         var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
-        if (marketDataService.TryGetIndicators(symbol, timeframe, out var response, out var error, identity))
-        {
-            return Results.Ok(response);
-        }
-
-        return ToMarketDataErrorResult(error);
+        return ToMarketDataResult(await marketDataService.GetIndicatorsAsync(symbol, timeframe, identity, cancellationToken));
     });
 app.MapGet(
     "/api/analysis/engines",
@@ -90,13 +72,14 @@ app.MapPost(
     "/api/analysis/run",
     async (AnalysisRunApiRequest request, IAnalysisEngineRegistry analysisEngines, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
-        if (!TryCreateAnalysisRequest(request, marketDataService, out var analysisRequest, out var errorResult))
+        var analysisRequestResult = await CreateAnalysisRequestAsync(request, marketDataService, cancellationToken);
+        if (analysisRequestResult.ErrorResult is not null)
         {
-            return errorResult;
+            return analysisRequestResult.ErrorResult;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var result = await analysisEngines.AnalyzeAsync(analysisRequest, cancellationToken);
+        var result = await analysisEngines.AnalyzeAsync(analysisRequestResult.Request!, cancellationToken);
         return ToAnalysisResult(result);
     });
 app.MapGet(
@@ -139,17 +122,10 @@ app.MapHub<MarketDataHub>("/hubs/market-data");
 
 app.Run();
 
-static IResult ExecuteMarketDataRequest(Func<IResult> operation)
-{
-    try
-    {
-        return operation();
-    }
-    catch (MarketDataProviderUnavailableException exception)
-    {
-        return ToMarketDataErrorResult(exception.Error);
-    }
-}
+static IResult ToMarketDataResult<T>(MarketDataReadResult<T> result) where T : class =>
+    result.IsSuccess && result.Value is not null
+        ? Results.Ok(result.Value)
+        : ToMarketDataErrorResult(result.Error);
 
 static IResult ToMarketDataErrorResult(MarketDataError? error)
 {
@@ -179,19 +155,15 @@ static IResult ToAnalysisResult(AnalysisResult result) => result.Error?.Code swi
         : Results.Ok(result),
 };
 
-static bool TryCreateAnalysisRequest(
+static async Task<AnalysisRequestBuildResult> CreateAnalysisRequestAsync(
     AnalysisRunApiRequest? request,
     IMarketDataService marketDataService,
-    out AnalysisRequest analysisRequest,
-    out IResult errorResult)
+    CancellationToken cancellationToken)
 {
-    analysisRequest = null!;
-    errorResult = null!;
-
+    cancellationToken.ThrowIfCancellationRequested();
     if (request is null)
     {
-        errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "An analysis request payload is required."));
-        return false;
+        return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "An analysis request payload is required.")));
     }
 
     var timeframe = string.IsNullOrWhiteSpace(request.Timeframe) ? MarketDataTimeframes.OneDay : request.Timeframe.Trim();
@@ -203,41 +175,38 @@ static bool TryCreateAnalysisRequest(
         var symbolCode = symbol?.Symbol ?? request.SymbolCode;
         if (string.IsNullOrWhiteSpace(symbolCode))
         {
-            errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol or symbolCode is required for analysis."));
-            return false;
+            return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol or symbolCode is required for analysis.")));
         }
 
-        if (!marketDataService.TryGetCandles(symbolCode, timeframe, out var candleSeries, out var marketDataError))
+        var candleRead = await marketDataService.GetCandlesAsync(symbolCode, timeframe, cancellationToken: cancellationToken);
+        if (candleRead.IsFailure || candleRead.Value is null)
         {
-            errorResult = ToMarketDataErrorResult(marketDataError);
-            return false;
+            return AnalysisRequestBuildResult.Failure(ToMarketDataErrorResult(candleRead.Error));
         }
 
-        if (candleSeries is null || candleSeries.Candles.Count == 0)
+        var candleSeries = candleRead.Value;
+        if (candleSeries.Candles.Count == 0)
         {
-            errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Market-data provider returned no candles for analysis."));
-            return false;
+            return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Market-data provider returned no candles for analysis.")));
         }
 
         bars = candleSeries.Candles;
         timeframe = candleSeries.Timeframe;
-        symbol ??= ResolveSymbolIdentity(marketDataService, candleSeries);
+        symbol ??= await ResolveSymbolIdentityAsync(marketDataService, candleSeries, cancellationToken);
     }
 
     if (symbol is null)
     {
-        errorResult = Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol identity is required when analysis bars are supplied directly."));
-        return false;
+        return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol identity is required when analysis bars are supplied directly.")));
     }
 
-    analysisRequest = new AnalysisRequest(
+    return AnalysisRequestBuildResult.Success(new AnalysisRequest(
         symbol,
         timeframe,
         request.RequestedAtUtc ?? DateTimeOffset.UtcNow,
         bars,
         request.EngineId,
-        request.StrategyName);
-    return true;
+        request.StrategyName));
 }
 
 static MarketDataSymbolIdentity? CreateSymbolIdentityFromCode(string? symbolCode)
@@ -273,10 +242,15 @@ static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
         currency);
 }
 
-static MarketDataSymbolIdentity ResolveSymbolIdentity(IMarketDataService marketDataService, CandleSeriesResponse candleSeries)
+static async Task<MarketDataSymbolIdentity> ResolveSymbolIdentityAsync(
+    IMarketDataService marketDataService,
+    CandleSeriesResponse candleSeries,
+    CancellationToken cancellationToken)
 {
-    if (marketDataService.TryGetSymbol(candleSeries.Symbol, out var marketSymbol) && marketSymbol is not null)
+    var symbolRead = await marketDataService.GetSymbolAsync(candleSeries.Symbol, cancellationToken);
+    if (symbolRead.IsSuccess && symbolRead.Value is not null)
     {
+        var marketSymbol = symbolRead.Value;
         return MarketDataSymbolIdentity.Create(
             marketSymbol.Symbol,
             candleSeries.Source,
@@ -410,3 +384,10 @@ public sealed record AnalysisRunApiRequest(
 public sealed record ReplaceWorkspaceWatchlistRequest(IReadOnlyList<WorkspaceWatchlistSymbolInput>? Symbols);
 
 public sealed record WorkspaceWatchlistErrorResponse(string Code, string Error);
+
+internal sealed record AnalysisRequestBuildResult(AnalysisRequest? Request, IResult? ErrorResult)
+{
+    public static AnalysisRequestBuildResult Success(AnalysisRequest request) => new(request, null);
+
+    public static AnalysisRequestBuildResult Failure(IResult errorResult) => new(null, errorResult);
+}

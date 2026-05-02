@@ -9,7 +9,7 @@ public static class MarketDataModuleServiceCollectionExtensions
         services.AddSingleton<IndicatorService>();
         services.AddSingleton<TrendingService>();
         services.AddSingleton<MarketDataService>();
-        services.AddSingleton<IMarketDataService>(static serviceProvider => serviceProvider.GetRequiredService<MarketDataService>());
+        services.AddSingleton<IMarketDataService, MarketDataService>();
         services.AddSingleton<IMarketDataStreamingService, MarketDataStreamingService>();
 
         return services;
