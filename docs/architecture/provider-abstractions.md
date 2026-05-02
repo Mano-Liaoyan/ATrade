@@ -265,10 +265,11 @@ Current implementation:
 
 Future plug-ins:
 
-- The current Next.js workspace uses the market-data search hook for
-  pin-any-symbol workflows while persisting exact provider/market instrument
-  metadata through `ATrade.Workspaces`; browser cache state remains a legacy
-  symbol-only migration/read-only fallback and is not an identity authority.
+- The current Next.js workspace uses a frontend symbol-search workflow over the
+  `ATrade.Api` market-data search endpoint for pin-any-symbol workflows while
+  persisting exact provider/market instrument metadata through
+  `ATrade.Workspaces`; browser cache state remains a legacy symbol-only
+  migration/read-only fallback and is not an identity authority.
 - Polygon or another market-data provider may be added later behind the same
   contracts and source metadata rules, reusing the Timescale storage fields for
   provider/source/symbol identity instead of introducing provider-specific

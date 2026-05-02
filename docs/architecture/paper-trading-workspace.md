@@ -101,6 +101,15 @@ The `frontend/` application owns:
 
 The frontend does **not** talk directly to IBKR, Redis, NATS, Postgres, or
 TimescaleDB. All durable and broker-aware behavior goes through the API.
+Frontend orchestration is centralized in `frontend/lib/*Workflow.ts` modules so
+rendering components receive normalized state and commands: `watchlistWorkflow`
+owns backend watchlist loads, one-time symbol-only legacy cache migration,
+read-only cached fallback, exact pin/unpin/remove commands, saving state, and
+stable watchlist error copy; `symbolSearchWorkflow` owns search query debounce,
+minimum-length validation, provider/authentication error copy, and result state;
+and `symbolChartWorkflow` owns candle/indicator HTTP reads, source-label
+formatting, SignalR subscription state, stream update application, and HTTP
+polling fallback when streaming closes or is unavailable.
 
 ### 3.2 `ATrade.Api`
 
@@ -520,13 +529,20 @@ Current implementation:
 - `frontend/components/CandlestickChart.tsx` uses `lightweight-charts` for
   OHLC candlesticks, volume, moving-average overlays, crosshair legend,
   zooming, and panning
-- `frontend/components/SymbolSearch.tsx` provides reusable IBKR stock search
-  controls for the workspace and symbol pages, including loading, validation,
-  no-results, and provider/authentication error states
-- `frontend/components/SymbolChartView.tsx` combines HTTP candle/indicator
-  fetches with SignalR updates from `/hubs/market-data`, embeds the compact
-  symbol search control, and falls back to HTTP polling when streaming is
-  unavailable
+- `frontend/lib/watchlistWorkflow.ts` owns backend watchlist API load/retry,
+  one-time symbol-only legacy cache migration, read-only cached fallback, exact
+  pin/unpin/remove commands, backend-authoritative `instrumentKey`/`pinKey`
+  matching, saving state, and stable watchlist error text for
+  `TradingWorkspace`, `TrendingList`, `SymbolSearch`, and `Watchlist`
+- `frontend/lib/symbolSearchWorkflow.ts` owns reusable IBKR stock search query
+  state, debounce, minimum-length validation, result state, and provider /
+  authentication error text while `frontend/components/SymbolSearch.tsx` renders
+  the workflow state for workspace and symbol pages
+- `frontend/lib/symbolChartWorkflow.ts` owns HTTP candle/indicator fetches,
+  source-label formatting, SignalR subscription state and updates from
+  `/hubs/market-data`, and HTTP polling fallback when streaming closes or is
+  unavailable while `frontend/components/SymbolChartView.tsx` renders the chart
+  workflow state and embeds the compact symbol search control
 
 Licensing guardrail:
 

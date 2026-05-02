@@ -53,7 +53,9 @@ see_also:
 > a Next.js home route with backend-driven trending symbols, IBKR stock search,
 > Postgres-backed watchlists, symbol navigation, and `lightweight-charts` chart
 > routes plus an analysis panel for provider-neutral LEAN signals/metrics while
-> preserving the original bootstrap smoke markers.
+> `frontend/lib/*Workflow.ts` hooks centralize watchlist, search, chart loading,
+> source labeling, and SignalR-to-HTTP fallback orchestration behind rendering
+> components and preserve the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -547,9 +549,11 @@ references.
   workspace route: Timescale-first/IBKR scanner-backed trending stocks/ETFs,
   reusable IBKR stock search controls, symbol navigation to `/symbols/[symbol]`,
   backend watchlist API reads/writes with provider metadata and a non-authoritative localStorage
-  cache/migration source, `lightweight-charts` candlesticks with `1m` / `5m` /
-  `1h` / `1D` timeframe switching, moving-average / RSI / MACD panels, SignalR
-  updates with HTTP fallback, and explicit no-real-orders messaging.
+  cache/migration source, workflow hooks for watchlist migration/exact pin
+  commands, search debounce/provider errors, chart HTTP loading/source labels,
+  and SignalR-to-HTTP fallback, `lightweight-charts` candlesticks with `1m` /
+  `5m` / `1h` / `1D` timeframe switching, moving-average / RSI / MACD panels,
+  SignalR updates with HTTP fallback, and explicit no-real-orders messaging.
 
 ## 5. Dependency Summary
 

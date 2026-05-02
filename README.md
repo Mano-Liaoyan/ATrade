@@ -216,6 +216,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
+- `tests/apphost/frontend-workspace-workflow-module-tests.sh`
 
 Task packets list their own targeted and full verification commands.
 

@@ -1,7 +1,7 @@
 # TP-041: Deepen frontend workspace workflow modules — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-02
 **Review Level:** 1
 **Review Counter:** 0
@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Frontend workflow extraction changed internal orchestration boundaries only; browser-facing API paths, payload shapes, and UI copy/markers remained stable. | Documented in architecture docs and test assertions; no README runtime-surface change beyond adding the new verification script entry. | Step 5 docs review |
+| No out-of-scope technical debt was discovered during TP-041. | No action required. | TP-041 |
 
 ---
 
@@ -104,6 +106,12 @@
 | 2026-05-02 16:43 | Step 3 completed | Existing frontend workspace script updated for workflow seams and passed; workflow module shell assertions verify exact pins, cached fallback, provider messages, API boundary, and SignalR-to-HTTP fallback |
 | 2026-05-02 16:44 | Step 4 started | Full verification begun |
 | 2026-05-02 16:53 | Step 4 completed | `dotnet test ATrade.slnx`, frontend build, `frontend-trading-workspace-tests.sh`, `frontend-workspace-workflow-module-tests.sh`, and `dotnet build ATrade.slnx` passed with zero failures |
+| 2026-05-02 16:54 | Step 5 started | Documentation and delivery review begun |
+| 2026-05-02 16:56 | Step 5 docs | Updated paper-trading workspace and modules architecture docs for frontend workflow module responsibilities |
+| 2026-05-02 16:58 | Step 5 affected docs | README verification list and provider-abstractions frontend search workflow wording reviewed/updated; runtime payload behavior unchanged |
+| 2026-05-02 16:59 | Step 5 discoveries | Delivery discoveries logged; no out-of-scope technical debt found |
+| 2026-05-02 17:00 | Step 5 completed | Documentation updated/reviewed and delivery discoveries logged |
+| 2026-05-02 17:00 | Task completed | All TP-041 steps complete |
 
 ---
 
@@ -115,4 +123,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Step 5 affected-docs review: README runtime surface remains stable; README verification entry points now include `frontend-workspace-workflow-module-tests.sh`. `docs/architecture/provider-abstractions.md` was updated only to name the frontend symbol-search workflow over the existing `ATrade.Api` market-data search endpoint; provider-neutral payload/source behavior is unchanged.
