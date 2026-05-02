@@ -1,6 +1,6 @@
 # TP-036: Deepen the local runtime contract module — Status
 
-**Current Step:** Step 3: Project resolved contract values into startup shims and AppHost
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 3
@@ -55,12 +55,12 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Integration/contract tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] FULL test suite passing
+- [x] Integration/contract tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -115,6 +115,13 @@
 | 2026-05-02 17:05 | AppHost handoff verified | AppHost now explicitly passes resolved API port and market-data cache freshness to `api`, preserves secret parameters for broker/iBeam and database passwords, keeps LEAN env projection via the shared loader, and projects frontend API URLs from the resolved API port. AppHost worker, infrastructure manifest, frontend bootstrap, and LEAN Aspire runtime contract tests passed. |
 | 2026-05-02 17:06 | Step 3 targeted tests | Passed: `bash tests/start-contract/start-wrapper-tests.sh`, `bash tests/apphost/apphost-worker-resource-wiring-tests.sh`, `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`, `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`, and `bash tests/apphost/lean-aspire-runtime-tests.sh`. |
 | 2026-05-02 17:07 | Step 3 completed | Startup shims and AppHost handoff now use the shared resolved runtime contract and targeted start/AppHost contract tests pass. |
+| 2026-05-02 17:08 | Step 4 started | Running full solution tests, integration/contract scripts, failure fixes, and final build gate. |
+| 2026-05-02 17:10 | Full solution tests | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed: 121 tests across 9 test assemblies, 0 failures. |
+| 2026-05-02 17:22 | Integration/contract scripts | Passed: `bash tests/start-contract/start-wrapper-tests.sh`, `bash tests/apphost/paper-trading-config-contract-tests.sh`, `bash tests/apphost/local-port-contract-tests.sh`, and `bash tests/apphost/local-runtime-contract-module-tests.sh`; local-port test emitted transient curl connection retries before success. |
+| 2026-05-02 17:23 | Failure review | No outstanding failures after rerunning the full solution tests and required integration/contract scripts. |
+| 2026-05-02 17:25 | Build retry cleanup | Initial `dotnet build ATrade.slnx --nologo --verbosity minimal` attempts hit transient MSBuild child-node exits while stale AppHost/MSBuild node-reuse processes from contract smoke tests were still running; cleaned worktree AppHost/API/worker processes and ran `dotnet build-server shutdown`. |
+| 2026-05-02 17:26 | Build gate | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings and 0 errors after cleanup. |
+| 2026-05-02 17:27 | Step 4 completed | Full test suite, required integration/contract scripts, failure cleanup, and solution build gate passed. |
 
 ---
 
