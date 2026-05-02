@@ -27,8 +27,12 @@ public sealed class IbkrMarketDataProvider(
 
     public MarketDataProviderCapabilities Capabilities => ProviderCapabilities;
 
-    public MarketDataProviderStatus GetStatus()
+    public MarketDataProviderStatus GetStatus() =>
+        throw new NotSupportedException("Synchronous IBKR market-data status reads are no longer supported. Use GetStatusAsync.");
+
+    public async Task<MarketDataProviderStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var guardResult = paperTradingGuard.Evaluate();
         if (!guardResult.IsAllowed)
         {
@@ -69,7 +73,7 @@ public sealed class IbkrMarketDataProvider(
 
         try
         {
-            var authStatus = Run(cancellationToken => marketDataClient.GetAuthStatusAsync(cancellationToken));
+            var authStatus = await marketDataClient.GetAuthStatusAsync(cancellationToken).ConfigureAwait(false);
             if (!authStatus.Authenticated || !authStatus.Connected)
             {
                 var message = string.IsNullOrWhiteSpace(authStatus.Message)
@@ -80,6 +84,10 @@ public sealed class IbkrMarketDataProvider(
 
             return MarketDataProviderStatus.Available(Identity, Capabilities);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (TaskCanceledException exception)
         {
             logger.LogWarning(exception, "IBKR iBeam market-data status request timed out over local HTTPS transport.");
@@ -87,10 +95,6 @@ public sealed class IbkrMarketDataProvider(
                 Identity,
                 Capabilities,
                 IbkrGatewayTransport.CreateTransportTimeoutMessage());
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (IbkrMarketDataProviderException exception)
         {
@@ -115,56 +119,69 @@ public sealed class IbkrMarketDataProvider(
         }
     }
 
-    public TrendingSymbolsResponse GetTrendingSymbols()
+    public TrendingSymbolsResponse GetTrendingSymbols() =>
+        throw new NotSupportedException("Synchronous IBKR trending reads are no longer supported. Use GetTrendingSymbolsAsync.");
+
+    public async Task<MarketDataReadResult<TrendingSymbolsResponse>> GetTrendingSymbolsAsync(CancellationToken cancellationToken = default)
     {
-        var status = GetStatus();
+        cancellationToken.ThrowIfCancellationRequested();
+        var status = await GetStatusAsync(cancellationToken).ConfigureAwait(false);
         if (!status.IsAvailable)
         {
-            throw new MarketDataProviderUnavailableException(status);
+            return MarketDataReadResult<TrendingSymbolsResponse>.Failure(status.ToError());
         }
 
-        if (!TryExecute(() => marketDataClient.GetTrendingScannerResultsAsync(), out var scannerResponse, out var scannerError) || scannerResponse is null)
+        var scannerRead = await TryExecuteAsync(
+            static (client, token) => client.GetTrendingScannerResultsAsync(token),
+            marketDataClient,
+            cancellationToken).ConfigureAwait(false);
+        if (!scannerRead.Succeeded || scannerRead.Result is null)
         {
-            var error = scannerError ?? status.ToError();
-            throw new MarketDataProviderUnavailableException(
-                MarketDataProviderStatus.Unavailable(Identity, Capabilities, error.Message),
-                error);
+            var error = scannerRead.Error ?? status.ToError();
+            return MarketDataReadResult<TrendingSymbolsResponse>.Failure(error);
         }
 
-        var scannerResults = scannerResponse
+        var scannerResults = scannerRead.Result
             .Where(result => !string.IsNullOrWhiteSpace(result.Conid))
             .Take(20)
             .ToArray();
-        var snapshots = GetSnapshotLookup(scannerResults.Select(result => result.Conid).ToArray());
+        var snapshots = await GetSnapshotLookupAsync(scannerResults.Select(result => result.Conid).ToArray(), cancellationToken).ConfigureAwait(false);
         var symbols = scannerResults
             .Select((result, index) => CreateTrendingSymbol(result, index + 1, snapshots))
             .ToArray();
 
-        return new TrendingSymbolsResponse(DateTimeOffset.UtcNow, symbols, IbkrMarketDataSource.Scanner);
+        return MarketDataReadResult<TrendingSymbolsResponse>.Success(new TrendingSymbolsResponse(DateTimeOffset.UtcNow, symbols, IbkrMarketDataSource.Scanner));
     }
 
-    public bool TrySearchSymbols(string query, out MarketDataSymbolSearchResponse? response, out MarketDataError? error)
+    public bool TrySearchSymbols(string query, out MarketDataSymbolSearchResponse? response, out MarketDataError? error) =>
+        throw new NotSupportedException("Synchronous IBKR symbol search is no longer supported. Use SearchSymbolsAsync.");
+
+    public async Task<MarketDataReadResult<MarketDataSymbolSearchResponse>> SearchSymbolsAsync(string query, CancellationToken cancellationToken = default)
     {
-        response = null;
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(query))
         {
-            error = new MarketDataError("invalid-query", "A non-empty symbol search query is required.");
-            return false;
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(new MarketDataError("invalid-query", "A non-empty symbol search query is required."));
         }
 
-        if (!TryEnsureAvailable(out error))
+        var availabilityError = await GetAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(availabilityError);
         }
 
-        if (!TryExecute(() => marketDataClient.SearchContractsAsync(query), out var contracts, out error) || contracts is null)
+        var contractsRead = await TryExecuteAsync(
+            static (state, token) => state.Client.SearchContractsAsync(state.Query, token),
+            (Client: marketDataClient, Query: query),
+            cancellationToken).ConfigureAwait(false);
+        if (!contractsRead.Succeeded || contractsRead.Result is null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(ToReadError(contractsRead.Error));
         }
 
-        response = new MarketDataSymbolSearchResponse(
+        var response = new MarketDataSymbolSearchResponse(
             DateTimeOffset.UtcNow,
-            contracts
+            contractsRead.Result
                 .Take(MarketDataSymbolSearchLimits.MaximumLimit)
                 .Select(contract => new MarketDataSymbolSearchResult(
                     CreateIdentity(contract),
@@ -172,116 +189,156 @@ public sealed class IbkrMarketDataProvider(
                     contract.Sector))
                 .ToArray(),
             IbkrMarketDataSource.Provider);
-        return true;
+        return MarketDataReadResult<MarketDataSymbolSearchResponse>.Success(response);
     }
 
-    public bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol)
+    public bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol) =>
+        throw new NotSupportedException("Synchronous IBKR symbol lookup is no longer supported. Use GetSymbolAsync.");
+
+    public async Task<MarketDataReadResult<MarketDataSymbol>> GetSymbolAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        marketSymbol = null;
-        if (string.IsNullOrWhiteSpace(symbol) || !TryEnsureAvailable(out _))
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataSymbol>.Failure(availabilityError);
         }
 
-        if (!TryResolveContract(symbol, identity: null, out var contract, out _))
+        var contractRead = await ResolveContractAsync(symbol, identity: null, cancellationToken).ConfigureAwait(false);
+        if (!contractRead.Succeeded || contractRead.Result is null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataSymbol>.Failure(ToReadError(contractRead.Error));
         }
 
-        var snapshotLookup = GetSnapshotLookup(new[] { contract.Conid });
-        var snapshot = FindSnapshot(contract, snapshotLookup);
-        marketSymbol = CreateMarketDataSymbol(contract, snapshot);
-        return true;
+        var snapshotLookup = await GetSnapshotLookupAsync(new[] { contractRead.Result.Conid }, cancellationToken).ConfigureAwait(false);
+        var snapshot = FindSnapshot(contractRead.Result, snapshotLookup);
+        return MarketDataReadResult<MarketDataSymbol>.Success(CreateMarketDataSymbol(contractRead.Result, snapshot));
     }
 
-    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
+        throw new NotSupportedException("Synchronous IBKR candle reads are no longer supported. Use GetCandlesAsync.");
+
+    public async Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
     {
-        response = null;
-        if (!TryEnsureAvailable(out error))
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
         {
-            return false;
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(availabilityError);
         }
 
-        if (!TryMapTimeframe(timeframe, out var definition, out var period, out var barSize, out error))
+        if (!TryMapTimeframe(timeframe, out var definition, out var period, out var barSize, out var error))
         {
-            return false;
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(error!);
         }
 
-        if (!TryResolveContract(symbol, identity, out var contract, out error))
+        var contractRead = await ResolveContractAsync(symbol, identity, cancellationToken).ConfigureAwait(false);
+        if (!contractRead.Succeeded || contractRead.Result is null)
         {
-            return false;
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(contractRead.Error));
         }
 
-        if (!TryExecute(() => marketDataClient.GetHistoricalBarsAsync(contract.Conid, period, barSize), out var bars, out error) || bars is null)
+        var barsRead = await TryExecuteAsync(
+            static (state, token) => state.Client.GetHistoricalBarsAsync(state.Conid, state.Period, state.BarSize, token),
+            (Client: marketDataClient, Conid: contractRead.Result.Conid, Period: period, BarSize: barSize),
+            cancellationToken).ConfigureAwait(false);
+        if (!barsRead.Succeeded || barsRead.Result is null)
         {
-            return false;
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(barsRead.Error));
         }
 
-        var candles = bars
+        var candles = barsRead.Result
             .Select(bar => new OhlcvCandle(bar.Time, bar.Open, bar.High, bar.Low, bar.Close, bar.Volume))
             .TakeLast(definition.CandleCount)
             .ToArray();
         if (candles.Length == 0)
         {
-            error = new MarketDataError("history-unavailable", $"IBKR iBeam returned no historical bars for {contract.Symbol}.");
-            return false;
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(new MarketDataError("history-unavailable", $"IBKR iBeam returned no historical bars for {contractRead.Result.Symbol}."));
         }
 
-        response = new CandleSeriesResponse(contract.Symbol, definition.Name, DateTimeOffset.UtcNow, candles, IbkrMarketDataSource.History, CreateIdentity(contract));
-        return true;
+        return MarketDataReadResult<CandleSeriesResponse>.Success(new CandleSeriesResponse(
+            contractRead.Result.Symbol,
+            definition.Name,
+            DateTimeOffset.UtcNow,
+            candles,
+            IbkrMarketDataSource.History,
+            CreateIdentity(contractRead.Result)));
     }
 
-    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
+        throw new NotSupportedException("Synchronous IBKR indicator reads are no longer supported. Use GetIndicatorsAsync.");
+
+    public async Task<MarketDataReadResult<IndicatorResponse>> GetIndicatorsAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
     {
-        response = null;
-        if (!TryGetCandles(symbol, timeframe, out var candleResponse, out error, identity) || candleResponse is null)
+        cancellationToken.ThrowIfCancellationRequested();
+        var candleRead = await GetCandlesAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        if (!candleRead.IsSuccess || candleRead.Value is null)
         {
-            return false;
+            return MarketDataReadResult<IndicatorResponse>.Failure(ToReadError(candleRead.Error));
         }
 
-        response = indicatorService.Calculate(candleResponse.Symbol, candleResponse.Timeframe, candleResponse.Candles, candleResponse.Identity) with
+        var response = indicatorService.Calculate(candleRead.Value.Symbol, candleRead.Value.Timeframe, candleRead.Value.Candles, candleRead.Value.Identity) with
         {
-            Source = candleResponse.Source,
+            Source = candleRead.Value.Source,
         };
-        return true;
+        return MarketDataReadResult<IndicatorResponse>.Success(response);
     }
 
-    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
+        throw new NotSupportedException("Synchronous IBKR latest-update reads are no longer supported. Use GetLatestUpdateAsync.");
+
+    public async Task<MarketDataReadResult<MarketDataUpdate>> GetLatestUpdateAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
     {
-        update = null;
-        if (!TryEnsureAvailable(out error))
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataUpdate>.Failure(availabilityError);
         }
 
         if (!MarketDataTimeframes.TryGetDefinition(timeframe, out var definition))
         {
-            error = new MarketDataError(
+            return MarketDataReadResult<MarketDataUpdate>.Failure(new MarketDataError(
                 "unsupported-timeframe",
-                $"Timeframe '{timeframe}' is not supported. Supported values: {string.Join(", ", MarketDataTimeframes.Supported)}.");
-            return false;
+                $"Timeframe '{timeframe}' is not supported. Supported values: {string.Join(", ", MarketDataTimeframes.Supported)}."));
         }
 
-        if (!TryResolveContract(symbol, identity, out var contract, out error))
+        var contractRead = await ResolveContractAsync(symbol, identity, cancellationToken).ConfigureAwait(false);
+        if (!contractRead.Succeeded || contractRead.Result is null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataUpdate>.Failure(ToReadError(contractRead.Error));
         }
 
-        if (!TryExecute(() => marketDataClient.GetSnapshotsAsync(new[] { contract.Conid }), out var snapshots, out error) || snapshots is null)
+        var snapshotsRead = await TryExecuteAsync(
+            static (state, token) => state.Client.GetSnapshotsAsync(new[] { state.Conid }, token),
+            (Client: marketDataClient, Conid: contractRead.Result.Conid),
+            cancellationToken).ConfigureAwait(false);
+        if (!snapshotsRead.Succeeded || snapshotsRead.Result is null)
         {
-            return false;
+            return MarketDataReadResult<MarketDataUpdate>.Failure(ToReadError(snapshotsRead.Error));
         }
 
-        var snapshot = FindSnapshot(contract, snapshots.ToDictionary(snapshot => snapshot.Conid, StringComparer.OrdinalIgnoreCase));
+        var snapshot = FindSnapshot(contractRead.Result, snapshotsRead.Result.ToDictionary(snapshot => snapshot.Conid, StringComparer.OrdinalIgnoreCase));
         if (snapshot?.LastPrice is null)
         {
-            error = new MarketDataError("snapshot-unavailable", $"IBKR iBeam returned no latest market-data snapshot for {contract.Symbol}.");
-            return false;
+            return MarketDataReadResult<MarketDataUpdate>.Failure(new MarketDataError("snapshot-unavailable", $"IBKR iBeam returned no latest market-data snapshot for {contractRead.Result.Symbol}."));
         }
 
         var last = Round(snapshot.LastPrice.Value);
-        update = new MarketDataUpdate(
-            contract.Symbol,
+        return MarketDataReadResult<MarketDataUpdate>.Success(new MarketDataUpdate(
+            contractRead.Result.Symbol,
             definition.Name,
             snapshot.ObservedAtUtc,
             Round(snapshot.Open ?? last),
@@ -291,41 +348,44 @@ public sealed class IbkrMarketDataProvider(
             snapshot.Volume ?? 0,
             Round(snapshot.ChangePercent ?? 0m),
             IbkrMarketDataSource.Snapshot,
-            CreateIdentity(contract));
-        return true;
+            CreateIdentity(contractRead.Result)));
     }
 
     public bool TryCreateSnapshot(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error) =>
-        TryGetLatestUpdate(symbol, timeframe, out update, out error);
+        throw new NotSupportedException("Synchronous IBKR streaming snapshots are no longer supported. Use CreateSnapshotAsync.");
+
+    public Task<MarketDataReadResult<MarketDataUpdate>> CreateSnapshotAsync(
+        string symbol,
+        string? timeframe,
+        CancellationToken cancellationToken = default) =>
+        GetLatestUpdateAsync(symbol, timeframe, identity: null, cancellationToken);
 
     public string GetGroupName(string symbol, string timeframe) => $"market-data:ibkr:{symbol.Trim().ToUpperInvariant()}:{timeframe}";
 
-    private bool TryEnsureAvailable(out MarketDataError? error)
+    private async Task<MarketDataError?> GetAvailabilityErrorAsync(CancellationToken cancellationToken)
     {
-        var status = GetStatus();
-        if (status.IsAvailable)
-        {
-            error = null;
-            return true;
-        }
-
-        error = status.ToError();
-        return false;
+        var status = await GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        return status.IsAvailable ? null : status.ToError();
     }
 
-    private bool TryResolveContract(string symbol, MarketDataSymbolIdentity? identity, out IbkrContract contract, out MarketDataError? error)
+    private async Task<ProviderRead<IbkrContract>> ResolveContractAsync(
+        string symbol,
+        MarketDataSymbolIdentity? identity,
+        CancellationToken cancellationToken)
     {
-        contract = null!;
-        error = null;
+        cancellationToken.ThrowIfCancellationRequested();
         if (string.IsNullOrWhiteSpace(symbol))
         {
-            error = new MarketDataError("unsupported-symbol", "A non-empty symbol is required.");
-            return false;
+            return ProviderRead<IbkrContract>.Failure(new MarketDataError(MarketDataProviderErrorCodes.UnsupportedSymbol, "A non-empty symbol is required."));
         }
 
-        if (!TryExecute(() => marketDataClient.SearchContractsAsync(symbol), out var contracts, out error) || contracts is null)
+        var contractsRead = await TryExecuteAsync(
+            static (state, token) => state.Client.SearchContractsAsync(state.Symbol, token),
+            (Client: marketDataClient, Symbol: symbol),
+            cancellationToken).ConfigureAwait(false);
+        if (!contractsRead.Succeeded || contractsRead.Result is null)
         {
-            return false;
+            return ProviderRead<IbkrContract>.Failure(ToReadError(contractsRead.Error));
         }
 
         var normalizedSymbol = symbol.Trim().ToUpperInvariant();
@@ -333,36 +393,37 @@ public sealed class IbkrMarketDataProvider(
             ? identity?.ProviderSymbolId
             : null;
         var found = !string.IsNullOrWhiteSpace(requestedProviderSymbolId)
-            ? contracts.FirstOrDefault(candidate => string.Equals(candidate.Conid, requestedProviderSymbolId, StringComparison.OrdinalIgnoreCase))
+            ? contractsRead.Result.FirstOrDefault(candidate => string.Equals(candidate.Conid, requestedProviderSymbolId, StringComparison.OrdinalIgnoreCase))
             : null;
-        found ??= contracts.FirstOrDefault(candidate => string.Equals(candidate.Symbol, normalizedSymbol, StringComparison.OrdinalIgnoreCase))
-            ?? contracts.FirstOrDefault();
+        found ??= contractsRead.Result.FirstOrDefault(candidate => string.Equals(candidate.Symbol, normalizedSymbol, StringComparison.OrdinalIgnoreCase))
+            ?? contractsRead.Result.FirstOrDefault();
         if (found is null)
         {
-            error = new MarketDataError("unsupported-symbol", $"IBKR iBeam returned no stock contract for '{symbol}'.");
-            return false;
+            return ProviderRead<IbkrContract>.Failure(new MarketDataError(MarketDataProviderErrorCodes.UnsupportedSymbol, $"IBKR iBeam returned no stock contract for '{symbol}'."));
         }
 
         if (!string.IsNullOrWhiteSpace(requestedProviderSymbolId)
             && !string.Equals(found.Conid, requestedProviderSymbolId, StringComparison.OrdinalIgnoreCase))
         {
-            error = new MarketDataError("unsupported-symbol", $"IBKR iBeam returned no contract {requestedProviderSymbolId} for '{symbol}'.");
-            return false;
+            return ProviderRead<IbkrContract>.Failure(new MarketDataError(MarketDataProviderErrorCodes.UnsupportedSymbol, $"IBKR iBeam returned no contract {requestedProviderSymbolId} for '{symbol}'."));
         }
 
-        contract = found;
-        return true;
+        return ProviderRead<IbkrContract>.Success(found);
     }
 
-    private Dictionary<string, IbkrMarketDataSnapshot> GetSnapshotLookup(IReadOnlyList<string> conids)
+    private async Task<Dictionary<string, IbkrMarketDataSnapshot>> GetSnapshotLookupAsync(IReadOnlyList<string> conids, CancellationToken cancellationToken)
     {
         if (conids.Count == 0)
         {
             return new Dictionary<string, IbkrMarketDataSnapshot>(StringComparer.OrdinalIgnoreCase);
         }
 
-        return TryExecute(() => marketDataClient.GetSnapshotsAsync(conids), out var snapshots, out _) && snapshots is not null
-            ? snapshots
+        var snapshotsRead = await TryExecuteAsync(
+            static (state, token) => state.Client.GetSnapshotsAsync(state.Conids, token),
+            (Client: marketDataClient, Conids: conids),
+            cancellationToken).ConfigureAwait(false);
+        return snapshotsRead.Succeeded && snapshotsRead.Result is not null
+            ? snapshotsRead.Result
                 .Where(snapshot => !string.IsNullOrWhiteSpace(snapshot.Conid))
                 .GroupBy(snapshot => snapshot.Conid, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase)
@@ -459,47 +520,48 @@ public sealed class IbkrMarketDataProvider(
         return true;
     }
 
-    private bool TryExecute<T>(Func<Task<T>> operation, out T? result, out MarketDataError? error)
+    private async Task<ProviderRead<T>> TryExecuteAsync<TState, T>(
+        Func<TState, CancellationToken, Task<T>> operation,
+        TState state,
+        CancellationToken cancellationToken)
     {
-        result = default;
-        error = null;
         try
         {
-            result = operation().ConfigureAwait(false).GetAwaiter().GetResult();
-            return true;
+            var result = await operation(state, cancellationToken).ConfigureAwait(false);
+            return ProviderRead<T>.Success(result);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (TaskCanceledException exception)
         {
             logger.LogWarning(exception, "IBKR iBeam market-data request timed out over local HTTPS transport.");
-            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportTimeoutMessage());
-            return false;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
+            return ProviderRead<T>.Failure(new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportTimeoutMessage()));
         }
         catch (IbkrMarketDataProviderException exception)
         {
             var message = RedactConfiguredValues(exception.Message);
             logger.LogWarning("IBKR iBeam market-data request failed safely: {Diagnostic}", message);
-            error = new MarketDataError(exception.Code, message);
-            return false;
+            return ProviderRead<T>.Failure(new MarketDataError(exception.Code, message));
         }
         catch (HttpRequestException exception)
         {
             logger.LogWarning(
                 "IBKR iBeam market-data request could not reach the local HTTPS gateway transport: {Diagnostic}",
                 RedactConfiguredValues(exception.Message));
-            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportUnavailableMessage());
-            return false;
+            return ProviderRead<T>.Failure(new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, IbkrGatewayTransport.CreateTransportUnavailableMessage()));
         }
         catch (Exception exception)
         {
             logger.LogWarning(exception, "IBKR iBeam market-data request failed safely.");
-            error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market-data request failed safely.");
-            return false;
+            return ProviderRead<T>.Failure(new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market-data request failed safely."));
         }
     }
+
+    private static MarketDataError ToReadError(MarketDataError? error) => error ?? new MarketDataError(
+        MarketDataProviderErrorCodes.MarketDataRequestFailed,
+        "IBKR iBeam market-data request failed safely.");
 
     private string RedactConfiguredValues(string message)
     {
@@ -521,9 +583,6 @@ public sealed class IbkrMarketDataProvider(
 
         return redactedMessage;
     }
-
-    private static T Run<T>(Func<CancellationToken, Task<T>> operation) =>
-        operation(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
 
     private static MarketDataSymbolIdentity CreateIdentity(IbkrContract contract) => MarketDataSymbolIdentity.Create(
         contract.Symbol,
@@ -547,6 +606,13 @@ public sealed class IbkrMarketDataProvider(
         long.TryParse(conid, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
 
     private static decimal Round(decimal value) => decimal.Round(value, 4, MidpointRounding.AwayFromZero);
+
+    private readonly record struct ProviderRead<T>(bool Succeeded, T? Result, MarketDataError? Error)
+    {
+        public static ProviderRead<T> Success(T result) => new(true, result, null);
+
+        public static ProviderRead<T> Failure(MarketDataError error) => new(false, default, error);
+    }
 }
 
 public static class IbkrMarketDataServiceCollectionExtensions

@@ -10,44 +10,58 @@ namespace ATrade.MarketData.Ibkr.Tests;
 public sealed class IbkrMarketDataProviderTests
 {
     [Fact]
-    public void Provider_ReportsNotConfiguredWithoutConfiguredIbeamCredentialsAndDoesNotCallHttp()
+    public async Task Provider_ReportsNotConfiguredWithoutConfiguredIbeamCredentialsAndDoesNotCallHttp()
     {
         var handler = new RecordingHttpMessageHandler((_, _) =>
             throw new InvalidOperationException("The fake handler must not receive requests when credentials are missing."));
         var options = CreateOptions(withCredentials: false);
         var provider = CreateProvider(handler, options);
 
-        var status = provider.GetStatus();
-        var result = provider.TryGetCandles("AAPL", MarketDataTimeframes.OneDay, out var candles, out var error);
+        var status = await provider.GetStatusAsync(CancellationToken.None);
+        var result = await provider.GetCandlesAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
 
         Assert.Equal(MarketDataProviderStates.NotConfigured, status.State);
         Assert.Equal(0, handler.CallCount);
-        Assert.False(result);
-        Assert.Null(candles);
-        Assert.NotNull(error);
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderNotConfigured, error.Code);
-        Assert.Contains("ignored local .env", error.Message);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderNotConfigured, result.Error!.Code);
+        Assert.Contains("ignored local .env", result.Error.Message);
     }
 
     [Fact]
-    public void StreamingService_ReturnsProviderUnavailableWithoutFallbackSnapshot()
+    public async Task StreamingService_ReturnsProviderUnavailableWithoutFallbackSnapshot()
     {
         var handler = new RecordingHttpMessageHandler((_, _) =>
             throw new InvalidOperationException("The fake handler must not receive streaming snapshot requests when credentials are missing."));
         var provider = CreateProvider(handler, CreateOptions(withCredentials: false));
         var streamingService = new MarketDataStreamingService(provider, provider);
 
-        var result = streamingService.TryCreateSnapshot("AAPL", MarketDataTimeframes.OneDay, out var update, out var error);
+        var result = await streamingService.CreateSnapshotAsync("AAPL", MarketDataTimeframes.OneDay, CancellationToken.None);
 
-        Assert.False(result);
-        Assert.Null(update);
-        Assert.NotNull(error);
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderNotConfigured, error.Code);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderNotConfigured, result.Error!.Code);
         Assert.Equal(0, handler.CallCount);
     }
 
     [Fact]
-    public void Provider_ReportsUnavailableWhenIbeamSessionIsNotAuthenticated()
+    public async Task Provider_HonorsPreCanceledReadTokenBeforeGatewayRequest()
+    {
+        var handler = new RecordingHttpMessageHandler((_, _) =>
+            throw new InvalidOperationException("The fake handler must not receive requests after cancellation."));
+        var provider = CreateProvider(handler, CreateOptions());
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => provider.SearchSymbolsAsync("AAPL", cancellation.Token));
+
+        Assert.Equal(0, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Provider_ReportsUnavailableWhenIbeamSessionIsNotAuthenticated()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
         {
@@ -63,7 +77,7 @@ public sealed class IbkrMarketDataProviderTests
         });
         var provider = CreateProvider(handler, CreateOptions());
 
-        var status = provider.GetStatus();
+        var status = await provider.GetStatusAsync(CancellationToken.None);
 
         Assert.Equal(MarketDataProviderStates.Unavailable, status.State);
         Assert.False(status.IsAvailable);
@@ -72,13 +86,13 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
-    public void Provider_ReportsSafeTransportDiagnosticWhenGatewayRequestFails()
+    public async Task Provider_ReportsSafeTransportDiagnosticWhenGatewayRequestFails()
     {
         var handler = new RecordingHttpMessageHandler((_, _) =>
             throw new HttpRequestException("connection reset by peer for paper-user through https://gateway.paper.local"));
         var provider = CreateProvider(handler, CreateOptions());
 
-        var status = provider.GetStatus();
+        var status = await provider.GetStatusAsync(CancellationToken.None);
 
         Assert.Equal(MarketDataProviderStates.Unavailable, status.State);
         Assert.Contains("local Client Portal HTTPS transport", status.Message);
@@ -90,7 +104,7 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
-    public void Provider_ReturnsProviderUnavailableWhenMarketDataEndpointRejectsUnauthenticatedSession()
+    public async Task Provider_ReturnsProviderUnavailableWhenMarketDataEndpointRejectsUnauthenticatedSession()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
         {
@@ -110,17 +124,17 @@ public sealed class IbkrMarketDataProviderTests
         });
         var provider = CreateProvider(handler, CreateOptions());
 
-        var result = provider.TrySearchSymbols("AAPL", out var search, out var error);
+        var result = await provider.SearchSymbolsAsync("AAPL", CancellationToken.None);
 
-        Assert.False(result);
-        Assert.Null(search);
-        Assert.NotNull(error);
-        Assert.Equal(MarketDataProviderErrorCodes.AuthenticationRequired, error.Code);
-        Assert.Contains("not authenticated", error.Message);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.AuthenticationRequired, result.Error!.Code);
+        Assert.Contains("not authenticated", result.Error.Message);
     }
 
     [Fact]
-    public void Provider_ConvertsTrendingScannerEndpointFailureToSafeUnavailableError()
+    public async Task Provider_ConvertsTrendingScannerEndpointFailureToSafeUnavailableError()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
         {
@@ -141,14 +155,17 @@ public sealed class IbkrMarketDataProviderTests
         });
         var provider = CreateProvider(handler, CreateOptions());
 
-        var exception = Assert.Throws<MarketDataProviderUnavailableException>(() => provider.GetTrendingSymbols());
+        var result = await provider.GetTrendingSymbolsAsync(CancellationToken.None);
 
-        Assert.Equal(MarketDataProviderErrorCodes.AuthenticationRequired, exception.Error.Code);
-        Assert.Contains("not authenticated", exception.Error.Message);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.AuthenticationRequired, result.Error!.Code);
+        Assert.Contains("not authenticated", result.Error.Message);
     }
 
     [Fact]
-    public void Provider_UsesSearchContractWhenStockDetailEndpointRequiresMonth()
+    public async Task Provider_UsesSearchContractWhenStockDetailEndpointRequiresMonth()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
         {
@@ -185,10 +202,11 @@ public sealed class IbkrMarketDataProviderTests
         });
         var provider = CreateProvider(handler, CreateOptions());
 
-        var result = provider.TrySearchSymbols("NVDA", out var search, out var error);
+        var result = await provider.SearchSymbolsAsync("NVDA", CancellationToken.None);
+        var search = result.Value;
 
-        Assert.True(result);
-        Assert.Null(error);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
         var match = Assert.Single(search!.Results);
         Assert.Equal("NVDA", match.Identity.Symbol);
         Assert.Equal("4815747", match.Identity.ProviderSymbolId);
@@ -198,21 +216,29 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
-    public void Provider_MapsContractLookupSnapshotsHistoricalBarsAndScannerResults()
+    public async Task Provider_MapsContractLookupSnapshotsHistoricalBarsAndScannerResults()
     {
         var handler = new RecordingHttpMessageHandler(RespondWithIbkrPayloads);
         var provider = CreateProvider(handler, CreateOptions());
 
-        var status = provider.GetStatus();
-        var trending = provider.GetTrendingSymbols();
-        var searchResult = provider.TrySearchSymbols("AAPL", out var search, out var searchError);
-        var symbolResult = provider.TryGetSymbol("AAPL", out var symbol);
-        var candlesResult = provider.TryGetCandles("AAPL", MarketDataTimeframes.OneDay, out var candles, out var candlesError);
-        var indicatorsResult = provider.TryGetIndicators("AAPL", MarketDataTimeframes.OneDay, out var indicators, out var indicatorsError);
-        var latestResult = provider.TryGetLatestUpdate("AAPL", MarketDataTimeframes.OneDay, out var latest, out var latestError);
+        var status = await provider.GetStatusAsync(CancellationToken.None);
+        var trendingResult = await provider.GetTrendingSymbolsAsync(CancellationToken.None);
+        var trending = trendingResult.Value;
+        var searchResult = await provider.SearchSymbolsAsync("AAPL", CancellationToken.None);
+        var search = searchResult.Value;
+        var symbolResult = await provider.GetSymbolAsync("AAPL", CancellationToken.None);
+        var symbol = symbolResult.Value;
+        var candlesResult = await provider.GetCandlesAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var candles = candlesResult.Value;
+        var indicatorsResult = await provider.GetIndicatorsAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var indicators = indicatorsResult.Value;
+        var latestResult = await provider.GetLatestUpdateAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var latest = latestResult.Value;
 
         Assert.True(status.IsAvailable);
-        Assert.Equal(IbkrMarketDataSource.Scanner, trending.Source);
+        Assert.True(trendingResult.IsSuccess);
+        Assert.NotNull(trending);
+        Assert.Equal(IbkrMarketDataSource.Scanner, trending!.Source);
         var trendingSymbol = Assert.Single(trending.Symbols);
         Assert.Equal("AAPL", trendingSymbol.Symbol);
         Assert.Equal("Apple Inc.", trendingSymbol.Name);
@@ -220,8 +246,8 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Equal(1.18m, trendingSymbol.ChangePercent);
         Assert.Contains(trendingSymbol.Reasons, reason => reason.Contains("IBKR scanner", StringComparison.Ordinal));
 
-        Assert.True(searchResult);
-        Assert.Null(searchError);
+        Assert.True(searchResult.IsSuccess);
+        Assert.Null(searchResult.Error);
         var searchMatch = Assert.Single(search!.Results);
         Assert.Equal(IbkrMarketDataSource.Provider, search!.Source);
         Assert.Equal("AAPL", searchMatch.Identity.Symbol);
@@ -232,13 +258,13 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Equal("USD", searchMatch.Identity.Currency);
         Assert.Equal("Apple Inc.", searchMatch.Name);
 
-        Assert.True(symbolResult);
+        Assert.True(symbolResult.IsSuccess);
         Assert.NotNull(symbol);
         Assert.Equal("AAPL", symbol.Symbol);
         Assert.Equal(58_000_000, symbol.AverageVolume);
 
-        Assert.True(candlesResult);
-        Assert.Null(candlesError);
+        Assert.True(candlesResult.IsSuccess);
+        Assert.Null(candlesResult.Error);
         Assert.Equal("AAPL", candles!.Symbol);
         Assert.Equal(MarketDataTimeframes.OneDay, candles.Timeframe);
         Assert.Equal(IbkrMarketDataSource.History, candles.Source);
@@ -246,15 +272,15 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Equal(195.11m, candles.Candles[0].Open);
         Assert.Equal(58_000_000, candles.Candles[^1].Volume);
 
-        Assert.True(indicatorsResult);
-        Assert.Null(indicatorsError);
+        Assert.True(indicatorsResult.IsSuccess);
+        Assert.Null(indicatorsResult.Error);
         Assert.Equal(IbkrMarketDataSource.History, indicators!.Source);
         Assert.Equal(2, indicators.MovingAverages.Count);
         Assert.Equal(2, indicators.Rsi.Count);
         Assert.Equal(2, indicators.Macd.Count);
 
-        Assert.True(latestResult);
-        Assert.Null(latestError);
+        Assert.True(latestResult.IsSuccess);
+        Assert.Null(latestResult.Error);
         Assert.Equal("AAPL", latest!.Symbol);
         Assert.Equal(196.44m, latest.Close);
         Assert.Equal(58_000_000, latest.Volume);

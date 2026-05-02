@@ -6,7 +6,7 @@ namespace ATrade.MarketData.Timescale.Tests;
 public sealed class TimescaleMarketDataCacheAsideTests
 {
     [Fact]
-    public void GetTrendingSymbolsReadsFreshTimescaleSnapshotBeforeProviderCall()
+    public async Task GetTrendingSymbolsReadsFreshTimescaleSnapshotBeforeProviderCall()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 10, 0, TimeSpan.Zero);
         var freshness = TimeSpan.FromMinutes(30);
@@ -20,19 +20,22 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, freshness);
 
-        var response = service.GetTrendingSymbols();
+        var result = await service.GetTrendingSymbolsAsync(CancellationToken.None);
+        var response = result.Value;
 
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(response);
         Assert.Equal(0, provider.GetTrendingSymbolsCalls);
         var query = Assert.Single(repository.TrendingQueries);
         Assert.Equal(provider.Identity.Provider, query.Provider);
         Assert.Null(query.Source);
         Assert.Equal(now - freshness, query.FreshnessCutoffUtc);
-        var symbol = Assert.Single(response.Symbols);
+        var symbol = Assert.Single(response!.Symbols);
         Assert.Equal("AAPL", symbol.Symbol);
     }
 
     [Fact]
-    public void GetTrendingSymbolsReturnsFreshPersistedSnapshotWithCacheSourceMetadata()
+    public async Task GetTrendingSymbolsReturnsFreshPersistedSnapshotWithCacheSourceMetadata()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 12, 0, TimeSpan.Zero);
         var repository = new RecordingTimescaleMarketDataRepository
@@ -45,9 +48,12 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var response = service.GetTrendingSymbols();
+        var result = await service.GetTrendingSymbolsAsync(CancellationToken.None);
+        var response = result.Value;
 
-        Assert.Equal("timescale-cache:ibkr-scanner", response.Source);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(response);
+        Assert.Equal("timescale-cache:ibkr-scanner", response!.Source);
         Assert.Equal(now.AddMinutes(-3), response.GeneratedAt);
         var symbol = Assert.Single(response.Symbols);
         Assert.Equal("Apple Inc.", symbol.Name);
@@ -63,7 +69,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void GetTrendingSymbolsFetchesProviderPersistsSnapshotAndReturnsProviderResponseOnCacheMiss()
+    public async Task GetTrendingSymbolsFetchesProviderPersistsSnapshotAndReturnsProviderResponseOnCacheMiss()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 14, 0, TimeSpan.Zero);
         var providerResponse = CreateProviderTrendingResponse(now.AddSeconds(-10), source: "ibkr-scanner");
@@ -74,8 +80,10 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var response = service.GetTrendingSymbols();
+        var result = await service.GetTrendingSymbolsAsync(CancellationToken.None);
+        var response = result.Value;
 
+        Assert.True(result.IsSuccess);
         Assert.Same(providerResponse, response);
         Assert.Equal("ibkr-scanner", response.Source);
         Assert.Equal(1, provider.GetTrendingSymbolsCalls);
@@ -93,7 +101,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void GetTrendingSymbolsReturnsFreshCacheWhenProviderIsUnavailable()
+    public async Task GetTrendingSymbolsReturnsFreshCacheWhenProviderIsUnavailable()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 16, 0, TimeSpan.Zero);
         var repository = new RecordingTimescaleMarketDataRepository
@@ -110,15 +118,18 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var response = service.GetTrendingSymbols();
+        var result = await service.GetTrendingSymbolsAsync(CancellationToken.None);
+        var response = result.Value;
 
-        Assert.Equal("timescale-cache:ibkr-scanner", response.Source);
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(response);
+        Assert.Equal("timescale-cache:ibkr-scanner", response!.Source);
         Assert.Equal(0, provider.GetTrendingSymbolsCalls);
         Assert.Single(repository.TrendingQueries);
     }
 
     [Fact]
-    public void GetTrendingSymbolsSurfacesProviderUnavailableWhenNoFreshCacheExists()
+    public async Task GetTrendingSymbolsSurfacesProviderUnavailableWhenNoFreshCacheExists()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 18, 0, TimeSpan.Zero);
         var repository = new RecordingTimescaleMarketDataRepository();
@@ -132,17 +143,20 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var exception = Assert.Throws<MarketDataProviderUnavailableException>(() => service.GetTrendingSymbols());
+        var result = await service.GetTrendingSymbolsAsync(CancellationToken.None);
 
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, exception.Error.Code);
-        Assert.Contains("iBeam", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, result.Error!.Code);
+        Assert.Contains("iBeam", result.Error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, provider.GetTrendingSymbolsCalls);
         Assert.Equal(2, repository.TrendingQueries.Count);
         Assert.Empty(repository.WrittenTrendingSnapshots);
     }
 
     [Fact]
-    public void GetTrendingSymbolsServesPersistedSnapshotAcrossServiceInstances()
+    public async Task GetTrendingSymbolsServesPersistedSnapshotAcrossServiceInstances()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 32, 0, TimeSpan.Zero);
         var providerResponse = CreateProviderTrendingResponse(now.AddMinutes(-1), source: "ibkr-scanner");
@@ -153,7 +167,8 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var firstService = CreateService(firstProvider, repository, now, TimeSpan.FromMinutes(30));
 
-        var providerResult = firstService.GetTrendingSymbols();
+        var providerRead = await firstService.GetTrendingSymbolsAsync(CancellationToken.None);
+        var providerResult = providerRead.Value;
         repository.TrendingQueries.Clear();
 
         var restartedProvider = new RecordingMarketDataProvider
@@ -166,8 +181,12 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var restartedService = CreateService(restartedProvider, repository, now.AddMinutes(1), TimeSpan.FromMinutes(30));
 
-        var homePageTrending = restartedService.GetTrendingSymbols();
+        var restartedRead = await restartedService.GetTrendingSymbolsAsync(CancellationToken.None);
+        var homePageTrending = restartedRead.Value;
 
+        Assert.True(providerRead.IsSuccess);
+        Assert.True(restartedRead.IsSuccess);
+        Assert.NotNull(homePageTrending);
         Assert.Same(providerResponse, providerResult);
         Assert.Equal("timescale-cache:ibkr-scanner", homePageTrending.Source);
         Assert.Equal(providerResponse.GeneratedAt, homePageTrending.GeneratedAt);
@@ -177,7 +196,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void TryGetCandlesReadsFreshTimescaleSeriesBeforeProviderCall()
+    public async Task TryGetCandlesReadsFreshTimescaleSeriesBeforeProviderCall()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 21, 0, TimeSpan.Zero);
         var freshness = TimeSpan.FromMinutes(30);
@@ -191,10 +210,11 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, freshness);
 
-        var ok = service.TryGetCandles(" aapl ", MarketDataTimeframes.OneDay, out var response, out var error);
+        var result = await service.GetCandlesAsync(" aapl ", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var response = result.Value;
 
-        Assert.True(ok);
-        Assert.Null(error);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
         Assert.NotNull(response);
         Assert.Equal(0, provider.TryGetCandlesCalls);
         var query = Assert.Single(repository.CandleQueries);
@@ -210,7 +230,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void TryGetCandlesUsesExactIdentityFiltersWhenProvided()
+    public async Task TryGetCandlesUsesExactIdentityFiltersWhenProvided()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 22, 0, TimeSpan.Zero);
         var identity = CreateIdentity();
@@ -224,10 +244,11 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var ok = service.TryGetCandles("aapl", MarketDataTimeframes.OneDay, out var response, out var error, identity);
+        var result = await service.GetCandlesAsync("aapl", MarketDataTimeframes.OneDay, identity, CancellationToken.None);
+        var response = result.Value;
 
-        Assert.True(ok);
-        Assert.Null(error);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
         Assert.NotNull(response);
         var query = Assert.Single(repository.CandleQueries);
         Assert.Equal("265598", query.ProviderSymbolId);
@@ -237,7 +258,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void TryGetCandlesFetchesProviderPersistsSeriesAndReturnsProviderResponseOnCacheMiss()
+    public async Task TryGetCandlesFetchesProviderPersistsSeriesAndReturnsProviderResponseOnCacheMiss()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 23, 0, TimeSpan.Zero);
         var providerResponse = CreateProviderCandleResponse(now.AddSeconds(-5), source: "ibkr-history");
@@ -248,10 +269,11 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var ok = service.TryGetCandles("AAPL", MarketDataTimeframes.OneDay, out var response, out var error);
+        var result = await service.GetCandlesAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var response = result.Value;
 
-        Assert.True(ok);
-        Assert.Null(error);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
         Assert.Same(providerResponse, response);
         Assert.Equal(1, provider.TryGetCandlesCalls);
         Assert.Single(repository.CandleQueries);
@@ -268,7 +290,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void TryGetIndicatorsComputesFromFreshCachedCandlesWithoutProviderCall()
+    public async Task TryGetIndicatorsComputesFromFreshCachedCandlesWithoutProviderCall()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 25, 0, TimeSpan.Zero);
         var cachedSeries = CreateCandleSeries(now.AddMinutes(-6), source: "ibkr-history");
@@ -282,10 +304,11 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var ok = service.TryGetIndicators("AAPL", MarketDataTimeframes.OneDay, out var response, out var error);
+        var result = await service.GetIndicatorsAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var response = result.Value;
 
-        Assert.True(ok);
-        Assert.Null(error);
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
         Assert.NotNull(response);
         Assert.Equal("AAPL", response.Symbol);
         Assert.Equal(MarketDataTimeframes.OneDay, response.Timeframe);
@@ -304,7 +327,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
-    public void TryGetCandlesPreservesUnsupportedTimeframeErrorInsteadOfReturningCachedSeries()
+    public async Task TryGetCandlesPreservesUnsupportedTimeframeErrorInsteadOfReturningCachedSeries()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 27, 0, TimeSpan.Zero);
         var repository = new RecordingTimescaleMarketDataRepository
@@ -317,19 +340,19 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var ok = service.TryGetCandles("AAPL", "2m", out var response, out var error);
+        var result = await service.GetCandlesAsync("AAPL", "2m", cancellationToken: CancellationToken.None);
 
-        Assert.False(ok);
-        Assert.Null(response);
-        Assert.NotNull(error);
-        Assert.Equal("unsupported-timeframe", error.Code);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal("unsupported-timeframe", result.Error!.Code);
         Assert.Equal(1, provider.TryGetCandlesCalls);
         Assert.Empty(repository.CandleQueries);
         Assert.Empty(repository.WrittenCandleSeries);
     }
 
     [Fact]
-    public void TryGetCandlesPreservesProviderUnavailableWhenNoFreshCacheExists()
+    public async Task TryGetCandlesPreservesProviderUnavailableWhenNoFreshCacheExists()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 29, 0, TimeSpan.Zero);
         var repository = new RecordingTimescaleMarketDataRepository();
@@ -342,13 +365,13 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
-        var ok = service.TryGetCandles("AAPL", MarketDataTimeframes.OneDay, out var response, out var error);
+        var result = await service.GetCandlesAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
 
-        Assert.False(ok);
-        Assert.Null(response);
-        Assert.NotNull(error);
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, error.Code);
-        Assert.Contains("iBeam", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, result.Error!.Code);
+        Assert.Contains("iBeam", result.Error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, provider.TryGetCandlesCalls);
         Assert.Single(repository.CandleQueries);
         Assert.Empty(repository.WrittenCandleSeries);

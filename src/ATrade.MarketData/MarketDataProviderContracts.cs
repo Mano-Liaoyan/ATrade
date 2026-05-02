@@ -109,5 +109,19 @@ public interface IMarketDataStreamingProvider
 
     bool TryCreateSnapshot(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error);
 
+    Task<MarketDataReadResult<MarketDataUpdate>> CreateSnapshotAsync(
+        string symbol,
+        string? timeframe,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            TryCreateSnapshot(symbol, timeframe, out var update, out var error) && update is not null
+                ? MarketDataReadResult<MarketDataUpdate>.Success(update)
+                : MarketDataReadResult<MarketDataUpdate>.Failure(error ?? new MarketDataError(
+                    MarketDataProviderErrorCodes.MarketDataRequestFailed,
+                    "Market-data snapshot request failed.")));
+    }
+
     string GetGroupName(string symbol, string timeframe);
 }

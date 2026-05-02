@@ -63,7 +63,7 @@ public sealed class IbkrScannerRequestContractTests
     }
 
     [Fact]
-    public void Provider_ConvertsScannerLengthRequiredToSafeUnavailableErrorWithoutLeakingConfiguredSecrets()
+    public async Task Provider_ConvertsScannerLengthRequiredToSafeUnavailableErrorWithoutLeakingConfiguredSecrets()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
         {
@@ -91,17 +91,20 @@ public sealed class IbkrScannerRequestContractTests
         });
         var provider = CreateProvider(handler, CreateOptions());
 
-        var exception = Assert.Throws<MarketDataProviderUnavailableException>(() => provider.GetTrendingSymbols());
+        var result = await provider.GetTrendingSymbolsAsync(CancellationToken.None);
 
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, exception.Error.Code);
-        Assert.Contains("411", exception.Error.Message);
-        Assert.Contains("Length Required", exception.Error.Message);
-        Assert.DoesNotContain("paper-user", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("paper-password", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("DU1234567", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("abc123", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("SESSION=secret", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("127.0.0.1", exception.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, result.Error!.Code);
+        Assert.Contains("411", result.Error.Message);
+        Assert.Contains("Length Required", result.Error.Message);
+        Assert.DoesNotContain("paper-user", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("paper-password", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DU1234567", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("abc123", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("SESSION=secret", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("127.0.0.1", result.Error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IbkrMarketDataClient CreateClient(HttpMessageHandler handler) => new(new HttpClient(handler)

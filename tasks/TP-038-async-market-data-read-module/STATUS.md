@@ -1,6 +1,6 @@
 # TP-038: Deepen the async market-data read module — Status
 
-**Current Step:** Step 1: Define one async read-result interface
+**Current Step:** Step 2: Convert Timescale cache-aside and IBKR provider adapters
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -37,12 +37,12 @@
 ---
 
 ### Step 2: Convert Timescale cache-aside and IBKR provider adapters
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Sync-over-async removed from market-data provider/cache read paths
-- [ ] Timescale-first cache-aside semantics preserved
-- [ ] IBKR/iBeam reads remain cancellable and safely redacted
-- [ ] Targeted IBKR and Timescale tests passing
+- [x] Sync-over-async removed from market-data provider/cache read paths
+- [x] Timescale-first cache-aside semantics preserved
+- [x] IBKR/iBeam reads remain cancellable and safely redacted
+- [x] Targeted IBKR and Timescale tests passing
 
 ---
 
@@ -99,6 +99,8 @@
 | 2026-05-02 14:52 | Step 0 completed | Required files, TP-037 dependency, .NET SDK, and solution projects verified |
 | 2026-05-02 14:53 | Step 1 hydrated | Planned async read-result shape, service mapping, payload stability, and targeted tests |
 | 2026-05-02 14:56 | Step 1 completed | Async read-result contract added; provider-abstraction tests passed (12/12) |
+| 2026-05-02 14:57 | Step 2 started | Converting Timescale cache-aside and IBKR adapter read paths to async end-to-end |
+| 2026-05-02 15:08 | Step 2 completed | Removed sync-over-async, converted Timescale and IBKR adapters, targeted IBKR/Timescale tests passed (46/46) |
 
 ---
 

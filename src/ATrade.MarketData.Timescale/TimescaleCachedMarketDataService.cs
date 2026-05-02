@@ -18,111 +18,146 @@ public sealed class TimescaleCachedMarketDataService(
     private readonly SemaphoreSlim schemaInitializationLock = new(1, 1);
     private bool schemaInitialized;
 
-    public TrendingSymbolsResponse GetTrendingSymbols()
+    public TrendingSymbolsResponse GetTrendingSymbols() =>
+        throw new NotSupportedException("Synchronous Timescale market-data reads are no longer supported. Use GetTrendingSymbolsAsync.");
+
+    public async Task<MarketDataReadResult<TrendingSymbolsResponse>> GetTrendingSymbolsAsync(CancellationToken cancellationToken = default)
     {
-        if (TryGetCachedTrendingSymbols(out var cachedResponse) && cachedResponse is not null)
+        cancellationToken.ThrowIfCancellationRequested();
+        var cachedResponse = await TryGetCachedTrendingSymbolsAsync(cancellationToken).ConfigureAwait(false);
+        if (cachedResponse is not null)
         {
-            return cachedResponse;
+            return MarketDataReadResult<TrendingSymbolsResponse>.Success(cachedResponse);
         }
 
-        try
+        var providerResponse = await providerBackedService.GetTrendingSymbolsAsync(cancellationToken).ConfigureAwait(false);
+        if (providerResponse.IsSuccess && providerResponse.Value is not null)
         {
-            var providerResponse = providerBackedService.GetTrendingSymbols();
-            TryPersistTrendingSymbols(providerResponse);
+            await TryPersistTrendingSymbolsAsync(providerResponse.Value, cancellationToken).ConfigureAwait(false);
             return providerResponse;
         }
-        catch (MarketDataProviderUnavailableException)
-        {
-            if (TryGetCachedTrendingSymbols(out cachedResponse) && cachedResponse is not null)
-            {
-                return cachedResponse;
-            }
 
-            throw;
-        }
+        cachedResponse = await TryGetCachedTrendingSymbolsAsync(cancellationToken).ConfigureAwait(false);
+        return cachedResponse is not null
+            ? MarketDataReadResult<TrendingSymbolsResponse>.Success(cachedResponse)
+            : MarketDataReadResult<TrendingSymbolsResponse>.Failure(ToReadError(providerResponse.Error));
     }
 
     public bool TrySearchSymbols(string? query, string? assetClass, int? limit, out MarketDataSymbolSearchResponse? response, out MarketDataError? error) =>
-        providerBackedService.TrySearchSymbols(query, assetClass, limit, out response, out error);
+        throw new NotSupportedException("Synchronous Timescale market-data search is no longer supported. Use SearchSymbolsAsync.");
+
+    public Task<MarketDataReadResult<MarketDataSymbolSearchResponse>> SearchSymbolsAsync(
+        string? query,
+        string? assetClass,
+        int? limit,
+        CancellationToken cancellationToken = default) =>
+        providerBackedService.SearchSymbolsAsync(query, assetClass, limit, cancellationToken);
 
     public bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol) =>
-        providerBackedService.TryGetSymbol(symbol, out marketSymbol);
+        throw new NotSupportedException("Synchronous Timescale market-data symbol lookup is no longer supported. Use GetSymbolAsync.");
 
-    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public Task<MarketDataReadResult<MarketDataSymbol>> GetSymbolAsync(string symbol, CancellationToken cancellationToken = default) =>
+        providerBackedService.GetSymbolAsync(symbol, cancellationToken);
+
+    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
+        throw new NotSupportedException("Synchronous Timescale market-data candle reads are no longer supported. Use GetCandlesAsync.");
+
+    public async Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
     {
-        response = null;
-        error = null;
-
+        cancellationToken.ThrowIfCancellationRequested();
         var normalizedIdentity = NormalizeIdentityForProvider(identity);
         var normalizedSymbol = NormalizeSymbol(normalizedIdentity?.Symbol ?? symbol);
-        if (normalizedSymbol is not null
-            && MarketDataTimeframes.TryGetDefinition(timeframe, out var definition)
-            && TryGetCachedCandles(normalizedSymbol, definition.Name, normalizedIdentity, out response)
-            && response is not null)
+        if (normalizedSymbol is not null && MarketDataTimeframes.TryGetDefinition(timeframe, out var definition))
         {
-            return true;
+            var cachedResponse = await TryGetCachedCandlesAsync(normalizedSymbol, definition.Name, normalizedIdentity, cancellationToken).ConfigureAwait(false);
+            if (cachedResponse is not null)
+            {
+                return MarketDataReadResult<CandleSeriesResponse>.Success(cachedResponse);
+            }
         }
 
-        if (!providerBackedService.TryGetCandles(symbol, timeframe, out response, out error, normalizedIdentity) || response is null)
+        var providerResponse = await providerBackedService.GetCandlesAsync(symbol, timeframe, normalizedIdentity, cancellationToken).ConfigureAwait(false);
+        if (providerResponse.IsFailure || providerResponse.Value is null)
         {
-            return false;
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(providerResponse.Error));
         }
 
+        var response = providerResponse.Value;
         if (response.Identity is null && normalizedIdentity is not null)
         {
             response = response with { Identity = normalizedIdentity };
         }
 
-        TryPersistCandleSeries(response);
-        return true;
+        await TryPersistCandleSeriesAsync(response, cancellationToken).ConfigureAwait(false);
+        return MarketDataReadResult<CandleSeriesResponse>.Success(response);
     }
 
-    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
+        throw new NotSupportedException("Synchronous Timescale market-data indicator reads are no longer supported. Use GetIndicatorsAsync.");
+
+    public async Task<MarketDataReadResult<IndicatorResponse>> GetIndicatorsAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
     {
-        response = null;
-        if (!TryGetCandles(symbol, timeframe, out var candles, out error, identity) || candles is null)
+        cancellationToken.ThrowIfCancellationRequested();
+        var candles = await GetCandlesAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        if (candles.IsFailure || candles.Value is null)
         {
-            return false;
+            return MarketDataReadResult<IndicatorResponse>.Failure(ToReadError(candles.Error));
         }
 
-        response = indicatorService.Calculate(candles.Symbol, candles.Timeframe, candles.Candles, candles.Identity) with
+        var response = indicatorService.Calculate(candles.Value.Symbol, candles.Value.Timeframe, candles.Value.Candles, candles.Value.Identity) with
         {
-            Source = candles.Source,
+            Source = candles.Value.Source,
         };
-        error = null;
-        return true;
+        return MarketDataReadResult<IndicatorResponse>.Success(response);
     }
 
     public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
-        providerBackedService.TryGetLatestUpdate(symbol, timeframe, out update, out error, NormalizeIdentityForProvider(identity));
+        throw new NotSupportedException("Synchronous Timescale market-data latest-update reads are no longer supported. Use GetLatestUpdateAsync.");
 
-    private bool TryGetCachedTrendingSymbols(out TrendingSymbolsResponse? response)
+    public Task<MarketDataReadResult<MarketDataUpdate>> GetLatestUpdateAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default) =>
+        providerBackedService.GetLatestUpdateAsync(symbol, timeframe, NormalizeIdentityForProvider(identity), cancellationToken);
+
+    private async Task<TrendingSymbolsResponse?> TryGetCachedTrendingSymbolsAsync(CancellationToken cancellationToken)
     {
-        response = null;
-        var snapshot = TryReadCache(
+        var snapshot = await TryReadCacheAsync(
             "read fresh trending snapshot",
-            () => repository.GetFreshTrendingSnapshotAsync(new TimescaleFreshTrendingSnapshotQuery(
+            token => repository.GetFreshTrendingSnapshotAsync(new TimescaleFreshTrendingSnapshotQuery(
                 provider.Identity.Provider,
                 Source: null,
-                FreshnessCutoffUtc: GetFreshnessCutoffUtc())));
+                FreshnessCutoffUtc: GetFreshnessCutoffUtc()), token),
+            cancellationToken).ConfigureAwait(false);
         if (snapshot is null)
         {
-            return false;
+            return null;
         }
 
-        response = new TrendingSymbolsResponse(
+        return new TrendingSymbolsResponse(
             snapshot.GeneratedAtUtc,
             snapshot.Symbols.Select(ToTrendingSymbol).ToArray(),
             ToCacheSource(snapshot.Source));
-        return true;
     }
 
-    private bool TryGetCachedCandles(string symbol, string timeframe, MarketDataSymbolIdentity? identity, out CandleSeriesResponse? response)
+    private async Task<CandleSeriesResponse?> TryGetCachedCandlesAsync(
+        string symbol,
+        string timeframe,
+        MarketDataSymbolIdentity? identity,
+        CancellationToken cancellationToken)
     {
-        response = null;
-        var series = TryReadCache(
+        var series = await TryReadCacheAsync(
             "read fresh candle series",
-            () => repository.GetFreshCandleSeriesAsync(new TimescaleFreshCandleSeriesQuery(
+            token => repository.GetFreshCandleSeriesAsync(new TimescaleFreshCandleSeriesQuery(
                 provider.Identity.Provider,
                 Source: null,
                 symbol,
@@ -131,23 +166,23 @@ public sealed class TimescaleCachedMarketDataService(
                 identity?.ProviderSymbolId,
                 identity?.Exchange,
                 identity?.Currency,
-                identity?.AssetClass)));
+                identity?.AssetClass), token),
+            cancellationToken).ConfigureAwait(false);
         if (series is null)
         {
-            return false;
+            return null;
         }
 
-        response = new CandleSeriesResponse(
+        return new CandleSeriesResponse(
             series.Symbol.Symbol,
             series.Timeframe,
             series.GeneratedAtUtc,
             series.Candles,
             ToCacheSource(series.Source),
             series.Symbol.ToMarketDataSymbolIdentity());
-        return true;
     }
 
-    private void TryPersistTrendingSymbols(TrendingSymbolsResponse response)
+    private Task TryPersistTrendingSymbolsAsync(TrendingSymbolsResponse response, CancellationToken cancellationToken)
     {
         var snapshot = new TimescaleTrendingSnapshot(
             provider.Identity.Provider,
@@ -155,17 +190,18 @@ public sealed class TimescaleCachedMarketDataService(
             response.GeneratedAt,
             response.Symbols.Select(ToTimescaleTrendingSymbol).ToArray());
 
-        TryWriteCache(
+        return TryWriteCacheAsync(
             "persist trending snapshot",
-            () => repository.UpsertTrendingSnapshotAsync(snapshot));
+            token => repository.UpsertTrendingSnapshotAsync(snapshot, token),
+            cancellationToken);
     }
 
-    private void TryPersistCandleSeries(CandleSeriesResponse response)
+    private Task TryPersistCandleSeriesAsync(CandleSeriesResponse response, CancellationToken cancellationToken)
     {
         var normalizedSymbol = NormalizeSymbol(response.Symbol);
         if (normalizedSymbol is null || response.Candles.Count == 0)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var series = new TimescaleCandleSeries(
@@ -184,21 +220,22 @@ public sealed class TimescaleCachedMarketDataService(
             response.GeneratedAt,
             response.Candles);
 
-        TryWriteCache(
+        return TryWriteCacheAsync(
             "persist candle series",
-            () => repository.UpsertCandleSeriesAsync(series));
+            token => repository.UpsertCandleSeriesAsync(series, token),
+            cancellationToken);
     }
 
-    private T? TryReadCache<T>(string operation, Func<Task<T?>> read) where T : class
+    private async Task<T?> TryReadCacheAsync<T>(string operation, Func<CancellationToken, Task<T?>> read, CancellationToken cancellationToken) where T : class
     {
-        if (!TryEnsureSchemaInitialized(operation))
+        if (!await TryEnsureSchemaInitializedAsync(operation, cancellationToken).ConfigureAwait(false))
         {
             return null;
         }
 
         try
         {
-            return read().GetAwaiter().GetResult();
+            return await read(cancellationToken).ConfigureAwait(false);
         }
         catch (TimescaleMarketDataStorageUnavailableException exception)
         {
@@ -207,16 +244,16 @@ public sealed class TimescaleCachedMarketDataService(
         }
     }
 
-    private void TryWriteCache(string operation, Func<Task> write)
+    private async Task TryWriteCacheAsync(string operation, Func<CancellationToken, Task> write, CancellationToken cancellationToken)
     {
-        if (!TryEnsureSchemaInitialized(operation))
+        if (!await TryEnsureSchemaInitializedAsync(operation, cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
         try
         {
-            write().GetAwaiter().GetResult();
+            await write(cancellationToken).ConfigureAwait(false);
         }
         catch (TimescaleMarketDataStorageUnavailableException exception)
         {
@@ -224,14 +261,14 @@ public sealed class TimescaleCachedMarketDataService(
         }
     }
 
-    private bool TryEnsureSchemaInitialized(string operation)
+    private async Task<bool> TryEnsureSchemaInitializedAsync(string operation, CancellationToken cancellationToken)
     {
         if (schemaInitialized)
         {
             return true;
         }
 
-        schemaInitializationLock.Wait();
+        await schemaInitializationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             if (schemaInitialized)
@@ -239,7 +276,7 @@ public sealed class TimescaleCachedMarketDataService(
                 return true;
             }
 
-            schemaInitializer.InitializeAsync().GetAwaiter().GetResult();
+            await schemaInitializer.InitializeAsync(cancellationToken).ConfigureAwait(false);
             schemaInitialized = true;
             return true;
         }
@@ -304,6 +341,10 @@ public sealed class TimescaleCachedMarketDataService(
 
         return identity.ToExactInstrumentIdentity().ToMarketDataSymbolIdentity();
     }
+
+    private static MarketDataError ToReadError(MarketDataError? error) => error ?? new MarketDataError(
+        MarketDataProviderErrorCodes.MarketDataRequestFailed,
+        "Market-data request failed.");
 
     private static string? NormalizeSymbol(string? symbol) => string.IsNullOrWhiteSpace(symbol) ? null : symbol.Trim().ToUpperInvariant();
 }

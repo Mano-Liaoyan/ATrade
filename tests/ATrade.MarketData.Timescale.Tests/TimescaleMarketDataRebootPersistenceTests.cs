@@ -29,8 +29,10 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
         {
             var writerService = CreateService(writerProvider, writerDataSource, now, freshness);
 
-            var firstResponse = writerService.GetTrendingSymbols();
+            var firstRead = await writerService.GetTrendingSymbolsAsync(CancellationToken.None);
+            var firstResponse = firstRead.Value;
 
+            Assert.True(firstRead.IsSuccess);
             Assert.Same(providerResponse, firstResponse);
             Assert.Equal(1, writerProvider.GetTrendingSymbolsCalls);
         }
@@ -42,9 +44,12 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
         await using var restartedDataSource = CreateDataSourceProvider(connectionString);
         var restartedService = CreateService(restartedProvider, restartedDataSource, now.AddMinutes(1), freshness);
 
-        var restartedResponse = restartedService.GetTrendingSymbols();
+        var restartedRead = await restartedService.GetTrendingSymbolsAsync(CancellationToken.None);
+        var restartedResponse = restartedRead.Value;
 
-        Assert.Equal($"timescale-cache:{source}", restartedResponse.Source);
+        Assert.True(restartedRead.IsSuccess);
+        Assert.NotNull(restartedResponse);
+        Assert.Equal($"timescale-cache:{source}", restartedResponse!.Source);
         Assert.Equal(providerResponse.GeneratedAt, restartedResponse.GeneratedAt);
         var restartedSymbol = Assert.Single(restartedResponse.Symbols);
         Assert.Equal(symbol, restartedSymbol.Symbol);
@@ -72,10 +77,11 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
         {
             var writerService = CreateService(writerProvider, writerDataSource, now, freshness);
 
-            var wroteCandles = writerService.TryGetCandles(symbol, MarketDataTimeframes.OneDay, out var firstResponse, out var firstError);
+            var writeRead = await writerService.GetCandlesAsync(symbol, MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+            var firstResponse = writeRead.Value;
 
-            Assert.True(wroteCandles);
-            Assert.Null(firstError);
+            Assert.True(writeRead.IsSuccess);
+            Assert.Null(writeRead.Error);
             Assert.Same(providerResponse, firstResponse);
             Assert.Equal(1, writerProvider.TryGetCandlesCalls);
         }
@@ -87,19 +93,21 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
         await using var restartedDataSource = CreateDataSourceProvider(connectionString);
         var restartedService = CreateService(restartedProvider, restartedDataSource, now.AddMinutes(1), freshness);
 
-        var readCandles = restartedService.TryGetCandles(symbol.ToLowerInvariant(), MarketDataTimeframes.OneDay, out var restartedResponse, out var restartedError);
-        var readIndicators = restartedService.TryGetIndicators(symbol, MarketDataTimeframes.OneDay, out var indicatorResponse, out var indicatorError);
+        var readCandles = await restartedService.GetCandlesAsync(symbol.ToLowerInvariant(), MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var restartedResponse = readCandles.Value;
+        var readIndicators = await restartedService.GetIndicatorsAsync(symbol, MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var indicatorResponse = readIndicators.Value;
 
-        Assert.True(readCandles);
-        Assert.Null(restartedError);
+        Assert.True(readCandles.IsSuccess);
+        Assert.Null(readCandles.Error);
         Assert.NotNull(restartedResponse);
-        Assert.Equal($"timescale-cache:{source}", restartedResponse.Source);
+        Assert.Equal($"timescale-cache:{source}", restartedResponse!.Source);
         Assert.Equal(providerResponse.GeneratedAt, restartedResponse.GeneratedAt);
         Assert.Equal(providerResponse.Candles.Count, restartedResponse.Candles.Count);
-        Assert.True(readIndicators);
-        Assert.Null(indicatorError);
+        Assert.True(readIndicators.IsSuccess);
+        Assert.Null(readIndicators.Error);
         Assert.NotNull(indicatorResponse);
-        Assert.Equal($"timescale-cache:{source}", indicatorResponse.Source);
+        Assert.Equal($"timescale-cache:{source}", indicatorResponse!.Source);
         Assert.Equal(providerResponse.Candles.Count, indicatorResponse.MovingAverages.Count);
         Assert.Equal(0, restartedProvider.TryGetCandlesCalls);
         Assert.Equal(0, restartedProvider.TryGetIndicatorsCalls);
@@ -126,8 +134,10 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
         {
             var writerService = CreateService(writerProvider, writerDataSource, now, freshness);
 
-            var providerResult = writerService.GetTrendingSymbols();
+            var providerRead = await writerService.GetTrendingSymbolsAsync(CancellationToken.None);
+            var providerResult = providerRead.Value;
 
+            Assert.True(providerRead.IsSuccess);
             Assert.Same(staleResponse, providerResult);
             Assert.Equal(1, writerProvider.GetTrendingSymbolsCalls);
         }
@@ -139,9 +149,12 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
         await using var restartedDataSource = CreateDataSourceProvider(connectionString);
         var restartedService = CreateService(unavailableProvider, restartedDataSource, now.AddMinutes(1), freshness);
 
-        var exception = Assert.Throws<MarketDataProviderUnavailableException>(() => restartedService.GetTrendingSymbols());
+        var restartedRead = await restartedService.GetTrendingSymbolsAsync(CancellationToken.None);
 
-        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, exception.Error.Code);
+        Assert.True(restartedRead.IsFailure);
+        Assert.Null(restartedRead.Value);
+        Assert.NotNull(restartedRead.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, restartedRead.Error!.Code);
         Assert.Equal(0, unavailableProvider.GetTrendingSymbolsCalls);
     }
 
