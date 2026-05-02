@@ -23,14 +23,14 @@
 ---
 
 ### Step 1: Establish Exact Instrument Identity as the backend-owned interface
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand checkboxes when entering this step based on the chosen module location and callers found during source inspection.
 
-- [ ] `ATrade.MarketData` exact identity module owns normalization/defaulting/encoding/equality and provider/market projection
-- [ ] `ATrade.Workspaces` delegates instrument key construction to the backend identity module while preserving existing `instrumentKey` / `pinKey` payloads
-- [ ] New identity contract tests cover same-symbol/different-market identities, manual legacy identities, and projected market-data identities
-- [ ] Targeted identity/workspace tests passing
+- [x] `ATrade.MarketData` exact identity module owns normalization/defaulting/encoding/equality and provider/market projection
+- [x] `ATrade.Workspaces` delegates instrument key construction to the backend identity module while preserving existing `instrumentKey` / `pinKey` payloads
+- [x] New identity contract tests cover same-symbol/different-market identities, manual legacy identities, and projected market-data identities
+- [x] Targeted identity/workspace tests passing
 
 ---
 

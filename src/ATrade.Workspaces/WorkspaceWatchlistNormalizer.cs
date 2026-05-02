@@ -1,4 +1,4 @@
-using System.Globalization;
+using ATrade.MarketData;
 
 namespace ATrade.Workspaces;
 
@@ -9,31 +9,25 @@ internal static class WorkspaceWatchlistNormalizer
         ArgumentNullException.ThrowIfNull(input);
 
         var normalizedSymbol = WorkspaceSymbolNormalizer.Normalize(input.Symbol);
-        var normalizedProvider = NormalizeProvider(input.Provider, input.IbkrConid);
-        var normalizedProviderSymbolId = NormalizeText(input.ProviderSymbolId)
-            ?? (input.IbkrConid.HasValue ? input.IbkrConid.Value.ToString(CultureInfo.InvariantCulture) : null);
-        var normalizedExchange = NormalizeText(input.Exchange)?.ToUpperInvariant();
-        var normalizedCurrency = NormalizeText(input.Currency)?.ToUpperInvariant() ?? WorkspaceWatchlistDefaults.DefaultCurrency;
-        var normalizedAssetClass = NormalizeText(input.AssetClass)?.ToUpperInvariant() ?? WorkspaceWatchlistDefaults.DefaultAssetClass;
-        var instrumentKey = WorkspaceWatchlistInstrumentKey.Create(
+        var exactIdentity = ExactInstrumentIdentity.Create(
             normalizedSymbol,
-            normalizedProvider,
-            normalizedProviderSymbolId,
+            input.Provider,
+            input.ProviderSymbolId,
             input.IbkrConid,
-            normalizedExchange,
-            normalizedCurrency,
-            normalizedAssetClass);
+            input.Exchange,
+            input.Currency,
+            input.AssetClass);
 
         return new NormalizedWorkspaceWatchlistSymbolInput(
-            normalizedSymbol,
-            instrumentKey,
-            normalizedProvider,
-            normalizedProviderSymbolId,
-            input.IbkrConid,
+            exactIdentity.Symbol,
+            exactIdentity.InstrumentKey,
+            exactIdentity.Provider,
+            exactIdentity.ProviderSymbolId,
+            exactIdentity.IbkrConid,
             NormalizeText(input.Name),
-            normalizedExchange,
-            normalizedCurrency,
-            normalizedAssetClass,
+            exactIdentity.Exchange,
+            exactIdentity.Currency,
+            exactIdentity.AssetClass,
             sortOrder);
     }
 
@@ -68,17 +62,6 @@ internal static class WorkspaceWatchlistNormalizer
     {
         var normalized = value?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-    }
-
-    private static string NormalizeProvider(string? provider, long? ibkrConid)
-    {
-        var normalized = NormalizeText(provider)?.ToLowerInvariant();
-        if (!string.IsNullOrWhiteSpace(normalized))
-        {
-            return normalized;
-        }
-
-        return ibkrConid.HasValue ? WorkspaceWatchlistDefaults.IbkrProvider : WorkspaceWatchlistDefaults.ManualProvider;
     }
 
     private static NormalizedWorkspaceWatchlistSymbolInput Merge(

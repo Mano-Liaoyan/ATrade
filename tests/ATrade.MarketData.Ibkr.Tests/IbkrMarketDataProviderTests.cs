@@ -227,7 +227,7 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Equal("AAPL", searchMatch.Identity.Symbol);
         Assert.Equal(IbkrMarketDataSource.Provider, searchMatch.Identity.Provider);
         Assert.Equal("265598", searchMatch.Identity.ProviderSymbolId);
-        Assert.Equal("Stock", searchMatch.Identity.AssetClass);
+        Assert.Equal(MarketDataAssetClasses.Stock, searchMatch.Identity.AssetClass);
         Assert.Equal("NASDAQ", searchMatch.Identity.Exchange);
         Assert.Equal("USD", searchMatch.Identity.Currency);
         Assert.Equal("Apple Inc.", searchMatch.Name);

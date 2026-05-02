@@ -1,3 +1,4 @@
+using System.Globalization;
 using ATrade.Brokers.Ibkr;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -166,13 +167,14 @@ public sealed class IbkrMarketDataProvider(
             contracts
                 .Take(MarketDataSymbolSearchLimits.MaximumLimit)
                 .Select(contract => new MarketDataSymbolSearchResult(
-                    new MarketDataSymbolIdentity(
+                    MarketDataSymbolIdentity.Create(
                         contract.Symbol,
                         Identity.Provider,
                         contract.Conid,
                         contract.AssetClass,
                         contract.Exchange,
-                        contract.Currency),
+                        contract.Currency,
+                        TryParseIbkrConid(contract.Conid)),
                     contract.Name,
                     contract.Sector))
                 .ToArray(),
@@ -513,6 +515,9 @@ public sealed class IbkrMarketDataProvider(
 
     private static T Run<T>(Func<CancellationToken, Task<T>> operation) =>
         operation(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+
+    private static long? TryParseIbkrConid(string? conid) =>
+        long.TryParse(conid, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;
 
     private static decimal Round(decimal value) => decimal.Round(value, 4, MidpointRounding.AwayFromZero);
 }

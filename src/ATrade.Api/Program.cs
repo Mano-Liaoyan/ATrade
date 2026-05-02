@@ -242,29 +242,29 @@ static MarketDataSymbolIdentity? CreateSymbolIdentityFromCode(string? symbolCode
 {
     return string.IsNullOrWhiteSpace(symbolCode)
         ? null
-        : new MarketDataSymbolIdentity(symbolCode.Trim().ToUpperInvariant(), "market-data-provider", null, MarketDataAssetClasses.Stock, "UNKNOWN", "USD");
+        : MarketDataSymbolIdentity.Create(symbolCode, "market-data-provider", null, MarketDataAssetClasses.Stock, "UNKNOWN", "USD");
 }
 
 static MarketDataSymbolIdentity ResolveSymbolIdentity(IMarketDataService marketDataService, CandleSeriesResponse candleSeries)
 {
     if (marketDataService.TryGetSymbol(candleSeries.Symbol, out var marketSymbol) && marketSymbol is not null)
     {
-        return new MarketDataSymbolIdentity(
+        return MarketDataSymbolIdentity.Create(
             marketSymbol.Symbol,
             candleSeries.Source,
-            ProviderSymbolId: null,
+            providerSymbolId: null,
             marketSymbol.AssetClass,
             marketSymbol.Exchange,
-            Currency: "USD");
+            currency: "USD");
     }
 
-    return new MarketDataSymbolIdentity(
+    return MarketDataSymbolIdentity.Create(
         candleSeries.Symbol,
         candleSeries.Source,
-        ProviderSymbolId: null,
+        providerSymbolId: null,
         MarketDataAssetClasses.Stock,
-        Exchange: "UNKNOWN",
-        Currency: "USD");
+        exchange: "UNKNOWN",
+        currency: "USD");
 }
 
 static Task<IResult> GetWorkspaceWatchlistAsync(

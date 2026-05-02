@@ -47,7 +47,24 @@ public sealed record MarketDataSymbolIdentity(
     string? ProviderSymbolId,
     string AssetClass,
     string Exchange,
-    string Currency);
+    string Currency)
+{
+    public static MarketDataSymbolIdentity Create(
+        string symbol,
+        string? provider,
+        string? providerSymbolId,
+        string? assetClass,
+        string? exchange,
+        string? currency,
+        long? ibkrConid = null) => ExactInstrumentIdentity
+            .Create(symbol, provider, providerSymbolId, ibkrConid, exchange, currency, assetClass)
+            .ToMarketDataSymbolIdentity();
+
+    public ExactInstrumentIdentity ToExactInstrumentIdentity(long? ibkrConid = null) =>
+        ExactInstrumentIdentity.FromMarketDataSymbolIdentity(this, ibkrConid);
+
+    public string InstrumentKey => ToExactInstrumentIdentity().InstrumentKey;
+}
 
 public sealed record MarketDataProviderCapabilities(
     bool SupportsTrendingScanner,
