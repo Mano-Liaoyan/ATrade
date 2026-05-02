@@ -1,6 +1,6 @@
 # TP-037: Deepen the Exact Instrument Identity module — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Establish Exact Instrument Identity as the backend-owned interface
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -23,13 +23,13 @@
 ---
 
 ### Step 1: Establish Exact Instrument Identity as the backend-owned interface
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand checkboxes when entering this step based on the chosen module location and callers found during source inspection.
 
-- [ ] Backend identity module owns normalization/defaulting/encoding/equality
-- [ ] Existing `instrumentKey` / `pinKey` payload compatibility preserved
-- [ ] New identity contract test file added
+- [ ] `ATrade.MarketData` exact identity module owns normalization/defaulting/encoding/equality and provider/market projection
+- [ ] `ATrade.Workspaces` delegates instrument key construction to the backend identity module while preserving existing `instrumentKey` / `pinKey` payloads
+- [ ] New identity contract tests cover same-symbol/different-market identities, manual legacy identities, and projected market-data identities
 - [ ] Targeted identity/workspace tests passing
 
 ---
