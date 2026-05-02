@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-01
+updated: 2026-05-02
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -20,8 +20,8 @@ ATrade is a personal swing and position trading platform built as a modular
 monolith with .NET 10, Next.js, and Aspire 13.2.
 
 The repository currently contains a runnable local stack and a Taskplane work
-queue for solution-reference cleanup and the next provider-backed trading
-workspace runtime fix.
+queue for architecture deepening across the provider-backed paper-trading
+workspace.
 
 ## Current Stack
 
@@ -137,13 +137,14 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 
 Taskplane packets live directly under `tasks/` while pending archival.
 
-Ready implementation tasks are queued as `TP-028` through `TP-032` for IBKR
-scanner/trending reliability, TimescaleDB market-data persistence, exact
-Postgres-backed watchlist pins, market-specific search badges, and configurable
-Aspire dashboard binding. `TP-030` depends on both `TP-028` and `TP-029`; the
-other new tasks can run in parallel where file scopes allow.
+Ready implementation tasks are queued as `TP-036` through `TP-041` for
+architecture deepening: the local runtime contract module, Exact Instrument
+Identity, the market-data read module, shared IBKR/iBeam readiness, backend
+analysis/workspace intake modules, and frontend paper-workspace workflow
+modules. The recommended order is sequential because each task stabilizes a seam
+used by the next.
 
-Completed Taskplane packets `TP-019` through `TP-027` currently remain under
+Completed Taskplane packets `TP-019` through `TP-035` currently remain under
 `tasks/` with `.DONE` markers pending archival; older completed packets live
 under `tasks/archive/`.
 

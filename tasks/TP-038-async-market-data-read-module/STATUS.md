@@ -1,0 +1,106 @@
+# TP-038: Deepen the async market-data read module — Status
+
+**Current Step:** Not Started
+**Status:** 🔵 Ready for Execution
+**Last Updated:** 2026-05-02
+**Review Level:** 2
+**Review Counter:** 0
+**Iteration:** 0
+**Size:** L
+
+> **Hydration:** Checkboxes represent meaningful outcomes, not individual code
+> changes. Workers expand steps when runtime discoveries warrant it — aim for
+> 2-5 outcome-level items per step, not exhaustive implementation scripts.
+
+---
+
+### Step 0: Preflight
+**Status:** ⬜ Not Started
+
+- [ ] Required files and paths exist
+- [ ] Dependencies satisfied
+
+---
+
+### Step 1: Define one async read-result interface
+**Status:** ⬜ Not Started
+
+> ⚠️ Hydrate: Expand checkboxes when entering this step based on the chosen result shape and call sites discovered.
+
+- [ ] Async market-data read interface/result shape implemented
+- [ ] Existing HTTP payload/status behavior preserved
+- [ ] New async read module test file added
+- [ ] Targeted provider-abstraction tests passing
+
+---
+
+### Step 2: Convert Timescale cache-aside and IBKR provider adapters
+**Status:** ⬜ Not Started
+
+- [ ] Sync-over-async removed from market-data provider/cache read paths
+- [ ] Timescale-first cache-aside semantics preserved
+- [ ] IBKR/iBeam reads remain cancellable and safely redacted
+- [ ] Targeted IBKR and Timescale tests passing
+
+---
+
+### Step 3: Update HTTP, SignalR, and analysis callers
+**Status:** ⬜ Not Started
+
+- [ ] HTTP route handlers await the deepened read interface and keep payloads stable
+- [ ] SignalR snapshot path uses async read/streaming seam without duplicate provider status logic
+- [ ] Analysis candle acquisition uses the new seam
+- [ ] Targeted AppHost/analysis/market-data scripts passing
+
+---
+
+### Step 4: Testing & Verification
+**Status:** ⬜ Not Started
+
+- [ ] FULL test suite passing
+- [ ] Integration tests passing or cleanly skipped where applicable
+- [ ] All failures fixed
+- [ ] Build passes
+
+---
+
+### Step 5: Documentation & Delivery
+**Status:** ⬜ Not Started
+
+- [ ] "Must Update" docs modified
+- [ ] "Check If Affected" docs reviewed
+- [ ] Discoveries logged
+
+---
+
+## Reviews
+
+| # | Type | Step | Verdict | File |
+|---|------|------|---------|------|
+
+---
+
+## Discoveries
+
+| Discovery | Disposition | Location |
+|-----------|-------------|----------|
+
+---
+
+## Execution Log
+
+| Timestamp | Action | Outcome |
+|-----------|--------|---------|
+| 2026-05-02 | Task staged | PROMPT.md and STATUS.md created |
+
+---
+
+## Blockers
+
+*None*
+
+---
+
+## Notes
+
+*Reserved for execution notes*
