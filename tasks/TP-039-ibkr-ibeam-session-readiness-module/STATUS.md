@@ -1,6 +1,6 @@
 # TP-039: Deepen the IBKR/iBeam session readiness module — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Create the shared IBKR/iBeam readiness interface
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -23,13 +23,13 @@
 ---
 
 ### Step 1: Create the shared IBKR/iBeam readiness interface
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-> ⚠️ Hydrate: Expand checkboxes when entering this step based on final readiness result shape and existing tests.
+> ⚠️ Hydrate: Expanded after inspecting current broker status, gateway client, transport, and broker tests. The shared result must normalize preflight failures, gateway session states, timeout/unreachable/error diagnostics, and redaction without changing external broker status contracts.
 
-- [ ] Shared readiness module evaluates paper guard, local runtime contract, auth status, transport, and safe diagnostics
-- [ ] New readiness matrix test file added
-- [ ] Existing provider-neutral broker status values and safe messages preserved
+- [ ] Normalized readiness result and service evaluate paper guard, integration, credentials/account id, iBeam image/port/url, auth status, transport errors/timeouts, and safe diagnostics
+- [ ] New readiness matrix test file covers disabled, missing credentials/account id, missing iBeam contract/url, unreachable, unauthenticated, authenticated, degraded/error, rejected-live, timeout, and redaction cases
+- [ ] Existing provider-neutral broker status states, booleans, capabilities, and safe messages preserved through readiness projection
 - [ ] Targeted broker tests passing
 
 ---
