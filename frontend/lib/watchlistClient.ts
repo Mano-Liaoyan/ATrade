@@ -1,9 +1,9 @@
 import { buildApiUrl } from './apiBaseUrl';
-
-const DEFAULT_PROVIDER = 'manual';
-const DEFAULT_IBKR_PROVIDER = 'ibkr';
-const DEFAULT_CURRENCY = 'USD';
-const DEFAULT_ASSET_CLASS = 'STK';
+import {
+  createProvisionalInstrumentKey,
+  normalizeInstrumentAssetClass,
+  type InstrumentIdentityInput,
+} from './instrumentIdentity';
 
 export type WatchlistSymbol = {
   symbol: string;
@@ -21,15 +21,7 @@ export type WatchlistSymbol = {
   updatedAtUtc: string;
 };
 
-export type WatchlistInstrumentIdentity = {
-  symbol: string;
-  provider?: string | null;
-  providerSymbolId?: string | null;
-  ibkrConid?: number | null;
-  exchange?: string | null;
-  currency?: string | null;
-  assetClass?: string | null;
-};
+export type WatchlistInstrumentIdentity = InstrumentIdentityInput;
 
 export type WatchlistSymbolInput = WatchlistInstrumentIdentity & {
   name?: string | null;
@@ -85,34 +77,9 @@ export function getWatchlistPinKey(symbol: WatchlistSymbol): string {
   return symbol.pinKey || symbol.instrumentKey || createWatchlistInstrumentKey(symbol);
 }
 
-export function createWatchlistInstrumentKey(identity: WatchlistInstrumentIdentity): string {
-  const ibkrConid = normalizeNullableNumber(identity.ibkrConid);
-  const provider = normalizeProvider(identity.provider, ibkrConid);
-  const providerSymbolId = normalizeOptional(identity.providerSymbolId) ?? (ibkrConid === null ? null : String(ibkrConid));
-  const symbol = identity.symbol.trim().toUpperCase();
-  const exchange = normalizeOptional(identity.exchange)?.toUpperCase() ?? '';
-  const currency = normalizeOptional(identity.currency)?.toUpperCase() ?? DEFAULT_CURRENCY;
-  const assetClass = normalizeWatchlistAssetClass(identity.assetClass);
+export const createWatchlistInstrumentKey = createProvisionalInstrumentKey;
 
-  return [
-    `provider=${encodeSegment(provider)}`,
-    `providerSymbolId=${encodeSegment(providerSymbolId)}`,
-    `ibkrConid=${encodeSegment(ibkrConid === null ? null : String(ibkrConid))}`,
-    `symbol=${encodeSegment(symbol)}`,
-    `exchange=${encodeSegment(exchange)}`,
-    `currency=${encodeSegment(currency)}`,
-    `assetClass=${encodeSegment(assetClass)}`,
-  ].join('|');
-}
-
-export function normalizeWatchlistAssetClass(assetClass: string | null | undefined): string {
-  const normalized = normalizeOptional(assetClass)?.toUpperCase();
-  if (!normalized) {
-    return DEFAULT_ASSET_CLASS;
-  }
-
-  return normalized === 'STOCK' ? DEFAULT_ASSET_CLASS : normalized;
-}
+export const normalizeWatchlistAssetClass = normalizeInstrumentAssetClass;
 
 async function fetchWatchlist(path: string, init: RequestInit = {}): Promise<WatchlistResponse> {
   const response = await fetch(buildApiUrl(path), {
@@ -137,28 +104,6 @@ async function fetchWatchlist(path: string, init: RequestInit = {}): Promise<Wat
   }
 
   return response.json() as Promise<WatchlistResponse>;
-}
-
-function normalizeProvider(provider: string | null | undefined, ibkrConid: number | null): string {
-  const normalized = normalizeOptional(provider)?.toLowerCase();
-  if (normalized) {
-    return normalized;
-  }
-
-  return ibkrConid === null ? DEFAULT_PROVIDER : DEFAULT_IBKR_PROVIDER;
-}
-
-function normalizeOptional(value: string | null | undefined): string | null {
-  const normalized = value?.trim();
-  return normalized ? normalized : null;
-}
-
-function normalizeNullableNumber(value: number | null | undefined): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function encodeSegment(value: string | null | undefined): string {
-  return encodeURIComponent(value?.trim() ?? '');
 }
 
 function parseErrorBody(body: string): { code?: string; error?: string } | null {

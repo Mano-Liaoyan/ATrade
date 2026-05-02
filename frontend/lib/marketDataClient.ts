@@ -1,4 +1,5 @@
 import { buildApiUrl } from './apiBaseUrl';
+import { appendIdentityQueryParams, type InstrumentIdentityInput } from './instrumentIdentity';
 import type { CandleSeriesResponse, IndicatorResponse, MarketDataSymbolSearchResponse, Timeframe, TrendingSymbolsResponse } from '../types/marketData';
 
 export class ApiClientError extends Error {
@@ -39,16 +40,21 @@ export async function searchSymbols(
   return fetchJson<MarketDataSymbolSearchResponse>(`/api/market-data/search?${params.toString()}`);
 }
 
-export async function getCandles(symbol: string, timeframe: Timeframe): Promise<CandleSeriesResponse> {
+export async function getCandles(symbol: string, timeframe: Timeframe, identity?: InstrumentIdentityInput | null): Promise<CandleSeriesResponse> {
   const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
-  const encodedTimeframe = encodeURIComponent(timeframe);
-  return fetchJson<CandleSeriesResponse>(`/api/market-data/${encodedSymbol}/candles?timeframe=${encodedTimeframe}`);
+  const params = buildMarketDataReadParams(timeframe, identity);
+  return fetchJson<CandleSeriesResponse>(`/api/market-data/${encodedSymbol}/candles?${params.toString()}`);
 }
 
-export async function getIndicators(symbol: string, timeframe: Timeframe): Promise<IndicatorResponse> {
+export async function getIndicators(symbol: string, timeframe: Timeframe, identity?: InstrumentIdentityInput | null): Promise<IndicatorResponse> {
   const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
-  const encodedTimeframe = encodeURIComponent(timeframe);
-  return fetchJson<IndicatorResponse>(`/api/market-data/${encodedSymbol}/indicators?timeframe=${encodedTimeframe}`);
+  const params = buildMarketDataReadParams(timeframe, identity);
+  return fetchJson<IndicatorResponse>(`/api/market-data/${encodedSymbol}/indicators?${params.toString()}`);
+}
+
+function buildMarketDataReadParams(timeframe: Timeframe, identity?: InstrumentIdentityInput | null): URLSearchParams {
+  const params = new URLSearchParams({ timeframe });
+  return appendIdentityQueryParams(params, identity);
 }
 
 async function fetchJson<T>(path: string): Promise<T> {

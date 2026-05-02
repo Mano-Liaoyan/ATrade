@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { createSymbolChartHref } from '../lib/instrumentIdentity';
 import { getWatchlistPinKey, type WatchlistSymbol } from '../lib/watchlistClient';
 import type { TrendingSymbol } from '../types/marketData';
 import { MarketLogo } from './MarketLogo';
@@ -77,11 +78,12 @@ export function Watchlist({
             const pinKey = getWatchlistPinKey(watchlistSymbol);
             const isSaving = savingPinKey === pinKey;
             const marketLabel = exchange ? `Market ${exchange}` : 'Market unknown';
+            const chartHref = createSymbolChartHref(watchlistSymbol);
 
             return (
               <li key={pinKey} aria-label={`${watchlistSymbol.symbol} ${marketLabel} ${provider}`}>
                 <div>
-                  <Link className="symbol-link" href={`/symbols/${encodeURIComponent(watchlistSymbol.symbol)}`}>
+                  <Link className="symbol-link" href={chartHref}>
                     {watchlistSymbol.symbol}
                   </Link>
                   <div className="instrument-identity-row">

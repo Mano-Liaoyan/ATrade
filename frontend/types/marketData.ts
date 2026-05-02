@@ -7,12 +7,13 @@ export const SUPPORTED_TIMEFRAMES: Timeframe[] = ['1m', '5m', '1h', '1D'];
 export type MarketDataSymbol = {
   symbol: string;
   name: string;
-  assetClass: AssetClass;
+  assetClass: AssetClass | string;
   exchange: string;
   sector: string;
   lastPrice: number;
   changePercent: number;
   averageVolume?: number;
+  identity?: MarketDataSymbolIdentity | null;
 };
 
 export type TrendingFactorBreakdown = {
@@ -76,6 +77,7 @@ export type CandleSeriesResponse = {
   generatedAt: string;
   candles: OhlcvCandle[];
   source: string;
+  identity?: MarketDataSymbolIdentity | null;
 };
 
 export type MovingAveragePoint = {
@@ -103,6 +105,7 @@ export type IndicatorResponse = {
   rsi: RsiPoint[];
   macd: MacdPoint[];
   source: string;
+  identity?: MarketDataSymbolIdentity | null;
 };
 
 export type MarketDataUpdate = {
@@ -116,4 +119,5 @@ export type MarketDataUpdate = {
   volume: number;
   changePercent: number;
   source: string;
+  identity?: MarketDataSymbolIdentity | null;
 };

@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getTrendingSymbols } from '../lib/marketDataClient';
 import {
-  createWatchlistInstrumentKey,
+  createProvisionalInstrumentKey,
+  getSearchResultIdentity,
+  getTrendingSymbolIdentity,
+  type InstrumentIdentityInput,
+} from '../lib/instrumentIdentity';
+import {
   getWatchlist,
   getWatchlistPinKey,
-  normalizeWatchlistAssetClass,
   pinWatchlistSymbol,
   unpinWatchlistInstrument,
   unpinWatchlistSymbol,
-  type WatchlistInstrumentIdentity,
   type WatchlistResponse,
   type WatchlistSymbol,
   type WatchlistSymbolInput,
@@ -100,7 +103,7 @@ export function TradingWorkspace() {
       }
 
       const input = createWatchlistInput(symbol);
-      const pinKey = createWatchlistInstrumentKey(input);
+      const pinKey = createProvisionalInstrumentKey(input);
       setSavingPinKey(pinKey);
 
       try {
@@ -124,7 +127,7 @@ export function TradingWorkspace() {
       }
 
       const input = createSearchResultWatchlistInput(result);
-      const pinKey = createWatchlistInstrumentKey(input);
+      const pinKey = createProvisionalInstrumentKey(input);
       setSavingPinKey(pinKey);
 
       try {
@@ -245,7 +248,7 @@ async function migrateCachedWatchlistAfterBackendLoad(response: WatchlistRespons
     const backendInstrumentKeys = new Set(response.symbols.map(getWatchlistPinKey));
     for (const cachedSymbol of cachedSymbols) {
       const manualInput = createManualWatchlistInput(cachedSymbol);
-      const manualPinKey = createWatchlistInstrumentKey(manualInput);
+      const manualPinKey = createProvisionalInstrumentKey(manualInput);
       if (!backendInstrumentKeys.has(manualPinKey)) {
         nextResponse = await pinWatchlistSymbol(manualInput);
         backendInstrumentKeys.add(manualPinKey);
@@ -259,27 +262,15 @@ async function migrateCachedWatchlistAfterBackendLoad(response: WatchlistRespons
 
 function createWatchlistInput(symbol: TrendingSymbol): WatchlistSymbolInput {
   return {
-    symbol: symbol.symbol,
-    provider: 'ibkr',
+    ...getTrendingSymbolIdentity(symbol),
     name: symbol.name,
-    exchange: symbol.exchange,
-    currency: 'USD',
-    assetClass: normalizeWatchlistAssetClass(symbol.assetClass),
   };
 }
 
 function createSearchResultWatchlistInput(result: MarketDataSymbolSearchResult): WatchlistSymbolInput {
-  const provider = result.provider || result.identity.provider;
-  const providerSymbolId = result.providerSymbolId ?? result.identity.providerSymbolId;
   return {
-    symbol: getSearchResultSymbol(result),
-    provider,
-    providerSymbolId,
-    ibkrConid: parseIbkrConid(provider, providerSymbolId),
+    ...getSearchResultIdentity(result),
     name: result.name,
-    exchange: result.exchange || result.identity.exchange,
-    currency: result.currency || result.identity.currency,
-    assetClass: normalizeWatchlistAssetClass(result.assetClass || result.identity.assetClass),
   };
 }
 
@@ -292,26 +283,14 @@ function createManualWatchlistInput(symbol: string): WatchlistSymbolInput {
   };
 }
 
-function getSearchResultSymbol(result: MarketDataSymbolSearchResult): string {
-  return (result.symbol || result.identity.symbol).toUpperCase();
-}
-
-function parseIbkrConid(provider: string, providerSymbolId: string | null): number | null {
-  if (provider.toLowerCase() !== 'ibkr' || !providerSymbolId || !/^\d+$/.test(providerSymbolId)) {
-    return null;
-  }
-
-  return Number(providerSymbolId);
-}
-
 function createCachedWatchlistSymbol(symbol: string, sortOrder: number): WatchlistSymbol {
-  const identity: WatchlistInstrumentIdentity = {
+  const identity: InstrumentIdentityInput = {
     symbol,
     provider: 'cache',
     currency: 'USD',
     assetClass: 'STK',
   };
-  const instrumentKey = createWatchlistInstrumentKey(identity);
+  const instrumentKey = createProvisionalInstrumentKey(identity);
 
   return {
     symbol,

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { searchSymbols } from '../lib/marketDataClient';
-import { createWatchlistInstrumentKey, normalizeWatchlistAssetClass } from '../lib/watchlistClient';
+import { createProvisionalInstrumentKey, createSymbolChartHref, getSearchResultIdentity } from '../lib/instrumentIdentity';
 import type { MarketDataSymbolSearchResult } from '../types/marketData';
 import { MarketLogo } from './MarketLogo';
 
@@ -139,12 +139,14 @@ export function SymbolSearch({
       {results.length > 0 ? (
         <ul className="symbol-search-results" aria-label="IBKR stock search results">
           {results.map((result) => {
-            const symbol = getResultSymbol(result);
-            const provider = result.provider || result.identity.provider;
-            const providerSymbolId = result.providerSymbolId ?? result.identity.providerSymbolId;
-            const exchange = result.exchange || result.identity.exchange;
-            const currency = result.currency || result.identity.currency;
-            const assetClass = result.assetClass || result.identity.assetClass;
+            const identity = getSearchResultIdentity(result);
+            const symbol = identity.symbol;
+            const provider = identity.provider;
+            const providerSymbolId = identity.providerSymbolId;
+            const exchange = identity.exchange ?? '';
+            const currency = identity.currency;
+            const assetClass = identity.assetClass;
+            const chartHref = createSymbolChartHref(identity);
             const pinKey = createSearchResultPinKey(result);
             const pinned = pinnedSet.has(pinKey);
             const isSaving = savingPinKey === pinKey;
@@ -154,7 +156,7 @@ export function SymbolSearch({
             return (
               <li key={pinKey} aria-label={accessibleLabel}>
                 <div>
-                  <Link className="symbol-link" href={`/symbols/${encodeURIComponent(symbol)}`}>
+                  <Link className="symbol-link" href={chartHref}>
                     {symbol}
                   </Link>
                   <p>{result.name}</p>
@@ -167,7 +169,7 @@ export function SymbolSearch({
                   </div>
                 </div>
                 <div className="symbol-search-actions">
-                  <Link className="open-chart-link" href={`/symbols/${encodeURIComponent(symbol)}`}>
+                  <Link className="open-chart-link" href={chartHref}>
                     Open
                   </Link>
                   {onTogglePin ? (
@@ -192,29 +194,7 @@ export function SymbolSearch({
 }
 
 function createSearchResultPinKey(result: MarketDataSymbolSearchResult): string {
-  const provider = result.provider || result.identity.provider;
-  const providerSymbolId = result.providerSymbolId ?? result.identity.providerSymbolId;
-  return createWatchlistInstrumentKey({
-    symbol: getResultSymbol(result),
-    provider,
-    providerSymbolId,
-    ibkrConid: parseIbkrConid(provider, providerSymbolId),
-    exchange: result.exchange || result.identity.exchange,
-    currency: result.currency || result.identity.currency,
-    assetClass: normalizeWatchlistAssetClass(result.assetClass || result.identity.assetClass),
-  });
-}
-
-function getResultSymbol(result: MarketDataSymbolSearchResult): string {
-  return (result.symbol || result.identity.symbol).toUpperCase();
-}
-
-function parseIbkrConid(provider: string, providerSymbolId: string | null): number | null {
-  if (provider.toLowerCase() !== 'ibkr' || !providerSymbolId || !/^\d+$/.test(providerSymbolId)) {
-    return null;
-  }
-
-  return Number(providerSymbolId);
+  return createProvisionalInstrumentKey(getSearchResultIdentity(result));
 }
 
 function formatProviderId(provider: string, providerSymbolId: string | null): string {

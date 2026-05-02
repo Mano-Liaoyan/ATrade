@@ -45,12 +45,12 @@
 ---
 
 ### Step 3: Make frontend provisional identity use one adapter
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Frontend identity adapter centralizes provisional watchlist keys, asset-class normalization, IBKR conid parsing, and chart query-string encoding
-- [ ] Workspace/search/trending/watchlist callers use the adapter while backend-owned persisted keys remain authoritative after watchlist responses
-- [ ] Legacy `/symbols/{symbol}` behavior remains compatible and exact identity handoff uses query state when metadata is available
-- [ ] Targeted frontend checks passing
+- [x] Frontend identity adapter centralizes provisional watchlist keys, asset-class normalization, IBKR conid parsing, and chart query-string encoding
+- [x] Workspace/search/trending/watchlist callers use the adapter while backend-owned persisted keys remain authoritative after watchlist responses
+- [x] Legacy `/symbols/{symbol}` behavior remains compatible and exact identity handoff uses query state when metadata is available
+- [x] Targeted frontend checks passing
 
 ---
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { createWatchlistInstrumentKey, normalizeWatchlistAssetClass } from '../lib/watchlistClient';
+import { createProvisionalInstrumentKey, createSymbolChartHref, getTrendingSymbolIdentity } from '../lib/instrumentIdentity';
 import type { TrendingSymbol } from '../types/marketData';
 
 type TrendingListProps = {
@@ -28,7 +28,9 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
 
       <div className="symbol-grid">
         {symbols.map((symbol) => {
+          const identity = getTrendingSymbolIdentity(symbol);
           const pinKey = createTrendingPinKey(symbol);
+          const chartHref = createSymbolChartHref(identity);
           const pinned = pinnedSet.has(pinKey);
           const isSaving = savingPinKey === pinKey;
 
@@ -36,7 +38,7 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
             <article className="symbol-card" key={pinKey}>
               <div className="symbol-card__topline">
                 <div>
-                  <Link className="symbol-link" href={`/symbols/${encodeURIComponent(symbol.symbol)}`}>
+                  <Link className="symbol-link" href={chartHref}>
                     {symbol.symbol}
                   </Link>
                   <p>{symbol.name}</p>
@@ -73,7 +75,7 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
                 <span>Volatility {symbol.factors.volatility.toFixed(2)}%</span>
               </div>
 
-              <Link className="open-chart-link" href={`/symbols/${encodeURIComponent(symbol.symbol)}`}>
+              <Link className="open-chart-link" href={chartHref}>
                 Open chart workspace
               </Link>
             </article>
@@ -85,13 +87,7 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
 }
 
 function createTrendingPinKey(symbol: TrendingSymbol): string {
-  return createWatchlistInstrumentKey({
-    symbol: symbol.symbol,
-    provider: 'ibkr',
-    exchange: symbol.exchange,
-    currency: 'USD',
-    assetClass: normalizeWatchlistAssetClass(symbol.assetClass),
-  });
+  return createProvisionalInstrumentKey(getTrendingSymbolIdentity(symbol));
 }
 
 function formatSourceLabel(source: string | null): string {

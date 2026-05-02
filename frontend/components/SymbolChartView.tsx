@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getCandles, getIndicators } from '../lib/marketDataClient';
+import { normalizeInstrumentIdentity, type InstrumentIdentityInput } from '../lib/instrumentIdentity';
 import { connectMarketDataStream, type MarketDataStreamState, type MarketDataStreamSubscription } from '../lib/marketDataStream';
 import type { CandleSeriesResponse, IndicatorResponse, MarketDataUpdate, OhlcvCandle, Timeframe } from '../types/marketData';
 import { AnalysisPanel } from './AnalysisPanel';
@@ -13,10 +14,15 @@ import { TimeframeSelector } from './TimeframeSelector';
 
 type SymbolChartViewProps = {
   symbol: string;
+  identity?: InstrumentIdentityInput | null;
 };
 
-export function SymbolChartView({ symbol }: SymbolChartViewProps) {
+export function SymbolChartView({ symbol, identity }: SymbolChartViewProps) {
   const normalizedSymbol = symbol.toUpperCase();
+  const chartIdentity = useMemo(
+    () => (identity ? normalizeInstrumentIdentity({ ...identity, symbol: normalizedSymbol }) : null),
+    [identity, normalizedSymbol],
+  );
   const [timeframe, setTimeframe] = useState<Timeframe>('1D');
   const [candles, setCandles] = useState<CandleSeriesResponse | null>(null);
   const [indicators, setIndicators] = useState<IndicatorResponse | null>(null);
@@ -33,8 +39,8 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
 
     try {
       const [candleResponse, indicatorResponse] = await Promise.all([
-        getCandles(normalizedSymbol, timeframe),
-        getIndicators(normalizedSymbol, timeframe),
+        getCandles(normalizedSymbol, timeframe, chartIdentity),
+        getIndicators(normalizedSymbol, timeframe, chartIdentity),
       ]);
       setCandles(candleResponse);
       setIndicators(indicatorResponse);
@@ -45,7 +51,7 @@ export function SymbolChartView({ symbol }: SymbolChartViewProps) {
         setLoading(false);
       }
     }
-  }, [normalizedSymbol, timeframe]);
+  }, [chartIdentity, normalizedSymbol, timeframe]);
 
   useEffect(() => {
     void refreshChartData(true);
