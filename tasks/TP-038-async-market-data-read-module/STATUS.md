@@ -1,6 +1,6 @@
 # TP-038: Deepen the async market-data read module — Status
 
-**Current Step:** Step 3: Update HTTP, SignalR, and analysis callers
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -57,12 +57,12 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Integration tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] FULL test suite passing
+- [x] Integration tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -103,6 +103,8 @@
 | 2026-05-02 15:08 | Step 2 completed | Removed sync-over-async, converted Timescale and IBKR adapters, targeted IBKR/Timescale tests passed (46/46) |
 | 2026-05-02 15:09 | Step 3 started | Updating API, SignalR, and analysis callers to await async market-data reads |
 | 2026-05-02 15:24 | Step 3 completed | API, SignalR, and analysis callers await async read seam; targeted apphost scripts passed |
+| 2026-05-02 15:25 | Step 4 started | Running full test, integration, failure-fix, and build gates |
+| 2026-05-02 15:39 | Step 4 completed | Full tests passed with constrained MSBuild after OOM retry; integration scripts and build passed |
 
 ---
 

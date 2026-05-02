@@ -84,8 +84,9 @@ public sealed class TimescaleMarketDataCacheAsideTests
         var response = result.Value;
 
         Assert.True(result.IsSuccess);
+        Assert.NotNull(response);
         Assert.Same(providerResponse, response);
-        Assert.Equal("ibkr-scanner", response.Source);
+        Assert.Equal("ibkr-scanner", response!.Source);
         Assert.Equal(1, provider.GetTrendingSymbolsCalls);
         Assert.Single(repository.TrendingQueries);
         var written = Assert.Single(repository.WrittenTrendingSnapshots);
