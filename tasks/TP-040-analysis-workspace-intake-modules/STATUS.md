@@ -1,6 +1,6 @@
 # TP-040: Deepen analysis and workspace intake modules — Status
 
-**Current Step:** Step 3: Keep HTTP behavior stable and simplify route code
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -56,12 +56,12 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Integration tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] FULL test suite passing
+- [x] Integration tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -102,6 +102,8 @@
 | 2026-05-02 16:12 | Step 2 completed | Workspaces watchlist intake seam implemented; API watchlist routes delegated; targeted Workspaces tests passed |
 | 2026-05-02 16:13 | Step 3 started | HTTP compatibility and AppHost script verification begun |
 | 2026-05-02 16:22 | Step 3 completed | Analysis/watchlist AppHost contract scripts passed; API maps intake errors explicitly; identity seam contained in Workspaces |
+| 2026-05-02 16:23 | Step 4 started | Full suite, integration scripts, and build verification begun |
+| 2026-05-02 16:34 | Step 4 completed | `dotnet test ATrade.slnx`, affected AppHost scripts, frontend build script, and `dotnet build ATrade.slnx` passed; LEAN runtime script cleanly skipped optional CLI execution |
 
 ---
 
