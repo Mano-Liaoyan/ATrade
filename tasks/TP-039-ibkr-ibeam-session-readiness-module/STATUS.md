@@ -1,6 +1,6 @@
 # TP-039: Deepen the IBKR/iBeam session readiness module — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -65,11 +65,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -84,6 +84,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| iBeam runtime contract safety script treated obvious database password placeholders as suspicious IBKR credentials after TP-036-style runtime placeholders were added. | Fixed the script allowlist for `ATRADE_POSTGRES_PASSWORD` and `ATRADE_TIMESCALEDB_PASSWORD` while preserving IBKR credential/account-id checks. | `tests/apphost/ibeam-runtime-contract-tests.sh` |
+| Broker status, market-data status/read guards, and worker monitoring now share a single IBKR/iBeam readiness result while preserving provider-neutral external states. | Documented in active architecture docs and README. | `docs/architecture/provider-abstractions.md`, `docs/architecture/modules.md`, `docs/architecture/paper-trading-workspace.md`, `README.md` |
 
 ---
 
@@ -105,4 +107,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Check If Affected docs: README runtime surface updated for shared readiness projections; scripts/README.md reviewed and no user-facing runtime command changes were required.

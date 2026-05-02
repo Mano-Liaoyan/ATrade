@@ -56,12 +56,14 @@ Core types:
 
 Current implementation:
 
-- `ATrade.Brokers.Ibkr` implements `IBrokerProvider` through the existing
-  paper-safe IBKR status service.
+- `ATrade.Brokers.Ibkr` implements `IBrokerProvider` by evaluating a shared
+  IBKR/iBeam readiness result and projecting it into the paper-safe broker
+  status contract.
 - `GET /api/broker/ibkr/status` resolves `IBrokerProvider`, not the concrete
   IBKR status service, and preserves the existing JSON shape.
-- `ATrade.Ibkr.Worker` consumes the same provider-neutral status object while
-  still composing the concrete IBKR adapter.
+- `ATrade.Ibkr.Worker` consumes the same shared IBKR/iBeam readiness module for
+  monitoring while API broker status projects that readiness into the
+  provider-neutral status object.
 
 Safety constraints:
 
@@ -223,7 +225,11 @@ Current implementation:
   HTTPS only; remote hosts keep normal certificate validation.
 - It does not read credential environment variables directly. Credential and
   paper-account presence is evaluated through typed gateway configuration and
-  the paper-only guard.
+  the paper-only guard. Broker status, market-data status/read guards, and
+  worker monitoring consume the same normalized IBKR/iBeam readiness result so
+  disabled, credentials-missing, not-configured, transport timeout/unreachable,
+  unauthenticated, authenticated, degraded, error, and rejected-live outcomes
+  stay consistent across provider projections.
 - It translates Client Portal contract search (`/iserver/secdef/search`) plus
   contract detail (`/iserver/secdef/info`) when available, snapshots
   (`/iserver/marketdata/snapshot`), historical bars (`/iserver/marketdata/history`),
