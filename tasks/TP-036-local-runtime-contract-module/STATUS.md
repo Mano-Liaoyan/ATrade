@@ -33,14 +33,14 @@
 ---
 
 ### Step 2: Deepen shared env parsing and resolved contract interface
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand checkboxes when entering this step based on the chosen shared module location and existing contract reader call sites.
 
-- [ ] `ATrade.ServiceDefaults` shared local runtime contract loader added for `.env.template`/`.env` parsing, process overlay, defaults, validation, and secret classification
-- [ ] Local port, AppHost storage, paper trading, and LEAN contract readers adapted to the shared loader with duplicate parser implementations removed
-- [ ] Resolved contract values preserve broker/iBeam, LEAN, database, API/frontend/dashboard behavior while keeping credential-bearing values classified as secret
-- [ ] Targeted .NET contract tests added/passing for overlay, defaults, validation, and secret/non-secret handling
+- [x] `ATrade.ServiceDefaults` shared local runtime contract loader added for `.env.template`/`.env` parsing, process overlay, defaults, validation, and secret classification
+- [x] Local port, AppHost storage, paper trading, and LEAN contract readers adapted to the shared loader with duplicate parser implementations removed
+- [x] Resolved contract values preserve broker/iBeam, LEAN, database, API/frontend/dashboard behavior while keeping credential-bearing values classified as secret
+- [x] Targeted .NET contract tests added/passing for overlay, defaults, validation, and secret/non-secret handling
 
 ---
 
@@ -104,6 +104,11 @@
 | 2026-05-02 16:16 | Step 1 targeted tests | `bash tests/apphost/paper-trading-config-contract-tests.sh && bash tests/start-contract/start-wrapper-tests.sh` passed. |
 | 2026-05-02 16:17 | Step 1 completed | Committed defaults, docs, drift test, and targeted startup/config contract tests are aligned on paper-safe runtime defaults. |
 | 2026-05-02 16:18 | Step 2 hydrated | Chosen shared module location: `src/ATrade.ServiceDefaults`; AppHost contract readers will adapt to that loader while preserving public record shapes. |
+| 2026-05-02 16:28 | Shared loader implemented | Added `src/ATrade.ServiceDefaults/LocalRuntimeContract.cs` with template/.env/process overlays, built-in safe defaults, port/volume validation, resolved settings records, and secret classification for credential/password/account-id values; AppHost project build passed after the shared loader change. |
+| 2026-05-02 16:30 | Contract readers adapted | `LocalDevelopmentPortContractLoader`, AppHost storage, paper-trading, and LEAN contract records now map from `LocalRuntimeContract`; grep confirms duplicate `ParseEnvironmentFile` implementations remain only in the shared loader. |
+| 2026-05-02 16:39 | Resolved contract behavior verified | New ServiceDefaults tests verify overlay order, safe built-in defaults, port/volume validation, frontend URL derivation, LEAN path normalization, and secret classification for database passwords plus IBKR username/password/account id. |
+| 2026-05-02 16:40 | Step 2 targeted .NET tests | `dotnet test tests/ATrade.ServiceDefaults.Tests/ATrade.ServiceDefaults.Tests.csproj --nologo --verbosity minimal` passed (9 tests); `dotnet build src/ATrade.AppHost/ATrade.AppHost.csproj --nologo --verbosity minimal` passed after adapter changes. |
+| 2026-05-02 16:41 | Step 2 completed | Shared ServiceDefaults runtime contract loader owns .NET env parsing/resolution; duplicate AppHost/port parsing was removed or isolated behind adapters. |
 
 ---
 

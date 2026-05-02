@@ -27,6 +27,7 @@
     <Project Path="tests/ATrade.MarketData.Timescale.Tests/ATrade.MarketData.Timescale.Tests.csproj" />
     <Project Path="tests/ATrade.Orders.Tests/ATrade.Orders.Tests.csproj" />
     <Project Path="tests/ATrade.ProviderAbstractions.Tests/ATrade.ProviderAbstractions.Tests.csproj" />
+    <Project Path="tests/ATrade.ServiceDefaults.Tests/ATrade.ServiceDefaults.Tests.csproj" />
     <Project Path="tests/ATrade.Workspaces.Tests/ATrade.Workspaces.Tests.csproj" />
   </Folder>
   <Folder Name="/workers/">

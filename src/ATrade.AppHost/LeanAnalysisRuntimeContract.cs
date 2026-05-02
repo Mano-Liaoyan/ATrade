@@ -1,3 +1,5 @@
+using ATrade.ServiceDefaults;
+
 namespace ATrade.AppHost;
 
 public sealed record LeanAnalysisRuntimeContract(
@@ -12,29 +14,29 @@ public sealed record LeanAnalysisRuntimeContract(
     string ManagedContainerName,
     string ContainerWorkspaceRoot)
 {
-    public const string AnalysisEngineVariableName = "ATRADE_ANALYSIS_ENGINE";
-    public const string RuntimeModeVariableName = "ATRADE_LEAN_RUNTIME_MODE";
-    public const string CliCommandVariableName = "ATRADE_LEAN_CLI_COMMAND";
-    public const string DockerCommandVariableName = "ATRADE_LEAN_DOCKER_COMMAND";
-    public const string DockerImageVariableName = "ATRADE_LEAN_DOCKER_IMAGE";
-    public const string WorkspaceRootVariableName = "ATRADE_LEAN_WORKSPACE_ROOT";
-    public const string TimeoutSecondsVariableName = "ATRADE_LEAN_TIMEOUT_SECONDS";
-    public const string KeepWorkspaceVariableName = "ATRADE_LEAN_KEEP_WORKSPACE";
-    public const string ManagedContainerNameVariableName = "ATRADE_LEAN_MANAGED_CONTAINER_NAME";
-    public const string ContainerWorkspaceRootVariableName = "ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT";
+    public const string AnalysisEngineVariableName = LocalRuntimeEnvironmentVariables.AnalysisEngine;
+    public const string RuntimeModeVariableName = LocalRuntimeEnvironmentVariables.LeanRuntimeMode;
+    public const string CliCommandVariableName = LocalRuntimeEnvironmentVariables.LeanCliCommand;
+    public const string DockerCommandVariableName = LocalRuntimeEnvironmentVariables.LeanDockerCommand;
+    public const string DockerImageVariableName = LocalRuntimeEnvironmentVariables.LeanDockerImage;
+    public const string WorkspaceRootVariableName = LocalRuntimeEnvironmentVariables.LeanWorkspaceRoot;
+    public const string TimeoutSecondsVariableName = LocalRuntimeEnvironmentVariables.LeanTimeoutSeconds;
+    public const string KeepWorkspaceVariableName = LocalRuntimeEnvironmentVariables.LeanKeepWorkspace;
+    public const string ManagedContainerNameVariableName = LocalRuntimeEnvironmentVariables.LeanManagedContainerName;
+    public const string ContainerWorkspaceRootVariableName = LocalRuntimeEnvironmentVariables.LeanContainerWorkspaceRoot;
 
-    public const string EngineNone = "none";
+    public const string EngineNone = LocalRuntimeContractDefaults.AnalysisEngine;
     public const string EngineLean = "Lean";
-    public const string RuntimeModeCli = "cli";
+    public const string RuntimeModeCli = LocalRuntimeContractDefaults.LeanRuntimeMode;
     public const string RuntimeModeDocker = "docker";
-    public const string DefaultCliCommand = "lean";
-    public const string DefaultDockerCommand = "docker";
-    public const string DefaultDockerImage = "quantconnect/lean:latest";
-    public const string DefaultTimeoutSeconds = "45";
-    public const string DefaultKeepWorkspace = "false";
-    public const string DefaultManagedContainerName = "atrade-lean-engine";
-    public const string DefaultContainerWorkspaceRoot = "/workspace";
-    public const string DefaultWorkspaceRootRelativePath = "artifacts/lean-workspaces";
+    public const string DefaultCliCommand = LocalRuntimeContractDefaults.LeanCliCommand;
+    public const string DefaultDockerCommand = LocalRuntimeContractDefaults.LeanDockerCommand;
+    public const string DefaultDockerImage = LocalRuntimeContractDefaults.LeanDockerImage;
+    public const string DefaultTimeoutSeconds = LocalRuntimeContractDefaults.LeanTimeoutSeconds;
+    public const string DefaultKeepWorkspace = LocalRuntimeContractDefaults.LeanKeepWorkspace;
+    public const string DefaultManagedContainerName = LocalRuntimeContractDefaults.LeanManagedContainerName;
+    public const string DefaultContainerWorkspaceRoot = LocalRuntimeContractDefaults.LeanContainerWorkspaceRoot;
+    public const string DefaultWorkspaceRootRelativePath = LocalRuntimeContractDefaults.LeanWorkspaceRoot;
 
     public bool IsLeanSelected => string.Equals(AnalysisEngine, EngineLean, StringComparison.OrdinalIgnoreCase)
         || string.Equals(AnalysisEngine, "lean", StringComparison.OrdinalIgnoreCase);
@@ -60,23 +62,27 @@ public sealed record LeanAnalysisRuntimeContract(
         ArgumentException.ThrowIfNullOrWhiteSpace(contractPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
 
-        var values = LoadMergedContractValues(contractPath);
-        var workspaceRoot = ResolveWorkspaceRoot(
-            ResolveOptionalValue(values, WorkspaceRootVariableName),
-            repositoryRoot);
+        return Load(LocalRuntimeContractLoader.Load(new LocalRuntimeContractLoadOptions(
+            RepositoryRoot: repositoryRoot,
+            ContractPath: contractPath)));
+    }
 
+    public static LeanAnalysisRuntimeContract Load(LocalRuntimeContract runtimeContract)
+    {
+        ArgumentNullException.ThrowIfNull(runtimeContract);
+
+        var lean = runtimeContract.Lean;
         return new LeanAnalysisRuntimeContract(
-            AnalysisEngine: ResolveOptionalValue(values, AnalysisEngineVariableName) ?? EngineNone,
-            RuntimeMode: ResolveOptionalValue(values, RuntimeModeVariableName) ?? RuntimeModeCli,
-            CliCommand: ResolveOptionalValue(values, CliCommandVariableName) ?? DefaultCliCommand,
-            DockerCommand: ResolveOptionalValue(values, DockerCommandVariableName) ?? DefaultDockerCommand,
-            DockerImage: ResolveOptionalValue(values, DockerImageVariableName) ?? DefaultDockerImage,
-            WorkspaceRoot: workspaceRoot,
-            TimeoutSeconds: ResolveOptionalValue(values, TimeoutSecondsVariableName) ?? DefaultTimeoutSeconds,
-            KeepWorkspace: ResolveOptionalValue(values, KeepWorkspaceVariableName) ?? DefaultKeepWorkspace,
-            ManagedContainerName: ResolveOptionalValue(values, ManagedContainerNameVariableName) ?? DefaultManagedContainerName,
-            ContainerWorkspaceRoot: NormalizeContainerWorkspaceRoot(
-                ResolveOptionalValue(values, ContainerWorkspaceRootVariableName) ?? DefaultContainerWorkspaceRoot));
+            AnalysisEngine: lean.AnalysisEngine,
+            RuntimeMode: lean.RuntimeMode,
+            CliCommand: lean.CliCommand,
+            DockerCommand: lean.DockerCommand,
+            DockerImage: lean.DockerImage,
+            WorkspaceRoot: lean.WorkspaceRoot,
+            TimeoutSeconds: lean.TimeoutSeconds,
+            KeepWorkspace: lean.KeepWorkspace,
+            ManagedContainerName: lean.ManagedContainerName,
+            ContainerWorkspaceRoot: lean.ContainerWorkspaceRoot);
     }
 
     public bool TryGetDockerImageReference(out string image, out string tag)
@@ -102,98 +108,5 @@ public sealed record LeanAnalysisRuntimeContract(
         image = DockerImage;
         tag = "latest";
         return true;
-    }
-
-    private static string ResolveWorkspaceRoot(string? configuredWorkspaceRoot, string repositoryRoot)
-    {
-        var rawWorkspaceRoot = string.IsNullOrWhiteSpace(configuredWorkspaceRoot)
-            ? DefaultWorkspaceRootRelativePath
-            : configuredWorkspaceRoot.Trim();
-
-        return Path.IsPathRooted(rawWorkspaceRoot)
-            ? Path.GetFullPath(rawWorkspaceRoot)
-            : Path.GetFullPath(Path.Combine(repositoryRoot, rawWorkspaceRoot));
-    }
-
-    private static string NormalizeContainerWorkspaceRoot(string value)
-    {
-        var trimmed = value.Trim().Replace('\\', '/').TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            return DefaultContainerWorkspaceRoot;
-        }
-
-        return trimmed.StartsWith("/", StringComparison.Ordinal)
-            ? trimmed
-            : $"/{trimmed}";
-    }
-
-    private static Dictionary<string, string> LoadMergedContractValues(string contractPath)
-    {
-        var contractDirectory = Path.GetDirectoryName(contractPath)
-            ?? throw new InvalidOperationException($"Failed to resolve the local LEAN runtime contract directory for '{contractPath}'.");
-        var templatePath = Path.Combine(contractDirectory, ".env.template");
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        if (File.Exists(templatePath) &&
-            !Path.GetFullPath(templatePath).Equals(Path.GetFullPath(contractPath), StringComparison.OrdinalIgnoreCase))
-        {
-            Overlay(values, ParseEnvironmentFile(templatePath));
-        }
-
-        Overlay(values, ParseEnvironmentFile(contractPath));
-        return values;
-    }
-
-    private static void Overlay(IDictionary<string, string> destination, IReadOnlyDictionary<string, string> source)
-    {
-        foreach (var pair in source)
-        {
-            destination[pair.Key] = pair.Value;
-        }
-    }
-
-    private static Dictionary<string, string> ParseEnvironmentFile(string path)
-    {
-        if (!File.Exists(path))
-        {
-            throw new InvalidOperationException($"Failed to load the local LEAN runtime contract file at '{path}'.");
-        }
-
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var rawLine in File.ReadAllLines(path))
-        {
-            var line = rawLine.Trim();
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-            {
-                continue;
-            }
-
-            var separatorIndex = line.IndexOf('=');
-            if (separatorIndex <= 0)
-            {
-                continue;
-            }
-
-            var key = line[..separatorIndex].Trim();
-            var value = line[(separatorIndex + 1)..].Trim().Trim('"', '\'');
-            values[key] = value;
-        }
-
-        return values;
-    }
-
-    private static string? ResolveOptionalValue(IReadOnlyDictionary<string, string> values, string key)
-    {
-        var environmentValue = Environment.GetEnvironmentVariable(key);
-        if (!string.IsNullOrWhiteSpace(environmentValue))
-        {
-            return environmentValue.Trim();
-        }
-
-        return values.TryGetValue(key, out var fileValue) && !string.IsNullOrWhiteSpace(fileValue)
-            ? fileValue.Trim()
-            : null;
     }
 }

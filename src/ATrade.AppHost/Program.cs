@@ -10,10 +10,11 @@ const string timescaleTuneCpuCount = "2";
 const string ibeamInputsMountSource = "./ibeam-inputs";
 const string ibeamInputsMountTarget = "/srv/inputs";
 
-var localPortContract = LocalDevelopmentPortContractLoader.Load();
-var paperTradingContract = PaperTradingEnvironmentContract.Load(localPortContract.LoadedFromPath);
-var leanRuntimeContract = LeanAnalysisRuntimeContract.Load(localPortContract.LoadedFromPath, localPortContract.RepositoryRoot);
-var storageContract = AppHostStorageContract.Load(localPortContract.LoadedFromPath);
+var localRuntimeContract = LocalRuntimeContractLoader.Load();
+var localPortContract = LocalDevelopmentPortContractLoader.FromRuntimeContract(localRuntimeContract);
+var paperTradingContract = PaperTradingEnvironmentContract.Load(localRuntimeContract);
+var leanRuntimeContract = LeanAnalysisRuntimeContract.Load(localRuntimeContract);
+var storageContract = AppHostStorageContract.Load(localRuntimeContract);
 var builder = DistributedApplication.CreateBuilder(args);
 var ibkrUsername = builder.AddParameter("ibkr-username", () => paperTradingContract.IbkrUsername, secret: true);
 var ibkrPassword = builder.AddParameter("ibkr-password", () => paperTradingContract.IbkrPassword, secret: true);
