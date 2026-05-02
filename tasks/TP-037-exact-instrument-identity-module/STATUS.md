@@ -35,12 +35,12 @@
 ---
 
 ### Step 2: Preserve identity through market-data and Timescale flows
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Market-data payload models and IBKR provider populate exact identity on search, trending, candles, indicators, and latest updates
-- [ ] Timescale cache-aside persists and rehydrates provider/market identity metadata for trending, candles, and indicator cache hits
-- [ ] Bare-symbol legacy reads and HTTP paths remain compatible while exact identity query filters are available for backend callers that supply metadata
-- [ ] Targeted market-data/provider/Timescale tests passing
+- [x] Market-data payload models and IBKR provider populate exact identity on search, trending, candles, indicators, and latest updates
+- [x] Timescale cache-aside persists and rehydrates provider/market identity metadata for trending, candles, and indicator cache hits
+- [x] Bare-symbol legacy reads and HTTP paths remain compatible while exact identity query filters are available for backend callers that supply metadata
+- [x] Targeted market-data/provider/Timescale tests passing
 
 ---
 

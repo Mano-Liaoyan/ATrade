@@ -197,7 +197,7 @@ public sealed class ProviderSwapabilityTests
             return true;
         }
 
-        public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error)
+        public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             CandleCallCount++;
             response = new CandleSeriesResponse(
@@ -212,14 +212,14 @@ public sealed class ProviderSwapabilityTests
             return true;
         }
 
-        public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error)
+        public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             response = new IndicatorResponse("TEST", MarketDataTimeframes.OneDay, Array.Empty<MovingAveragePoint>(), Array.Empty<RsiPoint>(), Array.Empty<MacdPoint>());
             error = null;
             return true;
         }
 
-        public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error)
+        public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             update = new MarketDataUpdate("TEST", MarketDataTimeframes.OneDay, DateTimeOffset.UtcNow, 100m, 102m, 99m, 101m, 1_000_000, 1.25m, Identity.Provider);
             error = null;

@@ -9,7 +9,31 @@ public sealed record TimescaleMarketDataSymbol(
     string? Name,
     string? Exchange,
     string? Currency,
-    string? AssetClass);
+    string? AssetClass)
+{
+    public static TimescaleMarketDataSymbol FromIdentity(MarketDataSymbolIdentity identity, string? name = null)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+
+        var exactIdentity = identity.ToExactInstrumentIdentity();
+        return new TimescaleMarketDataSymbol(
+            exactIdentity.Provider,
+            exactIdentity.ProviderSymbolId,
+            exactIdentity.Symbol,
+            name,
+            exactIdentity.Exchange,
+            exactIdentity.Currency,
+            exactIdentity.AssetClass);
+    }
+
+    public MarketDataSymbolIdentity ToMarketDataSymbolIdentity() => MarketDataSymbolIdentity.Create(
+        Symbol,
+        Provider,
+        ProviderSymbolId,
+        AssetClass,
+        Exchange,
+        Currency);
+}
 
 public sealed record TimescaleCandleSeries(
     TimescaleMarketDataSymbol Symbol,
@@ -23,7 +47,11 @@ public sealed record TimescaleFreshCandleSeriesQuery(
     string? Source,
     string Symbol,
     string Timeframe,
-    DateTimeOffset FreshnessCutoffUtc);
+    DateTimeOffset FreshnessCutoffUtc,
+    string? ProviderSymbolId = null,
+    string? Exchange = null,
+    string? Currency = null,
+    string? AssetClass = null);
 
 public sealed record TimescaleTrendingSnapshot(
     string Provider,
@@ -44,4 +72,8 @@ public sealed record TimescaleFreshTrendingSnapshotQuery(
     string Provider,
     string? Source,
     DateTimeOffset FreshnessCutoffUtc,
-    string? Symbol = null);
+    string? Symbol = null,
+    string? ProviderSymbolId = null,
+    string? Exchange = null,
+    string? Currency = null,
+    string? AssetClass = null);

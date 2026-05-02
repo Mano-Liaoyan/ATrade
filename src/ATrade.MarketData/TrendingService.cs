@@ -37,7 +37,8 @@ public sealed class TrendingService
                 $"Price momentum is {Round(priceMomentum)}% over the provider lookback window.",
                 $"Volatility contribution is {Round(volatility)}% from provider OHLC ranges.",
                 "External signal contribution is neutral until a dedicated news provider is configured.",
-            });
+            },
+            symbol.Identity);
     }
 
     private static decimal GetExternalSignalValue(string symbol)

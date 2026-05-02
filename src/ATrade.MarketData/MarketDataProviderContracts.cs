@@ -14,11 +14,11 @@ public interface IMarketDataProvider
 
     bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol);
 
-    bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error);
+    bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
-    bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error);
+    bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
-    bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error);
+    bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 }
 
 public interface IMarketDataStreamingProvider

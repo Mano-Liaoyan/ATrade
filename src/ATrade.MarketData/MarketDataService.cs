@@ -58,7 +58,7 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
         return provider.TryGetSymbol(symbol, out marketSymbol);
     }
 
-    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error)
+    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         response = null;
         if (!TryEnsureProviderAvailable(out error))
@@ -66,10 +66,10 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
             return false;
         }
 
-        return provider.TryGetCandles(symbol, timeframe, out response, out error);
+        return provider.TryGetCandles(symbol, timeframe, out response, out error, identity);
     }
 
-    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error)
+    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         response = null;
         if (!TryEnsureProviderAvailable(out error))
@@ -77,10 +77,10 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
             return false;
         }
 
-        return provider.TryGetIndicators(symbol, timeframe, out response, out error);
+        return provider.TryGetIndicators(symbol, timeframe, out response, out error, identity);
     }
 
-    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error)
+    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         update = null;
         if (!TryEnsureProviderAvailable(out error))
@@ -88,7 +88,7 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
             return false;
         }
 
-        return provider.TryGetLatestUpdate(symbol, timeframe, out update, out error);
+        return provider.TryGetLatestUpdate(symbol, timeframe, out update, out error, identity);
     }
 
     private static bool TryNormalizeSearchRequest(

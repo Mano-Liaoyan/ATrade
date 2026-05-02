@@ -53,6 +53,10 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Equal("Apple Inc.", symbol.Name);
         Assert.Equal("NASDAQ", symbol.Exchange);
         Assert.Equal("Technology", symbol.Sector);
+        Assert.NotNull(symbol.Identity);
+        Assert.Equal("265598", symbol.Identity.ProviderSymbolId);
+        Assert.Equal("NASDAQ", symbol.Identity.Exchange);
+        Assert.Equal("USD", symbol.Identity.Currency);
         Assert.Equal(91.5m, symbol.Score);
         Assert.Equal(["volume spike"], symbol.Reasons);
         Assert.Equal(0, provider.GetTrendingSymbolsCalls);
@@ -81,7 +85,11 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Equal(providerResponse.Source, written.Source);
         Assert.Equal(providerResponse.GeneratedAt, written.GeneratedAtUtc);
         Assert.Equal(providerResponse.Symbols.Count, written.Symbols.Count);
-        Assert.Equal("AAPL", Assert.Single(written.Symbols).Symbol.Symbol);
+        var writtenSymbol = Assert.Single(written.Symbols).Symbol;
+        Assert.Equal("AAPL", writtenSymbol.Symbol);
+        Assert.Equal("265598", writtenSymbol.ProviderSymbolId);
+        Assert.Equal("NASDAQ", writtenSymbol.Exchange);
+        Assert.Equal("USD", writtenSymbol.Currency);
     }
 
     [Fact]
@@ -195,6 +203,37 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Equal("AAPL", query.Symbol);
         Assert.Equal(MarketDataTimeframes.OneDay, query.Timeframe);
         Assert.Equal(now - freshness, query.FreshnessCutoffUtc);
+        Assert.NotNull(response.Identity);
+        Assert.Equal("265598", response.Identity.ProviderSymbolId);
+        Assert.Equal("NASDAQ", response.Identity.Exchange);
+        Assert.Equal("USD", response.Identity.Currency);
+    }
+
+    [Fact]
+    public void TryGetCandlesUsesExactIdentityFiltersWhenProvided()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 22, 0, TimeSpan.Zero);
+        var identity = CreateIdentity();
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            CandleSeries = CreateCandleSeries(now.AddMinutes(-4), source: "ibkr-history"),
+        };
+        var provider = new RecordingMarketDataProvider
+        {
+            ThrowIfCandlesRequested = true,
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var ok = service.TryGetCandles("aapl", MarketDataTimeframes.OneDay, out var response, out var error, identity);
+
+        Assert.True(ok);
+        Assert.Null(error);
+        Assert.NotNull(response);
+        var query = Assert.Single(repository.CandleQueries);
+        Assert.Equal("265598", query.ProviderSymbolId);
+        Assert.Equal("NASDAQ", query.Exchange);
+        Assert.Equal("USD", query.Currency);
+        Assert.Equal(MarketDataAssetClasses.Stock, query.AssetClass);
     }
 
     [Fact]
@@ -223,6 +262,9 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Equal(providerResponse.Source, written.Source);
         Assert.Equal(providerResponse.GeneratedAt, written.GeneratedAtUtc);
         Assert.Equal(providerResponse.Candles.Count, written.Candles.Count);
+        Assert.Equal("265598", written.Symbol.ProviderSymbolId);
+        Assert.Equal("NASDAQ", written.Symbol.Exchange);
+        Assert.Equal("USD", written.Symbol.Currency);
     }
 
     [Fact]
@@ -248,6 +290,10 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Equal("AAPL", response.Symbol);
         Assert.Equal(MarketDataTimeframes.OneDay, response.Timeframe);
         Assert.Equal("timescale-cache:ibkr-history", response.Source);
+        Assert.NotNull(response.Identity);
+        Assert.Equal("265598", response.Identity.ProviderSymbolId);
+        Assert.Equal("NASDAQ", response.Identity.Exchange);
+        Assert.Equal("USD", response.Identity.Currency);
         Assert.Equal(cachedSeries.Candles.Count, response.MovingAverages.Count);
         Assert.Equal(cachedSeries.Candles.Count, response.Rsi.Count);
         Assert.Equal(cachedSeries.Candles.Count, response.Macd.Count);
@@ -334,7 +380,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
             new TimescaleTrendingSnapshotSymbol(
                 new TimescaleMarketDataSymbol(
                     RecordingMarketDataProvider.ProviderName,
-                    ProviderSymbolId: null,
+                    ProviderSymbolId: "265598",
                     Symbol: "AAPL",
                     Name: "Apple Inc.",
                     Exchange: "NASDAQ",
@@ -361,7 +407,8 @@ public sealed class TimescaleMarketDataCacheAsideTests
                 1.23m,
                 91.5m,
                 new TrendingFactorBreakdown(2.1m, 1.2m, 0.8m, 0.4m),
-                ["volume spike"]),
+                ["volume spike"],
+                CreateIdentity()),
         ],
         source);
 
@@ -372,7 +419,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
         string timeframe = MarketDataTimeframes.OneDay) => new(
         new TimescaleMarketDataSymbol(
             RecordingMarketDataProvider.ProviderName,
-            ProviderSymbolId: null,
+            ProviderSymbolId: "265598",
             Symbol: symbol,
             Name: "Apple Inc.",
             Exchange: "NASDAQ",
@@ -392,7 +439,17 @@ public sealed class TimescaleMarketDataCacheAsideTests
         timeframe,
         generatedAtUtc,
         CreateCandles(generatedAtUtc),
-        source);
+        source,
+        CreateIdentity(symbol));
+
+    private static MarketDataSymbolIdentity CreateIdentity(string symbol = "AAPL") => MarketDataSymbolIdentity.Create(
+        symbol,
+        RecordingMarketDataProvider.ProviderName,
+        "265598",
+        MarketDataAssetClasses.Stock,
+        "NASDAQ",
+        "USD",
+        ibkrConid: 265598);
 
     private static IReadOnlyList<OhlcvCandle> CreateCandles(DateTimeOffset generatedAtUtc) =>
     [
@@ -513,7 +570,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
             return false;
         }
 
-        public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error)
+        public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             TryGetCandlesCalls++;
             if (ThrowIfCandlesRequested)
@@ -533,7 +590,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
             return false;
         }
 
-        public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error)
+        public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             TryGetIndicatorsCalls++;
             response = null;
@@ -541,7 +598,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
             return false;
         }
 
-        public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error)
+        public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             update = null;
             error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "Latest updates are not needed by this test.");

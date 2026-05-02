@@ -288,7 +288,7 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
             return false;
         }
 
-        public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error)
+        public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             TryGetCandlesCalls++;
             if (ThrowIfCandlesRequested)
@@ -308,7 +308,7 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
             return false;
         }
 
-        public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error)
+        public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             TryGetIndicatorsCalls++;
             response = null;
@@ -316,7 +316,7 @@ public sealed class TimescaleMarketDataRebootPersistenceTests
             return false;
         }
 
-        public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error)
+        public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
         {
             update = null;
             error = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "Latest updates are not needed by this test.");

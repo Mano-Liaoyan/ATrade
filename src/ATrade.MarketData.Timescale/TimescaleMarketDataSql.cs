@@ -142,6 +142,10 @@ internal static class TimescaleMarketDataSql
                AND symbol = @symbol
                AND timeframe = @timeframe
                AND generated_at_utc >= @freshness_cutoff_utc
+               AND (@provider_symbol_id IS NULL OR provider_symbol_id = @provider_symbol_id)
+               AND (@exchange IS NULL OR exchange = @exchange)
+               AND (@currency IS NULL OR currency = @currency)
+               AND (@asset_class IS NULL OR asset_class = @asset_class)
              GROUP BY source, generated_at_utc
              ORDER BY generated_at_utc DESC, source ASC
              LIMIT 1
@@ -169,6 +173,10 @@ internal static class TimescaleMarketDataSql
          WHERE candle.provider = @provider
            AND candle.symbol = @symbol
            AND candle.timeframe = @timeframe
+           AND (@provider_symbol_id IS NULL OR candle.provider_symbol_id = @provider_symbol_id)
+           AND (@exchange IS NULL OR candle.exchange = @exchange)
+           AND (@currency IS NULL OR candle.currency = @currency)
+           AND (@asset_class IS NULL OR candle.asset_class = @asset_class)
          ORDER BY candle.candle_time_utc ASC;
         """;
 
@@ -242,6 +250,10 @@ internal static class TimescaleMarketDataSql
                AND (@source IS NULL OR source = @source)
                AND generated_at_utc >= @freshness_cutoff_utc
                AND (@symbol IS NULL OR symbol = @symbol)
+               AND (@provider_symbol_id IS NULL OR provider_symbol_id = @provider_symbol_id)
+               AND (@exchange IS NULL OR exchange = @exchange)
+               AND (@currency IS NULL OR currency = @currency)
+               AND (@asset_class IS NULL OR asset_class = @asset_class)
              GROUP BY source, generated_at_utc
              ORDER BY generated_at_utc DESC, source ASC
              LIMIT 1
@@ -270,6 +282,10 @@ internal static class TimescaleMarketDataSql
            AND snapshot.generated_at_utc = latest_snapshot.generated_at_utc
          WHERE snapshot.provider = @provider
            AND (@symbol IS NULL OR snapshot.symbol = @symbol)
+           AND (@provider_symbol_id IS NULL OR snapshot.provider_symbol_id = @provider_symbol_id)
+           AND (@exchange IS NULL OR snapshot.exchange = @exchange)
+           AND (@currency IS NULL OR snapshot.currency = @currency)
+           AND (@asset_class IS NULL OR snapshot.asset_class = @asset_class)
          ORDER BY snapshot.score DESC, snapshot.symbol ASC;
         """;
 }

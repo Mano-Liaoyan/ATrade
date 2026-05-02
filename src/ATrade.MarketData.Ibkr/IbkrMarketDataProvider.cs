@@ -167,14 +167,7 @@ public sealed class IbkrMarketDataProvider(
             contracts
                 .Take(MarketDataSymbolSearchLimits.MaximumLimit)
                 .Select(contract => new MarketDataSymbolSearchResult(
-                    MarketDataSymbolIdentity.Create(
-                        contract.Symbol,
-                        Identity.Provider,
-                        contract.Conid,
-                        contract.AssetClass,
-                        contract.Exchange,
-                        contract.Currency,
-                        TryParseIbkrConid(contract.Conid)),
+                    CreateIdentity(contract),
                     contract.Name,
                     contract.Sector))
                 .ToArray(),
@@ -190,7 +183,7 @@ public sealed class IbkrMarketDataProvider(
             return false;
         }
 
-        if (!TryResolveContract(symbol, out var contract, out _))
+        if (!TryResolveContract(symbol, identity: null, out var contract, out _))
         {
             return false;
         }
@@ -201,7 +194,7 @@ public sealed class IbkrMarketDataProvider(
         return true;
     }
 
-    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error)
+    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         response = null;
         if (!TryEnsureAvailable(out error))
@@ -214,7 +207,7 @@ public sealed class IbkrMarketDataProvider(
             return false;
         }
 
-        if (!TryResolveContract(symbol, out var contract, out error))
+        if (!TryResolveContract(symbol, identity, out var contract, out error))
         {
             return false;
         }
@@ -234,26 +227,26 @@ public sealed class IbkrMarketDataProvider(
             return false;
         }
 
-        response = new CandleSeriesResponse(contract.Symbol, definition.Name, DateTimeOffset.UtcNow, candles, IbkrMarketDataSource.History);
+        response = new CandleSeriesResponse(contract.Symbol, definition.Name, DateTimeOffset.UtcNow, candles, IbkrMarketDataSource.History, CreateIdentity(contract));
         return true;
     }
 
-    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error)
+    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         response = null;
-        if (!TryGetCandles(symbol, timeframe, out var candleResponse, out error) || candleResponse is null)
+        if (!TryGetCandles(symbol, timeframe, out var candleResponse, out error, identity) || candleResponse is null)
         {
             return false;
         }
 
-        response = indicatorService.Calculate(candleResponse.Symbol, candleResponse.Timeframe, candleResponse.Candles) with
+        response = indicatorService.Calculate(candleResponse.Symbol, candleResponse.Timeframe, candleResponse.Candles, candleResponse.Identity) with
         {
             Source = candleResponse.Source,
         };
         return true;
     }
 
-    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error)
+    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         update = null;
         if (!TryEnsureAvailable(out error))
@@ -269,7 +262,7 @@ public sealed class IbkrMarketDataProvider(
             return false;
         }
 
-        if (!TryResolveContract(symbol, out var contract, out error))
+        if (!TryResolveContract(symbol, identity, out var contract, out error))
         {
             return false;
         }
@@ -297,7 +290,8 @@ public sealed class IbkrMarketDataProvider(
             last,
             snapshot.Volume ?? 0,
             Round(snapshot.ChangePercent ?? 0m),
-            IbkrMarketDataSource.Snapshot);
+            IbkrMarketDataSource.Snapshot,
+            CreateIdentity(contract));
         return true;
     }
 
@@ -319,7 +313,7 @@ public sealed class IbkrMarketDataProvider(
         return false;
     }
 
-    private bool TryResolveContract(string symbol, out IbkrContract contract, out MarketDataError? error)
+    private bool TryResolveContract(string symbol, MarketDataSymbolIdentity? identity, out IbkrContract contract, out MarketDataError? error)
     {
         contract = null!;
         error = null;
@@ -335,11 +329,24 @@ public sealed class IbkrMarketDataProvider(
         }
 
         var normalizedSymbol = symbol.Trim().ToUpperInvariant();
-        var found = contracts.FirstOrDefault(candidate => string.Equals(candidate.Symbol, normalizedSymbol, StringComparison.OrdinalIgnoreCase))
+        var requestedProviderSymbolId = string.Equals(identity?.Provider, ProviderIdentity.Provider, StringComparison.OrdinalIgnoreCase)
+            ? identity?.ProviderSymbolId
+            : null;
+        var found = !string.IsNullOrWhiteSpace(requestedProviderSymbolId)
+            ? contracts.FirstOrDefault(candidate => string.Equals(candidate.Conid, requestedProviderSymbolId, StringComparison.OrdinalIgnoreCase))
+            : null;
+        found ??= contracts.FirstOrDefault(candidate => string.Equals(candidate.Symbol, normalizedSymbol, StringComparison.OrdinalIgnoreCase))
             ?? contracts.FirstOrDefault();
         if (found is null)
         {
             error = new MarketDataError("unsupported-symbol", $"IBKR iBeam returned no stock contract for '{symbol}'.");
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedProviderSymbolId)
+            && !string.Equals(found.Conid, requestedProviderSymbolId, StringComparison.OrdinalIgnoreCase))
+        {
+            error = new MarketDataError("unsupported-symbol", $"IBKR iBeam returned no contract {requestedProviderSymbolId} for '{symbol}'.");
             return false;
         }
 
@@ -382,7 +389,8 @@ public sealed class IbkrMarketDataProvider(
             contract.Sector,
             Round(snapshot?.LastPrice ?? 0m),
             Round(snapshot?.ChangePercent ?? 0m),
-            snapshot?.Volume ?? 0);
+            snapshot?.Volume ?? 0,
+            CreateIdentity(contract));
     }
 
     private static TrendingSymbol CreateTrendingSymbol(
@@ -419,7 +427,8 @@ public sealed class IbkrMarketDataProvider(
                 snapshot is null
                     ? "IBKR snapshot data was not available for this scanner row."
                     : "Latest price and volume are from an IBKR iBeam snapshot.",
-            });
+            },
+            CreateIdentity(result));
     }
 
     private static bool TryMapTimeframe(
@@ -515,6 +524,24 @@ public sealed class IbkrMarketDataProvider(
 
     private static T Run<T>(Func<CancellationToken, Task<T>> operation) =>
         operation(CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult();
+
+    private static MarketDataSymbolIdentity CreateIdentity(IbkrContract contract) => MarketDataSymbolIdentity.Create(
+        contract.Symbol,
+        ProviderIdentity.Provider,
+        contract.Conid,
+        contract.AssetClass,
+        contract.Exchange,
+        contract.Currency,
+        TryParseIbkrConid(contract.Conid));
+
+    private static MarketDataSymbolIdentity CreateIdentity(IbkrScannerResult result) => MarketDataSymbolIdentity.Create(
+        result.Symbol,
+        ProviderIdentity.Provider,
+        result.Conid,
+        result.AssetClass,
+        result.Exchange,
+        currency: null,
+        ibkrConid: TryParseIbkrConid(result.Conid));
 
     private static long? TryParseIbkrConid(string? conid) =>
         long.TryParse(conid, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : null;

@@ -83,6 +83,10 @@ public sealed class TimescaleMarketDataRepository(ITimescaleMarketDataDataSource
             command.Parameters.AddWithValue("symbol", NpgsqlDbType.Text, NormalizeRequired(query.Symbol, nameof(query.Symbol)));
             command.Parameters.AddWithValue("timeframe", NpgsqlDbType.Text, NormalizeRequired(query.Timeframe, nameof(query.Timeframe)));
             command.Parameters.AddWithValue("freshness_cutoff_utc", NpgsqlDbType.TimestampTz, ToUtc(query.FreshnessCutoffUtc));
+            command.Parameters.AddWithValue("provider_symbol_id", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.ProviderSymbolId)));
+            command.Parameters.AddWithValue("exchange", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Exchange)));
+            command.Parameters.AddWithValue("currency", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Currency)));
+            command.Parameters.AddWithValue("asset_class", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.AssetClass)));
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             TimescaleMarketDataSymbol? symbol = null;
@@ -185,6 +189,10 @@ public sealed class TimescaleMarketDataRepository(ITimescaleMarketDataDataSource
             command.Parameters.AddWithValue("source", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Source)));
             command.Parameters.AddWithValue("freshness_cutoff_utc", NpgsqlDbType.TimestampTz, ToUtc(query.FreshnessCutoffUtc));
             command.Parameters.AddWithValue("symbol", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Symbol)));
+            command.Parameters.AddWithValue("provider_symbol_id", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.ProviderSymbolId)));
+            command.Parameters.AddWithValue("exchange", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Exchange)));
+            command.Parameters.AddWithValue("currency", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.Currency)));
+            command.Parameters.AddWithValue("asset_class", NpgsqlDbType.Text, NullableValue(NormalizeOptional(query.AssetClass)));
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             string? provider = null;

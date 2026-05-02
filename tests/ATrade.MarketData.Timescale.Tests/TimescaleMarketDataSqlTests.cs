@@ -40,6 +40,10 @@ public sealed class TimescaleMarketDataSqlTests
         Assert.Contains("AND symbol = @symbol", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("AND timeframe = @timeframe", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("AND generated_at_utc >= @freshness_cutoff_utc", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("AND (@provider_symbol_id IS NULL OR provider_symbol_id = @provider_symbol_id)", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("AND (@exchange IS NULL OR exchange = @exchange)", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("AND (@currency IS NULL OR currency = @currency)", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
+        Assert.Contains("AND (@asset_class IS NULL OR asset_class = @asset_class)", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("GROUP BY source, generated_at_utc", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("ORDER BY generated_at_utc DESC, source ASC", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
         Assert.Contains("ORDER BY candle.candle_time_utc ASC", TimescaleMarketDataSql.SelectFreshCandles, StringComparison.Ordinal);
@@ -54,6 +58,10 @@ public sealed class TimescaleMarketDataSqlTests
         Assert.Contains("AND (@source IS NULL OR source = @source)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("AND generated_at_utc >= @freshness_cutoff_utc", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("AND (@symbol IS NULL OR symbol = @symbol)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("AND (@provider_symbol_id IS NULL OR provider_symbol_id = @provider_symbol_id)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("AND (@exchange IS NULL OR exchange = @exchange)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("AND (@currency IS NULL OR currency = @currency)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
+        Assert.Contains("AND (@asset_class IS NULL OR asset_class = @asset_class)", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("GROUP BY source, generated_at_utc", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("ORDER BY generated_at_utc DESC, source ASC", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);
         Assert.Contains("ON snapshot.source = latest_snapshot.source", TimescaleMarketDataSql.SelectFreshTrendingSnapshot, StringComparison.Ordinal);

@@ -7,7 +7,7 @@ public sealed class IndicatorService
     private const int SignalEmaPeriod = 9;
     private const int RsiPeriod = 14;
 
-    public IndicatorResponse Calculate(string symbol, string timeframe, IReadOnlyList<OhlcvCandle> candles)
+    public IndicatorResponse Calculate(string symbol, string timeframe, IReadOnlyList<OhlcvCandle> candles, MarketDataSymbolIdentity? identity = null)
     {
         var movingAverages = new List<MovingAveragePoint>(candles.Count);
         var rsi = new List<RsiPoint>(candles.Count);
@@ -47,7 +47,7 @@ public sealed class IndicatorService
                 Round(macdValue - signalEma)));
         }
 
-        return new IndicatorResponse(symbol, timeframe, movingAverages, rsi, macd);
+        return new IndicatorResponse(symbol, timeframe, movingAverages, rsi, macd, Identity: identity);
     }
 
     private static decimal AverageClose(IReadOnlyList<OhlcvCandle> candles, int index, int window)

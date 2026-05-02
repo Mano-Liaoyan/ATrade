@@ -40,7 +40,8 @@ public sealed record MarketDataSymbol(
     string Sector,
     decimal LastPrice,
     decimal ChangePercent,
-    long AverageVolume);
+    long AverageVolume,
+    MarketDataSymbolIdentity? Identity = null);
 
 public sealed record TrendingFactorBreakdown(
     decimal VolumeSpike,
@@ -58,7 +59,8 @@ public sealed record TrendingSymbol(
     decimal ChangePercent,
     decimal Score,
     TrendingFactorBreakdown Factors,
-    IReadOnlyList<string> Reasons);
+    IReadOnlyList<string> Reasons,
+    MarketDataSymbolIdentity? Identity = null);
 
 public sealed record TrendingSymbolsResponse(
     DateTimeOffset GeneratedAt,
@@ -78,7 +80,8 @@ public sealed record CandleSeriesResponse(
     string Timeframe,
     DateTimeOffset GeneratedAt,
     IReadOnlyList<OhlcvCandle> Candles,
-    string Source = "provider");
+    string Source = "provider",
+    MarketDataSymbolIdentity? Identity = null);
 
 public sealed record MovingAveragePoint(DateTimeOffset Time, decimal Sma20, decimal Sma50);
 
@@ -92,7 +95,8 @@ public sealed record IndicatorResponse(
     IReadOnlyList<MovingAveragePoint> MovingAverages,
     IReadOnlyList<RsiPoint> Rsi,
     IReadOnlyList<MacdPoint> Macd,
-    string Source = "provider");
+    string Source = "provider",
+    MarketDataSymbolIdentity? Identity = null);
 
 public sealed record MarketDataUpdate(
     string Symbol,
@@ -104,7 +108,8 @@ public sealed record MarketDataUpdate(
     decimal Close,
     long Volume,
     decimal ChangePercent,
-    string Source);
+    string Source,
+    MarketDataSymbolIdentity? Identity = null);
 
 public sealed record MarketDataError(string Code, string Message);
 
@@ -116,9 +121,9 @@ public interface IMarketDataService
 
     bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol);
 
-    bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error);
+    bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
-    bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error);
+    bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
-    bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error);
+    bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 }

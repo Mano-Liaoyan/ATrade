@@ -61,9 +61,10 @@ app.MapGet(
     });
 app.MapGet(
     "/api/market-data/{symbol}/candles",
-    (string symbol, string? timeframe, IMarketDataService marketDataService) =>
+    (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService) =>
     {
-        if (marketDataService.TryGetCandles(symbol, timeframe, out var response, out var error))
+        var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
+        if (marketDataService.TryGetCandles(symbol, timeframe, out var response, out var error, identity))
         {
             return Results.Ok(response);
         }
@@ -72,9 +73,10 @@ app.MapGet(
     });
 app.MapGet(
     "/api/market-data/{symbol}/indicators",
-    (string symbol, string? timeframe, IMarketDataService marketDataService) =>
+    (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService) =>
     {
-        if (marketDataService.TryGetIndicators(symbol, timeframe, out var response, out var error))
+        var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
+        if (marketDataService.TryGetIndicators(symbol, timeframe, out var response, out var error, identity))
         {
             return Results.Ok(response);
         }
@@ -243,6 +245,32 @@ static MarketDataSymbolIdentity? CreateSymbolIdentityFromCode(string? symbolCode
     return string.IsNullOrWhiteSpace(symbolCode)
         ? null
         : MarketDataSymbolIdentity.Create(symbolCode, "market-data-provider", null, MarketDataAssetClasses.Stock, "UNKNOWN", "USD");
+}
+
+static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
+    string symbol,
+    string? provider,
+    string? providerSymbolId,
+    string? exchange,
+    string? currency,
+    string? assetClass)
+{
+    if (string.IsNullOrWhiteSpace(provider)
+        && string.IsNullOrWhiteSpace(providerSymbolId)
+        && string.IsNullOrWhiteSpace(exchange)
+        && string.IsNullOrWhiteSpace(currency)
+        && string.IsNullOrWhiteSpace(assetClass))
+    {
+        return null;
+    }
+
+    return MarketDataSymbolIdentity.Create(
+        symbol,
+        string.IsNullOrWhiteSpace(provider) ? "market-data-provider" : provider,
+        providerSymbolId,
+        assetClass,
+        exchange,
+        currency);
 }
 
 static MarketDataSymbolIdentity ResolveSymbolIdentity(IMarketDataService marketDataService, CandleSeriesResponse candleSeries)
