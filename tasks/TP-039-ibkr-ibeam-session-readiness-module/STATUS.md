@@ -1,6 +1,6 @@
 # TP-039: Deepen the IBKR/iBeam session readiness module — Status
 
-**Current Step:** Step 3: Preserve transport, auth, and redaction safety
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -55,12 +55,12 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Integration tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] FULL test suite passing
+- [x] Integration tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
