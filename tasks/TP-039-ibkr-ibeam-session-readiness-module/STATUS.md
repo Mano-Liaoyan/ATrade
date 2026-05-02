@@ -23,14 +23,14 @@
 ---
 
 ### Step 1: Create the shared IBKR/iBeam readiness interface
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expanded after inspecting current broker status, gateway client, transport, and broker tests. The shared result must normalize preflight failures, gateway session states, timeout/unreachable/error diagnostics, and redaction without changing external broker status contracts.
 
-- [ ] Normalized readiness result and service evaluate paper guard, integration, credentials/account id, iBeam image/port/url, auth status, transport errors/timeouts, and safe diagnostics
-- [ ] New readiness matrix test file covers disabled, missing credentials/account id, missing iBeam contract/url, unreachable, unauthenticated, authenticated, degraded/error, rejected-live, timeout, and redaction cases
-- [ ] Existing provider-neutral broker status states, booleans, capabilities, and safe messages preserved through readiness projection
-- [ ] Targeted broker tests passing
+- [x] Normalized readiness result and service evaluate paper guard, integration, credentials/account id, iBeam image/port/url, auth status, transport errors/timeouts, and safe diagnostics
+- [x] New readiness matrix test file covers disabled, missing credentials/account id, missing iBeam contract/url, unreachable, unauthenticated, authenticated, degraded/error, rejected-live, timeout, and redaction cases
+- [x] Existing provider-neutral broker status states, booleans, capabilities, and safe messages preserved through readiness projection
+- [x] Targeted broker tests passing
 
 ---
 
