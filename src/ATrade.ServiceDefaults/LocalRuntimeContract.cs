@@ -244,8 +244,22 @@ public static class LocalRuntimeContractLoader
         var ibkrUsername = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.IbkrUsername, LocalRuntimeContractDefaults.IbkrUsername);
         var ibkrPassword = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.IbkrPassword, LocalRuntimeContractDefaults.IbkrPassword);
         var paperAccountId = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.IbkrPaperAccountId, LocalRuntimeContractDefaults.IbkrPaperAccountId);
-        var frontendApiBaseUrl = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.FrontendApiBaseUrl, $"http://127.0.0.1:{apiHttpPort}");
+        var derivedFrontendApiBaseUrl = $"http://127.0.0.1:{apiHttpPort}";
+        var frontendApiBaseUrl = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.FrontendApiBaseUrl, derivedFrontendApiBaseUrl);
+        if (apiHttpPort != LocalRuntimeContractDefaults.ApiHttpPort &&
+            string.Equals(frontendApiBaseUrl, LocalRuntimeContractDefaults.FrontendApiBaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            frontendApiBaseUrl = derivedFrontendApiBaseUrl;
+            SetResolvedValue(resolvedValues, LocalRuntimeEnvironmentVariables.FrontendApiBaseUrl, frontendApiBaseUrl);
+        }
+
         var nextPublicApiBaseUrl = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.NextPublicApiBaseUrl, frontendApiBaseUrl);
+        if (!string.Equals(frontendApiBaseUrl, LocalRuntimeContractDefaults.FrontendApiBaseUrl, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(nextPublicApiBaseUrl, LocalRuntimeContractDefaults.NextPublicApiBaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            nextPublicApiBaseUrl = frontendApiBaseUrl;
+            SetResolvedValue(resolvedValues, LocalRuntimeEnvironmentVariables.NextPublicApiBaseUrl, nextPublicApiBaseUrl);
+        }
         var marketDataCacheFreshnessMinutes = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.MarketDataCacheFreshnessMinutes, LocalRuntimeContractDefaults.MarketDataCacheFreshnessMinutes);
         var analysisEngine = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.AnalysisEngine, LocalRuntimeContractDefaults.AnalysisEngine);
         var leanRuntimeMode = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.LeanRuntimeMode, LocalRuntimeContractDefaults.LeanRuntimeMode);

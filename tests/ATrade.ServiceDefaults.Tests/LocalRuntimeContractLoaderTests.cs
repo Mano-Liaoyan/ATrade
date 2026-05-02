@@ -15,6 +15,8 @@ public sealed class LocalRuntimeContractLoaderTests
 {{LocalRuntimeEnvironmentVariables.BrokerIntegrationEnabled}}=false
 {{LocalRuntimeEnvironmentVariables.IbkrUsername}}=IBKR_USERNAME
 {{LocalRuntimeEnvironmentVariables.IbkrPassword}}=IBKR_PASSWORD
+{{LocalRuntimeEnvironmentVariables.FrontendApiBaseUrl}}=http://127.0.0.1:5181
+{{LocalRuntimeEnvironmentVariables.NextPublicApiBaseUrl}}=http://127.0.0.1:5181
 {{LocalRuntimeEnvironmentVariables.LeanWorkspaceRoot}}=template-lean-workspace
 {{LocalRuntimeEnvironmentVariables.LeanContainerWorkspaceRoot}}=template-workspace
 """);

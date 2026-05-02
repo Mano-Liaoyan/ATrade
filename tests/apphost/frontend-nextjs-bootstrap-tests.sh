@@ -176,6 +176,8 @@ assert_apphost_manifest_preserves_frontend_resource() {
   assert_file_contains "$manifest_path" '"api"'
   assert_file_contains "$manifest_path" '"frontend"'
   assert_file_contains "$manifest_path" '"NODE_ENV": "development"'
+  assert_file_contains "$manifest_path" "\"ATRADE_FRONTEND_API_BASE_URL\": \"http://127.0.0.1:$ATRADE_API_HTTP_PORT\""
+  assert_file_contains "$manifest_path" "\"NEXT_PUBLIC_ATRADE_API_BASE_URL\": \"http://127.0.0.1:$ATRADE_API_HTTP_PORT\""
   assert_file_contains "$manifest_path" "\"targetPort\": $ATRADE_APPHOST_FRONTEND_HTTP_PORT"
   assert_file_contains "$manifest_path" '"external": true'
   assert_file_contains "$manifest_path" '"PORT": "{frontend.bindings.http.targetPort}"'

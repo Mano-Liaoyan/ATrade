@@ -1,6 +1,6 @@
 # TP-036: Deepen the local runtime contract module — Status
 
-**Current Step:** Step 2: Deepen shared env parsing and resolved contract interface
+**Current Step:** Step 3: Project resolved contract values into startup shims and AppHost
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 3
@@ -45,12 +45,12 @@
 ---
 
 ### Step 3: Project resolved contract values into startup shims and AppHost
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Startup shims and AppHost use consistent resolved defaults
-- [ ] `start run` contract preserved on Unix and Windows shims
-- [ ] AppHost environment handoff preserves broker/iBeam, LEAN, database, API, and frontend behavior
-- [ ] Targeted AppHost/start-contract tests passing
+- [x] Startup shims and AppHost use consistent resolved defaults
+- [x] `start run` contract preserved on Unix and Windows shims
+- [x] AppHost environment handoff preserves broker/iBeam, LEAN, database, API, and frontend behavior
+- [x] Targeted AppHost/start-contract tests passing
 
 ---
 
@@ -109,6 +109,12 @@
 | 2026-05-02 16:39 | Resolved contract behavior verified | New ServiceDefaults tests verify overlay order, safe built-in defaults, port/volume validation, frontend URL derivation, LEAN path normalization, and secret classification for database passwords plus IBKR username/password/account id. |
 | 2026-05-02 16:40 | Step 2 targeted .NET tests | `dotnet test tests/ATrade.ServiceDefaults.Tests/ATrade.ServiceDefaults.Tests.csproj --nologo --verbosity minimal` passed (9 tests); `dotnet build src/ATrade.AppHost/ATrade.AppHost.csproj --nologo --verbosity minimal` passed after adapter changes. |
 | 2026-05-02 16:41 | Step 2 completed | Shared ServiceDefaults runtime contract loader owns .NET env parsing/resolution; duplicate AppHost/port parsing was removed or isolated behind adapters. |
+| 2026-05-02 16:42 | Step 3 started | Projecting resolved runtime contract values through Unix/Windows shims and AppHost environment handoff. |
+| 2026-05-02 16:51 | Shims/AppHost default projection updated | Unix and PowerShell local-env loaders now overlay `.env.template` then ignored `.env` while preserving process-env overrides; AppHost uses shared resolved values/constants for API port, market-data freshness, frontend API URLs, and dashboard-related startup behavior. `bash -n`, AppHost build, and ServiceDefaults tests passed after these changes. |
+| 2026-05-02 16:57 | `start run` contract verified | Updated start-contract assertions for the shared loader path and local-env overlay behavior; `bash tests/start-contract/start-wrapper-tests.sh` passed. Local `pwsh` remains unavailable, so Windows wrapper runtime smoke remains CI/harness coverage. |
+| 2026-05-02 17:05 | AppHost handoff verified | AppHost now explicitly passes resolved API port and market-data cache freshness to `api`, preserves secret parameters for broker/iBeam and database passwords, keeps LEAN env projection via the shared loader, and projects frontend API URLs from the resolved API port. AppHost worker, infrastructure manifest, frontend bootstrap, and LEAN Aspire runtime contract tests passed. |
+| 2026-05-02 17:06 | Step 3 targeted tests | Passed: `bash tests/start-contract/start-wrapper-tests.sh`, `bash tests/apphost/apphost-worker-resource-wiring-tests.sh`, `bash tests/apphost/apphost-infrastructure-manifest-tests.sh`, `bash tests/apphost/frontend-nextjs-bootstrap-tests.sh`, and `bash tests/apphost/lean-aspire-runtime-tests.sh`. |
+| 2026-05-02 17:07 | Step 3 completed | Startup shims and AppHost handoff now use the shared resolved runtime contract and targeted start/AppHost contract tests pass. |
 
 ---
 

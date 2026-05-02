@@ -30,6 +30,8 @@ publish_apphost_manifest() {
   local gateway_url="${5:-https://127.0.0.1:5000}"
   local gateway_port="${6:-5000}"
 
+  ATRADE_API_HTTP_PORT=5181 \
+  ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES=30 \
   ATRADE_BROKER_INTEGRATION_ENABLED="$integration_enabled" \
   ATRADE_BROKER_ACCOUNT_MODE=Paper \
   ATRADE_IBKR_GATEWAY_URL="$gateway_url" \
@@ -115,6 +117,8 @@ expected_api_env = {
     "TIMESCALEDB_HOST": "{timescaledb.bindings.tcp.host}",
     "REDIS_HOST": "{redis.bindings.tcp.host}",
     "NATS_HOST": "{nats.bindings.tcp.host}",
+    "ATRADE_API_HTTP_PORT": "5181",
+    "ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES": "30",
     "ATRADE_BROKER_INTEGRATION_ENABLED": "false",
     "ATRADE_BROKER_ACCOUNT_MODE": "Paper",
     "ATRADE_IBKR_GATEWAY_URL": "https://127.0.0.1:5000",

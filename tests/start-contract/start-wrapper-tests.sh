@@ -160,6 +160,43 @@ run_with_local_contract_environment() {
     "$@"
 }
 
+assert_local_env_loader_overlays_template_and_preserves_process_environment() {
+  capture_original_env
+
+  cat >"$repo_root/.env" <<'EOF'
+ATRADE_API_HTTP_PORT=6198
+ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=6098
+EOF
+
+  local loader_output
+  loader_output="$(
+    env \
+      -u ATRADE_FRONTEND_DIRECT_HTTP_PORT \
+      -u ATRADE_APPHOST_FRONTEND_HTTP_PORT \
+      -u ATRADE_ASPIRE_DASHBOARD_HTTP_PORT \
+      ATRADE_API_HTTP_PORT=7198 \
+      /usr/bin/bash -c '
+        set -euo pipefail
+        repo_root="$1"
+        . "$repo_root/scripts/local-env.sh"
+        atrade_load_local_port_contract "$repo_root"
+        printf "__ATRADE_PORT_CONTRACT_PATH__=%s\n" "${ATRADE_PORT_CONTRACT_PATH-}"
+        printf "__ATRADE_API_HTTP_PORT__=%s\n" "${ATRADE_API_HTTP_PORT-}"
+        printf "__ATRADE_FRONTEND_DIRECT_HTTP_PORT__=%s\n" "${ATRADE_FRONTEND_DIRECT_HTTP_PORT-}"
+        printf "__ATRADE_APPHOST_FRONTEND_HTTP_PORT__=%s\n" "${ATRADE_APPHOST_FRONTEND_HTTP_PORT-}"
+        printf "__ATRADE_ASPIRE_DASHBOARD_HTTP_PORT__=%s\n" "${ATRADE_ASPIRE_DASHBOARD_HTTP_PORT-}"
+        printf "__ATRADE_BROKER_INTEGRATION_ENABLED__=%s\n" "${ATRADE_BROKER_INTEGRATION_ENABLED-}"
+      ' _ "$repo_root"
+  )"
+
+  assert_contains "$loader_output" "__ATRADE_PORT_CONTRACT_PATH__=$repo_root/.env"
+  assert_contains "$loader_output" '__ATRADE_API_HTTP_PORT__=7198'
+  assert_contains "$loader_output" '__ATRADE_FRONTEND_DIRECT_HTTP_PORT__=3111'
+  assert_contains "$loader_output" '__ATRADE_APPHOST_FRONTEND_HTTP_PORT__=3000'
+  assert_contains "$loader_output" '__ATRADE_ASPIRE_DASHBOARD_HTTP_PORT__=6098'
+  assert_contains "$loader_output" '__ATRADE_BROKER_INTEGRATION_ENABLED__=false'
+}
+
 install_run_stub() {
   local run_script_path="$repo_root/scripts/start.run.sh"
 
@@ -437,7 +474,8 @@ main() {
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'Aspire.Hosting.JavaScript'
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'ATrade.Api.csproj'
   assert_file_contains "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" 'ATrade.ServiceDefaults.csproj'
-  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'LocalDevelopmentPortContractLoader.Load()'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'LocalRuntimeContractLoader.Load()'
+  assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'LocalDevelopmentPortContractLoader.FromRuntimeContract(localRuntimeContract)'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'DistributedApplication.CreateBuilder(args)'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddProject<Projects.ATrade_Api>("api")'
   assert_file_contains "$repo_root/src/ATrade.AppHost/Program.cs" 'AddJavaScriptApp("frontend", localPortContract.FrontendDirectory, "dev")'
@@ -462,6 +500,7 @@ main() {
 
   assert_start_run_dispatches
   assert_start_run_script_failure_paths
+  assert_local_env_loader_overlays_template_and_preserves_process_environment
   assert_start_run_script_loads_dashboard_port_contract
   assert_apphost_launch_profile_bootstraps_runtime
   assert_start_run_dashboard_port_smoke

@@ -8,39 +8,57 @@ atrade_load_local_port_contract() {
   local raw_line=''
   local key=''
   local value=''
+  local contract_file=''
+  local -a contract_files=()
+  local -A contract_values=()
 
   if [[ -f "$preferred_path" ]]; then
     contract_path="$preferred_path"
   fi
 
-  if [[ ! -f "$contract_path" ]]; then
-    printf 'Missing local port contract file at %s\n' "$contract_path" >&2
+  if [[ -f "$fallback_path" ]]; then
+    contract_files+=("$fallback_path")
+  fi
+
+  if [[ -f "$preferred_path" ]]; then
+    contract_files+=("$preferred_path")
+  fi
+
+  if [[ "${#contract_files[@]}" -eq 0 ]]; then
+    printf 'Missing local port contract file at %s
+' "$fallback_path" >&2
     return 1
   fi
 
   export ATRADE_REPO_ROOT="$repo_root"
   export ATRADE_PORT_CONTRACT_PATH="$contract_path"
 
-  while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
-    if [[ "$raw_line" =~ ^[[:space:]]*$ || "$raw_line" =~ ^[[:space:]]*# ]]; then
-      continue
-    fi
+  for contract_file in "${contract_files[@]}"; do
+    while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+      if [[ "$raw_line" =~ ^[[:space:]]*$ || "$raw_line" =~ ^[[:space:]]*# ]]; then
+        continue
+      fi
 
-    key="${raw_line%%=*}"
-    value="${raw_line#*=}"
-    key="${key//[$'\t\r ']/}"
-    value="${value%$'\r'}"
-    value="${value%\"}"
-    value="${value#\"}"
-    value="${value%\'}"
-    value="${value#\'}"
+      key="${raw_line%%=*}"
+      value="${raw_line#*=}"
+      key="${key//[$'\t\r ']/}"
+      value="${value%$'\r'}"
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
 
-    if [[ -z "$key" ]]; then
-      continue
-    fi
+      if [[ -z "$key" || "$raw_line" != *'='* ]]; then
+        continue
+      fi
 
+      contract_values["$key"]="$value"
+    done <"$contract_file"
+  done
+
+  for key in "${!contract_values[@]}"; do
     if [[ -z "${!key+x}" ]]; then
-      export "$key=$value"
+      export "$key=${contract_values[$key]}"
     fi
-  done <"$contract_path"
+  done
 }
