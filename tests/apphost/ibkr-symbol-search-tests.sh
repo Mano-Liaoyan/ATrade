@@ -119,7 +119,7 @@ assert_search_contract_source() {
   assert_file_contains "$repo_root/src/ATrade.MarketData/MarketDataService.cs" 'MarketDataSymbolSearchLimits.MaximumLimit'
   assert_file_contains "$repo_root/src/ATrade.MarketData/MarketDataProviderModels.cs" 'string Provider'
   assert_file_contains "$repo_root/src/ATrade.MarketData/MarketDataProviderModels.cs" 'string Currency'
-  assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs" 'new MarketDataSymbolIdentity'
+  assert_file_contains "$repo_root/src/ATrade.MarketData.Ibkr/IbkrMarketDataProvider.cs" 'MarketDataSymbolIdentity.Create'
   assert_file_contains "$repo_root/tests/ATrade.MarketData.Ibkr.Tests/IbkrMarketDataProviderTests.cs" 'Assert.Equal("NASDAQ", searchMatch.Identity.Exchange)'
   assert_file_contains "$repo_root/tests/ATrade.MarketData.Ibkr.Tests/IbkrMarketDataProviderTests.cs" 'Assert.Equal("USD", searchMatch.Identity.Currency)'
   assert_file_contains "$repo_root/tests/ATrade.MarketData.Ibkr.Tests/IbkrMarketDataProviderTests.cs" 'Assert.Equal("265598", searchMatch.Identity.ProviderSymbolId)'
