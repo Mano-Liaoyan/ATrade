@@ -109,6 +109,8 @@
 | 2026-05-02 16:35 | Step 5 started | Documentation updates and delivery notes begun |
 | 2026-05-02 16:43 | Step 5 completed | Architecture docs updated; affected docs reviewed; discoveries logged |
 | 2026-05-02 16:43 | Task completed | All TP-040 steps complete |
+| 2026-05-02 15:57 | Worker iter 1 | done in 787s, tools: 154 |
+| 2026-05-02 15:57 | Task complete | .DONE created |
 
 ---
 
