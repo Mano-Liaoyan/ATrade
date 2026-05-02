@@ -146,7 +146,8 @@ To enable LEAN locally, copy `.env.template` to ignored `.env` and set
 override `ATRADE_LEAN_DOCKER_IMAGE` with a LEAN engine image such as
 `quantconnect/lean:latest`, and start through `./start run`; the Aspire graph
 then shows a `lean-engine` resource and mounts `ATRADE_LEAN_WORKSPACE_ROOT` into
-that container at `ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT`. The API receives only
+that container at `ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT`. AppHost resolves these
+settings through the shared local runtime contract loader; the API receives only
 these non-secret LEAN settings and invokes the engine launcher directly inside
 the managed container. CLI mode remains available for users who already have a
 usable LEAN CLI workspace by keeping `ATRADE_LEAN_RUNTIME_MODE=cli`, installing

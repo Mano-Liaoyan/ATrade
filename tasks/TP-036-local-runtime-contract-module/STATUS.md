@@ -1,7 +1,7 @@
 # TP-036: Deepen the local runtime contract module — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-02
 **Review Level:** 3
 **Review Counter:** 0
@@ -65,11 +65,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,7 @@
 |-----------|-------------|----------|
 | Prompt/file-scope references `scripts/start.run.cmd`, but the repository's committed Windows cmd shim is root `start.cmd`; `scripts/start.run.ps1` is the delegated Windows script. | Treat root `start.cmd` plus `scripts/start.run.ps1` as the Windows cmd/PowerShell startup surface unless implementation discovers a real need for a new delegated cmd script. | Preflight / `scripts/README.md` planned layout |
 | Default drift found in `.env.template`: ports use high lane values (`15181`/`13111`/`13000`/dashboard `10001`), broker integration defaults `true`, iBeam host URL/port use `15000`, frontend API URLs use `15181`, and cache freshness is `10`; docs and tests expect safe shared defaults (`5181`/`3111`/`3000`/dashboard `0`, broker `false`, iBeam `https://127.0.0.1:5000`, cache freshness `30`). | Restore `.env.template` to documented/tested paper-safe defaults and add a drift test so future changes fail fast. | `.env.template`, `README.md`, `scripts/README.md`, `tests/start-contract/start-wrapper-tests.sh`, `tests/apphost/paper-trading-config-contract-tests.sh`, architecture docs |
+| Long AppHost/start-contract smoke runs can leave worktree AppHost/API/worker processes and MSBuild node-reuse workers behind; this caused transient `MSB4166` child-node exits during the build gate. | Cleaned worktree processes and ran `dotnet build-server shutdown`; hardened the start-wrapper `.env` fixture cleanup so ignored `.env` files are not left behind. | Step 4 verification / `tests/start-contract/start-wrapper-tests.sh` |
 
 ---
 
@@ -123,6 +124,11 @@
 | 2026-05-02 17:26 | Build gate | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings and 0 errors after cleanup. |
 | 2026-05-02 17:27 | Step 4 completed | Full test suite, required integration/contract scripts, failure cleanup, and solution build gate passed. |
 | 2026-05-02 17:29 | Start-contract fixture cleanup fix | Fixed `tests/start-contract/start-wrapper-tests.sh` so repeated local `.env` writes do not treat a test-created `.env` as the user's original file; reran `bash tests/start-contract/start-wrapper-tests.sh` and confirmed no `.env` remains afterward. |
+| 2026-05-02 17:30 | Step 5 started | Updating and reviewing delivery documentation for the shared local runtime contract module. |
+| 2026-05-02 17:34 | Must-update docs modified | Updated `scripts/README.md`, `README.md`, `docs/architecture/overview.md`, and `docs/architecture/paper-trading-workspace.md` to document the shared ServiceDefaults runtime contract loader, overlay precedence, safe defaults, AppHost projection, and secret classification. |
+| 2026-05-02 17:35 | Check-if-affected docs reviewed | Updated `docs/architecture/analysis-engines.md` for LEAN settings resolved through the shared runtime contract and `docs/architecture/modules.md` for the new ServiceDefaults contract seam; reviewed `PLAN.md` and no material wording change was needed. |
+| 2026-05-02 17:36 | Discoveries logged | Discovery table records prompt path mismatch, committed default drift, and verification cleanup findings. |
+| 2026-05-02 17:37 | Step 5 completed | Delivery docs updated/reviewed and discoveries logged. Task complete. |
 
 ---
 

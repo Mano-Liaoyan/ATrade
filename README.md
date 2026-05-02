@@ -45,7 +45,10 @@ API, worker, frontend, and local infrastructure. Local bind-port overrides,
 including the optional fixed Aspire dashboard UI port
 (`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback) and
 AppHost Postgres/TimescaleDB data-volume/password overrides, are kept in ignored
-`.env` and documented in `scripts/README.md`.
+`.env` and documented in `scripts/README.md`. The .NET hosts resolve the local
+runtime contract through `ATrade.ServiceDefaults`, which overlays
+`.env.template`, ignored `.env`, and process environment values while keeping
+credential-bearing values classified for Aspire secret-parameter handoff.
 
 ## Current Runtime Surface
 

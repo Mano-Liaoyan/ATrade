@@ -108,10 +108,13 @@ supported platform:
 
 All three wrappers must resolve to the same behavior: launch the Aspire
 AppHost located under `src/ATrade.AppHost`. The AppHost is the only place
-that knows how to wire processes to infrastructure. The human-facing Aspire
-dashboard UI keeps the safe ephemeral loopback default (`0`) unless ignored
-`.env` sets `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` to a non-zero fixed local port;
-the dashboard OTLP endpoint remains ephemeral.
+that knows how to wire processes to infrastructure. Local runtime values are
+resolved once through the shared `ATrade.ServiceDefaults` contract loader, which
+overlays `.env.template`, ignored `.env`, and process environment variables
+before AppHost projects safe values into child resources. The human-facing
+Aspire dashboard UI keeps the safe ephemeral loopback default (`0`) unless
+ignored `.env` sets `ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` to a non-zero fixed local
+port; the dashboard OTLP endpoint remains ephemeral.
 
 Reserved-but-not-yet-implemented subcommands (`test`, `build`, `lint`,
 `fmt`, `agents:dispatch`, `plans:check`, `docs:check`) are enumerated in
@@ -143,11 +146,12 @@ architecture the AppHost is responsible for:
   the `timescaledb` data directory with `ATRADE_TIMESCALEDB_DATA_VOLUME` plus a
   stable `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data
   cache rows survive AppHost reboots, forwards the safe paper-trading IBKR/iBeam
-  environment contract into both .NET
-  processes using redacted Aspire parameters for credential-bearing values, and
-  only declares an optional `ibkr-gateway` `voyz/ibeam:latest` container when
-  broker integration is enabled and fake credential placeholders have been
-  replaced in ignored `.env`. The optional iBeam container also receives a
+  environment contract plus market-data cache freshness/API port values into the
+  API and worker from the shared local runtime contract, uses redacted Aspire
+  parameters for credential-bearing values, and only declares an optional
+  `ibkr-gateway` `voyz/ibeam:latest` container when broker integration is
+  enabled and fake credential placeholders have been replaced in ignored `.env`.
+  The optional iBeam container also receives a
   read-only repo-local inputs config so Client Portal accepts the loopback/private
   Docker bridge caller addresses used by Aspire published-port requests. When
   `ATRADE_ANALYSIS_ENGINE=Lean` and `ATRADE_LEAN_RUNTIME_MODE=docker`, the

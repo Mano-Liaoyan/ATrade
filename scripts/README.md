@@ -107,6 +107,15 @@ now come from a repo-level `.env` contract.
 - Store any real broker usernames, passwords, tokens, session cookies, or real account identifiers only in that ignored `.env` (or a separate local secret source), never in committed files.
 - When `.env` is absent, AppHost, direct API startup, and the shell test helpers fall back to `.env.template` with broker integration disabled.
 
+The .NET side resolves this contract through `ATrade.ServiceDefaults`' shared
+local runtime contract loader. That loader reads `.env.template`, overlays
+ignored `.env` when present, overlays process environment variables last,
+validates local port and Docker volume values, exposes resolved non-secret
+settings, and classifies database passwords plus IBKR username/password/account
+id values as secret. The Unix and PowerShell startup shims mirror the same
+`.env.template` → `.env` → process environment precedence for startup-time
+values such as the Aspire dashboard UI port.
+
 ### Current local port variables
 
 - `ATRADE_API_HTTP_PORT` — direct `ATrade.Api` startup and smoke coverage; committed default `5181`

@@ -135,13 +135,18 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 
 ### 2.2 `ATrade.ServiceDefaults` *(exists today)*
 
-- **Purpose:** Shared hosting defaults for every .NET process in the
-  solution.
+- **Purpose:** Shared hosting defaults and local runtime contract resolution for
+  every .NET process in the solution.
 - **Responsibilities:** OpenTelemetry wiring, default health checks,
-  HTTP/gRPC resilience handlers, service discovery integration.
+  HTTP/gRPC resilience handlers, service discovery integration, and the shared
+  local runtime contract loader that parses `.env.template`/ignored `.env`,
+  applies process-environment overrides, validates local ports and Docker volume
+  names, exposes resolved runtime settings, and classifies database passwords plus
+  IBKR credential/account-id values as secret.
 - **Expected dependencies:** None within ATrade; referenced by every other
   .NET module.
-- **First-phase focus:** None directly — infrastructure module.
+- **First-phase focus:** Own the shared local-development runtime contract seam
+  consumed by direct API startup and the AppHost.
 
 ### 2.3 `ATrade.Api` *(exists today, paper-safe backend slice)*
 

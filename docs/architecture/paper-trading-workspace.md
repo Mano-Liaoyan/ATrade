@@ -218,7 +218,10 @@ loopback/private local-development callers while allowing the Docker bridge
 source addresses that Aspire published-port requests use. The committed gateway
 URL default is `https://127.0.0.1:5000`, and custom local ports must keep
 `ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>` while
-still mapping to container target port `5000`. `http://127.0.0.1:<port>` is the
+still mapping to container target port `5000`. AppHost resolves those values
+through the shared `ATrade.ServiceDefaults` local runtime contract loader, which
+classifies the IBKR username, password, and paper account id as secret values
+before projecting them through Aspire secret parameters. `http://127.0.0.1:<port>` is the
 known-bad transport shape that can reset authenticated refresh requests before
 application logic sees an auth response.
 
