@@ -1,11 +1,11 @@
 # TP-036: Deepen the local runtime contract module — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Preflight
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 3
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,10 +15,10 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
@@ -83,6 +83,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Prompt/file-scope references `scripts/start.run.cmd`, but the repository's committed Windows cmd shim is root `start.cmd`; `scripts/start.run.ps1` is the delegated Windows script. | Treat root `start.cmd` plus `scripts/start.run.ps1` as the Windows cmd/PowerShell startup surface unless implementation discovers a real need for a new delegated cmd script. | Preflight / `scripts/README.md` planned layout |
 
 ---
 
@@ -91,6 +92,9 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-02 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-02 13:51 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-02 13:51 | Step 0 started | Preflight |
+| 2026-05-02 16:00 | Step 0 completed | Preflight files/dependencies verified; `scripts/start.run.cmd` prompt mismatch logged as discovery. |
 
 ---
 
@@ -102,4 +106,5 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Preflight dependency check: `dotnet 10.0.203`, GNU bash 5.3.9, git 2.54.0, node v24.15.0/npm 11.12.1, Docker 29.3.0-ce, Podman 5.8.1 available; `pwsh` is not installed locally, so Windows PowerShell wrapper coverage remains via repository Windows harness/CI.
+
