@@ -129,6 +129,8 @@
 | 2026-05-02 17:35 | Check-if-affected docs reviewed | Updated `docs/architecture/analysis-engines.md` for LEAN settings resolved through the shared runtime contract and `docs/architecture/modules.md` for the new ServiceDefaults contract seam; reviewed `PLAN.md` and no material wording change was needed. |
 | 2026-05-02 17:36 | Discoveries logged | Discovery table records prompt path mismatch, committed default drift, and verification cleanup findings. |
 | 2026-05-02 17:37 | Step 5 completed | Delivery docs updated/reviewed and discoveries logged. Task complete. |
+| 2026-05-02 14:16 | Worker iter 1 | done in 1539s, tools: 199 |
+| 2026-05-02 14:16 | Task complete | .DONE created |
 
 ---
 
