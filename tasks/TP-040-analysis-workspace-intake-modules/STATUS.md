@@ -23,15 +23,15 @@
 ---
 
 ### Step 1: Move analysis request construction into Analysis intake
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand checkboxes when entering this step based on final intake interface shape and updated market-data read seam.
 
-- [ ] Analysis module exposes an `IAnalysisRequestIntake` seam and provider-neutral `AnalysisRunRequest`/`AnalysisRunIntakeResult` types that delegate to `IMarketDataService` and `IAnalysisEngineRegistry`
-- [ ] Analysis intake owns direct-bar validation, symbol/timeframe defaults, candle acquisition via the async market-data read seam, symbol identity resolution/fallback, provider-error propagation, and engine handoff
-- [ ] `ATrade.Api` analysis route simplified to HTTP binding, intake invocation, and HTTP result projection without request construction helpers
-- [ ] `tests/ATrade.Analysis.Tests/AnalysisRequestIntakeTests.cs` covers direct bars, candle acquisition, provider errors, invalid requests, and engine-unavailable results
-- [ ] Targeted Analysis and LEAN tests passing
+- [x] Analysis module exposes an `IAnalysisRequestIntake` seam and provider-neutral `AnalysisRunRequest`/`AnalysisRunIntakeResult` types that delegate to `IMarketDataService` and `IAnalysisEngineRegistry`
+- [x] Analysis intake owns direct-bar validation, symbol/timeframe defaults, candle acquisition via the async market-data read seam, symbol identity resolution/fallback, provider-error propagation, and engine handoff
+- [x] `ATrade.Api` analysis route simplified to HTTP binding, intake invocation, and HTTP result projection without request construction helpers
+- [x] `tests/ATrade.Analysis.Tests/AnalysisRequestIntakeTests.cs` covers direct bars, candle acquisition, provider errors, invalid requests, and engine-unavailable results
+- [x] Targeted Analysis and LEAN tests passing
 
 ---
 
@@ -97,6 +97,7 @@
 | 2026-05-02 15:44 | Step 0 started | Preflight |
 | 2026-05-02 15:46 | Step 0 completed | Required paths verified; .NET 10.0.203 available; TP-038 and TP-039 marked complete |
 | 2026-05-02 15:47 | Step 1 hydrated | Analysis intake seam planned around provider-neutral run request/result and async market-data read seam |
+| 2026-05-02 15:58 | Step 1 completed | Analysis intake seam implemented; API analysis route delegated; targeted Analysis/LEAN tests passed |
 
 ---
 

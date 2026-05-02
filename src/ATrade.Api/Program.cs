@@ -70,18 +70,8 @@ app.MapGet(
     (IAnalysisEngineRegistry analysisEngines) => Results.Ok(analysisEngines.GetEngines()));
 app.MapPost(
     "/api/analysis/run",
-    async (AnalysisRunApiRequest request, IAnalysisEngineRegistry analysisEngines, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
-    {
-        var analysisRequestResult = await CreateAnalysisRequestAsync(request, marketDataService, cancellationToken);
-        if (analysisRequestResult.ErrorResult is not null)
-        {
-            return analysisRequestResult.ErrorResult;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var result = await analysisEngines.AnalyzeAsync(analysisRequestResult.Request!, cancellationToken);
-        return ToAnalysisResult(result);
-    });
+    async (AnalysisRunRequest? request, IAnalysisRequestIntake analysisIntake, CancellationToken cancellationToken) =>
+        ToAnalysisRunIntakeResult(await analysisIntake.RunAsync(request, cancellationToken)));
 app.MapGet(
     "/api/broker/ibkr/status",
     async (IBrokerProvider brokerProvider, CancellationToken cancellationToken) =>
@@ -155,65 +145,21 @@ static IResult ToAnalysisResult(AnalysisResult result) => result.Error?.Code swi
         : Results.Ok(result),
 };
 
-static async Task<AnalysisRequestBuildResult> CreateAnalysisRequestAsync(
-    AnalysisRunApiRequest? request,
-    IMarketDataService marketDataService,
-    CancellationToken cancellationToken)
+static IResult ToAnalysisRunIntakeResult(AnalysisRunIntakeResult result)
 {
-    cancellationToken.ThrowIfCancellationRequested();
-    if (request is null)
+    if (result.MarketDataError is not null)
     {
-        return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "An analysis request payload is required.")));
+        return ToMarketDataErrorResult(result.MarketDataError);
     }
 
-    var timeframe = string.IsNullOrWhiteSpace(request.Timeframe) ? MarketDataTimeframes.OneDay : request.Timeframe.Trim();
-    var symbol = request.Symbol ?? CreateSymbolIdentityFromCode(request.SymbolCode);
-    var bars = request.Bars;
-
-    if (bars is null || bars.Count == 0)
+    if (result.InvalidRequestError is not null)
     {
-        var symbolCode = symbol?.Symbol ?? request.SymbolCode;
-        if (string.IsNullOrWhiteSpace(symbolCode))
-        {
-            return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol or symbolCode is required for analysis.")));
-        }
-
-        var candleRead = await marketDataService.GetCandlesAsync(symbolCode, timeframe, cancellationToken: cancellationToken);
-        if (candleRead.IsFailure || candleRead.Value is null)
-        {
-            return AnalysisRequestBuildResult.Failure(ToMarketDataErrorResult(candleRead.Error));
-        }
-
-        var candleSeries = candleRead.Value;
-        if (candleSeries.Candles.Count == 0)
-        {
-            return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Market-data provider returned no candles for analysis.")));
-        }
-
-        bars = candleSeries.Candles;
-        timeframe = candleSeries.Timeframe;
-        symbol ??= await ResolveSymbolIdentityAsync(marketDataService, candleSeries, cancellationToken);
+        return Results.BadRequest(result.InvalidRequestError);
     }
 
-    if (symbol is null)
-    {
-        return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol identity is required when analysis bars are supplied directly.")));
-    }
-
-    return AnalysisRequestBuildResult.Success(new AnalysisRequest(
-        symbol,
-        timeframe,
-        request.RequestedAtUtc ?? DateTimeOffset.UtcNow,
-        bars,
-        request.EngineId,
-        request.StrategyName));
-}
-
-static MarketDataSymbolIdentity? CreateSymbolIdentityFromCode(string? symbolCode)
-{
-    return string.IsNullOrWhiteSpace(symbolCode)
-        ? null
-        : MarketDataSymbolIdentity.Create(symbolCode, "market-data-provider", null, MarketDataAssetClasses.Stock, "UNKNOWN", "USD");
+    return result.Result is not null
+        ? ToAnalysisResult(result.Result)
+        : Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Analysis request failed."));
 }
 
 static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
@@ -240,33 +186,6 @@ static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
         assetClass,
         exchange,
         currency);
-}
-
-static async Task<MarketDataSymbolIdentity> ResolveSymbolIdentityAsync(
-    IMarketDataService marketDataService,
-    CandleSeriesResponse candleSeries,
-    CancellationToken cancellationToken)
-{
-    var symbolRead = await marketDataService.GetSymbolAsync(candleSeries.Symbol, cancellationToken);
-    if (symbolRead.IsSuccess && symbolRead.Value is not null)
-    {
-        var marketSymbol = symbolRead.Value;
-        return MarketDataSymbolIdentity.Create(
-            marketSymbol.Symbol,
-            candleSeries.Source,
-            providerSymbolId: null,
-            marketSymbol.AssetClass,
-            marketSymbol.Exchange,
-            currency: "USD");
-    }
-
-    return MarketDataSymbolIdentity.Create(
-        candleSeries.Symbol,
-        candleSeries.Source,
-        providerSymbolId: null,
-        MarketDataAssetClasses.Stock,
-        exchange: "UNKNOWN",
-        currency: "USD");
 }
 
 static Task<IResult> GetWorkspaceWatchlistAsync(
@@ -372,22 +291,6 @@ static IReadOnlyList<WorkspaceWatchlistSymbolInput> NormalizeReplacementWatchlis
     return symbols.Select(NormalizePinnedSymbolRequest).ToArray();
 }
 
-public sealed record AnalysisRunApiRequest(
-    MarketDataSymbolIdentity? Symbol,
-    string? SymbolCode,
-    string? Timeframe,
-    DateTimeOffset? RequestedAtUtc,
-    IReadOnlyList<OhlcvCandle>? Bars,
-    string? EngineId,
-    string? StrategyName);
-
 public sealed record ReplaceWorkspaceWatchlistRequest(IReadOnlyList<WorkspaceWatchlistSymbolInput>? Symbols);
 
 public sealed record WorkspaceWatchlistErrorResponse(string Code, string Error);
-
-internal sealed record AnalysisRequestBuildResult(AnalysisRequest? Request, IResult? ErrorResult)
-{
-    public static AnalysisRequestBuildResult Success(AnalysisRequest request) => new(request, null);
-
-    public static AnalysisRequestBuildResult Failure(IResult errorResult) => new(null, errorResult);
-}
