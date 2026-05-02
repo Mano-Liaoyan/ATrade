@@ -1,6 +1,6 @@
 # TP-036: Deepen the local runtime contract module — Status
 
-**Current Step:** Step 1: Inventory and fix committed contract drift
+**Current Step:** Step 2: Deepen shared env parsing and resolved contract interface
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 3
@@ -33,13 +33,14 @@
 ---
 
 ### Step 2: Deepen shared env parsing and resolved contract interface
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand checkboxes when entering this step based on the chosen shared module location and existing contract reader call sites.
 
-- [ ] Shared runtime-contract interface implemented and duplicate parsing removed or adapted
-- [ ] Secret/non-secret handling preserved
-- [ ] Targeted .NET contract tests passing
+- [ ] `ATrade.ServiceDefaults` shared local runtime contract loader added for `.env.template`/`.env` parsing, process overlay, defaults, validation, and secret classification
+- [ ] Local port, AppHost storage, paper trading, and LEAN contract readers adapted to the shared loader with duplicate parser implementations removed
+- [ ] Resolved contract values preserve broker/iBeam, LEAN, database, API/frontend/dashboard behavior while keeping credential-bearing values classified as secret
+- [ ] Targeted .NET contract tests added/passing for overlay, defaults, validation, and secret/non-secret handling
 
 ---
 
@@ -102,6 +103,7 @@
 | 2026-05-02 16:12 | Drift test added | Added `tests/apphost/local-runtime-contract-module-tests.sh`; `bash -n` and the new test passed locally. |
 | 2026-05-02 16:16 | Step 1 targeted tests | `bash tests/apphost/paper-trading-config-contract-tests.sh && bash tests/start-contract/start-wrapper-tests.sh` passed. |
 | 2026-05-02 16:17 | Step 1 completed | Committed defaults, docs, drift test, and targeted startup/config contract tests are aligned on paper-safe runtime defaults. |
+| 2026-05-02 16:18 | Step 2 hydrated | Chosen shared module location: `src/ATrade.ServiceDefaults`; AppHost contract readers will adapt to that loader while preserving public record shapes. |
 
 ---
 
