@@ -93,19 +93,23 @@ LEAN project files, or provider-specific DTO names.
 integration approach is an official LEAN runtime process boundary:
 
 1. ATrade converts normalized `OhlcvCandle` bars into a temporary LEAN project
-   workspace containing `atrade-bars.csv`, `main.py`, and a minimal project
-   `config.json`.
+   workspace containing `atrade-bars.csv`, `main.py`, a minimal project
+   `config.json`, and, for managed Docker execution, a generated
+   `lean-engine-config.json` launcher configuration.
 2. `main.py` defines an analysis-only `QCAlgorithm` that reads the ATrade CSV,
    calculates a moving-average crossover signal set, risk/return metrics, and a
    backtest summary, and emits a single `ATRADE_ANALYSIS_RESULT:` JSON marker.
-3. `LeanRuntimeExecutor` invokes the configured official LEAN CLI command
-   (`lean backtest ...`) when `ATRADE_LEAN_RUNTIME_MODE=cli` is selected. When
-   `ATRADE_LEAN_RUNTIME_MODE=docker` is selected through the AppHost contract,
-   Aspire declares a visible `lean-engine` container from
-   `ATRADE_LEAN_DOCKER_IMAGE`, mounts the shared LEAN workspace root, and passes
-   managed-container metadata into `ATrade.Api`; the executor then runs
-   `docker exec` against that managed container instead of silently starting a
-   separate hidden `docker run` container.
+3. `LeanRuntimeExecutor` supports two explicit runtime paths. CLI mode invokes
+   the configured official LEAN CLI command (`lean backtest ...`) and therefore
+   inherits any local QuantConnect CLI/account requirements. Docker mode avoids
+   the paid CLI workspace path: when `ATRADE_LEAN_RUNTIME_MODE=docker` is
+   selected through the AppHost contract, Aspire declares a visible
+   `lean-engine` container from the configured LEAN engine image, mounts the
+   shared LEAN workspace root, and passes managed-container metadata into
+   `ATrade.Api`; the executor then runs `dotnet QuantConnect.Lean.Launcher.dll
+   --config <generated-config>` through `docker exec` against that managed
+   container instead of calling `lean backtest` or starting a hidden `docker run`
+   container.
 4. `LeanAnalysisResultParser` maps the emitted marker into provider-neutral
    `AnalysisResult`, `AnalysisSignal`, `AnalysisMetric`, and `BacktestSummary`
    records.
@@ -124,8 +128,8 @@ Committed templates keep analysis disabled by default and expose only safe,
 non-secret placeholders:
 
 ```text
-ATRADE_ANALYSIS_ENGINE=Lean
-ATRADE_LEAN_RUNTIME_MODE=docker
+ATRADE_ANALYSIS_ENGINE=none
+ATRADE_LEAN_RUNTIME_MODE=cli
 ATRADE_LEAN_CLI_COMMAND=lean
 ATRADE_LEAN_DOCKER_COMMAND=docker
 ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:latest
@@ -137,16 +141,21 @@ ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=/workspace
 ```
 
 To enable LEAN locally, copy `.env.template` to ignored `.env` and set
-`ATRADE_ANALYSIS_ENGINE=Lean`. For CLI mode, keep
-`ATRADE_LEAN_RUNTIME_MODE=cli` and install/configure the official `lean` command
-(or point `ATRADE_LEAN_CLI_COMMAND` at it). For AppHost-managed Docker mode, set
-`ATRADE_LEAN_RUNTIME_MODE=docker`, keep or override
-`ATRADE_LEAN_DOCKER_IMAGE`, and start through `./start run`; the Aspire graph
+`ATRADE_ANALYSIS_ENGINE=Lean`. For the no-paid-account local path, use AppHost-managed Docker mode: set
+`ATRADE_ANALYSIS_ENGINE=Lean`, set `ATRADE_LEAN_RUNTIME_MODE=docker`, keep or
+override `ATRADE_LEAN_DOCKER_IMAGE` with a LEAN engine image such as
+`quantconnect/lean:latest`, and start through `./start run`; the Aspire graph
 then shows a `lean-engine` resource and mounts `ATRADE_LEAN_WORKSPACE_ROOT` into
 that container at `ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT`. The API receives only
-these non-secret LEAN settings. If Docker mode is selected but the managed
-container metadata is absent, the container is not running, the Docker command is
-unavailable, or the runtime times out, `/api/analysis/run` returns HTTP 503 with
+these non-secret LEAN settings and invokes the engine launcher directly inside
+the managed container. CLI mode remains available for users who already have a
+usable LEAN CLI workspace by keeping `ATRADE_LEAN_RUNTIME_MODE=cli`, installing
+or configuring the official `lean` command, and ensuring
+`ATRADE_LEAN_WORKSPACE_ROOT` is at or under an initialized LEAN workspace
+containing `lean.json` from `lean init`. If Docker mode is selected but the
+managed container metadata is absent, the container is not running, the Docker
+command or engine image is unavailable, the runtime exits non-zero, or the
+runtime times out, `/api/analysis/run` returns HTTP 503 with
 `analysis-engine-unavailable`, empty signals/metrics, and no backtest summary.
 No LEAN setting may contain broker credentials or account identifiers.
 

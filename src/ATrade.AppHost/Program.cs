@@ -63,6 +63,7 @@ if (leanRuntimeContract.TryGetDockerImageReference(out var leanImage, out var le
     builder.AddContainer("lean-engine", leanImage, leanTag)
         .WithContainerName(leanRuntimeContract.ManagedContainerName)
         .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
+        .WithEnvironment("PYTHONDONTWRITEBYTECODE", "1")
         .WithBindMount(leanRuntimeContract.WorkspaceRoot, leanRuntimeContract.ContainerWorkspaceRoot, isReadOnly: false)
         .WithEntrypoint("tail")
         .WithArgs("-f", "/dev/null");

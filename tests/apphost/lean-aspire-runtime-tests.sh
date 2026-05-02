@@ -66,7 +66,7 @@ publish_manifest_with_lean_defaults() {
   ATRADE_LEAN_RUNTIME_MODE=cli \
   ATRADE_LEAN_CLI_COMMAND=lean \
   ATRADE_LEAN_DOCKER_COMMAND=docker \
-  ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation \
+  ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:latest \
   ATRADE_LEAN_WORKSPACE_ROOT=artifacts/lean-workspaces \
   ATRADE_LEAN_TIMEOUT_SECONDS=45 \
   ATRADE_LEAN_KEEP_WORKSPACE=false \
@@ -86,7 +86,7 @@ publish_manifest_with_lean_docker_enabled() {
   ATRADE_LEAN_RUNTIME_MODE=docker \
   ATRADE_LEAN_CLI_COMMAND=lean \
   ATRADE_LEAN_DOCKER_COMMAND="$docker_command" \
-  ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:foundation \
+  ATRADE_LEAN_DOCKER_IMAGE=quantconnect/lean:latest \
   ATRADE_LEAN_WORKSPACE_ROOT="$workspace_root" \
   ATRADE_LEAN_TIMEOUT_SECONDS="$timeout_seconds" \
   ATRADE_LEAN_KEEP_WORKSPACE=false \
@@ -233,7 +233,7 @@ expected = {
     "ATRADE_LEAN_RUNTIME_MODE": "cli",
     "ATRADE_LEAN_CLI_COMMAND": "lean",
     "ATRADE_LEAN_DOCKER_COMMAND": "docker",
-    "ATRADE_LEAN_DOCKER_IMAGE": "quantconnect/lean:foundation",
+    "ATRADE_LEAN_DOCKER_IMAGE": "quantconnect/lean:latest",
     "ATRADE_LEAN_WORKSPACE_ROOT": expected_workspace,
     "ATRADE_LEAN_TIMEOUT_SECONDS": "45",
     "ATRADE_LEAN_KEEP_WORKSPACE": "false",
@@ -268,7 +268,7 @@ if not lean:
     raise SystemExit(f"expected Docker-mode manifest to include stable lean-engine resource; got {sorted(resources)!r}")
 if lean.get("type") != "container.v0":
     raise SystemExit(f"lean-engine must be a container resource, got {lean!r}")
-if lean.get("image") != "quantconnect/lean:foundation":
+if lean.get("image") != "quantconnect/lean:latest":
     raise SystemExit(f"lean-engine must use configured LEAN image, got {lean.get('image')!r}")
 
 bind_mounts = lean.get("bindMounts", [])
@@ -292,7 +292,7 @@ expected = {
     "ATRADE_LEAN_RUNTIME_MODE": "docker",
     "ATRADE_LEAN_CLI_COMMAND": "lean",
     "ATRADE_LEAN_DOCKER_COMMAND": "docker",
-    "ATRADE_LEAN_DOCKER_IMAGE": "quantconnect/lean:foundation",
+    "ATRADE_LEAN_DOCKER_IMAGE": "quantconnect/lean:latest",
     "ATRADE_LEAN_WORKSPACE_ROOT": expected_workspace,
     "ATRADE_LEAN_TIMEOUT_SECONDS": "45",
     "ATRADE_LEAN_KEEP_WORKSPACE": "false",
@@ -392,14 +392,14 @@ optional_smoke_analysis_run_if_runtime_available() {
     return 0
   fi
 
-  local image='quantconnect/lean:foundation'
+  local image='quantconnect/lean:latest'
   if ! docker image inspect "$image" >/dev/null 2>&1; then
     printf 'SKIP: configured LEAN image %s is not present locally; skipping optional managed-runtime smoke.\n' "$image"
     return 0
   fi
 
-  if ! docker run --rm "$image" lean --version >/dev/null 2>&1; then
-    printf 'SKIP: configured LEAN image %s is present but does not expose an executable lean CLI; skipping optional managed-runtime smoke.\n' "$image"
+  if ! docker run --rm --entrypoint test "$image" -f /Lean/Launcher/bin/Debug/QuantConnect.Lean.Launcher.dll >/dev/null 2>&1; then
+    printf 'SKIP: configured LEAN image %s is present but does not expose the LEAN engine launcher; skipping optional managed-runtime smoke.\n' "$image"
     return 0
   fi
 

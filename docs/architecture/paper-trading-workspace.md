@@ -567,11 +567,14 @@ When no provider is configured, those endpoints still return explicit
 `analysis-engine-not-configured` metadata rather than fake signals. When an
 ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
 LEAN provider and `POST /api/analysis/run` can fetch normalized candles through
-the cache-aware `IMarketDataService` before invoking LEAN. CLI mode invokes the
-configured official `lean` command. Docker mode is AppHost-managed: the local
-Aspire graph shows `lean-engine`, bind-mounts the generated-workspace root, and
-passes container metadata to the API so execution uses `docker exec` against that
-resource. Runtime absence, missing managed-container metadata, missing Docker or
+the cache-aware `IMarketDataService` before invoking LEAN. Docker mode is the
+no-paid-account local path: the local Aspire graph shows `lean-engine`,
+bind-mounts the generated-workspace root, and passes container metadata to the
+API so execution uses `docker exec` to invoke `dotnet
+QuantConnect.Lean.Launcher.dll` with a generated local engine config inside that
+resource. CLI mode remains available for users with a usable official `lean`
+workspace, but that path inherits the CLI's organization-tier requirements.
+Runtime absence, missing managed-container metadata, missing Docker or
 image/container availability, timeout, parse failure, or non-zero LEAN exits
 return `analysis-engine-unavailable` instead of successful synthetic results.
 

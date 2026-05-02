@@ -70,6 +70,9 @@ nunit-*.xml
 # Agent workflow
 .worktrees/
 
+# Lean Workspace
+lean-workspaces/
+
 # Taskplane / Pi runtime artifacts (machine-specific, do not commit)
 .pi/batch-state.json
 .pi/batch-history.json

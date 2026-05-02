@@ -173,7 +173,7 @@ behavior by default.
 - `ATRADE_LEAN_RUNTIME_MODE` — official LEAN runtime invocation mode (`cli` by default; `docker` selects the AppHost-managed `lean-engine` container path)
 - `ATRADE_LEAN_CLI_COMMAND` — local official LEAN CLI command/path; committed default is `lean`
 - `ATRADE_LEAN_DOCKER_COMMAND` — Docker-compatible command/path for containerized LEAN invocation; committed default is `docker`
-- `ATRADE_LEAN_DOCKER_IMAGE` — LEAN runtime image placeholder used by the AppHost-managed `lean-engine`; committed default is `quantconnect/lean:foundation`
+- `ATRADE_LEAN_DOCKER_IMAGE` — LEAN runtime image used by the AppHost-managed `lean-engine`; committed default is `quantconnect/lean:latest` because Docker mode invokes the open-source LEAN engine launcher directly and does not require a paid LEAN CLI organization workspace
 - `ATRADE_LEAN_WORKSPACE_ROOT` — non-secret local directory for generated LEAN workspaces; committed default is the ignored/generated `artifacts/lean-workspaces` path so AppHost can bind-mount the same host directory into `lean-engine`
 - `ATRADE_LEAN_TIMEOUT_SECONDS` — analysis runtime timeout; committed default is `45`
 - `ATRADE_LEAN_KEEP_WORKSPACE` — optional debugging flag for generated LEAN workspaces; committed default is `false`
@@ -186,12 +186,16 @@ To show and use the LEAN Docker runtime in the Aspire dashboard, copy
 workspace, timeout, and managed-container values, and run `./start run`. The
 AppHost then declares `lean-engine`, bind-mounts the host workspace root into the
 container, passes the safe LEAN settings to `api`, and the LEAN executor uses
-`docker exec` against that managed container. If the Docker command, container,
-image, or runtime is unavailable, analysis requests return explicit
-`analysis-engine-unavailable` failures with no fake signals/metrics/backtest;
-when Docker is unavailable the optional smoke test reports a clear skip. CLI mode
-remains available by keeping `ATRADE_LEAN_RUNTIME_MODE=cli` and configuring
-`ATRADE_LEAN_CLI_COMMAND`.
+`docker exec` to invoke `dotnet QuantConnect.Lean.Launcher.dll` against a
+generated local engine config inside that managed container. This Docker path
+uses the open-source LEAN engine image directly and does not require a paid LEAN
+CLI organization workspace. If the Docker command, container, image, or runtime
+is unavailable, analysis requests return explicit `analysis-engine-unavailable`
+failures with no fake signals/metrics/backtest; when Docker is unavailable the
+optional smoke test reports a clear skip. CLI mode remains available by keeping
+`ATRADE_LEAN_RUNTIME_MODE=cli` and configuring `ATRADE_LEAN_CLI_COMMAND`, but the
+official `lean backtest` CLI path may require an initialized LEAN workspace and a
+QuantConnect organization tier accepted by the CLI.
 
 To start local iBeam for user-driven IBKR API login, copy `.env.template` to
 `.env`, set `ATRADE_BROKER_INTEGRATION_ENABLED=true`, keep

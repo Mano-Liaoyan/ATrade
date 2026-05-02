@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace ATrade.Analysis.Lean;
@@ -8,6 +9,16 @@ public sealed class LeanRuntimeExecutor(
     LeanAnalysisOptions options,
     ILogger<LeanRuntimeExecutor> logger) : ILeanRuntimeExecutor
 {
+    private const string EngineWorkingDirectory = "/Lean/Launcher/bin/Debug";
+    private const string EngineLauncherAssembly = "QuantConnect.Lean.Launcher.dll";
+    private const string EngineConfigFileName = "lean-engine-config.json";
+    private const string DisablePythonBytecodeEnvironment = "PYTHONDONTWRITEBYTECODE=1";
+
+    private static readonly JsonSerializerOptions EngineConfigJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+    };
+
     public async Task<LeanRuntimeExecutionResult> ExecuteAsync(LeanRuntimeExecutionRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -84,22 +95,26 @@ public sealed class LeanRuntimeExecutor(
 
             var workspacePath = MapHostPathToManagedContainerPath(request.WorkspacePath);
             var outputDirectory = MapHostPathToManagedContainerPath(request.OutputDirectory);
+            var engineConfigPath = PrepareManagedDockerEngineConfig(request, workspacePath, outputDirectory);
 
             return new LeanRuntimeCommand(
                 options.DockerCommand,
                 new[]
                 {
                     "exec",
+                    "-e",
+                    DisablePythonBytecodeEnvironment,
                     "-w",
-                    workspacePath,
+                    EngineWorkingDirectory,
                     options.ManagedContainerName!,
-                    options.CliCommand,
-                    "backtest",
-                    request.ProjectName,
-                    "--output",
-                    outputDirectory,
+                    "dotnet",
+                    EngineLauncherAssembly,
+                    "--config",
+                    engineConfigPath,
                 });
         }
+
+        EnsureLeanConfigurationAvailable(request.WorkspacePath);
 
         return new LeanRuntimeCommand(
             options.CliCommand,
@@ -110,6 +125,97 @@ public sealed class LeanRuntimeExecutor(
                 "--output",
                 request.OutputDirectory,
             });
+    }
+
+    private string PrepareManagedDockerEngineConfig(
+        LeanRuntimeExecutionRequest request,
+        string containerWorkspacePath,
+        string containerOutputDirectory)
+    {
+        var engineConfigPath = Path.Combine(request.WorkspacePath, EngineConfigFileName);
+        var containerProjectPath = CombineContainerPath(containerWorkspacePath, request.ProjectName);
+        var containerConfig = CreateManagedDockerEngineConfig(containerProjectPath, containerOutputDirectory);
+        File.WriteAllText(engineConfigPath, JsonSerializer.Serialize(containerConfig, EngineConfigJsonOptions));
+        return MapHostPathToManagedContainerPath(engineConfigPath);
+    }
+
+    private static Dictionary<string, object?> CreateManagedDockerEngineConfig(string containerProjectPath, string containerOutputDirectory) => new()
+    {
+        ["environment"] = "backtesting",
+        ["algorithm-type-name"] = "ATradeLeanAnalysisAlgorithm",
+        ["algorithm-language"] = "Python",
+        ["algorithm-location"] = CombineContainerPath(containerProjectPath, "main.py"),
+        ["data-folder"] = "/Lean/Data/",
+        ["debugging"] = false,
+        ["debugging-method"] = "LocalCmdline",
+        ["close-automatically"] = true,
+        ["composer-dll-directory"] = ".",
+        ["results-destination-folder"] = containerOutputDirectory,
+        ["log-handler"] = "QuantConnect.Logging.CompositeLogHandler",
+        ["messaging-handler"] = "QuantConnect.Messaging.Messaging",
+        ["job-queue-handler"] = "QuantConnect.Queues.JobQueue",
+        ["api-handler"] = "QuantConnect.Api.Api",
+        ["map-file-provider"] = "QuantConnect.Data.Auxiliary.LocalDiskMapFileProvider",
+        ["factor-file-provider"] = "QuantConnect.Data.Auxiliary.LocalDiskFactorFileProvider",
+        ["data-provider"] = "QuantConnect.Lean.Engine.DataFeeds.DefaultDataProvider",
+        ["data-channel-provider"] = "DataChannelProvider",
+        ["object-store"] = "QuantConnect.Lean.Engine.Storage.LocalObjectStore",
+        ["data-aggregator"] = "QuantConnect.Lean.Engine.DataFeeds.AggregationManager",
+        ["show-missing-data-logs"] = false,
+        ["force-exchange-always-open"] = false,
+        ["transaction-log"] = string.Empty,
+        ["job-user-id"] = "0",
+        ["api-access-token"] = string.Empty,
+        ["job-organization-id"] = string.Empty,
+        ["parameters"] = new Dictionary<string, string>(),
+        ["environments"] = new Dictionary<string, object?>
+        {
+            ["backtesting"] = new Dictionary<string, object?>
+            {
+                ["live-mode"] = false,
+                ["setup-handler"] = "QuantConnect.Lean.Engine.Setup.BacktestingSetupHandler",
+                ["result-handler"] = "QuantConnect.Lean.Engine.Results.BacktestingResultHandler",
+                ["data-feed-handler"] = "QuantConnect.Lean.Engine.DataFeeds.FileSystemDataFeed",
+                ["real-time-handler"] = "QuantConnect.Lean.Engine.RealTime.BacktestingRealTimeHandler",
+                ["history-provider"] = new[] { "QuantConnect.Lean.Engine.HistoricalData.SubscriptionDataReaderHistoryProvider" },
+                ["transaction-handler"] = "QuantConnect.Lean.Engine.TransactionHandlers.BacktestingTransactionHandler",
+            },
+        },
+    };
+
+    private void EnsureLeanConfigurationAvailable(string workspacePath)
+    {
+        if (FindLeanConfigPath(workspacePath) is not null)
+        {
+            return;
+        }
+
+        var configuredRoot = string.IsNullOrWhiteSpace(options.WorkspaceRoot)
+            ? workspacePath
+            : options.WorkspaceRoot;
+
+        throw new LeanRuntimeUnavailableException(
+            $"LEAN CLI backtests require an initialized LEAN workspace containing lean.json. Run `lean init` in '{Path.GetFullPath(configuredRoot)}' or set {LeanAnalysisEnvironmentVariables.WorkspaceRoot} to a directory at or under an existing initialized LEAN workspace.");
+    }
+
+    private static string? FindLeanConfigPath(string startPath)
+    {
+        var current = Directory.Exists(startPath)
+            ? new DirectoryInfo(Path.GetFullPath(startPath))
+            : Directory.GetParent(Path.GetFullPath(startPath));
+
+        while (current is not null)
+        {
+            var leanConfigPath = Path.Combine(current.FullName, "lean.json");
+            if (File.Exists(leanConfigPath))
+            {
+                return leanConfigPath;
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
     }
 
     private string MapHostPathToManagedContainerPath(string hostPath)

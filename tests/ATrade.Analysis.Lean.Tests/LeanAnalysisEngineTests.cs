@@ -34,7 +34,7 @@ public sealed class LeanAnalysisEngineTests
                 [LeanAnalysisEnvironmentVariables.AnalysisEngine] = "Lean",
                 [LeanAnalysisEnvironmentVariables.RuntimeMode] = "Docker",
                 [LeanAnalysisEnvironmentVariables.CliCommand] = "lean",
-                [LeanAnalysisEnvironmentVariables.DockerImage] = "quantconnect/lean:foundation",
+                [LeanAnalysisEnvironmentVariables.DockerImage] = "quantconnect/lean:latest",
                 [LeanAnalysisEnvironmentVariables.WorkspaceRoot] = "/tmp/atrade-lean",
                 [LeanAnalysisEnvironmentVariables.TimeoutSeconds] = "12",
                 [LeanAnalysisEnvironmentVariables.KeepWorkspace] = "true",
@@ -48,7 +48,7 @@ public sealed class LeanAnalysisEngineTests
         Assert.True(options.IsLeanSelected);
         Assert.Equal(LeanRuntimeMode.Docker, options.RuntimeMode);
         Assert.Equal("lean", options.CliCommand);
-        Assert.Equal("quantconnect/lean:foundation", options.DockerImage);
+        Assert.Equal("quantconnect/lean:latest", options.DockerImage);
         Assert.Equal("/tmp/atrade-lean", options.WorkspaceRoot);
         Assert.Equal(TimeSpan.FromSeconds(12), options.Timeout);
         Assert.True(options.KeepWorkspace);
@@ -94,6 +94,7 @@ public sealed class LeanAnalysisEngineTests
     {
         var command = CreateExecutableScript("printf '%s\\n' \"$@\"\n");
         var root = Directory.CreateTempSubdirectory("atrade-lean-cli-");
+        WriteLeanConfig(root.FullName);
         var workspace = Path.Combine(root.FullName, "run-1");
         var output = Path.Combine(workspace, "output");
         Directory.CreateDirectory(output);
@@ -119,10 +120,39 @@ public sealed class LeanAnalysisEngineTests
     }
 
     [Fact]
+    public async Task RuntimeExecutorRejectsCliModeWithoutLeanConfiguration()
+    {
+        var command = CreateExecutableScript("printf 'runtime should not be called'\n");
+        var root = Directory.CreateTempSubdirectory("atrade-lean-no-config-");
+        var workspace = Path.Combine(root.FullName, "run-1");
+        var output = Path.Combine(workspace, "output");
+        Directory.CreateDirectory(output);
+        var executor = new LeanRuntimeExecutor(
+            new LeanAnalysisOptions
+            {
+                RuntimeMode = LeanRuntimeMode.Cli,
+                CliCommand = command,
+                WorkspaceRoot = root.FullName,
+            },
+            NullLogger<LeanRuntimeExecutor>.Instance);
+
+        var exception = await Assert.ThrowsAsync<LeanRuntimeUnavailableException>(() => executor.ExecuteAsync(new LeanRuntimeExecutionRequest(
+            workspace,
+            LeanAnalysisWorkspaceFactory.ProjectName,
+            output,
+            TimeSpan.FromSeconds(5))));
+
+        Assert.Contains("lean.json", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("lean init", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(LeanAnalysisEnvironmentVariables.WorkspaceRoot, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RuntimeExecutorUsesManagedDockerExecWithSharedWorkspaceMapping()
     {
         var command = CreateExecutableScript("printf '%s\\n' \"$@\"\n");
         var root = Directory.CreateTempSubdirectory("atrade-lean-managed-");
+        WriteLeanConfig(root.FullName);
         var workspace = Path.Combine(root.FullName, "run-1");
         var output = Path.Combine(workspace, "output");
         Directory.CreateDirectory(output);
@@ -147,8 +177,12 @@ public sealed class LeanAnalysisEngineTests
         Assert.Equal(0, result.ExitCode);
         Assert.False(result.TimedOut);
         Assert.Equal(
-            $"exec\n-w\n/workspace/run-1\natrade-lean-engine\nlean\nbacktest\n{LeanAnalysisWorkspaceFactory.ProjectName}\n--output\n/workspace/run-1/output\n",
+            "exec\n-e\nPYTHONDONTWRITEBYTECODE=1\n-w\n/Lean/Launcher/bin/Debug\natrade-lean-engine\ndotnet\nQuantConnect.Lean.Launcher.dll\n--config\n/workspace/run-1/lean-engine-config.json\n",
             result.StandardOutput.ReplaceLineEndings("\n"));
+
+        var engineConfig = File.ReadAllText(Path.Combine(workspace, "lean-engine-config.json"));
+        Assert.Contains("\"algorithm-location\": \"/workspace/run-1/ATradeLeanAnalysis/main.py\"", engineConfig, StringComparison.Ordinal);
+        Assert.Contains("\"live-mode\": false", engineConfig, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -182,6 +216,7 @@ public sealed class LeanAnalysisEngineTests
     {
         var command = CreateExecutableScript("printf 'No such container: atrade-lean-engine\\n' >&2\nexit 1\n");
         var root = Directory.CreateTempSubdirectory("atrade-lean-missing-container-");
+        WriteLeanConfig(root.FullName);
         var options = new LeanAnalysisOptions
         {
             SelectedAnalysisEngine = "Lean",
@@ -257,6 +292,34 @@ public sealed class LeanAnalysisEngineTests
     }
 
     [Fact]
+    public async Task EngineIncludesRuntimeStandardOutputOnFailure()
+    {
+        var options = new LeanAnalysisOptions
+        {
+            SelectedAnalysisEngine = "Lean",
+            RuntimeMode = LeanRuntimeMode.Cli,
+            Timeout = TimeSpan.FromSeconds(1),
+        };
+        var engine = new LeanAnalysisEngine(
+            options,
+            new FakeLeanRuntimeExecutor(_ => new LeanRuntimeExecutionResult(
+                1,
+                "This command requires a Lean configuration file, run `lean init` in an empty directory to create one.",
+                string.Empty,
+                TimedOut: false)),
+            new LeanAnalysisWorkspaceFactory(options),
+            NullLogger<LeanAnalysisEngine>.Instance);
+
+        var result = await engine.AnalyzeAsync(CreateRequest(barCount: 25));
+
+        Assert.Equal(AnalysisResultStatuses.Failed, result.Status);
+        Assert.Equal(AnalysisEngineErrorCodes.EngineUnavailable, result.Error?.Code);
+        Assert.Contains("stdout:", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("lean init", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("lean.json", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task EngineExplainsCommandNotFoundRuntimeExit()
     {
         var options = new LeanAnalysisOptions
@@ -264,7 +327,7 @@ public sealed class LeanAnalysisEngineTests
             SelectedAnalysisEngine = "Lean",
             RuntimeMode = LeanRuntimeMode.Docker,
             CliCommand = "lean",
-            DockerImage = "quantconnect/lean:foundation",
+            DockerImage = "quantconnect/lean:latest",
             ManagedContainerName = "atrade-lean-engine",
             Timeout = TimeSpan.FromSeconds(1),
         };
@@ -279,7 +342,7 @@ public sealed class LeanAnalysisEngineTests
         Assert.Equal(AnalysisResultStatuses.Failed, result.Status);
         Assert.Equal(AnalysisEngineErrorCodes.EngineUnavailable, result.Error?.Code);
         Assert.Contains("command not found", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(LeanAnalysisEnvironmentVariables.CliCommand, result.Error?.Message, StringComparison.Ordinal);
+        Assert.Contains("engine image", result.Error?.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(LeanAnalysisEnvironmentVariables.DockerImage, result.Error?.Message, StringComparison.Ordinal);
     }
 
@@ -342,6 +405,8 @@ public sealed class LeanAnalysisEngineTests
         LeanAnalysisOptions.DefaultProvider,
         LeanAnalysisOptions.DefaultVersion,
         AnalysisEngineStates.Available);
+
+    private static void WriteLeanConfig(string directory) => File.WriteAllText(Path.Combine(directory, "lean.json"), "{}\n");
 
     private static string CreateExecutableScript(string body)
     {

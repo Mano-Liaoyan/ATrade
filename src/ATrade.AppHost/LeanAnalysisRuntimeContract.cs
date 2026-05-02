@@ -29,7 +29,7 @@ public sealed record LeanAnalysisRuntimeContract(
     public const string RuntimeModeDocker = "docker";
     public const string DefaultCliCommand = "lean";
     public const string DefaultDockerCommand = "docker";
-    public const string DefaultDockerImage = "quantconnect/lean:foundation";
+    public const string DefaultDockerImage = "quantconnect/lean:latest";
     public const string DefaultTimeoutSeconds = "45";
     public const string DefaultKeepWorkspace = "false";
     public const string DefaultManagedContainerName = "atrade-lean-engine";

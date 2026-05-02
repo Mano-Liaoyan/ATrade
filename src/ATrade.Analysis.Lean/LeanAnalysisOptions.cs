@@ -10,7 +10,7 @@ public sealed class LeanAnalysisOptions
     public const string DefaultVersion = "official-runtime";
     public const string DefaultCliCommand = "lean";
     public const string DefaultDockerCommand = "docker";
-    public const string DefaultDockerImage = "quantconnect/lean:foundation";
+    public const string DefaultDockerImage = "quantconnect/lean:latest";
     public const string DefaultManagedContainerName = "atrade-lean-engine";
     public const string DefaultContainerWorkspaceRoot = "/workspace";
     public const int DefaultTimeoutSeconds = 45;
