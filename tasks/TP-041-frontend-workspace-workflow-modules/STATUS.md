@@ -23,15 +23,15 @@
 ---
 
 ### Step 1: Extract watchlist and exact pin workflows
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expanded on entry after confirming TP-040 backend watchlist intake keeps `/api/workspace/watchlist` responses authoritative with `instrumentKey`/`pinKey`, while browser storage remains symbol-only fallback/migration input.
 
-- [ ] Watchlist workflow module exposes normalized state/commands for backend load, retry, legacy fallback/migration, exact pin toggle, removal, saving key, disabled state, and stable error text
-- [ ] TradingWorkspace delegates watchlist orchestration to the workflow module while retaining trending market-data loading and UI markers
-- [ ] TrendingList, SymbolSearch, and Watchlist consume workflow-derived pinned keys/saving state/commands without importing watchlist clients or storage
-- [ ] Backend-owned persisted `pinKey`/`instrumentKey` values remain authoritative; provisional keys are limited to optimistic UI matching and symbol-only cache fallback
-- [ ] New frontend workspace workflow shell test file asserts the module seam, storage authority, and renderer boundaries
+- [x] Watchlist workflow module exposes normalized state/commands for backend load, retry, legacy fallback/migration, exact pin toggle, removal, saving key, disabled state, and stable error text
+- [x] TradingWorkspace delegates watchlist orchestration to the workflow module while retaining trending market-data loading and UI markers
+- [x] TrendingList, SymbolSearch, and Watchlist consume workflow-derived pinned keys/saving state/commands without importing watchlist clients or storage
+- [x] Backend-owned persisted `pinKey`/`instrumentKey` values remain authoritative; provisional keys are limited to optimistic UI matching and symbol-only cache fallback
+- [x] New frontend workspace workflow shell test file asserts the module seam, storage authority, and renderer boundaries
 
 ---
 
@@ -98,6 +98,7 @@
 | 2026-05-02 16:01 | Step 0 started | Preflight |
 | 2026-05-02 16:05 | Step 0 completed | Required paths verified; TP-040 complete; .NET 10.0.203, Node v24.15.0, npm 11.12.1, and frontend dependencies available |
 | 2026-05-02 16:06 | Step 1 hydrated | Final watchlist API shape confirmed: backend `instrumentKey`/`pinKey` authoritative; frontend workflow owns symbol-only cache migration/fallback and provisional optimistic key matching |
+| 2026-05-02 16:17 | Step 1 completed | Watchlist workflow hook added; rendering components delegate pin state/commands; new workflow shell test and frontend build passed |
 
 ---
 

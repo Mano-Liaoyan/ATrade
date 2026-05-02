@@ -1,21 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { createProvisionalInstrumentKey, createSymbolChartHref, getTrendingSymbolIdentity } from '../lib/instrumentIdentity';
+import { createSymbolChartHref, getTrendingSymbolIdentity } from '../lib/instrumentIdentity';
+import type { WatchlistPinState } from '../lib/watchlistWorkflow';
 import type { TrendingSymbol } from '../types/marketData';
 
 type TrendingListProps = {
   symbols: TrendingSymbol[];
-  pinnedInstrumentKeys: string[];
+  getPinState: (symbol: TrendingSymbol) => WatchlistPinState;
   onTogglePin: (symbol: TrendingSymbol) => void;
-  actionsDisabled?: boolean;
-  savingPinKey?: string | null;
   source?: string | null;
 };
 
-export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actionsDisabled = false, savingPinKey = null, source = null }: TrendingListProps) {
-  const pinnedSet = new Set(pinnedInstrumentKeys);
-
+export function TrendingList({ symbols, getPinState, onTogglePin, source = null }: TrendingListProps) {
   return (
     <section className="workspace-panel" aria-labelledby="trending-title" data-testid="trending-list">
       <div className="panel-heading">
@@ -29,13 +26,11 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
       <div className="symbol-grid">
         {symbols.map((symbol) => {
           const identity = getTrendingSymbolIdentity(symbol);
-          const pinKey = createTrendingPinKey(symbol);
           const chartHref = createSymbolChartHref(identity);
-          const pinned = pinnedSet.has(pinKey);
-          const isSaving = savingPinKey === pinKey;
+          const pinState = getPinState(symbol);
 
           return (
-            <article className="symbol-card" key={pinKey}>
+            <article className="symbol-card" key={pinState.pinKey}>
               <div className="symbol-card__topline">
                 <div>
                   <Link className="symbol-link" href={chartHref}>
@@ -44,13 +39,13 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
                   <p>{symbol.name}</p>
                 </div>
                 <button
-                  className={pinned ? 'pin-button pin-button--active' : 'pin-button'}
+                  className={pinState.pinned ? 'pin-button pin-button--active' : 'pin-button'}
                   type="button"
-                  aria-pressed={pinned}
-                  disabled={actionsDisabled || isSaving}
+                  aria-pressed={pinState.pinned}
+                  disabled={pinState.disabled}
                   onClick={() => onTogglePin(symbol)}
                 >
-                  {isSaving ? (pinned ? 'Removing…' : 'Saving…') : pinned ? 'Pinned' : 'Pin'}
+                  {pinState.saving ? (pinState.pinned ? 'Removing…' : 'Saving…') : pinState.pinned ? 'Pinned' : 'Pin'}
                 </button>
               </div>
 
@@ -84,10 +79,6 @@ export function TrendingList({ symbols, pinnedInstrumentKeys, onTogglePin, actio
       </div>
     </section>
   );
-}
-
-function createTrendingPinKey(symbol: TrendingSymbol): string {
-  return createProvisionalInstrumentKey(getTrendingSymbolIdentity(symbol));
 }
 
 function formatSourceLabel(source: string | null): string {

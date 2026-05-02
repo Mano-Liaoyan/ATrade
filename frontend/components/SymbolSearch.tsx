@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { searchSymbols } from '../lib/marketDataClient';
-import { createProvisionalInstrumentKey, createSymbolChartHref, getSearchResultIdentity } from '../lib/instrumentIdentity';
+import { createSymbolChartHref, getSearchResultIdentity } from '../lib/instrumentIdentity';
+import type { WatchlistPinState } from '../lib/watchlistWorkflow';
 import type { MarketDataSymbolSearchResult } from '../types/marketData';
 import { MarketLogo } from './MarketLogo';
 
@@ -11,9 +12,7 @@ type SymbolSearchProps = {
   title?: string;
   description?: string;
   limit?: number;
-  pinnedInstrumentKeys?: string[];
-  actionsDisabled?: boolean;
-  savingPinKey?: string | null;
+  getPinState?: (result: MarketDataSymbolSearchResult) => WatchlistPinState;
   onTogglePin?: (result: MarketDataSymbolSearchResult) => void;
   compact?: boolean;
 };
@@ -24,9 +23,7 @@ export function SymbolSearch({
   title = 'Search IBKR stocks',
   description = 'Find stocks from the IBKR/iBeam instrument universe, open a chart, or pin the exact provider-market result to your watchlist.',
   limit = 10,
-  pinnedInstrumentKeys = [],
-  actionsDisabled = false,
-  savingPinKey = null,
+  getPinState,
   onTogglePin,
   compact = false,
 }: SymbolSearchProps) {
@@ -36,8 +33,6 @@ export function SymbolSearch({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
-
-  const pinnedSet = useMemo(() => new Set(pinnedInstrumentKeys), [pinnedInstrumentKeys]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -147,14 +142,12 @@ export function SymbolSearch({
             const currency = identity.currency;
             const assetClass = identity.assetClass;
             const chartHref = createSymbolChartHref(identity);
-            const pinKey = createSearchResultPinKey(result);
-            const pinned = pinnedSet.has(pinKey);
-            const isSaving = savingPinKey === pinKey;
+            const pinState = getPinState?.(result);
             const providerIdLabel = formatProviderId(provider, providerSymbolId);
             const accessibleLabel = `${symbol} ${result.name} on ${exchange}, ${currency}, ${formatAssetClass(assetClass)}, ${provider.toUpperCase()}${providerIdLabel ? `, ${providerIdLabel}` : ''}`;
 
             return (
-              <li key={pinKey} aria-label={accessibleLabel}>
+              <li key={pinState?.pinKey ?? chartHref} aria-label={accessibleLabel}>
                 <div>
                   <Link className="symbol-link" href={chartHref}>
                     {symbol}
@@ -172,15 +165,15 @@ export function SymbolSearch({
                   <Link className="open-chart-link" href={chartHref}>
                     Open
                   </Link>
-                  {onTogglePin ? (
+                  {onTogglePin && pinState ? (
                     <button
-                      className={pinned ? 'pin-button pin-button--active' : 'pin-button'}
+                      className={pinState.pinned ? 'pin-button pin-button--active' : 'pin-button'}
                       type="button"
-                      aria-pressed={pinned}
-                      disabled={actionsDisabled || isSaving}
+                      aria-pressed={pinState.pinned}
+                      disabled={pinState.disabled}
                       onClick={() => onTogglePin(result)}
                     >
-                      {isSaving ? (pinned ? 'Removing…' : 'Saving…') : pinned ? 'Pinned' : 'Pin result'}
+                      {pinState.saving ? (pinState.pinned ? 'Removing…' : 'Saving…') : pinState.pinned ? 'Pinned' : 'Pin result'}
                     </button>
                   ) : null}
                 </div>
@@ -191,10 +184,6 @@ export function SymbolSearch({
       ) : null}
     </section>
   );
-}
-
-function createSearchResultPinKey(result: MarketDataSymbolSearchResult): string {
-  return createProvisionalInstrumentKey(getSearchResultIdentity(result));
 }
 
 function formatProviderId(provider: string, providerSymbolId: string | null): string {

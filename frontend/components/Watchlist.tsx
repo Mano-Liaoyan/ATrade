@@ -2,20 +2,19 @@
 
 import Link from 'next/link';
 import { createSymbolChartHref } from '../lib/instrumentIdentity';
-import { getWatchlistPinKey, type WatchlistSymbol } from '../lib/watchlistClient';
+import type { WatchlistPinState, WatchlistWorkflowSymbol } from '../lib/watchlistWorkflow';
 import type { TrendingSymbol } from '../types/marketData';
 import { MarketLogo } from './MarketLogo';
 
 type WatchlistProps = {
-  symbols: WatchlistSymbol[];
+  symbols: WatchlistWorkflowSymbol[];
   trendingSymbols: TrendingSymbol[];
   loading: boolean;
   error: string | null;
   source: 'backend' | 'cache';
-  actionsDisabled: boolean;
-  savingPinKey?: string | null;
+  getPinState: (symbol: WatchlistWorkflowSymbol) => WatchlistPinState;
   onRetry: () => void;
-  onRemove: (symbol: WatchlistSymbol) => void;
+  onRemove: (symbol: WatchlistWorkflowSymbol) => void;
 };
 
 export function Watchlist({
@@ -24,8 +23,7 @@ export function Watchlist({
   loading,
   error,
   source,
-  actionsDisabled,
-  savingPinKey = null,
+  getPinState,
   onRetry,
   onRemove,
 }: WatchlistProps) {
@@ -75,13 +73,12 @@ export function Watchlist({
             const currency = watchlistSymbol.currency ? ` · ${watchlistSymbol.currency}` : '';
             const assetClass = watchlistSymbol.assetClass ? ` · ${watchlistSymbol.assetClass}` : '';
             const providerId = formatProviderId(watchlistSymbol.provider, watchlistSymbol.providerSymbolId);
-            const pinKey = getWatchlistPinKey(watchlistSymbol);
-            const isSaving = savingPinKey === pinKey;
+            const pinState = getPinState(watchlistSymbol);
             const marketLabel = exchange ? `Market ${exchange}` : 'Market unknown';
             const chartHref = createSymbolChartHref(watchlistSymbol);
 
             return (
-              <li key={pinKey} aria-label={`${watchlistSymbol.symbol} ${marketLabel} ${provider}`}>
+              <li key={pinState.pinKey} aria-label={`${watchlistSymbol.symbol} ${marketLabel} ${provider}`}>
                 <div>
                   <Link className="symbol-link" href={chartHref}>
                     {watchlistSymbol.symbol}
@@ -94,10 +91,10 @@ export function Watchlist({
                 <button
                   className="text-button"
                   type="button"
-                  disabled={actionsDisabled || isSaving}
+                  disabled={pinState.disabled}
                   onClick={() => onRemove(watchlistSymbol)}
                 >
-                  {isSaving ? 'Removing…' : 'Remove'}
+                  {pinState.saving ? 'Removing…' : 'Remove'}
                 </button>
               </li>
             );
