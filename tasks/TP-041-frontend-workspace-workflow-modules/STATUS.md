@@ -1,6 +1,6 @@
 # TP-041: Deepen frontend workspace workflow modules — Status
 
-**Current Step:** Step 1: Extract watchlist and exact pin workflows
+**Current Step:** Step 2: Extract search and chart data workflows
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 1
@@ -36,12 +36,12 @@
 ---
 
 ### Step 2: Extract search and chart data workflows
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Search/chart workflow modules own debounce, provider errors, candle/indicator loading, stream subscription, polling fallback, and source labels
-- [ ] `SymbolSearch` and `SymbolChartView` render workflow state without behavior regression
-- [ ] Frontend browser data access remains behind `ATrade.Api`
-- [ ] Targeted TypeScript/build and frontend shell tests passing
+- [x] Search/chart workflow modules own debounce, provider errors, candle/indicator loading, stream subscription, polling fallback, and source labels
+- [x] `SymbolSearch` and `SymbolChartView` render workflow state without behavior regression
+- [x] Frontend browser data access remains behind `ATrade.Api`
+- [x] Targeted TypeScript/build and frontend shell tests passing
 
 ---
 
@@ -99,6 +99,8 @@
 | 2026-05-02 16:05 | Step 0 completed | Required paths verified; TP-040 complete; .NET 10.0.203, Node v24.15.0, npm 11.12.1, and frontend dependencies available |
 | 2026-05-02 16:06 | Step 1 hydrated | Final watchlist API shape confirmed: backend `instrumentKey`/`pinKey` authoritative; frontend workflow owns symbol-only cache migration/fallback and provisional optimistic key matching |
 | 2026-05-02 16:17 | Step 1 completed | Watchlist workflow hook added; rendering components delegate pin state/commands; new workflow shell test and frontend build passed |
+| 2026-05-02 16:18 | Step 2 started | Search and chart workflow extraction begun |
+| 2026-05-02 16:29 | Step 2 completed | Symbol search and chart data workflow hooks added; SymbolSearch/SymbolChartView render hook state; frontend build and workflow shell test passed |
 
 ---
 

@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { searchSymbols } from '../lib/marketDataClient';
 import { createSymbolChartHref, getSearchResultIdentity } from '../lib/instrumentIdentity';
+import { useSymbolSearchWorkflow } from '../lib/symbolSearchWorkflow';
 import type { WatchlistPinState } from '../lib/watchlistWorkflow';
 import type { MarketDataSymbolSearchResult } from '../types/marketData';
 import { MarketLogo } from './MarketLogo';
@@ -17,8 +16,6 @@ type SymbolSearchProps = {
   compact?: boolean;
 };
 
-const MinimumQueryLength = 2;
-
 export function SymbolSearch({
   title = 'Search IBKR stocks',
   description = 'Find stocks from the IBKR/iBeam instrument universe, open a chart, or pin the exact provider-market result to your watchlist.',
@@ -27,70 +24,7 @@ export function SymbolSearch({
   onTogglePin,
   compact = false,
 }: SymbolSearchProps) {
-  const [query, setQuery] = useState('');
-  const [searchedQuery, setSearchedQuery] = useState('');
-  const [results, setResults] = useState<MarketDataSymbolSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const trimmedQuery = query.trim();
-
-    if (trimmedQuery.length === 0) {
-      setLoading(false);
-      setError(null);
-      setValidationMessage(null);
-      setSearchedQuery('');
-      setResults([]);
-      return;
-    }
-
-    if (trimmedQuery.length < MinimumQueryLength) {
-      setLoading(false);
-      setError(null);
-      setValidationMessage(`Type at least ${MinimumQueryLength} characters to search IBKR stocks.`);
-      setSearchedQuery('');
-      setResults([]);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    setError(null);
-    setValidationMessage(null);
-
-    const timeout = window.setTimeout(() => {
-      void searchSymbols(trimmedQuery, { assetClass: 'stock', limit })
-        .then((response) => {
-          if (!active) {
-            return;
-          }
-
-          setResults(response.results);
-          setSearchedQuery(trimmedQuery);
-        })
-        .catch((caughtError) => {
-          if (!active) {
-            return;
-          }
-
-          setResults([]);
-          setSearchedQuery(trimmedQuery);
-          setError(caughtError instanceof Error ? caughtError.message : 'IBKR stock search is unavailable.');
-        })
-        .finally(() => {
-          if (active) {
-            setLoading(false);
-          }
-        });
-    }, 350);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeout);
-    };
-  }, [limit, query]);
+  const search = useSymbolSearchWorkflow({ limit });
 
   return (
     <section className={compact ? 'workspace-panel symbol-search-panel symbol-search-panel--compact' : 'workspace-panel symbol-search-panel'} data-testid="symbol-search">
@@ -110,30 +44,30 @@ export function SymbolSearch({
         id={compact ? 'symbol-search-compact-query' : 'symbol-search-query'}
         className="symbol-search-input"
         type="search"
-        value={query}
+        value={search.query}
         autoComplete="off"
         placeholder="Type at least two characters"
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => search.setQuery(event.target.value)}
       />
 
-      {validationMessage ? <p className="symbol-search-help">{validationMessage}</p> : null}
-      {loading ? <p className="symbol-search-help" role="status">Searching IBKR/iBeam contracts…</p> : null}
-      {error ? (
+      {search.validationMessage ? <p className="symbol-search-help">{search.validationMessage}</p> : null}
+      {search.loading ? <p className="symbol-search-help" role="status">Searching IBKR/iBeam contracts…</p> : null}
+      {search.error ? (
         <div className="error-state symbol-search-message" role="alert">
           <strong>IBKR stock search unavailable.</strong>
-          <p>{error}</p>
+          <p>{search.error}</p>
         </div>
       ) : null}
-      {!loading && !error && searchedQuery && results.length === 0 ? (
+      {!search.loading && !search.error && search.searchedQuery && search.results.length === 0 ? (
         <div className="empty-state symbol-search-message">
           <strong>No IBKR stock results found.</strong>
           <p>Try a different symbol or company name. No local fallback catalog is used.</p>
         </div>
       ) : null}
 
-      {results.length > 0 ? (
+      {search.results.length > 0 ? (
         <ul className="symbol-search-results" aria-label="IBKR stock search results">
-          {results.map((result) => {
+          {search.results.map((result) => {
             const identity = getSearchResultIdentity(result);
             const symbol = identity.symbol;
             const provider = identity.provider;

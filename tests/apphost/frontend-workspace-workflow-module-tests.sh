@@ -69,6 +69,30 @@ assert_storage_authority_boundary() {
   assert_file_contains "$workflow" "provider: 'manual'"
 }
 
+assert_frontend_api_boundary() {
+  local market_client="$repo_root/frontend/lib/marketDataClient.ts"
+  local stream_client="$repo_root/frontend/lib/marketDataStream.ts"
+  local search_workflow="$repo_root/frontend/lib/symbolSearchWorkflow.ts"
+  local chart_workflow="$repo_root/frontend/lib/symbolChartWorkflow.ts"
+
+  assert_file_contains "$market_client" "buildApiUrl"
+  assert_file_contains "$stream_client" "buildApiUrl('/hubs/market-data')"
+  assert_file_contains "$search_workflow" "searchSymbols"
+  assert_file_contains "$chart_workflow" "getCandles"
+  assert_file_contains "$chart_workflow" "getIndicators"
+  assert_file_contains "$chart_workflow" "connectMarketDataStream"
+
+  if grep -RIn \
+    --exclude-dir=.next \
+    --exclude-dir=node_modules \
+    --exclude='package-lock.json' \
+    -E 'Npgsql|TimescaleConnection|PostgresConnection|Host=|User ID=|Password=|redis://|nats://|Client Portal|ibkr-gateway' \
+    "$repo_root/frontend"; then
+    printf 'frontend source must keep browser data access behind ATrade.Api clients.\n' >&2
+    return 1
+  fi
+}
+
 assert_renderer_boundaries() {
   local workspace="$repo_root/frontend/components/TradingWorkspace.tsx"
   local trending="$repo_root/frontend/components/TrendingList.tsx"
@@ -98,6 +122,7 @@ assert_renderer_boundaries() {
 main() {
   assert_watchlist_workflow_module
   assert_storage_authority_boundary
+  assert_frontend_api_boundary
   assert_renderer_boundaries
 }
 
