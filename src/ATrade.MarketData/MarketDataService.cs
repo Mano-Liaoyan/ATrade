@@ -91,6 +91,132 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
         return provider.TryGetLatestUpdate(symbol, timeframe, out update, out error, identity);
     }
 
+    public async Task<MarketDataReadResult<TrendingSymbolsResponse>> GetTrendingSymbolsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
+        {
+            return MarketDataReadResult<TrendingSymbolsResponse>.Failure(availabilityError);
+        }
+
+        return await provider.GetTrendingSymbolsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<MarketDataReadResult<MarketDataSymbolSearchResponse>> SearchSymbolsAsync(
+        string? query,
+        string? assetClass,
+        int? limit,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeSearchRequest(query, assetClass, limit, out var normalizedQuery, out var normalizedAssetClass, out var normalizedLimit, out var error))
+        {
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(error!);
+        }
+
+        var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
+        {
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(availabilityError);
+        }
+
+        if (!provider.Capabilities.SupportsSymbolSearch)
+        {
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(new MarketDataError(
+                MarketDataProviderErrorCodes.SearchNotSupported,
+                $"Market-data provider '{provider.Identity.Provider}' does not support symbol search."));
+        }
+
+        var providerResult = await provider.SearchSymbolsAsync(normalizedQuery, cancellationToken).ConfigureAwait(false);
+        if (providerResult.IsFailure || providerResult.Value is null)
+        {
+            return MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(ToReadError(providerResult.Error));
+        }
+
+        var providerResponse = providerResult.Value;
+        var response = providerResponse with
+        {
+            Results = providerResponse.Results
+                .Where(result => string.Equals(NormalizeSearchAssetClass(result.Identity.AssetClass), normalizedAssetClass, StringComparison.OrdinalIgnoreCase))
+                .Take(normalizedLimit)
+                .ToArray(),
+        };
+        return MarketDataReadResult<MarketDataSymbolSearchResponse>.Success(response);
+    }
+
+    public async Task<MarketDataReadResult<MarketDataSymbol>> GetSymbolAsync(string symbol, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
+        {
+            return MarketDataReadResult<MarketDataSymbol>.Failure(availabilityError);
+        }
+
+        var providerResult = await provider.GetSymbolAsync(symbol, cancellationToken).ConfigureAwait(false);
+        return providerResult.IsSuccess && providerResult.Value is not null
+            ? providerResult
+            : MarketDataReadResult<MarketDataSymbol>.Failure(ToReadError(providerResult.Error));
+    }
+
+    public async Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
+        {
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(availabilityError);
+        }
+
+        var providerResult = await provider.GetCandlesAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        return providerResult.IsSuccess && providerResult.Value is not null
+            ? providerResult
+            : MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(providerResult.Error));
+    }
+
+    public async Task<MarketDataReadResult<IndicatorResponse>> GetIndicatorsAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
+        {
+            return MarketDataReadResult<IndicatorResponse>.Failure(availabilityError);
+        }
+
+        var providerResult = await provider.GetIndicatorsAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        return providerResult.IsSuccess && providerResult.Value is not null
+            ? providerResult
+            : MarketDataReadResult<IndicatorResponse>.Failure(ToReadError(providerResult.Error));
+    }
+
+    public async Task<MarketDataReadResult<MarketDataUpdate>> GetLatestUpdateAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
+        if (availabilityError is not null)
+        {
+            return MarketDataReadResult<MarketDataUpdate>.Failure(availabilityError);
+        }
+
+        var providerResult = await provider.GetLatestUpdateAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        return providerResult.IsSuccess && providerResult.Value is not null
+            ? providerResult
+            : MarketDataReadResult<MarketDataUpdate>.Failure(ToReadError(providerResult.Error));
+    }
+
     private static bool TryNormalizeSearchRequest(
         string? query,
         string? assetClass,
@@ -159,4 +285,14 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
         error = status.ToError();
         return false;
     }
+
+    private async Task<MarketDataError?> GetProviderAvailabilityErrorAsync(CancellationToken cancellationToken)
+    {
+        var status = await provider.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+        return status.IsAvailable ? null : status.ToError();
+    }
+
+    private static MarketDataError ToReadError(MarketDataError? error) => error ?? new MarketDataError(
+        MarketDataProviderErrorCodes.MarketDataRequestFailed,
+        "Market-data request failed.");
 }

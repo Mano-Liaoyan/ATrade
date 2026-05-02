@@ -155,12 +155,12 @@ static IResult ToMarketDataErrorResult(MarketDataError? error)
 {
     if (error is null)
     {
-        return Results.BadRequest(new MarketDataError("market-data-error", "Market-data request failed."));
+        return Results.BadRequest(new MarketDataError(MarketDataProviderErrorCodes.MarketDataRequestFailed, "Market-data request failed."));
     }
 
     return error.Code switch
     {
-        "unsupported-symbol" => Results.NotFound(error),
+        MarketDataProviderErrorCodes.UnsupportedSymbol => Results.NotFound(error),
         MarketDataProviderErrorCodes.ProviderNotConfigured or MarketDataProviderErrorCodes.ProviderUnavailable or MarketDataProviderErrorCodes.AuthenticationRequired => Results.Json(
             error,
             statusCode: StatusCodes.Status503ServiceUnavailable),

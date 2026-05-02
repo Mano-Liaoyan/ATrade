@@ -113,6 +113,35 @@ public sealed record MarketDataUpdate(
 
 public sealed record MarketDataError(string Code, string Message);
 
+public sealed record MarketDataReadResult<T> where T : class
+{
+    private MarketDataReadResult(T? value, MarketDataError? error)
+    {
+        Value = value;
+        Error = error;
+    }
+
+    public bool IsSuccess => Error is null;
+
+    public bool IsFailure => Error is not null;
+
+    public T? Value { get; }
+
+    public MarketDataError? Error { get; }
+
+    public static MarketDataReadResult<T> Success(T value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new MarketDataReadResult<T>(value, null);
+    }
+
+    public static MarketDataReadResult<T> Failure(MarketDataError error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return new MarketDataReadResult<T>(null, error);
+    }
+}
+
 public interface IMarketDataService
 {
     TrendingSymbolsResponse GetTrendingSymbols();
@@ -126,4 +155,84 @@ public interface IMarketDataService
     bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
     bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
+
+    Task<MarketDataReadResult<TrendingSymbolsResponse>> GetTrendingSymbolsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            return Task.FromResult(MarketDataReadResult<TrendingSymbolsResponse>.Success(GetTrendingSymbols()));
+        }
+        catch (MarketDataProviderUnavailableException exception)
+        {
+            return Task.FromResult(MarketDataReadResult<TrendingSymbolsResponse>.Failure(exception.Error));
+        }
+    }
+
+    Task<MarketDataReadResult<MarketDataSymbolSearchResponse>> SearchSymbolsAsync(
+        string? query,
+        string? assetClass,
+        int? limit,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            TrySearchSymbols(query, assetClass, limit, out var response, out var error) && response is not null
+                ? MarketDataReadResult<MarketDataSymbolSearchResponse>.Success(response)
+                : MarketDataReadResult<MarketDataSymbolSearchResponse>.Failure(ToReadError(error)));
+    }
+
+    Task<MarketDataReadResult<MarketDataSymbol>> GetSymbolAsync(string symbol, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            TryGetSymbol(symbol, out var marketSymbol) && marketSymbol is not null
+                ? MarketDataReadResult<MarketDataSymbol>.Success(marketSymbol)
+                : MarketDataReadResult<MarketDataSymbol>.Failure(new MarketDataError(
+                    MarketDataProviderErrorCodes.UnsupportedSymbol,
+                    $"Market-data provider returned no symbol metadata for '{symbol}'.")));
+    }
+
+    Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            TryGetCandles(symbol, timeframe, out var response, out var error, identity) && response is not null
+                ? MarketDataReadResult<CandleSeriesResponse>.Success(response)
+                : MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(error)));
+    }
+
+    Task<MarketDataReadResult<IndicatorResponse>> GetIndicatorsAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            TryGetIndicators(symbol, timeframe, out var response, out var error, identity) && response is not null
+                ? MarketDataReadResult<IndicatorResponse>.Success(response)
+                : MarketDataReadResult<IndicatorResponse>.Failure(ToReadError(error)));
+    }
+
+    Task<MarketDataReadResult<MarketDataUpdate>> GetLatestUpdateAsync(
+        string symbol,
+        string? timeframe,
+        MarketDataSymbolIdentity? identity = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            TryGetLatestUpdate(symbol, timeframe, out var update, out var error, identity) && update is not null
+                ? MarketDataReadResult<MarketDataUpdate>.Success(update)
+                : MarketDataReadResult<MarketDataUpdate>.Failure(ToReadError(error)));
+    }
+
+    private static MarketDataError ToReadError(MarketDataError? error) => error ?? new MarketDataError(
+        MarketDataProviderErrorCodes.MarketDataRequestFailed,
+        "Market-data request failed.");
 }

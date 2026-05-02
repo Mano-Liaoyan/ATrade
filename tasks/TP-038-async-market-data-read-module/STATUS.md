@@ -23,16 +23,16 @@
 ---
 
 ### Step 1: Define one async read-result interface
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expanded after inspecting the current synchronous `IMarketDataService`, `IMarketDataProvider`, HTTP handlers, SignalR hub, and provider-abstraction tests.
 
-- [ ] `MarketDataReadResult<T>` and async read methods for trending, search, symbol lookup, candles, indicators, and latest updates are defined with cancellation-token parameters
-- [ ] `MarketDataService` maps provider status, provider errors, validation errors, and successful payloads into the new read-result shape without async caller status checks
-- [ ] Existing HTTP payload/status behavior preserved
-- [ ] New async read module test file added
-- [ ] Async read module tests cover success, unavailable, invalid request, and cancellation behavior
-- [ ] Targeted provider-abstraction tests passing
+- [x] `MarketDataReadResult<T>` and async read methods for trending, search, symbol lookup, candles, indicators, and latest updates are defined with cancellation-token parameters
+- [x] `MarketDataService` maps provider status, provider errors, validation errors, and successful payloads into the new read-result shape without async caller status checks
+- [x] Existing HTTP payload/status behavior preserved
+- [x] New async read module test file added
+- [x] Async read module tests cover success, unavailable, invalid request, and cancellation behavior
+- [x] Targeted provider-abstraction tests passing
 
 ---
 
@@ -98,6 +98,7 @@
 | 2026-05-02 14:52 | Step 0 started | Preflight |
 | 2026-05-02 14:52 | Step 0 completed | Required files, TP-037 dependency, .NET SDK, and solution projects verified |
 | 2026-05-02 14:53 | Step 1 hydrated | Planned async read-result shape, service mapping, payload stability, and targeted tests |
+| 2026-05-02 14:56 | Step 1 completed | Async read-result contract added; provider-abstraction tests passed (12/12) |
 
 ---
 
