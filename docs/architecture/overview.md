@@ -29,10 +29,11 @@ see_also:
 > `ATrade.Brokers` defines the provider-neutral broker contract,
 > `ATrade.Brokers.Ibkr` supplies the paper-only IBKR implementation,
 > `ATrade.Orders` owns deterministic paper-order simulation,
-> `ATrade.MarketData` supplies provider-neutral market-data contracts,
-> `ATrade.MarketData.Ibkr` supplies provider-backed IBKR/iBeam market data,
-> `ATrade.MarketData.Timescale` supplies TimescaleDB persistence plus API
-> cache-aside for candles and scanner/trending snapshots, and `ATrade.Workspaces`
+> `ATrade.MarketData` supplies provider-neutral market-data contracts and the
+> backend-owned Exact Instrument Identity helper, `ATrade.MarketData.Ibkr`
+> supplies provider-backed IBKR/iBeam market data, `ATrade.MarketData.Timescale`
+> supplies TimescaleDB persistence plus API cache-aside for candles and
+> scanner/trending snapshots with provider/market identity metadata, and `ATrade.Workspaces`
 > persists exact provider/market watchlist pins in Postgres. The AppHost graph
 > forwards the safe IBKR/iBeam paper-mode environment contract into `ATrade.Api`
 > and `ATrade.Ibkr.Worker`, provides the `postgres` connection string consumed by
@@ -187,10 +188,10 @@ Postgres schema for pinned workspace watchlists through the AppHost-provided
 backed by `ATRADE_POSTGRES_DATA_VOLUME` (default `atrade-postgres-data`) and a
 stable local-dev `ATRADE_POSTGRES_PASSWORD` secret parameter, so watchlist rows
 survive a full local `start run` stop/start cycle when the same volume is reused.
-Rows use a durable `instrument_key` derived from provider, provider id / IBKR
-`conid`, symbol, exchange, currency, and asset class, plus a temporary
-`local-user` / `paper-trading` identity seam until authentication and named
-workspaces exist.
+Rows use a durable `instrument_key` derived through the backend exact identity
+helper from provider, provider id / IBKR `conid`, symbol, exchange, currency,
+and asset class, plus a temporary `local-user` / `paper-trading` identity seam
+until authentication and named workspaces exist.
 
 ### 4.2 TimescaleDB — time-series workloads
 
@@ -199,10 +200,12 @@ time-stamped series ATrade generates (e.g. strategy evaluation ticks,
 backtest outputs, broker event streams at observation granularity). The current
 market-data foundation owns an `atrade_market_data` schema for provider-backed
 OHLCV candles and scanner/trending snapshots through
-`ATrade.MarketData.Timescale`; API cache-aside reads decide whether rows are
-fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, return cache
-hits with `timescale-cache:{originalSource}` source metadata, and refresh from
-the provider when rows are missing or stale. The AppHost-managed `timescaledb`
+`ATrade.MarketData.Timescale`; rows preserve provider symbol id, exchange,
+currency, and asset class where available. API cache-aside reads decide whether
+rows are fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, return
+cache hits with `timescale-cache:{originalSource}` source metadata and identity
+metadata, optionally filter exact chart reads by provider/market query metadata,
+and refresh from the provider when rows are missing or stale. The AppHost-managed `timescaledb`
 data directory is volume-backed with `ATRADE_TIMESCALEDB_DATA_VOLUME` (default
 `atrade-timescaledb-data`) and a stable `ATRADE_TIMESCALEDB_PASSWORD`, so fresh
 market-data cache rows survive a full local `start run` stop/start cycle when

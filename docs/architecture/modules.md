@@ -30,12 +30,14 @@ see_also:
 > credentials-missing, configured-iBeam, connecting/authenticated/degraded,
 > and rejected-live statuses while remaining intentionally light on broker-side state.
 > `ATrade.MarketData` now provides provider-neutral market-data contracts,
-> compatibility services, provider status/error shapes, stock search contracts,
+> compatibility services, provider status/error shapes, the backend-owned
+> `ExactInstrumentIdentity` normalization/key helper, stock search contracts,
 > and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
 > first real IBKR/iBeam market-data provider including secdef search/detail
 > mapping. `ATrade.MarketData.Timescale` now provides the TimescaleDB persistence
 > foundation plus the API cache-aside decorator for provider-backed candles and
-> scanner/trending snapshots. `ATrade.Analysis` now defines the
+> scanner/trending snapshots while preserving provider/market identity metadata.
+> `ATrade.Analysis` now defines the
 > provider-neutral analysis engine seam, API-facing registry, normalized request/result shapes, engine/source
 > metadata, and no-configured-engine fallback. `ATrade.Analysis.Lean` now
 > implements LEAN as the first analysis engine provider behind that seam using
@@ -264,12 +266,15 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** Market data ingestion, storage, and query.
 - **Responsibilities:** In the current slice, provide provider-neutral
   market-data provider contracts, provider identity/capability/status models,
-  symbol identity and stock-search contracts, OHLCV candle and indicator
-  payload shapes with source metadata, compatibility services for the existing
-  HTTP/SignalR API, moving-average / RSI / MACD indicator calculations,
-  transparent trending factors, and a SignalR hub/snapshot service consumed by
-  `ATrade.Api`. Search results include provider, provider symbol id, asset
-  class, exchange, currency, and name so UI/watchlist payloads remain provider-neutral.
+  the `ExactInstrumentIdentity` helper that owns normalization/defaulting/key
+  encoding/equality for provider/market identity, symbol identity and stock-search
+  contracts, OHLCV candle and indicator payload shapes with source metadata,
+  compatibility services for the existing HTTP/SignalR API, moving-average / RSI
+  / MACD indicator calculations, transparent trending factors, and a SignalR
+  hub/snapshot service consumed by `ATrade.Api`. Search results, provider-backed
+  trending symbols, candles, indicators, and latest updates include provider,
+  provider symbol id, asset class, exchange, currency, and name/identity metadata
+  where available so UI/watchlist/chart payloads remain provider-neutral.
   Concrete providers are registered by composition; production no
   longer ships a deterministic market-data provider or catalog fallback. The
   Timescale persistence and cache-aside integration now live in
@@ -296,7 +301,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   decorator used by `ATrade.Api`. Storage records provider metadata as generic
   `provider` / `provider_symbol_id` fields plus symbol, exchange, currency,
   asset class, source, generated/observed timestamps, and write timestamps.
-  The decorator reads fresh rows before provider calls for trending, candles, and
+  Fresh reads keep bare-symbol compatibility and can additionally filter by exact
+  provider symbol id / exchange / currency / asset class when callers supply
+  identity metadata. The decorator reads fresh rows before provider calls for trending, candles, and
   indicator candle inputs; writes provider responses after cache misses or stale
   rows; returns cache hits with `timescale-cache:{originalSource}` source
   metadata; and falls back to provider behavior when Timescale storage is
@@ -360,8 +367,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 
 - **Purpose:** Workspace preference and personalization persistence.
 - **Responsibilities:** Own the local user/workspace identity abstraction,
-  symbol normalization/validation, idempotent Postgres schema initialization,
-  and repository operations for pinned watchlist instruments. The current schema
+  symbol normalization/validation delegated to `ATrade.MarketData.ExactInstrumentIdentity`,
+  idempotent Postgres schema initialization, and repository operations for pinned
+  watchlist instruments. The current schema
   stores `user_id`, `workspace_id`, durable `instrument_key`, normalized symbol,
   provider, optional provider symbol id / IBKR `conid`, display name, exchange,
   currency, asset class, sort order, and timestamps. It deduplicates only exact
@@ -369,7 +377,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   be pinned for multiple exchanges/currencies, and rejects legacy symbol deletes
   when they would be ambiguous. The local identity provider is explicitly
   temporary until authentication and named workspaces are introduced.
-- **Expected dependencies:** `Postgres` via the AppHost-provided
+- **Expected dependencies:** `ATrade.MarketData` for backend-owned exact
+  identity normalization/key construction, `Postgres` via the AppHost-provided
   `ConnectionStrings:postgres`, `Microsoft.Extensions.Configuration`,
   `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. The AppHost-managed
   Postgres data directory is volume-backed so these preferences survive full

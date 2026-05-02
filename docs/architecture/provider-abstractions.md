@@ -88,23 +88,30 @@ Core types:
   candles, indicators, streaming snapshots, symbol search, and mock-data usage.
 - `MarketDataProviderStatus` — provider id, `available` / `not-configured` /
   `unavailable` state, message, observation time, and capabilities.
-- `MarketDataSymbolIdentity`, `MarketDataSymbolSearchResult`,
-  `MarketDataSymbolSearchResponse`, `OhlcvCandle`, `CandleSeriesResponse`,
-  `IndicatorResponse`, `MarketDataUpdate`, and trending response records — the
-  payload-safe domain shapes providers must emit. Search identity includes
-  `symbol`, `provider`, `providerSymbolId`, `assetClass`, `exchange`, and
-  `currency`; for IBKR the provider symbol id is the Client Portal `conid`.
-  Downstream watchlist pins must treat this provider/market tuple as the exact
-  instrument identity rather than collapsing results to a bare symbol or display
-  name; `ATrade.Workspaces` exposes the normalized tuple as `instrumentKey` and
-  `pinKey` when a result is persisted. Other payloads include source metadata
-  such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, scanner source ids, or
-  `timescale-cache:{originalSource}` when a fresh persisted Timescale row serves
-  the API response, including after a full AppHost restart when the row remains
-  inside the configured freshness window on the volume-backed TimescaleDB data
-  directory. The Timescale persistence layer stores provider metadata
-  generically as `provider`, `provider_symbol_id`, symbol, exchange, currency,
-  asset class, source, and timestamps; it must not persist frontend-only or
+- `ExactInstrumentIdentity`, `MarketDataSymbolIdentity`,
+  `MarketDataSymbolSearchResult`, `MarketDataSymbolSearchResponse`,
+  `OhlcvCandle`, `CandleSeriesResponse`, `IndicatorResponse`,
+  `MarketDataUpdate`, and trending response records — the payload-safe domain
+  shapes providers must emit. `ExactInstrumentIdentity` is the backend-owned
+  normalization/key/equality helper for provider, provider symbol id, symbol,
+  exchange, currency, and asset class; for IBKR the provider symbol id is the
+  Client Portal `conid`. Search results, trending symbols, candle series,
+  indicators, and latest updates carry `MarketDataSymbolIdentity` where provider
+  metadata is available while preserving the existing symbol/source fields for
+  callers that only know a bare symbol. Downstream watchlist pins must treat this
+  provider/market tuple as the exact instrument identity rather than collapsing
+  results to a bare symbol or display name; `ATrade.Workspaces` delegates key
+  construction to the backend identity helper and exposes the normalized tuple as
+  `instrumentKey` and `pinKey` when a result is persisted. Other payloads include
+  source metadata such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, scanner
+  source ids, or `timescale-cache:{originalSource}` when a fresh persisted
+  Timescale row serves the API response, including after a full AppHost restart
+  when the row remains inside the configured freshness window on the
+  volume-backed TimescaleDB data directory. The Timescale persistence layer
+  stores provider metadata generically as `provider`, `provider_symbol_id`,
+  symbol, exchange, currency, asset class, source, and timestamps, and exact
+  read filters can use that metadata without changing the legacy
+  `/api/market-data/{symbol}/...` paths; it must not persist frontend-only or
   IBKR-only API types.
 
 Compatibility layer:
@@ -112,7 +119,9 @@ Compatibility layer:
 - `IMarketDataService` remains the HTTP-facing compatibility service used by
   existing endpoints, including `GET /api/market-data/search`.
 - `MarketDataService` composes `IMarketDataProvider`, validates stock search
-  query length/asset class/result limit, and preserves endpoint payload behavior.
+  query length/asset class/result limit, forwards optional exact identity
+  metadata for candle/indicator/latest reads, and preserves endpoint payload
+  behavior for callers that only supply a symbol.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`.
 - Production provider composition is now `ATrade.MarketData.Ibkr`; the former

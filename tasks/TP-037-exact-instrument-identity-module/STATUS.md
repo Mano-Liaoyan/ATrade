@@ -1,7 +1,7 @@
 # TP-037: Deepen the Exact Instrument Identity module — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-02
 **Review Level:** 2
 **Review Counter:** 0
@@ -65,11 +65,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -84,6 +84,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Exact Instrument Identity is now a backend-owned `ATrade.MarketData` helper, so `ATrade.Workspaces` legitimately references `ATrade.MarketData` for key normalization instead of duplicating key construction. | Implemented and documented | `src/ATrade.MarketData/ExactInstrumentIdentity.cs`, `src/ATrade.Workspaces/ATrade.Workspaces.csproj` |
+| Timescale already had generic provider/market columns; the missing seam was carrying identity from provider payloads and applying optional exact filters during cache reads. | Implemented and documented | `src/ATrade.MarketData.Timescale/*` |
+| `next build` rewrites `frontend/next-env.d.ts` between dev and production route type imports; generated changes were reverted rather than committed. | No durable source change | `frontend/next-env.d.ts` |
 
 ---
 

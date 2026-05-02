@@ -33,12 +33,16 @@ implementation queue.
 
 ## Domain Vocabulary
 
-- **Exact Instrument Identity** — the provider-neutral identity tuple for a
-  tradable or chartable instrument: provider, provider symbol id, symbol,
-  exchange, currency, and asset class. Backend-owned persisted keys derive from
-  this tuple; frontend code may compute provisional keys only for optimistic UI
-  state until the backend returns authoritative `instrumentKey` / `pinKey`
-  values.
+- **Exact Instrument Identity** — the backend-owned provider-neutral identity
+  tuple for a tradable or chartable instrument: provider, provider symbol id,
+  symbol, exchange, currency, and asset class, normalized by
+  `ATrade.MarketData.ExactInstrumentIdentity`. Provider-backed market-data
+  search, trending, candle, indicator, latest-update, Timescale cache, and
+  watchlist flows carry this identity where available. Backend-owned persisted
+  keys derive from the normalized tuple and retain the legacy
+  `instrumentKey` / `pinKey` segment shape; frontend code may compute
+  provisional keys only for optimistic UI state until the backend returns
+  authoritative `instrumentKey` / `pinKey` values.
 
 ## Active Task Queue
 

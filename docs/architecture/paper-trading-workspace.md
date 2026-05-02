@@ -130,8 +130,12 @@ provider-backed `MarketDataService` and the `ATrade.MarketData.Ibkr` provider.
 Trending and candle requests initialize the Timescale schema idempotently, read
 fresh rows newer than `now - ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` before
 calling IBKR/iBeam, and return cache hits as the same provider-neutral payloads
-with source metadata such as `timescale-cache:ibkr-ibeam-history` or
-`timescale-cache:ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`. The AppHost
+with exact identity metadata and source metadata such as
+`timescale-cache:ibkr-ibeam-history` or
+`timescale-cache:ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`. Candle and
+indicator reads keep the legacy `/api/market-data/{symbol}/...` paths while
+accepting optional `provider`, `providerSymbolId`, `exchange`, `currency`, and
+`assetClass` query metadata for exact cache filtering/chart handoff. The AppHost
 `timescaledb` resource is backed by a named data volume, so those fresh rows can
 survive a full `start run` / AppHost stop-start cycle and serve the API after
 reboot without another provider call. Missing or stale rows trigger the
@@ -143,7 +147,9 @@ and MACD payloads for `1m`, `5m`, `1h`, and `1D`. The search endpoint remains
 provider-backed, enforces a minimum query length, stock-only asset class, and a
 capped result limit before returning provider-neutral `symbol`, `name`,
 `assetClass`, `exchange`, `currency`, `provider`, and provider-symbol-id
-metadata (IBKR `conid` for the current provider). SignalR is the outward-facing
+metadata (IBKR `conid` for the current provider). Provider-backed search,
+trending, candle, indicator, and latest-update payloads carry
+`MarketDataSymbolIdentity` where available. SignalR is the outward-facing
 streaming layer for browsers and creates provider-backed snapshots when the
 IBKR/iBeam provider is available. The analysis endpoints resolve
 `IAnalysisEngineRegistry`; they return explicit `analysis-engine-not-configured`
@@ -168,7 +174,8 @@ The paper-trading slice extends existing planned responsibilities as follows:
   fills; the current backend slice already returns deterministic simulated
   fills directly from this module
 - `ATrade.MarketData` owns provider-neutral quote/bar contracts, provider
-  status/error states, symbol-search readiness hooks, historical chart queries,
+  status/error states, the `ExactInstrumentIdentity` backend normalization/key
+  helper, symbol-search readiness hooks, historical chart queries,
   compatibility services, and SignalR snapshot contracts
 - `ATrade.MarketData.Ibkr` owns the first real market-data provider: IBKR/iBeam
   Client Portal contract search/detail lookup, scanner/trending-equivalent
@@ -178,9 +185,12 @@ The paper-trading slice extends existing planned responsibilities as follows:
 - `ATrade.MarketData.Timescale` owns provider-neutral TimescaleDB persistence
   and the API cache-aside decorator for provider-backed OHLCV candle series and
   scanner/trending snapshots. It creates the `atrade_market_data` schema, stores
-  provider metadata as generic `provider` / `provider_symbol_id` values, exposes
-  freshness-aware repository contracts, and wraps the provider-backed market-data
-  service so fresh rows can serve HTTP trending, candle, and indicator requests.
+  provider metadata as generic `provider` / `provider_symbol_id` values plus
+  symbol, exchange, currency, and asset class, exposes freshness-aware repository
+  contracts with optional exact identity filters, and wraps the provider-backed
+  market-data service so fresh rows can serve HTTP trending, candle, and
+  indicator requests without collapsing provider-backed instruments to a bare
+  symbol.
 - `ATrade.Analysis` owns the provider-neutral analysis engine seam, normalized
   request/result contracts, engine/source metadata, API-facing registry, and
   no-configured-engine fallback for LEAN or alternate analysis runtimes
@@ -369,9 +379,11 @@ not just an API process restart. The current foundation creates an
 snapshot tables for provider-backed market data:
 
 - historical OHLCV bars for charts, keyed by provider, source, symbol, timeframe,
-  and candle timestamp
+  and candle timestamp, with provider symbol id, exchange, currency, and asset
+  class metadata persisted where available for exact cache reads
 - scanner/trending snapshots with provider-neutral symbol identity, source,
-  generated timestamp, score/factor details, and reasons metadata
+  generated timestamp, score/factor details, reasons metadata, and provider/market
+  identity fields
 - derived factor time series used by trending calculations
 
 `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` controls the non-secret freshness
@@ -458,8 +470,9 @@ and unpins through the backend watchlist API, then updates its browser cache
 from the backend response. Search-result pins send the provider-neutral metadata
 returned by `GET /api/market-data/search`: provider, provider symbol id (IBKR
 `conid` today), optional `ibkrConid`, name, exchange, currency, and asset class.
-The backend normalizes those fields into a stable `instrumentKey`/`pinKey` tuple
-and uses it as the Postgres identity; pinning `AAPL` on NASDAQ and `AAPL` on LSE
+The backend normalizes those fields through `ATrade.MarketData.ExactInstrumentIdentity`
+into a stable `instrumentKey`/`pinKey` tuple and uses it as the Postgres
+identity; pinning `AAPL` on NASDAQ and `AAPL` on LSE
 creates two rows, and unpinning one exact key must not remove the other. Legacy
 `DELETE /api/workspace/watchlist/{symbol}` is kept only for unambiguous
 symbol-only rows; exact removals use
@@ -541,14 +554,16 @@ Users are no longer constrained to a trending/default list. The reusable
 `frontend/lib/marketDataClient.ts`, renders IBKR/iBeam stock results with local
 non-proprietary market/exchange badges and explicit provider, market/exchange,
 currency, asset class, and provider id/IBKR `conid` metadata, links each result
-to `/symbols/{symbol}`, and can pin/unpin the selected exact provider-market
-instrument through the backend watchlist API. The frontend uses provider-neutral
-fields (`provider`, `providerSymbolId`, `assetClass`, `exchange`, `currency`,
-and display `name`) to compute the same instrument key as the backend and only
-derives `ibkrConid` for persisted metadata when the provider is `ibkr` and the
-provider symbol id is numeric. Duplicate search results sharing a symbol or
-company name are keyed and rendered by exact instrument identity, not by bare
-symbol.
+to `/symbols/{symbol}` with exact identity query state when metadata is
+available, and can pin/unpin the selected exact provider-market instrument
+through the backend watchlist API. The frontend uses the centralized
+`frontend/lib/instrumentIdentity.ts` adapter to compute provisional optimistic
+keys, normalize asset classes, parse an IBKR `conid` only when the provider is
+`ibkr` and the provider symbol id is numeric, and build exact chart handoff query
+strings. Backend-owned `instrumentKey` / `pinKey` values returned by watchlist
+responses remain authoritative for persisted pins. Duplicate search results
+sharing a symbol or company name are keyed and rendered by exact instrument
+identity, not by bare symbol.
 
 The backend search path uses IBKR Client Portal `/iserver/secdef/search` plus
 `/iserver/secdef/info` enrichment when Client Portal accepts the detail request;

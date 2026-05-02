@@ -97,7 +97,12 @@ The current runnable slice includes:
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
-`ATrade.MarketData` contracts. When the local iBeam/Gateway runtime is
+`ATrade.MarketData` contracts. `ATrade.MarketData.ExactInstrumentIdentity` owns
+backend normalization/key encoding for provider, provider symbol id, symbol,
+exchange, currency, and asset class; search, trending, candle, indicator,
+latest-update, Timescale cache, and watchlist flows carry that identity where
+provider metadata is available while keeping legacy symbol-only HTTP paths
+compatible. When the local iBeam/Gateway runtime is
 configured with the HTTPS Client Portal URL (`https://127.0.0.1:<gateway-port>`),
 the AppHost-mounted iBeam inputs config allows the local/private Docker bridge
 source addresses that published-port requests use, and iBeam is authenticated
@@ -120,10 +125,11 @@ survive full local AppHost stop/start cycles when the same Postgres data volume
 and stable password are reused. Browser `localStorage` is only a
 non-authoritative symbol-only cache / one-time manual migration source. Users can search IBKR/iBeam stocks through
 `/api/market-data/search`, see explicit provider/market/exchange/currency/asset
-class metadata with local market badges, open result chart pages, and pin exact
-provider-market metadata (`provider`, provider symbol id / IBKR `conid`, name,
-exchange, currency, and asset class) into the backend watchlist without a
-production hard-coded symbol catalog. Analysis engine discovery/run contracts are available through
+class metadata with local market badges, open result chart pages that preserve
+exact identity in query state when available, and pin exact provider-market
+metadata (`provider`, provider symbol id / IBKR `conid`, name, exchange,
+currency, and asset class) into the backend watchlist without a production
+hard-coded symbol catalog. Analysis engine discovery/run contracts are available through
 `/api/analysis/engines` and `/api/analysis/run`. With no provider selected they
 return explicit `analysis-engine-not-configured` metadata with no fake signals;
 when ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers
