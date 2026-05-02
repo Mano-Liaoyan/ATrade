@@ -1,7 +1,7 @@
 # TP-038: Deepen the async market-data read module — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-02
 **Review Level:** 2
 **Review Counter:** 0
@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Full `dotnet test ATrade.slnx --nologo --verbosity minimal` initially hit MSBuild worker-node OOM because stale build nodes were consuming thread/memory resources; the suite passed after shutting down build servers and rerunning with `--disable-build-servers -m:1`. | Logged for verification context; no product code blocker. | Step 4 execution |
 
 ---
 
@@ -105,6 +106,8 @@
 | 2026-05-02 15:24 | Step 3 completed | API, SignalR, and analysis callers await async read seam; targeted apphost scripts passed |
 | 2026-05-02 15:25 | Step 4 started | Running full test, integration, failure-fix, and build gates |
 | 2026-05-02 15:39 | Step 4 completed | Full tests passed with constrained MSBuild after OOM retry; integration scripts and build passed |
+| 2026-05-02 15:40 | Step 5 started | Updating required architecture docs and recording affected-doc review |
+| 2026-05-02 15:46 | Step 5 completed | Required docs updated, affected docs reviewed, and discoveries logged |
 
 ---
 
@@ -116,4 +119,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Step 5 Check If Affected review: `docs/architecture/analysis-engines.md` updated because analysis candle acquisition now awaits the async market-data seam; `README.md` reviewed and left unchanged because endpoint names, response payloads, status codes, and runtime summary remain compatible.

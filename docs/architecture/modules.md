@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-01
+updated: 2026-05-02
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker and market-data seams.
 see_also:
   - ../INDEX.md
@@ -29,10 +29,10 @@ see_also:
 > simulation, and `ATrade.Ibkr.Worker` now reports safe disabled,
 > credentials-missing, configured-iBeam, connecting/authenticated/degraded,
 > and rejected-live statuses while remaining intentionally light on broker-side state.
-> `ATrade.MarketData` now provides provider-neutral market-data contracts,
-> compatibility services, provider status/error shapes, the backend-owned
-> `ExactInstrumentIdentity` normalization/key helper, stock search contracts,
-> and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
+> `ATrade.MarketData` now provides provider-neutral async market-data read
+> contracts, compatibility services, provider status/error shapes, the
+> backend-owned `ExactInstrumentIdentity` normalization/key helper, stock search
+> contracts, and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
 > first real IBKR/iBeam market-data provider including secdef search/detail
 > mapping. `ATrade.MarketData.Timescale` now provides the TimescaleDB persistence
 > foundation plus the API cache-aside decorator for provider-backed candles and
@@ -264,9 +264,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 ### 2.7 `ATrade.MarketData` *(exists today, provider-neutral market-data slice)*
 
 - **Purpose:** Market data ingestion, storage, and query.
-- **Responsibilities:** In the current slice, provide provider-neutral
-  market-data provider contracts, provider identity/capability/status models,
-  the `ExactInstrumentIdentity` helper that owns normalization/defaulting/key
+- **Responsibilities:** In the current slice, provide provider-neutral async
+  market-data provider/read contracts, provider identity/capability/status
+  models, `MarketDataReadResult<T>` / `MarketDataError` result shapes, the
+  `ExactInstrumentIdentity` helper that owns normalization/defaulting/key
   encoding/equality for provider/market identity, symbol identity and stock-search
   contracts, OHLCV candle and indicator payload shapes with source metadata,
   compatibility services for the existing HTTP/SignalR API, moving-average / RSI
@@ -278,8 +279,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   Concrete providers are registered by composition; production no
   longer ships a deterministic market-data provider or catalog fallback. The
   Timescale persistence and cache-aside integration now live in
-  `ATrade.MarketData.Timescale`; API trending, candle, and indicator reads can
-  use fresh stored rows before refreshing from providers. Future slices may
+  `ATrade.MarketData.Timescale`; API trending, search, symbol, candle,
+  indicator, latest-update, SignalR snapshot, and analysis candle callers await
+  the async seam, and cache-aware reads can use fresh stored rows before
+  refreshing from providers. Future slices may
   publish real-time updates onto NATS for API / SignalR projection and cache hot
   reads in Redis.
 - **Expected dependencies:** No external runtime services in the contract module
@@ -297,15 +300,16 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   Timescale initialization for candle and scanner/trending snapshot hypertables,
   repository contracts for upserting/reading fresh candle series and trending
   snapshots, typed cache freshness options from
-  `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, and the `IMarketDataService`
-  decorator used by `ATrade.Api`. Storage records provider metadata as generic
+  `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, and the async
+  `IMarketDataService` decorator used by `ATrade.Api`. Storage records provider metadata as generic
   `provider` / `provider_symbol_id` fields plus symbol, exchange, currency,
   asset class, source, generated/observed timestamps, and write timestamps.
   Fresh reads keep bare-symbol compatibility and can additionally filter by exact
   provider symbol id / exchange / currency / asset class when callers supply
-  identity metadata. The decorator reads fresh rows before provider calls for trending, candles, and
-  indicator candle inputs; writes provider responses after cache misses or stale
-  rows; returns cache hits with `timescale-cache:{originalSource}` source
+  identity metadata. The decorator awaits fresh rows before provider calls for
+  trending, candles, and indicator candle inputs; writes provider responses after
+  cache misses or stale rows without sync-over-async; returns cache hits with
+  `timescale-cache:{originalSource}` source
   metadata; and falls back to provider behavior when Timescale storage is
   unavailable. AppHost persists the `timescaledb` data directory in
   `ATRADE_TIMESCALEDB_DATA_VOLUME` (default `atrade-timescaledb-data`) with a

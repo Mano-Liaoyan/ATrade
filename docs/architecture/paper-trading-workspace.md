@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-01
+updated: 2026-05-02
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
@@ -124,9 +124,10 @@ exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
 `GET /api/analysis/engines`, `POST /api/analysis/run`, and the
 `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
-`IBrokerProvider` contract. The market-data endpoints use `IMarketDataService`; in the current API
-composition that contract is a Timescale-backed cache-aside service over the
-provider-backed `MarketDataService` and the `ATrade.MarketData.Ibkr` provider.
+`IBrokerProvider` contract. The market-data endpoints await the async
+`IMarketDataService` read seam; in the current API composition that contract is a
+Timescale-backed cache-aside service over the provider-backed `MarketDataService`
+and the `ATrade.MarketData.Ibkr` provider.
 Trending and candle requests initialize the Timescale schema idempotently, read
 fresh rows newer than `now - ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES` before
 calling IBKR/iBeam, and return cache hits as the same provider-neutral payloads
@@ -150,11 +151,12 @@ capped result limit before returning provider-neutral `symbol`, `name`,
 metadata (IBKR `conid` for the current provider). Provider-backed search,
 trending, candle, indicator, and latest-update payloads carry
 `MarketDataSymbolIdentity` where available. SignalR is the outward-facing
-streaming layer for browsers and creates provider-backed snapshots when the
+streaming layer for browsers and awaits `IMarketDataStreamingService`, which
+owns provider-status checks and creates provider-backed snapshots when the
 IBKR/iBeam provider is available. The analysis endpoints resolve
 `IAnalysisEngineRegistry`; they return explicit `analysis-engine-not-configured`
 metadata when no engine is selected and run the configured LEAN provider over
-`IMarketDataService` candles when `ATRADE_ANALYSIS_ENGINE=Lean`; in Docker mode
+async `IMarketDataService` candle reads when `ATRADE_ANALYSIS_ENGINE=Lean`; in Docker mode
 that provider uses the AppHost-managed `lean-engine` runtime and returns explicit
 `analysis-engine-unavailable` errors when the managed runtime is absent or
 unreachable. NATS remains the internal event backbone between API and workers.
@@ -290,7 +292,7 @@ source**:
 
 - the frontend consumes provider-neutral quotes/bars/trending updates from
   `ATrade.Api` over HTTP + SignalR
-- `ATrade.Api` talks to `IMarketDataService` / `IMarketDataStreamingService`,
+- `ATrade.Api` awaits `IMarketDataService` / `IMarketDataStreamingService`,
   which compose swappable provider contracts under `ATrade.MarketData`
 - HTTP trending, candle, and indicator requests read fresh provider-backed rows
   from the AppHost volume-backed TimescaleDB cache before making a live
@@ -585,7 +587,7 @@ When no provider is configured, those endpoints still return explicit
 `analysis-engine-not-configured` metadata rather than fake signals. When an
 ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
 LEAN provider and `POST /api/analysis/run` can fetch normalized candles through
-the cache-aware `IMarketDataService` before invoking LEAN. Docker mode is the
+the async cache-aware `IMarketDataService` before invoking LEAN. Docker mode is the
 no-paid-account local path: the local Aspire graph shows `lean-engine`,
 bind-mounts the generated-workspace root, and passes container metadata to the
 API so execution uses `docker exec` to invoke `dotnet

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-30
+updated: 2026-05-02
 summary: Provider-neutral broker, market-data, and analysis provider contracts for swapping ATrade providers without changing API or frontend payloads.
 see_also:
   - ../INDEX.md
@@ -79,10 +79,14 @@ Market-data provider contracts live in `src/ATrade.MarketData`.
 
 Core types:
 
-- `IMarketDataProvider` — provider seam for trending/scanner results, stock
-  search, symbol lookup, historical candles, indicators, and latest snapshots.
-- `IMarketDataStreamingProvider` — streaming snapshot/group-name seam used by
-  the SignalR compatibility layer.
+- `IMarketDataProvider` — async provider seam for trending/scanner results,
+  stock search, symbol lookup, historical candles, indicators, and latest
+  snapshots. Read methods accept cancellation tokens and return
+  `MarketDataReadResult<T>` so provider errors stay in the same payload-safe
+  shape instead of forcing callers to inspect status first or catch unavailable
+  exceptions.
+- `IMarketDataStreamingProvider` — async streaming snapshot/group-name seam used
+  by the SignalR compatibility layer.
 - `MarketDataProviderIdentity` — stable provider id plus display name.
 - `MarketDataProviderCapabilities` — flags for trending scanner, historical
   candles, indicators, streaming snapshots, symbol search, and mock-data usage.
@@ -116,19 +120,24 @@ Core types:
 
 Compatibility layer:
 
-- `IMarketDataService` remains the HTTP-facing compatibility service used by
-  existing endpoints, including `GET /api/market-data/search`.
+- `IMarketDataService` is the async HTTP-facing read seam used by market-data
+  endpoints, SignalR-adjacent callers, and analysis request construction.
+  Trending, search, symbol lookup, candle, indicator, and latest-update reads all
+  return `MarketDataReadResult<T>` with the same `MarketDataError` codes the
+  browser already understands.
 - `MarketDataService` composes `IMarketDataProvider`, validates stock search
-  query length/asset class/result limit, forwards optional exact identity
-  metadata for candle/indicator/latest reads, and preserves endpoint payload
-  behavior for callers that only supply a symbol.
+  query length/asset class/result limit before provider calls, forwards optional
+  exact identity metadata for candle/indicator/latest reads, and preserves
+  endpoint payload/status behavior for callers that only supply a symbol.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility
-  service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`.
+  service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`
+  asynchronously and owns provider-status checks so hubs do not duplicate that
+  logic.
 - Production provider composition is now `ATrade.MarketData.Ibkr`; the former
   production market-data mock providers and catalog fallback have been removed.
 - `ATrade.MarketData.Timescale` is a storage/cache-aside module, not a market-data
   provider. In `ATrade.Api` it wraps the concrete provider-backed
-  `MarketDataService` behind `IMarketDataService`, reads fresh Timescale rows
+  `MarketDataService` behind `IMarketDataService`, awaits fresh Timescale rows
   before provider calls for trending/candle/indicator inputs, persists provider
   responses after cache misses, and preserves provider-neutral endpoint payloads.
   AppHost supplies `ConnectionStrings:timescaledb` from a volume-backed
@@ -142,9 +151,9 @@ Unavailable handling:
 - `unavailable` maps to `provider-unavailable`.
 - rejected Client Portal requests caused by unauthenticated iBeam sessions may
   surface `authentication-required` while still avoiding fake data.
-- Compatibility services return these safe errors for request/response methods
-  that already expose `MarketDataError`; provider tasks must not silently fall
-  back to synthetic data when iBeam is unavailable.
+- Async read services return these safe errors through `MarketDataReadResult<T>`;
+  provider tasks must not silently fall back to synthetic data when iBeam is
+  unavailable.
 - Timescale cache-aside is allowed to return a fresh persisted response while the
   provider is unavailable, including after an AppHost reboot, because the payload
   is still within the configured freshness window and its source is labeled as

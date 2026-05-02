@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-30
+updated: 2026-05-02
 summary: Provider-neutral analysis engine contract and the LEAN provider implementation for backtesting, signal, and metric providers without coupling API/frontend payloads to LEAN.
 see_also:
   - ../INDEX.md
@@ -77,9 +77,9 @@ The LEAN provider is registered only when configuration selects it.
   returns `engineId = "lean"` with signal/backtest/metric capabilities and
   `requiresExternalRuntime = true`.
 - `POST /api/analysis/run` — accepts a provider-neutral analysis request. When
-  callers supply only `symbolCode` + `timeframe`, the API obtains candles from
-  the configured `IMarketDataService` and builds an `AnalysisRequest` over those
-  normalized bars. With no configured provider, it returns HTTP 503 with
+  callers supply only `symbolCode` + `timeframe`, the API awaits the configured
+  async `IMarketDataService` candle read seam and builds an `AnalysisRequest`
+  over those normalized bars. With no configured provider, it returns HTTP 503 with
   `status = "not-configured"`, error code `analysis-engine-not-configured`, and
   no signals, metrics, or backtest summary. With LEAN selected, it forwards the
   normalized bars to `ATrade.Analysis.Lean`.
