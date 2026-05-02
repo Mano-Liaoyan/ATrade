@@ -1,6 +1,6 @@
 # TP-037: Deepen the Exact Instrument Identity module — Status
 
-**Current Step:** Step 1: Establish Exact Instrument Identity as the backend-owned interface
+**Current Step:** Step 2: Preserve identity through market-data and Timescale flows
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -35,11 +35,11 @@
 ---
 
 ### Step 2: Preserve identity through market-data and Timescale flows
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Provider-backed identity carried where available for search, trending, candles, indicators, and latest updates
-- [ ] Timescale models/queries preserve provider/market metadata where available
-- [ ] Bare-symbol legacy reads remain compatible
+- [ ] Market-data payload models and IBKR provider populate exact identity on search, trending, candles, indicators, and latest updates
+- [ ] Timescale cache-aside persists and rehydrates provider/market identity metadata for trending, candles, and indicator cache hits
+- [ ] Bare-symbol legacy reads and HTTP paths remain compatible while exact identity query filters are available for backend callers that supply metadata
 - [ ] Targeted market-data/provider/Timescale tests passing
 
 ---
