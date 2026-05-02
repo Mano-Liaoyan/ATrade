@@ -1,6 +1,6 @@
 # TP-037: Deepen the Exact Instrument Identity module — Status
 
-**Current Step:** Step 2: Preserve identity through market-data and Timescale flows
+**Current Step:** Step 3: Make frontend provisional identity use one adapter
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -45,11 +45,11 @@
 ---
 
 ### Step 3: Make frontend provisional identity use one adapter
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] TypeScript provisional identity/key adapter centralized
-- [ ] Backend-owned persisted keys remain authoritative after watchlist responses
-- [ ] Legacy `/symbols/{symbol}` behavior preserved while exact handoff is documented if added
+- [ ] Frontend identity adapter centralizes provisional watchlist keys, asset-class normalization, IBKR conid parsing, and chart query-string encoding
+- [ ] Workspace/search/trending/watchlist callers use the adapter while backend-owned persisted keys remain authoritative after watchlist responses
+- [ ] Legacy `/symbols/{symbol}` behavior remains compatible and exact identity handoff uses query state when metadata is available
 - [ ] Targeted frontend checks passing
 
 ---
