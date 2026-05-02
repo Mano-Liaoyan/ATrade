@@ -45,15 +45,21 @@ Core types:
 
 - `IAnalysisEngine` — concrete provider seam with `Metadata`, `Capabilities`,
   and `AnalyzeAsync`.
-- `IAnalysisEngineRegistry` — API-facing discovery/run seam that chooses a
-  configured engine or falls back to the no-engine result.
+- `IAnalysisEngineRegistry` — discovery/run seam that chooses a configured
+  engine or falls back to the no-engine result.
+- `IAnalysisRequestIntake` — API-facing run intake seam that turns direct bars
+  or symbol/timeframe requests into normalized `AnalysisRequest` instances,
+  propagates market-data read errors, and hands valid requests to the registry.
 - `AnalysisEngineMetadata` — stable engine id, display name, provider label,
   version, state, and optional message.
 - `AnalysisEngineCapabilities` — flags for signals, backtests, metrics,
   optimization, and external-runtime requirements.
-- `AnalysisRequest` — normalized request containing `MarketDataSymbolIdentity`,
-  timeframe, requested time, and `IReadOnlyList<OhlcvCandle>` bars from
-  `ATrade.MarketData`.
+- `AnalysisRunRequest` / `AnalysisRunIntakeResult` — provider-neutral HTTP-facing
+  intake request/result records used by the API without coupling
+  `ATrade.Analysis` to ASP.NET result types.
+- `AnalysisRequest` — normalized engine request containing
+  `MarketDataSymbolIdentity`, timeframe, requested time, and
+  `IReadOnlyList<OhlcvCandle>` bars from `ATrade.MarketData`.
 - `AnalysisResult` — status, engine metadata, source metadata, normalized
   symbol/timeframe, generated time, signals, metrics, optional backtest summary,
   and optional error.
@@ -76,13 +82,17 @@ The LEAN provider is registered only when configuration selects it.
   capabilities do not claim production analysis support. With LEAN selected, it
   returns `engineId = "lean"` with signal/backtest/metric capabilities and
   `requiresExternalRuntime = true`.
-- `POST /api/analysis/run` — accepts a provider-neutral analysis request. When
-  callers supply only `symbolCode` + `timeframe`, the API awaits the configured
-  async `IMarketDataService` candle read seam and builds an `AnalysisRequest`
-  over those normalized bars. With no configured provider, it returns HTTP 503 with
-  `status = "not-configured"`, error code `analysis-engine-not-configured`, and
-  no signals, metrics, or backtest summary. With LEAN selected, it forwards the
-  normalized bars to `ATrade.Analysis.Lean`.
+- `POST /api/analysis/run` — accepts a provider-neutral analysis run request.
+  The API binds the payload and delegates to `IAnalysisRequestIntake`; the intake
+  applies symbol/timeframe defaults, accepts direct bars, or fetches candles via
+  the async `IMarketDataService` read seam when callers supply only `symbolCode`
+  + `timeframe`. It resolves/falls back symbol identity, returns invalid-request
+  and market-data errors as typed intake results for HTTP projection, and hands
+  valid requests to `IAnalysisEngineRegistry`. With no configured provider, the
+  endpoint returns HTTP 503 with `status = "not-configured"`, error code
+  `analysis-engine-not-configured`, and no signals, metrics, or backtest summary.
+  With LEAN selected, the intake forwards the normalized bars to
+  `ATrade.Analysis.Lean` through the registry.
 
 These endpoints are not LEAN endpoints. They must not expose QuantConnect types,
 LEAN project files, or provider-specific DTO names.
@@ -206,7 +216,7 @@ in DI/configuration and `engineId`, not in endpoint paths or frontend type names
 
 The contract and LEAN provider are verified by:
 
-- `tests/ATrade.Analysis.Tests/` for core contract and fallback behavior
+- `tests/ATrade.Analysis.Tests/` for core contract, request intake, and fallback behavior
 - `tests/ATrade.Analysis.Lean.Tests/` for input conversion, managed-runtime
   option binding, CLI/managed-Docker command construction, service registration,
   result parsing, timeout/error handling, and no-order guardrails

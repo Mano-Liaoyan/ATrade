@@ -123,7 +123,7 @@ Core types:
 Compatibility layer:
 
 - `IMarketDataService` is the async HTTP-facing read seam used by market-data
-  endpoints, SignalR-adjacent callers, and analysis request construction.
+  endpoints, SignalR-adjacent callers, and `ATrade.Analysis` request intake.
   Trending, search, symbol lookup, candle, indicator, and latest-update reads all
   return `MarketDataReadResult<T>` with the same `MarketDataError` codes the
   browser already understands.
@@ -189,8 +189,9 @@ Core rules:
 ## 5. Composition Rules
 
 - API endpoint handlers may depend on provider-neutral contracts such as
-  `IBrokerProvider`, `IMarketDataService`, `IAnalysisEngineRegistry`, and
-  SignalR-facing market-data services.
+  `IBrokerProvider`, `IMarketDataService`, `IAnalysisEngineRegistry`,
+  `IAnalysisRequestIntake`, `IWorkspaceWatchlistIntake`, and SignalR-facing
+  market-data services.
 - API endpoint handlers must not instantiate concrete providers such as the
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
@@ -201,7 +202,10 @@ Core rules:
   `AddAnalysisModule()`, and `AddLeanAnalysisEngine(...)`; LEAN only becomes
   active when configuration selects it. Endpoint handlers still depend only on
   provider-neutral services while the Timescale decorator owns cache-aside reads,
-  writes, freshness checks, and storage-unavailable fallback.
+  writes, freshness checks, and storage-unavailable fallback, `ATrade.Analysis`
+  intake owns analysis request construction/engine handoff, and
+  `ATrade.Workspaces` intake owns watchlist request normalization/storage error
+  shaping.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.

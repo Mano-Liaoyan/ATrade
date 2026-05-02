@@ -11,6 +11,7 @@ public static class AnalysisModuleServiceCollectionExtensions
 
         services.TryAddSingleton<NoConfiguredAnalysisEngine>();
         services.TryAddSingleton<IAnalysisEngineRegistry, AnalysisEngineRegistry>();
+        services.TryAddSingleton<IAnalysisRequestIntake, AnalysisRequestIntake>();
 
         return services;
     }

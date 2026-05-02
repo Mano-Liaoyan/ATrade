@@ -70,18 +70,8 @@ app.MapGet(
     (IAnalysisEngineRegistry analysisEngines) => Results.Ok(analysisEngines.GetEngines()));
 app.MapPost(
     "/api/analysis/run",
-    async (AnalysisRunApiRequest request, IAnalysisEngineRegistry analysisEngines, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
-    {
-        var analysisRequestResult = await CreateAnalysisRequestAsync(request, marketDataService, cancellationToken);
-        if (analysisRequestResult.ErrorResult is not null)
-        {
-            return analysisRequestResult.ErrorResult;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        var result = await analysisEngines.AnalyzeAsync(analysisRequestResult.Request!, cancellationToken);
-        return ToAnalysisResult(result);
-    });
+    async (AnalysisRunRequest? request, IAnalysisRequestIntake analysisIntake, CancellationToken cancellationToken) =>
+        ToAnalysisRunIntakeResult(await analysisIntake.RunAsync(request, cancellationToken)));
 app.MapGet(
     "/api/broker/ibkr/status",
     async (IBrokerProvider brokerProvider, CancellationToken cancellationToken) =>
@@ -112,11 +102,26 @@ app.MapPost(
         }
     });
 
-app.MapGet("/api/workspace/watchlist", GetWorkspaceWatchlistAsync);
-app.MapPut("/api/workspace/watchlist", ReplaceWorkspaceWatchlistAsync);
-app.MapPost("/api/workspace/watchlist", PinWorkspaceWatchlistSymbolAsync);
-app.MapDelete("/api/workspace/watchlist/pins/{instrumentKey}", UnpinWorkspaceWatchlistInstrumentAsync);
-app.MapDelete("/api/workspace/watchlist/{symbol}", UnpinWorkspaceWatchlistSymbolAsync);
+app.MapGet(
+    "/api/workspace/watchlist",
+    async (IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.GetAsync(cancellationToken)));
+app.MapPut(
+    "/api/workspace/watchlist",
+    async (ReplaceWorkspaceWatchlistRequest? request, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.ReplaceAsync(request, cancellationToken)));
+app.MapPost(
+    "/api/workspace/watchlist",
+    async (WorkspaceWatchlistSymbolInput? symbol, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.PinAsync(symbol, cancellationToken)));
+app.MapDelete(
+    "/api/workspace/watchlist/pins/{instrumentKey}",
+    async (string instrumentKey, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.UnpinByInstrumentKeyAsync(instrumentKey, cancellationToken)));
+app.MapDelete(
+    "/api/workspace/watchlist/{symbol}",
+    async (string symbol, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.UnpinBySymbolAsync(symbol, cancellationToken)));
 
 app.MapHub<MarketDataHub>("/hubs/market-data");
 
@@ -155,65 +160,21 @@ static IResult ToAnalysisResult(AnalysisResult result) => result.Error?.Code swi
         : Results.Ok(result),
 };
 
-static async Task<AnalysisRequestBuildResult> CreateAnalysisRequestAsync(
-    AnalysisRunApiRequest? request,
-    IMarketDataService marketDataService,
-    CancellationToken cancellationToken)
+static IResult ToAnalysisRunIntakeResult(AnalysisRunIntakeResult result)
 {
-    cancellationToken.ThrowIfCancellationRequested();
-    if (request is null)
+    if (result.MarketDataError is not null)
     {
-        return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "An analysis request payload is required.")));
+        return ToMarketDataErrorResult(result.MarketDataError);
     }
 
-    var timeframe = string.IsNullOrWhiteSpace(request.Timeframe) ? MarketDataTimeframes.OneDay : request.Timeframe.Trim();
-    var symbol = request.Symbol ?? CreateSymbolIdentityFromCode(request.SymbolCode);
-    var bars = request.Bars;
-
-    if (bars is null || bars.Count == 0)
+    if (result.InvalidRequestError is not null)
     {
-        var symbolCode = symbol?.Symbol ?? request.SymbolCode;
-        if (string.IsNullOrWhiteSpace(symbolCode))
-        {
-            return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol or symbolCode is required for analysis.")));
-        }
-
-        var candleRead = await marketDataService.GetCandlesAsync(symbolCode, timeframe, cancellationToken: cancellationToken);
-        if (candleRead.IsFailure || candleRead.Value is null)
-        {
-            return AnalysisRequestBuildResult.Failure(ToMarketDataErrorResult(candleRead.Error));
-        }
-
-        var candleSeries = candleRead.Value;
-        if (candleSeries.Candles.Count == 0)
-        {
-            return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Market-data provider returned no candles for analysis.")));
-        }
-
-        bars = candleSeries.Candles;
-        timeframe = candleSeries.Timeframe;
-        symbol ??= await ResolveSymbolIdentityAsync(marketDataService, candleSeries, cancellationToken);
+        return Results.BadRequest(result.InvalidRequestError);
     }
 
-    if (symbol is null)
-    {
-        return AnalysisRequestBuildResult.Failure(Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "A symbol identity is required when analysis bars are supplied directly.")));
-    }
-
-    return AnalysisRequestBuildResult.Success(new AnalysisRequest(
-        symbol,
-        timeframe,
-        request.RequestedAtUtc ?? DateTimeOffset.UtcNow,
-        bars,
-        request.EngineId,
-        request.StrategyName));
-}
-
-static MarketDataSymbolIdentity? CreateSymbolIdentityFromCode(string? symbolCode)
-{
-    return string.IsNullOrWhiteSpace(symbolCode)
-        ? null
-        : MarketDataSymbolIdentity.Create(symbolCode, "market-data-provider", null, MarketDataAssetClasses.Stock, "UNKNOWN", "USD");
+    return result.Result is not null
+        ? ToAnalysisResult(result.Result)
+        : Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Analysis request failed."));
 }
 
 static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
@@ -242,152 +203,22 @@ static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
         currency);
 }
 
-static async Task<MarketDataSymbolIdentity> ResolveSymbolIdentityAsync(
-    IMarketDataService marketDataService,
-    CandleSeriesResponse candleSeries,
-    CancellationToken cancellationToken)
+static IResult ToWorkspaceWatchlistResult(WorkspaceWatchlistIntakeResult result)
 {
-    var symbolRead = await marketDataService.GetSymbolAsync(candleSeries.Symbol, cancellationToken);
-    if (symbolRead.IsSuccess && symbolRead.Value is not null)
+    if (result.Response is not null)
     {
-        var marketSymbol = symbolRead.Value;
-        return MarketDataSymbolIdentity.Create(
-            marketSymbol.Symbol,
-            candleSeries.Source,
-            providerSymbolId: null,
-            marketSymbol.AssetClass,
-            marketSymbol.Exchange,
-            currency: "USD");
+        return Results.Ok(result.Response);
     }
 
-    return MarketDataSymbolIdentity.Create(
-        candleSeries.Symbol,
-        candleSeries.Source,
-        providerSymbolId: null,
-        MarketDataAssetClasses.Stock,
-        exchange: "UNKNOWN",
-        currency: "USD");
+    var error = result.Error ?? new WorkspaceWatchlistIntakeError(
+        WorkspaceWatchlistErrorCodes.InvalidSymbol,
+        "Watchlist request failed.",
+        WorkspaceWatchlistIntakeErrorKind.Validation);
+    var response = new WorkspaceWatchlistErrorResponse(error.Code, error.Error);
+
+    return error.Kind == WorkspaceWatchlistIntakeErrorKind.StorageUnavailable
+        ? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
+        : Results.BadRequest(response);
 }
-
-static Task<IResult> GetWorkspaceWatchlistAsync(
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.GetAsync(identityProvider.Current, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> ReplaceWorkspaceWatchlistAsync(
-    ReplaceWorkspaceWatchlistRequest? request,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        var symbols = NormalizeReplacementWatchlistRequest(request);
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.ReplaceAsync(identityProvider.Current, symbols, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> PinWorkspaceWatchlistSymbolAsync(
-    WorkspaceWatchlistSymbolInput? symbol,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        var normalizedSymbol = NormalizePinnedSymbolRequest(symbol);
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.PinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> UnpinWorkspaceWatchlistInstrumentAsync(
-    string instrumentKey,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.UnpinByInstrumentKeyAsync(identityProvider.Current, instrumentKey, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> UnpinWorkspaceWatchlistSymbolAsync(
-    string symbol,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        var normalizedSymbol = WorkspaceSymbolNormalizer.Normalize(symbol);
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.UnpinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static async Task<IResult> ExecuteWatchlistRequestAsync(Func<Task<IResult>> operation)
-{
-    try
-    {
-        return await operation();
-    }
-    catch (WorkspaceWatchlistValidationException exception)
-    {
-        return Results.BadRequest(new WorkspaceWatchlistErrorResponse(exception.Code, exception.Message));
-    }
-    catch (WorkspaceStorageUnavailableException exception)
-    {
-        return Results.Json(
-            new WorkspaceWatchlistErrorResponse(exception.Code, "Watchlist storage is unavailable."),
-            statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-}
-
-static WorkspaceWatchlistSymbolInput NormalizePinnedSymbolRequest(WorkspaceWatchlistSymbolInput? symbol)
-{
-    if (symbol is null)
-    {
-        throw new WorkspaceWatchlistValidationException(
-            WorkspaceWatchlistErrorCodes.InvalidSymbol,
-            "A watchlist symbol payload is required.");
-    }
-
-    return symbol with { Symbol = WorkspaceSymbolNormalizer.Normalize(symbol.Symbol) };
-}
-
-static IReadOnlyList<WorkspaceWatchlistSymbolInput> NormalizeReplacementWatchlistRequest(ReplaceWorkspaceWatchlistRequest? request)
-{
-    var symbols = request?.Symbols ?? Array.Empty<WorkspaceWatchlistSymbolInput>();
-    return symbols.Select(NormalizePinnedSymbolRequest).ToArray();
-}
-
-public sealed record AnalysisRunApiRequest(
-    MarketDataSymbolIdentity? Symbol,
-    string? SymbolCode,
-    string? Timeframe,
-    DateTimeOffset? RequestedAtUtc,
-    IReadOnlyList<OhlcvCandle>? Bars,
-    string? EngineId,
-    string? StrategyName);
-
-public sealed record ReplaceWorkspaceWatchlistRequest(IReadOnlyList<WorkspaceWatchlistSymbolInput>? Symbols);
 
 public sealed record WorkspaceWatchlistErrorResponse(string Code, string Error);
-
-internal sealed record AnalysisRequestBuildResult(AnalysisRequest? Request, IResult? ErrorResult)
-{
-    public static AnalysisRequestBuildResult Success(AnalysisRequest request) => new(request, null);
-
-    public static AnalysisRequestBuildResult Failure(IResult errorResult) => new(null, errorResult);
-}
