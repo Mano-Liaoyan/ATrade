@@ -102,11 +102,26 @@ app.MapPost(
         }
     });
 
-app.MapGet("/api/workspace/watchlist", GetWorkspaceWatchlistAsync);
-app.MapPut("/api/workspace/watchlist", ReplaceWorkspaceWatchlistAsync);
-app.MapPost("/api/workspace/watchlist", PinWorkspaceWatchlistSymbolAsync);
-app.MapDelete("/api/workspace/watchlist/pins/{instrumentKey}", UnpinWorkspaceWatchlistInstrumentAsync);
-app.MapDelete("/api/workspace/watchlist/{symbol}", UnpinWorkspaceWatchlistSymbolAsync);
+app.MapGet(
+    "/api/workspace/watchlist",
+    async (IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.GetAsync(cancellationToken)));
+app.MapPut(
+    "/api/workspace/watchlist",
+    async (ReplaceWorkspaceWatchlistRequest? request, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.ReplaceAsync(request, cancellationToken)));
+app.MapPost(
+    "/api/workspace/watchlist",
+    async (WorkspaceWatchlistSymbolInput? symbol, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.PinAsync(symbol, cancellationToken)));
+app.MapDelete(
+    "/api/workspace/watchlist/pins/{instrumentKey}",
+    async (string instrumentKey, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.UnpinByInstrumentKeyAsync(instrumentKey, cancellationToken)));
+app.MapDelete(
+    "/api/workspace/watchlist/{symbol}",
+    async (string symbol, IWorkspaceWatchlistIntake watchlistIntake, CancellationToken cancellationToken) =>
+        ToWorkspaceWatchlistResult(await watchlistIntake.UnpinBySymbolAsync(symbol, cancellationToken)));
 
 app.MapHub<MarketDataHub>("/hubs/market-data");
 
@@ -188,109 +203,22 @@ static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
         currency);
 }
 
-static Task<IResult> GetWorkspaceWatchlistAsync(
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.GetAsync(identityProvider.Current, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> ReplaceWorkspaceWatchlistAsync(
-    ReplaceWorkspaceWatchlistRequest? request,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        var symbols = NormalizeReplacementWatchlistRequest(request);
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.ReplaceAsync(identityProvider.Current, symbols, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> PinWorkspaceWatchlistSymbolAsync(
-    WorkspaceWatchlistSymbolInput? symbol,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        var normalizedSymbol = NormalizePinnedSymbolRequest(symbol);
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.PinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> UnpinWorkspaceWatchlistInstrumentAsync(
-    string instrumentKey,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.UnpinByInstrumentKeyAsync(identityProvider.Current, instrumentKey, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static Task<IResult> UnpinWorkspaceWatchlistSymbolAsync(
-    string symbol,
-    IWorkspaceIdentityProvider identityProvider,
-    IWorkspaceWatchlistSchemaInitializer schemaInitializer,
-    IWorkspaceWatchlistRepository repository,
-    CancellationToken cancellationToken) =>
-    ExecuteWatchlistRequestAsync(async () =>
-    {
-        var normalizedSymbol = WorkspaceSymbolNormalizer.Normalize(symbol);
-        await schemaInitializer.InitializeAsync(cancellationToken);
-        var response = await repository.UnpinAsync(identityProvider.Current, normalizedSymbol, cancellationToken);
-        return Results.Ok(response);
-    });
-
-static async Task<IResult> ExecuteWatchlistRequestAsync(Func<Task<IResult>> operation)
+static IResult ToWorkspaceWatchlistResult(WorkspaceWatchlistIntakeResult result)
 {
-    try
+    if (result.Response is not null)
     {
-        return await operation();
+        return Results.Ok(result.Response);
     }
-    catch (WorkspaceWatchlistValidationException exception)
-    {
-        return Results.BadRequest(new WorkspaceWatchlistErrorResponse(exception.Code, exception.Message));
-    }
-    catch (WorkspaceStorageUnavailableException exception)
-    {
-        return Results.Json(
-            new WorkspaceWatchlistErrorResponse(exception.Code, "Watchlist storage is unavailable."),
-            statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
+
+    var error = result.Error ?? new WorkspaceWatchlistIntakeError(
+        WorkspaceWatchlistErrorCodes.InvalidSymbol,
+        "Watchlist request failed.",
+        WorkspaceWatchlistIntakeErrorKind.Validation);
+    var response = new WorkspaceWatchlistErrorResponse(error.Code, error.Error);
+
+    return error.Kind == WorkspaceWatchlistIntakeErrorKind.StorageUnavailable
+        ? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
+        : Results.BadRequest(response);
 }
-
-static WorkspaceWatchlistSymbolInput NormalizePinnedSymbolRequest(WorkspaceWatchlistSymbolInput? symbol)
-{
-    if (symbol is null)
-    {
-        throw new WorkspaceWatchlistValidationException(
-            WorkspaceWatchlistErrorCodes.InvalidSymbol,
-            "A watchlist symbol payload is required.");
-    }
-
-    return symbol with { Symbol = WorkspaceSymbolNormalizer.Normalize(symbol.Symbol) };
-}
-
-static IReadOnlyList<WorkspaceWatchlistSymbolInput> NormalizeReplacementWatchlistRequest(ReplaceWorkspaceWatchlistRequest? request)
-{
-    var symbols = request?.Symbols ?? Array.Empty<WorkspaceWatchlistSymbolInput>();
-    return symbols.Select(NormalizePinnedSymbolRequest).ToArray();
-}
-
-public sealed record ReplaceWorkspaceWatchlistRequest(IReadOnlyList<WorkspaceWatchlistSymbolInput>? Symbols);
 
 public sealed record WorkspaceWatchlistErrorResponse(string Code, string Error);

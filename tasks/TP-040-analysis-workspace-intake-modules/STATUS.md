@@ -1,6 +1,6 @@
 # TP-040: Deepen analysis and workspace intake modules — Status
 
-**Current Step:** Step 1: Move analysis request construction into Analysis intake
+**Current Step:** Step 2: Move watchlist request handling into Workspaces intake
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-02
 **Review Level:** 2
@@ -36,12 +36,12 @@
 ---
 
 ### Step 2: Move watchlist request handling into Workspaces intake
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Workspaces intake owns schema initialization ordering, identity use, normalization, exact unpin validation, and stable errors
-- [ ] `ATrade.Api` watchlist routes simplified to HTTP binding/projection
-- [ ] New Workspaces watchlist intake test file added
-- [ ] Targeted Workspaces tests passing
+- [x] Workspaces intake owns schema initialization ordering, identity use, normalization, exact unpin validation, and stable errors
+- [x] `ATrade.Api` watchlist routes simplified to HTTP binding/projection
+- [x] New Workspaces watchlist intake test file added
+- [x] Targeted Workspaces tests passing
 
 ---
 
@@ -98,6 +98,8 @@
 | 2026-05-02 15:46 | Step 0 completed | Required paths verified; .NET 10.0.203 available; TP-038 and TP-039 marked complete |
 | 2026-05-02 15:47 | Step 1 hydrated | Analysis intake seam planned around provider-neutral run request/result and async market-data read seam |
 | 2026-05-02 15:58 | Step 1 completed | Analysis intake seam implemented; API analysis route delegated; targeted Analysis/LEAN tests passed |
+| 2026-05-02 16:00 | Step 2 started | Workspaces watchlist intake implementation begun |
+| 2026-05-02 16:12 | Step 2 completed | Workspaces watchlist intake seam implemented; API watchlist routes delegated; targeted Workspaces tests passed |
 
 ---
 

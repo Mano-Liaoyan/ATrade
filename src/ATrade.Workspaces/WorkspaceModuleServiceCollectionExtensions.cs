@@ -14,6 +14,7 @@ public static class WorkspaceModuleServiceCollectionExtensions
         services.AddSingleton<IWorkspacePostgresDataSourceProvider>(_ => new WorkspacePostgresDataSourceProvider(configuration));
         services.AddSingleton<IWorkspaceWatchlistSchemaInitializer, PostgresWorkspaceWatchlistSchemaInitializer>();
         services.AddSingleton<IWorkspaceWatchlistRepository, PostgresWorkspaceWatchlistRepository>();
+        services.AddSingleton<IWorkspaceWatchlistIntake, WorkspaceWatchlistIntake>();
 
         return services;
     }
