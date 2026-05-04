@@ -27,10 +27,11 @@
 
 > ⚠️ Hydrate: Expand component-level details after inspecting current home/chart component structure and CSS constraints.
 
-- [ ] Reusable shell/navigation/context components created
-- [ ] Terminal-style CSS system added with responsive and focus states
-- [ ] Paper-only/provider/exact-identity messaging preserved
-- [ ] New terminal shell UI shell test added
+- [ ] Shared shell primitives expose semantic header, command, navigation, main, and context landmarks without new UI dependencies
+- [ ] Shell primitives accept home/chart metadata, actions, anchors, and context cards while keeping workflow/client orchestration outside them
+- [ ] Terminal-style CSS system added with dense panels, responsive collapse, keyboard focus states, and no proprietary terminal assets
+- [ ] Paper-only/provider/exact-identity messaging remains explicit in shell affordances with no broker order actions or fake market data
+- [ ] New terminal shell UI test covers component source markers, SSR-visible landmarks, focusable navigation controls, and no Bloomberg/proprietary assets
 
 ---
 
