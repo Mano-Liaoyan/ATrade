@@ -1,11 +1,11 @@
 # TP-044: Make stock search results easier to explore — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 0: Preflight
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,10 +15,10 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
@@ -93,6 +93,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-04 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-04 09:06 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-04 09:06 | Step 0 started | Preflight |
 
 ---
 
