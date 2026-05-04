@@ -1,6 +1,6 @@
 # TP-042: Correct chart range presets — Status
 
-**Current Step:** Step 2: Wire ranges through API, provider, stream, and cache
+**Current Step:** Step 3: Update frontend chart controls and workflow copy
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -33,22 +33,22 @@
 ---
 
 ### Step 2: Wire ranges through API, provider, stream, and cache
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand based on whether existing method names can remain compatibility aliases or need deeper renaming after reading the market-data contracts.
 >
 > Hydrated decision: existing service/provider method names can remain compatibility aliases; normalize `range`/`chartRange` and legacy `timeframe` at edges.
 
-- [ ] HTTP and SignalR chart reads use normalized chart ranges
-- [ ] API compatibility accepts preferred chart range query aliases while retaining legacy `timeframe`
-- [ ] IBKR historical-bar mapping supports all new ranges and filters returned candles to the requested lookback window
-- [ ] Timescale cache-aside behavior separates normalized range keys and preserves exact instrument identity filters
-- [ ] Targeted backend/provider/cache tests added or updated
+- [x] HTTP and SignalR chart reads use normalized chart ranges
+- [x] API compatibility accepts preferred chart range query aliases while retaining legacy `timeframe`
+- [x] IBKR historical-bar mapping supports all new ranges and filters returned candles to the requested lookback window
+- [x] Timescale cache-aside behavior separates normalized range keys and preserves exact instrument identity filters
+- [x] Targeted backend/provider/cache tests added or updated
 
 ---
 
 ### Step 3: Update frontend chart controls and workflow copy
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Frontend market-data types/clients/streaming use normalized chart range values
 - [ ] Chart workflow and selector present the controls as lookback ranges from now
@@ -100,6 +100,7 @@
 | 2026-05-04 01:44 | Step 0 started | Preflight |
 | 2026-05-04 01:45 | Step 0 completed | Verified required files, TP-041 archive dependency, and local dotnet/node/npm tooling |
 | 2026-05-04 02:03 | Step 1 completed | Added chart range presets, normalized market-data range contracts, and passed provider-abstraction tests |
+| 2026-05-04 02:36 | Step 2 completed | Wired normalized ranges through API, SignalR, IBKR, and Timescale; provider/cache targeted tests passed |
 
 ---
 

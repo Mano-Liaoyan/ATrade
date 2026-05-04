@@ -259,6 +259,41 @@ public sealed class TimescaleMarketDataCacheAsideTests
     }
 
     [Fact]
+    public async Task TryGetCandlesTreatsLegacyMinuteCacheAsMissForOneMonthRange()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 23, 0, TimeSpan.Zero);
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            CandleSeries = CreateCandleSeries(
+                now.AddMinutes(-1),
+                source: "ibkr-history",
+                timeframe: ChartRangePresets.OneMonth,
+                candles:
+                [
+                    new OhlcvCandle(now.AddMinutes(-10), 180m, 185m, 179m, 184m, 10_000_000),
+                    new OhlcvCandle(now.AddMinutes(-5), 184m, 188m, 183m, 187m, 11_000_000),
+                    new OhlcvCandle(now.AddMinutes(-1), 187m, 191m, 186m, 190m, 12_000_000),
+                ]),
+        };
+        var providerResponse = CreateProviderCandleResponse(now.AddSeconds(-5), source: "ibkr-history", timeframe: ChartRangePresets.OneMonth);
+        var provider = new RecordingMarketDataProvider
+        {
+            CandleResponse = providerResponse,
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var result = await service.GetCandlesAsync("AAPL", ChartRangePresets.OneMonth, cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(providerResponse, result.Value);
+        Assert.Equal(1, provider.TryGetCandlesCalls);
+        var query = Assert.Single(repository.CandleQueries);
+        Assert.Equal(ChartRangePresets.OneMonth, query.Timeframe);
+        var written = Assert.Single(repository.WrittenCandleSeries);
+        Assert.Equal(ChartRangePresets.OneMonth, written.Timeframe);
+    }
+
+    [Fact]
     public async Task TryGetCandlesFetchesProviderPersistsSeriesAndReturnsProviderResponseOnCacheMiss()
     {
         var now = new DateTimeOffset(2026, 4, 30, 17, 23, 0, TimeSpan.Zero);
@@ -337,7 +372,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
         };
         var provider = new RecordingMarketDataProvider
         {
-            CandleError = new MarketDataError("unsupported-timeframe", "Timeframe '2m' is not supported."),
+            CandleError = new MarketDataError(MarketDataProviderErrorCodes.UnsupportedChartRange, "Chart range '2m' is not supported."),
         };
         var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
 
@@ -346,8 +381,8 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.True(result.IsFailure);
         Assert.Null(result.Value);
         Assert.NotNull(result.Error);
-        Assert.Equal("unsupported-timeframe", result.Error!.Code);
-        Assert.Equal(1, provider.TryGetCandlesCalls);
+        Assert.Equal(MarketDataProviderErrorCodes.UnsupportedChartRange, result.Error!.Code);
+        Assert.Equal(0, provider.TryGetCandlesCalls);
         Assert.Empty(repository.CandleQueries);
         Assert.Empty(repository.WrittenCandleSeries);
     }
@@ -440,7 +475,8 @@ public sealed class TimescaleMarketDataCacheAsideTests
         DateTimeOffset generatedAtUtc,
         string source,
         string symbol = "AAPL",
-        string timeframe = MarketDataTimeframes.OneDay) => new(
+        string timeframe = MarketDataTimeframes.OneDay,
+        IReadOnlyList<OhlcvCandle>? candles = null) => new(
         new TimescaleMarketDataSymbol(
             RecordingMarketDataProvider.ProviderName,
             ProviderSymbolId: "265598",
@@ -452,7 +488,7 @@ public sealed class TimescaleMarketDataCacheAsideTests
         timeframe,
         source,
         generatedAtUtc,
-        CreateCandles(generatedAtUtc));
+        candles ?? CreateCandles(generatedAtUtc));
 
     private static CandleSeriesResponse CreateProviderCandleResponse(
         DateTimeOffset generatedAtUtc,
@@ -477,8 +513,8 @@ public sealed class TimescaleMarketDataCacheAsideTests
 
     private static IReadOnlyList<OhlcvCandle> CreateCandles(DateTimeOffset generatedAtUtc) =>
     [
-        new OhlcvCandle(generatedAtUtc.AddDays(-2), 180m, 185m, 179m, 184m, 10_000_000),
-        new OhlcvCandle(generatedAtUtc.AddDays(-1), 184m, 188m, 183m, 187m, 11_000_000),
+        new OhlcvCandle(generatedAtUtc.AddHours(-6), 180m, 185m, 179m, 184m, 10_000_000),
+        new OhlcvCandle(generatedAtUtc.AddHours(-1), 184m, 188m, 183m, 187m, 11_000_000),
         new OhlcvCandle(generatedAtUtc, 187m, 191m, 186m, 190m, 12_000_000),
     ];
 

@@ -59,28 +59,34 @@ public sealed class TimescaleCachedMarketDataService(
     public Task<MarketDataReadResult<MarketDataSymbol>> GetSymbolAsync(string symbol, CancellationToken cancellationToken = default) =>
         providerBackedService.GetSymbolAsync(symbol, cancellationToken);
 
-    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
+    public bool TryGetCandles(string symbol, string? chartRange, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null) =>
         throw new NotSupportedException("Synchronous Timescale market-data candle reads are no longer supported. Use GetCandlesAsync.");
 
     public async Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var nowUtc = timeProvider.GetUtcNow().ToUniversalTime();
+        if (!MarketDataTimeframes.TryGetDefinition(chartRange, nowUtc, out var definition))
+        {
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(ChartRangePresets.CreateUnsupportedRangeError(chartRange));
+        }
+
         var normalizedIdentity = NormalizeIdentityForProvider(identity);
         var normalizedSymbol = NormalizeSymbol(normalizedIdentity?.Symbol ?? symbol);
-        if (normalizedSymbol is not null && MarketDataTimeframes.TryGetDefinition(timeframe, out var definition))
+        if (normalizedSymbol is not null)
         {
-            var cachedResponse = await TryGetCachedCandlesAsync(normalizedSymbol, definition.Name, normalizedIdentity, cancellationToken).ConfigureAwait(false);
+            var cachedResponse = await TryGetCachedCandlesAsync(normalizedSymbol, definition, normalizedIdentity, nowUtc, cancellationToken).ConfigureAwait(false);
             if (cachedResponse is not null)
             {
                 return MarketDataReadResult<CandleSeriesResponse>.Success(cachedResponse);
             }
         }
 
-        var providerResponse = await providerBackedService.GetCandlesAsync(symbol, timeframe, normalizedIdentity, cancellationToken).ConfigureAwait(false);
+        var providerResponse = await providerBackedService.GetCandlesAsync(symbol, definition.Name, normalizedIdentity, cancellationToken).ConfigureAwait(false);
         if (providerResponse.IsFailure || providerResponse.Value is null)
         {
             return MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(providerResponse.Error));
@@ -151,8 +157,9 @@ public sealed class TimescaleCachedMarketDataService(
 
     private async Task<CandleSeriesResponse?> TryGetCachedCandlesAsync(
         string symbol,
-        string timeframe,
+        TimeframeDefinition definition,
         MarketDataSymbolIdentity? identity,
+        DateTimeOffset nowUtc,
         CancellationToken cancellationToken)
     {
         var series = await TryReadCacheAsync(
@@ -161,23 +168,26 @@ public sealed class TimescaleCachedMarketDataService(
                 provider.Identity.Provider,
                 Source: null,
                 symbol,
-                timeframe,
+                definition.Name,
                 GetFreshnessCutoffUtc(),
                 identity?.ProviderSymbolId,
                 identity?.Exchange,
                 identity?.Currency,
                 identity?.AssetClass), token),
             cancellationToken).ConfigureAwait(false);
-        if (series is null)
+        if (series is null
+            || !ChartRangePresets.TryNormalize(series.Timeframe, out var cachedChartRange)
+            || !string.Equals(cachedChartRange, definition.Name, StringComparison.Ordinal)
+            || !TrySelectLookbackCandles(series, definition, nowUtc, out var candles))
         {
             return null;
         }
 
         return new CandleSeriesResponse(
             series.Symbol.Symbol,
-            series.Timeframe,
+            definition.Name,
             series.GeneratedAtUtc,
-            series.Candles,
+            candles,
             ToCacheSource(series.Source),
             series.Symbol.ToMarketDataSymbolIdentity());
     }
@@ -199,7 +209,7 @@ public sealed class TimescaleCachedMarketDataService(
     private Task TryPersistCandleSeriesAsync(CandleSeriesResponse response, CancellationToken cancellationToken)
     {
         var normalizedSymbol = NormalizeSymbol(response.Symbol);
-        if (normalizedSymbol is null || response.Candles.Count == 0)
+        if (normalizedSymbol is null || response.Candles.Count == 0 || !ChartRangePresets.TryNormalize(response.Timeframe, out var normalizedChartRange))
         {
             return Task.CompletedTask;
         }
@@ -215,7 +225,7 @@ public sealed class TimescaleCachedMarketDataService(
                     Currency: null,
                     AssetClass: null)
                 : TimescaleMarketDataSymbol.FromIdentity(response.Identity),
-            response.Timeframe,
+            normalizedChartRange,
             response.Source,
             response.GeneratedAt,
             response.Candles);
@@ -224,6 +234,55 @@ public sealed class TimescaleCachedMarketDataService(
             "persist candle series",
             token => repository.UpsertCandleSeriesAsync(series, token),
             cancellationToken);
+    }
+
+    private static bool TrySelectLookbackCandles(
+        TimescaleCandleSeries series,
+        TimeframeDefinition definition,
+        DateTimeOffset nowUtc,
+        out IReadOnlyList<OhlcvCandle> candles)
+    {
+        var orderedCandles = series.Candles
+            .Where(candle => IsWithinLookbackWindow(candle.Time, definition, nowUtc))
+            .OrderBy(candle => candle.Time)
+            .ToArray();
+        if (orderedCandles.Length == 0 || !HasCompatibleCachedCandleCadence(orderedCandles, definition))
+        {
+            candles = Array.Empty<OhlcvCandle>();
+            return false;
+        }
+
+        candles = definition.Name == ChartRangePresets.All
+            ? orderedCandles
+            : orderedCandles.TakeLast(definition.CandleCount).ToArray();
+        return candles.Count > 0;
+    }
+
+    private static bool IsWithinLookbackWindow(DateTimeOffset candleTime, TimeframeDefinition definition, DateTimeOffset nowUtc)
+    {
+        var candleTimeUtc = candleTime.ToUniversalTime();
+        var upperBoundUtc = nowUtc.ToUniversalTime();
+        return candleTimeUtc <= upperBoundUtc && (definition.LookbackStartUtc is null || candleTimeUtc >= definition.LookbackStartUtc.Value);
+    }
+
+    private static bool HasCompatibleCachedCandleCadence(IReadOnlyList<OhlcvCandle> candles, TimeframeDefinition definition)
+    {
+        if (definition.Name == ChartRangePresets.All || definition.Step < TimeSpan.FromDays(1) || candles.Count < 2)
+        {
+            return true;
+        }
+
+        var minimumObservedGap = TimeSpan.MaxValue;
+        for (var index = 1; index < candles.Count; index++)
+        {
+            var gap = candles[index].Time.ToUniversalTime() - candles[index - 1].Time.ToUniversalTime();
+            if (gap > TimeSpan.Zero && gap < minimumObservedGap)
+            {
+                minimumObservedGap = gap;
+            }
+        }
+
+        return minimumObservedGap == TimeSpan.MaxValue || minimumObservedGap >= TimeSpan.FromTicks(definition.Step.Ticks / 2);
     }
 
     private async Task<T?> TryReadCacheAsync<T>(string operation, Func<CancellationToken, Task<T?>> read, CancellationToken cancellationToken) where T : class

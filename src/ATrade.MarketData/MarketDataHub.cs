@@ -4,9 +4,9 @@ namespace ATrade.MarketData;
 
 public sealed class MarketDataHub(IMarketDataStreamingService streamingService) : Hub
 {
-    public async Task Subscribe(string symbol, string timeframe)
+    public async Task Subscribe(string symbol, string chartRange)
     {
-        var result = await streamingService.CreateSnapshotAsync(symbol, timeframe, Context.ConnectionAborted);
+        var result = await streamingService.CreateSnapshotAsync(symbol, chartRange, Context.ConnectionAborted);
         if (result.IsFailure || result.Value is null)
         {
             throw new HubException(result.Error?.Message ?? "Unable to create market-data update.");
@@ -17,8 +17,13 @@ public sealed class MarketDataHub(IMarketDataStreamingService streamingService) 
         await Clients.Caller.SendAsync("marketDataUpdated", update, Context.ConnectionAborted);
     }
 
-    public async Task Unsubscribe(string symbol, string timeframe)
+    public async Task Unsubscribe(string symbol, string chartRange)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, streamingService.GetGroupName(symbol, timeframe));
+        if (!ChartRangePresets.TryNormalize(chartRange, out var normalizedChartRange))
+        {
+            throw new HubException(ChartRangePresets.CreateUnsupportedRangeError(chartRange).Message);
+        }
+
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, streamingService.GetGroupName(symbol, normalizedChartRange));
     }
 }

@@ -149,7 +149,8 @@ public sealed class IbkrMarketDataProvider(
             return MarketDataReadResult<CandleSeriesResponse>.Failure(availabilityError);
         }
 
-        if (!TryMapTimeframe(timeframe, out var definition, out var period, out var barSize, out var error))
+        var nowUtc = DateTimeOffset.UtcNow;
+        if (!TryMapChartRange(timeframe, nowUtc, out var definition, out var period, out var barSize, out var error))
         {
             return MarketDataReadResult<CandleSeriesResponse>.Failure(error!);
         }
@@ -169,10 +170,12 @@ public sealed class IbkrMarketDataProvider(
             return MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(barsRead.Error));
         }
 
-        var candles = barsRead.Result
+        var filteredCandles = barsRead.Result
             .Select(bar => new OhlcvCandle(bar.Time, bar.Open, bar.High, bar.Low, bar.Close, bar.Volume))
-            .TakeLast(definition.CandleCount)
-            .ToArray();
+            .Where(candle => IsWithinLookbackWindow(candle.Time, definition, nowUtc));
+        var candles = definition.Name == ChartRangePresets.All
+            ? filteredCandles.ToArray()
+            : filteredCandles.TakeLast(definition.CandleCount).ToArray();
         if (candles.Length == 0)
         {
             return MarketDataReadResult<CandleSeriesResponse>.Failure(new MarketDataError("history-unavailable", $"IBKR iBeam returned no historical bars for {contractRead.Result.Symbol}."));
@@ -181,7 +184,7 @@ public sealed class IbkrMarketDataProvider(
         return MarketDataReadResult<CandleSeriesResponse>.Success(new CandleSeriesResponse(
             contractRead.Result.Symbol,
             definition.Name,
-            DateTimeOffset.UtcNow,
+            nowUtc,
             candles,
             IbkrMarketDataSource.History,
             CreateIdentity(contractRead.Result)));
@@ -228,9 +231,7 @@ public sealed class IbkrMarketDataProvider(
 
         if (!MarketDataTimeframes.TryGetDefinition(timeframe, out var definition))
         {
-            return MarketDataReadResult<MarketDataUpdate>.Failure(new MarketDataError(
-                "unsupported-timeframe",
-                $"Timeframe '{timeframe}' is not supported. Supported values: {string.Join(", ", MarketDataTimeframes.Supported)}."));
+            return MarketDataReadResult<MarketDataUpdate>.Failure(ChartRangePresets.CreateUnsupportedRangeError(timeframe));
         }
 
         var contractRead = await ResolveContractAsync(symbol, identity, cancellationToken).ConfigureAwait(false);
@@ -447,8 +448,9 @@ public sealed class IbkrMarketDataProvider(
             CreateIdentity(result));
     }
 
-    private static bool TryMapTimeframe(
-        string? timeframe,
+    private static bool TryMapChartRange(
+        string? chartRange,
+        DateTimeOffset nowUtc,
         out TimeframeDefinition definition,
         out string period,
         out string barSize,
@@ -457,22 +459,22 @@ public sealed class IbkrMarketDataProvider(
         period = string.Empty;
         barSize = string.Empty;
         error = null;
-        if (!MarketDataTimeframes.TryGetDefinition(timeframe, out definition))
+        if (!MarketDataTimeframes.TryGetDefinition(chartRange, nowUtc, out definition))
         {
-            error = new MarketDataError(
-                "unsupported-timeframe",
-                $"Timeframe '{timeframe}' is not supported. Supported values: {string.Join(", ", MarketDataTimeframes.Supported)}.");
+            error = ChartRangePresets.CreateUnsupportedRangeError(chartRange);
             return false;
         }
 
-        (period, barSize) = definition.Name switch
-        {
-            MarketDataTimeframes.OneMinute => ("2d", "1min"),
-            MarketDataTimeframes.FiveMinutes => ("1w", "5min"),
-            MarketDataTimeframes.OneHour => ("1m", "1h"),
-            _ => ("1y", "1d"),
-        };
+        period = definition.ProviderPeriod;
+        barSize = definition.ProviderBarSize;
         return true;
+    }
+
+    private static bool IsWithinLookbackWindow(DateTimeOffset candleTime, TimeframeDefinition definition, DateTimeOffset nowUtc)
+    {
+        var candleTimeUtc = candleTime.ToUniversalTime();
+        var upperBoundUtc = nowUtc.ToUniversalTime();
+        return candleTimeUtc <= upperBoundUtc && (definition.LookbackStartUtc is null || candleTimeUtc >= definition.LookbackStartUtc.Value);
     }
 
     private async Task<ProviderRead<T>> TryExecuteAsync<TState, T>(
