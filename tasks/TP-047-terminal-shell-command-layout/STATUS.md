@@ -1,6 +1,6 @@
 # TP-047: Build the terminal shell, command registry, and resizable layout — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Model terminal modules and deterministic commands
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Model terminal modules and deterministic commands
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create terminal types and enabled/disabled module registry
-- [ ] Create deterministic command registry/parser for approved commands
-- [ ] Ensure disabled modules render honest unavailable states
-- [ ] Add shell command source assertions
+- [x] Create terminal types and enabled/disabled module registry
+- [x] Create deterministic command registry/parser for approved commands
+- [x] Ensure disabled modules render honest unavailable states
+- [x] Add shell command source assertions
 
 ---
 
@@ -108,6 +108,8 @@
 | 2026-05-04 22:05 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-04 22:05 | Step 0 started | Preflight |
 | 2026-05-05 | Step 0 preflight | Verified required files, TP-046 terminal UI stack status, terminal primitives, installed frontend dependencies, and package lock |
+| 2026-05-05 | Step 1 started | Loaded terminal UI design, module, and paper-workspace authorities |
+| 2026-05-05 | Step 1 verification | Ran frontend-terminal-shell-command-tests.sh and TypeScript no-emit check with TS 6 deprecation silenced |
 
 ---
 
