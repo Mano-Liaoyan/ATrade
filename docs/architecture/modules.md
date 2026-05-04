@@ -1,10 +1,11 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
+updated: 2026-05-04
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker and market-data seams.
 see_also:
   - ../INDEX.md
+  - ../design/atrade-terminal-ui.md
   - overview.md
   - provider-abstractions.md
   - analysis-engines.md
@@ -50,15 +51,21 @@ see_also:
 > `conid`, symbol, exchange, currency, and asset class, plus a temporary local
 > user / workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
-> `frontend/` directory now hosts the first paper-trading workspace UI slice:
-> a Next.js home route with backend-driven trending symbols, bounded/ranked/
-> filterable IBKR stock search, Postgres-backed watchlists, symbol navigation,
-> and `lightweight-charts` chart routes arranged inside a shared terminal-style
-> workspace shell with command, navigation, primary content, and context regions plus an analysis panel for
-> provider-neutral LEAN signals/metrics while `frontend/lib/*Workflow.ts` hooks
-> centralize watchlist, bounded search result view models, chart range loading,
-> source labeling, and SignalR-to-HTTP fallback orchestration behind rendering
-> components and preserve the original bootstrap smoke markers.
+> `frontend/` directory now hosts the first paper-trading workspace UI slice,
+> and the target frontend reconstruction is governed by
+> [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a
+> clean-room ATrade Terminal with enabled API-backed modules, visible-disabled
+> future modules, deterministic commands, resizable panels, and shadcn/Tailwind/
+> Radix-compatible original primitives. The current slice remains a Next.js home
+> route with backend-driven trending symbols, bounded/ranked/filterable IBKR
+> stock search, Postgres-backed watchlists, symbol navigation, and
+> `lightweight-charts` chart routes arranged inside a shared terminal-style
+> workspace shell with command, navigation, primary content, and context regions
+> plus an analysis panel for provider-neutral LEAN signals/metrics while
+> `frontend/lib/*Workflow.ts` hooks centralize watchlist, bounded search result
+> view models, chart range loading, source labeling, and SignalR-to-HTTP fallback
+> orchestration behind rendering components and preserve the original bootstrap
+> smoke markers until the terminal cutover replaces them.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -551,23 +558,30 @@ references.
   account views, simulated orders, API-served IBKR/iBeam market data with fresh
   Timescale cache hits when available, clear
   provider-not-configured/provider-unavailable/authentication-required states,
-  and transparent trending-factor/source explanations. The current slice
-  preserves the stable home-page markers (`ATrade Frontend Home` / `Next.js
-  Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding the first
-  workspace route: Timescale-first/IBKR scanner-backed trending stocks/ETFs,
-  reusable IBKR stock search controls with bounded ranked results, best-match
-  summaries, market/currency/asset filter chips, and show-more/show-less
-  exploration, symbol navigation to `/symbols/[symbol]`, backend watchlist API
-  reads/writes with provider metadata and a non-authoritative localStorage
-  cache/migration source, workflow hooks for watchlist migration/exact pin
-  commands, search debounce/provider errors/bounded result view models, a
-  reusable terminal workspace shell component family (`TerminalWorkspaceShell`, `WorkspaceCommandBar`,
-  `WorkspaceNavigation`, `WorkspaceContextPanel`) for command-first navigation
-  and right-side context, chart HTTP loading/source labels, and SignalR-to-HTTP
-  fallback, `lightweight-charts` candlesticks with lookback range controls for
-  `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and All time,
-  moving-average / RSI / MACD panels, SignalR updates with HTTP fallback, and
-  explicit no-real-orders messaging.
+  and transparent trending-factor/source explanations. The target frontend state
+  is now the clean-room ATrade Terminal described in
+  [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): enabled modules for
+  `HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`, and `HELP`,
+  visible-disabled future modules, deterministic command routing, resizable
+  terminal layout, and original shadcn/Tailwind/Radix-compatible primitives. The
+  current slice preserves the stable home-page markers (`ATrade Frontend Home` /
+  `Next.js Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding
+  the first workspace route: Timescale-first/IBKR scanner-backed trending
+  stocks/ETFs, reusable IBKR stock search controls with bounded ranked results,
+  best-match summaries, market/currency/asset filter chips, and show-more/
+  show-less exploration, symbol navigation to `/symbols/[symbol]`, backend
+  watchlist API reads/writes with provider metadata and a non-authoritative
+  localStorage cache/migration source, workflow hooks for watchlist migration/
+  exact pin commands, search debounce/provider errors/bounded result view models,
+  a reusable terminal workspace shell component family (`TerminalWorkspaceShell`,
+  `WorkspaceCommandBar`, `WorkspaceNavigation`, `WorkspaceContextPanel`) for
+  command-first navigation and right-side context, chart HTTP loading/source
+  labels, and SignalR-to-HTTP fallback, `lightweight-charts` candlesticks with
+  lookback range controls for `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`,
+  `1y`, `5y`, and All time, moving-average / RSI / MACD panels, SignalR updates
+  with HTTP fallback, and explicit no-real-orders messaging. Terminal cutover
+  tasks may replace current rendering components and CSS while preserving API
+  contracts and reusable workflow logic.
 
 ## 5. Dependency Summary
 

@@ -1,10 +1,11 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
+updated: 2026-05-04
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
+  - ../design/atrade-terminal-ui.md
   - overview.md
   - modules.md
   - provider-abstractions.md
@@ -17,7 +18,12 @@ see_also:
 # Paper-Trading Workspace Architecture
 
 > **Status note:** This document defines the staged architecture and safety
-> contract for the broader paper-trading workspace. The current repository now
+> contract for the broader paper-trading workspace. The active ATrade Terminal
+> frontend reconstruction authority is
+> [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): it
+> governs the clean-room visual target, command/module model, resizable layout,
+> disabled future surfaces, and frontend replacement constraints while this
+> document continues to govern paper-only safety and backend/API boundaries. The current repository now
 > uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
 > first real market-data provider behind API/frontend-stable seams. The current
 > repository ships `ATrade.Brokers.Ibkr` as a paper-only broker adapter,
@@ -84,11 +90,16 @@ Next.js application:
 
 The workspace is intentionally **frontend-rich but backend-governed**:
 Next.js owns layout and interaction, while the backend owns trading rules,
-state transitions, data access, and streaming contracts. The home and chart
-routes share an original ATrade terminal-style shell that provides a command
-header, keyboard-focusable navigation anchors, a primary panel stack, and a
-right-side context rail for provider state, paper-only guardrails, exact
-instrument identity, watchlist pins, and broker/analysis status. The shell is
+state transitions, data access, and streaming contracts. The current target
+state is the clean-room ATrade Terminal defined in
+[`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a full frontend
+replacement with deterministic commands, enabled modules for current API-backed
+workflows, visible-disabled future modules, resizable multi-panel layout, and a
+simplified mobile fallback. The home and chart routes currently share an
+original ATrade terminal-style shell that provides a command header,
+keyboard-focusable navigation anchors, a primary panel stack, and a right-side
+context rail for provider state, paper-only guardrails, exact instrument
+identity, watchlist pins, and broker/analysis status. The terminal direction is
 inspired only by broad finance-terminal information architecture; it does not
 copy proprietary terminal layouts, assets, trademarks, or colors.
 

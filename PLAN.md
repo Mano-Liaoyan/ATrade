@@ -6,6 +6,7 @@ summary: Current implementation plan for the active ATrade Terminal frontend rec
 see_also:
   - README.md
   - docs/INDEX.md
+  - docs/design/atrade-terminal-ui.md
   - scripts/README.md
   - tasks/CONTEXT.md
 ---
@@ -24,7 +25,8 @@ work through `TP-044`. The current active queue is `TP-045` through `TP-050`,
 focused on a full ATrade Terminal frontend reconstruction inspired by modern
 institutional terminal UIs while preserving clean-room implementation,
 paper-only safety, provider-neutral API boundaries, and current ATrade
-workflows.
+workflows. The active clean-room UI design authority for this queue is
+`docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
 

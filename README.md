@@ -8,6 +8,7 @@ see_also:
   - docs/INDEX.md
   - scripts/README.md
   - docs/architecture/overview.md
+  - docs/design/atrade-terminal-ui.md
   - docs/architecture/modules.md
   - docs/architecture/provider-abstractions.md
   - docs/architecture/analysis-engines.md
@@ -182,6 +183,7 @@ agents used by the orchestrator.
 
 - Use `docs/INDEX.md` as the documentation discovery layer.
 - Only documents marked `active` are implementation authority.
+- `docs/design/atrade-terminal-ui.md` defines the active clean-room ATrade Terminal UI target for the frontend reconstruction queue.
 - `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md`, and `docs/architecture/paper-trading-workspace.md` define the provider seams, analysis engine contract, and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
