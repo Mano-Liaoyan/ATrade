@@ -43,15 +43,15 @@
 ---
 
 ### Step 3: Add resizable multi-panel layout and persistence
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand after selecting the exact resizable split implementation compatible with the chosen UI stack.
 
-- [ ] Use dependency-free React pointer-event splitters with CSS custom properties, avoiding a new resizable package
-- [ ] Add resizable primary/context/monitor layout with responsive fallback
-- [ ] Add versioned localStorage persistence with bounds/reset behavior
-- [ ] Add terminal layout CSS for splitters, panels, rail, command header, and status strip
-- [ ] Ensure persistence is SSR-safe and browser/desktop-wrapper friendly
+- [x] Use dependency-free React pointer-event splitters with CSS custom properties, avoiding a new resizable package
+- [x] Add resizable primary/context/monitor layout with responsive fallback
+- [x] Add versioned localStorage persistence with bounds/reset behavior
+- [x] Add terminal layout CSS for splitters, panels, rail, command header, and status strip
+- [x] Ensure persistence is SSR-safe and browser/desktop-wrapper friendly
 
 ---
 
@@ -114,6 +114,7 @@
 | 2026-05-05 | Step 2 started | Added new terminal frame, command input, module rail, status strip, help, and status components |
 | 2026-05-05 | Step 2 verification | Ran command source test, TypeScript no-emit check, safety source grep, and frontend build |
 | 2026-05-05 | Step 3 hydrated | Selected dependency-free pointer-event splitters and CSS variables for resizable layout persistence |
+| 2026-05-05 | Step 3 verification | Ran source greps for splitters, persistence, SSR guards, no resizable package, TypeScript no-emit checks, command source tests, and frontend builds |
 
 ---
 

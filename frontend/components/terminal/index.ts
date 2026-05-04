@@ -9,3 +9,4 @@ export * from "./TerminalStatusBadge";
 export * from "./TerminalStatusModule";
 export * from "./TerminalStatusStrip";
 export * from "./TerminalSurface";
+export * from "./TerminalWorkspaceLayout";

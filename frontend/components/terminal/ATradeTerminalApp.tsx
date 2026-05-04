@@ -32,6 +32,7 @@ import { TerminalPanel } from "./TerminalPanel";
 import { TerminalStatusBadge } from "./TerminalStatusBadge";
 import { TerminalStatusModule } from "./TerminalStatusModule";
 import { TerminalStatusStrip } from "./TerminalStatusStrip";
+import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
 
 type ATradeTerminalAppProps = {
   initialIdentity?: InstrumentIdentityInput | null;
@@ -224,7 +225,26 @@ export function ATradeTerminalApp({
           onModuleSelect={handleModuleSelect}
         />
         <main className="atrade-terminal-app__workspace" data-testid="terminal-workspace" aria-label={`${activeModuleId} workspace`}>
-          {moduleContent}
+          <TerminalWorkspaceLayout
+            activeModuleId={activeModuleId}
+            context={(
+              <TerminalContextSummary
+                activeModuleId={activeModuleId}
+                marketDataStatus={marketDataStatus}
+                symbol={normalizedInitialSymbol}
+                watchlistStatus={watchlistStatus}
+              />
+            )}
+            monitor={(
+              <TerminalMonitorPanel
+                marketDataError={marketDataError}
+                marketDataLoading={marketDataLoading}
+                sortedTrendingSymbols={sortedTrendingSymbols}
+              />
+            )}
+          >
+            {moduleContent}
+          </TerminalWorkspaceLayout>
         </main>
       </div>
 
@@ -236,6 +256,83 @@ export function ATradeTerminalApp({
         watchlistStatus={watchlistStatus}
       />
     </section>
+  );
+}
+
+function TerminalContextSummary({
+  activeModuleId,
+  marketDataStatus,
+  symbol,
+  watchlistStatus,
+}: {
+  activeModuleId: EnabledTerminalModuleId;
+  marketDataStatus: string;
+  symbol: string | null;
+  watchlistStatus: string;
+}) {
+  return (
+    <div className="terminal-context-summary" data-testid="terminal-context-summary">
+      <TerminalPanel
+        eyebrow="Context"
+        title="Provider and safety map"
+        description="Context stays visible while modules change, so provider state and paper-only constraints are never hidden by navigation."
+        tone="inset"
+      >
+        <dl className="terminal-context-summary__grid">
+          <div>
+            <dt>Active module</dt>
+            <dd>{activeModuleId}</dd>
+          </div>
+          <div>
+            <dt>Market data</dt>
+            <dd>{marketDataStatus}</dd>
+          </div>
+          <div>
+            <dt>Watchlist</dt>
+            <dd>{watchlistStatus}</dd>
+          </div>
+          <div>
+            <dt>Symbol</dt>
+            <dd>{symbol ?? "No symbol selected"}</dd>
+          </div>
+        </dl>
+      </TerminalPanel>
+      <TerminalPanel eyebrow="Safety" title="Paper-only status" tone="inset" actions={<TerminalStatusBadge tone="warning">No orders</TerminalStatusBadge>}>
+        <p>Orders are disabled by the paper-only safety contract. Browser-visible data flows through ATrade.Api.</p>
+      </TerminalPanel>
+    </div>
+  );
+}
+
+function TerminalMonitorPanel({
+  marketDataError,
+  marketDataLoading,
+  sortedTrendingSymbols,
+}: {
+  marketDataError: string | null;
+  marketDataLoading: boolean;
+  sortedTrendingSymbols: TrendingSymbol[];
+}) {
+  const visibleSymbols = sortedTrendingSymbols.slice(0, 6);
+
+  return (
+    <div className="terminal-monitor-panel" data-testid="terminal-monitor-panel">
+      <span className="terminal-monitor-panel__label">Monitor</span>
+      {marketDataLoading ? <span>Loading provider-backed trending symbols…</span> : null}
+      {!marketDataLoading && marketDataError ? <span>Market data unavailable: {marketDataError}</span> : null}
+      {!marketDataLoading && !marketDataError && visibleSymbols.length === 0 ? <span>No provider-backed symbols returned.</span> : null}
+      {!marketDataLoading && !marketDataError && visibleSymbols.length > 0 ? (
+        <ul>
+          {visibleSymbols.map((item) => (
+            <li key={`${item.symbol}-${item.exchange}`}>
+              <strong>{item.symbol}</strong>
+              <span>{item.exchange}</span>
+              <span>{item.changePercent.toFixed(2)}%</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
