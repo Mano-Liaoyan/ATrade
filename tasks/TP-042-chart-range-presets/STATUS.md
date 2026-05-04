@@ -1,6 +1,6 @@
 # TP-042: Correct chart range presets — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -58,18 +58,18 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Frontend build/checks passing
-- [ ] Targeted integration/shell tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Backend build passes
+- [x] FULL test suite passing
+- [x] Frontend build/checks passing
+- [x] Targeted integration/shell tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Backend build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] "Check If Affected" docs reviewed
@@ -102,6 +102,7 @@
 | 2026-05-04 02:03 | Step 1 completed | Added chart range presets, normalized market-data range contracts, and passed provider-abstraction tests |
 | 2026-05-04 02:36 | Step 2 completed | Wired normalized ranges through API, SignalR, IBKR, and Timescale; provider/cache targeted tests passed |
 | 2026-05-04 02:55 | Step 3 completed | Updated frontend chart range types, client/stream/workflow copy, analysis handoff, and added range shell test |
+| 2026-05-04 03:10 | Step 4 completed | Full dotnet tests, frontend build, targeted shell tests, and backend build passed |
 
 ---
 
