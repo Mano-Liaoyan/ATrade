@@ -1,7 +1,7 @@
 # TP-045: Define the ATrade Terminal UI design spec — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-04
 **Review Level:** 1
 **Review Counter:** 0
@@ -74,11 +74,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -93,6 +93,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Frontend build required local `npm ci` because `frontend/node_modules` was absent; build passed after installing ignored local dependencies. | No repo change required; `node_modules` remains ignored. | `frontend/` |
+| No out-of-scope technical debt discovered while authoring the design spec. | No action. | `tasks/TP-045-atrade-terminal-design-spec/STATUS.md` |
 
 ---
 
@@ -114,4 +116,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- 2026-05-04: Reviewed Check If Affected docs; `docs/architecture/modules.md`, `README.md`, and `PLAN.md` were updated to reference the new terminal design authority.
