@@ -34,9 +34,9 @@ see_also:
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js workspace with a shared
 > terminal-inspired shell, persistent command/navigation/context regions, IBKR
-> scanner-driven or fresh persisted trending symbols, IBKR stock search, exact market-specific
-> Postgres-backed watchlists, local market badges, `lightweight-charts`
-> candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
+> scanner-driven or fresh persisted trending symbols, bounded/ranked/filterable
+> IBKR stock search, exact market-specific Postgres-backed watchlists, local
+> market badges, `lightweight-charts` candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
 > `1D`, `1m`, `6m`, `1y`, `5y`, and All time), indicators, source metadata,
 > an analysis panel that can run LEAN when the analysis runtime is configured,
 > and SignalR-to-HTTP fallback behavior.
@@ -114,8 +114,10 @@ rendering components receive normalized state and commands: `watchlistWorkflow`
 owns backend watchlist loads, one-time symbol-only legacy cache migration,
 read-only cached fallback, exact pin/unpin/remove commands, saving state, and
 stable watchlist error copy; `symbolSearchWorkflow` owns search query debounce,
-minimum-length validation, provider/authentication error copy, and result state;
-and `symbolChartWorkflow` owns the selected chart range lookback, candle/indicator
+minimum-length validation, provider/authentication error copy, explicit bounded
+search limits, ranked result view models, metadata filter state, short visible
+result limits, and show-more/show-less exploration commands; and
+`symbolChartWorkflow` owns the selected chart range lookback, candle/indicator
 HTTP reads, source-label formatting, SignalR subscription state, stream update
 application, and HTTP polling fallback when streaming closes or is unavailable.
 `TerminalWorkspaceShell`, `WorkspaceCommandBar`, `WorkspaceNavigation`, and
@@ -175,10 +177,16 @@ payloads for the same normalized chart ranges. The search endpoint remains
 provider-backed, enforces a minimum query length, stock-only asset class, and a
 capped result limit before returning provider-neutral `symbol`, `name`,
 `assetClass`, `exchange`, `currency`, `provider`, and provider-symbol-id
-metadata (IBKR `conid` for the current provider). Provider-backed search,
-trending, candle, indicator, and latest-update payloads carry
-`MarketDataSymbolIdentity` where available. SignalR is the outward-facing
-streaming layer for browsers and awaits `IMarketDataStreamingService`, which
+metadata (IBKR `conid` for the current provider). The frontend always calls
+this endpoint through `searchSymbols()` with an explicit capped limit, ranks
+exact/best matches first, shows a short default list, and exposes market,
+currency, and asset-class chips plus deliberate show-more/show-less controls
+without fetching an unbounded browser result set. Pin and chart actions keep the
+same provider, provider symbol id / IBKR `conid`, exchange, currency, and asset
+class tuple. Provider-backed search, trending, candle, indicator, and
+latest-update payloads carry `MarketDataSymbolIdentity` where available. SignalR
+is the outward-facing streaming layer for browsers and awaits
+`IMarketDataStreamingService`, which
 owns provider-status checks and creates provider-backed snapshots when the
 IBKR/iBeam provider is available. The analysis endpoints use
 `IAnalysisEngineRegistry` for discovery and `IAnalysisRequestIntake` for runs;
