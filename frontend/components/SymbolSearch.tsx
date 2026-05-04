@@ -25,10 +25,13 @@ export function SymbolSearch({
   compact = false,
 }: SymbolSearchProps) {
   const search = useSymbolSearchWorkflow({ limit });
+  const panelClassName = compact
+    ? 'workspace-panel terminal-data-panel symbol-search-panel symbol-search-panel--compact'
+    : 'workspace-panel terminal-data-panel symbol-search-panel';
 
   return (
-    <section className={compact ? 'workspace-panel symbol-search-panel symbol-search-panel--compact' : 'workspace-panel symbol-search-panel'} data-testid="symbol-search">
-      <div className="panel-heading">
+    <section className={panelClassName} data-testid="symbol-search">
+      <div className="panel-heading terminal-panel-heading">
         <div>
           <p className="eyebrow">IBKR instrument search</p>
           <h2>{title}</h2>
@@ -81,7 +84,7 @@ export function SymbolSearch({
             const accessibleLabel = `${symbol} ${result.name} on ${exchange}, ${currency}, ${formatAssetClass(assetClass)}, ${provider.toUpperCase()}${providerIdLabel ? `, ${providerIdLabel}` : ''}`;
 
             return (
-              <li key={pinState?.pinKey ?? chartHref} aria-label={accessibleLabel}>
+              <li className="terminal-result-row" key={pinState?.pinKey ?? chartHref} aria-label={accessibleLabel}>
                 <div>
                   <Link className="symbol-link" href={chartHref}>
                     {symbol}

@@ -32,7 +32,8 @@ see_also:
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
 > AppHost-managed Postgres resource, a TimescaleDB-backed market-data
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
-> broker/iBeam configuration wiring, and a Next.js workspace with IBKR
+> broker/iBeam configuration wiring, and a Next.js workspace with a shared
+> terminal-inspired shell, persistent command/navigation/context regions, IBKR
 > scanner-driven or fresh persisted trending symbols, IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, `lightweight-charts`
 > candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
@@ -83,7 +84,13 @@ Next.js application:
 
 The workspace is intentionally **frontend-rich but backend-governed**:
 Next.js owns layout and interaction, while the backend owns trading rules,
-state transitions, data access, and streaming contracts.
+state transitions, data access, and streaming contracts. The home and chart
+routes share an original ATrade terminal-style shell that provides a command
+header, keyboard-focusable navigation anchors, a primary panel stack, and a
+right-side context rail for provider state, paper-only guardrails, exact
+instrument identity, watchlist pins, and broker/analysis status. The shell is
+inspired only by broad finance-terminal information architecture; it does not
+copy proprietary terminal layouts, assets, trademarks, or colors.
 
 ## 3. Runtime Boundaries
 
@@ -111,6 +118,11 @@ minimum-length validation, provider/authentication error copy, and result state;
 and `symbolChartWorkflow` owns the selected chart range lookback, candle/indicator
 HTTP reads, source-label formatting, SignalR subscription state, stream update
 application, and HTTP polling fallback when streaming closes or is unavailable.
+`TerminalWorkspaceShell`, `WorkspaceCommandBar`, `WorkspaceNavigation`, and
+`WorkspaceContextPanel` are reusable rendering primitives only: they accept
+metadata, anchors, command links, safety disclosures, and context cards while
+leaving API clients, storage migration, SignalR connections, and pin/unpin
+commands in the existing workflow/client modules.
 
 ### 3.2 `ATrade.Api`
 

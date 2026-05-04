@@ -14,8 +14,8 @@ type TrendingListProps = {
 
 export function TrendingList({ symbols, getPinState, onTogglePin, source = null }: TrendingListProps) {
   return (
-    <section className="workspace-panel" aria-labelledby="trending-title" data-testid="trending-list">
-      <div className="panel-heading">
+    <section className="workspace-panel terminal-data-panel terminal-data-panel--market" aria-labelledby="trending-title" data-testid="trending-list">
+      <div className="panel-heading terminal-panel-heading">
         <div>
           <p className="eyebrow">Backend-driven market data</p>
           <h2 id="trending-title">Trending stocks and ETFs</h2>
@@ -23,14 +23,14 @@ export function TrendingList({ symbols, getPinState, onTogglePin, source = null 
         <span className="pill">{formatSourceLabel(source)}</span>
       </div>
 
-      <div className="symbol-grid">
+      <div className="symbol-grid terminal-symbol-grid">
         {symbols.map((symbol) => {
           const identity = getTrendingSymbolIdentity(symbol);
           const chartHref = createSymbolChartHref(identity);
           const pinState = getPinState(symbol);
 
           return (
-            <article className="symbol-card" key={pinState.pinKey}>
+            <article className="symbol-card terminal-symbol-card" key={pinState.pinKey}>
               <div className="symbol-card__topline">
                 <div>
                   <Link className="symbol-link" href={chartHref}>
@@ -49,7 +49,7 @@ export function TrendingList({ symbols, getPinState, onTogglePin, source = null 
                 </button>
               </div>
 
-              <dl className="metric-row">
+              <dl className="metric-row terminal-metric-row">
                 <div>
                   <dt>Type</dt>
                   <dd>{symbol.assetClass}</dd>

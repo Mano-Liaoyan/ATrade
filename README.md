@@ -93,7 +93,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js paper-trading workspace with trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
+- `frontend/` — Next.js paper-trading workspace with a shared terminal-style shell for home/chart navigation, trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -216,6 +216,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
+- `tests/apphost/frontend-terminal-shell-ui-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 - `tests/apphost/frontend-workspace-workflow-module-tests.sh`
 
