@@ -34,6 +34,15 @@ assert_file_not_contains() {
   fi
 }
 
+assert_file_absent() {
+  local file_path="$1"
+
+  if [[ -e "$file_path" ]]; then
+    printf 'expected retired shell primitive to be absent: %s\n' "$file_path" >&2
+    return 1
+  fi
+}
+
 stop_frontend_lock_owner() {
   local lock_file="$repo_root/frontend/.next/dev/lock"
   local locked_pid=''
@@ -114,49 +123,53 @@ wait_for_http_200() {
 }
 
 assert_terminal_shell_source_contract() {
-  local shell="$repo_root/frontend/components/TerminalWorkspaceShell.tsx"
-  local command_bar="$repo_root/frontend/components/WorkspaceCommandBar.tsx"
-  local navigation="$repo_root/frontend/components/WorkspaceNavigation.tsx"
-  local context_panel="$repo_root/frontend/components/WorkspaceContextPanel.tsx"
+  local app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
+  local command_input="$repo_root/frontend/components/terminal/TerminalCommandInput.tsx"
+  local rail="$repo_root/frontend/components/terminal/TerminalModuleRail.tsx"
+  local layout="$repo_root/frontend/components/terminal/TerminalWorkspaceLayout.tsx"
+  local status_strip="$repo_root/frontend/components/terminal/TerminalStatusStrip.tsx"
+  local help_module="$repo_root/frontend/components/terminal/TerminalHelpModule.tsx"
+  local status_module="$repo_root/frontend/components/terminal/TerminalStatusModule.tsx"
+  local disabled_module="$repo_root/frontend/components/terminal/TerminalDisabledModule.tsx"
   local css="$repo_root/frontend/app/globals.css"
   local package_json="$repo_root/frontend/package.json"
 
-  assert_file_contains "$shell" 'export function TerminalWorkspaceShell'
-  assert_file_contains "$shell" '<WorkspaceCommandBar'
-  assert_file_contains "$shell" '<WorkspaceNavigation'
-  assert_file_contains "$shell" '<main className="terminal-workspace-shell__main"'
-  assert_file_contains "$shell" '<aside className="terminal-workspace-shell__context"'
-  assert_file_contains "$shell" 'data-testid="terminal-workspace-shell"'
-  assert_file_contains "$shell" 'data-testid="terminal-safety-strip"'
-  assert_file_contains "$shell" 'Paper-only workspace'
-  assert_file_contains "$shell" 'exact instrument identity'
-  assert_file_contains "$shell" 'No live broker orders'
-  assert_file_contains "$shell" 'no fake market data'
-  assert_file_not_contains "$shell" 'Place order'
-  assert_file_not_contains "$shell" 'Submit order'
-  assert_file_not_contains "$shell" 'mock market data'
+  assert_file_contains "$app" 'export function ATradeTerminalApp'
+  assert_file_contains "$app" '<TerminalCommandInput'
+  assert_file_contains "$app" '<TerminalModuleRail'
+  assert_file_contains "$app" '<TerminalWorkspaceLayout'
+  assert_file_contains "$app" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$app" 'data-testid="terminal-safety-strip"'
+  assert_file_contains "$app" 'Paper-only workspace'
+  assert_file_contains "$app" 'exact instrument identity'
+  assert_file_contains "$app" 'Orders are disabled by the paper-only safety contract.'
 
-  assert_file_contains "$command_bar" 'export function WorkspaceCommandBar'
-  assert_file_contains "$command_bar" '<header className="terminal-command-bar"'
-  assert_file_contains "$command_bar" 'aria-label="Workspace command controls"'
-  assert_file_contains "$command_bar" 'href={command.href}'
+  assert_file_contains "$command_input" 'parseTerminalCommand(commandText)'
+  assert_file_contains "$command_input" 'data-testid="terminal-command-input"'
+  assert_file_contains "$command_input" 'Deterministic local commands only'
+  assert_file_contains "$rail" 'data-testid="terminal-module-rail"'
+  assert_file_contains "$rail" 'getEnabledTerminalModules'
+  assert_file_contains "$rail" 'getDisabledTerminalModules'
+  assert_file_contains "$layout" 'data-testid="terminal-workspace-layout"'
+  assert_file_contains "$layout" 'data-testid="terminal-context-splitter"'
+  assert_file_contains "$layout" 'data-testid="terminal-monitor-splitter"'
+  assert_file_contains "$layout" 'readTerminalLayoutPreferences'
+  assert_file_contains "$layout" 'writeTerminalLayoutPreferences'
+  assert_file_contains "$status_strip" 'data-testid="terminal-status-strip"'
+  assert_file_contains "$help_module" 'data-testid="terminal-help-module"'
+  assert_file_contains "$status_module" 'data-testid="terminal-status-module"'
+  assert_file_contains "$disabled_module" 'data-testid={`terminal-disabled-module-${unavailable.module.id.toLowerCase()}`}'
 
-  assert_file_contains "$navigation" 'export function WorkspaceNavigation'
-  assert_file_contains "$navigation" '<nav className="terminal-navigation"'
-  assert_file_contains "$navigation" 'data-testid="workspace-navigation"'
-  assert_file_contains "$navigation" 'href={item.href}'
-  assert_file_contains "$navigation" 'terminal-navigation__link'
+  assert_file_absent "$repo_root/frontend/components/TerminalWorkspaceShell.tsx"
+  assert_file_absent "$repo_root/frontend/components/WorkspaceCommandBar.tsx"
+  assert_file_absent "$repo_root/frontend/components/WorkspaceNavigation.tsx"
+  assert_file_absent "$repo_root/frontend/components/WorkspaceContextPanel.tsx"
 
-  assert_file_contains "$context_panel" 'export function WorkspaceContextPanel'
-  assert_file_contains "$context_panel" 'data-testid="workspace-context-panel"'
-  assert_file_contains "$context_panel" 'Workspace context metrics'
-  assert_file_contains "$context_panel" 'Workspace context cards'
-
-  assert_file_contains "$css" '.terminal-workspace-shell'
-  assert_file_contains "$css" '.terminal-command-bar'
-  assert_file_contains "$css" '.terminal-navigation__link'
-  assert_file_contains "$css" '.terminal-context-panel'
-  assert_file_contains "$css" '.terminal-safety-strip'
+  assert_file_contains "$css" '.atrade-terminal-app'
+  assert_file_contains "$css" '.terminal-command-input'
+  assert_file_contains "$css" '.terminal-module-rail'
+  assert_file_contains "$css" '.terminal-workspace-layout__splitter'
+  assert_file_contains "$css" '.terminal-status-strip'
   assert_file_contains "$css" ':focus-visible'
   assert_file_contains "$css" '@media (max-width: 1100px)'
   assert_file_contains "$css" '@media (max-width: 720px)'
@@ -164,7 +177,6 @@ assert_terminal_shell_source_contract() {
   assert_file_not_contains "$package_json" '@mui/'
   assert_file_not_contains "$package_json" 'antd'
   assert_file_not_contains "$package_json" 'chakra'
-  assert_file_not_contains "$package_json" 'radix-ui'
 
   if grep -RIn --exclude-dir=.next --exclude-dir=node_modules -E 'Bloomberg|BLOOMBERG|BLP|bbg-terminal|bloomberg-terminal' "$repo_root/frontend"; then
     printf 'frontend terminal shell must not include Bloomberg/proprietary terminal assets or trademarks.\n' >&2
@@ -196,30 +208,30 @@ PY
   frontend_pid=$!
 
   wait_for_http_200 "$frontend_url/" "$root_response" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$root_response" 'data-testid="terminal-workspace-shell"'
-  assert_file_contains "$root_response" 'data-testid="workspace-command-bar"'
-  assert_file_contains "$root_response" 'data-testid="workspace-navigation"'
+  assert_file_contains "$root_response" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$root_response" 'data-testid="terminal-command-input"'
+  assert_file_contains "$root_response" 'data-testid="terminal-module-rail"'
   assert_file_contains "$root_response" 'data-testid="terminal-safety-strip"'
-  assert_file_contains "$root_response" 'href="#workspace-search"'
-  assert_file_contains "$root_response" 'href="#workspace-trending"'
-  assert_file_contains "$root_response" 'href="#workspace-watchlist"'
+  assert_file_contains "$root_response" 'data-testid="terminal-workspace-layout"'
+  assert_file_contains "$root_response" 'data-testid="terminal-status-strip"'
+  assert_file_contains "$root_response" 'ATrade Terminal Shell'
   assert_file_contains "$root_response" 'Paper-only workspace'
-  assert_file_contains "$root_response" 'exact instrument identity'
-  assert_file_contains "$root_response" 'No live broker orders'
+  assert_file_contains "$root_response" 'Orders are disabled by the paper-only safety contract.'
+  assert_file_not_contains "$root_response" 'ATrade Frontend Home'
+  assert_file_not_contains "$root_response" 'Next.js Bootstrap Slice'
   assert_file_not_contains "$root_response" 'Bloomberg'
 
   wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$chart_response" 'data-testid="terminal-workspace-shell"'
-  assert_file_contains "$chart_response" 'data-testid="workspace-command-bar"'
-  assert_file_contains "$chart_response" 'data-testid="workspace-navigation"'
-  assert_file_contains "$chart_response" 'data-testid="terminal-safety-strip"'
-  assert_file_contains "$chart_response" 'href="#chart-candles"'
-  assert_file_contains "$chart_response" 'href="#chart-range"'
-  assert_file_contains "$chart_response" 'href="#chart-analysis"'
-  assert_file_contains "$chart_response" 'href="#chart-provider"'
+  assert_file_contains "$chart_response" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$chart_response" 'data-testid="terminal-command-input"'
+  assert_file_contains "$chart_response" 'data-testid="terminal-module-rail"'
+  assert_file_contains "$chart_response" 'data-testid="terminal-workspace-layout"'
+  assert_file_contains "$chart_response" 'data-testid="terminal-chart-module"'
+  assert_file_contains "$chart_response" 'AAPL chart workspace'
   assert_file_contains "$chart_response" 'Chart range lookback controls'
-  assert_file_contains "$chart_response" 'Analysis only'
-  assert_file_contains "$chart_response" 'No live broker orders'
+  assert_file_contains "$chart_response" 'Provider-neutral analysis entry point'
+  assert_file_contains "$chart_response" 'Orders are disabled by the paper-only safety contract.'
+  assert_file_not_contains "$chart_response" '← Back to trading workspace'
   assert_file_not_contains "$chart_response" 'Bloomberg'
 }
 

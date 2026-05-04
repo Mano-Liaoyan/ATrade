@@ -1,6 +1,6 @@
 # TP-047: Build the terminal shell, command registry, and resizable layout — Status
 
-**Current Step:** Step 3: Add resizable multi-panel layout and persistence
+**Current Step:** Step 4: Retire the old shell primitives from active routes
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -56,12 +56,12 @@
 ---
 
 ### Step 4: Retire the old shell primitives from active routes
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Remove old shell primitive usage from active routes
-- [ ] Update frontend tests away from old homepage/shell copy
-- [ ] Preserve API clients/workflow modules for downstream module tasks
-- [ ] Run targeted shell/command tests and frontend build
+- [x] Remove old shell primitive usage from active routes
+- [x] Update frontend tests away from old homepage/shell copy
+- [x] Preserve API clients/workflow modules for downstream module tasks
+- [x] Run targeted shell/command tests and frontend build
 
 ---
 
@@ -115,6 +115,8 @@
 | 2026-05-05 | Step 2 verification | Ran command source test, TypeScript no-emit check, safety source grep, and frontend build |
 | 2026-05-05 | Step 3 hydrated | Selected dependency-free pointer-event splitters and CSS variables for resizable layout persistence |
 | 2026-05-05 | Step 3 verification | Ran source greps for splitters, persistence, SSR guards, no resizable package, TypeScript no-emit checks, command source tests, and frontend builds |
+| 2026-05-05 | Step 4 started | Began retiring legacy shell primitive files and old homepage test markers |
+| 2026-05-05 | Step 4 verification | Ran command test, terminal shell UI test, TypeScript check, workflow preservation greps, and frontend build |
 
 ---
 
