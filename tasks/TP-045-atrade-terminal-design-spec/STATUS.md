@@ -1,6 +1,6 @@
 # TP-045: Define the ATrade Terminal UI design spec — Status
 
-**Current Step:** Step 4: Wire the spec into active documentation
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -63,13 +63,13 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Design-spec validation test passing
-- [ ] FULL test suite passing
-- [ ] Frontend build passes
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Design-spec validation test passing
+- [x] FULL test suite passing
+- [x] Frontend build passes
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
