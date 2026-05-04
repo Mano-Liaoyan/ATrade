@@ -234,3 +234,117 @@ implementation while leaving room for a desktop wrapper later.
 - Mobile fallback may omit simultaneous multi-panel context; it must still expose
   enabled modules, safety copy, provider unavailable states, and deterministic
   command/help guidance.
+
+## 7. Visual System Direction
+
+The visual goal is an original ATrade interpretation of a modern institutional
+terminal: dense, precise, dark, data-forward, and command-friendly. It should
+feel closer to contemporary finance workstations than to a generic SaaS dashboard,
+while staying clearly separate from proprietary product identities.
+
+### 7.1 Fincept-Style Institutional Characteristics
+
+- **Dark dense panels:** default to a near-black application shell with layered
+  graphite/slate panels, subtle dividers, and restrained elevation rather than
+  large white cards or marketing-style gradients.
+- **High-contrast data hierarchy:** prices, symbols, status labels, timestamps,
+  source metadata, and unavailable states should have obvious priority through
+  weight, color, spacing, and alignment.
+- **Compact typography:** prefer compact sans-serif UI typography with tabular
+  numerals, tight line heights for tables, and clear monospace/code treatments
+  for commands, symbols, instrument keys, and provider/source labels.
+- **Grid/table density:** market lists, watchlists, search results, indicators,
+  and status diagnostics should use dense rows, sticky headings where useful,
+  right-aligned numeric columns, and scan-friendly separators.
+- **Terminal accents:** use amber, cyan, green, and red accents for attention,
+  selected/focused states, positive/negative movement, warning/unavailable
+  states, and paper-only safety. Accent use must be an original palette, not a
+  copied third-party brand palette.
+- **Rectangular/resizable paneling:** prefer crisp rectangular regions, splitters,
+  rails, code-like command surfaces, and instrument/status chips over rounded
+  consumer-card layouts.
+- **Non-generic shadcn styling:** avoid unmodified shadcn examples. Components
+  should be restyled into ATrade terminal primitives with custom density, focus,
+  color, and data-state treatments.
+
+### 7.2 UI Stack Direction
+
+The selected UI stack direction for implementation tasks is a shadcn/ui-style
+component approach using Tailwind CSS and Radix primitives where they fit the
+terminal interaction model.
+
+Implementation guidance:
+
+- Use Tailwind tokens/utilities as the styling substrate, but define ATrade
+  terminal tokens for shell backgrounds, panel layers, borders, focus rings,
+  data-state colors, typography scale, spacing density, and chart/workspace
+  surfaces.
+- Use Radix primitives for accessible dialogs, popovers, tabs, tooltips,
+  menus, separators, scroll areas, and similar behaviors when they reduce custom
+  accessibility risk.
+- Treat shadcn/ui as a composition pattern and starting implementation style, not
+  as a visual identity. Generated/default examples must be heavily restyled.
+- Build reusable original ATrade primitives such as terminal frame, command input,
+  module rail, resizable panel group, status strip, data table, metric tile,
+  provider-state callout, symbol identity chip, and disabled-module callout.
+- Preserve keyboard focus visibility and screen-reader labels even when the UI is
+  visually dense.
+
+## 8. Frontend Replacement And Reuse Constraints
+
+This queue is authorized to aggressively replace frontend rendering and styling
+while preserving the backend/API and workflow contracts that make the current
+paper-trading slice honest and safe.
+
+### 8.1 Disposable Frontend Surfaces
+
+- Existing page layouts, visual components, terminal-inspired shell components,
+  and CSS may be deleted or rewritten when they conflict with this spec.
+- Existing component names do not define the target architecture; the terminal
+  module registry, command system, layout primitives, and dense data components
+  should be designed around this document.
+- Existing generic dashboard/card styling is not a compatibility requirement.
+- Do not keep old UI solely to avoid churn if it blocks the terminal density,
+  resizable layout model, command workflow, or original visual system.
+
+### 8.2 Reusable Logic To Preserve When It Fits
+
+- Preserve browser-facing `ATrade.Api` endpoint contracts and provider-neutral
+  payload expectations from the active architecture docs.
+- Preserve workflow logic that already centralizes backend-aware behavior when it
+  fits the terminal architecture: watchlist load/migration/pin/unpin logic,
+  symbol search validation/ranking/error copy, chart range normalization/source
+  labels, SignalR-to-HTTP fallback, and analysis engine no-configured/unavailable
+  handling.
+- Preserve exact instrument identity handoff (`provider`, provider symbol id /
+  IBKR `conid`, symbol, exchange, currency, asset class, `instrumentKey`, and
+  `pinKey`) across search, watchlist, chart, analysis, and status surfaces.
+- Reuse types, API clients, data mappers, and tests when they keep provider
+  behavior honest; rewrite rendering components and CSS around the terminal
+  model.
+
+## 9. Safety And Data-Access Constraints
+
+The terminal reconstruction must preserve the paper-only safety contract and the
+browser/backend separation defined by the active architecture docs.
+
+Non-negotiable constraints:
+
+- Do not add order-entry UI in this batch.
+- Do not add a simulated-submit workflow, order ticket, staged ticket drawer,
+  buy/sell button, order preview, or order confirmation path to the terminal UI.
+- Do not add real or live order placement behavior.
+- Do not weaken the existing backend live-mode rejection or paper-only defaults.
+- Do not let the browser connect directly to Postgres, TimescaleDB, Redis, NATS,
+  IBKR/iBeam, LEAN, or any provider runtime.
+- All browser-visible data must flow through `ATrade.Api` and its existing
+  HTTP/SignalR/provider-neutral contracts.
+- Do not commit or display secrets, IBKR credentials, account identifiers,
+  tokens, session cookies, gateway URLs that include sensitive values, or hidden
+  provider runtime details.
+- If provider, analysis, database, SignalR, or runtime dependencies are missing,
+  unauthenticated, unavailable, or timed out, render explicit safe unavailable
+  states rather than fallback mocks.
+- Disabled `ORDERS` surfaces may explain that orders are out of scope and that
+  the current architecture remains paper-only; they must not provide controls
+  that look executable.

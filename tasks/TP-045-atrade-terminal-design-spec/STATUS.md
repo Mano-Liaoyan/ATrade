@@ -1,6 +1,6 @@
 # TP-045: Define the ATrade Terminal UI design spec — Status
 
-**Current Step:** Step 2: Specify modules, navigation, layout, and disabled surfaces
+**Current Step:** Step 3: Specify visual system and implementation constraints
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -43,12 +43,12 @@
 ---
 
 ### Step 3: Specify visual system and implementation constraints
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Define Fincept-style modern institutional terminal visual characteristics
-- [ ] Define shadcn/Tailwind/Radix implementation direction with original styling
-- [ ] Define aggressive frontend replacement and selective logic reuse rules
-- [ ] Preserve paper-only safety and no direct browser-provider/database access
+- [x] Define Fincept-style modern institutional terminal visual characteristics
+- [x] Define shadcn/Tailwind/Radix implementation direction with original styling
+- [x] Define aggressive frontend replacement and selective logic reuse rules
+- [x] Preserve paper-only safety and no direct browser-provider/database access
 
 ---
 

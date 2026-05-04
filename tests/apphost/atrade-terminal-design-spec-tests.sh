@@ -104,6 +104,44 @@ assert_layout_behavior() {
   assert_file_contains "$spec" 'single-column flow'
 }
 
+assert_visual_system() {
+  assert_file_contains "$spec" 'modern institutional'
+  assert_file_contains "$spec" 'Dark dense panels'
+  assert_file_contains "$spec" 'High-contrast data hierarchy'
+  assert_file_contains "$spec" 'Compact typography'
+  assert_file_contains "$spec" 'Grid/table density'
+  assert_file_contains "$spec" 'amber, cyan, green, and red accents'
+  assert_file_contains "$spec" 'Rectangular/resizable paneling'
+  assert_file_contains "$spec" 'Non-generic shadcn styling'
+}
+
+assert_stack_direction() {
+  assert_file_contains "$spec" 'shadcn/ui-style'
+  assert_file_contains "$spec" 'Tailwind CSS and Radix primitives'
+  assert_file_contains "$spec" 'define ATrade'
+  assert_file_contains "$spec" 'terminal tokens for shell backgrounds'
+  assert_file_contains "$spec" 'Generated/default examples must be heavily restyled'
+  assert_file_contains "$spec" 'Build reusable original ATrade primitives'
+}
+
+assert_replacement_rules() {
+  assert_file_contains "$spec" 'aggressively replace frontend rendering and styling'
+  assert_file_contains "$spec" 'Existing page layouts, visual components'
+  assert_file_contains "$spec" 'Preserve browser-facing `ATrade.Api` endpoint contracts'
+  assert_file_contains "$spec" 'watchlist load/migration/pin/unpin logic'
+  assert_file_contains "$spec" 'Preserve exact instrument identity handoff'
+}
+
+assert_safety_constraints() {
+  assert_file_contains "$spec" 'Do not add order-entry UI in this batch'
+  assert_file_contains "$spec" 'Do not add a simulated-submit workflow'
+  assert_file_contains "$spec" 'Do not add real or live order placement behavior'
+  assert_file_contains "$spec" 'Do not let the browser connect directly to Postgres, TimescaleDB, Redis, NATS,'
+  assert_file_contains "$spec" 'IBKR/iBeam, LEAN, or any provider runtime'
+  assert_file_contains "$spec" 'All browser-visible data must flow through `ATrade.Api`'
+  assert_file_contains "$spec" 'rather than fallback mocks'
+}
+
 assert_design_authority_exists
 assert_clean_room_guardrails
 assert_product_target_decisions
@@ -111,5 +149,9 @@ assert_enabled_modules
 assert_disabled_modules
 assert_terminal_commands
 assert_layout_behavior
+assert_visual_system
+assert_stack_direction
+assert_replacement_rules
+assert_safety_constraints
 
 printf 'ATrade Terminal design spec validation passed.\n'
