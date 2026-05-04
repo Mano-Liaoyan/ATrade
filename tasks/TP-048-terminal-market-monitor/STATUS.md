@@ -23,14 +23,14 @@
 ---
 
 ### Step 1: Model market monitor state and actions
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Decision — wrap and reuse the existing `symbolSearchWorkflow` and `watchlistWorkflow` hooks so debounce, capped search, provider/error copy, backend watchlist authority, and exact identity behavior remain centralized; add a new terminal monitor workflow above them for trending rows, unified view state, sorting/filtering, selection, and terminal action intents.
 
-- [ ] Wrap existing search/watchlist workflows with a combined terminal monitor workflow/view model
-- [ ] Preserve `ATrade.Api` clients, exact identity helpers, explicit capped search limits, and exact chart/analysis action payloads
-- [ ] Preserve backend watchlist authority, optimistic pin/unpin states, cached fallback copy, provider/authentication error copy, and debounce/minimum-query behavior
-- [ ] Add source assertions for bounded search and no direct provider/database/browser secrets access
+- [x] Wrap existing search/watchlist workflows with a combined terminal monitor workflow/view model
+- [x] Preserve `ATrade.Api` clients, exact identity helpers, explicit capped search limits, and exact chart/analysis action payloads
+- [x] Preserve backend watchlist authority, optimistic pin/unpin states, cached fallback copy, provider/authentication error copy, and debounce/minimum-query behavior
+- [x] Add source assertions for bounded search and no direct provider/database/browser secrets access
 
 ---
 
