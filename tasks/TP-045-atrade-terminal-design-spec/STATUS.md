@@ -1,6 +1,6 @@
 # TP-045: Define the ATrade Terminal UI design spec — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Create the clean-room terminal design authority
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Create the clean-room terminal design authority
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create active `docs/design/atrade-terminal-ui.md` with links to related docs
-- [ ] Record clean-room visual/source/asset/branding guardrails
-- [ ] Capture full frontend replacement and platform target decisions
-- [ ] Run targeted doc validation
+- [x] Create active `docs/design/atrade-terminal-ui.md` with links to related docs
+- [x] Record clean-room visual/source/asset/branding guardrails
+- [x] Capture full frontend replacement and platform target decisions
+- [x] Run targeted doc validation
 
 ---
 
