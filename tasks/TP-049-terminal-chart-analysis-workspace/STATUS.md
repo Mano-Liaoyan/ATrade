@@ -1,6 +1,6 @@
 # TP-049: Rebuild chart and analysis as terminal workspaces — Status
 
-**Current Step:** Step 5: Testing & Verification
+**Current Step:** Step 6: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -80,11 +80,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -99,6 +99,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Check-if-affected docs reviewed: `docs/design/atrade-terminal-ui.md` needed no change because the chart/analysis workspaces stayed within the approved terminal panel, command, disabled-module, and clean-room guardrails; `docs/architecture/provider-abstractions.md` needed no change because exact identity/source interpretation and provider payload semantics were preserved. | Reviewed; no document edits required. | Step 6 documentation review |
+| `CandlestickChart` was reusable as the low-level renderer once terminal-specific range/source/identity shell state moved to `TerminalChartWorkspace` and `TerminalInstrumentHeader`. | Implemented; old `TimeframeSelector` and `IndicatorPanel` renderers retired. | `frontend/components/terminal/TerminalChartWorkspace.tsx`, `frontend/components/terminal/TerminalInstrumentHeader.tsx`, `frontend/components/terminal/TerminalIndicatorGrid.tsx` |
+| Analysis and provider status needed terminal-specific view components rather than old page panels. | Implemented `TerminalAnalysisWorkspace` and `TerminalProviderDiagnostics`; retired `AnalysisPanel` and `BrokerPaperStatus` and documented ownership. | `frontend/components/terminal/TerminalAnalysisWorkspace.tsx`, `frontend/components/terminal/TerminalProviderDiagnostics.tsx`, `docs/architecture/modules.md` |
 
 ---
 

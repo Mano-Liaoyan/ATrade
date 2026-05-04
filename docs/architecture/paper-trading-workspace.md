@@ -43,11 +43,12 @@ see_also:
 > resizable primary/context/monitor panels with versioned local-only layout
 > persistence, IBKR scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/filterable IBKR stock search, exact market-specific
-> Postgres-backed watchlists, local market badges, `lightweight-charts`
-> candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
-> `1D`, `1m`, `6m`, `1y`, `5y`, and All time), indicators, source metadata, an
-> analysis panel that can run LEAN when the analysis runtime is configured, and
-> SignalR-to-HTTP fallback behavior.
+> Postgres-backed watchlists, local market badges, terminal chart workspaces
+> that reuse `lightweight-charts` candlesticks, chart range lookback controls
+> (`1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and All time),
+> indicator grids, source/exact-identity metadata, terminal analysis workspaces
+> that can run LEAN when the analysis runtime is configured, provider
+> diagnostics, and SignalR-to-HTTP fallback behavior.
 > Production mocked market-data providers have been removed; missing iBeam
 > runtime, credentials, or authentication returns safe
 > provider-not-configured/provider-unavailable/authentication-required errors
@@ -133,17 +134,23 @@ result limits, and show-more/show-less exploration commands;
 `terminalMarketMonitorWorkflow` wraps those hooks with provider-backed trending
 state, unified dense row view models, source/provider/pin filters, sorting,
 selection, show-more/show-less row exploration, and exact chart/analysis action
-intents; and `symbolChartWorkflow` owns the selected chart range lookback,
+intents; `symbolChartWorkflow` owns the selected chart range lookback,
 candle/indicator HTTP reads, source-label formatting, SignalR subscription
 state, stream update application, and HTTP polling fallback when streaming closes
-or is unavailable. The terminal frame composes those workflow/client modules
-through `ATradeTerminalApp`, `TerminalMarketMonitor`, `MarketMonitorTable`,
-`MarketMonitorSearch`, `MarketMonitorFilters`, `MarketMonitorDetailPanel`,
-`TerminalCommandInput`, `TerminalModuleRail`, and `TerminalWorkspaceLayout`; the
-old `SymbolSearch`, `TrendingList`, `Watchlist`, and `MarketLogo` renderers and
-the retired `TerminalWorkspaceShell`, `WorkspaceCommandBar`,
-`WorkspaceNavigation`, and `WorkspaceContextPanel` primitives are no longer
-active route dependencies.
+or is unavailable; `terminalChartWorkspaceWorkflow` adapts that contract into
+terminal-ready range/source/identity/stream view models; and
+`terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
+explicit no-engine, unavailable, running, and result states. The terminal frame
+composes those workflow/client modules through `ATradeTerminalApp`,
+`TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
+`MarketMonitorFilters`, `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
+`TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
+`TerminalProviderDiagnostics`, `TerminalCommandInput`, `TerminalModuleRail`, and
+`TerminalWorkspaceLayout`; the old `SymbolSearch`, `TrendingList`, `Watchlist`,
+`MarketLogo`, `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and
+`BrokerPaperStatus` renderers plus the retired `TerminalWorkspaceShell`,
+`WorkspaceCommandBar`, `WorkspaceNavigation`, and `WorkspaceContextPanel`
+primitives are no longer active route dependencies.
 
 ### 3.2 `ATrade.Api`
 
@@ -707,8 +714,8 @@ contracts:
 - analysis results include engine/source metadata so the frontend can display
   whether output came from LEAN or another engine
 - NATS events and persisted factor/signal records must not assume LEAN types
-- the frontend renders signal source metadata through `AnalysisPanel` without
-  binding its types to QuantConnect/LEAN classes
+- the frontend renders signal source metadata through `TerminalAnalysisWorkspace`
+  without binding its types to QuantConnect/LEAN classes
 - LEAN remains behind `ATrade.Analysis` contracts and the generated algorithm is
   analysis-only: no brokerage model, no live mode, no order placement, and no
   calls to ATrade order endpoints
