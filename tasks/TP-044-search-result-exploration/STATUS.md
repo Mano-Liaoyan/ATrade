@@ -1,6 +1,6 @@
 # TP-044: Make stock search results easier to explore — Status
 
-**Current Step:** Step 3: Integrate search exploration in the workspace shell
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -56,13 +56,13 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Frontend build/checks passing
-- [ ] Integration/shell tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Backend build passes
+- [x] FULL test suite passing
+- [x] Frontend build/checks passing
+- [x] Integration/shell tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Backend build passes
 
 ---
 
@@ -102,6 +102,8 @@
 | 2026-05-04 09:35 | Step 2 completed | Added ranked summary, metadata filter chips, show more/show less controls; frontend build passed |
 | 2026-05-04 09:36 | Step 3 started | Integrating search exploration with workspace shell contexts |
 | 2026-05-04 09:52 | Step 3 completed | Chart search uses default bounded exploration, long result lists scroll, targeted frontend build/shell checks passed |
+| 2026-05-04 09:53 | Step 4 started | Running full verification gate |
+| 2026-05-04 10:03 | Step 4 completed | dotnet test, frontend build, specified shell tests, and dotnet build passed |
 
 ---
 
