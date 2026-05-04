@@ -82,10 +82,39 @@ assert_existing_search_contracts_preserved() {
   assert_file_contains "$search" 'onTogglePin(result)'
 }
 
+assert_search_ui_exploration_contract() {
+  local search="$repo_root/frontend/components/SymbolSearch.tsx"
+  local chart="$repo_root/frontend/components/SymbolChartView.tsx"
+  local workspace="$repo_root/frontend/components/TradingWorkspace.tsx"
+  local css="$repo_root/frontend/app/globals.css"
+
+  assert_file_contains "$search" 'Ranked results'
+  assert_file_contains "$search" 'Best match'
+  assert_file_contains "$search" 'formatResultCount(searchView.filteredResultCount, searchView.totalResultCount)'
+  assert_file_contains "$search" 'Refine by market metadata'
+  assert_file_contains "$search" "VisibleSymbolSearchFilterKeys: SymbolSearchFilterKey[] = ['exchange', 'currency', 'assetClass']"
+  assert_file_contains "$search" 'aria-pressed={active}'
+  assert_file_contains "$search" 'Show more results'
+  assert_file_contains "$search" 'Show less'
+  assert_file_contains "$search" 'aria-controls={resultListId}'
+  assert_file_contains "$search" 'symbol-search-panel--compact'
+  assert_file_contains "$workspace" '<SymbolSearch'
+  assert_file_contains "$workspace" 'getSearchResultPinState'
+  assert_file_contains "$chart" '<SymbolSearch'
+  assert_file_contains "$chart" 'compact'
+  assert_file_not_contains "$chart" 'limit={6}'
+  assert_file_contains "$css" '.symbol-search-results'
+  assert_file_contains "$css" 'max-height: min(34rem, 58vh);'
+  assert_file_contains "$css" 'overflow-y: auto;'
+  assert_file_contains "$css" 'symbol-search-panel--compact .symbol-search-results'
+  assert_file_contains "$css" 'max-height: 44vh;'
+}
+
 main() {
   assert_search_workflow_view_model
   assert_bounded_backend_search
   assert_existing_search_contracts_preserved
+  assert_search_ui_exploration_contract
 }
 
 main "$@"

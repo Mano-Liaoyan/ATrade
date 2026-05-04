@@ -755,9 +755,16 @@ input:focus-visible,
 .symbol-search-results {
   display: grid;
   gap: 0.7rem;
+  max-height: min(34rem, 58vh);
+  overflow-y: auto;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0.15rem 0 0;
+  scrollbar-color: rgba(56, 189, 248, 0.48) rgba(15, 23, 42, 0.72);
+}
+
+.symbol-search-panel--compact .symbol-search-results {
+  max-height: min(24rem, 46vh);
 }
 
 .symbol-search-results li {
@@ -1223,6 +1230,15 @@ input:focus-visible,
   .analysis-result-summary,
   .analysis-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .symbol-search-results {
+    max-height: 44vh;
+  }
+
+  .symbol-search-explore-controls {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .symbol-search-results li,

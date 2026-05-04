@@ -1,6 +1,6 @@
 # TP-044: Make stock search results easier to explore — Status
 
-**Current Step:** Step 2: Implement a concise, explorable search UI
+**Current Step:** Step 3: Integrate search exploration in the workspace shell
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -46,12 +46,12 @@
 ---
 
 ### Step 3: Integrate search exploration in the workspace shell
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Home and chart search panels use the concise/explorable UI
-- [ ] Long result sets no longer push core workspace context off-screen on desktop/mobile
-- [ ] Existing shell/integration tests updated only for intentional marker moves
-- [ ] Targeted frontend checks passing
+- [x] Home and chart search panels use the concise/explorable UI
+- [x] Long result sets no longer push core workspace context off-screen on desktop/mobile
+- [x] Existing shell/integration tests updated only for intentional marker moves
+- [x] Targeted frontend checks passing
 
 ---
 
@@ -100,6 +100,8 @@
 | 2026-05-04 09:20 | Step 1 completed | Added bounded ranked/filterable search view model and source-level shell test |
 | 2026-05-04 09:21 | Step 2 started | Implementing concise explorable search UI |
 | 2026-05-04 09:35 | Step 2 completed | Added ranked summary, metadata filter chips, show more/show less controls; frontend build passed |
+| 2026-05-04 09:36 | Step 3 started | Integrating search exploration with workspace shell contexts |
+| 2026-05-04 09:52 | Step 3 completed | Chart search uses default bounded exploration, long result lists scroll, targeted frontend build/shell checks passed |
 
 ---
 
