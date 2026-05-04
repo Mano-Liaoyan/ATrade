@@ -1,6 +1,6 @@
 # TP-047: Build the terminal shell, command registry, and resizable layout — Status
 
-**Current Step:** Step 4: Retire the old shell primitives from active routes
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -66,15 +66,15 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Command/shell validation passing
-- [ ] Terminal shell UI validation passing
-- [ ] Frontend bootstrap checks passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Command/shell validation passing
+- [x] Terminal shell UI validation passing
+- [x] Frontend bootstrap checks passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -117,6 +117,8 @@
 | 2026-05-05 | Step 3 verification | Ran source greps for splitters, persistence, SSR guards, no resizable package, TypeScript no-emit checks, command source tests, and frontend builds |
 | 2026-05-05 | Step 4 started | Began retiring legacy shell primitive files and old homepage test markers |
 | 2026-05-05 | Step 4 verification | Ran command test, terminal shell UI test, TypeScript check, workflow preservation greps, and frontend build |
+| 2026-05-05 | Step 5 started | Began full testing and verification gate |
+| 2026-05-05 | Step 5 verification | Passed command, shell UI, frontend bootstrap, frontend build, dotnet test ATrade.slnx, and dotnet build ATrade.slnx |
 
 ---
 
