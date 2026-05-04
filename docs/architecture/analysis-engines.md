@@ -101,6 +101,19 @@ The LEAN provider is registered only when configuration selects it.
 These endpoints are not LEAN endpoints. They must not expose QuantConnect types,
 LEAN project files, or provider-specific DTO names.
 
+### 3.1 Frontend Terminal Behavior
+
+The Next.js terminal uses `frontend/lib/terminalAnalysisWorkflow.ts` over the
+provider-neutral `analysisClient` instead of binding UI components to LEAN. The
+`TerminalAnalysisWorkspace` component renders engine discovery, selected chart
+range/source context, explicit no-engine and runtime-unavailable states,
+analysis run progress, provider-neutral signals/metrics/backtest summaries, and
+the no-order-routing guardrail. Chart and monitor handoffs preserve exact
+instrument identity when available by sending the normalized symbol identity in
+`/api/analysis/run` requests while retaining the legacy `symbolCode` fallback for
+bare `ANALYSIS <symbol>` commands. `AnalysisPanel` was retired; terminal routes
+use `TerminalAnalysisWorkspace` inside `ATradeTerminalApp` and the chart module.
+
 ## 4. LEAN Provider Implementation
 
 `src/ATrade.Analysis.Lean` is the first concrete analysis provider. The chosen
@@ -233,8 +246,10 @@ The contract and LEAN provider are verified by:
   manifests, Docker-mode `lean-engine` manifest/resource assertions, API engine
   discovery from AppHost handoff, explicit unavailable runtime responses, and
   optional managed-runtime smoke skipping
-- `tests/apphost/frontend-trading-workspace-tests.sh` for analysis panel source
-  markers in the paper-trading UI
+- `tests/apphost/frontend-terminal-chart-analysis-tests.sh` for terminal chart,
+  analysis, exact identity, and no direct provider/order access assertions
+- `tests/apphost/frontend-trading-workspace-tests.sh` for terminal analysis
+  workspace source markers in the paper-trading UI
 
 ## 9. Change Control
 

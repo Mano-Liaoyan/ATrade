@@ -41,18 +41,22 @@ assert_chart_range_types() {
 }
 
 assert_chart_range_controls() {
-  local selector="$repo_root/frontend/components/TimeframeSelector.tsx"
-  local chart_view="$repo_root/frontend/components/SymbolChartView.tsx"
+  local header="$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx"
+  local chart_workspace="$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx"
+  local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
 
-  assert_file_contains "$selector" "Chart range lookback controls"
-  assert_file_contains "$selector" "data-testid=\"chart-range-controls\""
-  assert_file_contains "$selector" "Lookback from now: 1D = past day, 1m = past month, 6m = past six months."
-  assert_file_contains "$selector" "CHART_RANGE_LABELS[chartRange]"
-  assert_file_not_contains "$selector" "Chart timeframe controls"
+  assert_file_contains "$header" "Chart range lookback controls"
+  assert_file_contains "$header" "data-testid=\"chart-range-controls\""
+  assert_file_contains "$header" "data-testid=\"chart-range-help\""
+  assert_file_contains "$header" "chart.view.rangeHelpCopy"
+  assert_file_contains "$header" "chart.view.supportedRanges.map"
+  assert_file_contains "$header" "CHART_RANGE_LABELS[chartRange]"
+  assert_file_not_contains "$header" "Chart timeframe controls"
 
-  assert_file_contains "$chart_view" "Lookback candlestick chart"
-  assert_file_contains "$chart_view" "selected lookback range from now"
-  assert_file_contains "$chart_view" "<AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange}"
+  assert_file_contains "$chart_workspace" "Lookback candlestick chart"
+  assert_file_contains "$chart_workspace" "selected lookback range from now"
+  assert_file_contains "$chart_workspace" "<TerminalAnalysisWorkspace symbol={chart.normalizedSymbol} chartRange={chart.chartRange}"
+  assert_file_contains "$terminal_app" "initialChartRange"
 }
 
 assert_frontend_client_params() {
@@ -78,14 +82,16 @@ assert_frontend_client_params() {
 
 assert_symbol_page_ssr_markers() {
   local symbol_page="$repo_root/frontend/app/symbols/[symbol]/page.tsx"
-  local chart_view="$repo_root/frontend/components/SymbolChartView.tsx"
+  local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
+  local chart_workspace="$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx"
 
-  assert_file_contains "$symbol_page" "workspace-shell"
-  assert_file_contains "$symbol_page" "← Back to trading workspace"
-  assert_file_contains "$symbol_page" "<SymbolChartView symbol={normalizedSymbol} identity={identity} />"
-  assert_file_contains "$chart_view" "data-testid=\"chart-workspace\""
-  assert_file_contains "$chart_view" "chart workspace"
-  assert_file_contains "$chart_view" "SignalR {chart.streamState}"
+  assert_file_contains "$symbol_page" "<ATradeTerminalApp initialChartRange={initialChartRange} initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />"
+  assert_file_contains "$symbol_page" "createInitialChartRange"
+  assert_file_contains "$symbol_page" "SUPPORTED_CHART_RANGES.includes"
+  assert_file_contains "$terminal_app" "data-testid=\"terminal-chart-module\""
+  assert_file_contains "$chart_workspace" "data-testid=\"chart-workspace\""
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" "Dense chart workspace header"
+  assert_file_contains "$chart_workspace" "chart.view.streamLabel"
 }
 
 main() {

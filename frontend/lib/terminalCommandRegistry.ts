@@ -141,6 +141,7 @@ export function parseTerminalCommand(rawInput: string): TerminalCommandParseResu
         route: `/symbols/${encodeURIComponent(symbol)}`,
         focusTargetId: "terminal-chart",
         symbol,
+        chartRange: "1D",
       });
     }
     case "WATCH":
@@ -154,9 +155,10 @@ export function parseTerminalCommand(rawInput: string): TerminalCommandParseResu
       const symbol = normalizeSymbolArgument(argument);
       return openModuleCommand(input, symbol ? `ANALYSIS ${symbol}` : "ANALYSIS", command, {
         moduleId: "ANALYSIS",
-        route: symbol ? `/symbols/${encodeURIComponent(symbol)}?module=ANALYSIS` : "/",
+        route: symbol ? `/symbols/${encodeURIComponent(symbol)}?module=ANALYSIS&range=1D` : "/",
         focusTargetId: "terminal-analysis",
         symbol: symbol || undefined,
+        chartRange: symbol ? "1D" : undefined,
       });
     }
     case "STATUS":

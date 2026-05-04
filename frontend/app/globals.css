@@ -1114,6 +1114,161 @@ select:focus-visible,
   gap: 0.75rem;
 }
 
+.terminal-chart-workspace {
+  min-width: 0;
+}
+
+.terminal-instrument-header__actions,
+.terminal-instrument-header__summary,
+.terminal-chart-range-controls__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.terminal-instrument-header__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(18rem, 1.25fr);
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.terminal-instrument-header__summary,
+.terminal-instrument-header__identity,
+.terminal-indicator-grid {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
+  background: rgba(8, 13, 23, 0.54);
+  padding: 0.75rem;
+}
+
+.terminal-instrument-header__symbol {
+  color: #f8fafc;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.terminal-instrument-header__summary span:not(.terminal-instrument-header__symbol),
+.terminal-chart-range-controls__help,
+.terminal-indicator-grid__header span,
+.terminal-indicator-grid__state,
+.terminal-indicator-grid__tile small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.terminal-instrument-header__identity {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.terminal-instrument-header__identity div,
+.terminal-indicator-grid__tile {
+  min-width: 0;
+}
+
+.terminal-instrument-header__identity dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.terminal-instrument-header__identity dd {
+  margin: 0.2rem 0 0;
+  color: #f8fafc;
+  font-size: 0.82rem;
+}
+
+.terminal-chart-range-controls {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.terminal-chart-range-button {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.42rem 0.56rem;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.terminal-chart-range-button:hover,
+.terminal-chart-range-button:focus-visible {
+  border-color: rgba(56, 189, 248, 0.55);
+  color: #e0f2fe;
+  outline: none;
+}
+
+.terminal-chart-range-button--active {
+  border-color: rgba(56, 189, 248, 0.72);
+  background: rgba(56, 189, 248, 0.18);
+  color: #f8fafc;
+}
+
+.terminal-chart-workspace__market-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 23rem);
+  gap: 0.9rem;
+  align-items: stretch;
+}
+
+.terminal-chart-workspace__chart-region {
+  min-width: 0;
+  resize: vertical;
+  overflow: auto;
+}
+
+.terminal-indicator-grid {
+  align-self: stretch;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.terminal-indicator-grid__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.terminal-indicator-grid__header h3,
+.terminal-indicator-grid__header p {
+  margin: 0;
+}
+
+.terminal-indicator-grid__tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.terminal-indicator-grid__tile {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.64);
+  padding: 0.7rem;
+}
+
+.terminal-indicator-grid__tile strong {
+  display: block;
+  margin-top: 0.22rem;
+  color: #f8fafc;
+  font-size: 1.15rem;
+}
+
 .stream-pill {
   color: var(--warning);
   border-color: rgba(245, 158, 11, 0.45);
@@ -1599,25 +1754,38 @@ select:focus-visible,
 .terminal-context-summary,
 .terminal-help-module,
 .terminal-status-module,
+.terminal-analysis-workspace,
+.terminal-provider-diagnostics,
 .terminal-disabled-module__body {
   display: grid;
   gap: 0.75rem;
 }
 
 .terminal-context-summary__grid,
-.terminal-status-module__grid {
+.terminal-status-module__grid,
+.terminal-provider-diagnostics__grid,
+.terminal-analysis-workspace__summary {
   display: grid;
   gap: 0.55rem;
 }
 
+.terminal-analysis-workspace__summary,
+.terminal-provider-diagnostics__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .terminal-context-summary__grid div,
-.terminal-status-module__grid div {
+.terminal-status-module__grid div,
+.terminal-provider-diagnostics__grid div,
+.terminal-analysis-workspace__summary div {
   border-bottom: 1px solid hsl(var(--terminal-border) / 0.58);
   padding-bottom: 0.45rem;
 }
 
 .terminal-context-summary dt,
-.terminal-status-module dt {
+.terminal-status-module dt,
+.terminal-provider-diagnostics dt,
+.terminal-analysis-workspace__summary span {
   color: hsl(var(--terminal-text-subtle));
   font-size: 0.72rem;
   font-weight: 900;
@@ -1626,11 +1794,42 @@ select:focus-visible,
 }
 
 .terminal-context-summary dd,
-.terminal-status-module dd {
+.terminal-status-module dd,
+.terminal-provider-diagnostics dd,
+.terminal-analysis-workspace__summary strong {
   margin: 0.2rem 0 0;
   color: hsl(var(--terminal-text));
   font-family: var(--font-mono);
   font-size: 0.82rem;
+}
+
+.terminal-analysis-workspace__summary small,
+.terminal-provider-diagnostics small,
+.terminal-analysis-workspace__copy,
+.terminal-analysis-workspace__actions span {
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.78rem;
+}
+
+.terminal-provider-diagnostics__actions,
+.terminal-analysis-workspace__badges,
+.terminal-analysis-workspace__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-analysis-workspace__unavailable {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 14px;
+  background: rgba(245, 158, 11, 0.08);
+  padding: 0.75rem;
+}
+
+.terminal-analysis-result {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .terminal-monitor-panel {
@@ -2221,6 +2420,15 @@ select:focus-visible,
   .terminal-navigation ul {
     grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   }
+
+  .terminal-instrument-header__grid,
+  .terminal-chart-workspace__market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-chart-workspace__chart-region {
+    resize: none;
+  }
 }
 
 @media (max-width: 940px) {
@@ -2291,6 +2499,10 @@ select:focus-visible,
   .terminal-command-bar__status,
   .terminal-navigation ul,
   .indicator-panel,
+  .terminal-instrument-header__identity,
+  .terminal-indicator-grid__tiles,
+  .terminal-analysis-workspace__summary,
+  .terminal-provider-diagnostics__grid,
   .broker-status-grid,
   .analysis-result-summary,
   .analysis-metrics {

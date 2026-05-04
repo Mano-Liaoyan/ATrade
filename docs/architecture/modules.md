@@ -62,16 +62,18 @@ see_also:
 > layout with versioned browser-local persistence, status/help surfaces, and a
 > dense terminal market monitor over backend-driven trending symbols,
 > bounded/ranked/filterable IBKR stock search, and Postgres-backed exact
-> watchlists. `TerminalMarketMonitor`, `MarketMonitorTable`,
-> `MarketMonitorSearch`, `MarketMonitorFilters`, and
+> watchlists plus terminal chart/analysis workspaces. `TerminalMarketMonitor`,
+> `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
 > `MarketMonitorDetailPanel` replace the old long/list search, trending, and
 > watchlist renderers while preserving exact identity for chart/analysis actions.
-> `lightweight-charts` chart routes, SignalR-to-HTTP fallback, and the
-> provider-neutral analysis panel remain behind the same terminal frame. The
-> `frontend/lib/*Workflow.ts` hooks continue to centralize watchlist, bounded
-> search result view models, terminal monitor rows/actions, chart range loading,
-> source labeling, and streaming fallback orchestration behind the terminal
-> frame.
+> `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
+> `TerminalIndicatorGrid` own the chart module around the reusable
+> `CandlestickChart`; `TerminalAnalysisWorkspace` owns provider-neutral analysis
+> states; and `TerminalProviderDiagnostics` replaces the old broker status card.
+> The `frontend/lib/*Workflow.ts` hooks continue to centralize watchlist,
+> bounded search result view models, terminal monitor rows/actions, chart range
+> loading, source labeling, streaming fallback orchestration, and analysis engine
+> discovery/run view models behind the terminal frame.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -584,12 +586,20 @@ references.
   show-more/show-less exploration, exact pin state projection, and exact
   chart/analysis navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
   and its table/search/filter/detail components render that monitor for `HOME`,
-  `SEARCH`, and `WATCHLIST`. The old `SymbolSearch`, `TrendingList`, `Watchlist`,
-  and `MarketLogo` list renderers are retired. Chart range loading/source
-  labels/SignalR-to-HTTP fallback and provider-neutral analysis remain in their
-  existing workflow/client modules, while visible-disabled modules such as
-  `SCREENER` stay honest unavailable states rather than fake filters or demo
-  data, and no order-entry controls are introduced.
+  `SEARCH`, and `WATCHLIST`. `frontend/lib/terminalChartWorkspaceWorkflow.ts`
+  adapts `symbolChartWorkflow` into terminal source/range/identity/stream view
+  models consumed by `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
+  `TerminalIndicatorGrid`; the chart module keeps `CandlestickChart` as a
+  reusable low-level renderer while retiring `TimeframeSelector` and
+  `IndicatorPanel`. `frontend/lib/terminalAnalysisWorkflow.ts` adapts
+  `analysisClient` discovery/run behavior for `TerminalAnalysisWorkspace`, which
+  replaces `AnalysisPanel`; `TerminalProviderDiagnostics` replaces
+  `BrokerPaperStatus` as diagnostics-only broker/IBKR/iBeam/source state. The
+  old `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
+  `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and
+  `BrokerPaperStatus` renderers are retired. Visible-disabled modules such as
+  `SCREENER`, `PORTFOLIO`, and `ORDERS` stay honest unavailable states rather
+  than fake filters, portfolio rows, or order-entry controls.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
@@ -602,9 +612,12 @@ references.
   (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
   `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalCommandInput`,
   `TerminalModuleRail`, `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
-  `TerminalHelpModule`, `TerminalStatusModule`, and `TerminalDisabledModule`) and
-  intentionally avoid legacy page-shell layout assumptions, backend access,
-  provider runtime calls, order-entry behavior, or third-party terminal branding.
+  `TerminalHelpModule`, `TerminalStatusModule`, `TerminalChartWorkspace`,
+  `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
+  `TerminalAnalysisWorkspace`, `TerminalProviderDiagnostics`, and
+  `TerminalDisabledModule`) and intentionally avoid legacy page-shell layout
+  assumptions, backend access, provider runtime calls, order-entry behavior, or
+  third-party terminal branding.
 
 ## 5. Dependency Summary
 

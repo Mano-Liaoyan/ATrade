@@ -3,12 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AnalysisPanel } from "@/components/AnalysisPanel";
-import { CandlestickChart } from "@/components/CandlestickChart";
-import { IndicatorPanel } from "@/components/IndicatorPanel";
-import { TimeframeSelector } from "@/components/TimeframeSelector";
 import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
-import { formatMarketDataSourceLabel, useSymbolChartWorkflow } from "@/lib/symbolChartWorkflow";
+import { useTerminalChartWorkspaceWorkflow } from "@/lib/terminalChartWorkspaceWorkflow";
 import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
 import type {
   DisabledTerminalModuleId,
@@ -27,14 +23,18 @@ import { TerminalStatusModule } from "./TerminalStatusModule";
 import { TerminalStatusStrip } from "./TerminalStatusStrip";
 import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
+import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
+import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
+  initialChartRange?: ChartRange;
   initialIdentity?: InstrumentIdentityInput | null;
   initialModuleId?: EnabledTerminalModuleId;
   initialSymbol?: string | null;
 };
 
 export function ATradeTerminalApp({
+  initialChartRange = "1D",
   initialIdentity = null,
   initialModuleId = "HOME",
   initialSymbol = null,
@@ -46,12 +46,24 @@ export function ATradeTerminalApp({
   const [pendingFocusTargetId, setPendingFocusTargetId] = useState<string | null>(null);
   const [seededSearchQuery, setSeededSearchQuery] = useState("");
   const normalizedInitialSymbol = initialSymbol?.toUpperCase() ?? null;
+  const [activeSymbol, setActiveSymbol] = useState<string | null>(normalizedInitialSymbol);
+  const [activeIdentity, setActiveIdentity] = useState<InstrumentIdentityInput | null>(initialIdentity);
+  const [activeChartRange, setActiveChartRange] = useState<ChartRange>(initialChartRange);
   const marketDataStatus = "Market monitor owns provider state";
   const watchlistStatus = "Backend-owned pins in monitor";
 
   useEffect(() => {
     setActiveModuleId(initialModuleId);
   }, [initialModuleId]);
+
+  useEffect(() => {
+    setActiveSymbol(normalizedInitialSymbol);
+    setActiveIdentity(initialIdentity);
+  }, [initialIdentity, normalizedInitialSymbol]);
+
+  useEffect(() => {
+    setActiveChartRange(initialChartRange);
+  }, [initialChartRange]);
 
   useEffect(() => {
     if (!pendingFocusTargetId) {
@@ -75,6 +87,14 @@ export function ATradeTerminalApp({
 
       if (intent.moduleId === "SEARCH" && intent.searchQuery) {
         setSeededSearchQuery(intent.searchQuery);
+      }
+
+      if ((intent.moduleId === "CHART" || intent.moduleId === "ANALYSIS") && intent.symbol) {
+        setActiveSymbol(intent.symbol.toUpperCase());
+        setActiveIdentity(intent.identity ?? null);
+        if (intent.chartRange) {
+          setActiveChartRange(intent.chartRange);
+        }
       }
 
       if (intent.moduleId === "HOME") {
@@ -146,10 +166,11 @@ export function ATradeTerminalApp({
   ) : (
     <TerminalModuleContent
       activeModuleId={activeModuleId}
-      identity={initialIdentity}
+      chartRange={activeChartRange}
+      identity={activeIdentity}
       onOpenIntent={openIntent}
       searchQuery={seededSearchQuery}
-      symbol={normalizedInitialSymbol}
+      symbol={activeSymbol}
     />
   );
 
@@ -184,7 +205,7 @@ export function ATradeTerminalApp({
               <TerminalContextSummary
                 activeModuleId={activeModuleId}
                 marketDataStatus={marketDataStatus}
-                symbol={normalizedInitialSymbol}
+                symbol={activeSymbol}
                 watchlistStatus={watchlistStatus}
               />
             )}
@@ -199,7 +220,7 @@ export function ATradeTerminalApp({
         activeModuleId={activeModuleId}
         commandFeedback={commandFeedback}
         marketDataStatus={marketDataStatus}
-        symbol={normalizedInitialSymbol}
+        symbol={activeSymbol}
         watchlistStatus={watchlistStatus}
       />
     </section>
@@ -276,6 +297,7 @@ function TerminalMonitorPanel() {
 
 type TerminalModuleContentProps = {
   activeModuleId: EnabledTerminalModuleId;
+  chartRange: ChartRange;
   identity: InstrumentIdentityInput | null;
   onOpenIntent: (intent: TerminalNavigationIntent, feedback: string) => void;
   searchQuery: string;
@@ -284,6 +306,7 @@ type TerminalModuleContentProps = {
 
 function TerminalModuleContent({
   activeModuleId,
+  chartRange,
   identity,
   onOpenIntent,
   searchQuery,
@@ -297,9 +320,9 @@ function TerminalModuleContent({
     case "WATCHLIST":
       return <TerminalWatchlistModule onOpenIntent={onOpenIntent} />;
     case "CHART":
-      return symbol ? <TerminalChartModule identity={identity} symbol={symbol} /> : <TerminalChartPlaceholder />;
+      return symbol ? <TerminalChartModule identity={identity} initialChartRange={chartRange} symbol={symbol} /> : <TerminalChartPlaceholder />;
     case "ANALYSIS":
-      return <TerminalAnalysisModule symbol={symbol} />;
+      return <TerminalAnalysisModule chartRange={chartRange} identity={identity} symbol={symbol} />;
     case "STATUS":
       return <TerminalStatusModule />;
     case "HELP":
@@ -378,64 +401,17 @@ function TerminalChartPlaceholder() {
   );
 }
 
-function TerminalChartModule({ identity, symbol }: { identity: InstrumentIdentityInput | null; symbol: string }) {
-  const chart = useSymbolChartWorkflow({ symbol, identity });
-  const sourceLabel = formatMarketDataSourceLabel(chart.candles?.source);
-  const streamTone = chart.streamState === "connected" ? "success" : chart.streamState === "connecting" ? "info" : "warning";
+function TerminalChartModule({ identity, initialChartRange, symbol }: { identity: InstrumentIdentityInput | null; initialChartRange: ChartRange; symbol: string }) {
+  const chart = useTerminalChartWorkspaceWorkflow({ symbol, identity, initialChartRange });
 
   return (
-    <section className="terminal-module terminal-module--chart workspace-stack" data-testid="terminal-chart-module" id="terminal-chart" tabIndex={-1}>
-      <TerminalPanel
-        eyebrow="Chart"
-        title={`${chart.normalizedSymbol} chart workspace`}
-        description="Chart range controls use lookback windows from now while provider/source metadata, SignalR state, and HTTP fallback notes stay visible."
-        actions={<TerminalStatusBadge tone={streamTone}>SignalR {chart.streamState}</TerminalStatusBadge>}
-      >
-        <div id="terminal-chart-range" className="chart-command-range" aria-label="Chart range lookback controls">
-          <span className="indicator-label">Chart range lookback controls</span>
-          <TimeframeSelector value={chart.chartRange} onChange={chart.setChartRange} />
-        </div>
-      </TerminalPanel>
-
-      <section className="workspace-panel terminal-data-panel chart-view" data-testid="chart-workspace">
-        <div className="panel-heading chart-heading terminal-panel-heading">
-          <div>
-            <p className="eyebrow">Lookback candlestick chart</p>
-            <h2>{chart.normalizedSymbol} candles and indicators</h2>
-            <p>Current source: {sourceLabel}. Chart controls request the selected lookback range from now.</p>
-          </div>
-          <div className="chart-actions">
-            <span className={chart.streamState === "connected" ? "stream-pill stream-pill--connected" : "stream-pill"} data-testid="stream-state">
-              SignalR {chart.streamState}
-            </span>
-            <span className="pill">{CHART_RANGE_LABELS[chart.chartRange]} lookback</span>
-          </div>
-        </div>
-
-        {chart.loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div> : null}
-        {!chart.loading && chart.error ? (
-          <div className="error-state" role="alert">
-            <strong>IBKR chart data unavailable.</strong>
-            <p>{chart.error}</p>
-            <button className="primary-button" type="button" onClick={() => void chart.refreshChartData(true)}>
-              Retry chart data
-            </button>
-          </div>
-        ) : null}
-        {!chart.loading && !chart.error && chart.candles ? <CandlestickChart candles={chart.candles} indicators={chart.indicators} /> : null}
-
-        <IndicatorPanel indicators={chart.indicators} />
-        <ChartFooter chart={chart} sourceLabel={sourceLabel} />
-      </section>
-
-      <section id="terminal-analysis" tabIndex={-1} aria-label="Provider-neutral analysis entry point">
-        <AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} />
-      </section>
+    <section className="terminal-module terminal-module--chart" data-testid="terminal-chart-module" id="terminal-chart" tabIndex={-1}>
+      <TerminalChartWorkspace chart={chart} identity={identity} />
     </section>
   );
 }
 
-function TerminalAnalysisModule({ symbol }: { symbol: string | null }) {
+function TerminalAnalysisModule({ chartRange, identity, symbol }: { chartRange: ChartRange; identity: InstrumentIdentityInput | null; symbol: string | null }) {
   return (
     <section className="terminal-module terminal-module--analysis workspace-stack" data-testid="terminal-analysis-module" id="terminal-analysis" tabIndex={-1}>
       <TerminalPanel
@@ -444,44 +420,11 @@ function TerminalAnalysisModule({ symbol }: { symbol: string | null }) {
         description="Provider-neutral analysis lists configured engines and surfaces no-engine or runtime-unavailable states without fake signals."
         actions={<TerminalStatusBadge tone="info">ANALYSIS</TerminalStatusBadge>}
       >
-        {symbol ? <p>Running over the default {CHART_RANGE_LABELS["1D"]} chart range until a chart workspace selects another lookback.</p> : <p>Use ANALYSIS &lt;symbol&gt; from the command input or open a chart before selecting ANALYSIS.</p>}
+        {symbol ? <p>Running over the selected {CHART_RANGE_LABELS[chartRange]} chart range from the route or chart workspace context.</p> : <p>Use ANALYSIS &lt;symbol&gt; from the command input or open a chart before selecting ANALYSIS.</p>}
       </TerminalPanel>
-      {symbol ? <AnalysisPanel symbol={symbol} chartRange={"1D" as ChartRange} /> : null}
+      <TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />
     </section>
   );
-}
-
-function ChartFooter({ chart, sourceLabel }: { chart: ReturnType<typeof useSymbolChartWorkflow>; sourceLabel: string }) {
-  return (
-    <div className="chart-footer-note">
-      <p>
-        HTTP candles/indicators are refreshed for the selected lookback range from now. SignalR applies IBKR snapshot updates when `/hubs/market-data` is reachable;
-        if streaming is unavailable this view falls back to HTTP polling without synthetic fallback data.
-      </p>
-      {chart.candles ? <p>Current candle source: {sourceLabel}.</p> : null}
-      {chart.streamState === "unavailable" ? (
-        <p>Streaming snapshots are unavailable; polling continues against the IBKR/iBeam HTTP provider.</p>
-      ) : null}
-      {chart.latestUpdate ? (
-        <p>
-          Last market-data stream update: {chart.latestUpdate.symbol} {chart.latestUpdate.timeframe} range close {chart.latestUpdate.close.toFixed(2)} from {formatMarketDataSourceLabel(chart.latestUpdate.source)}.
-        </p>
-      ) : null}
-      <p>{formatChartIdentity(chart)}</p>
-    </div>
-  );
-}
-
-function formatChartIdentity(chart: ReturnType<typeof useSymbolChartWorkflow>): string {
-  if (!chart.chartIdentity) {
-    return `${chart.normalizedSymbol} uses the default manual symbol identity until provider metadata is supplied by search, trending, or cache payloads.`;
-  }
-
-  const provider = chart.chartIdentity.provider.toUpperCase();
-  const providerId = chart.chartIdentity.providerSymbolId ? ` · provider id ${chart.chartIdentity.providerSymbolId}` : "";
-  const exchange = chart.chartIdentity.exchange ? ` · market ${chart.chartIdentity.exchange}` : "";
-
-  return `${chart.chartIdentity.symbol} exact instrument identity: provider ${provider}${providerId}${exchange} · ${chart.chartIdentity.currency} · ${chart.chartIdentity.assetClass}.`;
 }
 
 function getModuleFocusTargetId(moduleId: EnabledTerminalModuleId): string {

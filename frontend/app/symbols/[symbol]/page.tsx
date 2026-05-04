@@ -1,4 +1,5 @@
 import { ATradeTerminalApp } from '@/components/terminal/ATradeTerminalApp';
+import { SUPPORTED_CHART_RANGES, type ChartRange } from '@/types/marketData';
 import type { EnabledTerminalModuleId } from '@/types/terminal';
 
 type SymbolPageProps = {
@@ -14,8 +15,13 @@ export default async function SymbolPage({ params, searchParams }: SymbolPagePro
   const normalizedSymbol = decodeURIComponent(symbol).toUpperCase();
   const identity = createQueryIdentity(normalizedSymbol, resolvedSearchParams);
   const initialModuleId = createInitialModuleId(firstQueryValue(resolvedSearchParams.module));
+  const initialChartRange = createInitialChartRange(
+    firstQueryValue(resolvedSearchParams.range)
+      ?? firstQueryValue(resolvedSearchParams.chartRange)
+      ?? firstQueryValue(resolvedSearchParams.timeframe),
+  );
 
-  return <ATradeTerminalApp initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />;
+  return <ATradeTerminalApp initialChartRange={initialChartRange} initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />;
 }
 
 function createInitialModuleId(moduleQuery: string | null): EnabledTerminalModuleId {
@@ -26,6 +32,12 @@ function createInitialModuleId(moduleQuery: string | null): EnabledTerminalModul
   }
 
   return 'CHART';
+}
+
+function createInitialChartRange(rangeQuery: string | null): ChartRange {
+  const normalizedRange = rangeQuery?.trim() as ChartRange | undefined;
+
+  return normalizedRange && SUPPORTED_CHART_RANGES.includes(normalizedRange) ? normalizedRange : '1D';
 }
 
 function createQueryIdentity(symbol: string, searchParams: Record<string, string | string[] | undefined>) {
