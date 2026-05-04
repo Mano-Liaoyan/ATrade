@@ -99,8 +99,10 @@ Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
 `ATrade.MarketData` contracts. `ATrade.MarketData.ExactInstrumentIdentity` owns
 backend normalization/key encoding for provider, provider symbol id, symbol,
-exchange, currency, and asset class; search, trending, candle, indicator,
-latest-update, Timescale cache, and watchlist flows carry that identity where
+exchange, currency, and asset class; `ATrade.MarketData.ChartRangePresets` owns
+chart lookback ranges from now (`1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`,
+`1y`, `5y`, and `all` / All time); search, trending, candle, indicator,
+latest-update, Timescale cache, and watchlist flows carry exact identity where
 provider metadata is available while keeping legacy symbol-only HTTP paths
 compatible. When the local iBeam/Gateway runtime is
 configured with the HTTPS Client Portal URL (`https://127.0.0.1:<gateway-port>`),
@@ -110,8 +112,9 @@ through ignored `.env` values, API endpoints return IBKR scanner, snapshot, and
 historical bar data with source metadata. `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`
 (default `30`) controls whether TimescaleDB rows for trending snapshots,
 candles, and indicator candle inputs are fresh enough to serve directly as
-`timescale-cache:{originalSource}` responses; because the AppHost TimescaleDB
-data directory is volume-backed, those fresh rows can survive a full local
+`timescale-cache:{originalSource}` responses for the requested normalized chart
+range; because the AppHost TimescaleDB data directory is volume-backed, those
+fresh rows can survive a full local
 AppHost reboot and be served without another IBKR/iBeam provider call. Missing or
 stale rows refresh from IBKR/iBeam, persist the provider response to TimescaleDB,
 and return the provider response. When iBeam is disabled, missing credentials,
@@ -212,6 +215,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/lean-analysis-engine-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `tests/apphost/frontend-chart-range-preset-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 - `tests/apphost/frontend-workspace-workflow-module-tests.sh`
 

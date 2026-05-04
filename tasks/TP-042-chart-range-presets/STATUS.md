@@ -1,7 +1,7 @@
 # TP-042: Correct chart range presets — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-04
 **Review Level:** 2
 **Review Counter:** 0
@@ -69,11 +69,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -88,6 +88,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Market-data service/provider method and payload field names could remain as compatibility aliases while normalizing values as chart ranges. | Implemented `range`/`chartRange` HTTP aliases, retained legacy `timeframe` query/payload compatibility, and documented behavior. | `src/ATrade.Api/Program.cs`, `docs/architecture/provider-abstractions.md` |
+| Analysis runs are affected because the frontend passes the selected chart range through the existing `timeframe` payload field. | Updated affected analysis documentation; no analysis runtime dependency or order behavior changed. | `frontend/components/AnalysisPanel.tsx`, `docs/architecture/analysis-engines.md` |
+| `npm ci` still reports two moderate frontend audit advisories. | Existing repo tech debt from prior frontend dependency audit; not addressed in this chart-range task. | `tasks/CONTEXT.md` |
 
 ---
 
@@ -103,6 +106,7 @@
 | 2026-05-04 02:36 | Step 2 completed | Wired normalized ranges through API, SignalR, IBKR, and Timescale; provider/cache targeted tests passed |
 | 2026-05-04 02:55 | Step 3 completed | Updated frontend chart range types, client/stream/workflow copy, analysis handoff, and added range shell test |
 | 2026-05-04 03:10 | Step 4 completed | Full dotnet tests, frontend build, targeted shell tests, and backend build passed |
+| 2026-05-04 03:24 | Step 5 completed | Updated active docs and logged compatibility/analysis discoveries |
 
 ---
 

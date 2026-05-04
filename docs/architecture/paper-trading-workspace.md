@@ -35,9 +35,10 @@ see_also:
 > broker/iBeam configuration wiring, and a Next.js workspace with IBKR
 > scanner-driven or fresh persisted trending symbols, IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, `lightweight-charts`
-> candlesticks, timeframe switching,
-> indicators, source metadata, an analysis panel that can run LEAN when the
-> analysis runtime is configured, and SignalR-to-HTTP fallback behavior.
+> candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
+> `1D`, `1m`, `6m`, `1y`, `5y`, and All time), indicators, source metadata,
+> an analysis panel that can run LEAN when the analysis runtime is configured,
+> and SignalR-to-HTTP fallback behavior.
 > Production mocked market-data providers have been removed; missing iBeam
 > runtime, credentials, or authentication returns safe
 > provider-not-configured/provider-unavailable/authentication-required errors
@@ -107,9 +108,9 @@ owns backend watchlist loads, one-time symbol-only legacy cache migration,
 read-only cached fallback, exact pin/unpin/remove commands, saving state, and
 stable watchlist error copy; `symbolSearchWorkflow` owns search query debounce,
 minimum-length validation, provider/authentication error copy, and result state;
-and `symbolChartWorkflow` owns candle/indicator HTTP reads, source-label
-formatting, SignalR subscription state, stream update application, and HTTP
-polling fallback when streaming closes or is unavailable.
+and `symbolChartWorkflow` owns the selected chart range lookback, candle/indicator
+HTTP reads, source-label formatting, SignalR subscription state, stream update
+application, and HTTP polling fallback when streaming closes or is unavailable.
 
 ### 3.2 `ATrade.Api`
 
@@ -125,8 +126,8 @@ polling fallback when streaming closes or is unavailable.
 The current backend slice exposes `GET /api/broker/ibkr/status`,
 `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 `GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
-`GET /api/market-data/{symbol}/candles?timeframe=...`,
-`GET /api/market-data/{symbol}/indicators?timeframe=...`, `GET /api/workspace/watchlist`,
+`GET /api/market-data/{symbol}/candles?range=...`,
+`GET /api/market-data/{symbol}/indicators?range=...`, `GET /api/workspace/watchlist`,
 `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
 exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
 `DELETE /api/workspace/watchlist/{symbol}` for unambiguous symbol-only rows,
@@ -144,16 +145,21 @@ with exact identity metadata and source metadata such as
 `timescale-cache:ibkr-ibeam-history` or
 `timescale-cache:ibkr-ibeam-scanner:STK.US.MAJOR:TOP_PERC_GAIN`. Candle and
 indicator reads keep the legacy `/api/market-data/{symbol}/...` paths while
-accepting optional `provider`, `providerSymbolId`, `exchange`, `currency`, and
-`assetClass` query metadata for exact cache filtering/chart handoff. The AppHost
-`timescaledb` resource is backed by a named data volume, so those fresh rows can
-survive a full `start run` / AppHost stop-start cycle and serve the API after
-reboot without another provider call. Missing or stale rows trigger the
-provider-backed scanner/historical-bar fetch, persist the provider response to
-TimescaleDB, and return the provider response; stale rows are not silently
-promoted to success when provider refresh fails. Indicator
-requests reuse the cache-aware candle path before computing moving average, RSI,
-and MACD payloads for `1m`, `5m`, `1h`, and `1D`. The search endpoint remains
+accepting `range` / `chartRange` query values and still accepting legacy
+`timeframe` as a query-name alias. Supported chart range values are `1min`,
+`5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and `all`; they mean
+lookbacks from the current time, so `1D` means the past day, `1m` means the past
+month, and `6m` means the past six months. Optional `provider`,
+`providerSymbolId`, `exchange`, `currency`, and `assetClass` query metadata is
+accepted for exact cache filtering/chart handoff. The AppHost `timescaledb`
+resource is backed by a named data volume, so those fresh rows can survive a full
+`start run` / AppHost stop-start cycle and serve the API after reboot without
+another provider call. Missing, stale, mismatched-range, or lookback-incompatible
+rows trigger the provider-backed scanner/historical-bar fetch, persist the
+provider response to TimescaleDB, and return the provider response; stale rows are
+not silently promoted to success when provider refresh fails. Indicator requests
+reuse the cache-aware candle path before computing moving average, RSI, and MACD
+payloads for the same normalized chart ranges. The search endpoint remains
 provider-backed, enforces a minimum query length, stock-only asset class, and a
 capped result limit before returning provider-neutral `symbol`, `name`,
 `assetClass`, `exchange`, `currency`, `provider`, and provider-symbol-id
@@ -164,9 +170,10 @@ streaming layer for browsers and awaits `IMarketDataStreamingService`, which
 owns provider-status checks and creates provider-backed snapshots when the
 IBKR/iBeam provider is available. The analysis endpoints use
 `IAnalysisEngineRegistry` for discovery and `IAnalysisRequestIntake` for runs;
-the intake owns direct-bar validation, symbol/timeframe defaults, async
-`IMarketDataService` candle reads, symbol identity resolution, invalid-request /
-market-data error propagation, and engine handoff. With no engine selected the
+the intake owns direct-bar validation, symbol/range (`timeframe` payload field)
+defaults, async `IMarketDataService` candle reads, symbol identity resolution,
+invalid-request / market-data error propagation, and engine handoff. With no
+engine selected the
 HTTP projection still returns explicit `analysis-engine-not-configured` metadata,
 and when `ATRADE_ANALYSIS_ENGINE=Lean` the configured LEAN provider analyzes the
 normalized bars; in Docker mode that provider uses the AppHost-managed
@@ -194,8 +201,9 @@ The paper-trading slice extends existing planned responsibilities as follows:
   fills directly from this module
 - `ATrade.MarketData` owns provider-neutral quote/bar contracts, provider
   status/error states, the `ExactInstrumentIdentity` backend normalization/key
-  helper, symbol-search readiness hooks, historical chart queries,
-  compatibility services, and SignalR snapshot contracts
+  helper, chart range preset normalization/lookback semantics, symbol-search
+  readiness hooks, historical chart queries, compatibility services, and SignalR
+  snapshot contracts
 - `ATrade.MarketData.Ibkr` owns the first real market-data provider: IBKR/iBeam
   Client Portal contract search/detail lookup, scanner/trending-equivalent
   mapping, snapshots, historical bars, indicator inputs, source metadata, and
@@ -404,9 +412,10 @@ not just an API process restart. The current foundation creates an
 `atrade_market_data` schema with hypertable-ready candle and scanner/trending
 snapshot tables for provider-backed market data:
 
-- historical OHLCV bars for charts, keyed by provider, source, symbol, timeframe,
-  and candle timestamp, with provider symbol id, exchange, currency, and asset
-  class metadata persisted where available for exact cache reads
+- historical OHLCV bars for charts, keyed by provider, source, symbol,
+  normalized chart range, and candle timestamp, with provider symbol id,
+  exchange, currency, and asset class metadata persisted where available for
+  exact cache reads
 - scanner/trending snapshots with provider-neutral symbol identity, source,
   generated timestamp, score/factor details, reasons metadata, and provider/market
   identity fields
@@ -479,7 +488,7 @@ The backend owns all state that must survive refresh, sign-in changes, or
 machine changes:
 
 - watchlists
-- chart interval / indicator presets that are meant to roam with the user
+- chart range / indicator presets that are meant to roam with the user
 - paper orders and fills
 - positions, balances, and account summaries
 - server-side trending lists and factor explanations
@@ -538,11 +547,11 @@ Current implementation:
   state, debounce, minimum-length validation, result state, and provider /
   authentication error text while `frontend/components/SymbolSearch.tsx` renders
   the workflow state for workspace and symbol pages
-- `frontend/lib/symbolChartWorkflow.ts` owns HTTP candle/indicator fetches,
-  source-label formatting, SignalR subscription state and updates from
-  `/hubs/market-data`, and HTTP polling fallback when streaming closes or is
-  unavailable while `frontend/components/SymbolChartView.tsx` renders the chart
-  workflow state and embeds the compact symbol search control
+- `frontend/lib/symbolChartWorkflow.ts` owns the selected lookback chart range,
+  HTTP candle/indicator fetches, source-label formatting, SignalR subscription
+  state and updates from `/hubs/market-data`, and HTTP polling fallback when
+  streaming closes or is unavailable while `frontend/components/SymbolChartView.tsx`
+  renders the chart workflow state and embeds the compact symbol search control
 
 Licensing guardrail:
 
@@ -594,7 +603,8 @@ through the backend watchlist API. The frontend uses the centralized
 `frontend/lib/instrumentIdentity.ts` adapter to compute provisional optimistic
 keys, normalize asset classes, parse an IBKR `conid` only when the provider is
 `ibkr` and the provider symbol id is numeric, and build exact chart handoff query
-strings. Backend-owned `instrumentKey` / `pinKey` values returned by watchlist
+strings without changing the selected chart range. Backend-owned `instrumentKey`
+/ `pinKey` values returned by watchlist
 responses remain authoritative for persisted pins. Duplicate search results
 sharing a symbol or company name are keyed and rendered by exact instrument
 identity, not by bare symbol.
@@ -619,8 +629,9 @@ When no provider is configured, those endpoints still return explicit
 `analysis-engine-not-configured` metadata rather than fake signals. When an
 ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers the
 LEAN provider and `POST /api/analysis/run` delegates to `ATrade.Analysis`
-intake, which can fetch normalized candles through the async cache-aware
-`IMarketDataService` before invoking LEAN. Docker mode is the no-paid-account
+intake, which can fetch normalized candles for the selected chart range through
+the async cache-aware `IMarketDataService` before invoking LEAN. Docker mode is
+the no-paid-account
 local path: the local Aspire graph shows `lean-engine`,
 bind-mounts the generated-workspace root, and passes container metadata to the
 API so execution uses `docker exec` to invoke `dotnet
