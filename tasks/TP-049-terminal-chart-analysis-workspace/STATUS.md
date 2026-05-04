@@ -1,6 +1,6 @@
 # TP-049: Rebuild chart and analysis as terminal workspaces — Status
 
-**Current Step:** Step 1: Preserve chart workflow contracts behind terminal view models
+**Current Step:** Step 2: Build the terminal chart workspace
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -33,10 +33,11 @@
 ---
 
 ### Step 2: Build the terminal chart workspace
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-> ⚠️ Hydrate: Expand based on which existing low-level chart components remain useful.
+> ⚠️ Hydrate: Decision — keep `CandlestickChart` as the low-level renderer, move the symbol/range/source/identity shell into terminal chart components, and replace active `TimeframeSelector`/`IndicatorPanel` imports with terminal-styled range and indicator regions.
 
+- [ ] Reuse CandlestickChart as the low-level renderer while moving shell/range/metadata into terminal components
 - [ ] Create terminal chart workspace and instrument header
 - [ ] Adapt chart/indicator regions for resizable terminal layout
 - [ ] Preserve supported lookback range list and copy
