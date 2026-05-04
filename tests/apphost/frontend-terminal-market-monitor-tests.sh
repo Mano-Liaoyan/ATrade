@@ -81,6 +81,9 @@ assert_bounded_api_only_search() {
 
 assert_exact_identity_actions() {
   local workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
+  local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
+  local table="$repo_root/frontend/components/terminal/MarketMonitorTable.tsx"
+  local detail="$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx"
   local identity="$repo_root/frontend/lib/instrumentIdentity.ts"
   local terminal_types="$repo_root/frontend/types/terminal.ts"
 
@@ -92,9 +95,71 @@ assert_exact_identity_actions() {
   assert_file_contains "$workflow" "assetClass: identity.assetClass"
   assert_file_contains "$workflow" "createChartNavigationIntent"
   assert_file_contains "$workflow" "createAnalysisNavigationIntent"
+  assert_file_contains "$monitor" "onOpenIntent(workflow.openChartIntent(row), buildOpenFeedback('CHART', row))"
+  assert_file_contains "$monitor" "onOpenIntent(workflow.openAnalysisIntent(row), buildOpenFeedback('ANALYSIS', row))"
+  assert_file_contains "$table" "href={row.chartHref}"
+  assert_file_contains "$table" "href={row.analysisHref}"
+  assert_file_contains "$detail" "href={row.chartHref}"
+  assert_file_contains "$detail" "href={row.analysisHref}"
   assert_file_contains "$identity" 'providerSymbolId=${encodeSegment(normalized.providerSymbolId)}'
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
   assert_file_contains "$terminal_types" "identity?: MarketDataSymbolIdentity | null"
+}
+
+assert_dense_terminal_components() {
+  local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
+  local table="$repo_root/frontend/components/terminal/MarketMonitorTable.tsx"
+  local detail="$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx"
+  local search="$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx"
+  local filters="$repo_root/frontend/components/terminal/MarketMonitorFilters.tsx"
+  local css="$repo_root/frontend/app/globals.css"
+
+  assert_file_contains "$monitor" "data-testid=\"terminal-market-monitor\""
+  assert_file_contains "$monitor" "MarketMonitorStateStrip"
+  assert_file_contains "$monitor" "workflow.statusSummary"
+  assert_file_contains "$table" "data-testid=\"market-monitor-row\""
+  assert_file_contains "$table" "row.rankLabel"
+  assert_file_contains "$table" "row.providerSymbolId"
+  assert_file_contains "$table" "row.exchange"
+  assert_file_contains "$table" "row.currency"
+  assert_file_contains "$table" "row.assetClass"
+  assert_file_contains "$table" "row.sourceLabel"
+  assert_file_contains "$table" "row.saved ? 'Saved' : 'Not saved'"
+  assert_file_contains "$table" "row.saving ? 'Saving'"
+  assert_file_contains "$detail" "data-testid=\"market-monitor-exact-identity\""
+  assert_file_contains "$detail" "Provider ID"
+  assert_file_contains "$detail" "IBKR conid"
+  assert_file_contains "$detail" "Pin key"
+  assert_file_contains "$search" "data-testid=\"market-monitor-search-input\""
+  assert_file_contains "$filters" "data-testid=\"market-monitor-filters\""
+  assert_file_contains "$css" ".market-monitor-table"
+  assert_file_contains "$css" "min-width: 78rem;"
+  assert_file_contains "$css" "max-height: min(34rem, 62vh);"
+}
+
+assert_monitor_interactions_and_responsiveness() {
+  local workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
+  local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
+  local table="$repo_root/frontend/components/terminal/MarketMonitorTable.tsx"
+  local filters="$repo_root/frontend/components/terminal/MarketMonitorFilters.tsx"
+  local css="$repo_root/frontend/app/globals.css"
+
+  assert_file_contains "$workflow" "setSort: (key: TerminalMarketMonitorSortKey) => void"
+  assert_file_contains "$workflow" "showMoreRows"
+  assert_file_contains "$workflow" "showLessRows"
+  assert_file_contains "$workflow" "selectRow: setSelectedRowId"
+  assert_file_contains "$workflow" "rowMatchesFilters"
+  assert_file_contains "$workflow" "buildAvailableMonitorFilters"
+  assert_file_contains "$monitor" "MarketMonitorExplorationControls"
+  assert_file_contains "$monitor" "Show more rows"
+  assert_file_contains "$monitor" "Show less"
+  assert_file_contains "$table" "aria-sort={getAriaSort(column.key, sort)}"
+  assert_file_contains "$table" "onSelectRow(row.id)"
+  assert_file_contains "$table" "aria-selected={selected}"
+  assert_file_contains "$filters" "aria-pressed={active}"
+  assert_file_contains "$css" ".terminal-market-monitor--compact .terminal-market-monitor__grid"
+  assert_file_contains "$css" "@media (max-width: 1100px)"
+  assert_file_contains "$css" ".market-monitor-state-strip"
 }
 
 assert_watchlist_and_error_copy_preserved() {
@@ -125,6 +190,8 @@ main() {
   assert_terminal_monitor_workflow_exists
   assert_bounded_api_only_search
   assert_exact_identity_actions
+  assert_dense_terminal_components
+  assert_monitor_interactions_and_responsiveness
   assert_watchlist_and_error_copy_preserved
 }
 

@@ -1,6 +1,6 @@
 # TP-048: Rebuild search, trending, and watchlist as a terminal market monitor — Status
 
-**Current Step:** Step 1: Model market monitor state and actions
+**Current Step:** Step 2: Implement dense terminal monitor components
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -35,12 +35,12 @@
 ---
 
 ### Step 2: Implement dense terminal monitor components
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create terminal market monitor component set
-- [ ] Render dense identity/source/pin/rank rows with explicit states
-- [ ] Add sorting, filters, show-more/less, selection, and accessible controls
-- [ ] Add chart/analysis actions preserving exact identity
+- [x] Create terminal market monitor component set
+- [x] Render dense identity/source/pin/rank rows with explicit states
+- [x] Add sorting, filters, show-more/less, selection, and accessible controls
+- [x] Add chart/analysis actions preserving exact identity
 
 ---
 
