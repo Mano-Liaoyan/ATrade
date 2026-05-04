@@ -3,6 +3,11 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 spec="$repo_root/docs/design/atrade-terminal-ui.md"
+docs_index="$repo_root/docs/INDEX.md"
+paper_workspace="$repo_root/docs/architecture/paper-trading-workspace.md"
+modules_doc="$repo_root/docs/architecture/modules.md"
+readme="$repo_root/README.md"
+plan="$repo_root/PLAN.md"
 
 assert_file_contains() {
   local file_path="$1"
@@ -142,6 +147,25 @@ assert_safety_constraints() {
   assert_file_contains "$spec" 'rather than fallback mocks'
 }
 
+assert_doc_wiring() {
+  assert_file_contains "$docs_index" 'design/atrade-terminal-ui.md'
+  assert_file_contains "$docs_index" 'Active clean-room ATrade Terminal UI design authority'
+
+  assert_file_contains "$paper_workspace" '../design/atrade-terminal-ui.md'
+  assert_file_contains "$paper_workspace" 'active ATrade Terminal'
+  assert_file_contains "$paper_workspace" 'full frontend'
+
+  assert_file_contains "$modules_doc" '../design/atrade-terminal-ui.md'
+  assert_file_contains "$modules_doc" 'target frontend reconstruction is governed'
+  assert_file_contains "$modules_doc" 'enabled modules for'
+
+  assert_file_contains "$readme" 'docs/design/atrade-terminal-ui.md'
+  assert_file_contains "$readme" 'active clean-room ATrade Terminal UI target'
+
+  assert_file_contains "$plan" 'docs/design/atrade-terminal-ui.md'
+  assert_file_contains "$plan" 'active clean-room UI design authority'
+}
+
 assert_design_authority_exists
 assert_clean_room_guardrails
 assert_product_target_decisions
@@ -153,5 +177,6 @@ assert_visual_system
 assert_stack_direction
 assert_replacement_rules
 assert_safety_constraints
+assert_doc_wiring
 
 printf 'ATrade Terminal design spec validation passed.\n'

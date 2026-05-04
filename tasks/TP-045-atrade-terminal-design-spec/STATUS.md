@@ -1,6 +1,6 @@
 # TP-045: Define the ATrade Terminal UI design spec — Status
 
-**Current Step:** Step 3: Specify visual system and implementation constraints
+**Current Step:** Step 4: Wire the spec into active documentation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -53,12 +53,12 @@
 ---
 
 ### Step 4: Wire the spec into active documentation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Add the design spec to `docs/INDEX.md`
-- [ ] Update paper-trading workspace architecture references
-- [ ] Update module docs if ownership language changes
-- [ ] Update README/PLAN only if stale
+- [x] Add the design spec to `docs/INDEX.md`
+- [x] Update paper-trading workspace architecture references
+- [x] Update module docs if ownership language changes
+- [x] Update README/PLAN only if stale
 
 ---
 
