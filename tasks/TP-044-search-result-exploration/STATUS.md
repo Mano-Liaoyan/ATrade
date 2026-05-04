@@ -1,6 +1,6 @@
 # TP-044: Make stock search results easier to explore — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Model bounded, ranked search result state
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -23,11 +23,12 @@
 ---
 
 ### Step 1: Model bounded, ranked search result state
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand based on current search workflow shape after TP-043 shell changes land.
 
-- [ ] Search workflow derives ranked/capped/filterable result state
+- [ ] Search workflow exports ranked/filterable result view-model helpers with best/exact matches first
+- [ ] Hook manages bounded visible results, selected metadata filters, and show more/show less state
 - [ ] Backend search remains behind `searchSymbols()` with explicit bounded limits
 - [ ] Existing debounce, validation, provider errors, and exact identity payloads preserved
 - [ ] New shell test asserts capped defaults/filtering/no unbounded fetches
@@ -95,6 +96,7 @@
 | 2026-05-04 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-04 09:06 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-04 09:06 | Step 0 started | Preflight |
+| 2026-05-04 09:07 | Step 1 started | Modeling bounded search result state |
 
 ---
 
