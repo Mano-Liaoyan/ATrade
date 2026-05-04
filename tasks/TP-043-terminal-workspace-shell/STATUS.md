@@ -1,6 +1,6 @@
 # TP-043: Redesign workspace navigation with a terminal-style shell — Status
 
-**Current Step:** Step 1: Create reusable workspace shell primitives
+**Current Step:** Step 2: Refactor the home workspace into navigable panels
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -23,20 +23,20 @@
 ---
 
 ### Step 1: Create reusable workspace shell primitives
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand component-level details after inspecting current home/chart component structure and CSS constraints.
 
-- [ ] Shared shell primitives expose semantic header, command, navigation, main, and context landmarks without new UI dependencies
-- [ ] Shell primitives accept home/chart metadata, actions, anchors, and context cards while keeping workflow/client orchestration outside them
-- [ ] Terminal-style CSS system added with dense panels, responsive collapse, keyboard focus states, and no proprietary terminal assets
-- [ ] Paper-only/provider/exact-identity messaging remains explicit in shell affordances with no broker order actions or fake market data
-- [ ] New terminal shell UI test covers component source markers, SSR-visible landmarks, focusable navigation controls, and no Bloomberg/proprietary assets
+- [x] Shared shell primitives expose semantic header, command, navigation, main, and context landmarks without new UI dependencies
+- [x] Shell primitives accept home/chart metadata, actions, anchors, and context cards while keeping workflow/client orchestration outside them
+- [x] Terminal-style CSS system added with dense panels, responsive collapse, keyboard focus states, and no proprietary terminal assets
+- [x] Paper-only/provider/exact-identity messaging remains explicit in shell affordances with no broker order actions or fake market data
+- [x] New terminal shell UI test covers component source markers, SSR-visible landmarks, focusable navigation controls, and no Bloomberg/proprietary assets
 
 ---
 
 ### Step 2: Refactor the home workspace into navigable panels
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Home route and trading workspace use the new shell and clear navigation landmarks
 - [ ] Workflow/client boundaries preserved in rendering components
@@ -98,6 +98,8 @@
 | 2026-05-04 06:27 | Step 0 started | Preflight |
 | 2026-05-04 06:28 | Step 0 completed | Required paths verified; TP-042 .DONE and local toolchain present |
 | 2026-05-04 06:28 | Step 1 started | Reusable workspace shell primitives |
+| 2026-05-04 06:45 | Step 1 completed | Shell primitives, terminal CSS, safety disclosures, and terminal shell UI test added; frontend TypeScript compile passed |
+| 2026-05-04 06:45 | Step 2 started | Home workspace shell refactor |
 
 ---
 
