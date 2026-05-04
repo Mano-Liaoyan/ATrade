@@ -1,6 +1,6 @@
 # TP-048: Rebuild search, trending, and watchlist as a terminal market monitor — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -69,11 +69,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -88,6 +88,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Existing `symbolSearchWorkflow` and `watchlistWorkflow` were reusable behind a new terminal monitor wrapper, preserving debounce, bounded search, backend watchlist authority, cached fallback, and provider/authentication error copy while retiring only the old renderers. | Implemented through `terminalMarketMonitorWorkflow` and documented in architecture docs. | `frontend/lib/terminalMarketMonitorWorkflow.ts`, `docs/architecture/paper-trading-workspace.md`, `docs/architecture/modules.md` |
+| `docs/design/atrade-terminal-ui.md` and `docs/architecture/provider-abstractions.md` were reviewed as check-if-affected docs; no changes were needed because the implementation stayed within the approved dense monitor interactions and did not alter provider payload interpretation. | Reviewed; no document changes required. | Step 5 documentation review |
 
 ---
 

@@ -115,8 +115,8 @@ No extra deployable services are introduced.
 The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
-- watchlist, chart, order-ticket, and account widgets
-- browser-side session state for active tabs, open panels, non-authoritative
+- terminal market monitor, chart, analysis, status, help, and account/status widgets
+- browser-side session state for active modules, open panels, non-authoritative
   watchlist cache/migration state, and optimistic UI interactions
 - SignalR subscriptions for real-time account, order, and market updates
 
@@ -129,15 +129,21 @@ read-only cached fallback, exact pin/unpin/remove commands, saving state, and
 stable watchlist error copy; `symbolSearchWorkflow` owns search query debounce,
 minimum-length validation, provider/authentication error copy, explicit bounded
 search limits, ranked result view models, metadata filter state, short visible
-result limits, and show-more/show-less exploration commands; and
-`symbolChartWorkflow` owns the selected chart range lookback, candle/indicator
-HTTP reads, source-label formatting, SignalR subscription state, stream update
-application, and HTTP polling fallback when streaming closes or is unavailable.
-The terminal frame composes those workflow/client modules through
-`ATradeTerminalApp`, `TerminalCommandInput`, `TerminalModuleRail`, and
-`TerminalWorkspaceLayout`; the retired `TerminalWorkspaceShell`,
-`WorkspaceCommandBar`, `WorkspaceNavigation`, and `WorkspaceContextPanel`
-primitives are no longer active route dependencies.
+result limits, and show-more/show-less exploration commands;
+`terminalMarketMonitorWorkflow` wraps those hooks with provider-backed trending
+state, unified dense row view models, source/provider/pin filters, sorting,
+selection, show-more/show-less row exploration, and exact chart/analysis action
+intents; and `symbolChartWorkflow` owns the selected chart range lookback,
+candle/indicator HTTP reads, source-label formatting, SignalR subscription
+state, stream update application, and HTTP polling fallback when streaming closes
+or is unavailable. The terminal frame composes those workflow/client modules
+through `ATradeTerminalApp`, `TerminalMarketMonitor`, `MarketMonitorTable`,
+`MarketMonitorSearch`, `MarketMonitorFilters`, `MarketMonitorDetailPanel`,
+`TerminalCommandInput`, `TerminalModuleRail`, and `TerminalWorkspaceLayout`; the
+old `SymbolSearch`, `TrendingList`, `Watchlist`, and `MarketLogo` renderers and
+the retired `TerminalWorkspaceShell`, `WorkspaceCommandBar`,
+`WorkspaceNavigation`, and `WorkspaceContextPanel` primitives are no longer
+active route dependencies.
 
 ### 3.2 `ATrade.Api`
 
@@ -578,12 +584,22 @@ Current implementation:
 - `frontend/lib/watchlistWorkflow.ts` owns backend watchlist API load/retry,
   one-time symbol-only legacy cache migration, read-only cached fallback, exact
   pin/unpin/remove commands, backend-authoritative `instrumentKey`/`pinKey`
-  matching, saving state, and stable watchlist error text for
-  `ATradeTerminalApp`, `TrendingList`, `SymbolSearch`, and `Watchlist`
+  matching, saving state, and stable watchlist error text for the terminal market
+  monitor
 - `frontend/lib/symbolSearchWorkflow.ts` owns reusable IBKR stock search query
-  state, debounce, minimum-length validation, result state, and provider /
-  authentication error text while `frontend/components/SymbolSearch.tsx` renders
-  the workflow state for workspace and symbol pages
+  state, debounce, minimum-length validation, result state, ranked/filterable
+  bounded result view models, show-more/show-less exploration commands, and
+  provider / authentication error text
+- `frontend/lib/terminalMarketMonitorWorkflow.ts` owns the combined market
+  monitor view model over provider trending rows, bounded search rows, and
+  backend watchlist rows, including source/provider/market filters, sorting,
+  selected-row state, pin state projection, cached-watchlist fallback copy, and
+  exact chart/analysis navigation intents
+- `frontend/components/terminal/TerminalMarketMonitor.tsx` with
+  `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
+  `MarketMonitorDetailPanel` renders the dense terminal monitor for `HOME`,
+  `SEARCH`, and `WATCHLIST`; the old long/list `SymbolSearch`, `TrendingList`,
+  `Watchlist`, and `MarketLogo` renderers are retired
 - `frontend/lib/symbolChartWorkflow.ts` owns the selected lookback chart range,
   HTTP candle/indicator fetches, source-label formatting, SignalR subscription
   state and updates from `/hubs/market-data`, and HTTP polling fallback when
@@ -622,29 +638,32 @@ The factor model explains a symbol's score using provider-derived components:
 
 The API exposes these as transparent factor contributions rather than a
 black-box "hotness" number via `GET /api/market-data/trending`. The Next.js
-landing workspace renders the backend-provided source metadata, including
-`timescale-cache:{originalSource}` for fresh persisted snapshots, and clearly
-surfaces provider-not-configured/provider-unavailable/authentication-required
-states when no fresh cache entry is available and local iBeam is not ready.
+terminal market monitor renders the backend-provided source metadata in dense
+ranked rows, including `timescale-cache:{originalSource}` for fresh persisted
+snapshots, and clearly surfaces provider-not-configured/provider-unavailable/
+authentication-required states when no fresh cache entry is available and local
+iBeam is not ready.
 
 ### 9.1 IBKR stock search and pin-any-symbol workflow
 
-Users are no longer constrained to a trending/default list. The reusable
-`SymbolSearch` component calls `GET /api/market-data/search` through
-`frontend/lib/marketDataClient.ts`, renders IBKR/iBeam stock results with local
-non-proprietary market/exchange badges and explicit provider, market/exchange,
-currency, asset class, and provider id/IBKR `conid` metadata, links each result
-to `/symbols/{symbol}` with exact identity query state when metadata is
-available, and can pin/unpin the selected exact provider-market instrument
-through the backend watchlist API. The frontend uses the centralized
+Users are no longer constrained to a trending/default list. The terminal market
+monitor calls `GET /api/market-data/search` through
+`frontend/lib/marketDataClient.ts` via `symbolSearchWorkflow`, always supplies an
+explicit capped limit, ranks and filters the bounded result set locally, and
+renders IBKR/iBeam stock results as dense rows with explicit provider,
+provider-symbol-id/IBKR `conid`, market/exchange, currency, asset class, source,
+rank/score, and saved-pin state. Chart and analysis actions route through the
+terminal app using `/symbols/{symbol}` query state that preserves exact identity
+metadata when available, and pin/unpin actions use the backend watchlist API for
+the selected exact provider-market instrument. The frontend uses the centralized
 `frontend/lib/instrumentIdentity.ts` adapter to compute provisional optimistic
 keys, normalize asset classes, parse an IBKR `conid` only when the provider is
-`ibkr` and the provider symbol id is numeric, and build exact chart handoff query
-strings without changing the selected chart range. Backend-owned `instrumentKey`
-/ `pinKey` values returned by watchlist
-responses remain authoritative for persisted pins. Duplicate search results
-sharing a symbol or company name are keyed and rendered by exact instrument
-identity, not by bare symbol.
+`ibkr` and the provider symbol id is numeric, and build exact chart/analysis
+handoff query strings without changing the selected chart range.
+Backend-owned `instrumentKey` / `pinKey` values returned by watchlist responses
+remain authoritative for persisted pins. Duplicate search results sharing a
+symbol or company name are keyed and rendered by exact instrument identity, not
+by bare symbol.
 
 The backend search path uses IBKR Client Portal `/iserver/secdef/search` plus
 `/iserver/secdef/info` enrichment when Client Portal accepts the detail request;
