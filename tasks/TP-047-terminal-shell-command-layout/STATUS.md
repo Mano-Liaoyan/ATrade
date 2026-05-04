@@ -1,6 +1,6 @@
 # TP-047: Build the terminal shell, command registry, and resizable layout — Status
 
-**Current Step:** Step 1: Model terminal modules and deterministic commands
+**Current Step:** Step 2: Build the terminal application frame and module rail
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Build the terminal application frame and module rail
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create terminal app, command input, rail, strip, help, and status components
-- [ ] Route home and symbol pages through the new terminal frame
-- [ ] Make command input and rail first-class navigation paths
-- [ ] Preserve paper-only/provider safety messages
+- [x] Create terminal app, command input, rail, strip, help, and status components
+- [x] Route home and symbol pages through the new terminal frame
+- [x] Make command input and rail first-class navigation paths
+- [x] Preserve paper-only/provider safety messages
 
 ---
 
@@ -110,6 +110,8 @@
 | 2026-05-05 | Step 0 preflight | Verified required files, TP-046 terminal UI stack status, terminal primitives, installed frontend dependencies, and package lock |
 | 2026-05-05 | Step 1 started | Loaded terminal UI design, module, and paper-workspace authorities |
 | 2026-05-05 | Step 1 verification | Ran frontend-terminal-shell-command-tests.sh and TypeScript no-emit check with TS 6 deprecation silenced |
+| 2026-05-05 | Step 2 started | Added new terminal frame, command input, module rail, status strip, help, and status components |
+| 2026-05-05 | Step 2 verification | Ran command source test, TypeScript no-emit check, safety source grep, and frontend build |
 
 ---
 

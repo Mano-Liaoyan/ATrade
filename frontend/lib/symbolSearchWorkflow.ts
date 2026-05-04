@@ -50,6 +50,7 @@ export type SymbolSearchResultViewModel = {
 export type SymbolSearchWorkflowOptions = {
   limit?: number;
   assetClass?: string;
+  initialQuery?: string;
   minimumQueryLength?: number;
 };
 
@@ -257,9 +258,11 @@ export type SymbolSearchWorkflow = {
 export function useSymbolSearchWorkflow({
   limit = DefaultSymbolSearchRequestLimit,
   assetClass = 'stock',
+  initialQuery = '',
   minimumQueryLength = MinimumSymbolSearchQueryLength,
 }: SymbolSearchWorkflowOptions): SymbolSearchWorkflow {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
+  const [appliedInitialQuery, setAppliedInitialQuery] = useState(initialQuery.trim());
   const [searchedQuery, setSearchedQuery] = useState('');
   const [rawResults, setRawResults] = useState<MarketDataSymbolSearchResult[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<SymbolSearchSelectedFilters>({});
@@ -278,6 +281,14 @@ export function useSymbolSearchWorkflow({
     }),
     [rawResults, searchedQuery, selectedFilters, visibleResultLimit],
   );
+
+  useEffect(() => {
+    const seededQuery = initialQuery.trim();
+    if (seededQuery && seededQuery !== appliedInitialQuery) {
+      setAppliedInitialQuery(seededQuery);
+      setQuery(seededQuery);
+    }
+  }, [appliedInitialQuery, initialQuery]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();

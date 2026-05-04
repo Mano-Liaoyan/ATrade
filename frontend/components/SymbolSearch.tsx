@@ -13,6 +13,7 @@ type SymbolSearchProps = {
   title?: string;
   description?: string;
   limit?: number;
+  initialQuery?: string;
   getPinState?: (result: MarketDataSymbolSearchResult) => WatchlistPinState;
   onTogglePin?: (result: MarketDataSymbolSearchResult) => void;
   compact?: boolean;
@@ -22,11 +23,12 @@ export function SymbolSearch({
   title = 'Search IBKR stocks',
   description = 'Find stocks from the IBKR/iBeam instrument universe, open a chart, or pin the exact provider-market result to your watchlist.',
   limit = DefaultSymbolSearchRequestLimit,
+  initialQuery = '',
   getPinState,
   onTogglePin,
   compact = false,
 }: SymbolSearchProps) {
-  const search = useSymbolSearchWorkflow({ limit });
+  const search = useSymbolSearchWorkflow({ initialQuery, limit });
   const searchView = search.searchView;
   const visibleResults = searchView.visibleResults;
   const hasResults = searchView.totalResultCount > 0;

@@ -1,9 +1,5 @@
-import { TradingWorkspace } from '../components/TradingWorkspace';
+import { ATradeTerminalApp } from '@/components/terminal/ATradeTerminalApp';
 
 export default function HomePage() {
-  return (
-    <div className="workspace-shell">
-      <TradingWorkspace />
-    </div>
-  );
+  return <ATradeTerminalApp initialModuleId="HOME" />;
 }
