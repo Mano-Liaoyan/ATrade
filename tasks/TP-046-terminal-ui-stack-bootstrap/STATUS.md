@@ -1,6 +1,6 @@
 # TP-046: Bootstrap the terminal UI stack — Status
 
-**Current Step:** Step 3: Create original terminal primitive components
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -43,19 +43,19 @@
 ---
 
 ### Step 3: Create original terminal primitive components
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand based on the exact primitives needed by the selected shadcn/Radix setup.
 
-- [ ] Add Radix/shadcn-style UI primitives: button, input, badge, tabs, dialog, popover, scroll area, separator, and tooltip
-- [ ] Add original `components/terminal` foundation primitives: surface, panel, section header, and status badge
-- [ ] Keep primitives independent from legacy shell layout assumptions
-- [ ] Add source assertions for primitive files, local utilities, and no copied/brand assets
+- [x] Add Radix/shadcn-style UI primitives: button, input, badge, tabs, dialog, popover, scroll area, separator, and tooltip
+- [x] Add original `components/terminal` foundation primitives: surface, panel, section header, and status badge
+- [x] Keep primitives independent from legacy shell layout assumptions
+- [x] Add source assertions for primitive files, local utilities, and no copied/brand assets
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Frontend terminal UI stack validation passing
 - [ ] Frontend build passes
