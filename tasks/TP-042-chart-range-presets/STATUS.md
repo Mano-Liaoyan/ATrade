@@ -36,8 +36,11 @@
 **Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand based on whether existing method names can remain compatibility aliases or need deeper renaming after reading the market-data contracts.
+>
+> Hydrated decision: existing service/provider method names can remain compatibility aliases; normalize `range`/`chartRange` and legacy `timeframe` at edges.
 
 - [ ] HTTP and SignalR chart reads use normalized chart ranges
+- [ ] API compatibility accepts preferred chart range query aliases while retaining legacy `timeframe`
 - [ ] IBKR historical-bar mapping supports all new ranges and filters returned candles to the requested lookback window
 - [ ] Timescale cache-aside behavior separates normalized range keys and preserves exact instrument identity filters
 - [ ] Targeted backend/provider/cache tests added or updated
