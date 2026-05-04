@@ -116,6 +116,7 @@ All variants delegate to the Aspire AppHost.
 ## Technical Debt / Future Work
 
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
+- [ ] Review TP-046 frontend npm audit advisories for `next` and `postcss` after the terminal UI stack bootstrap; do not force breaking upgrades inside the reconstruction queue.
 - [x] Archive completed `TP-019` through `TP-041` task packets before starting the previous queued run.
 - [ ] Archive completed `TP-042` through `TP-044` task packets when the terminal reconstruction queue is ready to run or after it completes.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.

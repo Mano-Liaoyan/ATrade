@@ -1,7 +1,7 @@
 # TP-046: Bootstrap the terminal UI stack — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-04
 **Review Level:** 2
 **Review Counter:** 0
@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| TP-046 implementation matched the approved shadcn/Tailwind/Radix terminal stack direction, so no design-spec amendment was needed. | Updated `README.md` and `docs/architecture/modules.md`; reviewed check-if-affected docs without changes. | `docs/design/atrade-terminal-ui.md`, `docs/architecture/paper-trading-workspace.md` |
+| Existing frontend bootstrap script had stale source-file marker checks and Linux-only `mktemp --suffix` / `/proc` assumptions when run on this lane. | Fixed the script to assert current `TradingWorkspace` markers and use portable manifest temp files with `/proc` environment checks skipped when unavailable. | `tests/apphost/frontend-nextjs-bootstrap-tests.sh` |
+| `npm audit` after the UI stack bootstrap reports two moderate advisories (`next`, `postcss`). | Logged future-work item; did not force breaking dependency upgrades inside TP-046. | `tasks/CONTEXT.md` |
 
 ---
 
@@ -107,4 +110,5 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Verification completed: terminal UI stack script, frontend build, existing frontend bootstrap script, full `dotnet test ATrade.slnx`, and `dotnet build ATrade.slnx` all passed.
+- `docs/design/atrade-terminal-ui.md` and `docs/architecture/paper-trading-workspace.md` were reviewed as check-if-affected docs; stack and runtime/API boundaries remained aligned with their current guidance.
