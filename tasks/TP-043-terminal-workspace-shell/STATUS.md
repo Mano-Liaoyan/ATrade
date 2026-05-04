@@ -1,6 +1,6 @@
 # TP-043: Redesign workspace navigation with a terminal-style shell — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -56,18 +56,18 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] FULL test suite passing
-- [ ] Frontend build/checks passing
-- [ ] Integration/shell tests passing or cleanly skipped where applicable
-- [ ] All failures fixed
-- [ ] Backend build passes
+- [x] FULL test suite passing
+- [x] Frontend build/checks passing
+- [x] Integration/shell tests passing or cleanly skipped where applicable
+- [x] All failures fixed
+- [x] Backend build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] "Check If Affected" docs reviewed
@@ -111,6 +111,13 @@
 | 2026-05-04 07:24 | Step 3 integration assertions | Added terminal shell/anchor assertions and robust Next dev cleanup to `frontend-trading-workspace-tests.sh`; script passed |
 | 2026-05-04 07:25 | Step 3 completed | Chart workspace now uses shared shell with range, provider, analysis, and fallback landmarks |
 | 2026-05-04 07:25 | Step 4 started | Full verification gate |
+| 2026-05-04 07:29 | Step 4 full tests | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed |
+| 2026-05-04 07:30 | Step 4 frontend build | `cd frontend && npm run build` passed |
+| 2026-05-04 07:35 | Step 4 integration shell tests | `bash tests/apphost/frontend-terminal-shell-ui-tests.sh`, `bash tests/apphost/frontend-trading-workspace-tests.sh`, and `bash tests/apphost/frontend-workspace-workflow-module-tests.sh` passed |
+| 2026-05-04 07:36 | Step 4 failure cleanup check | `git diff --check` passed and no stale Next dev lock/process remained after cleanup fixes |
+| 2026-05-04 07:37 | Step 4 backend build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors |
+| 2026-05-04 07:38 | Step 4 completed | Full test/build/integration verification gate passed |
+| 2026-05-04 07:38 | Step 5 started | Documentation and delivery updates |
 
 ---
 
