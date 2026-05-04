@@ -248,9 +248,14 @@ Current implementation:
   contract detail (`/iserver/secdef/info`) when available, snapshots
   (`/iserver/marketdata/snapshot`), historical bars (`/iserver/marketdata/history`),
   and scanner results (`/iserver/scanner/run`) into provider-neutral ATrade
-  payloads. If Client Portal returns the stock detail endpoint's
-  derivative-oriented `month required` validation error, search falls back to
-  the search contract payload instead of failing the provider request.
+  payloads. IBKR symbol text is canonicalized into the `ExactInstrumentIdentity`
+  safe symbol alphabet before search, snapshot, scanner, and watchlist payloads
+  are created, so provider variants such as class separators with spaces are
+  projected as stable legacy path-safe codes (for example, `BRK B` to `BRK.B`)
+  while retaining provider symbol id/IBKR `conid` as the exact identity. If
+  Client Portal returns the stock detail endpoint's derivative-oriented `month
+  required` validation error, search falls back to the search contract payload
+  instead of failing the provider request.
 - Search returns stock results with symbol, display name, asset class, exchange,
   currency, provider id, and provider symbol id/IBKR `conid`; no production
   hard-coded stock allowlist is used. Search UIs and watchlist persistence must

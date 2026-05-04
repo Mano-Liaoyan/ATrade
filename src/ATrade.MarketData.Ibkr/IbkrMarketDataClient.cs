@@ -32,6 +32,9 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
 
     private const string SnapshotFields = "31,55,70,71,82,83,84,86,87,7292,7295,7296,6509";
 
+    private static readonly Regex UnsupportedSymbolCharacters = new("[^A-Z0-9._-]+", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex RepeatedSymbolSeparators = new("[._-]{2,}", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         NumberHandling = JsonNumberHandling.AllowReadingFromString,
@@ -259,8 +262,9 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         var symbol = element.GetStringValue("symbol", "ticker", "localSymbol")
             ?? element.GetNestedStringValue("contract", "symbol")
             ?? fallback?.Symbol;
+        var normalizedSymbol = TryNormalizeSymbolCode(symbol);
 
-        if (string.IsNullOrWhiteSpace(conid) || string.IsNullOrWhiteSpace(symbol))
+        if (string.IsNullOrWhiteSpace(conid) || normalizedSymbol is null)
         {
             return null;
         }
@@ -279,7 +283,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         var name = element.GetStringValue("companyName", "description", "contract_description_1", "name")
             ?? TryParseNameFromCompanyHeader(companyHeader)
             ?? fallback?.Name
-            ?? symbol;
+            ?? normalizedSymbol;
         var sector = element.GetStringValue("sector", "industry", "category") ?? fallback?.Sector ?? assetClass;
         var currency = element.GetStringValue("currency", "currencyCode", "baseCurrency")
             ?? element.GetNestedStringValue("contract", "currency")
@@ -287,7 +291,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
             ?? fallback?.Currency
             ?? "USD";
 
-        return new IbkrContract(NormalizeSymbol(symbol), name, NormalizeAssetClass(assetClass), exchange, conid, sector, NormalizeCurrency(currency));
+        return new IbkrContract(normalizedSymbol, name, NormalizeAssetClass(assetClass), exchange, conid, sector, NormalizeCurrency(currency));
     }
 
     private static IbkrContract MergeContract(IbkrContract searchContract, IbkrContract detailContract)
@@ -305,7 +309,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
     private static IbkrMarketDataSnapshot? ParseSnapshot(JsonElement element)
     {
         var conid = element.GetStringValue("conid", "con_id", "contractId", "_conid") ?? string.Empty;
-        var symbol = element.GetStringValue("55", "symbol", "ticker", "localSymbol") ?? string.Empty;
+        var symbol = TryNormalizeSymbolCode(element.GetStringValue("55", "symbol", "ticker", "localSymbol")) ?? string.Empty;
         var lastPrice = element.GetDecimalValue("31", "lastPrice", "last", "price");
         var bid = element.GetDecimalValue("84", "bid");
         var ask = element.GetDecimalValue("86", "ask");
@@ -321,7 +325,7 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
 
         return new IbkrMarketDataSnapshot(
             conid,
-            NormalizeSymbol(symbol),
+            symbol,
             lastPrice,
             element.GetDecimalValue("83", "changePercent", "percentChange", "change_percent", "pctChange", "7289"),
             element.GetDecimalValue("7295", "open", "openPrice"),
@@ -361,14 +365,15 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         {
             var symbol = element.GetStringValue("symbol", "ticker", "localSymbol", "contract_description_1");
             var conid = element.GetStringValue("conid", "con_id", "contractId");
-            if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(conid))
+            var normalizedSymbol = TryNormalizeSymbolCode(symbol);
+            if (normalizedSymbol is null || string.IsNullOrWhiteSpace(conid))
             {
                 return null;
             }
 
             contract = new IbkrContract(
-                NormalizeSymbol(symbol),
-                element.GetStringValue("companyName", "description", "contract_description_2", "name") ?? symbol,
+                normalizedSymbol,
+                element.GetStringValue("companyName", "description", "contract_description_2", "name") ?? normalizedSymbol,
                 NormalizeAssetClass(element.GetStringValue("secType", "assetClass", "asset_class") ?? "Stock"),
                 element.GetStringValue("exchange", "listingExchange", "listing_exchange") ?? "SMART",
                 conid,
@@ -463,7 +468,25 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
             : DateTimeOffset.FromUnixTimeSeconds(value);
     }
 
-    private static string NormalizeSymbol(string symbol) => symbol.Trim().ToUpperInvariant();
+    private static string? TryNormalizeSymbolCode(string? symbol)
+    {
+        if (string.IsNullOrWhiteSpace(symbol))
+        {
+            return null;
+        }
+
+        var candidate = symbol.Trim().ToUpperInvariant();
+        if (ExactInstrumentIdentity.TryNormalizeSymbol(candidate, out var normalizedSymbol, out _))
+        {
+            return normalizedSymbol;
+        }
+
+        candidate = UnsupportedSymbolCharacters.Replace(candidate, ".");
+        candidate = RepeatedSymbolSeparators.Replace(candidate, ".").Trim('.', '-', '_');
+        return ExactInstrumentIdentity.TryNormalizeSymbol(candidate, out normalizedSymbol, out _)
+            ? normalizedSymbol
+            : null;
+    }
 
     private static string NormalizeCurrency(string currency) => currency.Trim().ToUpperInvariant();
 

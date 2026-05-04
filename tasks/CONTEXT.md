@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-04
 **Status:** Active
-**Next Task ID:** TP-045
+**Next Task ID:** TP-051
 
 ---
 
@@ -48,16 +48,20 @@ implementation queue.
 
 Ready implementation tasks now queued:
 
-- `TP-042` — correct chart range presets so time controls mean lookback ranges from now
-- `TP-043` — redesign workspace navigation with a terminal-style shell
-- `TP-044` — make stock search results easier to explore through bounded, ranked, filterable UI state
+- `TP-045` — define the active ATrade Terminal UI design spec and clean-room visual guardrails
+- `TP-046` — bootstrap the shadcn/Tailwind/Radix terminal UI stack and original ATrade primitives
+- `TP-047` — build the terminal shell, deterministic command registry, module rail, and resizable layout persistence
+- `TP-048` — rebuild search, trending, and watchlist as a dense terminal market monitor
+- `TP-049` — rebuild chart and analysis as terminal workspaces inside the new shell
+- `TP-050` — complete frontend cutover, cleanup, verification, and documentation updates
 
-Recommended orchestration order is sequential from `TP-042` through `TP-044`
-because each task stabilizes a seam used by the next task.
+Recommended orchestration order is sequential from `TP-045` through `TP-050`
+because each task establishes a frontend reconstruction seam used by the next.
 
-The next new Taskplane packet should use `TP-045`.
+The next new Taskplane packet should use `TP-051`.
 
-Completed task packets through `TP-041` live under `tasks/archive/`.
+Completed task packets through `TP-044` are present in `tasks/`; completed
+packets should be archived before or after the new redesign batch when convenient.
 
 ## Taskplane Usage
 
@@ -65,7 +69,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-045`
+- New tasks should use the next ID: `TP-051`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -93,7 +97,8 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | `tasks/TP-042-*` through  `tasks/TP-044-*`                |
+| Active tasks        | `tasks/TP-045-*` through  `tasks/TP-050-*`                |
+| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-044-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |
 | AppHost             | `src/ATrade.AppHost/Program.cs`                           |
@@ -111,6 +116,7 @@ All variants delegate to the Aspire AppHost.
 ## Technical Debt / Future Work
 
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
-- [x] Archive completed `TP-019` through `TP-041` task packets before starting the next queued run.
+- [x] Archive completed `TP-019` through `TP-041` task packets before starting the previous queued run.
+- [ ] Archive completed `TP-042` through `TP-044` task packets when the terminal reconstruction queue is ready to run or after it completes.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
 - [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.

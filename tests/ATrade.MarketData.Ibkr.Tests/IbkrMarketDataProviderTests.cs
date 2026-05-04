@@ -165,6 +165,62 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
+    public async Task Provider_CanonicalizesIbkrScannerSymbolsToExactIdentitySafeCodes()
+    {
+        var handler = new RecordingHttpMessageHandler((request, _) => Task.FromResult(request.RequestUri?.AbsolutePath switch
+        {
+            IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+            {
+                authenticated = true,
+                connected = true,
+                competing = false,
+                message = "ready",
+            }),
+            IbkrMarketDataClient.ScannerPath => JsonResponse(new[]
+            {
+                new
+                {
+                    rank = 1,
+                    conid = "54321",
+                    symbol = "BRK B",
+                    companyName = "Berkshire Hathaway Inc.",
+                    secType = "STK",
+                    exchange = "NYSE",
+                    currency = "USD",
+                    sector = "Financial Services",
+                    score = 91.5m,
+                    changePercent = 2.25m,
+                    volume = 1_250_000,
+                },
+            }),
+            IbkrMarketDataClient.SnapshotPath => JsonResponse(new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["conid"] = "54321",
+                    ["55"] = "BRK B",
+                    ["31"] = "427.10",
+                    ["83"] = "2.25%",
+                    ["87"] = "1250000",
+                },
+            }),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        }));
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var result = await provider.GetTrendingSymbolsAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
+        var trendingSymbol = Assert.Single(result.Value!.Symbols);
+        Assert.Equal("BRK.B", trendingSymbol.Symbol);
+        Assert.Equal("BRK.B", trendingSymbol.Identity?.Symbol);
+        Assert.Equal("54321", trendingSymbol.Identity?.ProviderSymbolId);
+        Assert.Equal("NYSE", trendingSymbol.Identity?.Exchange);
+        Assert.Equal("USD", trendingSymbol.Identity?.Currency);
+    }
+
+    [Fact]
     public async Task Provider_UsesSearchContractWhenStockDetailEndpointRequiresMonth()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>

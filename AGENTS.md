@@ -18,9 +18,9 @@ orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
 ## Current Coordination Model
 
 - Implementation work is tracked as Taskplane packets under `tasks/`.
-- Ready active tasks currently run from `TP-042` through `TP-044`.
-- Completed task packets through `TP-041` are archived under `tasks/archive/`.
-- `TP-042` through `TP-044` cover chart range semantics, terminal-style workspace navigation, and bounded/explorable stock search.
+- Ready active tasks currently run from `TP-045` through `TP-050`.
+- Completed task packets through `TP-044` are present in `tasks/`; completed packets should be archived when convenient.
+- `TP-045` through `TP-050` cover the ATrade Terminal design spec, shadcn/Tailwind/Radix UI foundation, command/module shell, market monitor, chart/analysis workspace, and final cutover verification.
 - The next task ID is recorded in `tasks/CONTEXT.md`.
 
 ## Repo-local Pi Skills

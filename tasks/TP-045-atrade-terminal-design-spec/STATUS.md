@@ -1,0 +1,115 @@
+# TP-045: Define the ATrade Terminal UI design spec — Status
+
+**Current Step:** Not Started
+**Status:** 🔵 Ready for Execution
+**Last Updated:** 2026-05-04
+**Review Level:** 1
+**Review Counter:** 0
+**Iteration:** 0
+**Size:** S
+
+> **Hydration:** Checkboxes represent meaningful outcomes, not individual code
+> changes. Workers expand steps when runtime discoveries warrant it — aim for
+> 2-5 outcome-level items per step, not exhaustive implementation scripts.
+
+---
+
+### Step 0: Preflight
+**Status:** ⬜ Not Started
+
+- [ ] Required files and paths exist
+- [ ] Dependencies satisfied
+
+---
+
+### Step 1: Create the clean-room terminal design authority
+**Status:** ⬜ Not Started
+
+- [ ] Create active `docs/design/atrade-terminal-ui.md` with links to related docs
+- [ ] Record clean-room visual/source/asset/branding guardrails
+- [ ] Capture full frontend replacement and platform target decisions
+- [ ] Run targeted doc validation
+
+---
+
+### Step 2: Specify modules, navigation, layout, and disabled surfaces
+**Status:** ⬜ Not Started
+
+- [ ] Define enabled first-release modules backed by current ATrade APIs
+- [ ] Define visible-disabled future modules and honest unavailable states
+- [ ] Define deterministic first-release terminal commands
+- [ ] Define resizable layout, persistence, rail/header/status, and responsive rules
+
+---
+
+### Step 3: Specify visual system and implementation constraints
+**Status:** ⬜ Not Started
+
+- [ ] Define Fincept-style modern institutional terminal visual characteristics
+- [ ] Define shadcn/Tailwind/Radix implementation direction with original styling
+- [ ] Define aggressive frontend replacement and selective logic reuse rules
+- [ ] Preserve paper-only safety and no direct browser-provider/database access
+
+---
+
+### Step 4: Wire the spec into active documentation
+**Status:** ⬜ Not Started
+
+- [ ] Add the design spec to `docs/INDEX.md`
+- [ ] Update paper-trading workspace architecture references
+- [ ] Update module docs if ownership language changes
+- [ ] Update README/PLAN only if stale
+
+---
+
+### Step 5: Testing & Verification
+**Status:** ⬜ Not Started
+
+- [ ] Design-spec validation test passing
+- [ ] FULL test suite passing
+- [ ] Frontend build passes
+- [ ] All failures fixed
+- [ ] Build passes
+
+---
+
+### Step 6: Documentation & Delivery
+**Status:** ⬜ Not Started
+
+- [ ] "Must Update" docs modified
+- [ ] "Check If Affected" docs reviewed
+- [ ] Discoveries logged
+
+---
+
+## Reviews
+
+| # | Type | Step | Verdict | File |
+|---|------|------|---------|------|
+
+---
+
+## Discoveries
+
+| Discovery | Disposition | Location |
+|-----------|-------------|----------|
+
+---
+
+## Execution Log
+
+| Timestamp | Action | Outcome |
+|-----------|--------|---------|
+| 2026-05-04 | Task staged | PROMPT.md and STATUS.md created |
+
+---
+
+## Blockers
+
+*None*
+
+---
+
+## Notes
+
+*Reserved for execution notes*

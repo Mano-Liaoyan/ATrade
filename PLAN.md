@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-05-04
-summary: Current implementation plan for the active ATrade paper-trading workspace UI refinement queue.
+summary: Current implementation plan for the active ATrade Terminal frontend reconstruction queue.
 see_also:
   - README.md
   - docs/INDEX.md
@@ -19,11 +19,12 @@ see_also:
 The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, exact
 provider/market pins, configurable local AppHost ports, optional
-AppHost-managed LEAN Docker runtime wiring, and completed architecture-deepening
-work from `TP-002` through `TP-041` now archived under `tasks/archive/`. The
-current active queue is `TP-042` through `TP-044`, focused on correcting chart
-range semantics and improving the frontend workspace/search navigation before
-the next run starts.
+AppHost-managed LEAN Docker runtime wiring, and completed frontend refinement
+work through `TP-044`. The current active queue is `TP-045` through `TP-050`,
+focused on a full ATrade Terminal frontend reconstruction inspired by modern
+institutional terminal UIs while preserving clean-room implementation,
+paper-only safety, provider-neutral API boundaries, and current ATrade
+workflows.
 
 Current repository contracts remain:
 
@@ -37,21 +38,28 @@ Current repository contracts remain:
 
 Ready implementation tasks:
 
-- `TP-042` — correct chart range presets so chart time controls mean lookback ranges from now
-- `TP-043` — redesign workspace navigation with a terminal-style shell inspired by finance-terminal information architecture
-- `TP-044` — make stock search results easier to explore with bounded, ranked, filterable result UI
+- `TP-045` — define the active ATrade Terminal UI design spec and clean-room visual guardrails
+- `TP-046` — bootstrap the shadcn/Tailwind/Radix terminal UI stack and original ATrade primitives
+- `TP-047` — build the terminal shell, deterministic command registry, module rail, and resizable layout persistence
+- `TP-048` — rebuild search, trending, and watchlist as a dense terminal market monitor
+- `TP-049` — rebuild chart and analysis as terminal workspaces inside the new shell
+- `TP-050` — complete frontend cutover, cleanup, verification, and documentation updates
 
-The next new Taskplane packet should use `TP-045`.
+The next new Taskplane packet should use `TP-051`.
 
-Completed task packets through `TP-041` are archived under `tasks/archive/`.
+Completed task packets through `TP-044` are present in `tasks/`; completed
+packets should be archived before or after the new redesign batch when convenient.
 
 ## Execution Order
 
 Recommended orchestration order:
 
-1. `TP-042` first, because chart range semantics should live behind the frontend workflow and market-data seams before UI layout changes.
-2. `TP-043` after `TP-042`, because the redesigned shell repositions chart controls after their semantics are corrected.
-3. `TP-044` after `TP-043`, because the search exploration UI should fit the new shell.
+1. `TP-045` first, because the design spec becomes the active authority for visual, command, module, layout, and clean-room decisions.
+2. `TP-046` after `TP-045`, because the Tailwind/shadcn/Radix-compatible terminal UI foundation must follow the approved spec.
+3. `TP-047` after `TP-046`, because the shell, module registry, command input, and resizable layout depend on the UI primitives.
+4. `TP-048` after `TP-047`, because the market monitor plugs into the terminal shell and command/module registry.
+5. `TP-049` after `TP-048`, because chart/analysis actions must preserve market-monitor exact identity handoff.
+6. `TP-050` last, because it is the full cutover, cleanup, safety, and documentation verification gate.
 
 The orchestrator dependency sections in each `PROMPT.md` are the machine-readable
 source for batch ordering.
@@ -68,4 +76,4 @@ source for batch ordering.
 
 ## Next Task ID
 
-`TP-045`
+`TP-051`

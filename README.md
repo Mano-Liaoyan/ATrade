@@ -150,12 +150,15 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-Ready implementation tasks are queued as `TP-042` through `TP-044` to fix chart
-range semantics and redesign the frontend workspace/search navigation. The
-recommended order is sequential because each task stabilizes a seam used by the
-next.
+Ready implementation tasks are queued as `TP-045` through `TP-050` for the
+ATrade Terminal frontend reconstruction: active design spec, shadcn/Tailwind/Radix
+terminal UI foundation, command/module shell, dense market monitor, terminal
+chart/analysis workspaces, and final cutover verification. The recommended order
+is sequential because each task establishes a frontend reconstruction seam used
+by the next.
 
-Completed Taskplane packets through `TP-041` live under `tasks/archive/`.
+Completed Taskplane packets through `TP-044` are present in `tasks/`; completed
+packets should be archived when convenient.
 
 ## Repository Map
 
