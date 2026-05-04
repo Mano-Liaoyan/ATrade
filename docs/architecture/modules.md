@@ -582,6 +582,19 @@ references.
   with HTTP fallback, and explicit no-real-orders messaging. Terminal cutover
   tasks may replace current rendering components and CSS while preserving API
   contracts and reusable workflow logic.
+- **UI stack foundation:** `frontend/tailwind.config.ts`,
+  `frontend/postcss.config.mjs`, `frontend/components.json`, and
+  `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
+  styling substrate, local `@/*` aliases, and `cn()` class merging helper for
+  downstream terminal modules. Minimal shadcn-style wrappers live under
+  `frontend/components/ui/` and are limited to reusable Radix/accessibility
+  primitives (button, input, badge, tabs, dialog, popover, scroll area,
+  separator, and tooltip) with ATrade Terminal tokens applied. Original
+  ATrade-only foundation components live under `frontend/components/terminal/`
+  (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`, and
+  `TerminalStatusBadge`) and intentionally avoid legacy page-shell layout
+  assumptions, backend access, provider runtime calls, order-entry behavior, or
+  third-party terminal branding.
 
 ## 5. Dependency Summary
 
