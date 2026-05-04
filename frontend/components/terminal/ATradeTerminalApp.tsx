@@ -27,12 +27,14 @@ import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
 import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
+  initialChartRange?: ChartRange;
   initialIdentity?: InstrumentIdentityInput | null;
   initialModuleId?: EnabledTerminalModuleId;
   initialSymbol?: string | null;
 };
 
 export function ATradeTerminalApp({
+  initialChartRange = "1D",
   initialIdentity = null,
   initialModuleId = "HOME",
   initialSymbol = null,
@@ -46,6 +48,7 @@ export function ATradeTerminalApp({
   const normalizedInitialSymbol = initialSymbol?.toUpperCase() ?? null;
   const [activeSymbol, setActiveSymbol] = useState<string | null>(normalizedInitialSymbol);
   const [activeIdentity, setActiveIdentity] = useState<InstrumentIdentityInput | null>(initialIdentity);
+  const [activeChartRange, setActiveChartRange] = useState<ChartRange>(initialChartRange);
   const marketDataStatus = "Market monitor owns provider state";
   const watchlistStatus = "Backend-owned pins in monitor";
 
@@ -57,6 +60,10 @@ export function ATradeTerminalApp({
     setActiveSymbol(normalizedInitialSymbol);
     setActiveIdentity(initialIdentity);
   }, [initialIdentity, normalizedInitialSymbol]);
+
+  useEffect(() => {
+    setActiveChartRange(initialChartRange);
+  }, [initialChartRange]);
 
   useEffect(() => {
     if (!pendingFocusTargetId) {
@@ -85,6 +92,9 @@ export function ATradeTerminalApp({
       if ((intent.moduleId === "CHART" || intent.moduleId === "ANALYSIS") && intent.symbol) {
         setActiveSymbol(intent.symbol.toUpperCase());
         setActiveIdentity(intent.identity ?? null);
+        if (intent.chartRange) {
+          setActiveChartRange(intent.chartRange);
+        }
       }
 
       if (intent.moduleId === "HOME") {
@@ -156,6 +166,7 @@ export function ATradeTerminalApp({
   ) : (
     <TerminalModuleContent
       activeModuleId={activeModuleId}
+      chartRange={activeChartRange}
       identity={activeIdentity}
       onOpenIntent={openIntent}
       searchQuery={seededSearchQuery}
@@ -286,6 +297,7 @@ function TerminalMonitorPanel() {
 
 type TerminalModuleContentProps = {
   activeModuleId: EnabledTerminalModuleId;
+  chartRange: ChartRange;
   identity: InstrumentIdentityInput | null;
   onOpenIntent: (intent: TerminalNavigationIntent, feedback: string) => void;
   searchQuery: string;
@@ -294,6 +306,7 @@ type TerminalModuleContentProps = {
 
 function TerminalModuleContent({
   activeModuleId,
+  chartRange,
   identity,
   onOpenIntent,
   searchQuery,
@@ -307,9 +320,9 @@ function TerminalModuleContent({
     case "WATCHLIST":
       return <TerminalWatchlistModule onOpenIntent={onOpenIntent} />;
     case "CHART":
-      return symbol ? <TerminalChartModule identity={identity} symbol={symbol} /> : <TerminalChartPlaceholder />;
+      return symbol ? <TerminalChartModule identity={identity} initialChartRange={chartRange} symbol={symbol} /> : <TerminalChartPlaceholder />;
     case "ANALYSIS":
-      return <TerminalAnalysisModule identity={identity} symbol={symbol} />;
+      return <TerminalAnalysisModule chartRange={chartRange} identity={identity} symbol={symbol} />;
     case "STATUS":
       return <TerminalStatusModule />;
     case "HELP":
@@ -388,8 +401,8 @@ function TerminalChartPlaceholder() {
   );
 }
 
-function TerminalChartModule({ identity, symbol }: { identity: InstrumentIdentityInput | null; symbol: string }) {
-  const chart = useTerminalChartWorkspaceWorkflow({ symbol, identity });
+function TerminalChartModule({ identity, initialChartRange, symbol }: { identity: InstrumentIdentityInput | null; initialChartRange: ChartRange; symbol: string }) {
+  const chart = useTerminalChartWorkspaceWorkflow({ symbol, identity, initialChartRange });
 
   return (
     <section className="terminal-module terminal-module--chart" data-testid="terminal-chart-module" id="terminal-chart" tabIndex={-1}>
@@ -398,7 +411,7 @@ function TerminalChartModule({ identity, symbol }: { identity: InstrumentIdentit
   );
 }
 
-function TerminalAnalysisModule({ identity, symbol }: { identity: InstrumentIdentityInput | null; symbol: string | null }) {
+function TerminalAnalysisModule({ chartRange, identity, symbol }: { chartRange: ChartRange; identity: InstrumentIdentityInput | null; symbol: string | null }) {
   return (
     <section className="terminal-module terminal-module--analysis workspace-stack" data-testid="terminal-analysis-module" id="terminal-analysis" tabIndex={-1}>
       <TerminalPanel
@@ -407,9 +420,9 @@ function TerminalAnalysisModule({ identity, symbol }: { identity: InstrumentIden
         description="Provider-neutral analysis lists configured engines and surfaces no-engine or runtime-unavailable states without fake signals."
         actions={<TerminalStatusBadge tone="info">ANALYSIS</TerminalStatusBadge>}
       >
-        {symbol ? <p>Running over the default {CHART_RANGE_LABELS["1D"]} chart range until a chart workspace selects another lookback.</p> : <p>Use ANALYSIS &lt;symbol&gt; from the command input or open a chart before selecting ANALYSIS.</p>}
+        {symbol ? <p>Running over the selected {CHART_RANGE_LABELS[chartRange]} chart range from the route or chart workspace context.</p> : <p>Use ANALYSIS &lt;symbol&gt; from the command input or open a chart before selecting ANALYSIS.</p>}
       </TerminalPanel>
-      <TerminalAnalysisWorkspace chartRange={"1D" as ChartRange} identity={identity} symbol={symbol} />
+      <TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />
     </section>
   );
 }

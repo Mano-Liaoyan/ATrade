@@ -57,7 +57,7 @@ assert_terminal_chart_workflow_contract() {
   assert_file_contains "$stream_client" "connection.invoke('Subscribe', options.symbol.toUpperCase(), options.chartRange)"
   assert_file_contains "$stream_client" "connection.invoke('Unsubscribe', options.symbol.toUpperCase(), options.chartRange)"
 
-  assert_file_contains "$terminal_app" 'useTerminalChartWorkspaceWorkflow({ symbol, identity })'
+  assert_file_contains "$terminal_app" 'useTerminalChartWorkspaceWorkflow({ symbol, identity, initialChartRange })'
   assert_file_contains "$terminal_app" '<TerminalChartWorkspace chart={chart} identity={identity} />'
   assert_file_contains "$terminal_workspace" 'chart.view.fallbackCopy'
   assert_file_contains "$terminal_workspace" 'chart.view.identitySummary'
@@ -86,12 +86,15 @@ assert_exact_identity_chart_and_analysis_handoff() {
   assert_file_contains "$monitor_workflow" "params.set('module', 'ANALYSIS');"
   assert_file_contains "$monitor_workflow" 'identity: row.exactIdentity'
   assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : row.chartHref"
+  assert_file_contains "$monitor_workflow" "chartRange: '1D'"
   assert_file_contains "$terminal_app" 'setActiveSymbol(intent.symbol.toUpperCase())'
   assert_file_contains "$terminal_app" 'setActiveIdentity(intent.identity ?? null)'
   assert_file_contains "$terminal_app" 'identity={activeIdentity}'
   assert_file_contains "$terminal_app" 'symbol={activeSymbol}'
   assert_file_contains "$command_registry" 'moduleId: "CHART"'
   assert_file_contains "$command_registry" 'moduleId: "ANALYSIS"'
+  assert_file_contains "$command_registry" 'chartRange: "1D"'
+  assert_file_contains "$command_registry" '?module=ANALYSIS&range=1D'
   assert_file_contains "$symbol_page" 'createQueryIdentity(normalizedSymbol, resolvedSearchParams)'
   assert_file_contains "$symbol_page" 'initialModuleId={initialModuleId}'
   assert_file_contains "$symbol_page" 'initialIdentity={identity}'
@@ -144,7 +147,7 @@ assert_provider_neutral_analysis_contract() {
   assert_file_contains "$analysis_panel" 'data-testid="analysis-run-button"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-no-automation-note"'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx" '<TerminalAnalysisWorkspace symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />'
-  assert_file_contains "$terminal_app" '<TerminalAnalysisWorkspace chartRange={"1D" as ChartRange} identity={identity} symbol={symbol} />'
+  assert_file_contains "$terminal_app" '<TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />'
 }
 
 assert_disabled_portfolio_orders_and_no_order_entry_ui() {

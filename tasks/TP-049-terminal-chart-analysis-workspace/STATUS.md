@@ -1,6 +1,6 @@
 # TP-049: Rebuild chart and analysis as terminal workspaces — Status
 
-**Current Step:** Step 3: Build terminal analysis and provider diagnostics panels
+**Current Step:** Step 4: Integrate symbol route and command flows
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -56,12 +56,12 @@
 ---
 
 ### Step 4: Integrate symbol route and command flows
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Route direct symbol URLs through the terminal frame/chart module
-- [ ] Converge CHART/ANALYSIS/monitor/direct route behavior
-- [ ] Update chart/range/search/analysis tests for terminal markers
-- [ ] Run targeted tests and frontend build
+- [x] Route direct symbol URLs through the terminal frame/chart module
+- [x] Converge CHART/ANALYSIS/monitor/direct route behavior
+- [x] Update chart/range/search/analysis tests for terminal markers
+- [x] Run targeted tests and frontend build
 
 ---
 

@@ -67,8 +67,8 @@ assert_provider_neutral_contracts() {
   assert_file_contains "$repo_root/frontend/types/analysis.ts" 'AnalysisEngineMetadata'
   assert_file_contains "$repo_root/frontend/types/analysis.ts" 'AnalysisResult'
   assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/run'
-  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'data-testid="analysis-panel"'
-  assert_file_contains "$repo_root/frontend/components/AnalysisPanel.tsx" 'Analysis only — no brokerage routing or automatic order placement.'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalAnalysisWorkspace.tsx" 'data-testid="analysis-panel"'
+  assert_file_contains "$repo_root/frontend/lib/terminalAnalysisWorkflow.ts" 'Analysis only — no brokerage routing or automatic order placement.'
   assert_file_not_contains "$repo_root/frontend/types/analysis.ts" 'QuantConnect'
 }
 

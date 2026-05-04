@@ -676,6 +676,7 @@ function createRowNavigationIntentFromBase(
     focusTargetId: moduleId === 'ANALYSIS' ? 'terminal-analysis' : 'terminal-chart',
     symbol: row.symbol,
     identity: row.exactIdentity,
+    chartRange: '1D',
   };
 }
 
