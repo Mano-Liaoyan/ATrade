@@ -59,13 +59,19 @@ see_also:
 > Radix-compatible original primitives. The current slice routes home and symbol
 > pages through `ATradeTerminalApp`: a deterministic command input,
 > enabled/disabled module registry and rail, resizable primary/context/monitor
-> layout with versioned browser-local persistence, and status/help surfaces over
-> the existing backend-driven trending symbols, bounded/ranked/filterable IBKR
-> stock search, Postgres-backed watchlists, `lightweight-charts` chart routes,
-> SignalR-to-HTTP fallback, and provider-neutral analysis panel. The
+> layout with versioned browser-local persistence, status/help surfaces, and a
+> dense terminal market monitor over backend-driven trending symbols,
+> bounded/ranked/filterable IBKR stock search, and Postgres-backed exact
+> watchlists. `TerminalMarketMonitor`, `MarketMonitorTable`,
+> `MarketMonitorSearch`, `MarketMonitorFilters`, and
+> `MarketMonitorDetailPanel` replace the old long/list search, trending, and
+> watchlist renderers while preserving exact identity for chart/analysis actions.
+> `lightweight-charts` chart routes, SignalR-to-HTTP fallback, and the
+> provider-neutral analysis panel remain behind the same terminal frame. The
 > `frontend/lib/*Workflow.ts` hooks continue to centralize watchlist, bounded
-> search result view models, chart range loading, source labeling, and streaming
-> fallback orchestration behind the terminal frame.
+> search result view models, terminal monitor rows/actions, chart range loading,
+> source labeling, and streaming fallback orchestration behind the terminal
+> frame.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -572,11 +578,18 @@ references.
   `TerminalWorkspaceLayout`, `TerminalStatusStrip`, `TerminalHelpModule`, and
   `TerminalStatusModule` instead of the retired `TerminalWorkspaceShell` /
   `WorkspaceCommandBar` / `WorkspaceNavigation` / `WorkspaceContextPanel`
-  primitives. The app keeps the existing workflow hooks for watchlist migration /
-  exact pin commands, search debounce/provider errors/bounded result view models,
-  chart range loading/source labels/SignalR-to-HTTP fallback, and provider-neutral
-  analysis while presenting disabled modules with honest unavailable states and
-  no order-entry controls.
+  primitives. `frontend/lib/terminalMarketMonitorWorkflow.ts` wraps the existing
+  watchlist and symbol-search workflow hooks with provider-backed trending state,
+  source/provider/market filters, sorting, selected-row state, bounded
+  show-more/show-less exploration, exact pin state projection, and exact
+  chart/analysis navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
+  and its table/search/filter/detail components render that monitor for `HOME`,
+  `SEARCH`, and `WATCHLIST`. The old `SymbolSearch`, `TrendingList`, `Watchlist`,
+  and `MarketLogo` list renderers are retired. Chart range loading/source
+  labels/SignalR-to-HTTP fallback and provider-neutral analysis remain in their
+  existing workflow/client modules, while visible-disabled modules such as
+  `SCREENER` stay honest unavailable states rather than fake filters or demo
+  data, and no order-entry controls are introduced.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
