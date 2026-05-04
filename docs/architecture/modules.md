@@ -51,14 +51,14 @@ see_also:
 > user / workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
 > `frontend/` directory now hosts the first paper-trading workspace UI slice:
-> a Next.js home route with backend-driven trending symbols, IBKR stock search,
-> Postgres-backed watchlists, symbol navigation, and `lightweight-charts` chart
-> routes arranged inside a shared terminal-style workspace shell with command,
-> navigation, primary content, and context regions plus an analysis panel for
+> a Next.js home route with backend-driven trending symbols, bounded/ranked/
+> filterable IBKR stock search, Postgres-backed watchlists, symbol navigation,
+> and `lightweight-charts` chart routes arranged inside a shared terminal-style
+> workspace shell with command, navigation, primary content, and context regions plus an analysis panel for
 > provider-neutral LEAN signals/metrics while `frontend/lib/*Workflow.ts` hooks
-> centralize watchlist, search, chart range loading, source labeling, and
-> SignalR-to-HTTP fallback orchestration behind rendering components and
-> preserve the original bootstrap smoke markers.
+> centralize watchlist, bounded search result view models, chart range loading,
+> source labeling, and SignalR-to-HTTP fallback orchestration behind rendering
+> components and preserve the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -555,11 +555,13 @@ references.
   preserves the stable home-page markers (`ATrade Frontend Home` / `Next.js
   Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding the first
   workspace route: Timescale-first/IBKR scanner-backed trending stocks/ETFs,
-  reusable IBKR stock search controls, symbol navigation to `/symbols/[symbol]`,
-  backend watchlist API reads/writes with provider metadata and a non-authoritative localStorage
+  reusable IBKR stock search controls with bounded ranked results, best-match
+  summaries, market/currency/asset filter chips, and show-more/show-less
+  exploration, symbol navigation to `/symbols/[symbol]`, backend watchlist API
+  reads/writes with provider metadata and a non-authoritative localStorage
   cache/migration source, workflow hooks for watchlist migration/exact pin
-  commands, search debounce/provider errors, a reusable terminal workspace shell
-  component family (`TerminalWorkspaceShell`, `WorkspaceCommandBar`,
+  commands, search debounce/provider errors/bounded result view models, a
+  reusable terminal workspace shell component family (`TerminalWorkspaceShell`, `WorkspaceCommandBar`,
   `WorkspaceNavigation`, `WorkspaceContextPanel`) for command-first navigation
   and right-side context, chart HTTP loading/source labels, and SignalR-to-HTTP
   fallback, `lightweight-charts` candlesticks with lookback range controls for

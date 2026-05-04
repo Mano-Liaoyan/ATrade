@@ -524,6 +524,155 @@ input:focus-visible,
   font-size: 0.88rem;
 }
 
+.symbol-search-summary {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(56, 189, 248, 0.16);
+  border-radius: 16px;
+  padding: 0.75rem;
+  background: rgba(8, 47, 73, 0.18);
+}
+
+.symbol-search-result-count,
+.symbol-search-result-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.symbol-search-result-count strong {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.symbol-search-best-match {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.symbol-search-best-match span,
+.symbol-search-best-badge {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.symbol-search-best-match strong {
+  color: #f8fafc;
+  font-size: 1.35rem;
+}
+
+.symbol-search-best-match small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.symbol-search-filters {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.symbol-search-filter-heading,
+.symbol-search-filter-group,
+.symbol-search-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.symbol-search-filter-heading {
+  justify-content: space-between;
+}
+
+.symbol-search-filter-heading > span,
+.symbol-search-filter-group > span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.symbol-search-filter-chip,
+.symbol-search-filter-clear {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.35rem 0.6rem;
+}
+
+.symbol-search-filter-chip {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.symbol-search-filter-chip span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.symbol-search-filter-chip--active {
+  border-color: rgba(56, 189, 248, 0.54);
+  background: rgba(56, 189, 248, 0.18);
+  color: #e0f2fe;
+}
+
+.symbol-search-filter-clear {
+  color: var(--accent);
+}
+
+.symbol-search-explore-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.symbol-search-explore-controls > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.symbol-search-explore-button {
+  border: 1px solid rgba(56, 189, 248, 0.32);
+  border-radius: 999px;
+  background: rgba(8, 47, 73, 0.3);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 0.45rem 0.75rem;
+}
+
+.symbol-search-filter-chip:focus-visible,
+.symbol-search-filter-clear:focus-visible,
+.symbol-search-explore-button:focus-visible,
+.pin-button:focus-visible,
+.open-chart-link:focus-visible,
+.symbol-link:focus-visible {
+  outline: 3px solid rgba(56, 189, 248, 0.36);
+  outline-offset: 3px;
+}
+
 .instrument-identity-row {
   display: flex;
   flex-wrap: wrap;
@@ -606,9 +755,16 @@ input:focus-visible,
 .symbol-search-results {
   display: grid;
   gap: 0.7rem;
+  max-height: min(34rem, 58vh);
+  overflow-y: auto;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0.15rem 0 0;
+  scrollbar-color: rgba(56, 189, 248, 0.48) rgba(15, 23, 42, 0.72);
+}
+
+.symbol-search-panel--compact .symbol-search-results {
+  max-height: min(24rem, 46vh);
 }
 
 .symbol-search-results li {
@@ -620,6 +776,11 @@ input:focus-visible,
   border-radius: 16px;
   padding: 0.8rem;
   background: rgba(15, 23, 42, 0.56);
+}
+
+.symbol-search-results .terminal-result-row--best {
+  border-color: rgba(56, 189, 248, 0.42);
+  background: rgba(8, 47, 73, 0.28);
 }
 
 .symbol-search-actions {
@@ -1069,6 +1230,15 @@ input:focus-visible,
   .analysis-result-summary,
   .analysis-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .symbol-search-results {
+    max-height: 44vh;
+  }
+
+  .symbol-search-explore-controls {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .symbol-search-results li,

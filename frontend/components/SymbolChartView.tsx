@@ -118,7 +118,6 @@ export function SymbolChartView({ symbol, identity }: SymbolChartViewProps) {
           title="Search another IBKR stock"
           description="Jump from this symbol page to any IBKR/iBeam stock result without relying on a local symbol catalog."
           compact
-          limit={6}
         />
       </section>
 
