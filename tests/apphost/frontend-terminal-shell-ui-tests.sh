@@ -34,11 +34,48 @@ assert_file_not_contains() {
   fi
 }
 
-cleanup() {
-  if [[ -n "$frontend_pid" ]] && kill -0 "$frontend_pid" 2>/dev/null; then
-    kill "$frontend_pid" 2>/dev/null || true
-    wait "$frontend_pid" 2>/dev/null || true
+stop_frontend_lock_owner() {
+  local lock_file="$repo_root/frontend/.next/dev/lock"
+  local locked_pid=''
+
+  if [[ ! -f "$lock_file" ]]; then
+    return 0
   fi
+
+  locked_pid="$(python3 - "$lock_file" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as handle:
+        value = json.load(handle).get('pid', '')
+    print(value if isinstance(value, int) else '')
+except Exception:
+    print('')
+PY
+)"
+
+  if [[ "$locked_pid" =~ ^[0-9]+$ ]] && kill -0 "$locked_pid" 2>/dev/null; then
+    kill "$locked_pid" 2>/dev/null || true
+    sleep 1
+    if kill -0 "$locked_pid" 2>/dev/null; then
+      kill -9 "$locked_pid" 2>/dev/null || true
+    fi
+  fi
+
+  rm -f "$lock_file" 2>/dev/null || true
+}
+
+cleanup() {
+  if [[ -n "$frontend_pid" ]]; then
+    pkill -TERM -P "$frontend_pid" 2>/dev/null || true
+    if kill -0 "$frontend_pid" 2>/dev/null; then
+      kill "$frontend_pid" 2>/dev/null || true
+      wait "$frontend_pid" 2>/dev/null || true
+    fi
+    pkill -KILL -P "$frontend_pid" 2>/dev/null || true
+  fi
+
+  stop_frontend_lock_owner
 
   for temp_file in "$frontend_log" "$root_response" "$chart_response"; do
     if [[ -n "$temp_file" && -f "$temp_file" ]]; then
@@ -145,6 +182,8 @@ print(s.getsockname()[1])
 s.close()
 PY
 )"
+  stop_frontend_lock_owner
+
   frontend_url="http://127.0.0.1:${port}"
   frontend_log="$(mktemp)"
   root_response="$(mktemp)"

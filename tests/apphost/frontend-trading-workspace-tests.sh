@@ -57,11 +57,48 @@ assert_file_not_contains() {
   fi
 }
 
-cleanup() {
-  if [[ -n "$frontend_pid" ]] && kill -0 "$frontend_pid" 2>/dev/null; then
-    kill "$frontend_pid" 2>/dev/null || true
-    wait "$frontend_pid" 2>/dev/null || true
+stop_frontend_lock_owner() {
+  local lock_file="$repo_root/frontend/.next/dev/lock"
+  local locked_pid=''
+
+  if [[ ! -f "$lock_file" ]]; then
+    return 0
   fi
+
+  locked_pid="$(python3 - "$lock_file" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as handle:
+        value = json.load(handle).get('pid', '')
+    print(value if isinstance(value, int) else '')
+except Exception:
+    print('')
+PY
+)"
+
+  if [[ "$locked_pid" =~ ^[0-9]+$ ]] && kill -0 "$locked_pid" 2>/dev/null; then
+    kill "$locked_pid" 2>/dev/null || true
+    sleep 1
+    if kill -0 "$locked_pid" 2>/dev/null; then
+      kill -9 "$locked_pid" 2>/dev/null || true
+    fi
+  fi
+
+  rm -f "$lock_file" 2>/dev/null || true
+}
+
+cleanup() {
+  if [[ -n "$frontend_pid" ]]; then
+    pkill -TERM -P "$frontend_pid" 2>/dev/null || true
+    if kill -0 "$frontend_pid" 2>/dev/null; then
+      kill "$frontend_pid" 2>/dev/null || true
+      wait "$frontend_pid" 2>/dev/null || true
+    fi
+    pkill -KILL -P "$frontend_pid" 2>/dev/null || true
+  fi
+
+  stop_frontend_lock_owner
 
   if [[ -n "$api_pid" ]] && kill -0 "$api_pid" 2>/dev/null; then
     kill "$api_pid" 2>/dev/null || true
@@ -231,6 +268,8 @@ start_api() {
 }
 
 start_frontend_and_assert_markers() {
+  stop_frontend_lock_owner
+
   frontend_log="$(mktemp)"
   root_response="$(mktemp)"
   chart_response="$(mktemp)"
@@ -248,6 +287,13 @@ start_frontend_and_assert_markers() {
   assert_file_contains "$root_response" 'Trading workspace MVP'
   assert_file_contains "$root_response" 'backend-saved watchlists'
   assert_file_contains "$root_response" 'Postgres-backed workspace watchlists'
+  assert_file_contains "$root_response" 'data-testid="terminal-workspace-shell"'
+  assert_file_contains "$root_response" 'data-testid="workspace-navigation"'
+  assert_file_contains "$root_response" 'href="#workspace-search"'
+  assert_file_contains "$root_response" 'href="#workspace-trending"'
+  assert_file_contains "$root_response" 'href="#workspace-watchlist"'
+  assert_file_contains "$root_response" 'Paper-only workspace'
+  assert_file_contains "$root_response" 'exact instrument identity'
   assert_file_contains "$root_response" 'Search IBKR stocks'
   assert_file_contains "$root_response" 'IBKR instrument search'
   assert_file_contains "$root_response" 'Loading IBKR/iBeam trending'
@@ -256,6 +302,12 @@ start_frontend_and_assert_markers() {
   wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$chart_response" 'AAPL'
   assert_file_contains "$chart_response" 'chart workspace'
+  assert_file_contains "$chart_response" 'data-testid="terminal-workspace-shell"'
+  assert_file_contains "$chart_response" 'data-testid="workspace-navigation"'
+  assert_file_contains "$chart_response" 'href="#chart-candles"'
+  assert_file_contains "$chart_response" 'href="#chart-range"'
+  assert_file_contains "$chart_response" 'href="#chart-analysis"'
+  assert_file_contains "$chart_response" 'href="#chart-provider"'
   assert_file_contains "$chart_response" 'Lookback candlestick chart'
   assert_file_contains "$chart_response" 'Chart range lookback controls'
   assert_file_contains "$chart_response" '1min'

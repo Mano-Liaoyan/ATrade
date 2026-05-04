@@ -1,6 +1,6 @@
 # TP-043: Redesign workspace navigation with a terminal-style shell — Status
 
-**Current Step:** Step 3: Refactor the chart workspace into the same shell
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -46,17 +46,17 @@
 ---
 
 ### Step 3: Refactor the chart workspace into the same shell
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Chart workspace uses the shared terminal-style shell/navigation model
-- [ ] Chart range controls, stream state, source metadata, and fallback notes remain visible on desktop and mobile
-- [ ] Broker status, analysis, candlestick, indicator, and SignalR fallback behavior preserved
-- [ ] Existing frontend integration assertions updated only for intentional marker moves
+- [x] Chart workspace uses the shared terminal-style shell/navigation model
+- [x] Chart range controls, stream state, source metadata, and fallback notes remain visible on desktop and mobile
+- [x] Broker status, analysis, candlestick, indicator, and SignalR fallback behavior preserved
+- [x] Existing frontend integration assertions updated only for intentional marker moves
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Frontend build/checks passing
@@ -105,6 +105,12 @@
 | 2026-05-04 07:02 | Step 2 targeted home checks | `bash tests/apphost/frontend-trading-workspace-tests.sh` passed |
 | 2026-05-04 07:03 | Step 2 completed | Home workspace now uses shared shell with navigation anchors and context watchlist |
 | 2026-05-04 07:03 | Step 3 started | Chart workspace shell refactor |
+| 2026-05-04 07:12 | Step 3 chart shell check | Chart route moved into TerminalWorkspaceShell; `bash tests/apphost/frontend-terminal-shell-ui-tests.sh` passed after clearing stale Next dev lock from prior test run |
+| 2026-05-04 07:16 | Step 3 chart controls check | Timeframe controls wrap for mobile; `bash tests/apphost/frontend-terminal-shell-ui-tests.sh` passed with robust Next dev lock cleanup |
+| 2026-05-04 07:20 | Step 3 chart behavior checks | `bash tests/apphost/frontend-workspace-workflow-module-tests.sh`, `cd frontend && npx tsc --noEmit --pretty false`, and `bash tests/apphost/frontend-trading-workspace-tests.sh` passed |
+| 2026-05-04 07:24 | Step 3 integration assertions | Added terminal shell/anchor assertions and robust Next dev cleanup to `frontend-trading-workspace-tests.sh`; script passed |
+| 2026-05-04 07:25 | Step 3 completed | Chart workspace now uses shared shell with range, provider, analysis, and fallback landmarks |
+| 2026-05-04 07:25 | Step 4 started | Full verification gate |
 
 ---
 

@@ -433,10 +433,21 @@ input:focus-visible,
   padding-block: 0.75rem;
 }
 
-.terminal-context-panel .watchlist-panel {
+.terminal-context-panel .watchlist-panel,
+.terminal-context-panel .broker-status-panel {
   position: static;
   background: rgba(15, 23, 42, 0.42);
   box-shadow: none;
+}
+
+.chart-command-range {
+  display: grid;
+  gap: 0.4rem;
+  min-width: min(100%, 34rem);
+}
+
+.chart-command-range .timeframe-selector {
+  justify-content: flex-start;
 }
 
 .terminal-provider-status {
@@ -803,10 +814,18 @@ input:focus-visible,
 
 .timeframe-selector {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
   padding: 0.25rem;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.8);
+}
+
+.timeframe-help {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.76rem;
+  padding: 0.2rem 0.45rem 0;
 }
 
 .timeframe-button {

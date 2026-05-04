@@ -15,13 +15,13 @@ export default async function SymbolPage({ params, searchParams }: SymbolPagePro
   const identity = createQueryIdentity(normalizedSymbol, resolvedSearchParams);
 
   return (
-    <main className="workspace-shell">
+    <div className="workspace-shell">
       <Link className="back-link" href="/">
         ← Back to trading workspace
       </Link>
 
       <SymbolChartView symbol={normalizedSymbol} identity={identity} />
-    </main>
+    </div>
   );
 }
 
