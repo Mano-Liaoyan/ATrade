@@ -9,8 +9,11 @@ atrade_load_local_port_contract() {
   local key=''
   local value=''
   local contract_file=''
+  local key_index=-1
+  local i=0
   local -a contract_files=()
-  local -A contract_values=()
+  local -a contract_keys=()
+  local -a contract_values=()
 
   if [[ -f "$preferred_path" ]]; then
     contract_path="$preferred_path"
@@ -52,13 +55,27 @@ atrade_load_local_port_contract() {
         continue
       fi
 
-      contract_values["$key"]="$value"
+      key_index=-1
+      for ((i = 0; i < ${#contract_keys[@]}; i++)); do
+        if [[ "${contract_keys[$i]}" == "$key" ]]; then
+          key_index="$i"
+          break
+        fi
+      done
+
+      if [[ "$key_index" -ge 0 ]]; then
+        contract_values[$key_index]="$value"
+      else
+        contract_keys+=("$key")
+        contract_values+=("$value")
+      fi
     done <"$contract_file"
   done
 
-  for key in "${!contract_values[@]}"; do
+  for ((i = 0; i < ${#contract_keys[@]}; i++)); do
+    key="${contract_keys[$i]}"
     if [[ -z "${!key+x}" ]]; then
-      export "$key=${contract_values[$key]}"
+      export "$key=${contract_values[$i]}"
     fi
   done
 }

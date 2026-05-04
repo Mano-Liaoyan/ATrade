@@ -2,6 +2,11 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+bash_exe="${BASH:-}"
+if [[ -z "$bash_exe" ]]; then
+  bash_exe="$(command -v bash)"
+fi
+
 . "$repo_root/scripts/local-env.sh"
 atrade_load_local_port_contract "$repo_root"
 
@@ -180,7 +185,7 @@ EOF
       -u ATRADE_APPHOST_FRONTEND_HTTP_PORT \
       -u ATRADE_ASPIRE_DASHBOARD_HTTP_PORT \
       ATRADE_API_HTTP_PORT=7198 \
-      /usr/bin/bash -c '
+      "$bash_exe" -c '
         set -euo pipefail
         repo_root="$1"
         . "$repo_root/scripts/local-env.sh"
@@ -262,7 +267,7 @@ assert_start_run_script_failure_paths() {
   ln -s "$(command -v dirname)" "$fake_bin/dirname"
 
   local missing_dotnet_output
-  missing_dotnet_output="$(PATH="$fake_bin" run_and_capture /usr/bin/bash "$repo_root/scripts/start.run.sh")"
+  missing_dotnet_output="$(PATH="$fake_bin" run_and_capture "$bash_exe" "$repo_root/scripts/start.run.sh")"
   rm -rf "$fake_bin"
 
   assert_contains "$missing_dotnet_output" 'dotnet is required to run the ATrade AppHost.'
@@ -274,7 +279,7 @@ assert_start_run_script_failure_paths() {
   mv "$project_path" "$backup_path"
 
   local missing_project_output
-  missing_project_output="$(run_and_capture /usr/bin/bash "$repo_root/scripts/start.run.sh")"
+  missing_project_output="$(run_and_capture "$bash_exe" "$repo_root/scripts/start.run.sh")"
 
   mv "$backup_path" "$project_path"
 
@@ -301,7 +306,7 @@ EOF
   write_local_port_contract 5198 3118 3018 5018
 
   local run_output
-  run_output="$(PATH="$fake_bin:$PATH" run_and_capture run_with_local_contract_environment /usr/bin/bash "$repo_root/scripts/start.run.sh" alpha beta)"
+  run_output="$(PATH="$fake_bin:$PATH" run_and_capture run_with_local_contract_environment "$bash_exe" "$repo_root/scripts/start.run.sh" alpha beta)"
 
   rm -rf "$fake_bin"
 
@@ -449,6 +454,9 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.sh" 'ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL:-http://127.0.0.1:0'
   assert_file_contains "$repo_root/scripts/start.run.sh" '--no-launch-profile -- "$@"'
   assert_file_contains "$repo_root/scripts/local-env.sh" 'ATRADE_PORT_CONTRACT_PATH'
+  assert_file_not_contains "$repo_root/scripts/local-env.sh" 'local -A'
+  assert_file_not_contains "$repo_root/scripts/local-env.sh" 'declare -A'
+  assert_file_not_contains "$repo_root/scripts/local-env.sh" 'typeset -A'
   assert_file_contains "$repo_root/scripts/local-env.ps1" 'Import-ATradeLocalPortContract'
   assert_file_contains "$repo_root/scripts/local-env.ps1" 'ATRADE_PORT_CONTRACT_PATH'
   assert_file_not_contains "$repo_root/scripts/local-env.ps1" 'Write-Host'
@@ -500,6 +508,7 @@ main() {
   assert_file_contains "$repo_root/frontend/tsconfig.json" '"name": "next"'
   assert_file_not_exists "$repo_root/frontend/server.js"
   assert_file_contains "$repo_root/scripts/README.md" 'The `run` contract is now bootstrapped in the repository.'
+  assert_file_contains "$repo_root/scripts/README.md" 'The Unix loader must stay compatible with Bash 3.2'
   assert_file_contains "$repo_root/scripts/README.md" './start run'
   assert_file_contains "$repo_root/scripts/README.md" 'are verified by GitHub Actions on `windows-latest` via `tests/start-contract/start-wrapper-windows.ps1`'
   assert_file_contains "$repo_root/README.md" 'Windows PowerShell: `./start.ps1 run`'

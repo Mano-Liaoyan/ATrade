@@ -252,6 +252,9 @@ Behavior must stay semantically identical across platforms.
 - same environment contract where possible
 - platform-specific wrappers may differ internally, but not conceptually
 
+The Unix loader must stay compatible with Bash 3.2 because `/usr/bin/env bash`
+can resolve to that version on macOS developer machines.
+
 ## Solution File Contract
 
 Repository-level .NET verification commands use `ATrade.slnx` as the
