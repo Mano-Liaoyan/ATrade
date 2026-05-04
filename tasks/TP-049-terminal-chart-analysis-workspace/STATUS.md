@@ -1,6 +1,6 @@
 # TP-049: Rebuild chart and analysis as terminal workspaces — Status
 
-**Current Step:** Step 4: Integrate symbol route and command flows
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -66,16 +66,16 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Terminal chart/analysis validation passing
-- [ ] Chart range validation passing
-- [ ] Frontend workspace validation passing
-- [ ] Analysis shell validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Terminal chart/analysis validation passing
+- [x] Chart range validation passing
+- [x] Frontend workspace validation passing
+- [x] Analysis shell validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
