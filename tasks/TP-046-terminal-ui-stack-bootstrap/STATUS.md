@@ -1,11 +1,11 @@
 # TP-046: Bootstrap the terminal UI stack — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 1: Add Tailwind/shadcn-compatible configuration
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,15 +15,15 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Add Tailwind/shadcn-compatible configuration
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add compatible Tailwind/PostCSS/shadcn/Radix dependencies
 - [ ] Create/update Tailwind, PostCSS, components, and utility config files
@@ -94,6 +94,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-04 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-04 21:47 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-04 21:47 | Step 0 started | Preflight |
 
 ---
 
