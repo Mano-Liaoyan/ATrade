@@ -38,14 +38,16 @@ see_also:
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
 > AppHost-managed Postgres resource, a TimescaleDB-backed market-data
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
-> broker/iBeam configuration wiring, and a Next.js workspace with a shared
-> terminal-inspired shell, persistent command/navigation/context regions, IBKR
-> scanner-driven or fresh persisted trending symbols, bounded/ranked/filterable
-> IBKR stock search, exact market-specific Postgres-backed watchlists, local
-> market badges, `lightweight-charts` candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
-> `1D`, `1m`, `6m`, `1y`, `5y`, and All time), indicators, source metadata,
-> an analysis panel that can run LEAN when the analysis runtime is configured,
-> and SignalR-to-HTTP fallback behavior.
+> broker/iBeam configuration wiring, and a Next.js ATrade Terminal workspace
+> with deterministic command routing, enabled/disabled module registry and rail,
+> resizable primary/context/monitor panels with versioned local-only layout
+> persistence, IBKR scanner-driven or fresh persisted trending symbols,
+> bounded/ranked/filterable IBKR stock search, exact market-specific
+> Postgres-backed watchlists, local market badges, `lightweight-charts`
+> candlesticks, chart range lookback controls (`1min`, `5mins`, `1h`, `6h`,
+> `1D`, `1m`, `6m`, `1y`, `5y`, and All time), indicators, source metadata, an
+> analysis panel that can run LEAN when the analysis runtime is configured, and
+> SignalR-to-HTTP fallback behavior.
 > Production mocked market-data providers have been removed; missing iBeam
 > runtime, credentials, or authentication returns safe
 > provider-not-configured/provider-unavailable/authentication-required errors
@@ -95,11 +97,11 @@ state is the clean-room ATrade Terminal defined in
 [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a full frontend
 replacement with deterministic commands, enabled modules for current API-backed
 workflows, visible-disabled future modules, resizable multi-panel layout, and a
-simplified mobile fallback. The home and chart routes currently share an
-original ATrade terminal-style shell that provides a command header,
-keyboard-focusable navigation anchors, a primary panel stack, and a right-side
-context rail for provider state, paper-only guardrails, exact instrument
-identity, watchlist pins, and broker/analysis status. The terminal direction is
+simplified mobile fallback. The home and symbol routes now render through
+`ATradeTerminalApp`, which provides the ATrade Terminal frame, deterministic
+command input, module rail, safety strip, resizable primary/context/monitor
+workspace, local-only layout reset/persistence, status strip, help module, and
+honest disabled-module surfaces for future modules. The terminal direction is
 inspired only by broad finance-terminal information architecture; it does not
 copy proprietary terminal layouts, assets, trademarks, or colors.
 
@@ -131,11 +133,11 @@ result limits, and show-more/show-less exploration commands; and
 `symbolChartWorkflow` owns the selected chart range lookback, candle/indicator
 HTTP reads, source-label formatting, SignalR subscription state, stream update
 application, and HTTP polling fallback when streaming closes or is unavailable.
-`TerminalWorkspaceShell`, `WorkspaceCommandBar`, `WorkspaceNavigation`, and
-`WorkspaceContextPanel` are reusable rendering primitives only: they accept
-metadata, anchors, command links, safety disclosures, and context cards while
-leaving API clients, storage migration, SignalR connections, and pin/unpin
-commands in the existing workflow/client modules.
+The terminal frame composes those workflow/client modules through
+`ATradeTerminalApp`, `TerminalCommandInput`, `TerminalModuleRail`, and
+`TerminalWorkspaceLayout`; the retired `TerminalWorkspaceShell`,
+`WorkspaceCommandBar`, `WorkspaceNavigation`, and `WorkspaceContextPanel`
+primitives are no longer active route dependencies.
 
 ### 3.2 `ATrade.Api`
 
@@ -506,7 +508,8 @@ server-owned.
 
 The Next.js frontend may own short-lived UI state such as:
 
-- active tab and panel arrangement during a browser session
+- active terminal module, rail/collapsed preference, and resizable panel layout
+  under the versioned local-only `atrade.terminal.layout.v1` key
 - a non-authoritative cached copy of backend watchlist symbols under
   `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
   and one-time migration of pre-Postgres pins
@@ -548,10 +551,13 @@ symbol-only rows; exact removals use
 symbol-only: it may seed a one-time manual-symbol migration into Postgres and
 may render a clearly labeled read-only cached snapshot when the backend/database
 is unavailable, but it must not be treated as saved state and must not contain
-secrets, broker account identifiers, provider ids, or tokens. Local cleanup is a
-manual developer action: stop AppHost first, then remove only a volume you own
-(for example an isolated test volume), never a shared/default volume that may
-contain desired watchlist state.
+secrets, broker account identifiers, provider ids, or tokens. The separate
+`atrade.terminal.layout.v1` key stores only convenience UI layout preferences
+(active enabled module, rail state, and bounded primary/context/monitor split
+sizes); invalid/stale versions reset to defaults and never write to a backend.
+Local cleanup is a manual developer action: stop AppHost first, then remove only
+a volume you own (for example an isolated test volume), never a shared/default
+volume that may contain desired watchlist state.
 
 ## 8. Charting Library Decision
 
@@ -573,7 +579,7 @@ Current implementation:
   one-time symbol-only legacy cache migration, read-only cached fallback, exact
   pin/unpin/remove commands, backend-authoritative `instrumentKey`/`pinKey`
   matching, saving state, and stable watchlist error text for
-  `TradingWorkspace`, `TrendingList`, `SymbolSearch`, and `Watchlist`
+  `ATradeTerminalApp`, `TrendingList`, `SymbolSearch`, and `Watchlist`
 - `frontend/lib/symbolSearchWorkflow.ts` owns reusable IBKR stock search query
   state, debounce, minimum-length validation, result state, and provider /
   authentication error text while `frontend/components/SymbolSearch.tsx` renders
@@ -581,8 +587,8 @@ Current implementation:
 - `frontend/lib/symbolChartWorkflow.ts` owns the selected lookback chart range,
   HTTP candle/indicator fetches, source-label formatting, SignalR subscription
   state and updates from `/hubs/market-data`, and HTTP polling fallback when
-  streaming closes or is unavailable while `frontend/components/SymbolChartView.tsx`
-  renders the chart workflow state and embeds the compact symbol search control
+  streaming closes or is unavailable while `frontend/components/terminal/ATradeTerminalApp.tsx`
+  renders the chart workflow state inside the terminal frame
 
 Licensing guardrail:
 

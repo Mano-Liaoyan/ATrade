@@ -139,10 +139,10 @@ assert_frontend_contract_files() {
   assert_file_contains "$repo_root/frontend/package.json" '"dev": "next dev --hostname 0.0.0.0"'
   assert_file_contains "$repo_root/frontend/package.json" '"build": "next build"'
   assert_file_contains "$repo_root/frontend/package.json" '"start": "next start"'
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'TradingWorkspace'
-  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'ATrade Frontend Home'
-  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'Next.js Bootstrap Slice'
-  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'ATradeTerminalApp'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'ATrade Terminal Shell'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Command-first paper workspace'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-safety-strip"'
   assert_file_contains "$repo_root/frontend/app/layout.tsx" "import './globals.css';"
   assert_file_contains "$repo_root/frontend/next-env.d.ts" '/// <reference types="next" />'
   assert_file_contains "$repo_root/frontend/tsconfig.json" '"name": "next"'
@@ -170,9 +170,10 @@ assert_direct_frontend_startup() {
   response_file="$(mktemp)"
 
   wait_for_http_200 "$frontend_url/" "$response_file" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$response_file" 'ATrade Frontend Home'
-  assert_file_contains "$response_file" 'Next.js Bootstrap Slice'
-  assert_file_contains "$response_file" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$response_file" 'ATrade Terminal Shell'
+  assert_file_contains "$response_file" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$response_file" 'data-testid="terminal-command-input"'
+  assert_file_contains "$response_file" 'Orders are disabled by the paper-only safety contract.'
   rm -f "$response_file"
 }
 
@@ -259,9 +260,10 @@ assert_apphost_frontend_runtime_is_warning_free() {
   local response_file
   response_file="$(mktemp)"
   wait_for_http_200 "$apphost_frontend_url/" "$response_file" "$apphost_pid" "$apphost_log"
-  assert_file_contains "$response_file" 'ATrade Frontend Home'
-  assert_file_contains "$response_file" 'Next.js Bootstrap Slice'
-  assert_file_contains "$response_file" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$response_file" 'ATrade Terminal Shell'
+  assert_file_contains "$response_file" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$response_file" 'data-testid="terminal-command-input"'
+  assert_file_contains "$response_file" 'Orders are disabled by the paper-only safety contract.'
   rm -f "$response_file"
 
   for attempt in {1..120}; do

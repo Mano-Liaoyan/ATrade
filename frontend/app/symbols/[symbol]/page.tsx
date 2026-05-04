@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { SymbolChartView } from '../../../components/SymbolChartView';
+import { ATradeTerminalApp } from '@/components/terminal/ATradeTerminalApp';
+import type { EnabledTerminalModuleId } from '@/types/terminal';
 
 type SymbolPageProps = {
   params: Promise<{
@@ -13,16 +13,19 @@ export default async function SymbolPage({ params, searchParams }: SymbolPagePro
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const normalizedSymbol = decodeURIComponent(symbol).toUpperCase();
   const identity = createQueryIdentity(normalizedSymbol, resolvedSearchParams);
+  const initialModuleId = createInitialModuleId(firstQueryValue(resolvedSearchParams.module));
 
-  return (
-    <div className="workspace-shell">
-      <Link className="back-link" href="/">
-        ← Back to trading workspace
-      </Link>
+  return <ATradeTerminalApp initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />;
+}
 
-      <SymbolChartView symbol={normalizedSymbol} identity={identity} />
-    </div>
-  );
+function createInitialModuleId(moduleQuery: string | null): EnabledTerminalModuleId {
+  const normalizedModule = moduleQuery?.trim().toUpperCase();
+
+  if (normalizedModule === 'ANALYSIS' || normalizedModule === 'STATUS' || normalizedModule === 'HELP') {
+    return normalizedModule;
+  }
+
+  return 'CHART';
 }
 
 function createQueryIdentity(symbol: string, searchParams: Record<string, string | string[] | undefined>) {
