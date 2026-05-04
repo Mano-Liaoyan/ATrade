@@ -1,8 +1,8 @@
 # General — Context
 
-**Last Updated:** 2026-05-02
+**Last Updated:** 2026-05-04
 **Status:** Active
-**Next Task ID:** TP-042
+**Next Task ID:** TP-045
 
 ---
 
@@ -28,8 +28,8 @@ implementation queue.
   provider-neutral analysis/LEAN seams, the `ATrade.slnx` solution-file
   contract, the HTTPS local iBeam Client Portal transport contract,
   AppHost-managed LEAN Docker runtime wiring, durable AppHost Postgres
-  watchlists, and durable TimescaleDB cache rows are present from the completed
-  TP-019 through TP-035 batches.
+  watchlists, durable TimescaleDB cache rows, and frontend workflow module seams
+  are present from completed and archived batches through `TP-041`.
 
 ## Domain Vocabulary
 
@@ -48,21 +48,16 @@ implementation queue.
 
 Ready implementation tasks now queued:
 
-- `TP-036` — deepen the local runtime contract module and fix committed runtime/default drift
-- `TP-037` — deepen the Exact Instrument Identity module across market data, Timescale, Workspaces, and frontend pins
-- `TP-038` — deepen the market-data read module into an async, cache-aware read seam
-- `TP-039` — deepen the shared IBKR/iBeam session readiness module for broker, market-data, and worker callers
-- `TP-040` — deepen analysis and workspace watchlist intake modules so `ATrade.Api` delegates domain ordering
-- `TP-041` — deepen frontend workspace workflow modules for watchlist, search, chart, and stream fallback orchestration
+- `TP-042` — correct chart range presets so time controls mean lookback ranges from now
+- `TP-043` — redesign workspace navigation with a terminal-style shell
+- `TP-044` — make stock search results easier to explore through bounded, ranked, filterable UI state
 
-Recommended orchestration order is sequential from `TP-036` through `TP-041`
+Recommended orchestration order is sequential from `TP-042` through `TP-044`
 because each task stabilizes a seam used by the next task.
 
-The next new Taskplane packet should use `TP-042`.
+The next new Taskplane packet should use `TP-045`.
 
-Completed task packets `TP-019` through `TP-035` currently remain under
-`tasks/` with `.DONE` markers pending archival. Older completed packets live
-under `tasks/archive/`.
+Completed task packets through `TP-041` live under `tasks/archive/`.
 
 ## Taskplane Usage
 
@@ -70,7 +65,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-042`
+- New tasks should use the next ID: `TP-045`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -92,19 +87,18 @@ All variants delegate to the Aspire AppHost.
 
 ## Key Files
 
-| Category            | Path                                      |
-| ------------------- | ----------------------------------------- |
-| Human overview      | `README.md`                               |
-| Current plan        | `PLAN.md`                                 |
-| Documentation index | `docs/INDEX.md`                           |
-| Startup contract    | `scripts/README.md`                       |
-| Active tasks        | `tasks/TP-036-*` through `tasks/TP-041-*` |
-| Completed pending archival | `tasks/TP-019-*` through `tasks/TP-035-*` |
-| Archived tasks      | `tasks/archive/`                          |
-| Taskplane config    | `.pi/taskplane-config.json`               |
-| AppHost             | `src/ATrade.AppHost/Program.cs`           |
-| API                 | `src/ATrade.Api/Program.cs`               |
-| Frontend            | `frontend/`                               |
+| Category            | Path                                                      |
+| ------------------- | --------------------------------------------------------- |
+| Human overview      | `README.md`                                               |
+| Current plan        | `PLAN.md`                                                 |
+| Documentation index | `docs/INDEX.md`                                           |
+| Startup contract    | `scripts/README.md`                                       |
+| Active tasks        | `tasks/TP-042-*` through  `tasks/TP-044-*`                |
+| Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
+| Taskplane config    | `.pi/taskplane-config.json`                               |
+| AppHost             | `src/ATrade.AppHost/Program.cs`                           |
+| API                 | `src/ATrade.Api/Program.cs`                               |
+| Frontend            | `frontend/`                                               |
 
 ## Documentation Rules
 
@@ -117,6 +111,6 @@ All variants delegate to the Aspire AppHost.
 ## Technical Debt / Future Work
 
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
-- [ ] Archive completed `TP-019` through `TP-035` task packets when orchestration cleanup time allows.
+- [x] Archive completed `TP-019` through `TP-041` task packets before starting the next queued run.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
 - [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.

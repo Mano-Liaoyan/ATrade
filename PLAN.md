@@ -1,8 +1,8 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
-summary: Current implementation plan for the ATrade paper-trading workspace architecture deepening queue.
+updated: 2026-05-04
+summary: Current implementation plan for the active ATrade paper-trading workspace UI refinement queue.
 see_also:
   - README.md
   - docs/INDEX.md
@@ -12,18 +12,18 @@ see_also:
 
 # ATrade Current Plan
 
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-04
 
 ## Current Focus
 
 The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, exact
-provider/market pins, configurable local AppHost ports, and optional
-AppHost-managed LEAN Docker runtime wiring. The next queued batch (`TP-036`
-through `TP-041`) is an architecture deepening program focused on making the
-runtime contract, Exact Instrument Identity, market-data reads, IBKR/iBeam
-session readiness, backend intake modules, and frontend workflow modules deeper
-and easier to test.
+provider/market pins, configurable local AppHost ports, optional
+AppHost-managed LEAN Docker runtime wiring, and completed architecture-deepening
+work from `TP-002` through `TP-041` now archived under `tasks/archive/`. The
+current active queue is `TP-042` through `TP-044`, focused on correcting chart
+range semantics and improving the frontend workspace/search navigation before
+the next run starts.
 
 Current repository contracts remain:
 
@@ -37,29 +37,21 @@ Current repository contracts remain:
 
 Ready implementation tasks:
 
-- `TP-036` — deepen the local runtime contract module and fix committed runtime/default drift
-- `TP-037` — deepen the Exact Instrument Identity module across market data, Timescale, Workspaces, and frontend pins
-- `TP-038` — deepen the market-data read module into an async, cache-aware read seam
-- `TP-039` — deepen the shared IBKR/iBeam session readiness module for broker, market-data, and worker callers
-- `TP-040` — deepen analysis and workspace watchlist intake modules so `ATrade.Api` delegates domain ordering
-- `TP-041` — deepen frontend workspace workflow modules for watchlist, search, chart, and stream fallback orchestration
+- `TP-042` — correct chart range presets so chart time controls mean lookback ranges from now
+- `TP-043` — redesign workspace navigation with a terminal-style shell inspired by finance-terminal information architecture
+- `TP-044` — make stock search results easier to explore with bounded, ranked, filterable result UI
 
-The next new Taskplane packet should use `TP-042`.
+The next new Taskplane packet should use `TP-045`.
 
-Completed task packets `TP-019` through `TP-035` remain under `tasks/` with
-`.DONE` markers pending archival. Older completed packets are archived under
-`tasks/archive/`.
+Completed task packets through `TP-041` are archived under `tasks/archive/`.
 
 ## Execution Order
 
 Recommended orchestration order:
 
-1. `TP-036` first, because it stabilizes safe local runtime defaults and shared contract loading.
-2. `TP-037` after `TP-036`, because Exact Instrument Identity becomes the shared provider/market identity language for later tasks.
-3. `TP-038` after `TP-037`, because the market-data read seam should preserve the deepened identity model.
-4. `TP-039` after `TP-038`, because IBKR/iBeam readiness adapts the provider modules after the read seam stabilizes.
-5. `TP-040` after `TP-038` and `TP-039`, because backend intake modules consume both stable market-data reads and stable provider errors.
-6. `TP-041` after `TP-040`, because frontend workflows should follow stable backend identity/intake behavior.
+1. `TP-042` first, because chart range semantics should live behind the frontend workflow and market-data seams before UI layout changes.
+2. `TP-043` after `TP-042`, because the redesigned shell repositions chart controls after their semantics are corrected.
+3. `TP-044` after `TP-043`, because the search exploration UI should fit the new shell.
 
 The orchestrator dependency sections in each `PROMPT.md` are the machine-readable
 source for batch ordering.
@@ -76,4 +68,4 @@ source for batch ordering.
 
 ## Next Task ID
 
-`TP-042`
+`TP-045`

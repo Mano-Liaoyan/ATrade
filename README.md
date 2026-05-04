@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
+updated: 2026-05-04
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -144,18 +144,15 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 
 ## Active Task Queue
 
-Taskplane packets live directly under `tasks/` while pending archival.
+Ready Taskplane packets live directly under `tasks/`; completed packets are
+archived under `tasks/archive/`.
 
-Ready implementation tasks are queued as `TP-036` through `TP-041` for
-architecture deepening: the local runtime contract module, Exact Instrument
-Identity, the market-data read module, shared IBKR/iBeam readiness, backend
-analysis/workspace intake modules, and frontend paper-workspace workflow
-modules. The recommended order is sequential because each task stabilizes a seam
-used by the next.
+Ready implementation tasks are queued as `TP-042` through `TP-044` to fix chart
+range semantics and redesign the frontend workspace/search navigation. The
+recommended order is sequential because each task stabilizes a seam used by the
+next.
 
-Completed Taskplane packets `TP-019` through `TP-035` currently remain under
-`tasks/` with `.DONE` markers pending archival; older completed packets live
-under `tasks/archive/`.
+Completed Taskplane packets through `TP-041` live under `tasks/archive/`.
 
 ## Repository Map
 

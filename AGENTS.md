@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
+updated: 2026-05-04
 summary: Repository guidance and introduction of repo-local Pi skills.
 see_also:
   - README.md
@@ -18,8 +18,9 @@ orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
 ## Current Coordination Model
 
 - Implementation work is tracked as Taskplane packets under `tasks/`.
-- Ready active tasks currently run from `TP-036` through `TP-041`.
-- Completed task packets `TP-019` through `TP-035` remain under `tasks/` with `.DONE` markers pending archival; older completed packets are archived under `tasks/archive/`.
+- Ready active tasks currently run from `TP-042` through `TP-044`.
+- Completed task packets through `TP-041` are archived under `tasks/archive/`.
+- `TP-042` through `TP-044` cover chart range semantics, terminal-style workspace navigation, and bounded/explorable stock search.
 - The next task ID is recorded in `tasks/CONTEXT.md`.
 
 ## Repo-local Pi Skills
