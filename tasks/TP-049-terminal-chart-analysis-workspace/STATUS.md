@@ -33,15 +33,15 @@
 ---
 
 ### Step 2: Build the terminal chart workspace
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Decision — keep `CandlestickChart` as the low-level renderer, move the symbol/range/source/identity shell into terminal chart components, and replace active `TimeframeSelector`/`IndicatorPanel` imports with terminal-styled range and indicator regions.
 
-- [ ] Reuse CandlestickChart as the low-level renderer while moving shell/range/metadata into terminal components
-- [ ] Create terminal chart workspace and instrument header
-- [ ] Adapt chart/indicator regions for resizable terminal layout
-- [ ] Preserve supported lookback range list and copy
-- [ ] Retire old page-level chart shell components once equivalent exists
+- [x] Reuse CandlestickChart as the low-level renderer while moving shell/range/metadata into terminal components
+- [x] Create terminal chart workspace and instrument header
+- [x] Adapt chart/indicator regions for resizable terminal layout
+- [x] Preserve supported lookback range list and copy
+- [x] Retire old page-level chart shell components once equivalent exists
 
 ---
 

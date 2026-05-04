@@ -4,11 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
-import { CandlestickChart } from "@/components/CandlestickChart";
-import { IndicatorPanel } from "@/components/IndicatorPanel";
-import { TimeframeSelector } from "@/components/TimeframeSelector";
 import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
-import { useTerminalChartWorkspaceWorkflow, type TerminalChartWorkspaceWorkflow } from "@/lib/terminalChartWorkspaceWorkflow";
+import { useTerminalChartWorkspaceWorkflow } from "@/lib/terminalChartWorkspaceWorkflow";
 import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
 import type {
   DisabledTerminalModuleId,
@@ -27,6 +24,7 @@ import { TerminalStatusModule } from "./TerminalStatusModule";
 import { TerminalStatusStrip } from "./TerminalStatusStrip";
 import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
+import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
   initialIdentity?: InstrumentIdentityInput | null;
@@ -392,56 +390,10 @@ function TerminalChartPlaceholder() {
 
 function TerminalChartModule({ identity, symbol }: { identity: InstrumentIdentityInput | null; symbol: string }) {
   const chart = useTerminalChartWorkspaceWorkflow({ symbol, identity });
-  const sourceLabel = chart.view.candleSourceLabel;
 
   return (
-    <section className="terminal-module terminal-module--chart workspace-stack" data-testid="terminal-chart-module" id="terminal-chart" tabIndex={-1}>
-      <TerminalPanel
-        eyebrow="Chart"
-        title={`${chart.normalizedSymbol} chart workspace`}
-        description="Chart range controls use lookback windows from now while provider/source metadata, SignalR state, and HTTP fallback notes stay visible."
-        actions={<TerminalStatusBadge tone={chart.view.streamTone}>{chart.view.streamLabel}</TerminalStatusBadge>}
-      >
-        <div id="terminal-chart-range" className="chart-command-range" aria-label="Chart range lookback controls">
-          <span className="indicator-label">Chart range lookback controls</span>
-          <TimeframeSelector value={chart.chartRange} onChange={chart.setChartRange} />
-        </div>
-      </TerminalPanel>
-
-      <section className="workspace-panel terminal-data-panel chart-view" data-testid="chart-workspace">
-        <div className="panel-heading chart-heading terminal-panel-heading">
-          <div>
-            <p className="eyebrow">Lookback candlestick chart</p>
-            <h2>{chart.normalizedSymbol} candles and indicators</h2>
-            <p>Current source: {sourceLabel}. Chart controls request the selected lookback range from now.</p>
-          </div>
-          <div className="chart-actions">
-            <span className={chart.streamState === "connected" ? "stream-pill stream-pill--connected" : "stream-pill"} data-testid="stream-state">
-              {chart.view.streamLabel}
-            </span>
-            <span className="pill">{chart.view.chartRangeLabel} lookback</span>
-          </div>
-        </div>
-
-        {chart.loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div> : null}
-        {!chart.loading && chart.error ? (
-          <div className="error-state" role="alert">
-            <strong>IBKR chart data unavailable.</strong>
-            <p>{chart.error}</p>
-            <button className="primary-button" type="button" onClick={() => void chart.refreshChartData(true)}>
-              Retry chart data
-            </button>
-          </div>
-        ) : null}
-        {!chart.loading && !chart.error && chart.candles ? <CandlestickChart candles={chart.candles} indicators={chart.indicators} /> : null}
-
-        <IndicatorPanel indicators={chart.indicators} />
-        <ChartFooter chart={chart} sourceLabel={sourceLabel} />
-      </section>
-
-      <section id="terminal-analysis" tabIndex={-1} aria-label="Provider-neutral analysis entry point">
-        <AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />
-      </section>
+    <section className="terminal-module terminal-module--chart" data-testid="terminal-chart-module" id="terminal-chart" tabIndex={-1}>
+      <TerminalChartWorkspace chart={chart} identity={identity} />
     </section>
   );
 }
@@ -459,27 +411,6 @@ function TerminalAnalysisModule({ identity, symbol }: { identity: InstrumentIden
       </TerminalPanel>
       {symbol ? <AnalysisPanel symbol={symbol} chartRange={"1D" as ChartRange} identity={identity} /> : null}
     </section>
-  );
-}
-
-function ChartFooter({ chart, sourceLabel }: { chart: TerminalChartWorkspaceWorkflow; sourceLabel: string }) {
-  return (
-    <div className="chart-footer-note">
-      <p>
-        HTTP candles/indicators are refreshed for the selected lookback range from now. {chart.view.fallbackCopy}
-      </p>
-      {chart.candles ? <p>Current candle source: {sourceLabel}.</p> : null}
-      {chart.streamState === "unavailable" ? (
-        <p>Streaming snapshots are unavailable; polling continues against the IBKR/iBeam HTTP provider.</p>
-      ) : null}
-      {chart.latestUpdate ? (
-        <p>
-          Last market-data stream update: {chart.latestUpdate.symbol} {chart.latestUpdate.timeframe} range close {chart.latestUpdate.close.toFixed(2)} from {chart.view.latestUpdateSourceLabel ?? sourceLabel}.
-        </p>
-      ) : null}
-      <p>{chart.view.identitySummary}</p>
-      <p>{chart.view.noOrderCopy}</p>
-    </div>
   );
 }
 

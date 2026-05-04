@@ -34,6 +34,8 @@ assert_terminal_chart_workflow_contract() {
   local market_client="$repo_root/frontend/lib/marketDataClient.ts"
   local stream_client="$repo_root/frontend/lib/marketDataStream.ts"
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
+  local terminal_workspace="$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx"
+  local instrument_header="$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx"
 
   assert_file_contains "$symbol_workflow" 'chartRange: ChartRange'
   assert_file_contains "$symbol_workflow" 'getCandles(normalizedSymbol, chartRange, chartIdentity)'
@@ -56,9 +58,16 @@ assert_terminal_chart_workflow_contract() {
   assert_file_contains "$stream_client" "connection.invoke('Unsubscribe', options.symbol.toUpperCase(), options.chartRange)"
 
   assert_file_contains "$terminal_app" 'useTerminalChartWorkspaceWorkflow({ symbol, identity })'
-  assert_file_contains "$terminal_app" 'chart.view.fallbackCopy'
-  assert_file_contains "$terminal_app" 'chart.view.identitySummary'
-  assert_file_contains "$terminal_app" 'chart.view.noOrderCopy'
+  assert_file_contains "$terminal_app" '<TerminalChartWorkspace chart={chart} identity={identity} />'
+  assert_file_contains "$terminal_workspace" 'chart.view.fallbackCopy'
+  assert_file_contains "$terminal_workspace" 'chart.view.identitySummary'
+  assert_file_contains "$terminal_workspace" 'chart.view.noOrderCopy'
+  assert_file_contains "$terminal_workspace" '<CandlestickChart candles={chart.candles} indicators={chart.indicators} />'
+  assert_file_contains "$instrument_header" 'data-testid="terminal-instrument-header"'
+  assert_file_contains "$instrument_header" 'data-testid="chart-range-controls"'
+  assert_file_contains "$instrument_header" 'chart.view.rangeHelpCopy'
+  assert_file_contains "$instrument_header" 'chart.view.supportedRanges.map'
+  assert_file_contains "$instrument_header" 'CHART_RANGE_LABELS[chartRange]'
   assert_file_not_contains "$terminal_app" 'connectMarketDataStream'
   assert_file_not_contains "$terminal_app" 'getCandles('
   assert_file_not_contains "$terminal_app" 'getIndicators('
@@ -88,6 +97,25 @@ assert_exact_identity_chart_and_analysis_handoff() {
   assert_file_contains "$symbol_page" 'initialIdentity={identity}'
 }
 
+assert_retired_old_chart_shell_components() {
+  local retired_components=(
+    "$repo_root/frontend/components/TimeframeSelector.tsx"
+    "$repo_root/frontend/components/IndicatorPanel.tsx"
+  )
+
+  for retired in "${retired_components[@]}"; do
+    if [[ -e "$retired" ]]; then
+      printf 'expected retired chart shell/control component to be removed: %s\n' "$retired" >&2
+      return 1
+    fi
+  done
+
+  assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" '<ATradeTerminalApp initialIdentity={identity} initialModuleId="CHART" initialSymbol={symbol} />'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TerminalChartWorkspace'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" 'TerminalInstrumentHeader'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalIndicatorGrid.tsx" 'TerminalIndicatorGrid'
+}
+
 assert_provider_neutral_analysis_contract() {
   local analysis_workflow="$repo_root/frontend/lib/terminalAnalysisWorkflow.ts"
   local analysis_client="$repo_root/frontend/lib/analysisClient.ts"
@@ -110,7 +138,7 @@ assert_provider_neutral_analysis_contract() {
   assert_file_contains "$analysis_panel" 'data-testid="analysis-unavailable"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-run-button"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-no-automation-note"'
-  assert_file_contains "$terminal_app" '<AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx" '<AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />'
 }
 
 assert_no_direct_provider_database_or_order_access() {
@@ -139,6 +167,7 @@ assert_no_direct_provider_database_or_order_access() {
 main() {
   assert_terminal_chart_workflow_contract
   assert_exact_identity_chart_and_analysis_handoff
+  assert_retired_old_chart_shell_components
   assert_provider_neutral_analysis_contract
   assert_no_direct_provider_database_or_order_access
 }
