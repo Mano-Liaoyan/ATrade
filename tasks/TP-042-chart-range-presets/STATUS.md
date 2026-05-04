@@ -1,6 +1,6 @@
 # TP-042: Correct chart range presets — Status
 
-**Current Step:** Step 3: Update frontend chart controls and workflow copy
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -48,17 +48,17 @@
 ---
 
 ### Step 3: Update frontend chart controls and workflow copy
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Frontend market-data types/clients/streaming use normalized chart range values
-- [ ] Chart workflow and selector present the controls as lookback ranges from now
-- [ ] SignalR fallback, indicators, analysis panel, and exact identity query state preserved
-- [ ] New frontend chart range shell test added
+- [x] Frontend market-data types/clients/streaming use normalized chart range values
+- [x] Chart workflow and selector present the controls as lookback ranges from now
+- [x] SignalR fallback, indicators, analysis panel, and exact identity query state preserved
+- [x] New frontend chart range shell test added
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] FULL test suite passing
 - [ ] Frontend build/checks passing
@@ -101,6 +101,7 @@
 | 2026-05-04 01:45 | Step 0 completed | Verified required files, TP-041 archive dependency, and local dotnet/node/npm tooling |
 | 2026-05-04 02:03 | Step 1 completed | Added chart range presets, normalized market-data range contracts, and passed provider-abstraction tests |
 | 2026-05-04 02:36 | Step 2 completed | Wired normalized ranges through API, SignalR, IBKR, and Timescale; provider/cache targeted tests passed |
+| 2026-05-04 02:55 | Step 3 completed | Updated frontend chart range types, client/stream/workflow copy, analysis handoff, and added range shell test |
 
 ---
 

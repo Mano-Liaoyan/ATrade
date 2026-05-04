@@ -1,6 +1,6 @@
 import { buildApiUrl } from './apiBaseUrl';
 import { appendIdentityQueryParams, type InstrumentIdentityInput } from './instrumentIdentity';
-import type { CandleSeriesResponse, IndicatorResponse, MarketDataSymbolSearchResponse, Timeframe, TrendingSymbolsResponse } from '../types/marketData';
+import type { CandleSeriesResponse, ChartRange, IndicatorResponse, MarketDataSymbolSearchResponse, TrendingSymbolsResponse } from '../types/marketData';
 
 export class ApiClientError extends Error {
   constructor(
@@ -40,20 +40,20 @@ export async function searchSymbols(
   return fetchJson<MarketDataSymbolSearchResponse>(`/api/market-data/search?${params.toString()}`);
 }
 
-export async function getCandles(symbol: string, timeframe: Timeframe, identity?: InstrumentIdentityInput | null): Promise<CandleSeriesResponse> {
+export async function getCandles(symbol: string, chartRange: ChartRange, identity?: InstrumentIdentityInput | null): Promise<CandleSeriesResponse> {
   const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
-  const params = buildMarketDataReadParams(timeframe, identity);
+  const params = buildMarketDataReadParams(chartRange, identity);
   return fetchJson<CandleSeriesResponse>(`/api/market-data/${encodedSymbol}/candles?${params.toString()}`);
 }
 
-export async function getIndicators(symbol: string, timeframe: Timeframe, identity?: InstrumentIdentityInput | null): Promise<IndicatorResponse> {
+export async function getIndicators(symbol: string, chartRange: ChartRange, identity?: InstrumentIdentityInput | null): Promise<IndicatorResponse> {
   const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
-  const params = buildMarketDataReadParams(timeframe, identity);
+  const params = buildMarketDataReadParams(chartRange, identity);
   return fetchJson<IndicatorResponse>(`/api/market-data/${encodedSymbol}/indicators?${params.toString()}`);
 }
 
-function buildMarketDataReadParams(timeframe: Timeframe, identity?: InstrumentIdentityInput | null): URLSearchParams {
-  const params = new URLSearchParams({ timeframe });
+function buildMarketDataReadParams(chartRange: ChartRange, identity?: InstrumentIdentityInput | null): URLSearchParams {
+  const params = new URLSearchParams({ range: chartRange });
   return appendIdentityQueryParams(params, identity);
 }
 

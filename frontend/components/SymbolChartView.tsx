@@ -22,14 +22,14 @@ export function SymbolChartView({ symbol, identity }: SymbolChartViewProps) {
       <section className="workspace-panel chart-view" data-testid="chart-workspace">
         <div className="panel-heading chart-heading">
           <div>
-            <p className="eyebrow">Interactive candlestick chart</p>
+            <p className="eyebrow">Lookback candlestick chart</p>
             <h1>{chart.normalizedSymbol} chart workspace</h1>
           </div>
           <div className="chart-actions">
             <span className={chart.streamState === 'connected' ? 'stream-pill stream-pill--connected' : 'stream-pill'} data-testid="stream-state">
               SignalR {chart.streamState}
             </span>
-            <TimeframeSelector value={chart.timeframe} onChange={chart.setTimeframe} />
+            <TimeframeSelector value={chart.chartRange} onChange={chart.setChartRange} />
           </div>
         </div>
 
@@ -54,11 +54,11 @@ export function SymbolChartView({ symbol, identity }: SymbolChartViewProps) {
 
         <IndicatorPanel indicators={chart.indicators} />
 
-        <AnalysisPanel symbol={chart.normalizedSymbol} timeframe={chart.timeframe} candleSource={chart.candles?.source} />
+        <AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} />
 
         <div className="chart-footer-note">
           <p>
-            HTTP candles/indicators are refreshed from IBKR/iBeam on demand. SignalR applies IBKR snapshot updates when `/hubs/market-data` is reachable;
+            HTTP candles/indicators are refreshed for the selected lookback range from now. SignalR applies IBKR snapshot updates when `/hubs/market-data` is reachable;
             if streaming is unavailable this view falls back to HTTP polling without synthetic fallback data.
           </p>
           {chart.candles ? (
@@ -69,7 +69,7 @@ export function SymbolChartView({ symbol, identity }: SymbolChartViewProps) {
           ) : null}
           {chart.latestUpdate ? (
             <p>
-              Last market-data stream update: {chart.latestUpdate.symbol} {chart.latestUpdate.timeframe} close {chart.latestUpdate.close.toFixed(2)} from {formatMarketDataSourceLabel(chart.latestUpdate.source)}.
+              Last market-data stream update: {chart.latestUpdate.symbol} {chart.latestUpdate.timeframe} range close {chart.latestUpdate.close.toFixed(2)} from {formatMarketDataSourceLabel(chart.latestUpdate.source)}.
             </p>
           ) : null}
         </div>

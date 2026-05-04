@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnalysisClientError, getAnalysisEngines, runAnalysis } from '../lib/analysisClient';
 import type { AnalysisEngineDescriptor, AnalysisMetric, AnalysisResult, AnalysisSignal } from '../types/analysis';
-import type { Timeframe } from '../types/marketData';
+import { CHART_RANGE_DESCRIPTIONS, CHART_RANGE_LABELS, type ChartRange } from '../types/marketData';
 
 type AnalysisPanelProps = {
   symbol: string;
-  timeframe: Timeframe;
+  chartRange: ChartRange;
   candleSource?: string | null;
 };
 
-export function AnalysisPanel({ symbol, timeframe, candleSource }: AnalysisPanelProps) {
+export function AnalysisPanel({ symbol, chartRange, candleSource }: AnalysisPanelProps) {
   const [engines, setEngines] = useState<AnalysisEngineDescriptor[]>([]);
   const [enginesLoading, setEnginesLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -86,7 +86,7 @@ export function AnalysisPanel({ symbol, timeframe, candleSource }: AnalysisPanel
     try {
       const analysis = await runAnalysis({
         symbolCode: symbol,
-        timeframe,
+        timeframe: chartRange,
         engineId: configuredEngine.metadata.engineId,
         strategyName: 'moving-average-crossover',
       });
@@ -101,7 +101,7 @@ export function AnalysisPanel({ symbol, timeframe, candleSource }: AnalysisPanel
     } finally {
       setRunning(false);
     }
-  }, [configuredEngine, symbol, timeframe]);
+  }, [configuredEngine, symbol, chartRange]);
 
   return (
     <section className="analysis-panel" data-testid="analysis-panel" aria-live="polite">
@@ -116,7 +116,7 @@ export function AnalysisPanel({ symbol, timeframe, candleSource }: AnalysisPanel
       </div>
 
       <p className="analysis-copy">
-        Run an analysis-only backtest over the current {timeframe} candles from {formatSourceLabel(candleSource)}. Results are signals and metrics only;
+        Run an analysis-only backtest over the current {CHART_RANGE_LABELS[chartRange]} lookback candles ({CHART_RANGE_DESCRIPTIONS[chartRange].toLowerCase()}) from {formatSourceLabel(candleSource)}. Results are signals and metrics only;
         this panel never places orders or starts automated trading.
       </p>
 

@@ -1,8 +1,38 @@
 export type AssetClass = 'Stock' | 'ETF';
 
-export type Timeframe = '1m' | '5m' | '1h' | '1D';
+export type ChartRange = '1min' | '5mins' | '1h' | '6h' | '1D' | '1m' | '6m' | '1y' | '5y' | 'all';
 
-export const SUPPORTED_TIMEFRAMES: Timeframe[] = ['1m', '5m', '1h', '1D'];
+export type Timeframe = ChartRange;
+
+export const SUPPORTED_CHART_RANGES: ChartRange[] = ['1min', '5mins', '1h', '6h', '1D', '1m', '6m', '1y', '5y', 'all'];
+
+export const SUPPORTED_TIMEFRAMES = SUPPORTED_CHART_RANGES;
+
+export const CHART_RANGE_LABELS: Record<ChartRange, string> = {
+  '1min': '1min',
+  '5mins': '5mins',
+  '1h': '1h',
+  '6h': '6h',
+  '1D': '1D',
+  '1m': '1m',
+  '6m': '6m',
+  '1y': '1y',
+  '5y': '5y',
+  all: 'All time',
+};
+
+export const CHART_RANGE_DESCRIPTIONS: Record<ChartRange, string> = {
+  '1min': 'Past 1 minute from now',
+  '5mins': 'Past 5 minutes from now',
+  '1h': 'Past 1 hour from now',
+  '6h': 'Past 6 hours from now',
+  '1D': 'Past day from now',
+  '1m': 'Past month from now',
+  '6m': 'Past six months from now',
+  '1y': 'Past year from now',
+  '5y': 'Past five years from now',
+  all: 'All available history',
+};
 
 export type MarketDataSymbol = {
   symbol: string;
