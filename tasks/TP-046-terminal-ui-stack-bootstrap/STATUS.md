@@ -1,6 +1,6 @@
 # TP-046: Bootstrap the terminal UI stack — Status
 
-**Current Step:** Step 1: Add Tailwind/shadcn-compatible configuration
+**Current Step:** Step 2: Establish terminal design tokens and base CSS
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Add Tailwind/shadcn-compatible configuration
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add compatible Tailwind/PostCSS/shadcn/Radix dependencies
-- [ ] Create/update Tailwind, PostCSS, components, and utility config files
-- [ ] Confirm deterministic package lock/build behavior
-- [ ] Run targeted frontend stack validation
+- [x] Add compatible Tailwind/PostCSS/shadcn/Radix dependencies
+- [x] Create/update Tailwind, PostCSS, components, and utility config files
+- [x] Confirm deterministic package lock/build behavior
+- [x] Run targeted frontend stack validation
 
 ---
 
 ### Step 2: Establish terminal design tokens and base CSS
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add dense terminal color/surface/status/splitter/table variables
 - [ ] Make shadcn-style primitives inherit the ATrade Terminal theme
