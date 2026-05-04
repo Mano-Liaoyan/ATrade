@@ -1,6 +1,6 @@
 # TP-048: Rebuild search, trending, and watchlist as a terminal market monitor — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Model market monitor state and actions
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -23,14 +23,14 @@
 ---
 
 ### Step 1: Model market monitor state and actions
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-> ⚠️ Hydrate: Expand after deciding whether to wrap, reuse, or retire existing search/watchlist workflow modules.
+> ⚠️ Hydrate: Decision — wrap and reuse the existing `symbolSearchWorkflow` and `watchlistWorkflow` hooks so debounce, capped search, provider/error copy, backend watchlist authority, and exact identity behavior remain centralized; add a new terminal monitor workflow above them for trending rows, unified view state, sorting/filtering, selection, and terminal action intents.
 
-- [ ] Create combined monitor workflow/view model
-- [ ] Preserve API clients, exact identity, and capped search behavior
-- [ ] Preserve backend watchlist authority and provider/error copy
-- [ ] Add source assertions for no unbounded/direct access paths
+- [ ] Wrap existing search/watchlist workflows with a combined terminal monitor workflow/view model
+- [ ] Preserve `ATrade.Api` clients, exact identity helpers, explicit capped search limits, and exact chart/analysis action payloads
+- [ ] Preserve backend watchlist authority, optimistic pin/unpin states, cached fallback copy, provider/authentication error copy, and debounce/minimum-query behavior
+- [ ] Add source assertions for bounded search and no direct provider/database/browser secrets access
 
 ---
 
