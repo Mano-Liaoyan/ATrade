@@ -1,6 +1,6 @@
 # TP-045: Define the ATrade Terminal UI design spec — Status
 
-**Current Step:** Step 1: Create the clean-room terminal design authority
+**Current Step:** Step 2: Specify modules, navigation, layout, and disabled surfaces
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Specify modules, navigation, layout, and disabled surfaces
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Define enabled first-release modules backed by current ATrade APIs
-- [ ] Define visible-disabled future modules and honest unavailable states
-- [ ] Define deterministic first-release terminal commands
-- [ ] Define resizable layout, persistence, rail/header/status, and responsive rules
+- [x] Define enabled first-release modules backed by current ATrade APIs
+- [x] Define visible-disabled future modules and honest unavailable states
+- [x] Define deterministic first-release terminal commands
+- [x] Define resizable layout, persistence, rail/header/status, and responsive rules
 
 ---
 

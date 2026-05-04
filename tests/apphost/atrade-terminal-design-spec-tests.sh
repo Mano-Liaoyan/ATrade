@@ -52,8 +52,64 @@ assert_product_target_decisions() {
   assert_file_contains "$spec" 'full multi-panel terminal experience'
 }
 
+assert_enabled_modules() {
+  for module in HOME SEARCH WATCHLIST CHART ANALYSIS STATUS HELP; do
+    assert_file_contains "$spec" "\`$module\`"
+  done
+
+  assert_file_contains "$spec" 'GET /api/market-data/trending'
+  assert_file_contains "$spec" 'GET /api/market-data/search?query=...&assetClass=stock&limit=...'
+  assert_file_contains "$spec" 'GET /api/market-data/{symbol}/candles?range=...'
+  assert_file_contains "$spec" 'GET /api/market-data/{symbol}/indicators?range=...'
+  assert_file_contains "$spec" 'GET /api/analysis/engines'
+  assert_file_contains "$spec" 'POST /api/analysis/run'
+  assert_file_contains "$spec" 'GET` / `PUT` / `POST /api/workspace/watchlist'
+  assert_file_contains "$spec" 'exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`'
+}
+
+assert_disabled_modules() {
+  for module in NEWS PORTFOLIO RESEARCH SCREENER ECON AI NODE ORDERS; do
+    assert_file_contains "$spec" "\`$module\`"
+  done
+
+  assert_file_contains "$spec" 'must not be keyboard-selectable as'
+  assert_file_contains "$spec" 'honest unavailable copy instead of mock data'
+  assert_file_contains "$spec" 'No provider configured in ATrade yet'
+  assert_file_contains "$spec" 'Orders are disabled by the paper-only safety contract'
+  assert_file_contains "$spec" 'must not display fake tables'
+}
+
+assert_terminal_commands() {
+  assert_file_contains "$spec" 'The command bar is a deterministic router'
+  assert_file_contains "$spec" '`HOME` | Open/focus the `HOME` module.'
+  assert_file_contains "$spec" '`SEARCH <query>`'
+  assert_file_contains "$spec" '`CHART <symbol>`'
+  assert_file_contains "$spec" '`WATCH` | Open/focus the `WATCHLIST` module.'
+  assert_file_contains "$spec" '`WATCHLIST` | Alias for `WATCH`'
+  assert_file_contains "$spec" '`ANALYSIS <symbol>`'
+  assert_file_contains "$spec" '`STATUS` | Open/focus the `STATUS` module.'
+  assert_file_contains "$spec" '`HELP` | Open/focus the `HELP` module'
+  assert_file_contains "$spec" 'Unknown commands must not try fuzzy execution or AI completion'
+}
+
+assert_layout_behavior() {
+  assert_file_contains "$spec" 'Resizable Multi-Panel Workspace'
+  assert_file_contains "$spec" 'top command/header region, left module'
+  assert_file_contains "$spec" 'accessible handles'
+  assert_file_contains "$spec" 'atrade.terminal.layout.v1'
+  assert_file_contains "$spec" 'The rail lists enabled modules'
+  assert_file_contains "$spec" 'Top Command/Header Region'
+  assert_file_contains "$spec" 'Status/Ticker Strip'
+  assert_file_contains "$spec" 'Responsive And Laptop Fallback Rules'
+  assert_file_contains "$spec" 'single-column flow'
+}
+
 assert_design_authority_exists
 assert_clean_room_guardrails
 assert_product_target_decisions
+assert_enabled_modules
+assert_disabled_modules
+assert_terminal_commands
+assert_layout_behavior
 
 printf 'ATrade Terminal design spec validation passed.\n'
