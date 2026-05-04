@@ -1,7 +1,7 @@
 # TP-047: Build the terminal shell, command registry, and resizable layout — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-04
 **Review Level:** 2
 **Review Counter:** 0
@@ -79,11 +79,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -98,6 +98,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Dependency-free pointer-event splitters satisfy the terminal layout requirements without adding a resizable package. | Implemented and documented as local UI behavior. | `frontend/components/terminal/TerminalWorkspaceLayout.tsx`, `frontend/lib/terminalLayoutPersistence.ts`, docs architecture updates |
+| No provider/status-label contract changes were needed for this shell task. | `provider-abstractions.md` reviewed with no changes required. | `docs/architecture/provider-abstractions.md` |
 
 ---
 
@@ -119,6 +121,9 @@
 | 2026-05-05 | Step 4 verification | Ran command test, terminal shell UI test, TypeScript check, workflow preservation greps, and frontend build |
 | 2026-05-05 | Step 5 started | Began full testing and verification gate |
 | 2026-05-05 | Step 5 verification | Passed command, shell UI, frontend bootstrap, frontend build, dotnet test ATrade.slnx, and dotnet build ATrade.slnx |
+| 2026-05-05 | Step 6 started | Began required documentation updates and delivery notes |
+| 2026-05-05 | Check-if-affected docs reviewed | Reviewed design/atrade-terminal-ui.md and provider-abstractions.md; no command/layout or provider-label refinements required |
+| 2026-05-05 | Step 6 complete | Updated README, modules architecture, paper-workspace architecture, and STATUS discoveries |
 
 ---
 

@@ -56,16 +56,16 @@ see_also:
 > [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a
 > clean-room ATrade Terminal with enabled API-backed modules, visible-disabled
 > future modules, deterministic commands, resizable panels, and shadcn/Tailwind/
-> Radix-compatible original primitives. The current slice remains a Next.js home
-> route with backend-driven trending symbols, bounded/ranked/filterable IBKR
-> stock search, Postgres-backed watchlists, symbol navigation, and
-> `lightweight-charts` chart routes arranged inside a shared terminal-style
-> workspace shell with command, navigation, primary content, and context regions
-> plus an analysis panel for provider-neutral LEAN signals/metrics while
-> `frontend/lib/*Workflow.ts` hooks centralize watchlist, bounded search result
-> view models, chart range loading, source labeling, and SignalR-to-HTTP fallback
-> orchestration behind rendering components and preserve the original bootstrap
-> smoke markers until the terminal cutover replaces them.
+> Radix-compatible original primitives. The current slice routes home and symbol
+> pages through `ATradeTerminalApp`: a deterministic command input,
+> enabled/disabled module registry and rail, resizable primary/context/monitor
+> layout with versioned browser-local persistence, and status/help surfaces over
+> the existing backend-driven trending symbols, bounded/ranked/filterable IBKR
+> stock search, Postgres-backed watchlists, `lightweight-charts` chart routes,
+> SignalR-to-HTTP fallback, and provider-neutral analysis panel. The
+> `frontend/lib/*Workflow.ts` hooks continue to centralize watchlist, bounded
+> search result view models, chart range loading, source labeling, and streaming
+> fallback orchestration behind the terminal frame.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -555,33 +555,28 @@ references.
 - **Expected dependencies:** `ATrade.Api` for all data; the Aspire
   AppHost for process lifecycle and environment wiring.
 - **First-phase focus:** UI surfaces for paper-only IBKR connection /
-  account views, simulated orders, API-served IBKR/iBeam market data with fresh
-  Timescale cache hits when available, clear
-  provider-not-configured/provider-unavailable/authentication-required states,
-  and transparent trending-factor/source explanations. The target frontend state
-  is now the clean-room ATrade Terminal described in
-  [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): enabled modules for
-  `HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`, and `HELP`,
-  visible-disabled future modules, deterministic command routing, resizable
-  terminal layout, and original shadcn/Tailwind/Radix-compatible primitives. The
-  current slice preserves the stable home-page markers (`ATrade Frontend Home` /
-  `Next.js Bootstrap Slice` / `Aspire AppHost Frontend Contract`) while adding
-  the first workspace route: Timescale-first/IBKR scanner-backed trending
-  stocks/ETFs, reusable IBKR stock search controls with bounded ranked results,
-  best-match summaries, market/currency/asset filter chips, and show-more/
-  show-less exploration, symbol navigation to `/symbols/[symbol]`, backend
-  watchlist API reads/writes with provider metadata and a non-authoritative
-  localStorage cache/migration source, workflow hooks for watchlist migration/
+  account views, API-served IBKR/iBeam market data with fresh Timescale cache
+  hits when available, clear provider-not-configured/provider-unavailable/
+  authentication-required states, and transparent trending-factor/source
+  explanations. The current frontend shell is the clean-room ATrade Terminal
+  described in [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
+  `frontend/types/terminal.ts` and `frontend/lib/terminalModuleRegistry.ts` own
+  enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`,
+  `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
+  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`); `frontend/lib/terminalCommandRegistry.ts`
+  owns deterministic local parsing for `HOME`, `SEARCH <query>`, `CHART <symbol>`,
+  `WATCH` / `WATCHLIST`, `ANALYSIS <symbol>`, `STATUS`, and `HELP`; and
+  `frontend/lib/terminalLayoutPersistence.ts` owns versioned local-only layout
+  preferences under `atrade.terminal.layout.v1`. Home and symbol routes now render
+  through `ATradeTerminalApp`, `TerminalCommandInput`, `TerminalModuleRail`,
+  `TerminalWorkspaceLayout`, `TerminalStatusStrip`, `TerminalHelpModule`, and
+  `TerminalStatusModule` instead of the retired `TerminalWorkspaceShell` /
+  `WorkspaceCommandBar` / `WorkspaceNavigation` / `WorkspaceContextPanel`
+  primitives. The app keeps the existing workflow hooks for watchlist migration /
   exact pin commands, search debounce/provider errors/bounded result view models,
-  a reusable terminal workspace shell component family (`TerminalWorkspaceShell`,
-  `WorkspaceCommandBar`, `WorkspaceNavigation`, `WorkspaceContextPanel`) for
-  command-first navigation and right-side context, chart HTTP loading/source
-  labels, and SignalR-to-HTTP fallback, `lightweight-charts` candlesticks with
-  lookback range controls for `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`,
-  `1y`, `5y`, and All time, moving-average / RSI / MACD panels, SignalR updates
-  with HTTP fallback, and explicit no-real-orders messaging. Terminal cutover
-  tasks may replace current rendering components and CSS while preserving API
-  contracts and reusable workflow logic.
+  chart range loading/source labels/SignalR-to-HTTP fallback, and provider-neutral
+  analysis while presenting disabled modules with honest unavailable states and
+  no order-entry controls.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
@@ -591,10 +586,12 @@ references.
   primitives (button, input, badge, tabs, dialog, popover, scroll area,
   separator, and tooltip) with ATrade Terminal tokens applied. Original
   ATrade-only foundation components live under `frontend/components/terminal/`
-  (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`, and
-  `TerminalStatusBadge`) and intentionally avoid legacy page-shell layout
-  assumptions, backend access, provider runtime calls, order-entry behavior, or
-  third-party terminal branding.
+  (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
+  `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalCommandInput`,
+  `TerminalModuleRail`, `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
+  `TerminalHelpModule`, `TerminalStatusModule`, and `TerminalDisabledModule`) and
+  intentionally avoid legacy page-shell layout assumptions, backend access,
+  provider runtime calls, order-entry behavior, or third-party terminal branding.
 
 ## 5. Dependency Summary
 
