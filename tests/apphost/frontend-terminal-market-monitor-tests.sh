@@ -162,6 +162,19 @@ assert_monitor_interactions_and_responsiveness() {
   assert_file_contains "$css" ".market-monitor-state-strip"
 }
 
+assert_screener_remains_disabled() {
+  local module_registry="$repo_root/frontend/lib/terminalModuleRegistry.ts"
+  local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
+  local filters="$repo_root/frontend/components/terminal/MarketMonitorFilters.tsx"
+
+  assert_file_contains "$module_registry" 'id: "SCREENER"'
+  assert_file_contains "$module_registry" 'availability: "disabled"'
+  assert_file_contains "$module_registry" "The current backend supports scanner/trending and bounded symbol search only."
+  assert_file_contains "$module_registry" "No arbitrary multi-factor screen-building API exists yet."
+  assert_file_not_contains "$monitor" "SCREENER"
+  assert_file_not_contains "$filters" "Screener"
+}
+
 assert_watchlist_and_error_copy_preserved() {
   local workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
   local search_workflow="$repo_root/frontend/lib/symbolSearchWorkflow.ts"
@@ -192,6 +205,7 @@ main() {
   assert_exact_identity_actions
   assert_dense_terminal_components
   assert_monitor_interactions_and_responsiveness
+  assert_screener_remains_disabled
   assert_watchlist_and_error_copy_preserved
 }
 

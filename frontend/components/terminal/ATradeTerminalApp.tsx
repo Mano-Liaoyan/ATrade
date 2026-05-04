@@ -1,21 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
-import { BrokerPaperStatus } from "@/components/BrokerPaperStatus";
 import { CandlestickChart } from "@/components/CandlestickChart";
 import { IndicatorPanel } from "@/components/IndicatorPanel";
-import { SymbolSearch } from "@/components/SymbolSearch";
 import { TimeframeSelector } from "@/components/TimeframeSelector";
-import { TrendingList } from "@/components/TrendingList";
-import { Watchlist } from "@/components/Watchlist";
 import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
-import { getTrendingSymbols } from "@/lib/marketDataClient";
 import { formatMarketDataSourceLabel, useSymbolChartWorkflow } from "@/lib/symbolChartWorkflow";
-import { useWatchlistWorkflow } from "@/lib/watchlistWorkflow";
-import type { TrendingSymbol } from "@/types/marketData";
 import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
 import type {
   DisabledTerminalModuleId,
@@ -32,6 +25,7 @@ import { TerminalPanel } from "./TerminalPanel";
 import { TerminalStatusBadge } from "./TerminalStatusBadge";
 import { TerminalStatusModule } from "./TerminalStatusModule";
 import { TerminalStatusStrip } from "./TerminalStatusStrip";
+import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
 
 type ATradeTerminalAppProps = {
@@ -51,33 +45,9 @@ export function ATradeTerminalApp({
   const [commandFeedback, setCommandFeedback] = useState("Ready for deterministic terminal commands.");
   const [pendingFocusTargetId, setPendingFocusTargetId] = useState<string | null>(null);
   const [seededSearchQuery, setSeededSearchQuery] = useState("");
-  const [trendingSymbols, setTrendingSymbols] = useState<TrendingSymbol[]>([]);
-  const [marketDataLoading, setMarketDataLoading] = useState(true);
-  const [marketDataError, setMarketDataError] = useState<string | null>(null);
-  const [marketDataSource, setMarketDataSource] = useState<string | null>(null);
-  const watchlist = useWatchlistWorkflow();
   const normalizedInitialSymbol = initialSymbol?.toUpperCase() ?? null;
-
-  const loadTrendingSymbols = useCallback(async () => {
-    setMarketDataLoading(true);
-    setMarketDataError(null);
-
-    try {
-      const response = await getTrendingSymbols();
-      setTrendingSymbols(response.symbols);
-      setMarketDataSource(response.source);
-    } catch (caughtError) {
-      setMarketDataError(caughtError instanceof Error ? caughtError.message : "IBKR market data is unavailable.");
-      setMarketDataSource(null);
-      setTrendingSymbols([]);
-    } finally {
-      setMarketDataLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadTrendingSymbols();
-  }, [loadTrendingSymbols]);
+  const marketDataStatus = "Market monitor owns provider state";
+  const watchlistStatus = "Backend-owned pins in monitor";
 
   useEffect(() => {
     setActiveModuleId(initialModuleId);
@@ -96,22 +66,6 @@ export function ATradeTerminalApp({
 
     return () => window.cancelAnimationFrame(animationFrame);
   }, [activeModuleId, disabledModuleId, pendingFocusTargetId]);
-
-  const sortedTrendingSymbols = useMemo(
-    () => [...trendingSymbols].sort((left, right) => right.score - left.score),
-    [trendingSymbols],
-  );
-
-  const marketDataStatus = marketDataLoading
-    ? "Loading IBKR/iBeam"
-    : marketDataError
-      ? "Provider unavailable"
-      : `${sortedTrendingSymbols.length} provider symbols`;
-  const watchlistStatus = watchlist.loading
-    ? "Loading pins"
-    : watchlist.error
-      ? "Backend unavailable"
-      : `${watchlist.symbols.length} saved pins`;
 
   const openIntent = useCallback(
     (intent: TerminalNavigationIntent, feedback: string) => {
@@ -133,15 +87,19 @@ export function ATradeTerminalApp({
 
       if (intent.moduleId === "CHART" && intent.symbol) {
         setActiveModuleId("CHART");
-        if (normalizedInitialSymbol !== intent.symbol) {
-          router.push(intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}`);
+        const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}`;
+        if (normalizedInitialSymbol !== intent.symbol || intent.route) {
+          router.push(route);
         }
         return;
       }
 
-      if (intent.moduleId === "ANALYSIS" && intent.symbol && normalizedInitialSymbol !== intent.symbol) {
+      if (intent.moduleId === "ANALYSIS" && intent.symbol) {
         setActiveModuleId("ANALYSIS");
-        router.push(intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}?module=ANALYSIS`);
+        const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}?module=ANALYSIS`;
+        if (normalizedInitialSymbol !== intent.symbol || intent.route) {
+          router.push(route);
+        }
         return;
       }
 
@@ -189,14 +147,9 @@ export function ATradeTerminalApp({
     <TerminalModuleContent
       activeModuleId={activeModuleId}
       identity={initialIdentity}
-      marketDataError={marketDataError}
-      marketDataLoading={marketDataLoading}
-      marketDataSource={marketDataSource}
-      onReloadTrending={loadTrendingSymbols}
+      onOpenIntent={openIntent}
       searchQuery={seededSearchQuery}
-      sortedTrendingSymbols={sortedTrendingSymbols}
       symbol={normalizedInitialSymbol}
-      watchlist={watchlist}
     />
   );
 
@@ -235,13 +188,7 @@ export function ATradeTerminalApp({
                 watchlistStatus={watchlistStatus}
               />
             )}
-            monitor={(
-              <TerminalMonitorPanel
-                marketDataError={marketDataError}
-                marketDataLoading={marketDataLoading}
-                sortedTrendingSymbols={sortedTrendingSymbols}
-              />
-            )}
+            monitor={<TerminalMonitorPanel />}
           >
             {moduleContent}
           </TerminalWorkspaceLayout>
@@ -304,34 +251,25 @@ function TerminalContextSummary({
   );
 }
 
-function TerminalMonitorPanel({
-  marketDataError,
-  marketDataLoading,
-  sortedTrendingSymbols,
-}: {
-  marketDataError: string | null;
-  marketDataLoading: boolean;
-  sortedTrendingSymbols: TrendingSymbol[];
-}) {
-  const visibleSymbols = sortedTrendingSymbols.slice(0, 6);
-
+function TerminalMonitorPanel() {
   return (
     <div className="terminal-monitor-panel" data-testid="terminal-monitor-panel">
       <span className="terminal-monitor-panel__label">Monitor</span>
-      {marketDataLoading ? <span>Loading provider-backed trending symbols…</span> : null}
-      {!marketDataLoading && marketDataError ? <span>Market data unavailable: {marketDataError}</span> : null}
-      {!marketDataLoading && !marketDataError && visibleSymbols.length === 0 ? <span>No provider-backed symbols returned.</span> : null}
-      {!marketDataLoading && !marketDataError && visibleSymbols.length > 0 ? (
-        <ul>
-          {visibleSymbols.map((item) => (
-            <li key={`${item.symbol}-${item.exchange}`}>
-              <strong>{item.symbol}</strong>
-              <span>{item.exchange}</span>
-              <span>{item.changePercent.toFixed(2)}%</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <span>SEARCH, WATCHLIST, and HOME render the dense terminal market monitor.</span>
+      <ul>
+        <li>
+          <strong>Search</strong>
+          <span>Capped ranked IBKR stock results</span>
+        </li>
+        <li>
+          <strong>Watch</strong>
+          <span>Backend-owned exact pins</span>
+        </li>
+        <li>
+          <strong>Actions</strong>
+          <span>Chart/analysis preserve identity</span>
+        </li>
+      </ul>
     </div>
   );
 }
@@ -339,44 +277,25 @@ function TerminalMonitorPanel({
 type TerminalModuleContentProps = {
   activeModuleId: EnabledTerminalModuleId;
   identity: InstrumentIdentityInput | null;
-  marketDataError: string | null;
-  marketDataLoading: boolean;
-  marketDataSource: string | null;
-  onReloadTrending: () => void;
+  onOpenIntent: (intent: TerminalNavigationIntent, feedback: string) => void;
   searchQuery: string;
-  sortedTrendingSymbols: TrendingSymbol[];
   symbol: string | null;
-  watchlist: ReturnType<typeof useWatchlistWorkflow>;
 };
 
 function TerminalModuleContent({
   activeModuleId,
   identity,
-  marketDataError,
-  marketDataLoading,
-  marketDataSource,
-  onReloadTrending,
+  onOpenIntent,
   searchQuery,
-  sortedTrendingSymbols,
   symbol,
-  watchlist,
 }: TerminalModuleContentProps) {
   switch (activeModuleId) {
     case "HOME":
-      return (
-        <TerminalHomeModule
-          marketDataError={marketDataError}
-          marketDataLoading={marketDataLoading}
-          marketDataSource={marketDataSource}
-          onReloadTrending={onReloadTrending}
-          sortedTrendingSymbols={sortedTrendingSymbols}
-          watchlist={watchlist}
-        />
-      );
+      return <TerminalHomeModule onOpenIntent={onOpenIntent} searchQuery={searchQuery} />;
     case "SEARCH":
-      return <TerminalSearchModule searchQuery={searchQuery} watchlist={watchlist} />;
+      return <TerminalSearchModule onOpenIntent={onOpenIntent} searchQuery={searchQuery} />;
     case "WATCHLIST":
-      return <TerminalWatchlistModule sortedTrendingSymbols={sortedTrendingSymbols} watchlist={watchlist} />;
+      return <TerminalWatchlistModule onOpenIntent={onOpenIntent} />;
     case "CHART":
       return symbol ? <TerminalChartModule identity={identity} symbol={symbol} /> : <TerminalChartPlaceholder />;
     case "ANALYSIS":
@@ -390,41 +309,30 @@ function TerminalModuleContent({
   }
 }
 
-type TerminalHomeModuleProps = {
-  marketDataError: string | null;
-  marketDataLoading: boolean;
-  marketDataSource: string | null;
-  onReloadTrending: () => void;
-  sortedTrendingSymbols: TrendingSymbol[];
-  watchlist: ReturnType<typeof useWatchlistWorkflow>;
+type TerminalMarketMonitorModuleProps = {
+  onOpenIntent: (intent: TerminalNavigationIntent, feedback: string) => void;
+  searchQuery?: string;
 };
 
-function TerminalHomeModule({
-  marketDataError,
-  marketDataLoading,
-  marketDataSource,
-  onReloadTrending,
-  sortedTrendingSymbols,
-  watchlist,
-}: TerminalHomeModuleProps) {
+function TerminalHomeModule({ onOpenIntent, searchQuery = "" }: TerminalMarketMonitorModuleProps) {
   return (
     <section className="terminal-module terminal-module--home workspace-stack" data-testid="terminal-home-module" id="terminal-module-home" tabIndex={-1}>
       <TerminalPanel
         eyebrow="Home"
         title="ATrade Terminal home"
-        description="Paper-only command workspace with provider state, search, watchlist, chart, analysis, status, and help entry points."
+        description="Paper-only command workspace with provider state, search, watchlist, chart, analysis, status, help, and the dense market monitor."
         actions={<TerminalStatusBadge tone="success">Paper only</TerminalStatusBadge>}
       >
         <div className="terminal-home-summary">
           <div>
-            <span>Market data</span>
-            <strong>{marketDataLoading ? "Loading" : marketDataError ? "Unavailable" : `${sortedTrendingSymbols.length} symbols`}</strong>
-            <small>{formatMarketDataSource(marketDataSource)}</small>
+            <span>Market monitor</span>
+            <strong>Search · watch · trend</strong>
+            <small>Unified bounded search, provider trending, and backend-owned exact pins.</small>
           </div>
           <div>
-            <span>Watchlist</span>
-            <strong>{watchlist.loading ? "Loading" : watchlist.error ? "Backend unavailable" : `${watchlist.symbols.length} pins`}</strong>
-            <small>Postgres-backed through ATrade.Api</small>
+            <span>Identity</span>
+            <strong>Exact handoff</strong>
+            <small>Provider, provider ID, market, currency, and asset class stay on chart/analysis routes.</small>
           </div>
           <div>
             <span>Safety</span>
@@ -434,121 +342,23 @@ function TerminalHomeModule({
         </div>
       </TerminalPanel>
 
-      <section id="terminal-search" tabIndex={-1}>
-        <SymbolSearch
-          getPinState={watchlist.getSearchResultPinState}
-          onTogglePin={(result) => void watchlist.toggleSearchPin(result)}
-        />
-      </section>
-
-      <section id="terminal-watchlist" tabIndex={-1}>
-        <Watchlist
-          symbols={watchlist.symbols}
-          trendingSymbols={sortedTrendingSymbols}
-          loading={watchlist.loading}
-          error={watchlist.error}
-          source={watchlist.source}
-          getPinState={watchlist.getWatchlistSymbolPinState}
-          onRetry={watchlist.retry}
-          onRemove={(itemSymbol) => void watchlist.removePin(itemSymbol)}
-        />
-      </section>
-
-      <TerminalTrendingSection
-        marketDataError={marketDataError}
-        marketDataLoading={marketDataLoading}
-        marketDataSource={marketDataSource}
-        onReloadTrending={onReloadTrending}
-        sortedTrendingSymbols={sortedTrendingSymbols}
-        watchlist={watchlist}
-      />
+      <TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title="Home market monitor" />
     </section>
   );
 }
 
-function TerminalSearchModule({ searchQuery, watchlist }: { searchQuery: string; watchlist: ReturnType<typeof useWatchlistWorkflow> }) {
+function TerminalSearchModule({ onOpenIntent, searchQuery = "" }: TerminalMarketMonitorModuleProps) {
   return (
     <section className="terminal-module terminal-module--search" data-testid="terminal-search-module" id="terminal-search" tabIndex={-1}>
-      <SymbolSearch
-        initialQuery={searchQuery}
-        getPinState={watchlist.getSearchResultPinState}
-        onTogglePin={(result) => void watchlist.toggleSearchPin(result)}
-      />
+      <TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title={searchQuery ? `Search monitor · ${searchQuery}` : "Search market monitor"} />
     </section>
   );
 }
 
-function TerminalWatchlistModule({
-  sortedTrendingSymbols,
-  watchlist,
-}: {
-  sortedTrendingSymbols: TrendingSymbol[];
-  watchlist: ReturnType<typeof useWatchlistWorkflow>;
-}) {
+function TerminalWatchlistModule({ onOpenIntent }: TerminalMarketMonitorModuleProps) {
   return (
     <section className="terminal-module terminal-module--watchlist" data-testid="terminal-watchlist-module" id="terminal-watchlist" tabIndex={-1}>
-      <Watchlist
-        symbols={watchlist.symbols}
-        trendingSymbols={sortedTrendingSymbols}
-        loading={watchlist.loading}
-        error={watchlist.error}
-        source={watchlist.source}
-        getPinState={watchlist.getWatchlistSymbolPinState}
-        onRetry={watchlist.retry}
-        onRemove={(itemSymbol) => void watchlist.removePin(itemSymbol)}
-      />
-    </section>
-  );
-}
-
-function TerminalTrendingSection({
-  marketDataError,
-  marketDataLoading,
-  marketDataSource,
-  onReloadTrending,
-  sortedTrendingSymbols,
-  watchlist,
-}: {
-  marketDataError: string | null;
-  marketDataLoading: boolean;
-  marketDataSource: string | null;
-  onReloadTrending: () => void;
-  sortedTrendingSymbols: TrendingSymbol[];
-  watchlist: ReturnType<typeof useWatchlistWorkflow>;
-}) {
-  return (
-    <section id="terminal-monitor" className="terminal-module__monitor workspace-stack" aria-label="Trending provider-backed symbols">
-      {marketDataLoading ? (
-        <div className="workspace-panel loading-state" role="status">
-          Loading IBKR/iBeam trending stocks and ETFs…
-        </div>
-      ) : null}
-
-      {!marketDataLoading && marketDataError ? (
-        <div className="workspace-panel error-state" role="alert">
-          <strong>IBKR market data unavailable.</strong>
-          <p>{marketDataError}</p>
-          <button className="primary-button" type="button" onClick={() => void onReloadTrending()}>
-            Retry IBKR market data
-          </button>
-        </div>
-      ) : null}
-
-      {!marketDataLoading && !marketDataError && sortedTrendingSymbols.length === 0 ? (
-        <div className="workspace-panel empty-state">
-          <strong>No trending symbols returned.</strong>
-          <p>The IBKR/iBeam provider responded, but no stocks or ETFs were available for the workspace.</p>
-        </div>
-      ) : null}
-
-      {!marketDataLoading && !marketDataError && sortedTrendingSymbols.length > 0 ? (
-        <TrendingList
-          symbols={sortedTrendingSymbols}
-          getPinState={watchlist.getTrendingPinState}
-          source={marketDataSource}
-          onTogglePin={(itemSymbol) => void watchlist.toggleTrendingPin(itemSymbol)}
-        />
-      ) : null}
+      <TerminalMarketMonitor onOpenIntent={onOpenIntent} title="Watchlist market monitor" />
     </section>
   );
 }
@@ -695,14 +505,3 @@ function getModuleFocusTargetId(moduleId: EnabledTerminalModuleId): string {
   }
 }
 
-function formatMarketDataSource(source: string | null): string {
-  if (!source) {
-    return "IBKR/iBeam";
-  }
-
-  if (source.includes("scanner")) {
-    return "IBKR scanner";
-  }
-
-  return source.includes("ibkr") ? "IBKR/iBeam" : source;
-}

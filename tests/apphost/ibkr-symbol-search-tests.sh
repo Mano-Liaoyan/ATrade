@@ -165,32 +165,38 @@ PY
 }
 
 assert_frontend_search_controls() {
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'data-testid="symbol-search"'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'Search IBKR stocks'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'Pin result'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'No local fallback catalog is used.'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" '<MarketLogo'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'Provider {provider.toUpperCase()}'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'Market {exchange}'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'IBKR conid'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'key={pinKey}'
-  assert_file_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'pinnedSet.has(pinKey)'
-  assert_file_not_contains "$repo_root/frontend/components/SymbolSearch.tsx" 'pinnedSet.has(symbol'
-  assert_file_contains "$repo_root/frontend/components/MarketLogo.tsx" 'NASDAQ Stock Market'
-  assert_file_contains "$repo_root/frontend/components/MarketLogo.tsx" 'Toronto Stock Exchange'
-  assert_file_contains "$repo_root/frontend/components/MarketLogo.tsx" 'Hong Kong Exchange'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx" 'data-testid="terminal-market-monitor"'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx" 'data-testid="market-monitor-search-input"'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx" 'Bounded IBKR stock search'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorTable.tsx" 'data-testid="market-monitor-row"'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorTable.tsx" 'Pin'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorTable.tsx" 'row.providerSymbolId'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorTable.tsx" 'row.exchange'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorTable.tsx" 'IBKR ${providerSymbolId}'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx" 'data-testid="market-monitor-exact-identity"'
+  assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx" 'IBKR conid'
+  assert_file_contains "$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts" 'createSearchMonitorRow'
+  assert_file_contains "$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts" 'getSearchResultIdentity(result)'
+  assert_file_contains "$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts" 'watchlist.getSearchResultPinState(result)'
+  assert_file_contains "$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts" 'watchlist.toggleSearchPin(row.searchResult)'
   assert_file_contains "$repo_root/frontend/lib/marketDataClient.ts" '/api/market-data/search'
   assert_file_contains "$repo_root/frontend/lib/watchlistClient.ts" 'createWatchlistInstrumentKey'
   assert_file_contains "$repo_root/frontend/lib/watchlistClient.ts" 'instrumentKey: string'
-  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'createSearchResultWatchlistInput(result)'
-  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'pinnedInstrumentKeys'
-  assert_file_not_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'pinnedSymbolNames'
-  assert_file_not_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'savingSymbol'
-  assert_file_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'onTogglePin={handleToggleSearchPin}'
-  assert_file_contains "$repo_root/frontend/components/Watchlist.tsx" 'Use IBKR stock search'
-  assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" 'Search another IBKR stock'
-  assert_file_not_contains "$repo_root/frontend/components/TradingWorkspace.tsx" 'TRENDING_SYMBOLS'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TerminalMarketMonitor'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'initialSearchQuery={searchQuery}'
+  assert_file_not_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TRENDING_SYMBOLS'
+
+  for obsolete in \
+    "$repo_root/frontend/components/SymbolSearch.tsx" \
+    "$repo_root/frontend/components/MarketLogo.tsx" \
+    "$repo_root/frontend/components/Watchlist.tsx"; do
+    if [[ -e "$obsolete" ]]; then
+      printf 'expected obsolete symbol-search component to be removed: %s\n' "$obsolete" >&2
+      return 1
+    fi
+  done
 }
+
 
 main() {
   if ! command -v curl >/dev/null 2>&1; then

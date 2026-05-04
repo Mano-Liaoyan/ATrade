@@ -1,6 +1,6 @@
 # TP-048: Rebuild search, trending, and watchlist as a terminal market monitor — Status
 
-**Current Step:** Step 2: Implement dense terminal monitor components
+**Current Step:** Step 3: Integrate monitor into commands and retire old list UI
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -45,12 +45,12 @@
 ---
 
 ### Step 3: Integrate monitor into commands and retire old list UI
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Wire SEARCH/WATCH/HOME commands to the monitor
-- [ ] Replace old SymbolSearch/TrendingList/Watchlist usage
-- [ ] Keep SCREENER visible-disabled rather than fake
-- [ ] Update old search/list tests to terminal monitor markers
+- [x] Wire SEARCH/WATCH/HOME commands to the monitor
+- [x] Replace old SymbolSearch/TrendingList/Watchlist usage
+- [x] Keep SCREENER visible-disabled rather than fake
+- [x] Update old search/list tests to terminal monitor markers
 
 ---
 
