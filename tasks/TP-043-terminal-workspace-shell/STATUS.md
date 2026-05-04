@@ -1,6 +1,6 @@
 # TP-043: Redesign workspace navigation with a terminal-style shell — Status
 
-**Current Step:** Step 2: Refactor the home workspace into navigable panels
+**Current Step:** Step 3: Refactor the chart workspace into the same shell
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -36,17 +36,17 @@
 ---
 
 ### Step 2: Refactor the home workspace into navigable panels
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Home route and trading workspace use the new shell and clear navigation landmarks
-- [ ] Workflow/client boundaries preserved in rendering components
-- [ ] Search, trending, and watchlist panels fit the shell without behavior regression
-- [ ] Targeted home workspace checks passing
+- [x] Home route and trading workspace use the new shell and clear navigation landmarks
+- [x] Workflow/client boundaries preserved in rendering components
+- [x] Search, trending, and watchlist panels fit the shell without behavior regression
+- [x] Targeted home workspace checks passing
 
 ---
 
 ### Step 3: Refactor the chart workspace into the same shell
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Chart workspace uses the shared terminal-style shell/navigation model
 - [ ] Chart range controls, stream state, source metadata, and fallback notes remain visible on desktop and mobile
@@ -100,6 +100,11 @@
 | 2026-05-04 06:28 | Step 1 started | Reusable workspace shell primitives |
 | 2026-05-04 06:45 | Step 1 completed | Shell primitives, terminal CSS, safety disclosures, and terminal shell UI test added; frontend TypeScript compile passed |
 | 2026-05-04 06:45 | Step 2 started | Home workspace shell refactor |
+| 2026-05-04 06:53 | Step 2 workflow boundary check | `bash tests/apphost/frontend-workspace-workflow-module-tests.sh` passed after home shell refactor |
+| 2026-05-04 06:58 | Step 2 panel regression check | `bash tests/apphost/frontend-workspace-workflow-module-tests.sh` and `cd frontend && npx tsc --noEmit --pretty false` passed after panel presentation changes |
+| 2026-05-04 07:02 | Step 2 targeted home checks | `bash tests/apphost/frontend-trading-workspace-tests.sh` passed |
+| 2026-05-04 07:03 | Step 2 completed | Home workspace now uses shared shell with navigation anchors and context watchlist |
+| 2026-05-04 07:03 | Step 3 started | Chart workspace shell refactor |
 
 ---
 

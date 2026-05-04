@@ -405,6 +405,47 @@ input:focus-visible,
   font-size: 0.88rem;
 }
 
+.terminal-data-panel {
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(56, 189, 248, 0.06), transparent 11rem),
+    rgba(15, 23, 42, 0.72);
+}
+
+.terminal-panel-heading {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  padding-bottom: 0.85rem;
+}
+
+.terminal-symbol-card,
+.terminal-result-row {
+  box-shadow: inset 0 1px 0 rgba(248, 250, 252, 0.03);
+}
+
+.terminal-symbol-card:hover,
+.terminal-result-row:hover {
+  border-color: rgba(56, 189, 248, 0.32);
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.terminal-metric-row {
+  border-block: 1px solid rgba(148, 163, 184, 0.12);
+  padding-block: 0.75rem;
+}
+
+.terminal-context-panel .watchlist-panel {
+  position: static;
+  background: rgba(15, 23, 42, 0.42);
+  box-shadow: none;
+}
+
+.terminal-provider-status {
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.56);
+  padding: 0.85rem;
+}
+
 .panel-heading,
 .symbol-card__topline,
 .watchlist li {

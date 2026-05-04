@@ -31,8 +31,8 @@ export function Watchlist({
   const sourceLabel = source === 'backend' ? 'Postgres' : 'Cached snapshot';
 
   return (
-    <section className="workspace-panel watchlist-panel" aria-labelledby="watchlist-title" data-testid="watchlist-panel">
-      <div className="panel-heading">
+    <section className="workspace-panel terminal-data-panel watchlist-panel" aria-labelledby="watchlist-title" data-testid="watchlist-panel">
+      <div className="panel-heading terminal-panel-heading">
         <div>
           <p className="eyebrow">Backend workspace preference</p>
           <h2 id="watchlist-title">Personal watchlist</h2>
@@ -64,7 +64,7 @@ export function Watchlist({
       ) : null}
 
       {!loading && symbols.length > 0 ? (
-        <ul className="watchlist" aria-label={source === 'backend' ? 'Saved watchlist pins' : 'Cached watchlist pins'}>
+        <ul className="watchlist terminal-watchlist" aria-label={source === 'backend' ? 'Saved watchlist pins' : 'Cached watchlist pins'}>
           {symbols.map((watchlistSymbol) => {
             const details = bySymbol.get(watchlistSymbol.symbol);
             const name = watchlistSymbol.name ?? details?.name ?? 'Pinned symbol';
@@ -78,7 +78,7 @@ export function Watchlist({
             const chartHref = createSymbolChartHref(watchlistSymbol);
 
             return (
-              <li key={pinState.pinKey} aria-label={`${watchlistSymbol.symbol} ${marketLabel} ${provider}`}>
+              <li className="terminal-result-row" key={pinState.pinKey} aria-label={`${watchlistSymbol.symbol} ${marketLabel} ${provider}`}>
                 <div>
                   <Link className="symbol-link" href={chartHref}>
                     {watchlistSymbol.symbol}
