@@ -53,10 +53,12 @@ see_also:
 > `frontend/` directory now hosts the first paper-trading workspace UI slice:
 > a Next.js home route with backend-driven trending symbols, IBKR stock search,
 > Postgres-backed watchlists, symbol navigation, and `lightweight-charts` chart
-> routes plus an analysis panel for provider-neutral LEAN signals/metrics while
-> `frontend/lib/*Workflow.ts` hooks centralize watchlist, search, chart range
-> loading, source labeling, and SignalR-to-HTTP fallback orchestration behind
-> rendering components and preserve the original bootstrap smoke markers.
+> routes arranged inside a shared terminal-style workspace shell with command,
+> navigation, primary content, and context regions plus an analysis panel for
+> provider-neutral LEAN signals/metrics while `frontend/lib/*Workflow.ts` hooks
+> centralize watchlist, search, chart range loading, source labeling, and
+> SignalR-to-HTTP fallback orchestration behind rendering components and
+> preserve the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -556,11 +558,14 @@ references.
   reusable IBKR stock search controls, symbol navigation to `/symbols/[symbol]`,
   backend watchlist API reads/writes with provider metadata and a non-authoritative localStorage
   cache/migration source, workflow hooks for watchlist migration/exact pin
-  commands, search debounce/provider errors, chart HTTP loading/source labels,
-  and SignalR-to-HTTP fallback, `lightweight-charts` candlesticks with lookback
-  range controls for `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`,
-  and All time, moving-average / RSI / MACD panels, SignalR updates with HTTP
-  fallback, and explicit no-real-orders messaging.
+  commands, search debounce/provider errors, a reusable terminal workspace shell
+  component family (`TerminalWorkspaceShell`, `WorkspaceCommandBar`,
+  `WorkspaceNavigation`, `WorkspaceContextPanel`) for command-first navigation
+  and right-side context, chart HTTP loading/source labels, and SignalR-to-HTTP
+  fallback, `lightweight-charts` candlesticks with lookback range controls for
+  `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and All time,
+  moving-average / RSI / MACD panels, SignalR updates with HTTP fallback, and
+  explicit no-real-orders messaging.
 
 ## 5. Dependency Summary
 

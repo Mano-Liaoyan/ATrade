@@ -1,7 +1,7 @@
 # TP-043: Redesign workspace navigation with a terminal-style shell — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-04
 **Review Level:** 2
 **Review Counter:** 0
@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Next dev can leave a `.next/dev/lock` owner process when tests kill only the npm wrapper. | Fixed in terminal shell and trading workspace shell tests by reading the lock pid, killing child processes, and clearing the lock before/after test runs. | `tests/apphost/frontend-terminal-shell-ui-tests.sh`; `tests/apphost/frontend-trading-workspace-tests.sh` |
 
 ---
 
@@ -118,6 +119,11 @@
 | 2026-05-04 07:37 | Step 4 backend build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors |
 | 2026-05-04 07:38 | Step 4 completed | Full test/build/integration verification gate passed |
 | 2026-05-04 07:38 | Step 5 started | Documentation and delivery updates |
+| 2026-05-04 07:42 | Step 5 must-update docs | Updated `paper-trading-workspace.md`, `modules.md`, and `README.md` for terminal-style workspace shell and new shell test entry point |
+| 2026-05-04 07:43 | Step 5 check-if-affected docs | Reviewed `provider-abstractions.md` and `PLAN.md`; no edits needed because provider/source payload semantics and task queue did not change |
+| 2026-05-04 07:44 | Step 5 discoveries | Logged Next dev lock cleanup discovery in STATUS.md |
+| 2026-05-04 07:45 | Step 5 completed | Documentation and delivery notes complete |
+| 2026-05-04 07:45 | Task completed | All STATUS.md steps checked and verification passed |
 
 ---
 
