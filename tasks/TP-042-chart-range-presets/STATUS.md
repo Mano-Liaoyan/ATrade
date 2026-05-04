@@ -1,6 +1,6 @@
 # TP-042: Correct chart range presets — Status
 
-**Current Step:** Step 1: Model chart ranges as lookbacks from now
+**Current Step:** Step 2: Wire ranges through API, provider, stream, and cache
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Model chart ranges as lookbacks from now
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create chart range preset helper with supported normalized values and lookback boundaries
-- [ ] Update market-data models/contracts to normalize requested ranges while retaining safe compatibility for legacy `timeframe` callers
-- [ ] Add provider-abstraction tests for day/month/six-month semantics, minute labels, and unsupported values
-- [ ] Targeted provider-abstraction tests passing
+- [x] Create chart range preset helper with supported normalized values and lookback boundaries
+- [x] Update market-data models/contracts to normalize requested ranges while retaining safe compatibility for legacy `timeframe` callers
+- [x] Add provider-abstraction tests for day/month/six-month semantics, minute labels, and unsupported values
+- [x] Targeted provider-abstraction tests passing
 
 ---
 
 ### Step 2: Wire ranges through API, provider, stream, and cache
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand based on whether existing method names can remain compatibility aliases or need deeper renaming after reading the market-data contracts.
 
@@ -96,6 +96,7 @@
 | 2026-05-04 01:44 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-04 01:44 | Step 0 started | Preflight |
 | 2026-05-04 01:45 | Step 0 completed | Verified required files, TP-041 archive dependency, and local dotnet/node/npm tooling |
+| 2026-05-04 02:03 | Step 1 completed | Added chart range presets, normalized market-data range contracts, and passed provider-abstraction tests |
 
 ---
 

@@ -58,37 +58,52 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
         return provider.TryGetSymbol(symbol, out marketSymbol);
     }
 
-    public bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetCandles(string symbol, string? chartRange, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         response = null;
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out error))
+        {
+            return false;
+        }
+
         if (!TryEnsureProviderAvailable(out error))
         {
             return false;
         }
 
-        return provider.TryGetCandles(symbol, timeframe, out response, out error, identity);
+        return provider.TryGetCandles(symbol, normalizedChartRange, out response, out error, identity);
     }
 
-    public bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetIndicators(string symbol, string? chartRange, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         response = null;
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out error))
+        {
+            return false;
+        }
+
         if (!TryEnsureProviderAvailable(out error))
         {
             return false;
         }
 
-        return provider.TryGetIndicators(symbol, timeframe, out response, out error, identity);
+        return provider.TryGetIndicators(symbol, normalizedChartRange, out response, out error, identity);
     }
 
-    public bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
+    public bool TryGetLatestUpdate(string symbol, string? chartRange, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null)
     {
         update = null;
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out error))
+        {
+            return false;
+        }
+
         if (!TryEnsureProviderAvailable(out error))
         {
             return false;
         }
 
-        return provider.TryGetLatestUpdate(symbol, timeframe, out update, out error, identity);
+        return provider.TryGetLatestUpdate(symbol, normalizedChartRange, out update, out error, identity);
     }
 
     public async Task<MarketDataReadResult<TrendingSymbolsResponse>> GetTrendingSymbolsAsync(CancellationToken cancellationToken = default)
@@ -162,18 +177,23 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
 
     public async Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out var rangeError))
+        {
+            return MarketDataReadResult<CandleSeriesResponse>.Failure(rangeError!);
+        }
+
         var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
         if (availabilityError is not null)
         {
             return MarketDataReadResult<CandleSeriesResponse>.Failure(availabilityError);
         }
 
-        var providerResult = await provider.GetCandlesAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        var providerResult = await provider.GetCandlesAsync(symbol, normalizedChartRange, identity, cancellationToken).ConfigureAwait(false);
         return providerResult.IsSuccess && providerResult.Value is not null
             ? providerResult
             : MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(providerResult.Error));
@@ -181,18 +201,23 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
 
     public async Task<MarketDataReadResult<IndicatorResponse>> GetIndicatorsAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out var rangeError))
+        {
+            return MarketDataReadResult<IndicatorResponse>.Failure(rangeError!);
+        }
+
         var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
         if (availabilityError is not null)
         {
             return MarketDataReadResult<IndicatorResponse>.Failure(availabilityError);
         }
 
-        var providerResult = await provider.GetIndicatorsAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        var providerResult = await provider.GetIndicatorsAsync(symbol, normalizedChartRange, identity, cancellationToken).ConfigureAwait(false);
         return providerResult.IsSuccess && providerResult.Value is not null
             ? providerResult
             : MarketDataReadResult<IndicatorResponse>.Failure(ToReadError(providerResult.Error));
@@ -200,18 +225,23 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
 
     public async Task<MarketDataReadResult<MarketDataUpdate>> GetLatestUpdateAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out var rangeError))
+        {
+            return MarketDataReadResult<MarketDataUpdate>.Failure(rangeError!);
+        }
+
         var availabilityError = await GetProviderAvailabilityErrorAsync(cancellationToken).ConfigureAwait(false);
         if (availabilityError is not null)
         {
             return MarketDataReadResult<MarketDataUpdate>.Failure(availabilityError);
         }
 
-        var providerResult = await provider.GetLatestUpdateAsync(symbol, timeframe, identity, cancellationToken).ConfigureAwait(false);
+        var providerResult = await provider.GetLatestUpdateAsync(symbol, normalizedChartRange, identity, cancellationToken).ConfigureAwait(false);
         return providerResult.IsSuccess && providerResult.Value is not null
             ? providerResult
             : MarketDataReadResult<MarketDataUpdate>.Failure(ToReadError(providerResult.Error));
@@ -271,6 +301,18 @@ public sealed class MarketDataService(IMarketDataProvider provider) : IMarketDat
             "STOCK" or "STOCKS" => MarketDataAssetClasses.Stock,
             var normalized => normalized,
         };
+    }
+
+    private static bool TryNormalizeChartRange(string? chartRange, out string normalizedChartRange, out MarketDataError? error)
+    {
+        if (ChartRangePresets.TryNormalize(chartRange, out normalizedChartRange))
+        {
+            error = null;
+            return true;
+        }
+
+        error = ChartRangePresets.CreateUnsupportedRangeError(chartRange);
+        return false;
     }
 
     private bool TryEnsureProviderAvailable(out MarketDataError? error)
