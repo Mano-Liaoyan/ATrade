@@ -1,107 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnalysisClientError, getAnalysisEngines, runAnalysis } from '../lib/analysisClient';
-import type { AnalysisEngineDescriptor, AnalysisMetric, AnalysisResult, AnalysisSignal } from '../types/analysis';
-import { CHART_RANGE_DESCRIPTIONS, CHART_RANGE_LABELS, type ChartRange } from '../types/marketData';
+import type { InstrumentIdentityInput } from '../lib/instrumentIdentity';
+import { useTerminalAnalysisWorkflow } from '../lib/terminalAnalysisWorkflow';
+import type { AnalysisMetric, AnalysisResult } from '../types/analysis';
+import type { ChartRange } from '../types/marketData';
 
 type AnalysisPanelProps = {
   symbol: string;
   chartRange: ChartRange;
   candleSource?: string | null;
+  identity?: InstrumentIdentityInput | null;
 };
 
-export function AnalysisPanel({ symbol, chartRange, candleSource }: AnalysisPanelProps) {
-  const [engines, setEngines] = useState<AnalysisEngineDescriptor[]>([]);
-  const [enginesLoading, setEnginesLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadEngines() {
-      setEnginesLoading(true);
-      setError(null);
-
-      try {
-        const descriptors = await getAnalysisEngines();
-        if (active) {
-          setEngines(descriptors);
-        }
-      } catch (caughtError) {
-        if (active) {
-          setError(caughtError instanceof Error ? caughtError.message : 'Analysis engine discovery is unavailable.');
-        }
-      } finally {
-        if (active) {
-          setEnginesLoading(false);
-        }
-      }
-    }
-
-    void loadEngines();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const configuredEngine = useMemo(
-    () => engines.find((engine) => engine.metadata.state === 'available' && engine.metadata.engineId !== 'not-configured') ?? null,
-    [engines],
-  );
-
-  const unavailableMessage = useMemo(() => {
-    if (enginesLoading) {
-      return null;
-    }
-
-    if (error) {
-      return error;
-    }
-
-    if (!configuredEngine) {
-      const descriptor = engines[0];
-      return descriptor?.metadata.message ?? 'No analysis engine is configured. Set ATRADE_ANALYSIS_ENGINE=Lean in ignored .env to enable analysis.';
-    }
-
-    if (configuredEngine.metadata.state !== 'available') {
-      return configuredEngine.metadata.message ?? `${configuredEngine.metadata.displayName} is unavailable.`;
-    }
-
-    return null;
-  }, [configuredEngine, engines, enginesLoading, error]);
-
-  const handleRunAnalysis = useCallback(async () => {
-    if (!configuredEngine) {
-      return;
-    }
-
-    setRunning(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const analysis = await runAnalysis({
-        symbolCode: symbol,
-        timeframe: chartRange,
-        engineId: configuredEngine.metadata.engineId,
-        strategyName: 'moving-average-crossover',
-      });
-      setResult(analysis);
-    } catch (caughtError) {
-      if (caughtError instanceof AnalysisClientError) {
-        setResult(caughtError.result ?? null);
-        setError(caughtError.message);
-      } else {
-        setError(caughtError instanceof Error ? caughtError.message : 'Analysis request failed.');
-      }
-    } finally {
-      setRunning(false);
-    }
-  }, [configuredEngine, symbol, chartRange]);
+export function AnalysisPanel({ symbol, chartRange, candleSource, identity = null }: AnalysisPanelProps) {
+  const analysis = useTerminalAnalysisWorkflow({ symbol, chartRange, candleSource, identity });
 
   return (
     <section className="analysis-panel" data-testid="analysis-panel" aria-live="polite">
@@ -110,20 +22,20 @@ export function AnalysisPanel({ symbol, chartRange, candleSource }: AnalysisPane
           <p className="eyebrow">Analysis engine</p>
           <h2>Provider-neutral signals</h2>
         </div>
-        <span className={configuredEngine ? 'pill analysis-pill--ready' : 'pill analysis-pill--muted'} data-testid="analysis-engine-state">
-          {enginesLoading ? 'checking…' : configuredEngine ? configuredEngine.metadata.displayName : 'not configured'}
+        <span className={analysis.runnableEngine ? 'pill analysis-pill--ready' : 'pill analysis-pill--muted'} data-testid="analysis-engine-state">
+          {analysis.engineStateLabel}
         </span>
       </div>
 
       <p className="analysis-copy">
-        Run an analysis-only backtest over the current {CHART_RANGE_LABELS[chartRange]} lookback candles ({CHART_RANGE_DESCRIPTIONS[chartRange].toLowerCase()}) from {formatSourceLabel(candleSource)}. Results are signals and metrics only;
-        this panel never places orders or starts automated trading.
+        Run an analysis-only backtest over the current {analysis.chartRangeLabel} lookback candles ({analysis.chartRangeDescription.toLowerCase()}) from {analysis.sourceLabel}. Results are signals and metrics only;
+        this panel never places orders or starts automated trading. {analysis.providerNeutralCopy}
       </p>
 
-      {unavailableMessage ? (
+      {analysis.unavailableMessage ? (
         <div className="analysis-unavailable" data-testid="analysis-unavailable" role="status">
           <strong>Analysis unavailable.</strong>
-          <p>{unavailableMessage}</p>
+          <p>{analysis.unavailableMessage}</p>
         </div>
       ) : null}
 
@@ -132,23 +44,23 @@ export function AnalysisPanel({ symbol, chartRange, candleSource }: AnalysisPane
           className="primary-button"
           type="button"
           data-testid="analysis-run-button"
-          disabled={!configuredEngine || running || enginesLoading}
-          onClick={() => void handleRunAnalysis()}
+          disabled={!analysis.canRun}
+          onClick={() => void analysis.runAnalysis()}
         >
-          {running ? 'Running analysis…' : `Run ${configuredEngine?.metadata.provider ?? 'analysis'}`}
+          {analysis.running ? 'Running analysis…' : `Run ${analysis.runnableEngine?.metadata.provider ?? 'analysis'}`}
         </button>
-        <span data-testid="analysis-no-automation-note">Analysis only — no brokerage routing or automatic order placement.</span>
+        <span data-testid="analysis-no-automation-note">{analysis.noOrderCopy}</span>
       </div>
 
-      {running ? <div className="loading-state" role="status">Waiting for the configured analysis runtime…</div> : null}
-      {error && !unavailableMessage ? (
-        <div className="error-state analysis-error" role="alert" data-testid={isTimeoutMessage(error) ? 'analysis-timeout' : 'analysis-error'}>
-          <strong>{isTimeoutMessage(error) ? 'Analysis timed out.' : 'Analysis request failed.'}</strong>
-          <p>{error}</p>
+      {analysis.running ? <div className="loading-state" role="status">Waiting for the configured analysis runtime…</div> : null}
+      {analysis.error && !analysis.unavailableMessage ? (
+        <div className="error-state analysis-error" role="alert" data-testid={isTimeoutMessage(analysis.error) ? 'analysis-timeout' : 'analysis-error'}>
+          <strong>{isTimeoutMessage(analysis.error) ? 'Analysis timed out.' : 'Analysis request failed.'}</strong>
+          <p>{analysis.error}</p>
         </div>
       ) : null}
 
-      {result ? <AnalysisResultView result={result} /> : null}
+      {analysis.result ? <AnalysisResultView result={analysis.result} /> : null}
     </section>
   );
 }
@@ -226,14 +138,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
-}
-
-function formatSourceLabel(source: string | null | undefined): string {
-  if (!source) {
-    return 'the market-data provider';
-  }
-
-  return source.includes('ibkr') ? 'IBKR/iBeam' : source;
 }
 
 function formatBacktestWindow(result: AnalysisResult): string {

@@ -1,6 +1,6 @@
 # TP-049: Rebuild chart and analysis as terminal workspaces — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Preserve chart workflow contracts behind terminal view models
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Preserve chart workflow contracts behind terminal view models
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Preserve chart range, identity, candle/indicator, SignalR, and HTTP fallback behavior
-- [ ] Wire CHART and monitor chart actions with exact identity handoff
-- [ ] Wire ANALYSIS actions to provider-neutral analysis behavior
-- [ ] Add assertions against direct provider/database/order access
+- [x] Preserve chart range, identity, candle/indicator, SignalR, and HTTP fallback behavior
+- [x] Wire CHART and monitor chart actions with exact identity handoff
+- [x] Wire ANALYSIS actions to provider-neutral analysis behavior
+- [x] Add assertions against direct provider/database/order access
 
 ---
 
