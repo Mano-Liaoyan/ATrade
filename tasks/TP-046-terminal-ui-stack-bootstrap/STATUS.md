@@ -47,10 +47,10 @@
 
 > ⚠️ Hydrate: Expand based on the exact primitives needed by the selected shadcn/Radix setup.
 
-- [ ] Add minimal `components/ui` primitives for downstream terminal modules
-- [ ] Add original `components/terminal` foundation primitives
+- [ ] Add Radix/shadcn-style UI primitives: button, input, badge, tabs, dialog, popover, scroll area, separator, and tooltip
+- [ ] Add original `components/terminal` foundation primitives: surface, panel, section header, and status badge
 - [ ] Keep primitives independent from legacy shell layout assumptions
-- [ ] Add source assertions for local utilities and no copied/brand assets
+- [ ] Add source assertions for primitive files, local utilities, and no copied/brand assets
 
 ---
 
