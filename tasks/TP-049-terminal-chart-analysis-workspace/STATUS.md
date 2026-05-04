@@ -1,6 +1,6 @@
 # TP-049: Rebuild chart and analysis as terminal workspaces — Status
 
-**Current Step:** Step 2: Build the terminal chart workspace
+**Current Step:** Step 3: Build terminal analysis and provider diagnostics panels
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -46,12 +46,12 @@
 ---
 
 ### Step 3: Build terminal analysis and provider diagnostics panels
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create terminal analysis workspace with explicit no-engine/unavailable states
-- [ ] Create provider diagnostics without order/credential controls
-- [ ] Replace or retire old AnalysisPanel/BrokerPaperStatus usage
-- [ ] Keep PORTFOLIO/ORDERS disabled and no order-entry UI
+- [x] Create terminal analysis workspace with explicit no-engine/unavailable states
+- [x] Create provider diagnostics without order/credential controls
+- [x] Replace or retire old AnalysisPanel/BrokerPaperStatus usage
+- [x] Keep PORTFOLIO/ORDERS disabled and no order-entry UI
 
 ---
 

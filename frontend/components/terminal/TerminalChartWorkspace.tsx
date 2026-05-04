@@ -1,10 +1,10 @@
 'use client';
 
-import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { CandlestickChart } from '@/components/CandlestickChart';
 import type { InstrumentIdentityInput } from '@/lib/instrumentIdentity';
 import type { TerminalChartWorkspaceWorkflow } from '@/lib/terminalChartWorkspaceWorkflow';
 import { cn } from '@/lib/utils';
+import { TerminalAnalysisWorkspace } from './TerminalAnalysisWorkspace';
 import { TerminalIndicatorGrid } from './TerminalIndicatorGrid';
 import { TerminalInstrumentHeader } from './TerminalInstrumentHeader';
 
@@ -66,7 +66,7 @@ export function TerminalChartWorkspace({
 
       {includeAnalysis ? (
         <section id="terminal-analysis" tabIndex={-1} aria-label="Provider-neutral analysis entry point">
-          <AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />
+          <TerminalAnalysisWorkspace symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />
         </section>
       ) : null}
     </section>

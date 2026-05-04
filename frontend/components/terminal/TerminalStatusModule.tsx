@@ -1,6 +1,6 @@
-import { BrokerPaperStatus } from "@/components/BrokerPaperStatus";
 import { TerminalPanel } from "./TerminalPanel";
 import { TerminalStatusBadge } from "./TerminalStatusBadge";
+import { TerminalProviderDiagnostics } from "./TerminalProviderDiagnostics";
 
 export function TerminalStatusModule() {
   return (
@@ -30,7 +30,7 @@ export function TerminalStatusModule() {
           </div>
         </dl>
       </TerminalPanel>
-      <BrokerPaperStatus />
+      <TerminalProviderDiagnostics />
     </section>
   );
 }

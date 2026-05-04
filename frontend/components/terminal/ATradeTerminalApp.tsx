@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { AnalysisPanel } from "@/components/AnalysisPanel";
 import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
 import { useTerminalChartWorkspaceWorkflow } from "@/lib/terminalChartWorkspaceWorkflow";
 import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
@@ -24,6 +23,7 @@ import { TerminalStatusModule } from "./TerminalStatusModule";
 import { TerminalStatusStrip } from "./TerminalStatusStrip";
 import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
+import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
 import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
@@ -409,7 +409,7 @@ function TerminalAnalysisModule({ identity, symbol }: { identity: InstrumentIden
       >
         {symbol ? <p>Running over the default {CHART_RANGE_LABELS["1D"]} chart range until a chart workspace selects another lookback.</p> : <p>Use ANALYSIS &lt;symbol&gt; from the command input or open a chart before selecting ANALYSIS.</p>}
       </TerminalPanel>
-      {symbol ? <AnalysisPanel symbol={symbol} chartRange={"1D" as ChartRange} identity={identity} /> : null}
+      <TerminalAnalysisWorkspace chartRange={"1D" as ChartRange} identity={identity} symbol={symbol} />
     </section>
   );
 }

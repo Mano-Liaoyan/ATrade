@@ -101,6 +101,8 @@ assert_retired_old_chart_shell_components() {
   local retired_components=(
     "$repo_root/frontend/components/TimeframeSelector.tsx"
     "$repo_root/frontend/components/IndicatorPanel.tsx"
+    "$repo_root/frontend/components/AnalysisPanel.tsx"
+    "$repo_root/frontend/components/BrokerPaperStatus.tsx"
   )
 
   for retired in "${retired_components[@]}"; do
@@ -114,12 +116,14 @@ assert_retired_old_chart_shell_components() {
   assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TerminalChartWorkspace'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" 'TerminalInstrumentHeader'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalIndicatorGrid.tsx" 'TerminalIndicatorGrid'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalAnalysisWorkspace.tsx" 'TerminalAnalysisWorkspace'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalProviderDiagnostics.tsx" 'TerminalProviderDiagnostics'
 }
 
 assert_provider_neutral_analysis_contract() {
   local analysis_workflow="$repo_root/frontend/lib/terminalAnalysisWorkflow.ts"
   local analysis_client="$repo_root/frontend/lib/analysisClient.ts"
-  local analysis_panel="$repo_root/frontend/components/AnalysisPanel.tsx"
+  local analysis_panel="$repo_root/frontend/components/terminal/TerminalAnalysisWorkspace.tsx"
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
 
   assert_file_contains "$analysis_client" '/api/analysis/engines'
@@ -134,19 +138,38 @@ assert_provider_neutral_analysis_contract() {
   assert_file_contains "$analysis_workflow" 'TERMINAL_ANALYSIS_NO_ORDER_COPY'
   assert_file_contains "$analysis_workflow" 'TERMINAL_ANALYSIS_PROVIDER_NEUTRAL_COPY'
   assert_file_contains "$analysis_panel" 'useTerminalAnalysisWorkflow'
+  assert_file_contains "$analysis_panel" 'data-testid="terminal-analysis-workspace"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-panel"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-unavailable"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-run-button"'
   assert_file_contains "$analysis_panel" 'data-testid="analysis-no-automation-note"'
-  assert_file_contains "$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx" '<AnalysisPanel symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx" '<TerminalAnalysisWorkspace symbol={chart.normalizedSymbol} chartRange={chart.chartRange} candleSource={chart.candles?.source} identity={chart.view.identity ?? identity} />'
+  assert_file_contains "$terminal_app" '<TerminalAnalysisWorkspace chartRange={"1D" as ChartRange} identity={identity} symbol={symbol} />'
+}
+
+assert_disabled_portfolio_orders_and_no_order_entry_ui() {
+  local module_registry="$repo_root/frontend/lib/terminalModuleRegistry.ts"
+  local disabled_component="$repo_root/frontend/components/terminal/TerminalDisabledModule.tsx"
+  local help_component="$repo_root/frontend/components/terminal/TerminalHelpModule.tsx"
+
+  assert_file_contains "$module_registry" 'id: "PORTFOLIO"'
+  assert_file_contains "$module_registry" 'No durable positions or portfolio P/L workspace exists beyond current paper account status contracts.'
+  assert_file_contains "$module_registry" 'id: "ORDERS"'
+  assert_file_contains "$module_registry" 'Orders are disabled by the paper-only safety contract.'
+  assert_file_contains "$module_registry" 'does not provide order tickets, buy/sell buttons, staged submissions, previews, or confirmations'
+  assert_file_contains "$disabled_component" 'no fake data, no demo provider responses, and no order-entry controls'
+  assert_file_contains "$help_component" 'no order tickets, buy/sell controls, previews, or submit actions'
+
+  if grep -RInE --exclude-dir=.next --exclude-dir=node_modules --exclude='TerminalCommandInput.tsx' 'Place order|Submit order|/api/orders|orders/simulate|MarketOrder|SetBrokerageModel|SetLiveMode' "$repo_root/frontend/components" "$repo_root/frontend/lib"; then
+    printf 'terminal frontend must not include order-entry UI, order API calls, or live-trading runtime tokens.\n' >&2
+    return 1
+  fi
 }
 
 assert_no_direct_provider_database_or_order_access() {
   local forbidden_pattern='Npgsql|TimescaleConnection|PostgresConnection|Host=|User ID=|Password=|redis://|nats://|ibkr-gateway|iserver/secdef|iserver/scanner|Client Portal|ATRADE_IBKR|IBKR_USERNAME|IBKR_PASSWORD|ATRADE_LEAN|docker exec|QuantConnect\.Lean|lean-engine|LeanRuntime|/api/orders|orders/simulate'
   local scan_paths=(
     "$repo_root/frontend/app/symbols"
-    "$repo_root/frontend/components/AnalysisPanel.tsx"
-    "$repo_root/frontend/components/BrokerPaperStatus.tsx"
     "$repo_root/frontend/components/SymbolChartView.tsx"
     "$repo_root/frontend/components/terminal"
     "$repo_root/frontend/lib/analysisClient.ts"
@@ -169,6 +192,7 @@ main() {
   assert_exact_identity_chart_and_analysis_handoff
   assert_retired_old_chart_shell_components
   assert_provider_neutral_analysis_contract
+  assert_disabled_portfolio_orders_and_no_order_entry_ui
   assert_no_direct_provider_database_or_order_access
 }
 

@@ -1754,25 +1754,38 @@ select:focus-visible,
 .terminal-context-summary,
 .terminal-help-module,
 .terminal-status-module,
+.terminal-analysis-workspace,
+.terminal-provider-diagnostics,
 .terminal-disabled-module__body {
   display: grid;
   gap: 0.75rem;
 }
 
 .terminal-context-summary__grid,
-.terminal-status-module__grid {
+.terminal-status-module__grid,
+.terminal-provider-diagnostics__grid,
+.terminal-analysis-workspace__summary {
   display: grid;
   gap: 0.55rem;
 }
 
+.terminal-analysis-workspace__summary,
+.terminal-provider-diagnostics__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .terminal-context-summary__grid div,
-.terminal-status-module__grid div {
+.terminal-status-module__grid div,
+.terminal-provider-diagnostics__grid div,
+.terminal-analysis-workspace__summary div {
   border-bottom: 1px solid hsl(var(--terminal-border) / 0.58);
   padding-bottom: 0.45rem;
 }
 
 .terminal-context-summary dt,
-.terminal-status-module dt {
+.terminal-status-module dt,
+.terminal-provider-diagnostics dt,
+.terminal-analysis-workspace__summary span {
   color: hsl(var(--terminal-text-subtle));
   font-size: 0.72rem;
   font-weight: 900;
@@ -1781,11 +1794,42 @@ select:focus-visible,
 }
 
 .terminal-context-summary dd,
-.terminal-status-module dd {
+.terminal-status-module dd,
+.terminal-provider-diagnostics dd,
+.terminal-analysis-workspace__summary strong {
   margin: 0.2rem 0 0;
   color: hsl(var(--terminal-text));
   font-family: var(--font-mono);
   font-size: 0.82rem;
+}
+
+.terminal-analysis-workspace__summary small,
+.terminal-provider-diagnostics small,
+.terminal-analysis-workspace__copy,
+.terminal-analysis-workspace__actions span {
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.78rem;
+}
+
+.terminal-provider-diagnostics__actions,
+.terminal-analysis-workspace__badges,
+.terminal-analysis-workspace__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-analysis-workspace__unavailable {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 14px;
+  background: rgba(245, 158, 11, 0.08);
+  padding: 0.75rem;
+}
+
+.terminal-analysis-result {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .terminal-monitor-panel {
@@ -2457,6 +2501,8 @@ select:focus-visible,
   .indicator-panel,
   .terminal-instrument-header__identity,
   .terminal-indicator-grid__tiles,
+  .terminal-analysis-workspace__summary,
+  .terminal-provider-diagnostics__grid,
   .broker-status-grid,
   .analysis-result-summary,
   .analysis-metrics {
