@@ -1,6 +1,6 @@
 # TP-046: Bootstrap the terminal UI stack — Status
 
-**Current Step:** Step 2: Establish terminal design tokens and base CSS
+**Current Step:** Step 3: Create original terminal primitive components
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 2
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Establish terminal design tokens and base CSS
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add dense terminal color/surface/status/splitter/table variables
-- [ ] Make shadcn-style primitives inherit the ATrade Terminal theme
-- [ ] Preserve focus, contrast, reduced-motion, and responsive basics
-- [ ] Keep browser-first shell styling desktop-wrapper-friendly
+- [x] Add dense terminal color/surface/status/splitter/table variables
+- [x] Make shadcn-style primitives inherit the ATrade Terminal theme
+- [x] Preserve focus, contrast, reduced-motion, and responsive basics
+- [x] Keep browser-first shell styling desktop-wrapper-friendly
 
 ---
 
 ### Step 3: Create original terminal primitive components
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand based on the exact primitives needed by the selected shadcn/Radix setup.
 
