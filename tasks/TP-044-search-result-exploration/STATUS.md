@@ -1,6 +1,6 @@
 # TP-044: Make stock search results easier to explore — Status
 
-**Current Step:** Step 1: Model bounded, ranked search result state
+**Current Step:** Step 2: Implement a concise, explorable search UI
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-04
 **Review Level:** 1
@@ -36,12 +36,12 @@
 ---
 
 ### Step 2: Implement a concise, explorable search UI
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Default result panel shows a short ranked list with best match and result count
-- [ ] Market/currency/asset metadata filters or chips implemented from provider-neutral fields
-- [ ] Show more/show less and keyboard/focus-friendly controls implemented
-- [ ] Pin/chart actions, market logos, accessible labels, and compact behavior preserved
+- [x] Default result panel shows a short ranked list with best match and result count
+- [x] Market/currency/asset metadata filters or chips implemented from provider-neutral fields
+- [x] Show more/show less and keyboard/focus-friendly controls implemented
+- [x] Pin/chart actions, market logos, accessible labels, and compact behavior preserved
 
 ---
 
@@ -98,6 +98,8 @@
 | 2026-05-04 09:06 | Step 0 started | Preflight |
 | 2026-05-04 09:07 | Step 1 started | Modeling bounded search result state |
 | 2026-05-04 09:20 | Step 1 completed | Added bounded ranked/filterable search view model and source-level shell test |
+| 2026-05-04 09:21 | Step 2 started | Implementing concise explorable search UI |
+| 2026-05-04 09:35 | Step 2 completed | Added ranked summary, metadata filter chips, show more/show less controls; frontend build passed |
 
 ---
 
