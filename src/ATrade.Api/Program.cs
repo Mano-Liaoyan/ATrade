@@ -53,17 +53,17 @@ app.MapGet(
         ToMarketDataResult(await marketDataService.SearchSymbolsAsync(query, assetClass, limit, cancellationToken)));
 app.MapGet(
     "/api/market-data/{symbol}/candles",
-    async (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+    async (string symbol, string? range, string? chartRange, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
         var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
-        return ToMarketDataResult(await marketDataService.GetCandlesAsync(symbol, timeframe, identity, cancellationToken));
+        return ToMarketDataResult(await marketDataService.GetCandlesAsync(symbol, SelectChartRange(range, chartRange, timeframe), identity, cancellationToken));
     });
 app.MapGet(
     "/api/market-data/{symbol}/indicators",
-    async (string symbol, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+    async (string symbol, string? range, string? chartRange, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
         var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
-        return ToMarketDataResult(await marketDataService.GetIndicatorsAsync(symbol, timeframe, identity, cancellationToken));
+        return ToMarketDataResult(await marketDataService.GetIndicatorsAsync(symbol, SelectChartRange(range, chartRange, timeframe), identity, cancellationToken));
     });
 app.MapGet(
     "/api/analysis/engines",
@@ -176,6 +176,9 @@ static IResult ToAnalysisRunIntakeResult(AnalysisRunIntakeResult result)
         ? ToAnalysisResult(result.Result)
         : Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Analysis request failed."));
 }
+
+static string? SelectChartRange(params string?[] requestedRanges) =>
+    requestedRanges.FirstOrDefault(requestedRange => !string.IsNullOrWhiteSpace(requestedRange));
 
 static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
     string symbol,

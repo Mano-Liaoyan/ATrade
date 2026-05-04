@@ -1,4 +1,4 @@
-import type { MarketDataSymbolIdentity, OhlcvCandle, Timeframe } from './marketData';
+import type { ChartRange, MarketDataSymbolIdentity, OhlcvCandle } from './marketData';
 
 export type AnalysisEngineState = 'available' | 'not-configured' | 'unavailable' | string;
 
@@ -66,7 +66,7 @@ export type AnalysisResult = {
   engine: AnalysisEngineMetadata;
   source: AnalysisDataSource;
   symbol: MarketDataSymbolIdentity;
-  timeframe: Timeframe | string;
+  timeframe: ChartRange | string;
   generatedAtUtc: string;
   signals: AnalysisSignal[];
   metrics: AnalysisMetric[];
@@ -77,7 +77,7 @@ export type AnalysisResult = {
 export type RunAnalysisRequest = {
   symbol?: MarketDataSymbolIdentity | null;
   symbolCode?: string;
-  timeframe: Timeframe;
+  timeframe: ChartRange;
   requestedAtUtc?: string;
   bars?: OhlcvCandle[];
   engineId?: string;

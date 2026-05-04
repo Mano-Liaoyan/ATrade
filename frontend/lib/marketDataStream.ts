@@ -1,6 +1,6 @@
 import * as signalR from '@microsoft/signalr';
 import { buildApiUrl } from './apiBaseUrl';
-import type { MarketDataUpdate, Timeframe } from '../types/marketData';
+import type { ChartRange, MarketDataUpdate } from '../types/marketData';
 
 export type MarketDataStreamState = 'connecting' | 'connected' | 'reconnecting' | 'closed' | 'unavailable';
 
@@ -11,7 +11,7 @@ export type MarketDataStreamSubscription = {
 
 export type ConnectMarketDataStreamOptions = {
   symbol: string;
-  timeframe: Timeframe;
+  chartRange: ChartRange;
   onUpdate: (update: MarketDataUpdate) => void;
   onStateChange?: (state: MarketDataStreamState) => void;
 };
@@ -35,14 +35,14 @@ export async function connectMarketDataStream(options: ConnectMarketDataStreamOp
   connection.onclose(() => options.onStateChange?.('closed'));
 
   await connection.start();
-  await connection.invoke('Subscribe', options.symbol.toUpperCase(), options.timeframe);
+  await connection.invoke('Subscribe', options.symbol.toUpperCase(), options.chartRange);
   options.onStateChange?.('connected');
 
   return {
     connection,
     stop: async () => {
       try {
-        await connection.invoke('Unsubscribe', options.symbol.toUpperCase(), options.timeframe);
+        await connection.invoke('Unsubscribe', options.symbol.toUpperCase(), options.chartRange);
       } finally {
         await connection.stop();
       }

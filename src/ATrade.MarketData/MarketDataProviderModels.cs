@@ -17,6 +17,7 @@ public static class MarketDataProviderErrorCodes
     public const string UnsupportedAssetClass = "unsupported-asset-class";
     public const string InvalidSearchLimit = "invalid-search-limit";
     public const string UnsupportedSymbol = "unsupported-symbol";
+    public const string UnsupportedChartRange = "unsupported-chart-range";
     public const string MarketDataRequestFailed = "market-data-error";
 }
 

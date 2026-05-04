@@ -94,11 +94,16 @@ Core types:
   candles, indicators, streaming snapshots, symbol search, and mock-data usage.
 - `MarketDataProviderStatus` — provider id, `available` / `not-configured` /
   `unavailable` state, message, observation time, and capabilities.
-- `ExactInstrumentIdentity`, `MarketDataSymbolIdentity`,
+- `ChartRangePresets`, `ExactInstrumentIdentity`, `MarketDataSymbolIdentity`,
   `MarketDataSymbolSearchResult`, `MarketDataSymbolSearchResponse`,
   `OhlcvCandle`, `CandleSeriesResponse`, `IndicatorResponse`,
   `MarketDataUpdate`, and trending response records — the payload-safe domain
-  shapes providers must emit. `ExactInstrumentIdentity` is the backend-owned
+  shapes providers must emit. `ChartRangePresets` defines the supported chart
+  lookback ranges from now: `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`,
+  `1y`, `5y`, and `all` / All time. The legacy model property and method name
+  `timeframe` remains a compatibility alias in payloads and API methods, but the
+  value is normalized as a chart range; `1m` means one month and one-minute reads
+  use `1min`. `ExactInstrumentIdentity` is the backend-owned
   normalization/key/equality helper for provider, provider symbol id, symbol,
   exchange, currency, and asset class; for IBKR the provider symbol id is the
   Client Portal `conid`. Search results, trending symbols, candle series,
@@ -128,9 +133,11 @@ Compatibility layer:
   return `MarketDataReadResult<T>` with the same `MarketDataError` codes the
   browser already understands.
 - `MarketDataService` composes `IMarketDataProvider`, validates stock search
-  query length/asset class/result limit before provider calls, forwards optional
-  exact identity metadata for candle/indicator/latest reads, and preserves
-  endpoint payload/status behavior for callers that only supply a symbol.
+  query length/asset class/result limit before provider calls, normalizes chart
+  range values before candle/indicator/latest reads, forwards optional exact
+  identity metadata, and preserves endpoint payload/status behavior for callers
+  that only supply a symbol. HTTP callers should send `range` / `chartRange`;
+  legacy `timeframe` query parameters are still accepted as aliases.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`
   asynchronously and owns provider-status checks so hubs do not duplicate that
@@ -140,8 +147,10 @@ Compatibility layer:
 - `ATrade.MarketData.Timescale` is a storage/cache-aside module, not a market-data
   provider. In `ATrade.Api` it wraps the concrete provider-backed
   `MarketDataService` behind `IMarketDataService`, awaits fresh Timescale rows
-  before provider calls for trending/candle/indicator inputs, persists provider
-  responses after cache misses, and preserves provider-neutral endpoint payloads.
+  before provider calls for trending/candle/indicator inputs, keys candle rows by
+  normalized chart range, rejects stale or cadence-incompatible legacy range rows,
+  persists provider responses after cache misses, and preserves provider-neutral
+  endpoint payloads.
   AppHost supplies `ConnectionStrings:timescaledb` from a volume-backed
   `timescaledb` resource so fresh persisted rows can survive full local AppHost
   reboots without changing API/frontend payloads.
@@ -158,9 +167,10 @@ Unavailable handling:
   unavailable.
 - Timescale cache-aside is allowed to return a fresh persisted response while the
   provider is unavailable, including after an AppHost reboot, because the payload
-  is still within the configured freshness window and its source is labeled as
-  cache-backed. Stale or missing rows must not be presented as successful fresh
-  data when provider refresh fails.
+  is still within the configured freshness window, uses the requested normalized
+  chart range, satisfies that range's lookback semantics, and its source is
+  labeled as cache-backed. Stale, mismatched-range, or missing rows must not be
+  presented as successful fresh data when provider refresh fails.
 
 ## 4. Analysis Engine Provider Family
 

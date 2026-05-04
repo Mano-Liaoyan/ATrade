@@ -4,22 +4,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getCandles, getIndicators } from './marketDataClient';
 import { normalizeInstrumentIdentity, type InstrumentIdentityInput, type NormalizedInstrumentIdentity } from './instrumentIdentity';
 import { connectMarketDataStream, type MarketDataStreamState, type MarketDataStreamSubscription } from './marketDataStream';
-import type { CandleSeriesResponse, IndicatorResponse, MarketDataUpdate, OhlcvCandle, Timeframe } from '../types/marketData';
+import type { CandleSeriesResponse, ChartRange, IndicatorResponse, MarketDataUpdate, OhlcvCandle } from '../types/marketData';
 
 export const ChartPollingFallbackMs = 15_000;
 
 export type SymbolChartWorkflowOptions = {
   symbol: string;
   identity?: InstrumentIdentityInput | null;
-  initialTimeframe?: Timeframe;
+  initialChartRange?: ChartRange;
   pollingFallbackMs?: number;
 };
 
 export type SymbolChartWorkflow = {
   normalizedSymbol: string;
   chartIdentity: NormalizedInstrumentIdentity | null;
-  timeframe: Timeframe;
-  setTimeframe: (timeframe: Timeframe) => void;
+  chartRange: ChartRange;
+  setChartRange: (chartRange: ChartRange) => void;
   candles: CandleSeriesResponse | null;
   indicators: IndicatorResponse | null;
   latestUpdate: MarketDataUpdate | null;
@@ -32,7 +32,7 @@ export type SymbolChartWorkflow = {
 export function useSymbolChartWorkflow({
   symbol,
   identity = null,
-  initialTimeframe = '1D',
+  initialChartRange = '1D',
   pollingFallbackMs = ChartPollingFallbackMs,
 }: SymbolChartWorkflowOptions): SymbolChartWorkflow {
   const normalizedSymbol = symbol.toUpperCase();
@@ -40,7 +40,7 @@ export function useSymbolChartWorkflow({
     () => (identity ? normalizeInstrumentIdentity({ ...identity, symbol: normalizedSymbol }) : null),
     [identity, normalizedSymbol],
   );
-  const [timeframe, setTimeframe] = useState<Timeframe>(initialTimeframe);
+  const [chartRange, setChartRange] = useState<ChartRange>(initialChartRange);
   const [candles, setCandles] = useState<CandleSeriesResponse | null>(null);
   const [indicators, setIndicators] = useState<IndicatorResponse | null>(null);
   const [latestUpdate, setLatestUpdate] = useState<MarketDataUpdate | null>(null);
@@ -56,8 +56,8 @@ export function useSymbolChartWorkflow({
 
     try {
       const [candleResponse, indicatorResponse] = await Promise.all([
-        getCandles(normalizedSymbol, timeframe, chartIdentity),
-        getIndicators(normalizedSymbol, timeframe, chartIdentity),
+        getCandles(normalizedSymbol, chartRange, chartIdentity),
+        getIndicators(normalizedSymbol, chartRange, chartIdentity),
       ]);
       setCandles(candleResponse);
       setIndicators(indicatorResponse);
@@ -68,7 +68,7 @@ export function useSymbolChartWorkflow({
         setLoading(false);
       }
     }
-  }, [chartIdentity, normalizedSymbol, timeframe]);
+  }, [chartIdentity, normalizedSymbol, chartRange]);
 
   useEffect(() => {
     void refreshChartData(true);
@@ -98,7 +98,7 @@ export function useSymbolChartWorkflow({
       try {
         subscription = await connectMarketDataStream({
           symbol: normalizedSymbol,
-          timeframe,
+          chartRange,
           onStateChange: (state) => {
             if (!active) {
               return;
@@ -139,13 +139,13 @@ export function useSymbolChartWorkflow({
         void subscription.stop();
       }
     };
-  }, [normalizedSymbol, pollingFallbackMs, timeframe, refreshChartData]);
+  }, [normalizedSymbol, pollingFallbackMs, chartRange, refreshChartData]);
 
   return {
     normalizedSymbol,
     chartIdentity,
-    timeframe,
-    setTimeframe,
+    chartRange,
+    setChartRange,
     candles,
     indicators,
     latestUpdate,

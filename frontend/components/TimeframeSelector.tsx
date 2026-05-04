@@ -1,24 +1,29 @@
 'use client';
 
-import { SUPPORTED_TIMEFRAMES, type Timeframe } from '../types/marketData';
+import { CHART_RANGE_DESCRIPTIONS, CHART_RANGE_LABELS, SUPPORTED_CHART_RANGES, type ChartRange } from '../types/marketData';
 
 type TimeframeSelectorProps = {
-  value: Timeframe;
-  onChange: (timeframe: Timeframe) => void;
+  value: ChartRange;
+  onChange: (chartRange: ChartRange) => void;
 };
 
 export function TimeframeSelector({ value, onChange }: TimeframeSelectorProps) {
   return (
-    <div className="timeframe-selector" aria-label="Chart timeframe controls" data-testid="timeframe-controls">
-      {SUPPORTED_TIMEFRAMES.map((timeframe) => (
+    <div className="timeframe-selector" aria-label="Chart range lookback controls" data-testid="chart-range-controls">
+      <span className="timeframe-help" data-testid="chart-range-help">
+        Lookback from now: 1D = past day, 1m = past month, 6m = past six months.
+      </span>
+      {SUPPORTED_CHART_RANGES.map((chartRange) => (
         <button
-          aria-pressed={timeframe === value}
-          className={timeframe === value ? 'timeframe-button timeframe-button--active' : 'timeframe-button'}
-          key={timeframe}
+          aria-label={CHART_RANGE_DESCRIPTIONS[chartRange]}
+          aria-pressed={chartRange === value}
+          className={chartRange === value ? 'timeframe-button timeframe-button--active' : 'timeframe-button'}
+          key={chartRange}
+          title={CHART_RANGE_DESCRIPTIONS[chartRange]}
           type="button"
-          onClick={() => onChange(timeframe)}
+          onClick={() => onChange(chartRange)}
         >
-          {timeframe}
+          {CHART_RANGE_LABELS[chartRange]}
         </button>
       ))}
     </div>

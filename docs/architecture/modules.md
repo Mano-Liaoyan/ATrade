@@ -31,8 +31,9 @@ see_also:
 > and rejected-live statuses while remaining intentionally light on broker-side state.
 > `ATrade.MarketData` now provides provider-neutral async market-data read
 > contracts, compatibility services, provider status/error shapes, the
-> backend-owned `ExactInstrumentIdentity` normalization/key helper, stock search
-> contracts, and SignalR snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
+> backend-owned `ExactInstrumentIdentity` normalization/key helper, chart range
+> preset normalization/lookback semantics, stock search contracts, and SignalR
+> snapshot contracts, while `ATrade.MarketData.Ibkr` provides the
 > first real IBKR/iBeam market-data provider including secdef search/detail
 > mapping. `ATrade.MarketData.Timescale` now provides the TimescaleDB persistence
 > foundation plus the API cache-aside decorator for provider-backed candles and
@@ -53,9 +54,9 @@ see_also:
 > a Next.js home route with backend-driven trending symbols, IBKR stock search,
 > Postgres-backed watchlists, symbol navigation, and `lightweight-charts` chart
 > routes plus an analysis panel for provider-neutral LEAN signals/metrics while
-> `frontend/lib/*Workflow.ts` hooks centralize watchlist, search, chart loading,
-> source labeling, and SignalR-to-HTTP fallback orchestration behind rendering
-> components and preserve the original bootstrap smoke markers.
+> `frontend/lib/*Workflow.ts` hooks centralize watchlist, search, chart range
+> loading, source labeling, and SignalR-to-HTTP fallback orchestration behind
+> rendering components and preserve the original bootstrap smoke markers.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -162,8 +163,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
   `POST /api/orders/simulate`, `GET /api/market-data/trending`,
   `GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
-  `GET /api/market-data/{symbol}/candles?timeframe=...`,
-  `GET /api/market-data/{symbol}/indicators?timeframe=...`,
+  `GET /api/market-data/{symbol}/candles?range=...`,
+  `GET /api/market-data/{symbol}/indicators?range=...`,
   `GET /api/analysis/engines`, `POST /api/analysis/run`, `GET /api/workspace/watchlist`,
   `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`, exact
   `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
@@ -181,11 +182,13 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   indicator HTTP paths, API composition wraps the provider-backed service with
   `ATrade.MarketData.Timescale`, reads fresh Timescale rows before provider
   access, persists provider responses on cache misses, and labels cache hits with
-  `timescale-cache:{originalSource}` source metadata. The analysis endpoints
-  resolve `IAnalysisEngineRegistry` for discovery and `IAnalysisRequestIntake`
-  for runs, so `ATrade.Analysis` owns symbol/timeframe defaults, candle
-  acquisition through the cache-aware `IMarketDataService` seam, symbol identity
-  resolution, invalid-request/provider-error mapping, and engine handoff before
+  `timescale-cache:{originalSource}` source metadata. Candle/indicator endpoints
+  prefer `range` / `chartRange` and retain legacy `timeframe` as a query-name
+  alias for normalized chart range values. The analysis endpoints resolve
+  `IAnalysisEngineRegistry` for discovery and `IAnalysisRequestIntake` for runs,
+  so `ATrade.Analysis` owns symbol/range (`timeframe` payload field) defaults,
+  candle acquisition through the cache-aware `IMarketDataService` seam, symbol
+  identity resolution, invalid-request/provider-error mapping, and engine handoff before
   the API projects the HTTP result. The watchlist endpoints resolve
   `IWorkspaceWatchlistIntake`, so `ATrade.Workspaces` owns the temporary local
   workspace identity, idempotent schema initialization ordering, exact
@@ -275,9 +278,11 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ExactInstrumentIdentity` helper that owns normalization/defaulting/key
   encoding/equality for provider/market identity, symbol identity and stock-search
   contracts, OHLCV candle and indicator payload shapes with source metadata,
-  compatibility services for the existing HTTP/SignalR API, moving-average / RSI
-  / MACD indicator calculations, transparent trending factors, and a SignalR
-  hub/snapshot service consumed by `ATrade.Api`. Search results, provider-backed
+  `ChartRangePresets` for `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`,
+  `5y`, and `all` lookbacks from now, compatibility services for the existing
+  HTTP/SignalR API, moving-average / RSI / MACD indicator calculations,
+  transparent trending factors, and a SignalR hub/snapshot service consumed by
+  `ATrade.Api`. Search results, provider-backed
   trending symbols, candles, indicators, and latest updates include provider,
   provider symbol id, asset class, exchange, currency, and name/identity metadata
   where available so UI/watchlist/chart payloads remain provider-neutral.
@@ -286,8 +291,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   Timescale persistence and cache-aside integration now live in
   `ATrade.MarketData.Timescale`; API trending, search, symbol, candle,
   indicator, latest-update, SignalR snapshot, and analysis candle callers await
-  the async seam, and cache-aware reads can use fresh stored rows before
-  refreshing from providers. Future slices may
+  the async seam, and cache-aware reads can use fresh stored rows keyed by
+  normalized chart range before refreshing from providers. Future slices may
   publish real-time updates onto NATS for API / SignalR projection and cache hot
   reads in Redis.
 - **Expected dependencies:** No external runtime services in the contract module
@@ -315,8 +320,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   trending, candles, and indicator candle inputs; writes provider responses after
   cache misses or stale rows without sync-over-async; returns cache hits with
   `timescale-cache:{originalSource}` source
-  metadata; and falls back to provider behavior when Timescale storage is
-  unavailable. AppHost persists the `timescaledb` data directory in
+  metadata after verifying the cached candles match the requested normalized
+  chart range and lookback semantics; and falls back to provider behavior when
+  Timescale storage is unavailable. AppHost persists the `timescaledb` data directory in
   `ATRADE_TIMESCALEDB_DATA_VOLUME` (default `atrade-timescaledb-data`) with a
   stable `ATRADE_TIMESCALEDB_PASSWORD`, so fresh cache rows survive full local
   AppHost restarts while stale rows still require provider refresh.
@@ -342,9 +348,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   HTTP-facing provider-neutral `AnalysisRunRequest` / `AnalysisRunIntakeResult`
   intake records, normalized `AnalysisRequest` and `AnalysisResult` records,
   signal/metric/backtest output contracts, and the `NoConfiguredAnalysisEngine`
-  fallback. The intake owns symbol/timeframe defaults, direct-bar validation,
-  cache-aware candle acquisition through `IMarketDataService`, symbol identity
-  resolution/fallback, invalid-request and provider-error propagation, and
+  fallback. The intake owns symbol/range (`timeframe` payload field) defaults,
+  direct-bar validation, cache-aware candle acquisition through `IMarketDataService`,
+  symbol identity resolution/fallback, invalid-request and provider-error propagation, and
   engine handoff. The current API surface exposes `GET /api/analysis/engines`
   and `POST /api/analysis/run`; with no selected provider, run requests return
   `analysis-engine-not-configured` with empty signals, metrics, and backtest
@@ -551,9 +557,10 @@ references.
   backend watchlist API reads/writes with provider metadata and a non-authoritative localStorage
   cache/migration source, workflow hooks for watchlist migration/exact pin
   commands, search debounce/provider errors, chart HTTP loading/source labels,
-  and SignalR-to-HTTP fallback, `lightweight-charts` candlesticks with `1m` /
-  `5m` / `1h` / `1D` timeframe switching, moving-average / RSI / MACD panels,
-  SignalR updates with HTTP fallback, and explicit no-real-orders messaging.
+  and SignalR-to-HTTP fallback, `lightweight-charts` candlesticks with lookback
+  range controls for `1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`,
+  and All time, moving-average / RSI / MACD panels, SignalR updates with HTTP
+  fallback, and explicit no-real-orders messaging.
 
 ## 5. Dependency Summary
 

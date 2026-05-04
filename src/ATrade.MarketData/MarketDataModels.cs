@@ -2,35 +2,77 @@ namespace ATrade.MarketData;
 
 public static class MarketDataTimeframes
 {
-    public const string OneMinute = "1m";
-    public const string FiveMinutes = "5m";
-    public const string OneHour = "1h";
-    public const string OneDay = "1D";
+    public const string OneMinute = ChartRangePresets.OneMinute;
+    public const string FiveMinutes = ChartRangePresets.FiveMinutes;
+    public const string OneHour = ChartRangePresets.OneHour;
+    public const string SixHours = ChartRangePresets.SixHours;
+    public const string OneDay = ChartRangePresets.OneDay;
+    public const string OneMonth = ChartRangePresets.OneMonth;
+    public const string SixMonths = ChartRangePresets.SixMonths;
+    public const string OneYear = ChartRangePresets.OneYear;
+    public const string FiveYears = ChartRangePresets.FiveYears;
+    public const string All = ChartRangePresets.All;
+    public const string Default = ChartRangePresets.Default;
 
-    private static readonly IReadOnlyDictionary<string, TimeframeDefinition> Definitions = new Dictionary<string, TimeframeDefinition>(StringComparer.OrdinalIgnoreCase)
-    {
-        [OneMinute] = new(OneMinute, TimeSpan.FromMinutes(1), 120),
-        [FiveMinutes] = new(FiveMinutes, TimeSpan.FromMinutes(5), 120),
-        [OneHour] = new(OneHour, TimeSpan.FromHours(1), 168),
-        [OneDay] = new(OneDay, TimeSpan.FromDays(1), 180),
-    };
+    public static IReadOnlyList<string> Supported => ChartRangePresets.Supported;
 
-    public static IReadOnlyList<string> Supported { get; } = new[]
-    {
-        OneMinute,
-        FiveMinutes,
-        OneHour,
-        OneDay,
-    };
+    public static bool TryGetDefinition(string? timeframe, out TimeframeDefinition definition) =>
+        TryGetDefinition(timeframe, DateTimeOffset.UtcNow, out definition);
 
-    public static bool TryGetDefinition(string? timeframe, out TimeframeDefinition definition)
+    public static bool TryGetDefinition(string? timeframe, DateTimeOffset nowUtc, out TimeframeDefinition definition)
     {
-        var normalized = string.IsNullOrWhiteSpace(timeframe) ? OneDay : timeframe.Trim();
-        return Definitions.TryGetValue(normalized, out definition);
+        if (!ChartRangePresets.TryGetPreset(timeframe, out var preset))
+        {
+            definition = default;
+            return false;
+        }
+
+        definition = TimeframeDefinition.FromPreset(preset, nowUtc);
+        return true;
     }
 }
 
-public readonly record struct TimeframeDefinition(string Name, TimeSpan Step, int CandleCount);
+public readonly record struct TimeframeDefinition(
+    string Name,
+    TimeSpan Step,
+    int CandleCount,
+    string ProviderPeriod,
+    string ProviderBarSize,
+    DateTimeOffset? LookbackStartUtc)
+{
+    public static TimeframeDefinition FromPreset(ChartRangePreset preset, DateTimeOffset nowUtc) => new(
+        preset.Value,
+        ParseProviderBarStep(preset.ProviderBarSize),
+        EstimateCandleCount(preset),
+        preset.ProviderPeriod,
+        preset.ProviderBarSize,
+        preset.GetLookbackStartUtc(nowUtc));
+
+    private static TimeSpan ParseProviderBarStep(string providerBarSize) => providerBarSize.Trim().ToLowerInvariant() switch
+    {
+        "1min" => TimeSpan.FromMinutes(1),
+        "5min" => TimeSpan.FromMinutes(5),
+        "1h" => TimeSpan.FromHours(1),
+        "1d" => TimeSpan.FromDays(1),
+        "1w" => TimeSpan.FromDays(7),
+        _ => TimeSpan.FromDays(1),
+    };
+
+    private static int EstimateCandleCount(ChartRangePreset preset) => preset.Value switch
+    {
+        ChartRangePresets.OneMinute => 1,
+        ChartRangePresets.FiveMinutes => 5,
+        ChartRangePresets.OneHour => 60,
+        ChartRangePresets.SixHours => 72,
+        ChartRangePresets.OneDay => 288,
+        ChartRangePresets.OneMonth => 31,
+        ChartRangePresets.SixMonths => 190,
+        ChartRangePresets.OneYear => 370,
+        ChartRangePresets.FiveYears => 260,
+        ChartRangePresets.All => 520,
+        _ => 180,
+    };
+}
 
 public sealed record MarketDataSymbol(
     string Symbol,
@@ -150,11 +192,11 @@ public interface IMarketDataService
 
     bool TryGetSymbol(string symbol, out MarketDataSymbol? marketSymbol);
 
-    bool TryGetCandles(string symbol, string? timeframe, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
+    bool TryGetCandles(string symbol, string? chartRange, out CandleSeriesResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
-    bool TryGetIndicators(string symbol, string? timeframe, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
+    bool TryGetIndicators(string symbol, string? chartRange, out IndicatorResponse? response, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
-    bool TryGetLatestUpdate(string symbol, string? timeframe, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
+    bool TryGetLatestUpdate(string symbol, string? chartRange, out MarketDataUpdate? update, out MarketDataError? error, MarketDataSymbolIdentity? identity = null);
 
     Task<MarketDataReadResult<TrendingSymbolsResponse>> GetTrendingSymbolsAsync(CancellationToken cancellationToken = default)
     {
@@ -195,41 +237,68 @@ public interface IMarketDataService
 
     Task<MarketDataReadResult<CandleSeriesResponse>> GetCandlesAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out var rangeError))
+        {
+            return Task.FromResult(MarketDataReadResult<CandleSeriesResponse>.Failure(rangeError!));
+        }
+
         return Task.FromResult(
-            TryGetCandles(symbol, timeframe, out var response, out var error, identity) && response is not null
+            TryGetCandles(symbol, normalizedChartRange, out var response, out var error, identity) && response is not null
                 ? MarketDataReadResult<CandleSeriesResponse>.Success(response)
                 : MarketDataReadResult<CandleSeriesResponse>.Failure(ToReadError(error)));
     }
 
     Task<MarketDataReadResult<IndicatorResponse>> GetIndicatorsAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out var rangeError))
+        {
+            return Task.FromResult(MarketDataReadResult<IndicatorResponse>.Failure(rangeError!));
+        }
+
         return Task.FromResult(
-            TryGetIndicators(symbol, timeframe, out var response, out var error, identity) && response is not null
+            TryGetIndicators(symbol, normalizedChartRange, out var response, out var error, identity) && response is not null
                 ? MarketDataReadResult<IndicatorResponse>.Success(response)
                 : MarketDataReadResult<IndicatorResponse>.Failure(ToReadError(error)));
     }
 
     Task<MarketDataReadResult<MarketDataUpdate>> GetLatestUpdateAsync(
         string symbol,
-        string? timeframe,
+        string? chartRange,
         MarketDataSymbolIdentity? identity = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (!TryNormalizeChartRange(chartRange, out var normalizedChartRange, out var rangeError))
+        {
+            return Task.FromResult(MarketDataReadResult<MarketDataUpdate>.Failure(rangeError!));
+        }
+
         return Task.FromResult(
-            TryGetLatestUpdate(symbol, timeframe, out var update, out var error, identity) && update is not null
+            TryGetLatestUpdate(symbol, normalizedChartRange, out var update, out var error, identity) && update is not null
                 ? MarketDataReadResult<MarketDataUpdate>.Success(update)
                 : MarketDataReadResult<MarketDataUpdate>.Failure(ToReadError(error)));
+    }
+
+    private static bool TryNormalizeChartRange(string? chartRange, out string normalizedChartRange, out MarketDataError? error)
+    {
+        if (ChartRangePresets.TryNormalize(chartRange, out normalizedChartRange))
+        {
+            error = null;
+            return true;
+        }
+
+        error = ChartRangePresets.CreateUnsupportedRangeError(chartRange);
+        return false;
     }
 
     private static MarketDataError ToReadError(MarketDataError? error) => error ?? new MarketDataError(

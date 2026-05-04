@@ -293,6 +293,123 @@ public sealed class IbkrMarketDataProviderTests
         Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath == IbkrMarketDataClient.ScannerPath);
     }
 
+    [Theory]
+    [InlineData(ChartRangePresets.OneMinute, "1d", "1min")]
+    [InlineData(ChartRangePresets.FiveMinutes, "1d", "1min")]
+    [InlineData(ChartRangePresets.OneHour, "1d", "1min")]
+    [InlineData(ChartRangePresets.SixHours, "1d", "5min")]
+    [InlineData(ChartRangePresets.OneDay, "2d", "5min")]
+    [InlineData(ChartRangePresets.OneMonth, "1m", "1d")]
+    [InlineData(ChartRangePresets.SixMonths, "6m", "1d")]
+    [InlineData(ChartRangePresets.OneYear, "1y", "1d")]
+    [InlineData(ChartRangePresets.FiveYears, "5y", "1w")]
+    [InlineData(ChartRangePresets.All, "10y", "1w")]
+    public async Task Provider_MapsSupportedChartRangesToIbkrHistoricalRequestHints(string chartRange, string expectedPeriod, string expectedBar)
+    {
+        var handler = new RecordingHttpMessageHandler((request, cancellationToken) =>
+        {
+            Assert.False(cancellationToken.IsCancellationRequested);
+            return Task.FromResult(request.RequestUri?.AbsolutePath switch
+            {
+                IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+                {
+                    authenticated = true,
+                    connected = true,
+                    competing = false,
+                    message = "ready",
+                }),
+                IbkrMarketDataClient.ContractSearchPath => JsonResponse(new[]
+                {
+                    new { conid = "265598", symbol = "AAPL", companyName = "Apple Inc.", secType = "STK", sector = "Technology" },
+                }),
+                IbkrMarketDataClient.ContractInfoPath => JsonResponse(new[]
+                {
+                    new { conid = "265598", symbol = "AAPL", companyName = "Apple Inc.", secType = "STK", exchange = "NASDAQ", currency = "USD", sector = "Technology" },
+                }),
+                IbkrMarketDataClient.HistoricalDataPath => HistoricalResponseForRequest(request, expectedPeriod, expectedBar),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            });
+        });
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var result = await provider.GetCandlesAsync("AAPL", chartRange, cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
+        Assert.Equal(chartRange, result.Value!.Timeframe);
+        Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath == IbkrMarketDataClient.HistoricalDataPath);
+    }
+
+    [Fact]
+    public async Task Provider_FiltersHistoricalBarsToRequestedLookbackWindow()
+    {
+        var recentTime = DateTimeOffset.UtcNow.AddHours(-2);
+        var staleTime = DateTimeOffset.UtcNow.AddDays(-2);
+        var handler = new RecordingHttpMessageHandler((request, cancellationToken) =>
+        {
+            Assert.False(cancellationToken.IsCancellationRequested);
+            return Task.FromResult(request.RequestUri?.AbsolutePath switch
+            {
+                IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+                {
+                    authenticated = true,
+                    connected = true,
+                    competing = false,
+                    message = "ready",
+                }),
+                IbkrMarketDataClient.ContractSearchPath => JsonResponse(new[]
+                {
+                    new { conid = "265598", symbol = "AAPL", companyName = "Apple Inc.", secType = "STK", sector = "Technology" },
+                }),
+                IbkrMarketDataClient.ContractInfoPath => JsonResponse(new[]
+                {
+                    new { conid = "265598", symbol = "AAPL", companyName = "Apple Inc.", secType = "STK", exchange = "NASDAQ", currency = "USD", sector = "Technology" },
+                }),
+                IbkrMarketDataClient.HistoricalDataPath => JsonResponse(new
+                {
+                    data = new[]
+                    {
+                        new { t = ToUnixMilliseconds(staleTime), o = 190.00m, h = 191.00m, l = 189.00m, c = 190.50m, v = 1000 },
+                        new { t = ToUnixMilliseconds(recentTime), o = 195.11m, h = 197.22m, l = 194.10m, c = 196.00m, v = 52_000_000 },
+                    },
+                }),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+            });
+        });
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var result = await provider.GetCandlesAsync("AAPL", ChartRangePresets.OneDay, cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var candle = Assert.Single(result.Value!.Candles);
+        Assert.Equal(195.11m, candle.Open);
+        Assert.Equal(52_000_000, candle.Volume);
+    }
+
+    [Fact]
+    public async Task Provider_ReturnsSupportedChartRangeErrorForUnsupportedHistoricalRange()
+    {
+        var handler = new RecordingHttpMessageHandler((request, _) => Task.FromResult(request.RequestUri?.AbsolutePath switch
+        {
+            IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+            {
+                authenticated = true,
+                connected = true,
+                competing = false,
+                message = "ready",
+            }),
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        }));
+        var provider = CreateProvider(handler, CreateOptions());
+
+        var result = await provider.GetCandlesAsync("AAPL", "5m", cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(MarketDataProviderErrorCodes.UnsupportedChartRange, result.Error?.Code);
+        Assert.Contains("Supported values: 1min, 5mins", result.Error?.Message);
+        Assert.DoesNotContain(handler.Requests, request => request.RequestUri!.AbsolutePath == IbkrMarketDataClient.HistoricalDataPath);
+    }
+
     private static IbkrGatewayOptions CreateOptions(bool withCredentials = true)
     {
         return new IbkrGatewayOptions
@@ -390,11 +507,7 @@ public sealed class IbkrMarketDataProviderTests
             }),
             IbkrMarketDataClient.HistoricalDataPath => JsonResponse(new
             {
-                data = new[]
-                {
-                    new { t = 1_714_521_600_000, o = 195.11m, h = 197.22m, l = 194.10m, c = 196.00m, v = 52_000_000 },
-                    new { t = 1_714_608_000_000, o = 196.00m, h = 198.10m, l = 195.50m, c = 196.44m, v = 58_000_000 },
-                },
+                data = CreateRecentHistoricalPayloadBars(),
             }),
             IbkrMarketDataClient.ScannerPath => JsonResponse(new[]
             {
@@ -416,6 +529,24 @@ public sealed class IbkrMarketDataProviderTests
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
         });
     }
+
+    private static HttpResponseMessage HistoricalResponseForRequest(HttpRequestMessage request, string expectedPeriod, string expectedBar)
+    {
+        Assert.Contains($"period={Uri.EscapeDataString(expectedPeriod)}", request.RequestUri!.Query, StringComparison.Ordinal);
+        Assert.Contains($"bar={Uri.EscapeDataString(expectedBar)}", request.RequestUri!.Query, StringComparison.Ordinal);
+        return JsonResponse(new
+        {
+            data = CreateRecentHistoricalPayloadBars(),
+        });
+    }
+
+    private static object[] CreateRecentHistoricalPayloadBars() =>
+    [
+        new { t = ToUnixMilliseconds(DateTimeOffset.UtcNow.AddSeconds(-30)), o = 195.11m, h = 197.22m, l = 194.10m, c = 196.00m, v = 52_000_000 },
+        new { t = ToUnixMilliseconds(DateTimeOffset.UtcNow.AddSeconds(-10)), o = 196.00m, h = 198.10m, l = 195.50m, c = 196.44m, v = 58_000_000 },
+    ];
+
+    private static long ToUnixMilliseconds(DateTimeOffset time) => time.ToUnixTimeMilliseconds();
 
     private static HttpResponseMessage JsonResponse<T>(T payload) => new(HttpStatusCode.OK)
     {
