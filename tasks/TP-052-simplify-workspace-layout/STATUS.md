@@ -1,7 +1,7 @@
 # TP-052: Simplify workspace layout and remove extra chrome — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
@@ -77,11 +77,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -96,6 +96,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Layout-only change did not alter provider/source labels or analysis user-facing states | Check-if-affected provider and analysis docs reviewed; no edits required | `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md` |
+| Simplified layout validation now covers removed chrome, grid, full-width shell, page-scroll prevention, and preserved workflow/safety surfaces | Added and ran dedicated apphost validation | `tests/apphost/frontend-simplified-workspace-layout-tests.sh` |
 
 ---
 
@@ -117,6 +119,8 @@
 | 2026-05-05 14:44 | Step 5 started | Running required validation and build/test gates |
 | 2026-05-05 14:58 | Step 5 validation progress | Simplified layout, no-command, shell/cutover, affected workflow validations, frontend build, and dotnet test passed with zero failures |
 | 2026-05-05 15:00 | Step 5 build gate | dotnet build ATrade.slnx passed with zero warnings/errors |
+| 2026-05-05 15:01 | Step 6 started | Verifying delivery documentation and affected-doc review notes |
+| 2026-05-05 15:04 | Task complete | Delivery documentation verified and discoveries logged |
 
 ---
 
@@ -128,4 +132,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Check-if-affected docs reviewed: `docs/architecture/provider-abstractions.md` and `docs/architecture/analysis-engines.md` did not require changes because TP-052 changed only layout chrome/viewport behavior, not provider/source labels or analysis user-facing states.
