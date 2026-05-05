@@ -94,7 +94,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, a compact-filtered dense market monitor for trending/search/watchlist rows, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -153,20 +153,22 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-The `TP-045` through `TP-053` frontend reconstruction, no-command cutover,
-layout-simplification, and top-chrome/filter-density batch now covers the active
-design spec, shadcn/Tailwind/Radix UI foundation, module/workflow shell, dense
-market monitor, chart/analysis workspaces, final cutover verification, removal
-of the visible terminal branding plus command input/parser, the simplified
-rail-first full-bleed single-primary workspace layout, removal of the remaining
-app-level brand header/global safety strip, and compact market-monitor filters.
-The current frontend surface is the direct module/workflow ATrade paper
-workspace; follow-up implementation packets should start at `TP-054` and build
-on module rail navigation plus explicit workflow actions rather than the retired
-old shell/list route wrappers, a command system, or the removed app-level,
-context, monitor, footer, and top-safety chrome.
+The `TP-045` through `TP-055` frontend reconstruction, no-command cutover,
+layout-simplification, chart-visibility restoration, and theme-foundation batch
+now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
+module/workflow shell, dense market monitor, chart/analysis workspaces, final
+cutover verification, removal of the visible terminal branding plus command
+input/parser, the simplified rail-first full-bleed single-primary workspace
+layout, removal of the remaining app-level brand header/global safety strip,
+compact market-monitor filters, visible stock chart rendering, and the original
+black/graphite/amber ATrade terminal palette validation. The current frontend
+surface is the direct module/workflow ATrade paper workspace; follow-up
+implementation packets should start at `TP-056` and build on module rail
+navigation plus explicit workflow actions rather than the retired old shell/list
+route wrappers, a command system, cyan/blue-gradient-dominant styling, or the
+removed app-level, context, monitor, footer, and top-safety chrome.
 
-Completed Taskplane packets through `TP-053` are present in `tasks/`; completed
+Completed Taskplane packets through `TP-055` are present in `tasks/`; completed
 packets should be archived when convenient. During orchestrated runs the runtime
 handles post-merge archival for active task folders.
 
@@ -231,6 +233,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-terminal-cutover-tests.sh`
 - `tests/apphost/frontend-terminal-ui-stack-tests.sh`
+- `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
 - `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`

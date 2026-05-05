@@ -612,7 +612,7 @@ references.
   screeners, macro calendars, assistant text, node graphs, or order-entry
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
-  top-chrome/filter-density, shell/market/chart/analysis validation scripts.
+  top-chrome/filter-density, shell/market/chart/analysis/theme validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
@@ -620,7 +620,8 @@ references.
   downstream terminal modules. Minimal shadcn-style wrappers live under
   `frontend/components/ui/` and are limited to reusable Radix/accessibility
   primitives (button, input, badge, tabs, dialog, popover, scroll area,
-  separator, and tooltip) with ATrade workspace tokens applied. Original
+  separator, and tooltip) with the original black/graphite/amber ATrade
+  workspace tokens applied. Original
   ATrade-only foundation components live under `frontend/components/terminal/`
   (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
   `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalModuleRail`,

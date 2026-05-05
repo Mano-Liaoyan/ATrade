@@ -269,14 +269,16 @@ implementation while leaving room for a desktop wrapper later.
 
 The visual goal is an original ATrade interpretation of a modern institutional
 finance workstation: dense, precise, dark, data-forward, and module-friendly. It
-should feel closer to contemporary finance workspaces than to a generic SaaS
-dashboard, while staying clearly separate from proprietary product identities.
+uses a repository-owned black/graphite/amber terminal palette with red/green
+market states and restrained gray/steel information states. It should feel
+closer to contemporary finance workspaces than to a generic SaaS dashboard,
+while staying clearly separate from proprietary product identities.
 
 ### 7.1 Institutional Characteristics
 
 - **Dark dense panels:** default to a near-black application shell with layered
-  graphite/slate panels, subtle dividers, and restrained elevation rather than
-  large white cards or marketing-style gradients.
+  black/graphite panels, warm gray dividers, and restrained elevation rather
+  than large white cards or marketing-style gradients.
 - **High-contrast data hierarchy:** prices, symbols, status labels, timestamps,
   source metadata, and unavailable states should have obvious priority through
   weight, color, spacing, and alignment.
@@ -286,13 +288,15 @@ dashboard, while staying clearly separate from proprietary product identities.
 - **Grid/table density:** market lists, watchlists, search results, indicators,
   and status diagnostics should use dense rows, sticky headings where useful,
   right-aligned numeric columns, and scan-friendly separators.
-- **Workspace accents:** use amber, cyan, green, and red accents for attention,
-  selected/focused states, positive/negative movement, warning/unavailable
-  states, and paper-only safety. Accent use must be an original palette, not a
-  copied third-party brand palette.
+- **Workspace accents:** use amber/orange as the primary emphasis for selected,
+  active, focused, chart overlay, and paper-safety attention states; use green
+  and red only for truthful positive/negative market movement and danger; use
+  yellow/amber for warning/unavailable states; and keep any blue/cyan-like
+  treatment muted for secondary information only. Accent use must be an original
+  ATrade palette, not a copied third-party brand palette.
 - **Rectangular full-bleed paneling:** prefer crisp rectangular regions, a clear
-  module rail, source/status chips, and instrument identity chips over rounded
-  consumer-card layouts or extra shell chrome.
+  module rail, source/status chips, chart frames, dense filters, and instrument
+  identity chips over rounded consumer-card layouts or extra shell chrome.
 - **Non-generic shadcn styling:** avoid unmodified shadcn examples. Components
   should be restyled into ATrade primitives with custom density, focus, color,
   and data-state treatments.
@@ -306,8 +310,10 @@ Implementation guidance:
 
 - Use Tailwind tokens/utilities as the styling substrate, but define ATrade
   workspace tokens for shell backgrounds, panel layers, borders, focus rings,
-  data-state colors, typography scale, spacing density, and chart/workspace
-  surfaces.
+  amber/orange emphasis, red/green market states, gray dividers, typography
+  scale, spacing density, and chart/workspace surfaces. Token values and names
+  must remain original ATrade work rather than exact FinceptTerminal,
+  Bloomberg, or other third-party values.
 - Use Radix primitives for accessible dialogs, popovers, tabs, tooltips, menus,
   separators, scroll areas, and similar behaviors when they reduce custom
   accessibility risk.

@@ -1,7 +1,7 @@
 # TP-055: Fincept-inspired terminal theme refactor — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
@@ -65,12 +65,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -97,6 +97,9 @@
 | Added source/build theme validation for black/graphite shell tokens, amber primary/focus states, red/green market chart states, gray dividers, Tailwind token consistency, no cyan/blue-dominant utilities, and clean-room/no-provider-source guardrails; initial run passed. | Run again in Step 4 as the quality gate. | `tests/apphost/frontend-terminal-theme-refactor-tests.sh` |
 | Reviewed existing frontend terminal validation scripts after the palette refactor: UI stack/shell validations still pass without changing their no-command/no-top-chrome/API-boundary assertions, and stock chart visibility validation still passes with the chart color refactor. | No existing validation script update required. | `tests/apphost/frontend-terminal-ui-stack-tests.sh`, `tests/apphost/frontend-terminal-shell-ui-tests.sh`, `tests/apphost/frontend-stock-chart-visibility-tests.sh` |
 | Confirmed the new theme validation uses source/build assertions only: it runs `npm ci` plus `npm run build`, does not launch `next dev` or call provider endpoints, and includes guardrails against provider/runtime direct references in active frontend source. | Provider credentials/runtimes are not required for the script. | `tests/apphost/frontend-terminal-theme-refactor-tests.sh` |
+| Updated required docs for TP-055: the UI design spec now defines the original black/graphite/amber clean-room palette, README lists the new theme validation and current surface, and PLAN records TP-055 plus TP-056 as next. | Documentation reflects the theme foundation and verification entry point. | `docs/design/atrade-terminal-ui.md`, `README.md`, `PLAN.md` |
+| Reviewed "Check If Affected" docs: paper-workspace visual contract now mentions the original palette; modules doc notes the theme validation and tokenized UI primitives; no frontend ownership or browser/API boundary change required further architecture edits. | Check-if-affected docs are aligned without changing runtime contracts. | `docs/architecture/paper-trading-workspace.md`, `docs/architecture/modules.md` |
+| Final delivery discovery: TP-055 required no live IBKR/iBeam or LEAN verification because all changes are frontend source/build/theme validation; provider-unavailable/no-engine/order-disabled behavior remains unchanged and was verified through source/build scripts plus full .NET test/build. | Keep any future real-provider validation optional through ignored local `.env` values only. | Step 4 verification, `tests/apphost/frontend-terminal-theme-refactor-tests.sh` |
 
 ---
 

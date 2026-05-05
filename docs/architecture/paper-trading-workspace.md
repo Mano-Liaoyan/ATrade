@@ -110,8 +110,10 @@ modules, and honest disabled-module surfaces for future modules
 rail, market-monitor chart/analysis actions, and symbol route state; no command
 input, command parser, or backend command route is part of the active frontend.
 The visual direction is inspired only by broad finance-workstation information
-architecture; it does not copy proprietary terminal layouts, assets, trademarks,
-or colors.
+architecture and is implemented with original ATrade black/graphite/amber tokens,
+red/green market-state colors, warm gray dividers, and restrained information
+contrast; it does not copy proprietary terminal layouts, assets, trademarks, or
+colors.
 
 ## 3. Runtime Boundaries
 
