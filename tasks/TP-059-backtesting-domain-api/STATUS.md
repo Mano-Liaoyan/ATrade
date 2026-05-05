@@ -1,6 +1,6 @@
 # TP-059: Backtesting domain, persistence, and API — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Create provider-neutral backtesting contracts and validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 3
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Create provider-neutral backtesting contracts and validation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Backtesting contracts and statuses created
-- [ ] Built-in strategy IDs and JSON parameter bag validation implemented
-- [ ] Run creation snapshots effective capital/source and blocks without capital
-- [ ] Tests cover validation, capital snapshotting, direct-bar rejection, no custom code, and no order fields
+- [x] Backtesting contracts and statuses created
+- [x] Built-in strategy IDs and JSON parameter bag validation implemented
+- [x] Run creation snapshots effective capital/source and blocks without capital
+- [x] Tests cover validation, capital snapshotting, direct-bar rejection, no custom code, and no order fields
 
 ---
 
