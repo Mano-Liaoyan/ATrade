@@ -1,6 +1,6 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
-**Current Step:** Step 1: Audit active frontend routes and legacy leftovers
+**Current Step:** Step 2: Verify full functional replacement behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,19 +23,19 @@
 ---
 
 ### Step 1: Audit active frontend routes and legacy leftovers
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expanded after reading completed TP-047 through TP-049 state. TP-047 routed home/symbol pages through the terminal frame and kept dependency-free resizable layout; TP-048 wrapped search/watchlist workflows behind `terminalMarketMonitorWorkflow`; TP-049 kept `CandlestickChart` while retiring old page-level chart/analysis panels.
 
-- [ ] Inventory active route imports and component references to prove home/symbol routes enter only the terminal app frame
-- [ ] Delete or retire unused legacy rendering components/CSS while preserving active clients/workflows/types/chart primitives
-- [ ] Remove stale old copy/test markers from active frontend code/tests
-- [ ] Add and run cutover assertions for no old-shell imports/copy and terminal markers present
+- [x] Inventory active route imports and component references to prove home/symbol routes enter only the terminal app frame
+- [x] Delete or retire unused legacy rendering components/CSS while preserving active clients/workflows/types/chart primitives
+- [x] Remove stale old copy/test markers from active frontend code/tests
+- [x] Add and run cutover assertions for no old-shell imports/copy and terminal markers present
 
 ---
 
 ### Step 2: Verify full functional replacement behavior
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Verify all supported commands open/focus correct terminal modules
 - [ ] Verify current workflows remain reachable in terminal UI
@@ -97,6 +97,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Active Next.js routes are limited to `frontend/app/page.tsx`, `frontend/app/symbols/[symbol]/page.tsx`, and `frontend/app/layout.tsx`; both user-facing route pages import `ATradeTerminalApp` directly and do not import the retired `TradingWorkspace` or `SymbolChartView` wrappers. | Used as the Step 1 route cutover inventory; obsolete wrappers remain candidates for deletion because only tests/source self references mention them. | `frontend/app/page.tsx`, `frontend/app/symbols/[symbol]/page.tsx` |
+| `TradingWorkspace` and `SymbolChartView` were compatibility wrappers around `ATradeTerminalApp` with no active route imports after TP-047/TP-049. | Deleted the wrappers, updated chart-analysis tests to assert direct route ownership, and purged unused old-shell/search/watchlist/timeframe/indicator CSS selectors while preserving active terminal clients, workflows, types, and `CandlestickChart`. | `frontend/components/TradingWorkspace.tsx`, `frontend/components/SymbolChartView.tsx`, `frontend/app/globals.css`, `tests/apphost/frontend-terminal-chart-analysis-tests.sh` |
 
 ---
 
@@ -110,6 +112,12 @@
 | 2026-05-05 13:29 | Step 0 completed | Required paths and dependencies verified; frontend npm dependencies installed with npm ci |
 | 2026-05-05 13:29 | Step 1 started | Audit active frontend routes and legacy leftovers |
 | 2026-05-05 13:31 | Step 1 hydrated | Read TP-047 through TP-049 completion state and expanded route/component cutover audit outcomes |
+| 2026-05-05 13:33 | Step 1 route inventory | Confirmed active route pages import `ATradeTerminalApp` directly and old wrapper components are not active route imports |
+| 2026-05-05 13:40 | Step 1 legacy cleanup | Deleted obsolete route wrappers, purged unused legacy CSS selectors, updated chart/UI stack source assertions, and reran chart-analysis, UI-stack, and frontend build checks |
+| 2026-05-05 13:43 | Step 1 stale marker cleanup | Removed obsolete old route copy assertions from shell UI tests and verified active frontend/tests no longer contain old homepage/back-link copy markers |
+| 2026-05-05 13:45 | Step 1 cutover validation | Added `frontend-terminal-cutover-tests.sh` and passed source assertions for terminal routes, obsolete renderer deletion, old copy/CSS absence, and terminal markers |
+| 2026-05-05 13:46 | Step 1 completed | Active routes cut over to terminal app frame; obsolete wrappers/CSS retired; cutover validation added |
+| 2026-05-05 13:46 | Step 2 started | Verify full functional replacement behavior |
 
 ---
 

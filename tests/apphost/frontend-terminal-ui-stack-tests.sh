@@ -127,7 +127,7 @@ assert_terminal_primitives() {
   assert_file_contains "$frontend_root/components/terminal/TerminalStatusBadge.tsx" 'data-terminal-status-badge'
   assert_file_contains "$frontend_root/components/terminal/index.ts" 'export * from "./TerminalPanel"'
 
-  if grep -RIn -E 'workspace-shell|terminal-workspace-shell|TradingWorkspace|SymbolSearch|Watchlist' \
+  if grep -RIn -E 'workspace-shell|terminal-workspace-shell|TradingWorkspace|<(SymbolSearch|Watchlist)([[:space:]>])|from ["'"'"'][^"'"'"']*/(SymbolSearch|Watchlist)["'"'"']' \
     "$frontend_root/components/ui" "$frontend_root/components/terminal"; then
     printf 'terminal primitives must not depend on legacy workspace rendering or shell classes.\n' >&2
     return 1

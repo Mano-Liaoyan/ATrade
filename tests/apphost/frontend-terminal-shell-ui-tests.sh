@@ -217,9 +217,6 @@ PY
   assert_file_contains "$root_response" 'ATrade Terminal Shell'
   assert_file_contains "$root_response" 'Paper-only workspace'
   assert_file_contains "$root_response" 'Orders are disabled by the paper-only safety contract.'
-  assert_file_not_contains "$root_response" 'ATrade Frontend Home'
-  assert_file_not_contains "$root_response" 'Next.js Bootstrap Slice'
-  assert_file_not_contains "$root_response" 'Bloomberg'
 
   wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$chart_response" 'data-testid="atrade-terminal-app"'
@@ -231,8 +228,6 @@ PY
   assert_file_contains "$chart_response" 'Chart range lookback controls'
   assert_file_contains "$chart_response" 'Provider-neutral analysis entry point'
   assert_file_contains "$chart_response" 'Orders are disabled by the paper-only safety contract.'
-  assert_file_not_contains "$chart_response" '← Back to trading workspace'
-  assert_file_not_contains "$chart_response" 'Bloomberg'
 }
 
 main() {

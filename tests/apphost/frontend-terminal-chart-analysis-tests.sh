@@ -28,6 +28,15 @@ assert_file_not_contains() {
   fi
 }
 
+assert_path_missing() {
+  local path="$1"
+
+  if [[ -e "$path" ]]; then
+    printf 'expected path to be removed: %s\n' "$path" >&2
+    return 1
+  fi
+}
+
 assert_terminal_chart_workflow_contract() {
   local symbol_workflow="$repo_root/frontend/lib/symbolChartWorkflow.ts"
   local terminal_workflow="$repo_root/frontend/lib/terminalChartWorkspaceWorkflow.ts"
@@ -115,7 +124,8 @@ assert_retired_old_chart_shell_components() {
     fi
   done
 
-  assert_file_contains "$repo_root/frontend/components/SymbolChartView.tsx" '<ATradeTerminalApp initialIdentity={identity} initialModuleId="CHART" initialSymbol={symbol} />'
+  assert_path_missing "$repo_root/frontend/components/SymbolChartView.tsx"
+  assert_file_contains "$repo_root/frontend/app/symbols/[symbol]/page.tsx" '<ATradeTerminalApp initialChartRange={initialChartRange} initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />'
   assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TerminalChartWorkspace'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" 'TerminalInstrumentHeader'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalIndicatorGrid.tsx" 'TerminalIndicatorGrid'
@@ -173,7 +183,6 @@ assert_no_direct_provider_database_or_order_access() {
   local forbidden_pattern='Npgsql|TimescaleConnection|PostgresConnection|Host=|User ID=|Password=|redis://|nats://|ibkr-gateway|iserver/secdef|iserver/scanner|Client Portal|ATRADE_IBKR|IBKR_USERNAME|IBKR_PASSWORD|ATRADE_LEAN|docker exec|QuantConnect\.Lean|lean-engine|LeanRuntime|/api/orders|orders/simulate'
   local scan_paths=(
     "$repo_root/frontend/app/symbols"
-    "$repo_root/frontend/components/SymbolChartView.tsx"
     "$repo_root/frontend/components/terminal"
     "$repo_root/frontend/lib/analysisClient.ts"
     "$repo_root/frontend/lib/marketDataClient.ts"
