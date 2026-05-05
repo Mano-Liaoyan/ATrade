@@ -45,6 +45,7 @@ assert_terminal_chart_workflow_contract() {
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
   local terminal_workspace="$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx"
   local instrument_header="$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx"
+  local candlestick_chart="$repo_root/frontend/components/CandlestickChart.tsx"
 
   assert_file_contains "$symbol_workflow" 'chartRange: ChartRange'
   assert_file_contains "$symbol_workflow" 'getCandles(normalizedSymbol, chartRange, chartIdentity)'
@@ -60,6 +61,8 @@ assert_terminal_chart_workflow_contract() {
   assert_file_contains "$terminal_workflow" 'getMarketDataIdentity'
   assert_file_contains "$terminal_workflow" 'formatTerminalChartIdentitySummary'
   assert_file_contains "$terminal_workflow" 'ChartPollingFallbackMs'
+  assert_file_contains "$terminal_workflow" 'hasCandleData: Boolean(chart.candles && chart.candles.candles.length > 0)'
+  assert_file_contains "$terminal_workflow" 'isEmpty: !hasCandleData'
 
   assert_file_contains "$market_client" 'new URLSearchParams({ range: chartRange })'
   assert_file_contains "$market_client" 'appendIdentityQueryParams(params, identity)'
@@ -71,7 +74,15 @@ assert_terminal_chart_workflow_contract() {
   assert_file_contains "$terminal_workspace" 'chart.view.fallbackCopy'
   assert_file_contains "$terminal_workspace" 'chart.view.identitySummary'
   assert_file_contains "$terminal_workspace" 'chart.view.noOrderCopy'
+  assert_file_contains "$terminal_workspace" 'chart.candles && chart.view.hasCandleData'
+  assert_file_contains "$terminal_workspace" '!chart.candles || !chart.view.hasCandleData'
   assert_file_contains "$terminal_workspace" '<CandlestickChart candles={chart.candles} indicators={chart.indicators} />'
+  assert_file_contains "$terminal_workspace" 'no synthetic chart data is shown'
+  assert_file_contains "$candlestick_chart" 'autoSize: false'
+  assert_file_contains "$candlestick_chart" 'measureChartContainer(container)'
+  assert_file_contains "$candlestick_chart" 'ResizeObserver'
+  assert_file_contains "$candlestick_chart" 'chart.resize(nextSize.width, nextSize.height, true)'
+  assert_file_contains "$candlestick_chart" 'chart.unsubscribeCrosshairMove(handleCrosshairMove)'
   assert_file_contains "$instrument_header" 'data-testid="terminal-instrument-header"'
   assert_file_contains "$instrument_header" 'data-testid="chart-range-controls"'
   assert_file_contains "$instrument_header" 'chart.view.rangeHelpCopy'

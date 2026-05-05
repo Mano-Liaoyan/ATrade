@@ -1,6 +1,6 @@
 # TP-054: Restore stock chart visibility — Status
 
-**Current Step:** Step 2: Make the stock chart visibly render when candle data exists
+**Current Step:** Step 3: Protect chart visibility in CSS and validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -46,11 +46,11 @@
 ---
 
 ### Step 3: Protect chart visibility in CSS and validation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Prevent chart region/container collapse or hidden overflow in `frontend/app/globals.css`
-- [ ] Create `tests/apphost/frontend-stock-chart-visibility-tests.sh`
-- [ ] Update existing chart/layout validation scripts for the fixed chart contract
+- [x] Prevent chart region/container collapse or hidden overflow in `frontend/app/globals.css`
+- [x] Create `tests/apphost/frontend-stock-chart-visibility-tests.sh`
+- [x] Update existing chart/layout validation scripts for the fixed chart contract
 
 ---
 
@@ -106,6 +106,7 @@
 | 2026-05-05 18:38 | Step 0 started | Preflight |
 | 2026-05-05 18:45 | Step 1 hydrated | Expanded diagnosis outcomes before implementation |
 | 2026-05-05 19:00 | Step 2 started | Implementing measured chart sizing/rendering fixes |
+| 2026-05-05 19:10 | Step 3 started | Adding non-collapsing CSS and validation coverage |
 
 ---
 
@@ -119,4 +120,5 @@
 
 - Step 2 sizing check: `cd frontend && npx tsc --noEmit --pretty false --ignoreDeprecations 6.0` passed after adding explicit chart measurement and ResizeObserver/window resize handling. `npm run lint -- --file components/CandlestickChart.tsx` was attempted first, but this frontend package has no lint script.
 - Step 2 route/identity check: `bash tests/apphost/frontend-terminal-chart-analysis-tests.sh` passed after preserving CHART module/exact identity behavior.
+- Step 3 validation check: new stock chart visibility, chart-analysis, chart-range, and simplified-layout scripts passed after CSS/validation updates.
 

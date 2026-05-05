@@ -244,6 +244,13 @@ assert_simplified_workspace_source_contract() {
   assert_css_rule_contains '.atrade-terminal-app__workspace' 'overflow: hidden;'
   assert_css_rule_contains '.terminal-workspace-layout' 'overflow: hidden;'
   assert_css_rule_contains '.terminal-workspace-layout__primary' 'overflow: auto;'
+  assert_css_rule_contains '.terminal-chart-workspace' 'min-height: min(44rem, calc(100dvh - 4rem));'
+  assert_css_rule_contains '.terminal-chart-workspace__market-grid' 'min-height: min(42rem, 72dvh);'
+  assert_css_rule_contains '.terminal-chart-workspace__chart-region' 'grid-template-rows: auto minmax(26rem, 1fr) auto;'
+  assert_css_rule_contains '.terminal-chart-workspace__chart-region' 'overflow: auto;'
+  assert_css_rule_contains '.chart-shell' 'min-height: 30rem;'
+  assert_css_rule_contains '.chart-container' 'height: clamp(420px, 56dvh, 680px);'
+  assert_css_rule_contains '.chart-container' 'min-width: 1px;'
 }
 
 start_frontend_and_assert_simplified_markup() {
