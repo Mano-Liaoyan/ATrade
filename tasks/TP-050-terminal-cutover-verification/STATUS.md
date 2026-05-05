@@ -153,6 +153,8 @@
 | 2026-05-05 14:35 | Step 6 discoveries | Logged cutover discoveries for deleted wrappers, focus requests, bootstrap pipefail fix, and unchanged analysis state semantics |
 | 2026-05-05 14:36 | Step 6 completed | Documentation and delivery checklist complete |
 | 2026-05-05 14:36 | Task complete | All TP-050 steps complete; final status set to complete |
+| 2026-05-05 11:59 | Worker iter 1 | done in 1806s, tools: 249 |
+| 2026-05-05 11:59 | Task complete | .DONE created |
 
 ---
 
