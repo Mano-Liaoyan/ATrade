@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ATrade.Accounts\ATrade.Accounts.csproj" />
     <ProjectReference Include="..\ATrade.Brokers\ATrade.Brokers.csproj" />
   </ItemGroup>
 </Project>

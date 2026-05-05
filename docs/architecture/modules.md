@@ -1,8 +1,8 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-05
-summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker and market-data seams.
+updated: 2026-05-06
+summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker, account-capital, and market-data seams.
 see_also:
   - ../INDEX.md
   - ../design/atrade-terminal-ui.md
@@ -45,10 +45,14 @@ see_also:
 > implements LEAN as the first analysis engine provider behind that seam using
 > a generated analysis-only LEAN workspace, AppHost-managed Docker metadata when
 > Docker mode is selected, and safe runtime-unavailable states.
-> `ATrade.Workspaces` owns the first backend-persisted
-> workspace preference: Postgres-backed exact instrument watchlists with stable
-> `instrumentKey`/`pinKey` payloads derived from provider, provider id / IBKR
-> `conid`, symbol, exchange, currency, and asset class, plus a temporary local
+> `ATrade.Accounts` now also owns the provider-neutral paper-capital contract,
+> Postgres-backed local paper-capital fallback ledger, and `IPaperCapitalService`
+> selection flow that prefers an authenticated IBKR paper balance before local
+> fallback and explicit unavailable states. `ATrade.Workspaces` owns the first
+> backend-persisted workspace preference: Postgres-backed exact instrument
+> watchlists with stable `instrumentKey`/`pinKey` payloads derived from provider,
+> provider id / IBKR `conid`, symbol, exchange, currency, and asset class, plus a
+> temporary local
 > user / workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
 > `frontend/` directory now hosts the first paper-trading workspace UI slice,
@@ -180,7 +184,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Responsibilities:** In the current slice, provide an ASP.NET Core host
   that uses `ATrade.ServiceDefaults`, composes the Accounts, Orders, IBKR
   broker, MarketData, Analysis, and Workspaces modules, and exposes stable `GET /health`,
-  `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,
+  `GET /api/accounts/overview`, `GET /api/accounts/paper-capital`,
+  `PUT /api/accounts/local-paper-capital`, `GET /api/broker/ibkr/status`,
   `POST /api/orders/simulate`, `GET /api/market-data/trending`,
   `GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
   `GET /api/market-data/{symbol}/candles?range=...`,
@@ -215,10 +220,17 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   provider/market pin normalization, exact unpin validation, Postgres
   persistence, stable `instrumentKey`/`pinKey` metadata payloads, and stable
   validation/storage error shapes while the API only binds HTTP requests and
-  projects HTTP responses. The AppHost now injects runtime connection
-  information for `Postgres`, `TimescaleDB`, `Redis`, and `NATS`; the API
-  consumes `Postgres` for workspace watchlists and `TimescaleDB` for fresh
-  market-data cache-aside reads today. Later slices add authenticated
+  projects HTTP responses. The paper-capital endpoints resolve
+  `IPaperCapitalService`, so `ATrade.Accounts` owns local capital validation,
+  Postgres schema initialization, stable storage-unavailable errors, IBKR-first
+  effective-capital selection, and redaction; the API returns only the safe
+  payload (`effectiveCapital`, `currency`, `source`, `ibkrAvailable`,
+  `localConfigured`, `localCapital`, and `messages`) and never account ids,
+  credentials, gateway URLs, tokens, cookies, or session details. The AppHost
+  now injects runtime connection information for `Postgres`, `TimescaleDB`,
+  `Redis`, and `NATS`; the API consumes `Postgres` for Accounts local
+  paper-capital fallback storage and workspace watchlists, and `TimescaleDB` for
+  fresh market-data cache-aside reads today. Later slices add authenticated
   REST/streaming endpoints for deeper accounts, charts, strategies, and broader
   market-data queries plus translation of HTTP requests into module calls and
   NATS publications.
@@ -228,33 +240,45 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.Analysis.Lean`, and `ATrade.Workspaces` today for functional behavior;
   the current AppHost graph also provides `Postgres`, `TimescaleDB`, `Redis`,
   `NATS`, and optional LEAN Docker-mode environment handoff / workspace mapping
-  information. `Postgres` is consumed by `ATrade.Workspaces`
-  now; the other infrastructure references remain ready for later slices.
+  information. `Postgres` is consumed by `ATrade.Accounts` for local
+  paper-capital fallback storage and by `ATrade.Workspaces` for exact watchlists;
+  the other infrastructure references remain ready for later slices.
 - **First-phase focus:** The backend now proves the paper-safe composition
   pattern: official IBKR session status, deterministic order simulation,
   IBKR/iBeam-backed market-data HTTP/SignalR surfaces with safe unavailable
   states, provider-neutral analysis discovery/run contracts with an explicit
-  no-engine fallback plus optional LEAN execution, and Postgres-backed workspace watchlists for the frontend workspace.
+  no-engine fallback plus optional LEAN execution, Postgres-backed workspace
+  watchlists for the frontend workspace, and paper-capital source selection for
+  future backtest initialization without browser-visible broker account data.
 
-### 2.4 `ATrade.Accounts` *(exists today, first read-only slice)*
+### 2.4 `ATrade.Accounts` *(exists today, bootstrap overview plus paper-capital source)*
 
-- **Purpose:** Account, portfolio, and position bookkeeping.
+- **Purpose:** Account, portfolio, position, and paper-capital bookkeeping.
 - **Responsibilities:** In the current slice, provide deterministic,
-  bootstrap-safe `AccountOverview` response types, a minimal overview
-  provider, and DI registration used by `ATrade.Api` to serve
-  `GET /api/accounts/overview`. The response intentionally stops at module
-  markers (`module = "accounts"`, `status = "bootstrap"`,
-  `brokerConnection = "not-configured"`, `accounts = []`). Future slices
-  own the canonical account/portfolio/position schema, reconcile
-  broker-reported state with internal state, and expose richer query and
-  projection APIs.
-- **Expected dependencies:** `Postgres` (system of record), `NATS`
-  (execution events from the broker integration), and
-  `ATrade.ServiceDefaults` in later slices. The current slice
-  intentionally avoids persistence, broker/data clients, and fake account
-  state while contributing only bootstrap-safe read-only behavior.
-- **First-phase focus:** Reconcile against IBKR account and execution
-  events after the bootstrap overview slice proves module wiring.
+  bootstrap-safe `AccountOverview` response types and DI registration used by
+  `ATrade.Api` to serve `GET /api/accounts/overview`; own the provider-neutral
+  paper-capital response contract (`ibkr-paper-balance`, `local-paper-ledger`,
+  and `unavailable` sources); validate `PUT /api/accounts/local-paper-capital`
+  payloads as positive USD local fallback capital with sensitive provider fields
+  rejected; initialize and persist the `atrade_accounts.local_paper_capital`
+  Postgres table idempotently under the temporary `local-user` /
+  `paper-trading` identity; compose `IIbkrPaperCapitalProvider` availability
+  with the local ledger so `GET /api/accounts/paper-capital` prefers a safe
+  authenticated IBKR paper balance, falls back to local capital, or returns an
+  explicit unavailable state; and redact account identifiers, credentials,
+  gateway URLs, tokens, cookies, and session details from messages and errors.
+  The overview response intentionally remains bootstrap-safe (`module =
+  "accounts"`, `status = "bootstrap"`, `brokerConnection = "not-configured"`,
+  `accounts = []`). Future slices own the canonical account/portfolio/position
+  schema, reconcile broker-reported state with internal state, and expose richer
+  query and projection APIs.
+- **Expected dependencies:** `Postgres` today for local paper-capital fallback
+  storage, `ATrade.Brokers.Ibkr` through the provider-neutral
+  `IIbkrPaperCapitalProvider` seam for authenticated paper-balance reads, and
+  `ATrade.ServiceDefaults`. `NATS` joins later for execution/account events.
+- **First-phase focus:** Provide a truthful initial-capital source for
+  backtesting and future account workflows without fake account state or leaked
+  broker identifiers.
 
 ### 2.5 `ATrade.Orders` *(exists today, first paper-simulation slice)*
 
@@ -453,17 +477,21 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   auth-status client boundary over the shared HTTPS/local-certificate transport,
   own the normalized IBKR/iBeam readiness result, implement
   `ATrade.Brokers.IBrokerProvider` by projecting that readiness into safe broker
-  status/capability shapes, redact credential-bearing env values, and keep order
-  placement, credential storage, unofficial SDKs, and persistence out of scope. Later
-  explicitly reviewed slices may translate
-  approved paper-only order intents into IBKR API calls and surface the
-  results back onto NATS.
+  status/capability shapes, expose an Accounts-facing `IIbkrPaperCapitalProvider`
+  that reads the configured paper account summary only after authenticated paper
+  readiness, parse `/v1/api/portfolio/{configured paper account id}/summary`
+  for `totalcashvalue` first and `netliquidation` second, redact
+  credential-bearing env values and account identifiers, and keep order
+  placement, credential storage, unofficial SDKs, and persistence out of scope.
+  Later explicitly reviewed slices may translate approved paper-only order
+  intents into IBKR API calls and surface the results back onto NATS.
 - **Expected dependencies:** Shared hosting/configuration abstractions today;
   consumed directly by `ATrade.Api` and `ATrade.Ibkr.Worker`. Future slices
   may additionally use `NATS` and `Redis` for broker event publication and
   rate-limit counters. Paired with `ATrade.Ibkr.Worker` under `workers/`.
 - **First-phase focus:** Provide the paper-only broker seam: session status
-  first, paper-safe data next, and no live-trading behavior.
+  first, paper-safe data and paper-balance reads next, and no live-trading
+  behavior.
 
 ### 2.12 `ATrade.MarketData.Ibkr` *(exists today, first real market-data provider)*
 
@@ -612,7 +640,7 @@ references.
   screeners, macro calendars, assistant text, node graphs, or order-entry
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
-  top-chrome/filter-density, shell/market/chart/analysis validation scripts.
+  top-chrome/filter-density, shell/market/chart/analysis/theme validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
@@ -620,7 +648,8 @@ references.
   downstream terminal modules. Minimal shadcn-style wrappers live under
   `frontend/components/ui/` and are limited to reusable Radix/accessibility
   primitives (button, input, badge, tabs, dialog, popover, scroll area,
-  separator, and tooltip) with ATrade workspace tokens applied. Original
+  separator, and tooltip) with the original black/graphite/amber ATrade
+  workspace tokens applied. Original
   ATrade-only foundation components live under `frontend/components/terminal/`
   (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
   `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalModuleRail`,
@@ -639,7 +668,8 @@ The expected intra-repo dependency direction is:
 frontend (Next.js)
     │  HTTP / streaming
     ▼
-ATrade.Api ──► ATrade.Accounts
+ATrade.Api ──► ATrade.Accounts ──► Postgres
+          │              └────► ATrade.Brokers.Ibkr
           ├──► ATrade.Brokers ◄──── ATrade.Brokers.Ibkr ◄── ATrade.Ibkr.Worker
           ├──► ATrade.Orders ─────────────────────────────┘
           ├──► ATrade.Workspaces ──► Postgres

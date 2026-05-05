@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-05
+updated: 2026-05-06
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -30,7 +30,7 @@ workspace.
 - Frontend: `Next.js`
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
-- Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract and IBKR/iBeam-backed market data
+- Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract, IBKR/iBeam-backed market data, and a paper-capital source that prefers authenticated IBKR paper balances before local fallback capital
 - Analysis direction: provider-neutral `ATrade.Analysis` contracts with `ATrade.Analysis.Lean` as the first optional analysis provider when the official LEAN runtime is configured locally
 
 ## Run Contract
@@ -62,7 +62,8 @@ The current runnable slice includes:
   runtime container when ignored local `.env` selects LEAN Docker mode; the
   primary `postgres` data directory uses `ATRADE_POSTGRES_DATA_VOLUME` (default
   `atrade-postgres-data`) plus a stable local-dev `ATRADE_POSTGRES_PASSWORD`
-  secret parameter so workspace preferences survive full local AppHost reboots;
+  secret parameter so workspace preferences and local paper-capital fallback
+  values survive full local AppHost reboots;
   the `timescaledb` data directory uses `ATRADE_TIMESCALEDB_DATA_VOLUME`
   (default `atrade-timescaledb-data`) plus a stable local-dev
   `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data cache rows
@@ -71,9 +72,12 @@ The current runnable slice includes:
   container receives a repo-local non-secret iBeam inputs mount so Client Portal
   accepts loopback/private Docker bridge callers used by Aspire.
 - `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
+- `src/ATrade.Accounts` — bootstrap-safe account overview plus the effective paper-capital contract, Postgres-backed local paper-capital fallback, and IBKR-first capital-source selection for future backtests.
 - `src/ATrade.Api` — browser-facing backend with:
   - `GET /health`
   - `GET /api/accounts/overview`
+  - `GET /api/accounts/paper-capital`
+  - `PUT /api/accounts/local-paper-capital`
   - `GET /api/broker/ibkr/status`
   - `POST /api/orders/simulate`
   - `GET /api/market-data/trending`
@@ -94,7 +98,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, a compact-filtered dense market monitor for trending/search/watchlist rows, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -148,27 +152,40 @@ that resource. Missing LEAN runtime, missing managed container metadata,
 unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 `analysis-engine-unavailable` responses without fake signals.
 
+Paper-capital selection is available through `GET /api/accounts/paper-capital`
+and `PUT /api/accounts/local-paper-capital`. The effective-capital payload uses
+`source = "ibkr-paper-balance"` only when the configured paper iBeam session is
+authenticated and a positive Client Portal account-summary balance is available;
+it otherwise falls back to the Postgres-backed local paper ledger, or reports
+`source = "unavailable"` with safe messages when neither source exists. Browser
+payloads, logs, docs, and tests must not expose IBKR account identifiers,
+credentials, gateway URLs, tokens, cookies, or session details.
+
 ## Active Task Queue
 
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-The `TP-045` through `TP-053` frontend reconstruction, no-command cutover,
-layout-simplification, and top-chrome/filter-density batch now covers the active
-design spec, shadcn/Tailwind/Radix UI foundation, module/workflow shell, dense
-market monitor, chart/analysis workspaces, final cutover verification, removal
-of the visible terminal branding plus command input/parser, the simplified
-rail-first full-bleed single-primary workspace layout, removal of the remaining
-app-level brand header/global safety strip, and compact market-monitor filters.
-The current frontend surface is the direct module/workflow ATrade paper
-workspace; follow-up implementation packets should start at `TP-054` and build
-on module rail navigation plus explicit workflow actions rather than the retired
-old shell/list route wrappers, a command system, or the removed app-level,
-context, monitor, footer, and top-safety chrome.
+The `TP-045` through `TP-055` frontend reconstruction, no-command cutover,
+layout-simplification, chart-visibility restoration, and theme-foundation batch
+now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
+module/workflow shell, dense market monitor, chart/analysis workspaces, final
+cutover verification, removal of the visible terminal branding plus command
+input/parser, the simplified rail-first full-bleed single-primary workspace
+layout, removal of the remaining app-level brand header/global safety strip,
+compact market-monitor filters, visible stock chart rendering, and the original
+black/graphite/amber ATrade terminal palette validation. The current frontend
+surface is the direct module/workflow ATrade paper workspace. The active
+backend/backtesting MVP wave starts with `TP-058` paper-capital source work and
+should build on module rail navigation plus explicit workflow actions rather
+than the retired old shell/list
+route wrappers, a command system, cyan/blue-gradient-dominant styling, or the
+removed app-level, context, monitor, footer, and top-safety chrome.
 
-Completed Taskplane packets through `TP-053` are present in `tasks/`; completed
-packets should be archived when convenient. During orchestrated runs the runtime
-handles post-merge archival for active task folders.
+Completed Taskplane packets through `TP-055` are present in `tasks/`; `TP-058`
+is currently staged as an active paper-capital source packet. Completed packets
+should be archived when convenient. During orchestrated runs the runtime handles
+post-merge archival for active task folders.
 
 ## Repository Map
 
@@ -228,9 +245,11 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/analysis-engine-contract-tests.sh`
 - `tests/apphost/lean-analysis-engine-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
+- `tests/apphost/paper-capital-source-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-terminal-cutover-tests.sh`
 - `tests/apphost/frontend-terminal-ui-stack-tests.sh`
+- `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
 - `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`

@@ -5,20 +5,20 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm border text-xs font-semibold uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-terminal-canvas disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm border text-xs font-semibold uppercase tracking-[0.12em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-amber focus-visible:ring-offset-2 focus-visible:ring-offset-terminal-canvas disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "border-terminal-cyan/45 bg-terminal-cyan/14 text-terminal-cyan shadow-terminal-glow hover:bg-terminal-cyan/22",
+          "border-terminal-amber/50 bg-terminal-amber/16 text-terminal-amber shadow-terminal-glow hover:bg-terminal-amber/24",
         terminal:
-          "border-terminal-border bg-terminal-surface-elevated text-terminal-text hover:border-terminal-cyan/55 hover:bg-terminal-cyan/10",
+          "border-terminal-border bg-terminal-surface-elevated text-terminal-text hover:border-terminal-amber/55 hover:bg-terminal-amber/10",
         amber:
-          "border-terminal-amber/45 bg-terminal-amber/14 text-terminal-amber hover:bg-terminal-amber/22",
+          "border-terminal-orange/50 bg-terminal-orange/14 text-terminal-amber hover:bg-terminal-orange/22",
         destructive:
           "border-terminal-red/45 bg-terminal-red/14 text-terminal-red hover:bg-terminal-red/22",
         outline:
-          "border-terminal-border bg-transparent text-terminal-text hover:border-terminal-cyan/50 hover:bg-terminal-surface-elevated",
+          "border-terminal-border bg-transparent text-terminal-text hover:border-terminal-amber/50 hover:bg-terminal-surface-elevated",
         ghost:
           "border-transparent bg-transparent text-terminal-muted hover:bg-terminal-surface-elevated hover:text-terminal-text",
       },

@@ -69,7 +69,7 @@ main() {
 
   assert_file_contains "$repo_root/ATrade.slnx" 'ATrade.Accounts'
   assert_file_contains "$api_project" 'ATrade.Accounts.csproj'
-  assert_file_contains "$api_program" 'builder.Services.AddAccountsModule();'
+  assert_file_contains "$api_program" 'builder.Services.AddAccountsModule(builder.Configuration);'
   assert_file_contains "$api_program" 'app.MapGet("/api/accounts/overview"'
   assert_file_contains "$accounts_project" 'Microsoft.AspNetCore.App'
   assert_file_contains "$accounts_service" 'AccountOverview.Bootstrap'

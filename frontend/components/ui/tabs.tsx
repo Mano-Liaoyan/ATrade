@@ -29,7 +29,7 @@ const TabsTrigger = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Trigger
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-[calc(var(--radius)-2px)] px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-[0.12em] ring-offset-terminal-canvas transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-cyan focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-terminal-cyan/12 data-[state=active]:text-terminal-cyan data-[state=active]:shadow-terminal-glow",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-[calc(var(--radius)-2px)] px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-[0.12em] ring-offset-terminal-canvas transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-amber focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-terminal-amber/12 data-[state=active]:text-terminal-amber data-[state=active]:shadow-terminal-glow",
       className,
     )}
     data-slot="tabs-trigger"
@@ -45,7 +45,7 @@ const TabsContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     className={cn(
-      "mt-2 ring-offset-terminal-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-cyan focus-visible:ring-offset-2",
+      "mt-2 ring-offset-terminal-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-terminal-amber focus-visible:ring-offset-2",
       className,
     )}
     ref={ref}

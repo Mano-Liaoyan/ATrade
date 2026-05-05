@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-05
+updated: 2026-05-06
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
@@ -29,6 +29,7 @@ see_also:
 > repository ships `ATrade.Brokers.Ibkr` as a paper-only broker adapter,
 > `ATrade.MarketData.Ibkr` as the IBKR/iBeam market-data provider,
 > `ATrade.Api` endpoints for `GET /api/broker/ibkr/status`,
+> `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`,
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
@@ -55,7 +56,8 @@ see_also:
 > runtime, credentials, or authentication returns safe
 > provider-not-configured/provider-unavailable/authentication-required errors
 > rather than fallback data. Durable paper-order storage and real broker order
-> placement remain future work.
+> placement remain future work; paper-capital fallback storage is durable in
+> Postgres and remains paper-only/read-only from the broker side.
 
 ## 1. Scope And Non-Negotiable Safety Rules
 
@@ -110,8 +112,10 @@ modules, and honest disabled-module surfaces for future modules
 rail, market-monitor chart/analysis actions, and symbol route state; no command
 input, command parser, or backend command route is part of the active frontend.
 The visual direction is inspired only by broad finance-workstation information
-architecture; it does not copy proprietary terminal layouts, assets, trademarks,
-or colors.
+architecture and is implemented with original ATrade black/graphite/amber tokens,
+red/green market-state colors, warm gray dividers, and restrained information
+contrast; it does not copy proprietary terminal layouts, assets, trademarks, or
+colors.
 
 ## 3. Runtime Boundaries
 
@@ -180,6 +184,7 @@ present as active route dependencies.
 - enforcement of the paper-only guardrails described in this document
 
 The current backend slice exposes `GET /api/broker/ibkr/status`,
+`GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`,
 `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 `GET /api/market-data/search?query=...&assetClass=stock&limit=...`,
 `GET /api/market-data/{symbol}/candles?range=...`,
@@ -244,20 +249,41 @@ when the managed runtime is absent or unreachable. Watchlist endpoints use
 `IWorkspaceWatchlistIntake`; Workspaces owns local identity use, schema
 initialization ordering, pin/replace/unpin normalization, exact instrument-key
 validation, and storage/validation error shapes while the API only binds and
-projects HTTP requests. NATS remains the internal event backbone between API and workers.
+projects HTTP requests.
+
+Paper-capital endpoints use `IPaperCapitalService`; Accounts owns the effective
+capital contract and local ledger intake while the API only projects HTTP. `GET
+/api/accounts/paper-capital` returns `effectiveCapital`, `currency`, `source`,
+`ibkrAvailable`, `localConfigured`, `localCapital`, and safe `messages`. The
+source order is intentionally IBKR-first: an authenticated paper iBeam session
+may supply `ibkr-paper-balance`, otherwise the service falls back to the
+Postgres-backed `local-paper-ledger`; when neither is available the response is
+explicitly `source = "unavailable"` so downstream backtest creation can block
+instead of inventing capital. `PUT /api/accounts/local-paper-capital` validates a
+positive USD amount, rejects provider account/credential fields, persists only
+the local fallback amount/currency, and returns the same effective-capital
+payload. Storage failures use a stable 503 `paper-capital-storage-unavailable`
+error shape. Browser payloads and logs must never include configured account
+identifiers, credentials, gateway URLs, tokens, cookies, or session details.
+NATS remains the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
 
 The paper-trading slice extends existing planned responsibilities as follows:
 
-- `ATrade.Accounts` owns paper account projections, balances, positions, and
-  broker-session summaries
+- `ATrade.Accounts` owns paper account projections, effective paper-capital
+  contracts, local paper-capital validation/intake, the Postgres-backed local
+  ledger fallback scoped to the temporary local user/workspace identity,
+  balances, positions, and broker-session summaries
 - `ATrade.Brokers` owns the provider-neutral broker identity, capability,
   account-mode, and status contracts shared by API, worker, and adapters
 - `ATrade.Brokers.Ibkr` owns typed paper-mode configuration, the official
-  Gateway session/status client boundary, paper-only guardrails, the normalized
-  IBKR/iBeam readiness result, and the safe `IBrokerProvider` projection used by
-  the API
+  Gateway session/status client boundary, the authenticated Client Portal
+  account-summary balance read seam (`/v1/api/portfolio/{configured paper
+  account id}/summary` for `totalcashvalue` / `netliquidation`), paper-only
+  guardrails, the normalized IBKR/iBeam readiness result, the safe
+  `IBrokerProvider` projection, and the Accounts `IIbkrPaperCapitalProvider`
+  implementation used by the API
 - `ATrade.Orders` owns paper-order validation, lifecycle state, and simulated
   fills; the current backend slice already returns deterministic simulated
   fills directly from this module
@@ -452,16 +478,22 @@ Postgres remains the canonical relational store for:
 - audit-friendly snapshots of broker/session capability state
 
 Current implementation note: pinned workspace watchlists are stored in Postgres
-by `ATrade.Workspaces` under the AppHost-provided `postgres` connection string.
-The AppHost `postgres` resource uses a writable named data volume
-(`ATRADE_POSTGRES_DATA_VOLUME`, default `atrade-postgres-data`) plus a stable
-local-dev secret parameter (`ATRADE_POSTGRES_PASSWORD`) so rows survive a full
-`start run` / AppHost stop/start cycle, not just an API process restart. Rows
-carry `user_id`, `workspace_id`, and a durable `instrument_key` primary key so
+by `ATrade.Workspaces` under the AppHost-provided `postgres` connection string,
+and local paper-capital fallback settings are stored in Postgres by
+`ATrade.Accounts` under the same connection string. The AppHost `postgres`
+resource uses a writable named data volume (`ATRADE_POSTGRES_DATA_VOLUME`,
+default `atrade-postgres-data`) plus a stable local-dev secret parameter
+(`ATRADE_POSTGRES_PASSWORD`) so rows survive a full `start run` / AppHost
+stop/start cycle, not just an API process restart. Watchlist rows carry
+`user_id`, `workspace_id`, and a durable `instrument_key` primary key so
 duplicate same-symbol instruments can coexist when provider/market identity
-differs; until authentication and named workspaces exist, the API deliberately
-uses the temporary `local-user` / `paper-trading` identity seam documented in
-`LocalWorkspaceIdentityProvider`.
+differs. Local paper-capital rows live in `atrade_accounts.local_paper_capital`
+with `user_id`, `workspace_id`, positive `amount`, `currency`, and timestamps;
+they deliberately do not store IBKR account identifiers, credentials, gateway
+URLs, tokens, cookies, or session details. Until authentication and named
+workspaces exist, both workspace preferences and local paper capital use the
+temporary `local-user` / `paper-trading` identity seam documented in
+`LocalWorkspaceIdentityProvider` and `LocalPaperCapitalIdentityProvider`.
 
 ### 6.2 TimescaleDB
 
@@ -555,13 +587,18 @@ machine changes:
 - watchlists
 - chart range / indicator presets that are meant to roam with the user
 - paper orders and fills
-- positions, balances, and account summaries
+- positions, balances, account summaries, and local paper-capital fallback
+  settings
 - server-side trending lists and factor explanations
 
 ### 7.3 Preference storage choice
 
 Durable watchlist preferences are now stored in **Postgres** as workspace-scoped
-settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. Because
+settings owned by `ATrade.Workspaces` and exposed through `ATrade.Api`. Local
+paper-capital fallback values are also stored in Postgres as workspace-scoped
+settings owned by `ATrade.Accounts`; they are API-only state for backtesting
+capital selection, not browser-local preferences, and are superseded whenever a
+safe authenticated IBKR paper balance is available. Because
 the AppHost-managed Postgres data directory is backed by the named
 `ATRADE_POSTGRES_DATA_VOLUME` volume, pins survive full local application
 reboots that recreate the AppHost/Postgres container when the same volume and
