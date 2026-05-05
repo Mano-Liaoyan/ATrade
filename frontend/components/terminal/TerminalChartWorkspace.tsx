@@ -51,11 +51,11 @@ export function TerminalChartWorkspace({
               </button>
             </div>
           ) : null}
-          {!chart.loading && !chart.error && chart.candles ? <CandlestickChart candles={chart.candles} indicators={chart.indicators} /> : null}
-          {!chart.loading && !chart.error && !chart.candles ? (
+          {!chart.loading && !chart.error && chart.candles && chart.view.hasCandleData ? <CandlestickChart candles={chart.candles} indicators={chart.indicators} /> : null}
+          {!chart.loading && !chart.error && (!chart.candles || !chart.view.hasCandleData) ? (
             <div className="empty-state" role="status">
               <strong>No candle data returned.</strong>
-              <p>The provider returned an empty response for this lookback range; no synthetic chart data is shown.</p>
+              <p>The provider returned no candle rows for this lookback range; no synthetic chart data is shown.</p>
             </div>
           ) : null}
           <ChartFooter chart={chart} />

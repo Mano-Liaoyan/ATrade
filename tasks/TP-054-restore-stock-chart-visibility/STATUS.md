@@ -1,6 +1,6 @@
 # TP-054: Restore stock chart visibility — Status
 
-**Current Step:** Step 1: Reproduce and pin down the chart visibility failure
+**Current Step:** Step 2: Make the stock chart visibly render when candle data exists
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -36,12 +36,12 @@
 ---
 
 ### Step 2: Make the stock chart visibly render when candle data exists
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Give the `lightweight-charts` canvas reliable non-zero dimensions and resize behavior after module/layout changes
-- [ ] Preserve OHLC legend, volume, SMA overlays, fit-content, crosshair behavior, and cleanup
-- [ ] Preserve truthful loading/error/empty states with no fake candle data
-- [ ] Keep stock route and market-monitor Chart actions on the selected CHART module with exact identity metadata when available
+- [x] Give the `lightweight-charts` canvas reliable non-zero dimensions and resize behavior after module/layout changes
+- [x] Preserve OHLC legend, volume, SMA overlays, fit-content, crosshair behavior, and cleanup
+- [x] Preserve truthful loading/error/empty states with no fake candle data
+- [x] Keep stock route and market-monitor Chart actions on the selected CHART module with exact identity metadata when available
 
 ---
 
@@ -105,6 +105,7 @@
 | 2026-05-05 18:38 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 18:38 | Step 0 started | Preflight |
 | 2026-05-05 18:45 | Step 1 hydrated | Expanded diagnosis outcomes before implementation |
+| 2026-05-05 19:00 | Step 2 started | Implementing measured chart sizing/rendering fixes |
 
 ---
 
@@ -116,4 +117,6 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Step 2 sizing check: `cd frontend && npx tsc --noEmit --pretty false --ignoreDeprecations 6.0` passed after adding explicit chart measurement and ResizeObserver/window resize handling. `npm run lint -- --file components/CandlestickChart.tsx` was attempted first, but this frontend package has no lint script.
+- Step 2 route/identity check: `bash tests/apphost/frontend-terminal-chart-analysis-tests.sh` passed after preserving CHART module/exact identity behavior.
+
