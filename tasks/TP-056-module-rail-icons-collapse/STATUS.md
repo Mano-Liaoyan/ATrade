@@ -1,6 +1,6 @@
 # TP-056: Add module rail icons and collapse behavior — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -52,20 +52,20 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] New rail validation passing
-- [ ] Shell validation passing
-- [ ] Simplified layout validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] New rail validation passing
+- [x] Shell validation passing
+- [x] Simplified layout validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] README/PLAN verification/current-surface text updated if affected
@@ -100,6 +100,7 @@
 | 2026-05-06 | Step 1 completed | Registry icon metadata and lucide rendering added; frontend build passed |
 | 2026-05-06 | Step 2 completed | Accessible local rail collapse state, collapsed CSS, and frontend build verified |
 | 2026-05-06 | Step 3 completed | Source-only rail icon/collapse validation added; existing shell/layout validation remained compatible |
+| 2026-05-06 | Step 4 completed | New rail, shell, simplified-layout, frontend build, dotnet test, and dotnet build checks passed |
 
 ---
 
