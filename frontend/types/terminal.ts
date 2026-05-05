@@ -80,13 +80,3 @@ export type TerminalNavigationIntent = {
   chartRange?: ChartRange;
 };
 
-export type TerminalLayoutRegion = "primary" | "context" | "monitor";
-
-export type TerminalLayoutSizes = Record<TerminalLayoutRegion, number>;
-
-export type TerminalLayoutPreferences = {
-  version: 1;
-  activeModuleId: EnabledTerminalModuleId;
-  railCollapsed: boolean;
-  sizes: TerminalLayoutSizes;
-};

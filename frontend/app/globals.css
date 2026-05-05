@@ -37,7 +37,6 @@
   --terminal-border-strong: 211 28% 29%;
   --terminal-grid: 194 85% 41%;
   --terminal-splitter: 215 24% 18%;
-  --terminal-splitter-active: 191 94% 55%;
   --terminal-text: 213 33% 91%;
   --terminal-text-muted: 215 17% 63%;
   --terminal-text-subtle: 217 12% 46%;
@@ -71,9 +70,6 @@
   --terminal-density-row-md: 2.5rem;
   --terminal-panel-padding: clamp(0.75rem, 1vw, 1rem);
   --terminal-panel-gap: 0.75rem;
-  --terminal-shell-max-width: 1480px;
-  --terminal-shell-gutter: clamp(0.75rem, 1.4vw, 1.5rem);
-  --terminal-splitter-size: 0.375rem;
   --terminal-table-cell-x: 0.625rem;
   --terminal-table-cell-y: 0.375rem;
   --shadow-terminal-panel: 0 20px 70px hsl(222 80% 2% / 0.42);
@@ -101,14 +97,18 @@
 }
 
 html {
+  height: 100%;
+  overflow: hidden;
   background: hsl(var(--terminal-canvas));
 }
 
 body {
   margin: 0;
+  width: 100%;
+  height: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: hidden;
+  overflow: hidden;
   background:
     radial-gradient(circle at top left, hsl(var(--terminal-accent-cyan) / 0.14), transparent 34rem),
     radial-gradient(circle at 80% 0%, hsl(var(--terminal-accent-amber) / 0.08), transparent 28rem),
@@ -691,12 +691,15 @@ select:focus-visible,
 
 .atrade-terminal-app {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.75rem;
-  width: min(100%, 1680px);
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0 auto;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0;
   padding: clamp(0.75rem, 1.4vw, 1.35rem);
+  overflow: hidden;
   border: 1px solid hsl(var(--terminal-border) / 0.72);
   background:
     linear-gradient(90deg, var(--terminal-grid-line) 1px, transparent 1px),
@@ -715,16 +718,7 @@ select:focus-visible,
 .atrade-terminal-app__brand,
 
 
-.terminal-module-rail,
-
-
-.terminal-status-strip,
-
-
-.terminal-monitor-panel,
-
-
-.terminal-context-summary {
+.terminal-module-rail {
   border: 1px solid hsl(var(--terminal-border) / 0.8);
   background: hsl(var(--terminal-surface) / 0.88);
   box-shadow: var(--shadow-terminal-panel);
@@ -755,33 +749,16 @@ select:focus-visible,
   grid-template-columns: minmax(5.25rem, 11rem) minmax(0, 1fr);
   gap: 0.75rem;
   min-height: 0;
+  overflow: hidden;
 }
 
 .atrade-terminal-app__workspace {
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.terminal-monitor-panel__label {
-  color: hsl(var(--terminal-accent-amber));
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
 
-.terminal-workspace-layout__reset {
-  border: 1px solid hsl(var(--terminal-accent-cyan) / 0.46);
-  background: hsl(var(--terminal-accent-cyan) / 0.12);
-  color: hsl(var(--terminal-accent-cyan));
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  padding: 0.55rem 0.75rem;
-  text-transform: uppercase;
-}
 
 .terminal-module-rail {
   display: grid;
@@ -853,93 +830,20 @@ select:focus-visible,
 }
 
 .terminal-workspace-layout {
-  position: relative;
   display: grid;
-  grid-template-areas:
-    "primary splitter-v context"
-    "splitter-h splitter-h splitter-h"
-    "monitor monitor monitor";
-  grid-template-columns: minmax(0, var(--terminal-primary-size, 68%)) var(--terminal-splitter-size) minmax(16rem, var(--terminal-context-size, 32%));
-  grid-template-rows: minmax(0, 1fr) var(--terminal-splitter-size) minmax(8rem, var(--terminal-monitor-size, 26%));
-  gap: 0;
-  height: min(74vh, 58rem);
-  min-height: 38rem;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
-.terminal-workspace-layout__primary,
-
-
-.terminal-workspace-layout__context,
-
-
-.terminal-workspace-layout__monitor {
+.terminal-workspace-layout__primary {
   min-width: 0;
   min-height: 0;
   overflow: auto;
   border: 1px solid hsl(var(--terminal-border) / 0.7);
   background: hsl(var(--terminal-surface-inset) / 0.56);
-}
-
-.terminal-workspace-layout__primary {
-  grid-area: primary;
   padding: 0.75rem;
 }
-
-.terminal-workspace-layout__context {
-  grid-area: context;
-  padding: 0.75rem;
-}
-
-.terminal-workspace-layout__monitor {
-  grid-area: monitor;
-  padding: 0.55rem;
-}
-
-.terminal-workspace-layout__splitter {
-  position: relative;
-  border: 0;
-  background: hsl(var(--terminal-splitter));
-  cursor: col-resize;
-  padding: 0;
-}
-
-.terminal-workspace-layout__splitter::after {
-  position: absolute;
-  inset: 0;
-  content: "";
-  transition: background-color 160ms ease;
-}
-
-.terminal-workspace-layout__splitter:hover::after,
-
-
-.terminal-workspace-layout__splitter:focus-visible::after,
-
-
-.terminal-workspace-layout--resizing .terminal-workspace-layout__splitter::after {
-  background: hsl(var(--terminal-splitter-active) / 0.65);
-}
-
-.terminal-workspace-layout__splitter--vertical {
-  grid-area: splitter-v;
-}
-
-.terminal-workspace-layout__splitter--horizontal {
-  grid-area: splitter-h;
-  cursor: row-resize;
-}
-
-.terminal-workspace-layout__reset {
-  position: absolute;
-  right: 0.65rem;
-  bottom: 0.65rem;
-  z-index: 2;
-  opacity: 0.82;
-}
-
-.terminal-context-summary,
-
 
 .terminal-help-module,
 
@@ -957,9 +861,6 @@ select:focus-visible,
   display: grid;
   gap: 0.75rem;
 }
-
-.terminal-context-summary__grid,
-
 
 .terminal-status-module__grid,
 
@@ -979,9 +880,6 @@ select:focus-visible,
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.terminal-context-summary__grid div,
-
-
 .terminal-status-module__grid div,
 
 
@@ -992,9 +890,6 @@ select:focus-visible,
   border-bottom: 1px solid hsl(var(--terminal-border) / 0.58);
   padding-bottom: 0.45rem;
 }
-
-.terminal-context-summary dt,
-
 
 .terminal-status-module dt,
 
@@ -1009,9 +904,6 @@ select:focus-visible,
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-
-.terminal-context-summary dd,
-
 
 .terminal-status-module dd,
 
@@ -1063,58 +955,6 @@ select:focus-visible,
 .terminal-analysis-result {
   display: grid;
   gap: 0.75rem;
-}
-
-.terminal-monitor-panel {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: center;
-  min-height: 100%;
-  padding: 0.55rem;
-}
-
-.terminal-monitor-panel ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.terminal-monitor-panel li {
-  display: flex;
-  gap: 0.45rem;
-  align-items: center;
-  border: 1px solid hsl(var(--terminal-border) / 0.72);
-  background: hsl(var(--terminal-surface-elevated) / 0.76);
-  color: hsl(var(--terminal-text-muted));
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  padding: 0.35rem 0.5rem;
-}
-
-.terminal-monitor-panel strong {
-  color: hsl(var(--terminal-text));
-}
-
-.terminal-status-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem 0.7rem;
-  align-items: center;
-  color: hsl(var(--terminal-text-muted));
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  line-height: 1.45;
-  padding: 0.5rem 0.7rem;
-}
-
-.terminal-status-strip span:not(:last-child)::after {
-  color: hsl(var(--terminal-border-strong));
-  content: "•";
-  margin-left: 0.7rem;
 }
 
 .terminal-help-module__grid {
@@ -1713,37 +1553,13 @@ select:focus-visible,
     grid-template-columns: 1fr;
   }
 
-  .terminal-workspace-layout {
-    grid-template-areas:
-      "primary"
-      "context"
-      "monitor";
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-
-  .terminal-workspace-layout__splitter {
-    display: none;
-  }
-
-  .terminal-workspace-layout__primary,
 
 
-  .terminal-workspace-layout__context,
 
 
-  .terminal-workspace-layout__monitor {
-    overflow: visible;
-  }
 
-  .terminal-workspace-layout__reset {
-    position: static;
-    justify-self: end;
-    margin-top: 0.5rem;
-  }
+
+
 
   .terminal-instrument-header__grid,
 
@@ -1783,10 +1599,7 @@ select:focus-visible,
     grid-template-columns: 1fr;
   }
 
-  .terminal-status-strip span:not(:last-child)::after {
-    content: "";
-    margin-left: 0;
-  }
+
 
   .panel-heading,
 
@@ -1825,15 +1638,7 @@ select:focus-visible,
   }
 
   .workspace-panel,
-
-
-  .terminal-workspace-layout__primary,
-
-
-  .terminal-workspace-layout__context,
-
-
-  .terminal-workspace-layout__monitor {
+  .terminal-workspace-layout__primary {
     border-radius: 12px;
   }
 }
