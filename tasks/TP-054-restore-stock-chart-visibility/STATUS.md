@@ -1,6 +1,6 @@
 # TP-054: Restore stock chart visibility — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Reproduce and pin down the chart visibility failure
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,12 +23,14 @@
 ---
 
 ### Step 1: Reproduce and pin down the chart visibility failure
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-> ⚠️ Hydrate: Expand based on whether the failure is caused by route/module state, provider/data state, chart container sizing, `lightweight-charts` lifecycle, or workspace overflow/layout.
+> ⚠️ Hydrate: Expanded to isolate route/module intent wiring, provider-state truthfulness, chart lifecycle/sizing, and workspace layout/CSS collapse risks before implementation.
 
-- [ ] Inspect chart route, market-monitor chart intents, chart workflow, chart components, and relevant CSS
-- [ ] Distinguish no-data/provider-unavailable states from a UI rendering failure
+- [ ] Verify `/symbols/[symbol]` route, market-monitor Chart actions, and terminal chart workflow keep the CHART module and exact identity selected
+- [ ] Verify market-data client and workspace states distinguish loading/error/provider-unavailable/empty from real candle payloads
+- [ ] Inspect `TerminalChartWorkspace` and `CandlestickChart` for render path, `lightweight-charts` lifecycle, dimensions, resize, overlays, legend, and cleanup behavior
+- [ ] Inspect workspace/global CSS for collapsed chart regions, hidden overflow, viewport-height, and compact-filter side effects
 - [ ] Record the root cause and impacted files in STATUS.md discoveries before implementation
 
 ---
@@ -97,6 +99,7 @@
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-05 18:38 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 18:38 | Step 0 started | Preflight |
+| 2026-05-05 18:45 | Step 1 hydrated | Expanded diagnosis outcomes before implementation |
 
 ---
 
