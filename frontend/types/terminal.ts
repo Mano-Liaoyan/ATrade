@@ -33,11 +33,28 @@ export type TerminalModuleId = (typeof TERMINAL_MODULE_IDS)[number];
 export type TerminalModuleAvailability = "enabled" | "disabled";
 export type TerminalModulePlacement = "primary" | "future";
 export type TerminalModuleTone = "default" | "positive" | "warning" | "muted";
+export type TerminalModuleIconId =
+  | "home"
+  | "search"
+  | "bookmark"
+  | "chart-candlestick"
+  | "flask-conical"
+  | "activity"
+  | "circle-question"
+  | "newspaper"
+  | "briefcase-business"
+  | "file-search"
+  | "sliders-horizontal"
+  | "landmark"
+  | "bot"
+  | "workflow"
+  | "ban";
 
 export type TerminalModuleDefinition = {
   id: TerminalModuleId;
   label: string;
   shortLabel: string;
+  icon: TerminalModuleIconId;
   description: string;
   availability: TerminalModuleAvailability;
   placement: TerminalModulePlacement;

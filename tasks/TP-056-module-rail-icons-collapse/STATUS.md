@@ -1,6 +1,6 @@
 # TP-056: Add module rail icons and collapse behavior — Status
 
-**Current Step:** Step 1: Add a meaningful icon contract for every module
+**Current Step:** Step 2: Implement collapsible rail behavior accessibly
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Add a meaningful icon contract for every module
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add purpose-matched icons for every enabled module
-- [ ] Add purpose-matched icons for every visible-disabled module
-- [ ] Use existing `lucide-react` dependency unless explicitly justified otherwise
-- [ ] Preserve labels, short labels, routes, and disabled explanations
+- [x] Add purpose-matched icons for every enabled module
+- [x] Add purpose-matched icons for every visible-disabled module
+- [x] Use existing `lucide-react` dependency unless explicitly justified otherwise
+- [x] Preserve labels, short labels, routes, and disabled explanations
 
 ---
 
 ### Step 2: Implement collapsible rail behavior accessibly
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add accessible collapse/expand control
 - [ ] Render expanded icon+label and collapsed icon-first modes
@@ -97,6 +97,7 @@
 | 2026-05-05 22:42 | Step 0 started | Preflight |
 | 2026-05-06 | Step 0 completed | Required paths and tool/dependency availability verified |
 | 2026-05-06 | Step 1 started | Module icon contract work |
+| 2026-05-06 | Step 1 completed | Registry icon metadata and lucide rendering added; frontend build passed |
 
 ---
 
