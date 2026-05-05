@@ -1,6 +1,6 @@
 # TP-058: Paper capital source — Status
 
-**Current Step:** Step 3: Expose paper-capital APIs through `ATrade.Api`
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -56,14 +56,14 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Targeted Accounts tests passing
-- [ ] Targeted IBKR broker tests passing
-- [ ] Paper-capital apphost/API validation passing
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Targeted Accounts tests passing
+- [x] Targeted IBKR broker tests passing
+- [x] Paper-capital apphost/API validation passing
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
