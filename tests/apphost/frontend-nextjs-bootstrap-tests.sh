@@ -275,7 +275,7 @@ assert_apphost_frontend_runtime_is_warning_free() {
 
   local next_pid=''
   for attempt in {1..40}; do
-    next_pid="$(ps -eo pid=,args= | awk '/next dev --hostname 0.0.0.0/ && !/awk/ { print $1; exit }')"
+    next_pid="$(ps -eo pid=,args= | awk '/next dev --hostname 0.0.0.0/ && !/awk/ && found == 0 { print $1; found=1 }')"
     if [[ -n "$next_pid" ]]; then
       break
     fi

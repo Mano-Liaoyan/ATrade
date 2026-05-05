@@ -1,6 +1,6 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
-**Current Step:** Step 5: Testing & Verification
+**Current Step:** Step 6: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -65,20 +65,20 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Cutover validation passing
-- [ ] All terminal frontend validations passing
-- [ ] Existing frontend validations passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Cutover validation passing
+- [x] All terminal frontend validations passing
+- [x] Existing frontend validations passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] "Check If Affected" docs reviewed
@@ -136,6 +136,15 @@
 | 2026-05-05 14:17 | Step 4 README/PLAN | Added cutover validation to README verification entry points and updated PLAN to mark `TP-045` through `TP-050` terminal reconstruction complete/follow-up-ready with `TP-051` as next ID |
 | 2026-05-05 14:18 | Step 4 completed | Docs, plan, and verification inventory updated for the terminal cutover |
 | 2026-05-05 14:18 | Step 5 started | Testing and verification quality gate |
+| 2026-05-05 14:19 | Step 5 cutover validation | `bash tests/apphost/frontend-terminal-cutover-tests.sh` passed |
+| 2026-05-05 14:21 | Step 5 terminal frontend validations | UI stack, shell command, shell UI, market monitor, and chart/analysis apphost scripts passed |
+| 2026-05-05 14:28 | Step 5 existing frontend validations | Fixed `frontend-nextjs-bootstrap-tests.sh` pipefail/SIGPIPE process lookup, then nextjs bootstrap, symbol search exploration, chart range preset, trading workspace, and workspace workflow scripts passed |
+| 2026-05-05 14:29 | Step 5 frontend build | `cd frontend && npm run build` passed |
+| 2026-05-05 14:30 | Step 5 full test suite | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed |
+| 2026-05-05 14:31 | Step 5 failures fixed | Fixed the frontend bootstrap pipefail/SIGPIPE process lookup and updated terminal shell UI chart SSR assertions; rerun validations passed |
+| 2026-05-05 14:31 | Step 5 dotnet build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors |
+| 2026-05-05 14:32 | Step 5 completed | Full frontend, solution test, and solution build quality gate passed |
+| 2026-05-05 14:32 | Step 6 started | Documentation and delivery review |
 
 ---
 
