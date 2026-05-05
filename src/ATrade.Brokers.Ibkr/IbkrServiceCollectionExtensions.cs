@@ -1,3 +1,4 @@
+using ATrade.Accounts;
 using ATrade.Brokers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +20,18 @@ public static class IbkrServiceCollectionExtensions
         services.AddSingleton(IbkrBrokerAdapterCapabilities.PaperSafeReadOnly);
         services.AddSingleton<IIbkrBrokerStatusService, IbkrBrokerStatusService>();
         services.AddSingleton<IBrokerProvider>(static serviceProvider => serviceProvider.GetRequiredService<IIbkrBrokerStatusService>());
+        services.AddSingleton<IIbkrPaperCapitalProvider, IbkrPaperCapitalProvider>();
         services.AddHttpClient<IIbkrGatewayClient, IbkrGatewayClient>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
+            IbkrGatewayTransport.ConfigureHttpClient(client, options);
+        })
+        .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+        {
+            var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
+            return IbkrGatewayTransport.CreateHttpMessageHandler(options);
+        });
+        services.AddHttpClient<IIbkrAccountSummaryClient, IbkrAccountSummaryClient>((serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<IbkrGatewayOptions>();
             IbkrGatewayTransport.ConfigureHttpClient(client, options);

@@ -33,15 +33,15 @@
 ---
 
 ### Step 2: Add safe IBKR/iBeam paper balance read seam
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 > ⚠️ Hydrate: Expand based on the existing broker gateway transport/client patterns and selected safe Client Portal balance endpoint.
 
-- [ ] Client Portal account-summary read client parses `/v1/api/portfolio/{configuredPaperAccountId}/summary` for `totalcashvalue`/`netliquidation`
-- [ ] Authenticated-readiness gate and Accounts `IIbkrPaperCapitalProvider` adapter added
-- [ ] Account id use remains internal and redacted from availability/messages/logs/tests
-- [ ] Disabled/missing credentials/unauthenticated/rejected-live/timeout/provider failure states mapped safely
-- [ ] IBKR broker tests cover balance success, unavailable states, timeout/error redaction, and no leaked account identifiers
+- [x] Client Portal account-summary read client parses `/v1/api/portfolio/{configuredPaperAccountId}/summary` for `totalcashvalue`/`netliquidation`
+- [x] Authenticated-readiness gate and Accounts `IIbkrPaperCapitalProvider` adapter added
+- [x] Account id use remains internal and redacted from availability/messages/logs/tests
+- [x] Disabled/missing credentials/unauthenticated/rejected-live/timeout/provider failure states mapped safely
+- [x] IBKR broker tests cover balance success, unavailable states, timeout/error redaction, and no leaked account identifiers
 
 ---
 

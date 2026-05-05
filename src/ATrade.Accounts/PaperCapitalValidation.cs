@@ -7,6 +7,10 @@ public static class PaperCapitalErrorCodes
     public const string InvalidCurrency = "invalid-paper-capital-currency";
     public const string StorageUnavailable = "paper-capital-storage-unavailable";
     public const string IbkrDisabled = "ibkr-paper-balance-disabled";
+    public const string IbkrCredentialsMissing = "ibkr-paper-balance-credentials-missing";
+    public const string IbkrUnauthenticated = "ibkr-paper-balance-unauthenticated";
+    public const string IbkrRejectedLive = "ibkr-paper-balance-rejected-live";
+    public const string IbkrTimeout = "ibkr-paper-balance-timeout";
     public const string IbkrUnavailable = "ibkr-paper-balance-unavailable";
     public const string LocalUnconfigured = "local-paper-capital-unconfigured";
     public const string NoCapitalSource = "paper-capital-source-unavailable";
@@ -15,6 +19,10 @@ public static class PaperCapitalErrorCodes
 public static class PaperCapitalSafeMessages
 {
     public const string IbkrSourceUnavailable = "IBKR paper balance is not available.";
+    public const string IbkrCredentialsMissing = "IBKR paper balance requires a configured paper iBeam session.";
+    public const string IbkrUnauthenticated = "IBKR paper balance requires an authenticated paper iBeam session.";
+    public const string IbkrRejectedLive = "IBKR paper balance is disabled because only paper mode is supported.";
+    public const string IbkrTimeout = "IBKR paper balance read timed out.";
     public const string LocalStorageUnavailable = "Local paper capital storage is unavailable.";
     public const string LocalSourceUnconfigured = "Local paper capital has not been configured.";
     public const string NoCapitalSource = "No paper capital source is configured.";
