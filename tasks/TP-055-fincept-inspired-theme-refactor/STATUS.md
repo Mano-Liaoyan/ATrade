@@ -5,7 +5,7 @@
 **Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Define the original ATrade institutional terminal palette
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Inventory current theme tokens, terminal primitives, and chart colors
-- [ ] Define original black/graphite/amber terminal tokens without copying third-party palette values or branding
-- [ ] Fix token/config mismatches discovered during inventory
-- [ ] Record palette decisions and clean-room constraints in discoveries
+- [x] Inventory current theme tokens, terminal primitives, and chart colors
+- [x] Define original black/graphite/amber terminal tokens without copying third-party palette values or branding
+- [x] Fix token/config mismatches discovered during inventory
+- [x] Record palette decisions and clean-room constraints in discoveries
 
 ---
 
@@ -85,6 +85,11 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Inventory found the active theme is still cyan/blue dominant: `--primary`, `--ring`, `--terminal-accent-cyan`, `--terminal-focus-ring`, active rail state, section eyebrows, button/input/tabs focus, body radial glow, chart range buttons, volume/SMA50, and legacy global helpers use cyan/blue/slate values. | Replace with an original ATrade black/graphite/amber primary theme while retaining green/red market state and restrained non-brand info/focus contrast. | `frontend/app/globals.css`, `frontend/tailwind.config.ts`, terminal/ui primitives, `frontend/components/CandlestickChart.tsx` |
+| Inventory found Tailwind token mismatches: components reference `terminal-border-strong` and `terminal-splitter-active`, while Tailwind config only exposes `terminal.border` and `terminal.splitter`; active cyan aliases also encourage the unwanted dominant accent. | Fix config/CSS token aliases before broad styling so primitives compile consistently against the original palette. | `frontend/tailwind.config.ts`, `frontend/components/ui/scroll-area.tsx`, `frontend/components/terminal/*` |
+| Defined the original ATrade terminal token direction as near-black canvas, graphite layers, warm gray dividers, amber/orange primary emphasis/focus, muted steel info, green/red market states, compact density, and chart-specific token hooks; no Fincept/Bloomberg names, assets, exact palette values, or proprietary copy are introduced. | Apply these repository-owned tokens across CSS, Tailwind, primitives, and chart styling. | `frontend/app/globals.css` |
+| Fixed token plumbing discovered during inventory: `terminal-border-strong` / `terminal-splitter-active` are now Tailwind-backed, the stale `--terminal-grid` reference points at the chart grid token, and plain CSS helper aliases no longer overwrite shadcn HSL tokens such as `--muted`/`--accent`. | Continue the visual refactor using the corrected token contract. | `frontend/tailwind.config.ts`, `frontend/app/globals.css` |
+| Clean-room constraint recorded for the refactor: use only repository-authored ATrade token names, CSS, copy, components, and chart settings; do not import or reproduce Fincept/Bloomberg source, assets, branding strings, exact palette values, layouts, screenshots, command taxonomies, or proprietary copy. | Enforce with source-based validation and docs. | `STATUS.md`, upcoming `tests/apphost/frontend-terminal-theme-refactor-tests.sh`, `docs/design/atrade-terminal-ui.md` |
 
 ---
 
@@ -96,6 +101,7 @@
 | 2026-05-05 21:51 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 21:51 | Step 0 started | Preflight |
 | 2026-05-05 | Step 0 completed | Required paths verified; Node/npm/.NET available; frontend dependencies installed with npm ci |
+| 2026-05-05 21:53 | Worker iter 1 | done in 112s, tools: 36 |
 
 ---
 

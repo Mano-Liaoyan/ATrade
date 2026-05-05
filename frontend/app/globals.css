@@ -8,85 +8,92 @@
   --font-sans: "Inter", "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  --background: 224 48% 5%;
-  --foreground: 213 31% 91%;
-  --card: 222 39% 8%;
-  --card-foreground: 213 31% 91%;
-  --popover: 222 43% 7%;
-  --popover-foreground: 213 31% 91%;
-  --primary: 191 94% 55%;
-  --primary-foreground: 222 47% 5%;
-  --secondary: 222 28% 14%;
-  --secondary-foreground: 211 30% 86%;
-  --muted: 222 22% 16%;
-  --muted-foreground: 215 16% 63%;
-  --accent: 36 100% 56%;
-  --accent-foreground: 222 47% 6%;
-  --destructive: 356 73% 58%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 215 24% 20%;
-  --input: 215 24% 18%;
-  --ring: 191 94% 55%;
-  --radius: 0.35rem;
+  --background: 42 18% 3%;
+  --foreground: 42 18% 91%;
+  --card: 40 12% 6%;
+  --card-foreground: 42 18% 91%;
+  --popover: 38 12% 7%;
+  --popover-foreground: 42 18% 91%;
+  --primary: 32 94% 54%;
+  --primary-foreground: 38 28% 6%;
+  --secondary: 38 10% 12%;
+  --secondary-foreground: 42 16% 84%;
+  --muted: 38 8% 15%;
+  --muted-foreground: 42 9% 66%;
+  --accent: 28 88% 48%;
+  --accent-foreground: 38 28% 6%;
+  --destructive: 356 70% 59%;
+  --destructive-foreground: 42 18% 95%;
+  --border: 38 8% 20%;
+  --input: 38 9% 16%;
+  --ring: 36 94% 58%;
+  --radius: 0.25rem;
 
-  --terminal-canvas: 224 50% 4%;
-  --terminal-surface: 222 41% 7%;
-  --terminal-surface-elevated: 220 37% 10%;
-  --terminal-surface-inset: 225 43% 5%;
-  --terminal-border: 215 25% 20%;
-  --terminal-border-strong: 211 28% 29%;
-  --terminal-splitter: 215 24% 18%;
-  --terminal-text: 213 33% 91%;
-  --terminal-text-muted: 215 17% 63%;
-  --terminal-text-subtle: 217 12% 46%;
-  --terminal-accent-amber: 36 100% 56%;
-  --terminal-accent-cyan: 191 94% 55%;
-  --terminal-accent-green: 151 71% 48%;
-  --terminal-accent-red: 356 73% 58%;
-  --terminal-accent-blue: 214 86% 62%;
-  --terminal-focus-ring: 191 94% 55%;
-  --terminal-table-header: 222 35% 9%;
-  --terminal-table-row: 222 35% 7%;
-  --terminal-table-row-alt: 222 33% 8%;
-  --terminal-table-row-hover: 218 34% 12%;
-  --terminal-table-row-selected: 213 70% 14%;
-  --terminal-table-positive: 151 71% 48%;
-  --terminal-table-negative: 356 73% 58%;
+  --terminal-canvas: 42 18% 3%;
+  --terminal-surface: 40 12% 6%;
+  --terminal-surface-elevated: 38 11% 9%;
+  --terminal-surface-inset: 43 16% 4%;
+  --terminal-border: 38 8% 20%;
+  --terminal-border-strong: 36 10% 30%;
+  --terminal-splitter: 38 7% 17%;
+  --terminal-splitter-active: 35 42% 34%;
+  --terminal-text: 42 18% 91%;
+  --terminal-text-muted: 42 9% 66%;
+  --terminal-text-subtle: 40 7% 48%;
+  --terminal-accent-amber: 32 94% 54%;
+  --terminal-accent-orange: 25 88% 50%;
+  --terminal-accent-cyan: 194 38% 52%;
+  --terminal-accent-blue: 216 34% 55%;
+  --terminal-accent-green: 145 58% 48%;
+  --terminal-accent-red: 356 70% 59%;
+  --terminal-focus-ring: 36 94% 58%;
+  --terminal-table-header: 38 12% 8%;
+  --terminal-table-row: 40 11% 6%;
+  --terminal-table-row-alt: 38 11% 7%;
+  --terminal-table-row-hover: 35 19% 10%;
+  --terminal-table-row-selected: 33 34% 13%;
+  --terminal-table-positive: 145 58% 48%;
+  --terminal-table-negative: 356 70% 59%;
+  --terminal-chart-background: 42 18% 3%;
+  --terminal-chart-grid: 38 7% 24%;
+  --terminal-chart-volume: 32 72% 44%;
+  --terminal-chart-sma-fast: 32 94% 54%;
+  --terminal-chart-sma-slow: 216 28% 61%;
 
-  --status-neutral: 215 17% 63%;
-  --status-info: 191 94% 55%;
-  --status-success: 151 71% 48%;
-  --status-warning: 36 100% 56%;
-  --status-danger: 356 73% 58%;
+  --status-neutral: 42 9% 66%;
+  --status-info: 194 38% 52%;
+  --status-success: 145 58% 48%;
+  --status-warning: 32 94% 54%;
+  --status-danger: 356 70% 59%;
   --status-neutral-surface: hsl(var(--status-neutral) / 0.12);
-  --status-info-surface: hsl(var(--status-info) / 0.14);
+  --status-info-surface: hsl(var(--status-info) / 0.12);
   --status-success-surface: hsl(var(--status-success) / 0.13);
   --status-warning-surface: hsl(var(--status-warning) / 0.14);
   --status-danger-surface: hsl(var(--status-danger) / 0.14);
 
-  --terminal-density-row-xs: 1.75rem;
-  --terminal-density-row-sm: 2.125rem;
-  --terminal-density-row-md: 2.5rem;
-  --terminal-panel-padding: clamp(0.75rem, 1vw, 1rem);
-  --terminal-panel-gap: 0.75rem;
-  --terminal-table-cell-x: 0.625rem;
-  --terminal-table-cell-y: 0.375rem;
-  --shadow-terminal-panel: 0 20px 70px hsl(222 80% 2% / 0.42);
-  --shadow-terminal-glow: 0 0 0 1px hsl(var(--terminal-accent-cyan) / 0.22), 0 0 32px hsl(var(--terminal-accent-cyan) / 0.08);
+  --terminal-density-row-xs: 1.625rem;
+  --terminal-density-row-sm: 1.95rem;
+  --terminal-density-row-md: 2.25rem;
+  --terminal-panel-padding: clamp(0.65rem, 0.9vw, 0.9rem);
+  --terminal-panel-gap: 0.65rem;
+  --terminal-table-cell-x: 0.55rem;
+  --terminal-table-cell-y: 0.32rem;
+  --shadow-terminal-panel: 0 16px 48px hsl(42 40% 1% / 0.46);
+  --shadow-terminal-glow: 0 0 0 1px hsl(var(--terminal-accent-amber) / 0.26), 0 0 22px hsl(var(--terminal-accent-amber) / 0.08);
 
   --panel: hsl(var(--terminal-surface));
   --panel-soft: hsl(var(--terminal-surface-elevated));
-  --panel-border: hsl(var(--terminal-border) / 0.76);
+  --panel-border: hsl(var(--terminal-border) / 0.82);
   --text: hsl(var(--terminal-text));
-  --muted: hsl(var(--terminal-text-muted));
-  --accent: hsl(var(--terminal-accent-cyan));
-  --accent-strong: hsl(var(--terminal-accent-blue));
+  --ui-muted: hsl(var(--terminal-text-muted));
+  --ui-accent: hsl(var(--terminal-accent-amber));
+  --accent-strong: hsl(var(--terminal-accent-orange));
   --positive: hsl(var(--terminal-accent-green));
   --warning: hsl(var(--terminal-accent-amber));
   --danger: hsl(var(--terminal-accent-red));
-  --terminal-panel: hsl(var(--terminal-surface) / 0.86);
-  --terminal-panel-strong: hsl(var(--terminal-surface-elevated) / 0.94);
-  --terminal-focus: hsl(var(--terminal-focus-ring) / 0.38);
+  --terminal-panel: hsl(var(--terminal-surface) / 0.92);
+  --terminal-panel-strong: hsl(var(--terminal-surface-elevated) / 0.96);
+  --terminal-focus: hsl(var(--terminal-focus-ring) / 0.34);
 }
 
 * {
@@ -244,13 +251,13 @@ select:focus-visible,
 }
 
 .workspace-panel p {
-  color: var(--muted);
+  color: var(--ui-muted);
   line-height: 1.65;
 }
 
 .eyebrow {
   margin: 0 0 0.6rem;
-  color: var(--accent);
+  color: var(--ui-accent);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -298,7 +305,7 @@ select:focus-visible,
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 999px;
   padding: 0.35rem 0.65rem;
-  color: var(--accent);
+  color: var(--ui-accent);
   font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
@@ -312,7 +319,7 @@ select:focus-visible,
 }
 
 .primary-button {
-  background: var(--accent);
+  background: var(--ui-accent);
   color: #082f49;
 }
 
@@ -414,7 +421,7 @@ select:focus-visible,
 
 
 .terminal-indicator-grid__tile small {
-  color: var(--muted);
+  color: var(--ui-muted);
   font-size: 0.78rem;
 }
 
@@ -433,7 +440,7 @@ select:focus-visible,
 }
 
 .terminal-instrument-header__identity dt {
-  color: var(--muted);
+  color: var(--ui-muted);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -455,7 +462,7 @@ select:focus-visible,
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 6px;
   background: rgba(15, 23, 42, 0.8);
-  color: var(--muted);
+  color: var(--ui-muted);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.76rem;
@@ -562,7 +569,7 @@ select:focus-visible,
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
-  color: var(--muted);
+  color: var(--ui-muted);
   font-size: 0.85rem;
 }
 
@@ -591,7 +598,7 @@ select:focus-visible,
 
 .chart-footer-note p {
   margin: 0;
-  color: var(--muted);
+  color: var(--ui-muted);
   font-size: 0.9rem;
 }
 
@@ -617,7 +624,7 @@ select:focus-visible,
 
 .indicator-label {
   display: block;
-  color: var(--muted);
+  color: var(--ui-muted);
   font-size: 0.72rem;
   text-transform: uppercase;
 }
@@ -625,7 +632,7 @@ select:focus-visible,
 .analysis-result-summary small {
   display: block;
   margin-top: 0.2rem;
-  color: var(--muted);
+  color: var(--ui-muted);
 }
 
 .analysis-error {
@@ -669,7 +676,7 @@ select:focus-visible,
 
 
 .analysis-signals small {
-  color: var(--muted);
+  color: var(--ui-muted);
 }
 
 .analysis-signals p {
