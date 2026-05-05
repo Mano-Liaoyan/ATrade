@@ -1,8 +1,8 @@
 # General — Context
 
-**Last Updated:** 2026-05-04
+**Last Updated:** 2026-05-05
 **Status:** Active
-**Next Task ID:** TP-051
+**Next Task ID:** TP-053
 
 ---
 
@@ -28,8 +28,9 @@ implementation queue.
   provider-neutral analysis/LEAN seams, the `ATrade.slnx` solution-file
   contract, the HTTPS local iBeam Client Portal transport contract,
   AppHost-managed LEAN Docker runtime wiring, durable AppHost Postgres
-  watchlists, durable TimescaleDB cache rows, and frontend workflow module seams
-  are present from completed and archived batches through `TP-041`.
+  watchlists, durable TimescaleDB cache rows, frontend workflow module seams,
+  and the completed `TP-045` through `TP-052` frontend reconstruction,
+  no-command cutover, and simplified workspace layout are present.
 
 ## Domain Vocabulary
 
@@ -46,22 +47,18 @@ implementation queue.
 
 ## Active Task Queue
 
-Ready implementation tasks now queued:
+No ready implementation tasks are currently queued after the completed
+`TP-051` through `TP-052` batch.
 
-- `TP-045` — define the active ATrade Terminal UI design spec and clean-room visual guardrails
-- `TP-046` — bootstrap the shadcn/Tailwind/Radix terminal UI stack and original ATrade primitives
-- `TP-047` — build the terminal shell, deterministic command registry, module rail, and resizable layout persistence
-- `TP-048` — rebuild search, trending, and watchlist as a dense terminal market monitor
-- `TP-049` — rebuild chart and analysis as terminal workspaces inside the new shell
-- `TP-050` — complete frontend cutover, cleanup, verification, and documentation updates
+The most recent completed batch:
 
-Recommended orchestration order is sequential from `TP-045` through `TP-050`
-because each task establishes a frontend reconstruction seam used by the next.
+- `TP-051` — removed visible terminal branding plus the command input/parser/registry while preserving API-backed module workflows
+- `TP-052` — simplified the common workspace to a full-bleed single-primary layout with no context/monitor/footer chrome, background grid, page-level scroll, or layout persistence
 
-The next new Taskplane packet should use `TP-051`.
+The next new Taskplane packet should use `TP-053`.
 
-Completed task packets through `TP-044` are present in `tasks/`; completed
-packets should be archived before or after the new redesign batch when convenient.
+Completed task packets through `TP-052` are present in `tasks/`; completed
+packets should be archived when convenient.
 
 ## Taskplane Usage
 
@@ -69,7 +66,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-051`
+- New tasks should use the next ID: `TP-053`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -97,8 +94,8 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | `tasks/TP-045-*` through  `tasks/TP-050-*`                |
-| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-044-*`                 |
+| Active tasks        | None currently queued; next packet is `TP-053`            |
+| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-052-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |
 | AppHost             | `src/ATrade.AppHost/Program.cs`                           |
@@ -118,6 +115,6 @@ All variants delegate to the Aspire AppHost.
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
 - [ ] Review TP-046 frontend npm audit advisories for `next` and `postcss` after the terminal UI stack bootstrap; do not force breaking upgrades inside the reconstruction queue.
 - [x] Archive completed `TP-019` through `TP-041` task packets before starting the previous queued run.
-- [ ] Archive completed `TP-042` through `TP-044` task packets when the terminal reconstruction queue is ready to run or after it completes.
+- [ ] Archive completed `TP-042` through `TP-052` task packets when convenient.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
 - [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.

@@ -162,7 +162,7 @@ start at `TP-053` and build on module rail navigation plus explicit workflow
 actions rather than the retired old shell/list route wrappers, a command system,
 or the removed context/monitor/footer chrome.
 
-Completed Taskplane packets through `TP-044` are present in `tasks/`; completed
+Completed Taskplane packets through `TP-052` are present in `tasks/`; completed
 packets should be archived when convenient. During orchestrated runs the runtime
 handles post-merge archival for active task folders.
 

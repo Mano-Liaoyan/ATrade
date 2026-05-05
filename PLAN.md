@@ -55,7 +55,7 @@ simplified workspace layout:
 
 The next new Taskplane packet should use `TP-053`.
 
-Completed task packets through `TP-044` are present in `tasks/`; completed
+Completed task packets through `TP-052` are present in `tasks/`; completed
 packets should be archived when convenient. The orchestrator handles active task
 folder archival after merge.
 
