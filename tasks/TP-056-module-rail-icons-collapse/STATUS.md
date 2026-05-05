@@ -1,8 +1,8 @@
 # TP-056: Add module rail icons and collapse behavior — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
-**Last Updated:** 2026-05-05
+**Status:** ✅ Complete
+**Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
 **Iteration:** 1
@@ -65,12 +65,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -85,6 +85,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Final rail icon mapping: HOME=home, SEARCH=search, WATCHLIST=bookmark, CHART=chart-candlestick, ANALYSIS=flask-conical, STATUS=activity, HELP=circle-question, NEWS=newspaper, PORTFOLIO=briefcase-business, RESEARCH=file-search, SCREENER=sliders-horizontal, ECON=landmark, AI=bot, NODE=workflow, ORDERS=ban. | Implemented through `TerminalModuleIconId`, registry metadata, and `lucide-react` rendering. | `frontend/types/terminal.ts`; `frontend/lib/terminalModuleRegistry.ts`; `frontend/components/terminal/TerminalModuleRail.tsx` |
+| Rail collapse state is local component state only; it is not persisted to localStorage or a layout preference key. Collapsed labels remain accessible through DOM text visually hidden by CSS plus `title` attributes. | Implemented and documented; validation rejects rail/local layout persistence and retired chrome/command/order surfaces. | `frontend/components/terminal/TerminalModuleRail.tsx`; `frontend/app/globals.css`; `tests/apphost/frontend-module-rail-icons-collapse-tests.sh` |
 
 ---
 
@@ -101,6 +103,7 @@
 | 2026-05-06 | Step 2 completed | Accessible local rail collapse state, collapsed CSS, and frontend build verified |
 | 2026-05-06 | Step 3 completed | Source-only rail icon/collapse validation added; existing shell/layout validation remained compatible |
 | 2026-05-06 | Step 4 completed | New rail, shell, simplified-layout, frontend build, dotnet test, and dotnet build checks passed |
+| 2026-05-06 | Step 5 completed | Active docs updated and final icon/collapse persistence discoveries logged |
 
 ---
 

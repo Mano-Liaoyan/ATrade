@@ -21,8 +21,8 @@ see_also:
 > contract for the broader paper-trading workspace. The active frontend UI
 > authority is [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
 > it governs the clean-room visual target, direct module/workflow navigation,
-> simplified full-viewport layout, disabled future surfaces, and frontend
-> replacement constraints while this document continues to govern paper-only safety and
+> simplified full-viewport layout, purpose-matched rail icons/collapse behavior,
+> disabled future surfaces, and frontend replacement constraints while this document continues to govern paper-only safety and
 > backend/API boundaries. The current repository now
 > uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
 > first real market-data provider behind API/frontend-stable seams. The current
@@ -41,8 +41,9 @@ see_also:
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js ATrade paper workspace
 > with direct module/workflow navigation, enabled/disabled module registry and
-> rail, a rail-first full-bleed single-primary workspace with no top app brand
-> header, visible global safety strip, shell context panel, monitor strip,
+> rail with purpose-matched icons plus local icon-first collapse behavior, a
+> rail-first full-bleed single-primary workspace with no top app brand header,
+> visible global safety strip, shell context panel, monitor strip,
 > footer/status strip, resizable splitters, layout reset, or page-level vertical
 > scrolling, IBKR scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/compact-filterable IBKR stock search, exact market-specific
@@ -101,9 +102,10 @@ state transitions, data access, and streaming contracts. The current frontend
 surface is the clean-room ATrade paper workspace defined in
 [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a completed frontend
 replacement with enabled modules for current API-backed workflows,
-visible-disabled future modules, a rail-first simplified full-viewport
-single-primary layout without a top app brand header or global visible safety
-strip, and a responsive fallback. The home and symbol routes now render directly through
+visible-disabled future modules, purpose-matched rail icons, local icon-first
+rail collapse behavior, a rail-first simplified full-viewport single-primary
+layout without a top app brand header or global visible safety strip, and a
+responsive fallback. The home and symbol routes now render directly through
 `ATradeTerminalApp`, which provides the direct module/workflow frame, module
 rail, single primary workspace region, module-owned scrolling, STATUS/HELP
 modules, and honest disabled-module surfaces for future modules
@@ -570,9 +572,9 @@ server-owned.
 The Next.js frontend may own short-lived UI state such as:
 
 - active workspace module, selected symbol/range route state, visible-disabled
-  module selection, and short-lived focus/navigation status; the simplified
-  shell does not use a versioned local layout-persistence key for
-  context/monitor split sizes
+  module selection, local rail collapse state, and short-lived focus/navigation
+  status; the simplified shell does not use a versioned local
+  layout-persistence key for context/monitor split sizes or rail collapse
 - a non-authoritative cached copy of backend watchlist symbols under
   `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
   and one-time migration of pre-Postgres pins
@@ -622,8 +624,9 @@ is unavailable, but it must not be treated as saved state and must not contain
 secrets, broker account identifiers, provider ids, or tokens. The simplified
 workspace removed the separate `atrade.terminal.layout.v1` context/monitor split
 preference key and its reset behavior; there is no active browser-local layout
-size authority. Any future non-sensitive UI preference key must be versioned,
-reset stale data safely, and never write broker/provider data to a backend.
+size authority, and the rail collapse state is local component state rather than
+persisted preference data. Any future non-sensitive UI preference key must be
+versioned, reset stale data safely, and never write broker/provider data to a backend.
 Local cleanup is a manual developer action: stop AppHost first, then remove only
 a volume you own (for example an isolated test volume), never a shared/default
 volume that may contain desired watchlist state.

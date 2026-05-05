@@ -21,13 +21,14 @@ The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, durable
 Postgres local paper-capital fallback storage, exact provider/market pins,
 configurable local AppHost ports, optional AppHost-managed LEAN Docker runtime
-wiring, and the completed `TP-045` through `TP-055` frontend reconstruction,
+wiring, and the completed `TP-045` through `TP-056` frontend reconstruction,
 no-command cutover, layout simplification,
-top-chrome/filter-density cleanup, stock chart visibility restoration, and
-original terminal theme foundation. The current frontend surface is the
+top-chrome/filter-density cleanup, stock chart visibility restoration, original
+terminal theme foundation, and module rail icon/collapse behavior. The current frontend surface is the
 clean-room ATrade paper workspace: direct module/workflow navigation,
-enabled/current workflow modules, visible-disabled future modules, compact dense
-market monitor, visibly sized chart/analysis workspaces, provider diagnostics,
+enabled/current workflow modules, visible-disabled future modules, purpose-matched
+module rail icons with local icon-first collapse behavior, compact dense market
+monitor, visibly sized chart/analysis workspaces, provider diagnostics,
 a rail-first full-bleed single-primary workspace layout with no app-level brand header,
 visible global safety strip, shell context/monitor/footer chrome, or page-level
 vertical scrolling, an original black/graphite/amber institutional terminal
@@ -53,7 +54,8 @@ Current repository contracts remain:
 
 The frontend reconstruction queue is complete/follow-up-ready through the
 rail-first top-chrome/filter-density cleanup, stock chart visibility restoration,
-and original black/graphite/amber terminal theme foundation:
+original black/graphite/amber terminal theme foundation, and module rail
+icon/collapse behavior:
 
 - `TP-045` — defined the active UI design spec and clean-room visual guardrails
 - `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
@@ -66,6 +68,7 @@ and original black/graphite/amber terminal theme foundation:
 - `TP-053` — removed the remaining top app brand header/global safety strip and compacted market-monitor filters while preserving module safety surfaces
 - `TP-054` — restored visible stock chart rendering with measured `lightweight-charts` sizing, non-collapsing chart layout, truthful empty/provider states, and chart visibility validation
 - `TP-055` — refactored the frontend into an original black/graphite/amber institutional terminal palette, reduced cyan/blue-gradient dominance, aligned chart colors, and added theme validation
+- `TP-056` — added purpose-matched icons for enabled and visible-disabled rail modules, local accessible icon-first rail collapse behavior, and rail validation
 
 `TP-058` is the active paper-capital source packet for the backend/backtesting
 MVP wave. The next new Taskplane packet should use `TP-059` unless an operator
@@ -80,8 +83,8 @@ handles active task folder archival after merge.
 
 Future frontend work should build on the direct module/workflow frame,
 rail-first full-viewport workspace, compact market-monitor filters,
-non-collapsing chart visibility contract, and original black/graphite/amber
-terminal palette established by `ATradeTerminalApp`,
+non-collapsing chart visibility contract, original black/graphite/amber
+terminal palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`, and

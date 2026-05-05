@@ -59,11 +59,12 @@ see_also:
 > and the target frontend reconstruction is governed by
 > [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a
 > clean-room ATrade paper workspace with enabled API-backed modules,
-> visible-disabled future modules, direct workflow navigation, a simplified
-> full-viewport layout, and shadcn/Tailwind/Radix-compatible original primitives.
+> visible-disabled future modules, purpose-matched rail icons, local icon-first
+> rail collapse behavior, direct workflow navigation, a simplified full-viewport
+> layout, and shadcn/Tailwind/Radix-compatible original primitives.
 > The current slice routes home and symbol pages through `ATradeTerminalApp`: an
-> enabled/disabled module registry and rail, a rail-first full-bleed
-> single-primary `TerminalWorkspaceLayout` with no top app brand header, visible
+> enabled/disabled module registry and rail with icon metadata, a rail-first
+> full-bleed single-primary `TerminalWorkspaceLayout` with no top app brand header, visible
 > global safety strip, context/monitor shell chrome, footer/status strip,
 > splitters, layout reset, or page-level vertical scrolling, status/help
 > surfaces, and a dense terminal market monitor over backend-driven trending
@@ -602,9 +603,12 @@ references.
   `frontend/types/terminal.ts` and `frontend/lib/terminalModuleRegistry.ts` own
   enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`,
   `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
-  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`). Home and symbol routes now render
-  directly through `ATradeTerminalApp`, `TerminalModuleRail`,
-  `TerminalWorkspaceLayout`, `TerminalHelpModule`, and `TerminalStatusModule`;
+  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`) and their purpose-matched rail
+  icon metadata. Home and symbol routes now render directly through
+  `ATradeTerminalApp`, `TerminalModuleRail`, `TerminalWorkspaceLayout`,
+  `TerminalHelpModule`, and `TerminalStatusModule`; `TerminalModuleRail` keeps
+  local non-persisted icon-first collapse state while preserving accessible
+  labels, active/focus states, and disabled-module explanations.
   the simplified rail-first shell removed the former app-level brand header,
   visible global safety strip, context/monitor split-size persistence, shell
   monitor strip, context aside, footer/status strip, and layout reset. The old `TradingWorkspace`
@@ -640,7 +644,8 @@ references.
   screeners, macro calendars, assistant text, node graphs, or order-entry
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
-  top-chrome/filter-density, shell/market/chart/analysis/theme validation scripts.
+  top-chrome/filter-density, shell/market/chart/analysis/theme, and module rail
+  icon/collapse validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
