@@ -1,6 +1,6 @@
 # TP-059: Backtesting domain, persistence, and API — Status
 
-**Current Step:** Step 3: Expose first-class backtest REST APIs
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 3
@@ -54,13 +54,13 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Targeted backtesting tests passing
-- [ ] Backtesting API/apphost validation passing
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Targeted backtesting tests passing
+- [x] Backtesting API/apphost validation passing
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
