@@ -1303,19 +1303,63 @@ select:focus-visible,
   grid-template-columns: minmax(0, 1.8fr) minmax(18rem, 0.85fr);
   gap: 0.75rem;
   align-items: start;
+  min-height: 0;
 }
 
 .terminal-market-monitor__table-region {
+  display: grid;
+  gap: 0.5rem;
   min-width: 0;
+  min-height: 0;
 }
 
 .market-monitor-table-shell {
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .market-monitor-table-scroll {
   width: 100%;
+  height: min(34rem, 62vh);
+  min-height: 16rem;
   max-height: min(34rem, 62vh);
+  overflow: hidden;
+}
+
+.market-monitor-table-scroll [data-slot="scroll-area-viewport"] {
+  width: 100%;
+  height: 100%;
+  scrollbar-gutter: stable both-edges;
+}
+
+.market-monitor-table-scroll [data-slot="scroll-area-scrollbar"] {
+  background: hsl(var(--terminal-surface-elevated) / 0.96);
+  opacity: 1;
+}
+
+.market-monitor-table-scroll [data-slot="scroll-area-scrollbar"][data-orientation="vertical"] {
+  width: 0.85rem;
+  border-left: 1px solid hsl(var(--terminal-border-strong) / 0.68);
+}
+
+.market-monitor-table-scroll [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"] {
+  height: 0.85rem;
+  border-top: 1px solid hsl(var(--terminal-border-strong) / 0.68);
+}
+
+.market-monitor-table-scroll [data-slot="scroll-area-thumb"] {
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 1px solid hsl(var(--terminal-accent-amber) / 0.5);
+  background: hsl(var(--terminal-accent-amber) / 0.72);
+  box-shadow: inset 0 0 0 1px hsl(var(--terminal-canvas) / 0.32);
+}
+
+.market-monitor-table-scroll [data-slot="scroll-area-corner"] {
+  background: hsl(var(--terminal-surface-elevated));
+  border-top: 1px solid hsl(var(--terminal-border-strong) / 0.68);
+  border-left: 1px solid hsl(var(--terminal-border-strong) / 0.68);
 }
 
 .market-monitor-table {
@@ -1581,6 +1625,8 @@ select:focus-visible,
 
 
 .market-monitor-table-shell--compact .market-monitor-table-scroll {
+  height: min(26rem, 54vh);
+  min-height: 14rem;
   max-height: min(26rem, 54vh);
 }
 
@@ -1599,7 +1645,10 @@ select:focus-visible,
   .terminal-instrument-header__grid,
 
 
-  .terminal-chart-workspace__market-grid {
+  .terminal-chart-workspace__market-grid,
+
+
+  .terminal-market-monitor__grid {
     grid-template-columns: 1fr;
   }
 
@@ -1632,6 +1681,12 @@ select:focus-visible,
   .market-monitor-filters__group {
     width: 100%;
     align-items: flex-start;
+  }
+
+  .market-monitor-table-scroll {
+    height: min(28rem, 58dvh);
+    min-height: 13rem;
+    max-height: min(28rem, 58dvh);
   }
 
   .terminal-module-rail {

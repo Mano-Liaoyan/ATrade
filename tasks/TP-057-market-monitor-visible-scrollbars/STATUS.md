@@ -1,6 +1,6 @@
 # TP-057: Make market monitor table scrollbars visible — Status
 
-**Current Step:** Step 2: Implement visible vertical and horizontal table scrolling
+**Current Step:** Step 3: Add scrollbar validation coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Implement visible vertical and horizontal table scrolling
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Constrain vertical overflow to an internal table viewport
-- [ ] Enable horizontal scrolling for the wide table while preserving sticky headers and row actions
-- [ ] Make scrollbar tracks/thumbs visible when overflow exists
-- [ ] Preserve full-viewport and responsive behavior without page-level scrolling
+- [x] Constrain vertical overflow to an internal table viewport
+- [x] Enable horizontal scrolling for the wide table while preserving sticky headers and row actions
+- [x] Make scrollbar tracks/thumbs visible when overflow exists
+- [x] Preserve full-viewport and responsive behavior without page-level scrolling
 
 ---
 
 ### Step 3: Add scrollbar validation coverage
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
 - [ ] Update existing market-monitor/top-chrome/layout validation scripts only if affected
