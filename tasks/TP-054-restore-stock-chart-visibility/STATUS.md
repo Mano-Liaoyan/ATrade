@@ -1,11 +1,11 @@
 # TP-054: Restore stock chart visibility — Status
 
-**Current Step:** Step 3: Protect chart visibility in CSS and validation
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -55,16 +55,16 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] New chart visibility validation passing
-- [ ] Chart/analysis validation passing
-- [ ] Chart range preset validation passing
-- [ ] Final layout validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] New chart visibility validation passing
+- [x] Chart/analysis validation passing
+- [x] Chart range preset validation passing
+- [x] Final layout validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -107,6 +107,8 @@
 | 2026-05-05 18:45 | Step 1 hydrated | Expanded diagnosis outcomes before implementation |
 | 2026-05-05 19:00 | Step 2 started | Implementing measured chart sizing/rendering fixes |
 | 2026-05-05 19:10 | Step 3 started | Adding non-collapsing CSS and validation coverage |
+| 2026-05-05 18:50 | Worker iter 1 | done in 700s, tools: 123 |
+| 2026-05-05 18:50 | Step 4 started | Testing & Verification |
 
 ---
 
