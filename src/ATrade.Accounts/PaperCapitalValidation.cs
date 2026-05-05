@@ -1,0 +1,90 @@
+namespace ATrade.Accounts;
+
+public static class PaperCapitalErrorCodes
+{
+    public const string InvalidPayload = "invalid-paper-capital-payload";
+    public const string InvalidAmount = "invalid-paper-capital-amount";
+    public const string InvalidCurrency = "invalid-paper-capital-currency";
+    public const string StorageUnavailable = "paper-capital-storage-unavailable";
+    public const string IbkrDisabled = "ibkr-paper-balance-disabled";
+    public const string IbkrUnavailable = "ibkr-paper-balance-unavailable";
+    public const string LocalUnconfigured = "local-paper-capital-unconfigured";
+    public const string NoCapitalSource = "paper-capital-source-unavailable";
+}
+
+public static class PaperCapitalSafeMessages
+{
+    public const string IbkrSourceUnavailable = "IBKR paper balance is not available.";
+    public const string LocalStorageUnavailable = "Local paper capital storage is unavailable.";
+    public const string LocalSourceUnconfigured = "Local paper capital has not been configured.";
+    public const string NoCapitalSource = "No paper capital source is configured.";
+}
+
+public sealed class PaperCapitalValidationException : ArgumentException
+{
+    public PaperCapitalValidationException(string code, string message, string? paramName = null)
+        : base(message, paramName)
+    {
+        Code = code;
+    }
+
+    public string Code { get; }
+}
+
+public sealed record LocalPaperCapitalValue(decimal Amount, string Currency);
+
+public static class LocalPaperCapitalValidator
+{
+    public const string DefaultCurrency = "USD";
+
+    private static readonly HashSet<string> SupportedCurrencies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        DefaultCurrency,
+    };
+
+    public static LocalPaperCapitalValue Validate(LocalPaperCapitalUpdateRequest? request)
+    {
+        if (request is null)
+        {
+            throw new PaperCapitalValidationException(
+                PaperCapitalErrorCodes.InvalidPayload,
+                "A local paper capital payload is required.");
+        }
+
+        if (!request.Amount.HasValue)
+        {
+            throw new PaperCapitalValidationException(
+                PaperCapitalErrorCodes.InvalidAmount,
+                "Local paper capital amount is required.",
+                nameof(request.Amount));
+        }
+
+        if (request.Amount.Value <= 0)
+        {
+            throw new PaperCapitalValidationException(
+                PaperCapitalErrorCodes.InvalidAmount,
+                "Local paper capital amount must be greater than zero.",
+                nameof(request.Amount));
+        }
+
+        var currency = NormalizeCurrency(request.Currency);
+        return new LocalPaperCapitalValue(decimal.Round(request.Amount.Value, 2, MidpointRounding.AwayFromZero), currency);
+    }
+
+    public static string NormalizeCurrency(string? currency)
+    {
+        var normalizedCurrency = string.IsNullOrWhiteSpace(currency)
+            ? DefaultCurrency
+            : currency.Trim().ToUpperInvariant();
+
+        if (!SupportedCurrencies.Contains(normalizedCurrency))
+        {
+            throw new PaperCapitalValidationException(
+                PaperCapitalErrorCodes.InvalidCurrency,
+                "Local paper capital currency is not supported.",
+                nameof(currency));
+        }
+
+        return normalizedCurrency;
+    }
+}

@@ -1,6 +1,6 @@
 # TP-058: Paper capital source — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Add provider-neutral paper-capital contracts and local ledger persistence
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Add provider-neutral paper-capital contracts and local ledger persistence
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Accounts paper-capital contracts created
-- [ ] Postgres local paper capital repository/schema added
-- [ ] Local capital validation and storage error shapes implemented
-- [ ] `tests/ATrade.Accounts.Tests` covers local persistence, validation, unconfigured state, and redaction
+- [x] Accounts paper-capital contracts created
+- [x] Postgres local paper capital repository/schema added
+- [x] Local capital validation and storage error shapes implemented
+- [x] `tests/ATrade.Accounts.Tests` covers local persistence, validation, unconfigured state, and redaction
 
 ---
 

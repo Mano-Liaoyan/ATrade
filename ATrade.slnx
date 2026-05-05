@@ -20,6 +20,7 @@
     <Project Path="src/ATrade.Workspaces/ATrade.Workspaces.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ATrade.Accounts.Tests/ATrade.Accounts.Tests.csproj" />
     <Project Path="tests/ATrade.Analysis.Tests/ATrade.Analysis.Tests.csproj" />
     <Project Path="tests/ATrade.Analysis.Lean.Tests/ATrade.Analysis.Lean.Tests.csproj" />
     <Project Path="tests/ATrade.Brokers.Ibkr.Tests/ATrade.Brokers.Ibkr.Tests.csproj" />
