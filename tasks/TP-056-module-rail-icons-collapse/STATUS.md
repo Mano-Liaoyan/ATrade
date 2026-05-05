@@ -104,6 +104,8 @@
 | 2026-05-06 | Step 3 completed | Source-only rail icon/collapse validation added; existing shell/layout validation remained compatible |
 | 2026-05-06 | Step 4 completed | New rail, shell, simplified-layout, frontend build, dotnet test, and dotnet build checks passed |
 | 2026-05-06 | Step 5 completed | Active docs updated and final icon/collapse persistence discoveries logged |
+| 2026-05-05 22:59 | Worker iter 1 | done in 1035s, tools: 174 |
+| 2026-05-05 22:59 | Task complete | .DONE created |
 
 ---
 
