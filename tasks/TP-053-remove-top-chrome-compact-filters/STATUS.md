@@ -58,6 +58,7 @@
 - [ ] New chrome/filter validation passing
 - [ ] Affected layout and market-monitor validations passing
 - [ ] No-command/shell/cutover validations passing if touched
+- [ ] Touched bootstrap/trading workspace validations passing
 - [ ] Frontend build passes
 - [ ] FULL test suite passing
 - [ ] All failures fixed
