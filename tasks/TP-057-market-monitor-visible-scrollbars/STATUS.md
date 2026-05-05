@@ -1,6 +1,6 @@
 # TP-057: Make market monitor table scrollbars visible — Status
 
-**Current Step:** Step 3: Add scrollbar validation coverage
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -43,16 +43,16 @@
 ---
 
 ### Step 3: Add scrollbar validation coverage
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
-- [ ] Update existing market-monitor/top-chrome/layout validation scripts only if affected
-- [ ] Ensure validation is deterministic and provider-independent
+- [x] Create `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
+- [x] Update existing market-monitor/top-chrome/layout validation scripts only if affected
+- [x] Ensure validation is deterministic and provider-independent
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] New scrollbar validation passing
 - [ ] Market monitor validation passing
@@ -89,6 +89,7 @@
 | Wide market-monitor columns remain required: provider, provider symbol id/IBKR conid, market/exchange, currency, asset class, source, score/rank, pin state, and chart/analysis/pin actions preserve exact provider-market identity across search/watchlist/trending handoffs. | Keep wide minimum table width and add horizontal scrolling instead of removing columns or actions. | Step 1 audit: `MarketMonitorTable.tsx`, `MarketMonitorDetailPanel.tsx`, `terminalMarketMonitorWorkflow.ts`, `docs/design/atrade-terminal-ui.md`, `docs/architecture/provider-abstractions.md` |
 | Scrollbar strategy chosen: use the shared Radix `ScrollArea` with `type="always"`, render both vertical and horizontal `ScrollBar`s, constrain the market-monitor table root/viewport, and add market-monitor CSS/native fallback styling for visible tracks/thumbs and stable scroll gutters. | Implement in Step 2 without enabling page-level scrolling or removing dense table columns/actions. | Step 1 audit: `scroll-area.tsx`, `MarketMonitorTable.tsx`, `globals.css`, Radix `@radix-ui/react-scroll-area` 1.2.10 types |
 | Radix tradeoff: the existing primitive only renders a vertical scrollbar and `type="auto"` can make visibility depend on overflow/interaction; horizontal support must be explicitly mounted and native scrollbar CSS is needed as a scoped browser fallback. | Keep the primitive generally reusable but allow horizontal scrollbar rendering; scope native scrollbar styling to the market-monitor viewport to avoid broad UI changes. | Step 1 audit: `frontend/components/ui/scroll-area.tsx`, `frontend/app/globals.css` |
+| Existing market-monitor validation now asserts the new scroll owner/type/slot contract; top-chrome and simplified layout scripts already cover page-level overflow and compact filters and did not need weakening. | Updated only `frontend-terminal-market-monitor-tests.sh`; full validation remains in the new scrollbar script. | Step 3 validation coverage |
 
 ---
 
