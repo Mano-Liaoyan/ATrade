@@ -59,7 +59,8 @@ Current non-goals:
 
 ATrade may use broad public finance-workstation patterns only as inspiration:
 dense dark information hierarchy, keyboard-friendly module navigation,
-resizable panels, source/status chips, and multi-panel market context. The
+full-bleed workspace regions, source/status chips, and data-dense market
+context. The
 implementation must be an original ATrade design and codebase.
 
 Non-negotiable clean-room rules:
@@ -93,7 +94,7 @@ reskin of the old paper-trading pages and not a command-first shell.
   contracts.
 - **Future wrapper compatibility:** keep state and interactions friendly to a
   later desktop wrapper by avoiding browser-only assumptions in core workspace
-  state, module registry behavior, layout persistence keys, and keyboard/focus
+  state, module registry behavior, viewport layout rules, and keyboard/focus
   handling.
 - **Primary form factor:** optimize for desktop and laptop screens where dense
   multi-panel market context is valuable.
@@ -174,15 +175,19 @@ ATrade should present a dense but legible multi-panel paper workspace on
 laptop/desktop screens. The layout model should be simple enough for the first
 implementation while leaving room for a desktop wrapper later.
 
-### 6.1 Resizable Multi-Panel Workspace
+### 6.1 Simplified Full-Viewport Workspace
 
-- Use a rectangular workspace frame with a top header region, left module rail,
-  central workspace grid, optional context/status rail, and compact status strip.
-- The central workspace should support resizable split panels for first-release
-  market workflows: for example market monitor + watchlist, chart + indicators,
-  chart + analysis, or status/help + context.
-- Resizing should use accessible handles, preserve minimum usable panel sizes,
-  and avoid overlapping or free-floating windows in the first release.
+- Use a full-bleed rectangular workspace frame that spans the viewport width with
+  no centered max-width wrapper, no left/right outer gutters, and no active
+  background grid.
+- The active page uses a top header, paper-only safety strip, left module rail,
+  and one primary workspace region. It does not render shell-only context aside,
+  monitor strip, footer/status strip, context/monitor splitters, or a layout
+  reset control.
+- The main page and body should not vertically scroll. The application frame is
+  viewport-height with page-level `overflow: hidden`; long market-monitor,
+  chart, analysis, status, help, and disabled-module content scrolls inside the
+  primary workspace or module-owned scroll regions.
 - Panel content must remain honest about backend state: loading, provider
   not-configured, provider unavailable, authentication required, no analysis
   engine configured, no watchlist pins, and disabled module states each get
@@ -190,15 +195,15 @@ implementation while leaving room for a desktop wrapper later.
 
 ### 6.2 Layout Persistence
 
-- Persist only non-sensitive UI preferences in browser-local storage, such as
-  active enabled module, panel split sizes, collapsed/expanded rail preference,
-  and last selected chart range.
-- Use an ATrade-owned versioned key namespace such as
-  `atrade.terminal.layout.v1` so future migrations can reset safely.
-- Treat local layout state as convenience state only. Backend-owned watchlists,
-  exact instrument identity, analysis inputs/results intended to roam, account
-  state, and any broker/provider data remain API-owned.
-- Invalid or stale persisted layout should reset to a documented default instead
+- The current simplified workspace does not persist context/monitor split sizes
+  or resizable shell layout state. `TerminalWorkspaceLayout` is a single primary
+  content region without pointer resize handlers or local layout reset behavior.
+- Treat any future browser-local UI state as convenience-only, non-sensitive
+  state. Backend-owned watchlists, exact instrument identity, analysis
+  inputs/results intended to roam, account state, and any broker/provider data
+  remain API-owned.
+- If future tasks reintroduce local UI preferences, they should use a fresh
+  ATrade-owned versioned key and must reset invalid or stale data safely instead
   of breaking module navigation.
 
 ### 6.3 Module Rail
@@ -221,26 +226,29 @@ implementation while leaving room for a desktop wrapper later.
 - The header must not include a command input, command prompt, command grammar,
   or command-first product tagline.
 
-### 6.5 Status Strip
+### 6.5 Status And Safety Surfaces
 
-- The strip may show provider/source labels, cache freshness/source metadata,
-  selected symbol identity, backend health, and compact navigation status.
-- It must not show fabricated price ticks. If SignalR or HTTP market data is
-  unavailable, show explicit stale/unavailable labels and retry affordances.
-- It must repeat paper-only/no-live-orders safety in compact form when order or
-  broker terms appear elsewhere on the screen.
+- Provider/source labels, cache freshness/source metadata, selected symbol
+  identity, backend health, and navigation status live inside module-owned
+  surfaces such as HOME, STATUS, HELP, chart/analysis headers, and market monitor
+  rows rather than a persistent footer strip.
+- These surfaces must not show fabricated price ticks. If SignalR or HTTP market
+  data is unavailable, show explicit stale/unavailable labels and retry
+  affordances.
+- Paper-only/no-live-orders safety remains visible in the header/safety strip and
+  in module content when order or broker terms appear elsewhere on the screen.
 
 ### 6.6 Responsive And Laptop Fallback Rules
 
 - Desktop and laptop layouts are primary; optimize first for approximately
   1280px-wide and larger screens.
-- At narrower laptop widths, allow the context rail to collapse under the active
-  workspace and allow the module rail to shrink.
-- At tablet/mobile widths, collapse to a single-column flow with header, module
-  rail/picker, active panel, and status sections stacked vertically.
-- Mobile fallback may omit simultaneous multi-panel context; it must still expose
-  enabled modules, safety copy, provider unavailable states, and HELP/STATUS
-  guidance.
+- At narrower laptop widths, let the module rail shrink or wrap while the single
+  primary workspace remains the scroll-owning content region.
+- At tablet/mobile widths, collapse to a single-column flow with header,
+  safety copy, module rail/picker, and active module content.
+- Mobile fallback may omit simultaneous side-by-side context; it must still
+  expose enabled modules, safety copy, provider unavailable states, and
+  HELP/STATUS guidance.
 
 ## 7. Visual System Direction
 
@@ -267,9 +275,9 @@ dashboard, while staying clearly separate from proprietary product identities.
   selected/focused states, positive/negative movement, warning/unavailable
   states, and paper-only safety. Accent use must be an original palette, not a
   copied third-party brand palette.
-- **Rectangular/resizable paneling:** prefer crisp rectangular regions,
-  splitters, rails, source/status chips, and instrument identity chips over
-  rounded consumer-card layouts.
+- **Rectangular full-bleed paneling:** prefer crisp rectangular regions, a clear
+  module rail, source/status chips, and instrument identity chips over rounded
+  consumer-card layouts or extra shell chrome.
 - **Non-generic shadcn styling:** avoid unmodified shadcn examples. Components
   should be restyled into ATrade primitives with custom density, focus, color,
   and data-state treatments.
@@ -291,8 +299,8 @@ Implementation guidance:
 - Treat shadcn/ui as a composition pattern and starting implementation style, not
   as a visual identity. Generated/default examples must be heavily restyled.
 - Build reusable original ATrade primitives such as workspace frame, module rail,
-  resizable panel group, status strip, data table, metric tile, provider-state
-  callout, symbol identity chip, and disabled-module callout.
+  primary workspace region, data table, metric tile, provider-state callout,
+  symbol identity chip, and disabled-module callout.
 - Preserve keyboard focus visibility and screen-reader labels even when the UI is
   visually dense.
 
@@ -311,7 +319,8 @@ paper-trading slice honest and safe.
   components should be designed around this document.
 - Existing generic dashboard/card styling is not a compatibility requirement.
 - Do not keep old UI solely to avoid churn if it blocks the dense workspace,
-  resizable layout model, direct workflow navigation, or original visual system.
+  simplified full-viewport layout model, direct workflow navigation, or original
+  visual system.
 
 ### 8.2 Reusable Logic To Preserve When It Fits
 

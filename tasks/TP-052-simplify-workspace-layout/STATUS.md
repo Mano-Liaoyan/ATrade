@@ -1,6 +1,6 @@
 # TP-052: Simplify workspace layout and remove extra chrome — Status
 
-**Current Step:** Step 3: Remove background grid styling and add layout validation
+**Current Step:** Step 4: Update active documentation and verification inventory
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -53,12 +53,12 @@
 ---
 
 ### Step 4: Update active documentation and verification inventory
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Update design doc for simplified layout
-- [ ] Update paper workspace and module docs
-- [ ] Update README verification inventory
-- [ ] Update PLAN follow-up direction
+- [x] Update design doc for simplified layout
+- [x] Update paper workspace and module docs
+- [x] Update README verification inventory
+- [x] Update PLAN follow-up direction
 
 ---
 
@@ -112,6 +112,8 @@
 | 2026-05-05 14:25 | Step 2 targeted check | Frontend build passed after single-workspace layout/persistence changes |
 | 2026-05-05 14:26 | Step 3 started | Removing grid styling and refreshing shell/cutover validations |
 | 2026-05-05 14:35 | Step 3 targeted checks | Simplified layout, shell UI, cutover, and no-command validations passed |
+| 2026-05-05 14:36 | Step 4 started | Updating active docs for the simplified full-bleed workspace layout |
+| 2026-05-05 14:43 | Step 4 docs check | Must-update docs and verification inventory updated for simplified layout |
 
 ---
 

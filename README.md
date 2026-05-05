@@ -94,7 +94,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, resizable primary/context/monitor layout with local-only persistence, a dense market monitor for trending/search/watchlist rows, chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a full-bleed single-primary workspace layout with no shell context/monitor/footer chrome and no page-level vertical scrolling, a dense market monitor for trending/search/watchlist rows, chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -151,14 +151,16 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-The `TP-045` through `TP-051` frontend reconstruction and no-command cutover
-batch now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
-module/workflow shell, dense market monitor, chart/analysis workspaces, final
-cutover verification, and removal of the visible terminal branding plus command
-input/parser. The current frontend surface is the direct module/workflow ATrade
-paper workspace; follow-up implementation packets should start at `TP-052` and
-build on module rail navigation plus explicit workflow actions rather than the
-retired old shell/list route wrappers or a command system.
+The `TP-045` through `TP-052` frontend reconstruction, no-command cutover, and
+layout-simplification batch now covers the active design spec,
+shadcn/Tailwind/Radix UI foundation, module/workflow shell, dense market monitor,
+chart/analysis workspaces, final cutover verification, removal of the visible
+terminal branding plus command input/parser, and the simplified full-bleed
+single-primary workspace layout. The current frontend surface is the direct
+module/workflow ATrade paper workspace; follow-up implementation packets should
+start at `TP-053` and build on module rail navigation plus explicit workflow
+actions rather than the retired old shell/list route wrappers, a command system,
+or the removed context/monitor/footer chrome.
 
 Completed Taskplane packets through `TP-044` are present in `tasks/`; completed
 packets should be archived when convenient. During orchestrated runs the runtime
@@ -230,6 +232,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
 - `tests/apphost/frontend-terminal-market-monitor-tests.sh`
 - `tests/apphost/frontend-no-command-shell-tests.sh`
+- `tests/apphost/frontend-simplified-workspace-layout-tests.sh`
 - `tests/apphost/frontend-terminal-shell-ui-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 - `tests/apphost/frontend-workspace-workflow-module-tests.sh`

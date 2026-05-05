@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-04
+updated: 2026-05-05
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker and market-data seams.
 see_also:
   - ../INDEX.md
@@ -55,12 +55,13 @@ see_also:
 > and the target frontend reconstruction is governed by
 > [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a
 > clean-room ATrade paper workspace with enabled API-backed modules,
-> visible-disabled future modules, direct workflow navigation, resizable panels,
-> and shadcn/Tailwind/Radix-compatible original primitives. The current slice
-> routes home and symbol pages through `ATradeTerminalApp`: an enabled/disabled
-> module registry and rail, resizable primary/context/monitor
-> layout with versioned browser-local persistence, status/help surfaces, and a
-> dense terminal market monitor over backend-driven trending symbols,
+> visible-disabled future modules, direct workflow navigation, a simplified
+> full-viewport layout, and shadcn/Tailwind/Radix-compatible original primitives.
+> The current slice routes home and symbol pages through `ATradeTerminalApp`: an
+> enabled/disabled module registry and rail, a full-bleed single-primary
+> `TerminalWorkspaceLayout` with no context/monitor shell chrome, footer/status
+> strip, splitters, layout reset, or page-level vertical scrolling, status/help
+> surfaces, and a dense terminal market monitor over backend-driven trending symbols,
 > bounded/ranked/filterable IBKR stock search, and Postgres-backed exact
 > watchlists plus terminal chart/analysis workspaces. `TerminalMarketMonitor`,
 > `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
@@ -571,12 +572,11 @@ references.
   `frontend/types/terminal.ts` and `frontend/lib/terminalModuleRegistry.ts` own
   enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`,
   `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
-  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`), and
-  `frontend/lib/terminalLayoutPersistence.ts` owns versioned local-only layout
-  preferences under `atrade.terminal.layout.v1`. Home and symbol routes now render
+  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`). Home and symbol routes now render
   directly through `ATradeTerminalApp`, `TerminalModuleRail`,
-  `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
-  `TerminalHelpModule`, and `TerminalStatusModule`; the old `TradingWorkspace`
+  `TerminalWorkspaceLayout`, `TerminalHelpModule`, and `TerminalStatusModule`;
+  the simplified shell removed the former context/monitor split-size persistence,
+  shell monitor strip, context aside, footer/status strip, and layout reset. The old `TradingWorkspace`
   and `SymbolChartView` compatibility wrappers have been deleted, and the
   retired `TerminalWorkspaceShell` / `WorkspaceCommandBar` /
   `WorkspaceNavigation` / `WorkspaceContextPanel` primitives remain absent.
@@ -616,9 +616,8 @@ references.
   ATrade-only foundation components live under `frontend/components/terminal/`
   (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
   `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalModuleRail`,
-  `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
-  `TerminalHelpModule`, `TerminalStatusModule`, `TerminalChartWorkspace`,
-  `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
+  `TerminalWorkspaceLayout`, `TerminalHelpModule`, `TerminalStatusModule`,
+  `TerminalChartWorkspace`, `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
   `TerminalAnalysisWorkspace`, `TerminalProviderDiagnostics`, and
   `TerminalDisabledModule`) and intentionally avoid legacy page-shell layout
   assumptions, backend access, provider runtime calls, order-entry behavior, or

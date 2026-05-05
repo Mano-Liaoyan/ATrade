@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-04
+updated: 2026-05-05
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
@@ -21,8 +21,8 @@ see_also:
 > contract for the broader paper-trading workspace. The active frontend UI
 > authority is [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
 > it governs the clean-room visual target, direct module/workflow navigation,
-> resizable layout, disabled future surfaces, and frontend replacement
-> constraints while this document continues to govern paper-only safety and
+> simplified full-viewport layout, disabled future surfaces, and frontend
+> replacement constraints while this document continues to govern paper-only safety and
 > backend/API boundaries. The current repository now
 > uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
 > first real market-data provider behind API/frontend-stable seams. The current
@@ -40,8 +40,9 @@ see_also:
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js ATrade paper workspace
 > with direct module/workflow navigation, enabled/disabled module registry and
-> rail, resizable primary/context/monitor panels with versioned local-only layout
-> persistence, IBKR scanner-driven or fresh persisted trending symbols,
+> rail, a full-bleed single-primary workspace with no shell context panel,
+> monitor strip, footer/status strip, resizable splitters, layout reset, or
+> page-level vertical scrolling, IBKR scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/filterable IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, terminal chart workspaces
 > that reuse `lightweight-charts` candlesticks, chart range lookback controls
@@ -97,13 +98,13 @@ state transitions, data access, and streaming contracts. The current frontend
 surface is the clean-room ATrade paper workspace defined in
 [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a completed frontend
 replacement with enabled modules for current API-backed workflows,
-visible-disabled future modules, resizable multi-panel layout, and a simplified
-mobile fallback. The home and symbol routes now render directly through
+visible-disabled future modules, a simplified full-viewport single-primary
+layout, and a responsive fallback. The home and symbol routes now render directly through
 `ATradeTerminalApp`, which provides the direct module/workflow frame, module
-rail, safety strip, resizable primary/context/monitor workspace, local-only
-bounded layout reset/persistence, status strip, help module, and honest
-disabled-module surfaces for future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
-`SCREENER`, `ECON`, `AI`, `NODE`, and `ORDERS`). Users open modules through the
+rail, safety strip, single primary workspace region, module-owned scrolling,
+STATUS/HELP modules, and honest disabled-module surfaces for future modules
+(`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
+`ORDERS`). Users open modules through the
 rail, market-monitor chart/analysis actions, and symbol route state; no command
 input, command parser, or backend command route is part of the active frontend.
 The visual direction is inspired only by broad finance-workstation information
@@ -121,9 +122,10 @@ The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
 - market monitor, chart, analysis, status, help, and provider/status widgets
-- browser-side session state for active modules, open panels, non-authoritative
-  watchlist cache/migration state, optimistic UI interactions, and bounded
-  local-only resizable layout preferences
+- browser-side session state for active modules, non-authoritative watchlist
+  cache/migration state, optimistic UI interactions, and route-local workflow
+  state; the active shell no longer persists context/monitor split sizes or
+  layout reset state
 - SignalR subscriptions for market-data stream updates plus HTTP fallback; broker
   status is diagnostics-only and no order-entry or order-submit UI is rendered
 
@@ -528,8 +530,10 @@ server-owned.
 
 The Next.js frontend may own short-lived UI state such as:
 
-- active workspace module, rail/collapsed preference, and resizable panel layout
-  under the versioned local-only `atrade.terminal.layout.v1` key
+- active workspace module, selected symbol/range route state, visible-disabled
+  module selection, and short-lived focus/navigation status; the simplified
+  shell does not use a versioned local layout-persistence key for
+  context/monitor split sizes
 - a non-authoritative cached copy of backend watchlist symbols under
   `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
   and one-time migration of pre-Postgres pins
@@ -571,10 +575,11 @@ symbol-only rows; exact removals use
 symbol-only: it may seed a one-time manual-symbol migration into Postgres and
 may render a clearly labeled read-only cached snapshot when the backend/database
 is unavailable, but it must not be treated as saved state and must not contain
-secrets, broker account identifiers, provider ids, or tokens. The separate
-`atrade.terminal.layout.v1` key stores only convenience UI layout preferences
-(active enabled module, rail state, and bounded primary/context/monitor split
-sizes); invalid/stale versions reset to defaults and never write to a backend.
+secrets, broker account identifiers, provider ids, or tokens. The simplified
+workspace removed the separate `atrade.terminal.layout.v1` context/monitor split
+preference key and its reset behavior; there is no active browser-local layout
+size authority. Any future non-sensitive UI preference key must be versioned,
+reset stale data safely, and never write broker/provider data to a backend.
 Local cleanup is a manual developer action: stop AppHost first, then remove only
 a volume you own (for example an isolated test volume), never a shared/default
 volume that may contain desired watchlist state.
