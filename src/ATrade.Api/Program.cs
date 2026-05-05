@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 LocalDevelopmentPortContractLoader.ApplyApiHttpPortDefault(builder);
 builder.AddServiceDefaults();
 builder.Services.AddIbkrBrokerAdapter(builder.Configuration);
-builder.Services.AddAccountsModule();
+builder.Services.AddAccountsModule(builder.Configuration);
 builder.Services.AddOrdersModule();
 builder.Services.AddMarketDataModule();
 builder.Services.AddTimescaleMarketDataPersistence(builder.Configuration);
@@ -43,6 +43,14 @@ app.UseCors("LocalFrontend");
 
 app.MapGet("/health", () => Results.Text("ok", "text/plain"));
 app.MapGet("/api/accounts/overview", (IAccountOverviewProvider overviewProvider) => Results.Ok(overviewProvider.GetOverview()));
+app.MapGet(
+    "/api/accounts/paper-capital",
+    async (IPaperCapitalService paperCapitalService, CancellationToken cancellationToken) =>
+        Results.Ok(await paperCapitalService.GetAsync(cancellationToken)));
+app.MapPut(
+    "/api/accounts/local-paper-capital",
+    async (LocalPaperCapitalUpdateRequest? request, IPaperCapitalService paperCapitalService, CancellationToken cancellationToken) =>
+        ToPaperCapitalIntakeResult(await paperCapitalService.UpdateLocalAsync(request, cancellationToken)));
 app.MapGet(
     "/api/market-data/trending",
     async (IMarketDataService marketDataService, CancellationToken cancellationToken) =>
@@ -224,4 +232,23 @@ static IResult ToWorkspaceWatchlistResult(WorkspaceWatchlistIntakeResult result)
         : Results.BadRequest(response);
 }
 
+static IResult ToPaperCapitalIntakeResult(PaperCapitalIntakeResult result)
+{
+    if (result.Response is not null)
+    {
+        return Results.Ok(result.Response);
+    }
+
+    var error = result.Error ?? new PaperCapitalIntakeError(
+        PaperCapitalErrorCodes.InvalidPayload,
+        "Paper capital request failed.");
+    var response = new PaperCapitalErrorResponse(error.Code, error.Message);
+
+    return string.Equals(error.Code, PaperCapitalErrorCodes.StorageUnavailable, StringComparison.Ordinal)
+        ? Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable)
+        : Results.BadRequest(response);
+}
+
 public sealed record WorkspaceWatchlistErrorResponse(string Code, string Error);
+
+public sealed record PaperCapitalErrorResponse(string Code, string Error);

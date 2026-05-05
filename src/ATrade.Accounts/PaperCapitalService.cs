@@ -3,6 +3,7 @@ namespace ATrade.Accounts;
 public sealed class PaperCapitalService(
     ILocalPaperCapitalRepository localRepository,
     IPaperCapitalIdentityProvider identityProvider,
+    ILocalPaperCapitalSchemaInitializer schemaInitializer,
     IEnumerable<IIbkrPaperCapitalProvider> ibkrPaperCapitalProviders) : IPaperCapitalService
 {
     public async Task<PaperCapitalResponse> GetAsync(CancellationToken cancellationToken = default)
@@ -30,6 +31,7 @@ public sealed class PaperCapitalService(
         var identity = identityProvider.Current;
         try
         {
+            await schemaInitializer.InitializeAsync(cancellationToken).ConfigureAwait(false);
             await localRepository.UpsertAsync(identity, value, cancellationToken).ConfigureAwait(false);
         }
         catch (PaperCapitalStorageUnavailableException)
@@ -83,6 +85,7 @@ public sealed class PaperCapitalService(
     {
         try
         {
+            await schemaInitializer.InitializeAsync(cancellationToken).ConfigureAwait(false);
             return (await localRepository.GetAsync(identityProvider.Current, cancellationToken).ConfigureAwait(false), true);
         }
         catch (PaperCapitalStorageUnavailableException)

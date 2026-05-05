@@ -1,6 +1,6 @@
 # TP-058: Paper capital source — Status
 
-**Current Step:** Step 2: Add safe IBKR/iBeam paper balance read seam
+**Current Step:** Step 3: Expose paper-capital APIs through `ATrade.Api`
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -46,12 +46,12 @@
 ---
 
 ### Step 3: Expose paper-capital APIs through `ATrade.Api`
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Accounts services composed with required configuration/Postgres dependencies
-- [ ] `GET /api/accounts/paper-capital` implemented
-- [ ] `PUT /api/accounts/local-paper-capital` implemented
-- [ ] API/apphost contract validation added
+- [x] Accounts services composed with required configuration/Postgres dependencies
+- [x] `GET /api/accounts/paper-capital` implemented
+- [x] `PUT /api/accounts/local-paper-capital` implemented
+- [x] API/apphost contract validation added
 
 ---
 

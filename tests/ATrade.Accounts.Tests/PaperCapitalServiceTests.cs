@@ -105,7 +105,7 @@ public sealed class PaperCapitalServiceTests
     private static PaperCapitalService CreateService(
         ILocalPaperCapitalRepository repository,
         params IIbkrPaperCapitalProvider[] ibkrProviders) =>
-        new(repository, new StaticPaperCapitalIdentityProvider(Identity), ibkrProviders);
+        new(repository, new StaticPaperCapitalIdentityProvider(Identity), new NoopLocalPaperCapitalSchemaInitializer(), ibkrProviders);
 
     private static IIbkrPaperCapitalProvider DisabledIbkr() =>
         new StaticIbkrPaperCapitalProvider(IbkrPaperCapitalAvailability.Unavailable(
@@ -150,6 +150,11 @@ public sealed class PaperCapitalServiceTests
     private sealed class StaticPaperCapitalIdentityProvider(PaperCapitalIdentity identity) : IPaperCapitalIdentityProvider
     {
         public PaperCapitalIdentity Current { get; } = identity;
+    }
+
+    private sealed class NoopLocalPaperCapitalSchemaInitializer : ILocalPaperCapitalSchemaInitializer
+    {
+        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class StaticIbkrPaperCapitalProvider(IbkrPaperCapitalAvailability availability) : IIbkrPaperCapitalProvider

@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace ATrade.Accounts;
 
 public static class PaperCapitalSources
@@ -67,7 +70,11 @@ public sealed record PaperCapitalResponse(
     decimal? LocalCapital,
     IReadOnlyList<PaperCapitalMessage> Messages);
 
-public sealed record LocalPaperCapitalUpdateRequest(decimal? Amount, string? Currency);
+public sealed record LocalPaperCapitalUpdateRequest(decimal? Amount, string? Currency)
+{
+    [JsonExtensionData]
+    public IDictionary<string, JsonElement>? AdditionalProperties { get; init; }
+}
 
 public sealed record PaperCapitalIntakeError(string Code, string Message);
 

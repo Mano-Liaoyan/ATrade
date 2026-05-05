@@ -59,6 +59,8 @@ public static class LocalPaperCapitalValidator
                 "A local paper capital payload is required.");
         }
 
+        RejectSensitiveAdditionalProperties(request);
+
         if (!request.Amount.HasValue)
         {
             throw new PaperCapitalValidationException(
@@ -94,5 +96,30 @@ public static class LocalPaperCapitalValidator
         }
 
         return normalizedCurrency;
+    }
+
+    private static void RejectSensitiveAdditionalProperties(LocalPaperCapitalUpdateRequest request)
+    {
+        if (request.AdditionalProperties is null || request.AdditionalProperties.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var propertyName in request.AdditionalProperties.Keys)
+        {
+            if (propertyName.Contains("account", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("credential", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("password", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("token", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("cookie", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("session", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("gateway", StringComparison.OrdinalIgnoreCase) ||
+                propertyName.Contains("url", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new PaperCapitalValidationException(
+                    PaperCapitalErrorCodes.InvalidPayload,
+                    "Local paper capital updates must not include provider account or credential fields.");
+            }
+        }
     }
 }
