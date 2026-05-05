@@ -1,6 +1,6 @@
 # TP-052: Simplify workspace layout and remove extra chrome — Status
 
-**Current Step:** Step 4: Update active documentation and verification inventory
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -63,16 +63,16 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Simplified layout validation passing
-- [ ] No-command validation passing
-- [ ] Updated shell/cutover validations passing
-- [ ] Affected workflow validations passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Simplified layout validation passing
+- [x] No-command validation passing
+- [x] Updated shell/cutover validations passing
+- [x] Affected workflow validations passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -114,6 +114,9 @@
 | 2026-05-05 14:35 | Step 3 targeted checks | Simplified layout, shell UI, cutover, and no-command validations passed |
 | 2026-05-05 14:36 | Step 4 started | Updating active docs for the simplified full-bleed workspace layout |
 | 2026-05-05 14:43 | Step 4 docs check | Must-update docs and verification inventory updated for simplified layout |
+| 2026-05-05 14:44 | Step 5 started | Running required validation and build/test gates |
+| 2026-05-05 14:58 | Step 5 validation progress | Simplified layout, no-command, shell/cutover, affected workflow validations, frontend build, and dotnet test passed with zero failures |
+| 2026-05-05 15:00 | Step 5 build gate | dotnet build ATrade.slnx passed with zero warnings/errors |
 
 ---
 
