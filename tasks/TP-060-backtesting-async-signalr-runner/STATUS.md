@@ -1,6 +1,6 @@
 # TP-060: Backtesting async runner and SignalR updates — Status
 
-**Current Step:** Step 1: Add durable async job runner and restart recovery
+**Current Step:** Step 2: Execute runs through market data and analysis/LEAN seams
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Execute runs through market data and analysis/LEAN seams
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Runner fetches candles server-side via `IMarketDataService`
-- [ ] Runner invokes `IAnalysisEngineRegistry` with saved strategy metadata and cancellation
-- [ ] Market-data and analysis unavailable states map to failed runs safely
-- [ ] Completed result envelopes persist for TP-061 enrichment
+- [x] Runner fetches candles server-side via `IMarketDataService`
+- [x] Runner invokes `IAnalysisEngineRegistry` with saved strategy metadata and cancellation
+- [x] Market-data and analysis unavailable states map to failed runs safely
+- [x] Completed result envelopes persist for TP-061 enrichment
 
 ---
 

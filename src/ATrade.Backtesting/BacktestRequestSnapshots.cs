@@ -21,6 +21,7 @@ public static class BacktestRequestSnapshots
                 normalized.CostModel.CommissionBps,
                 normalized.CostModel.Currency),
             SlippageBps: normalized.SlippageBps,
-            BenchmarkMode: normalized.BenchmarkMode);
+            BenchmarkMode: normalized.BenchmarkMode,
+            EngineId: normalized.EngineId);
     }
 }

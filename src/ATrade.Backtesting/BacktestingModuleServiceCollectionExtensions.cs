@@ -20,7 +20,7 @@ public static class BacktestingModuleServiceCollectionExtensions
             serviceProvider.GetRequiredService<IPaperCapitalService>(),
             serviceProvider.GetRequiredService<IPaperCapitalIdentityProvider>()));
         services.Configure<BacktestRunCoordinatorOptions>(configuration.GetSection("Backtesting:Runner"));
-        services.TryAddSingleton<IBacktestRunExecutionPipeline, UnavailableBacktestRunExecutionPipeline>();
+        services.TryAddSingleton<IBacktestRunExecutionPipeline, BacktestRunAnalysisExecutionPipeline>();
         services.AddSingleton<IBacktestRunCoordinator, BacktestRunCoordinator>();
         services.AddHostedService<BacktestRunHostedService>();
 

@@ -121,6 +121,8 @@ public static class BacktestErrorCodes
     public const string RunInterrupted = "backtest-run-interrupted";
     public const string RunnerUnavailable = "backtest-runner-unavailable";
     public const string RunnerFailed = "backtest-runner-failed";
+    public const string MarketDataUnavailable = "backtest-market-data-unavailable";
+    public const string AnalysisUnavailable = "backtest-analysis-unavailable";
 }
 
 public static class BacktestSafeMessages
@@ -138,6 +140,8 @@ public static class BacktestSafeMessages
     public const string RunInterrupted = "Backtest run was interrupted by an API restart before completion.";
     public const string RunnerUnavailable = "Backtest execution is unavailable because no runner pipeline is configured.";
     public const string RunnerFailed = "Backtest execution failed.";
+    public const string MarketDataUnavailable = "Market data is unavailable for backtest execution.";
+    public const string AnalysisUnavailable = "Analysis engine is unavailable for backtest execution.";
 }
 
 public sealed record BacktestRunId(string Value)
@@ -182,7 +186,8 @@ public sealed record BacktestCreateRequest(
     string? ChartRange,
     BacktestCostModel? CostModel,
     decimal? SlippageBps,
-    string? BenchmarkMode)
+    string? BenchmarkMode,
+    string? EngineId = null)
 {
     [JsonExtensionData]
     public IDictionary<string, JsonElement>? AdditionalProperties { get; init; }
@@ -195,7 +200,8 @@ public sealed record BacktestRequestSnapshot(
     string ChartRange,
     BacktestCostModelSnapshot CostModel,
     decimal SlippageBps,
-    string BenchmarkMode);
+    string BenchmarkMode,
+    string? EngineId = null);
 
 public sealed record BacktestCapitalSnapshot(decimal InitialCapital, string Currency, string CapitalSource);
 

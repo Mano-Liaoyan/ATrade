@@ -106,6 +106,7 @@ public static class BacktestRequestValidator
         var costModel = NormalizeCostModel(request.CostModel);
         var slippageBps = NormalizeSlippage(request.SlippageBps);
         var benchmarkMode = NormalizeBenchmarkMode(request.BenchmarkMode);
+        var engineId = NormalizeEngineId(request.EngineId);
 
         return new BacktestRequestSnapshot(
             symbol,
@@ -114,7 +115,8 @@ public static class BacktestRequestValidator
             chartRange,
             costModel,
             slippageBps,
-            benchmarkMode);
+            benchmarkMode,
+            engineId);
     }
 
     private static MarketDataSymbolIdentity NormalizeSymbol(MarketDataSymbolIdentity? symbol, string? symbolCode)
@@ -285,6 +287,27 @@ public static class BacktestRequestValidator
         }
 
         return decimal.Round(value, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private static string? NormalizeEngineId(string? engineId)
+    {
+        if (string.IsNullOrWhiteSpace(engineId))
+        {
+            return null;
+        }
+
+        var normalized = engineId.Trim().ToLowerInvariant();
+        if (normalized.Length > BacktestValidationLimits.MaximumParameterNameLength ||
+            normalized.Any(character => !(char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.')))
+        {
+            throw new BacktestValidationException(
+                BacktestErrorCodes.InvalidParameters,
+                "Backtest engine ids may contain only letters, numbers, dots, dashes, and underscores.",
+                nameof(engineId));
+        }
+
+        RejectForbiddenPropertyName(normalized);
+        return normalized;
     }
 
     private static string NormalizeBenchmarkMode(string? benchmarkMode)

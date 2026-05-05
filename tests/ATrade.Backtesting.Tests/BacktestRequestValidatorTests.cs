@@ -22,7 +22,8 @@ public sealed class BacktestRequestValidatorTests
             ChartRange: "1y",
             CostModel: new BacktestCostModel(1.23456m, 2.34567m, "usd"),
             SlippageBps: 4.56789m,
-            BenchmarkMode: "BUY-AND-HOLD");
+            BenchmarkMode: "BUY-AND-HOLD",
+            EngineId: "LEAN");
 
         var snapshot = BacktestRequestValidator.Validate(request);
 
@@ -35,6 +36,7 @@ public sealed class BacktestRequestValidatorTests
         Assert.Equal("USD", snapshot.CostModel.Currency);
         Assert.Equal(4.5679m, snapshot.SlippageBps);
         Assert.Equal(BacktestBenchmarkModes.BuyAndHold, snapshot.BenchmarkMode);
+        Assert.Equal("lean", snapshot.EngineId);
     }
 
     [Fact]
