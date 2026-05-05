@@ -1,8 +1,8 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
-summary: Provider-neutral broker, market-data, and analysis provider contracts for swapping ATrade providers without changing API or frontend payloads.
+updated: 2026-05-06
+summary: Provider-neutral broker, account-capital, market-data, and analysis provider contracts for swapping ATrade providers without changing API or frontend payloads.
 see_also:
   - ../INDEX.md
   - overview.md
@@ -15,10 +15,10 @@ see_also:
 
 # Provider Abstractions
 
-ATrade composes broker, market-data, and analysis implementations behind
-provider-neutral contracts. The API and frontend must depend on ATrade
-contracts and payloads, not on the concrete IBKR Gateway/iBeam runtime,
-Polygon, LEAN, or any future provider runtime.
+ATrade composes broker, account-capital, market-data, and analysis
+implementations behind provider-neutral contracts. The API and frontend must
+depend on ATrade contracts and payloads, not on the concrete IBKR Gateway/iBeam
+runtime, Polygon, LEAN, or any future provider runtime.
 
 This document is the switching overview for the provider seams introduced in
 `TP-019` and extended by the analysis engine contract. The detailed analysis
@@ -27,6 +27,8 @@ engine contract lives in `analysis-engines.md`.
 ## 1. Goals
 
 - Allow broker status providers to change without rewriting API endpoint code.
+- Allow paper-capital source providers to change without changing API/frontend
+  payloads used by future backtest initialization.
 - Allow market-data providers to change without changing HTTP/SignalR payloads.
 - Allow analysis engines to change without changing API/frontend request or result payloads.
 - Keep paper-only safety explicit: real order placement is not supported by the
@@ -65,6 +67,22 @@ Current implementation:
   monitoring while API broker status projects that readiness into the
   provider-neutral status object.
 
+Related account-capital seam:
+
+- `ATrade.Accounts` owns `IPaperCapitalService`, the browser-facing
+  effective-capital response, and source values `ibkr-paper-balance`,
+  `local-paper-ledger`, and `unavailable`.
+- `ATrade.Brokers.Ibkr` contributes only an Accounts-facing
+  `IIbkrPaperCapitalProvider` implementation. It reads the configured paper
+  account summary after authenticated paper readiness, maps disabled /
+  credentials-missing / unauthenticated / rejected-live / timeout / provider
+  failure states into safe availability messages, and never exposes the
+  configured account id through API payloads, logs, docs, or tests.
+- Local fallback capital is a Postgres-backed Accounts ledger value, not a broker
+  provider capability. The service must prefer a usable IBKR paper balance,
+  fall back to the local ledger, and otherwise return explicit unavailable state
+  rather than synthesizing capital.
+
 Safety constraints:
 
 - `SupportsBrokerOrderPlacement` is `false` in the current paper-safe IBKR
@@ -73,7 +91,7 @@ Safety constraints:
 - Credential persistence and execution persistence remain unsupported until a
   separately reviewed task adds them.
 - Provider implementations must not leak gateway URLs, account identifiers,
-  secrets, tokens, or session cookies through status payloads.
+  secrets, tokens, or session cookies through status or paper-capital payloads.
 
 ## 3. Market-Data Provider Contract
 
@@ -202,9 +220,9 @@ Core rules:
 ## 5. Composition Rules
 
 - API endpoint handlers may depend on provider-neutral contracts such as
-  `IBrokerProvider`, `IMarketDataService`, `IAnalysisEngineRegistry`,
-  `IAnalysisRequestIntake`, `IWorkspaceWatchlistIntake`, and SignalR-facing
-  market-data services.
+  `IBrokerProvider`, `IPaperCapitalService`, `IMarketDataService`,
+  `IAnalysisEngineRegistry`, `IAnalysisRequestIntake`,
+  `IWorkspaceWatchlistIntake`, and SignalR-facing market-data services.
 - API endpoint handlers must not instantiate concrete providers such as the
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
@@ -215,15 +233,16 @@ Core rules:
   `AddAnalysisModule()`, and `AddLeanAnalysisEngine(...)`; LEAN only becomes
   active when configuration selects it. Endpoint handlers still depend only on
   provider-neutral services while the Timescale decorator owns cache-aside reads,
-  writes, freshness checks, and storage-unavailable fallback, `ATrade.Analysis`
-  intake owns analysis request construction/engine handoff, and
-  `ATrade.Workspaces` intake owns watchlist request normalization/storage error
-  shaping.
+  writes, freshness checks, and storage-unavailable fallback; `ATrade.Analysis`
+  intake owns analysis request construction/engine handoff; `ATrade.Workspaces`
+  intake owns watchlist request normalization/storage error shaping; and
+  `ATrade.Accounts` owns paper-capital source selection plus local ledger
+  storage/error shaping.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.
 
-## 6. Current IBKR Market-Data Provider And Future Plug-ins
+## 6. Current IBKR Provider Implementations And Future Plug-ins
 
 Current implementation:
 
@@ -242,11 +261,16 @@ Current implementation:
   HTTPS only; remote hosts keep normal certificate validation.
 - It does not read credential environment variables directly. Credential and
   paper-account presence is evaluated through typed gateway configuration and
-  the paper-only guard. Broker status, market-data status/read guards, and
-  worker monitoring consume the same normalized IBKR/iBeam readiness result so
-  disabled, credentials-missing, not-configured, transport timeout/unreachable,
-  unauthenticated, authenticated, degraded, error, and rejected-live outcomes
-  stay consistent across provider projections.
+  the paper-only guard. Broker status, paper-capital availability, market-data
+  status/read guards, and worker monitoring consume the same normalized
+  IBKR/iBeam readiness result so disabled, credentials-missing, not-configured,
+  transport timeout/unreachable, unauthenticated, authenticated, degraded,
+  error, and rejected-live outcomes stay consistent across provider projections.
+- For paper-capital availability only, it reads
+  `/v1/api/portfolio/{configured paper account id}/summary` after readiness is
+  authenticated for paper mode and parses `totalcashvalue` before
+  `netliquidation`; the configured account id remains an internal path segment
+  and must be redacted from payloads and diagnostics.
 - It translates Client Portal contract search (`/iserver/secdef/search`) plus
   contract detail (`/iserver/secdef/info`) when available, snapshots
   (`/iserver/marketdata/snapshot`), historical bars (`/iserver/marketdata/history`),
