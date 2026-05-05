@@ -1,6 +1,6 @@
 # TP-057: Make market monitor table scrollbars visible — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -52,21 +52,21 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] New scrollbar validation passing
-- [ ] Market monitor validation passing
-- [ ] Top chrome/filter density validation passing
-- [ ] Simplified layout validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] New scrollbar validation passing
+- [x] Market monitor validation passing
+- [x] Top chrome/filter density validation passing
+- [x] Simplified layout validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] README/PLAN verification/current-surface text updated if affected
