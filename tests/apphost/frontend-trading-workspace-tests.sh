@@ -219,7 +219,7 @@ assert_frontend_dependencies_and_source() {
   assert_file_contains "$repo_root/frontend/lib/symbolChartWorkflow.ts" 'connectMarketDataStream'
   assert_file_contains "$repo_root/frontend/lib/symbolChartWorkflow.ts" 'fallbackTimer = window.setInterval'
   assert_file_contains "$repo_root/frontend/lib/symbolChartWorkflow.ts" 'formatMarketDataSourceLabel'
-  assert_file_contains "$repo_root/frontend/components/terminal/TerminalProviderDiagnostics.tsx" 'Diagnostics only — the terminal renders no order-entry controls and does not call broker order routes.'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalProviderDiagnostics.tsx" 'Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes.'
   assert_file_contains "$repo_root/frontend/types/analysis.ts" 'AnalysisResult'
   assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/engines'
   assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/run'
@@ -274,14 +274,15 @@ start_frontend_and_assert_markers() {
   frontend_pid=$!
 
   wait_for_http_200 "$frontend_url/" "$root_response" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$root_response" 'ATrade Terminal Shell'
-  assert_file_contains "$root_response" 'Command-first paper workspace'
+  assert_file_contains "$root_response" 'Paper Trading Workspace'
+  assert_file_contains "$root_response" 'Module-driven paper workspace'
+  assert_file_not_contains "$root_response" 'ATrade Terminal Shell'
+  assert_file_not_contains "$root_response" 'Command-first paper workspace'
   assert_file_contains "$root_response" 'data-testid="atrade-terminal-app"'
   assert_file_contains "$root_response" 'data-testid="terminal-module-rail"'
   assert_file_contains "$root_response" 'data-testid="terminal-workspace-layout"'
   assert_file_contains "$root_response" 'data-testid="terminal-market-monitor"'
   assert_file_contains "$root_response" 'Bounded IBKR stock search'
-  assert_file_contains "$root_response" 'Terminal market monitor'
   assert_file_contains "$root_response" 'Market monitor'
   assert_file_contains "$root_response" 'Backend-owned exact Postgres pins through ATrade.Api.'
   assert_file_contains "$root_response" 'Paper-only workspace'

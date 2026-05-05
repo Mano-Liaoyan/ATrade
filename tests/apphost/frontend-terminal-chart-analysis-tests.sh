@@ -85,7 +85,6 @@ assert_terminal_chart_workflow_contract() {
 assert_exact_identity_chart_and_analysis_handoff() {
   local monitor_workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
-  local command_registry="$repo_root/frontend/lib/terminalCommandRegistry.ts"
   local symbol_page="$repo_root/frontend/app/symbols/[symbol]/page.tsx"
   local identity="$repo_root/frontend/lib/instrumentIdentity.ts"
 
@@ -100,10 +99,6 @@ assert_exact_identity_chart_and_analysis_handoff() {
   assert_file_contains "$terminal_app" 'setActiveIdentity(intent.identity ?? null)'
   assert_file_contains "$terminal_app" 'identity={activeIdentity}'
   assert_file_contains "$terminal_app" 'symbol={activeSymbol}'
-  assert_file_contains "$command_registry" 'moduleId: "CHART"'
-  assert_file_contains "$command_registry" 'moduleId: "ANALYSIS"'
-  assert_file_contains "$command_registry" 'chartRange: "1D"'
-  assert_file_contains "$command_registry" '?module=ANALYSIS&range=1D'
   assert_file_contains "$symbol_page" 'createQueryIdentity(normalizedSymbol, resolvedSearchParams)'
   assert_file_contains "$symbol_page" 'initialModuleId={initialModuleId}'
   assert_file_contains "$symbol_page" 'initialIdentity={identity}'
@@ -173,8 +168,8 @@ assert_disabled_portfolio_orders_and_no_order_entry_ui() {
   assert_file_contains "$disabled_component" 'no fake data, no demo provider responses, and no order-entry controls'
   assert_file_contains "$help_component" 'no order tickets, buy/sell controls, previews, or submit actions'
 
-  if grep -RInE --exclude-dir=.next --exclude-dir=node_modules --exclude='TerminalCommandInput.tsx' 'Place order|Submit order|/api/orders|orders/simulate|MarketOrder|SetBrokerageModel|SetLiveMode' "$repo_root/frontend/components" "$repo_root/frontend/lib"; then
-    printf 'terminal frontend must not include order-entry UI, order API calls, or live-trading runtime tokens.\n' >&2
+  if grep -RInE --exclude-dir=.next --exclude-dir=node_modules 'Place order|Submit order|/api/orders|orders/simulate|MarketOrder|SetBrokerageModel|SetLiveMode' "$repo_root/frontend/components" "$repo_root/frontend/lib"; then
+    printf 'frontend workspace must not include order-entry UI, order API calls, or live-trading runtime tokens.\n' >&2
     return 1
   fi
 }
@@ -190,7 +185,6 @@ assert_no_direct_provider_database_or_order_access() {
     "$repo_root/frontend/lib/symbolChartWorkflow.ts"
     "$repo_root/frontend/lib/terminalAnalysisWorkflow.ts"
     "$repo_root/frontend/lib/terminalChartWorkspaceWorkflow.ts"
-    "$repo_root/frontend/lib/terminalCommandRegistry.ts"
   )
 
   if grep -RInE --exclude-dir=.next --exclude-dir=node_modules --exclude='package-lock.json' "$forbidden_pattern" "${scan_paths[@]}"; then

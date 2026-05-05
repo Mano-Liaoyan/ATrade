@@ -147,6 +147,7 @@ REGEX
     --exclude-dir=node_modules \
     --exclude='package-lock.json' \
     --exclude='frontend-terminal-cutover-tests.sh' \
+    --exclude='frontend-no-command-shell-tests.sh' \
     "$secret_pattern" \
     "$frontend_root" \
     "$repo_root/tests/apphost"/frontend-*.sh \
@@ -189,7 +190,6 @@ assert_no_order_entry_or_direct_runtime_access() {
   if grep -RInE \
     --exclude-dir=.next \
     --exclude-dir=node_modules \
-    --exclude='TerminalCommandInput.tsx' \
     'Place order|Submit order|Buy button|Sell button|buy-button|sell-button|OrderTicket|Preview order|Confirm order|/api/orders|orders/simulate|simulateOrder|MarketOrder|LimitOrder|SetBrokerageModel|SetLiveMode|type="submit"' \
     "$frontend_root/app" "$frontend_root/components" "$frontend_root/lib" "$frontend_root/types"; then
     printf 'unexpected order-entry, simulated-submit, or live-trading UI/runtime token found in frontend source.\n' >&2
@@ -267,12 +267,12 @@ assert_disabled_future_modules_visible_and_honest() {
   assert_file_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'Not available'
   assert_file_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'unavailable.details.map((detail)'
   assert_file_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'no fake data, no demo provider responses, and no order-entry controls'
-  assert_file_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'Type HELP for enabled commands.'
-  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The terminal does not show scraped headlines, stale fixture stories, or invented market narratives.'
-  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The terminal does not synthesize holdings, balances, or account identifiers.'
-  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The terminal does not display fake factor tables or prebuilt demo screens.'
-  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The terminal does not display demo assistant output or generated market commentary.'
-  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'This terminal shell does not provide order tickets, buy/sell buttons, staged submissions, previews, or confirmations.'
+  assert_file_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'Use the HELP module for enabled workspace navigation.'
+  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The workspace does not show scraped headlines, stale fixture stories, or invented market narratives.'
+  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The workspace does not synthesize holdings, balances, or account identifiers.'
+  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The workspace does not display fake factor tables or prebuilt demo screens.'
+  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'The workspace does not display demo assistant output or generated market commentary.'
+  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'This workspace does not provide order tickets, buy/sell buttons, staged submissions, previews, or confirmations.'
   assert_file_not_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'Place order'
   assert_file_not_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'Submit order'
   assert_file_not_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'type="submit"'
@@ -285,7 +285,8 @@ assert_terminal_markers_present() {
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-watchlist-module"'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-chart-module"'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-analysis-module"'
-  assert_file_contains "$frontend_root/components/terminal/TerminalCommandInput.tsx" 'data-testid="terminal-command-input"'
+  assert_path_missing "$frontend_root/components/terminal/TerminalCommandInput.tsx"
+  assert_path_missing "$frontend_root/lib/terminalCommandRegistry.ts"
   assert_file_contains "$frontend_root/components/terminal/TerminalModuleRail.tsx" 'data-testid="terminal-module-rail"'
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-workspace-layout"'
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-layout-reset"'
@@ -311,7 +312,7 @@ main() {
   assert_resizable_layout_persistence_and_responsive_fallback
   assert_terminal_markers_present
 
-  printf 'ATrade Terminal cutover validation passed.\n'
+  printf 'Frontend cutover validation passed.\n'
 }
 
 main "$@"

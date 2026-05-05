@@ -1,6 +1,6 @@
 # TP-051: Remove terminal branding and command system — Status
 
-**Current Step:** Step 3: Update and add frontend validation scripts
+**Current Step:** Step 4: Update active documentation and plan state
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -43,17 +43,17 @@
 ---
 
 ### Step 3: Update and add frontend validation scripts
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-no-command-shell-tests.sh`
-- [ ] Delete or retire `tests/apphost/frontend-terminal-shell-command-tests.sh`
-- [ ] Update affected shell/cutover/chart-analysis tests away from command assertions
-- [ ] Preserve API-boundary, no-order, no-secrets, disabled-module, and identity-handoff assertions
+- [x] Create `tests/apphost/frontend-no-command-shell-tests.sh`
+- [x] Delete or retire `tests/apphost/frontend-terminal-shell-command-tests.sh`
+- [x] Update affected shell/cutover/chart-analysis tests away from command assertions
+- [x] Preserve API-boundary, no-order, no-secrets, disabled-module, and identity-handoff assertions
 
 ---
 
 ### Step 4: Update active documentation and plan state
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update design doc away from command-first terminal requirements
 - [ ] Update paper workspace and module docs for direct module/workflow navigation
