@@ -274,8 +274,10 @@ start_frontend_and_assert_markers() {
   frontend_pid=$!
 
   wait_for_http_200 "$frontend_url/" "$root_response" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$root_response" 'Paper Trading Workspace'
-  assert_file_contains "$root_response" 'Module-driven paper workspace'
+  assert_file_contains "$root_response" 'Paper workspace home'
+  assert_file_contains "$root_response" 'Paper-only module workspace'
+  assert_file_not_contains "$root_response" 'Paper Trading Workspace'
+  assert_file_not_contains "$root_response" 'terminal-safety-strip'
   assert_file_not_contains "$root_response" 'ATrade Terminal Shell'
   assert_file_not_contains "$root_response" 'Command-first paper workspace'
   assert_file_contains "$root_response" 'data-testid="atrade-terminal-app"'
@@ -285,8 +287,8 @@ start_frontend_and_assert_markers() {
   assert_file_contains "$root_response" 'Bounded IBKR stock search'
   assert_file_contains "$root_response" 'Market monitor'
   assert_file_contains "$root_response" 'Backend-owned exact Postgres pins through ATrade.Api.'
-  assert_file_contains "$root_response" 'Paper-only workspace'
-  assert_file_contains "$root_response" 'exact instrument identity'
+  assert_file_contains "$root_response" 'Paper-only module workspace'
+  assert_file_contains "$root_response" 'Exact handoff'
   assert_file_contains "$root_response" 'Orders are disabled by the paper-only safety contract.'
   assert_file_not_contains "$root_response" 'Mocked factors'
   assert_file_not_contains "$root_response" 'Trading workspace MVP'

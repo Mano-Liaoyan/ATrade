@@ -140,9 +140,10 @@ assert_frontend_contract_files() {
   assert_file_contains "$repo_root/frontend/package.json" '"build": "next build"'
   assert_file_contains "$repo_root/frontend/package.json" '"start": "next start"'
   assert_file_contains "$repo_root/frontend/app/page.tsx" 'ATradeTerminalApp'
-  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Paper Trading Workspace'
-  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Module-driven paper workspace'
-  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-safety-strip"'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Paper workspace home'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Paper-only module workspace'
+  assert_file_not_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Paper Trading Workspace'
+  assert_file_not_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-safety-strip"'
   assert_file_contains "$repo_root/frontend/app/layout.tsx" "import './globals.css';"
   assert_file_contains "$repo_root/frontend/next-env.d.ts" '/// <reference types="next" />'
   assert_file_contains "$repo_root/frontend/tsconfig.json" '"name": "next"'
@@ -170,7 +171,9 @@ assert_direct_frontend_startup() {
   response_file="$(mktemp)"
 
   wait_for_http_200 "$frontend_url/" "$response_file" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$response_file" 'Paper Trading Workspace'
+  assert_file_contains "$response_file" 'Paper workspace home'
+  assert_file_not_contains "$response_file" 'Paper Trading Workspace'
+  assert_file_not_contains "$response_file" 'terminal-safety-strip'
   assert_file_contains "$response_file" 'data-testid="atrade-terminal-app"'
   assert_file_not_contains "$response_file" 'data-testid="terminal-command-input"'
   assert_file_contains "$response_file" 'Orders are disabled by the paper-only safety contract.'
@@ -260,7 +263,9 @@ assert_apphost_frontend_runtime_is_warning_free() {
   local response_file
   response_file="$(mktemp)"
   wait_for_http_200 "$apphost_frontend_url/" "$response_file" "$apphost_pid" "$apphost_log"
-  assert_file_contains "$response_file" 'Paper Trading Workspace'
+  assert_file_contains "$response_file" 'Paper workspace home'
+  assert_file_not_contains "$response_file" 'Paper Trading Workspace'
+  assert_file_not_contains "$response_file" 'terminal-safety-strip'
   assert_file_contains "$response_file" 'data-testid="atrade-terminal-app"'
   assert_file_not_contains "$response_file" 'data-testid="terminal-command-input"'
   assert_file_contains "$response_file" 'Orders are disabled by the paper-only safety contract.'

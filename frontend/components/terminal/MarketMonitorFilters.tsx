@@ -47,19 +47,16 @@ export function MarketMonitorFilters({
   return (
     <section className={cn('market-monitor-filters', compact && 'market-monitor-filters--compact', className)} data-testid="market-monitor-filters" aria-label="Market monitor filters">
       <div className="market-monitor-filters__header">
-        <div>
-          <p className="market-monitor-filters__eyebrow"><SlidersHorizontal aria-hidden="true" /> Filters</p>
-          <p>Refine by source, pin state, provider, market, currency, or asset class without fetching more than the capped search payload.</p>
-        </div>
+        <p className="market-monitor-filters__eyebrow"><SlidersHorizontal aria-hidden="true" /> Filter rows</p>
         <div className="market-monitor-filters__actions">
           <TerminalStatusBadge tone={selectedCount > 0 ? 'info' : 'neutral'}>{selectedCount} active</TerminalStatusBadge>
-          <Button disabled={selectedCount === 0} onClick={onClearFilters} size="xs" type="button" variant="ghost">
+          <Button aria-label="Clear all market monitor filters" disabled={selectedCount === 0} onClick={onClearFilters} size="xs" type="button" variant="ghost">
             Clear all
           </Button>
         </div>
       </div>
 
-      <div className="market-monitor-filters__groups">
+      <div className="market-monitor-filters__groups" aria-label="Available market monitor filter groups">
         {MarketMonitorFilterOrder.map((key) => {
           const options = availableFilters[key];
           const selectedValue = selectedFilters[key];

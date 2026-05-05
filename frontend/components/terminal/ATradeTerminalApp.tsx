@@ -155,19 +155,6 @@ export function ATradeTerminalApp({
 
   return (
     <section className="atrade-terminal-app" data-testid="atrade-terminal-app" aria-label="ATrade paper workspace application frame">
-      <header className="atrade-terminal-app__header">
-        <div className="atrade-terminal-app__brand">
-          <p className="eyebrow">ATrade Workspace</p>
-          <h1>Paper Trading Workspace</h1>
-          <p>Module-driven paper workspace · ATrade.Api boundary · provider-truthful states</p>
-        </div>
-      </header>
-
-      <div className="terminal-safety-strip" data-testid="terminal-safety-strip" aria-label="Paper trading safety and provider identity notes">
-        <span>Paper-only workspace: search, watchlist, charts, status, help, and analysis entry points are exposed without order controls.</span>
-        <span>Provider state and exact instrument identity stay visible; unavailable states are not replaced with fake market data.</span>
-        <span>Orders are disabled by the paper-only safety contract.</span>
-      </div>
       <p className="sr-only" aria-live="polite" role="status">
         {navigationStatus}
       </p>

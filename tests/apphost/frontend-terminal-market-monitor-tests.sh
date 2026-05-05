@@ -132,9 +132,14 @@ assert_dense_terminal_components() {
   assert_file_contains "$detail" "Pin key"
   assert_file_contains "$search" "data-testid=\"market-monitor-search-input\""
   assert_file_contains "$filters" "data-testid=\"market-monitor-filters\""
+  assert_file_contains "$filters" "Filter rows"
+  assert_file_contains "$filters" "aria-label=\"Clear all market monitor filters\""
+  assert_file_not_contains "$filters" "Refine by source, pin state, provider, market, currency, or asset class without fetching more than the capped search payload."
   assert_file_contains "$css" ".market-monitor-table"
   assert_file_contains "$css" "min-width: 78rem;"
   assert_file_contains "$css" "max-height: min(34rem, 62vh);"
+  assert_file_contains "$css" ".market-monitor-filters__groups"
+  assert_file_contains "$css" "gap: 0.35rem 0.55rem;"
 }
 
 assert_monitor_interactions_and_responsiveness() {
@@ -157,6 +162,10 @@ assert_monitor_interactions_and_responsiveness() {
   assert_file_contains "$table" "onSelectRow(row.id)"
   assert_file_contains "$table" "aria-selected={selected}"
   assert_file_contains "$filters" "aria-pressed={active}"
+  assert_file_contains "$filters" "data-monitor-filter-key={key}"
+  assert_file_contains "$filters" "data-monitor-filter-value={option.value}"
+  assert_file_contains "$filters" 'aria-label={`${option.count} rows`}'
+  assert_file_contains "$filters" "disabled={selectedCount === 0}"
   assert_file_contains "$css" ".terminal-market-monitor--compact .terminal-market-monitor__grid"
   assert_file_contains "$css" "@media (max-width: 1100px)"
   assert_file_contains "$css" ".market-monitor-state-strip"
