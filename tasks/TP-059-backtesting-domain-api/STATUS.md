@@ -1,6 +1,6 @@
 # TP-059: Backtesting domain, persistence, and API — Status
 
-**Current Step:** Step 2: Add Postgres persistence for saved backtest runs
+**Current Step:** Step 3: Expose first-class backtest REST APIs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 3
@@ -43,13 +43,13 @@
 ---
 
 ### Step 3: Expose first-class backtest REST APIs
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `AddBacktestingModule(...)` composed in API
-- [ ] `POST /api/backtests` implemented
-- [ ] `GET /api/backtests` and `GET /api/backtests/{id}` implemented
-- [ ] `POST /api/backtests/{id}/cancel` and `/retry` implemented
-- [ ] API/apphost contract tests added
+- [x] `AddBacktestingModule(...)` composed in API
+- [x] `POST /api/backtests` implemented
+- [x] `GET /api/backtests` and `GET /api/backtests/{id}` implemented
+- [x] `POST /api/backtests/{id}/cancel` and `/retry` implemented
+- [x] API/apphost contract tests added
 
 ---
 

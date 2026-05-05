@@ -1,6 +1,7 @@
 using ATrade.Accounts;
 using ATrade.Analysis;
 using ATrade.Analysis.Lean;
+using ATrade.Backtesting;
 using ATrade.Brokers;
 using ATrade.Brokers.Ibkr;
 using ATrade.MarketData;
@@ -21,6 +22,7 @@ builder.Services.AddMarketDataModule();
 builder.Services.AddTimescaleMarketDataPersistence(builder.Configuration);
 builder.Services.AddAnalysisModule();
 builder.Services.AddLeanAnalysisEngine(builder.Configuration);
+builder.Services.AddBacktestingModule(builder.Configuration);
 builder.Services.AddIbkrMarketDataProvider();
 builder.Services.AddTimescaleMarketDataCacheAside();
 builder.Services.AddWorkspacesModule(builder.Configuration);
@@ -80,6 +82,174 @@ app.MapPost(
     "/api/analysis/run",
     async (AnalysisRunRequest? request, IAnalysisRequestIntake analysisIntake, CancellationToken cancellationToken) =>
         ToAnalysisRunIntakeResult(await analysisIntake.RunAsync(request, cancellationToken)));
+app.MapPost(
+    "/api/backtests",
+    async (
+        BacktestCreateRequest? request,
+        IBacktestRunFactory runFactory,
+        IBacktestRunSchemaInitializer schemaInitializer,
+        IBacktestRunRepository runRepository,
+        CancellationToken cancellationToken) =>
+    {
+        var createResult = await runFactory.CreateQueuedRunAsync(request, cancellationToken);
+        if (!createResult.IsSuccess || createResult.Run is null)
+        {
+            return ToBacktestErrorResult(createResult.Error);
+        }
+
+        try
+        {
+            await schemaInitializer.InitializeAsync(cancellationToken);
+            var savedRun = await runRepository.CreateAsync(createResult.Run, cancellationToken);
+            return Results.Accepted($"/api/backtests/{savedRun.Run.Id}", savedRun.Run);
+        }
+        catch (BacktestStorageUnavailableException)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.StorageUnavailable, BacktestSafeMessages.StorageUnavailable));
+        }
+        catch (BacktestValidationException exception)
+        {
+            return ToBacktestErrorResult(new BacktestError(exception.Code, exception.Message));
+        }
+    });
+app.MapGet(
+    "/api/backtests",
+    async (
+        int? limit,
+        IPaperCapitalIdentityProvider identityProvider,
+        IBacktestRunSchemaInitializer schemaInitializer,
+        IBacktestRunRepository runRepository,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            await schemaInitializer.InitializeAsync(cancellationToken);
+            var runs = await runRepository.ListAsync(GetBacktestScope(identityProvider), limit ?? BacktestRunRepositoryDefaults.DefaultListLimit, cancellationToken);
+            return Results.Ok(runs);
+        }
+        catch (BacktestStorageUnavailableException)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.StorageUnavailable, BacktestSafeMessages.StorageUnavailable));
+        }
+    });
+app.MapGet(
+    "/api/backtests/{id}",
+    async (
+        string id,
+        IPaperCapitalIdentityProvider identityProvider,
+        IBacktestRunSchemaInitializer schemaInitializer,
+        IBacktestRunRepository runRepository,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            await schemaInitializer.InitializeAsync(cancellationToken);
+            var run = await runRepository.GetAsync(GetBacktestScope(identityProvider), id, cancellationToken);
+            return run is not null
+                ? Results.Ok(run.Run)
+                : ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.RunNotFound, BacktestSafeMessages.RunNotFound));
+        }
+        catch (BacktestStorageUnavailableException)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.StorageUnavailable, BacktestSafeMessages.StorageUnavailable));
+        }
+        catch (ArgumentException exception)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.InvalidPayload, exception.Message));
+        }
+    });
+app.MapPost(
+    "/api/backtests/{id}/cancel",
+    async (
+        string id,
+        IPaperCapitalIdentityProvider identityProvider,
+        IBacktestRunSchemaInitializer schemaInitializer,
+        IBacktestRunRepository runRepository,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            await schemaInitializer.InitializeAsync(cancellationToken);
+            var scope = GetBacktestScope(identityProvider);
+            var existing = await runRepository.GetAsync(scope, id, cancellationToken);
+            if (existing is null)
+            {
+                return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.RunNotFound, BacktestSafeMessages.RunNotFound));
+            }
+
+            if (!BacktestRunStatuses.CanCancel(existing.Run.Status))
+            {
+                return ToBacktestErrorResult(new BacktestError(
+                    BacktestErrorCodes.InvalidStatusTransition,
+                    "Backtest run is not queued or running and cannot be cancelled."));
+            }
+
+            var cancelled = await runRepository.CancelAsync(scope, id, cancellationToken);
+            return Results.Ok((cancelled ?? existing).Run);
+        }
+        catch (BacktestStorageUnavailableException)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.StorageUnavailable, BacktestSafeMessages.StorageUnavailable));
+        }
+        catch (ArgumentException exception)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.InvalidPayload, exception.Message));
+        }
+    });
+app.MapPost(
+    "/api/backtests/{id}/retry",
+    async (
+        string id,
+        IPaperCapitalIdentityProvider identityProvider,
+        IBacktestRunFactory runFactory,
+        IBacktestRunSchemaInitializer schemaInitializer,
+        IBacktestRunRepository runRepository,
+        CancellationToken cancellationToken) =>
+    {
+        try
+        {
+            await schemaInitializer.InitializeAsync(cancellationToken);
+            var scope = GetBacktestScope(identityProvider);
+            var source = await runRepository.GetAsync(scope, id, cancellationToken);
+            if (source is null)
+            {
+                return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.RunNotFound, BacktestSafeMessages.RunNotFound));
+            }
+
+            if (!BacktestRunStatuses.CanRetry(source.Run.Status))
+            {
+                return ToBacktestErrorResult(new BacktestError(
+                    BacktestErrorCodes.InvalidStatusTransition,
+                    "Backtest run is not failed or cancelled and cannot be retried."));
+            }
+
+            var retryRequest = BacktestRequestSnapshots.ToCreateRequest(source.Run.Request);
+            var retryCreateResult = await runFactory.CreateQueuedRunAsync(retryRequest, cancellationToken);
+            if (!retryCreateResult.IsSuccess || retryCreateResult.Run is null)
+            {
+                return ToBacktestErrorResult(retryCreateResult.Error);
+            }
+
+            var retryRun = await runRepository.CreateRetryAsync(scope, source.Run.Id, retryCreateResult.Run, cancellationToken);
+            return retryRun is not null
+                ? Results.Accepted($"/api/backtests/{retryRun.Run.Id}", retryRun.Run)
+                : ToBacktestErrorResult(new BacktestError(
+                    BacktestErrorCodes.InvalidStatusTransition,
+                    "Backtest retry source is no longer failed or cancelled."));
+        }
+        catch (BacktestStorageUnavailableException)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.StorageUnavailable, BacktestSafeMessages.StorageUnavailable));
+        }
+        catch (BacktestValidationException exception)
+        {
+            return ToBacktestErrorResult(new BacktestError(exception.Code, exception.Message));
+        }
+        catch (ArgumentException exception)
+        {
+            return ToBacktestErrorResult(new BacktestError(BacktestErrorCodes.InvalidPayload, exception.Message));
+        }
+    });
 app.MapGet(
     "/api/broker/ibkr/status",
     async (IBrokerProvider brokerProvider, CancellationToken cancellationToken) =>
@@ -184,6 +354,22 @@ static IResult ToAnalysisRunIntakeResult(AnalysisRunIntakeResult result)
         ? ToAnalysisResult(result.Result)
         : Results.BadRequest(new AnalysisError(AnalysisEngineErrorCodes.InvalidRequest, "Analysis request failed."));
 }
+
+static IResult ToBacktestErrorResult(BacktestError? error)
+{
+    var response = error ?? new BacktestError(BacktestErrorCodes.InvalidPayload, "Backtest request failed.");
+
+    return response.Code switch
+    {
+        BacktestErrorCodes.RunNotFound => Results.NotFound(response),
+        BacktestErrorCodes.StorageUnavailable => Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable),
+        BacktestErrorCodes.CapitalUnavailable or BacktestErrorCodes.InvalidStatusTransition => Results.Conflict(response),
+        _ => Results.BadRequest(response),
+    };
+}
+
+static BacktestWorkspaceScope GetBacktestScope(IPaperCapitalIdentityProvider identityProvider) =>
+    BacktestWorkspaceScope.From(identityProvider.Current);
 
 static string? SelectChartRange(params string?[] requestedRanges) =>
     requestedRanges.FirstOrDefault(requestedRange => !string.IsNullOrWhiteSpace(requestedRange));
