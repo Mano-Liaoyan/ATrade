@@ -14,6 +14,7 @@ import {
   Time,
   UTCTimestamp,
   createChart,
+  type MouseEventParams,
 } from 'lightweight-charts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CandleSeriesResponse, IndicatorResponse, OhlcvCandle } from '../types/marketData';
@@ -30,6 +31,11 @@ type LegendSnapshot = {
   low: number;
   close: number;
 };
+
+const FallbackChartWidth = 640;
+const MinimumChartWidth = 1;
+const MinimumChartHeight = 420;
+const FallbackChartHeight = 440;
 
 export function CandlestickChart({ candles, indicators }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -60,12 +66,16 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
   }, [candles]);
 
   useEffect(() => {
-    if (!containerRef.current || chartData.length === 0) {
+    const container = containerRef.current;
+    if (!container || chartData.length === 0) {
       return;
     }
 
-    const chart: IChartApi = createChart(containerRef.current, {
-      autoSize: true,
+    const initialSize = measureChartContainer(container);
+    const chart: IChartApi = createChart(container, {
+      autoSize: false,
+      width: initialSize.width,
+      height: initialSize.height,
       layout: {
         background: { type: ColorType.Solid, color: '#0f1b2e' },
         textColor: '#cbd5e1',
@@ -98,6 +108,12 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
       },
     });
 
+    const resizeAndFitChart = () => {
+      const nextSize = measureChartContainer(container);
+      chart.resize(nextSize.width, nextSize.height, true);
+      chart.timeScale().fitContent();
+    };
+
     const candleSeries: ISeriesApi<'Candlestick'> = chart.addSeries(CandlestickSeries, {
       upColor: '#34d399',
       borderUpColor: '#34d399',
@@ -127,7 +143,7 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
     const sma50Series = chart.addSeries(LineSeries, { color: '#38bdf8', lineWidth: 2, title: 'SMA 50' });
     sma50Series.setData(sma50Data);
 
-    chart.subscribeCrosshairMove((param) => {
+    const handleCrosshairMove = (param: MouseEventParams<Time>) => {
       if (!param.time) {
         setLegend(toLegendSnapshot(candles.candles.at(-1)));
         return;
@@ -145,11 +161,39 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
         low: seriesData.low,
         close: seriesData.close,
       });
-    });
+    };
 
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+
+    let resizeAnimationFrame: number | null = null;
+    const scheduleResizeAndFit = () => {
+      if (resizeAnimationFrame !== null) {
+        window.cancelAnimationFrame(resizeAnimationFrame);
+      }
+
+      resizeAnimationFrame = window.requestAnimationFrame(() => {
+        resizeAnimationFrame = null;
+        resizeAndFitChart();
+      });
+    };
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(scheduleResizeAndFit);
+      resizeObserver.observe(container);
+    }
+
+    window.addEventListener('resize', scheduleResizeAndFit);
     chart.timeScale().fitContent();
+    scheduleResizeAndFit();
 
     return () => {
+      if (resizeAnimationFrame !== null) {
+        window.cancelAnimationFrame(resizeAnimationFrame);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleResizeAndFit);
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.remove();
     };
   }, [candles, chartData, volumeData, sma20Data, sma50Data]);
@@ -173,6 +217,18 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
       <p className="chart-help">Mouse wheel / pinch to zoom, drag to pan, and move the crosshair for OHLC legend values.</p>
     </div>
   );
+}
+
+function measureChartContainer(container: HTMLDivElement): { width: number; height: number } {
+  const bounds = container.getBoundingClientRect();
+  const parentBounds = container.parentElement?.getBoundingClientRect();
+  const width = Math.floor(bounds.width || container.clientWidth || parentBounds?.width || FallbackChartWidth);
+  const height = Math.floor(bounds.height || container.clientHeight || FallbackChartHeight);
+
+  return {
+    width: Math.max(MinimumChartWidth, width),
+    height: Math.max(MinimumChartHeight, height),
+  };
 }
 
 function toCandlestickData(candle: OhlcvCandle): CandlestickData<Time> {

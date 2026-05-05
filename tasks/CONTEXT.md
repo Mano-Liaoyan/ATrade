@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-05
 **Status:** Active
-**Next Task ID:** TP-053
+**Next Task ID:** TP-055
 
 ---
 
@@ -29,8 +29,9 @@ implementation queue.
   contract, the HTTPS local iBeam Client Portal transport contract,
   AppHost-managed LEAN Docker runtime wiring, durable AppHost Postgres
   watchlists, durable TimescaleDB cache rows, frontend workflow module seams,
-  and the completed `TP-045` through `TP-052` frontend reconstruction,
-  no-command cutover, and simplified workspace layout are present.
+  and the completed `TP-045` through `TP-054` frontend reconstruction,
+  no-command cutover, simplified workspace layout, top-chrome/filter-density
+  cleanup, and restored stock chart visibility are present.
 
 ## Domain Vocabulary
 
@@ -48,16 +49,16 @@ implementation queue.
 ## Active Task Queue
 
 No ready implementation tasks are currently queued after the completed
-`TP-051` through `TP-052` batch.
+`TP-053` through `TP-054` wave.
 
 The most recent completed batch:
 
-- `TP-051` — removed visible terminal branding plus the command input/parser/registry while preserving API-backed module workflows
-- `TP-052` — simplified the common workspace to a full-bleed single-primary layout with no context/monitor/footer chrome, background grid, page-level scroll, or layout persistence
+- `TP-053` — removed the remaining top app brand header/global safety strip and compacted market-monitor filters while preserving module safety surfaces
+- `TP-054` — restored visible stock chart rendering with measured `lightweight-charts` sizing, non-collapsing chart layout, truthful empty/provider states, and chart visibility validation
 
-The next new Taskplane packet should use `TP-053`.
+The next new Taskplane packet should use `TP-055`.
 
-Completed task packets through `TP-052` are present in `tasks/`; completed
+Completed task packets through `TP-054` are present in `tasks/`; completed
 packets should be archived when convenient.
 
 ## Taskplane Usage
@@ -66,7 +67,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-053`
+- New tasks should use the next ID: `TP-055`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -94,8 +95,8 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | None currently queued; next packet is `TP-053`            |
-| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-052-*`                 |
+| Active tasks        | None currently queued; next packet is `TP-055`            |
+| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-054-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |
 | AppHost             | `src/ATrade.AppHost/Program.cs`                           |
@@ -115,6 +116,6 @@ All variants delegate to the Aspire AppHost.
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
 - [ ] Review TP-046 frontend npm audit advisories for `next` and `postcss` after the terminal UI stack bootstrap; do not force breaking upgrades inside the reconstruction queue.
 - [x] Archive completed `TP-019` through `TP-041` task packets before starting the previous queued run.
-- [ ] Archive completed `TP-042` through `TP-052` task packets when convenient.
+- [ ] Archive completed `TP-042` through `TP-054` task packets when convenient.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
 - [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.

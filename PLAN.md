@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-05-05
-summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, no-command cutover, and simplified workspace layout.
+summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, no-command cutover, simplified workspace layout, and restored stock chart visibility.
 see_also:
   - README.md
   - docs/INDEX.md
@@ -21,15 +21,17 @@ The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, exact
 provider/market pins, configurable local AppHost ports, optional
 AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045` through
-`TP-053` frontend reconstruction, no-command cutover, layout simplification, and
-top-chrome/filter-density cleanup. The current frontend surface is the
-clean-room ATrade paper workspace: direct module/workflow navigation,
+`TP-054` frontend reconstruction, no-command cutover, layout simplification,
+top-chrome/filter-density cleanup, and stock chart visibility restoration. The
+current frontend surface is the clean-room ATrade paper workspace: direct
+module/workflow navigation,
 enabled/current workflow modules, visible-disabled future modules, compact dense
-market monitor, chart/analysis workspaces, provider diagnostics, a rail-first
-full-bleed single-primary workspace layout with no app-level brand header,
+market monitor, visibly sized chart/analysis workspaces, provider diagnostics,
+a rail-first full-bleed single-primary workspace layout with no app-level brand header,
 visible global safety strip, shell context/monitor/footer chrome, or page-level
 vertical scrolling, and final cutover/no-command/simplified-layout/top-chrome
-filter-density guardrails for clean-room, no-order, and `ATrade.Api` browser
+filter-density/chart-visibility guardrails for clean-room, no-order, truthful
+provider-state, and `ATrade.Api` browser
 boundaries. The active clean-room UI design authority remains
 `docs/design/atrade-terminal-ui.md`.
 
@@ -44,7 +46,7 @@ Current repository contracts remain:
 ## Active Task Queue
 
 The frontend reconstruction queue is complete/follow-up-ready through the
-rail-first top-chrome and filter-density cleanup:
+rail-first top-chrome/filter-density cleanup and stock chart visibility restoration:
 
 - `TP-045` — defined the active UI design spec and clean-room visual guardrails
 - `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
@@ -55,18 +57,20 @@ rail-first top-chrome and filter-density cleanup:
 - `TP-051` — removed visible terminal branding plus the command input/parser/registry and added no-command validation
 - `TP-052` — simplified the workspace to a full-bleed single-primary layout with no context/monitor/footer chrome, background grid, page-level scroll, or layout persistence
 - `TP-053` — removed the remaining top app brand header/global safety strip and compacted market-monitor filters while preserving module safety surfaces
+- `TP-054` — restored visible stock chart rendering with measured `lightweight-charts` sizing, non-collapsing chart layout, truthful empty/provider states, and chart visibility validation
 
-The next new Taskplane packet should use `TP-054`.
+The next new Taskplane packet should use `TP-055`.
 
-Completed task packets through `TP-053` are present in `tasks/`; completed
+Completed task packets through `TP-054` are present in `tasks/`; completed
 packets should be archived when convenient. The orchestrator handles active task
 folder archival after merge.
 
 ## Follow-Up Direction
 
 Future frontend work should build on the direct module/workflow frame,
-rail-first full-viewport workspace, and compact market-monitor filters
-established by `ATradeTerminalApp`, `frontend/types/terminal.ts`,
+rail-first full-viewport workspace, compact market-monitor filters, and
+non-collapsing chart visibility contract established by `ATradeTerminalApp`,
+`frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`, and
 `terminalAnalysisWorkflow`. New modules should remain visible-disabled until
@@ -88,4 +92,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-054`
+`TP-055`

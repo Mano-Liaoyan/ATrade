@@ -55,6 +55,8 @@ assert_chart_range_controls() {
 
   assert_file_contains "$chart_workspace" "Lookback candlestick chart"
   assert_file_contains "$chart_workspace" "selected lookback range from now"
+  assert_file_contains "$chart_workspace" "chart.candles && chart.view.hasCandleData"
+  assert_file_contains "$chart_workspace" "!chart.candles || !chart.view.hasCandleData"
   assert_file_contains "$chart_workspace" "<TerminalAnalysisWorkspace symbol={chart.normalizedSymbol} chartRange={chart.chartRange}"
   assert_file_contains "$terminal_app" "initialChartRange"
 }
@@ -91,6 +93,7 @@ assert_symbol_page_ssr_markers() {
   assert_file_contains "$terminal_app" "data-testid=\"terminal-chart-module\""
   assert_file_contains "$chart_workspace" "data-testid=\"chart-workspace\""
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" "Dense chart workspace header"
+  assert_file_contains "$repo_root/frontend/components/CandlestickChart.tsx" "chart.timeScale().fitContent()"
   assert_file_contains "$chart_workspace" "chart.view.streamLabel"
 }
 

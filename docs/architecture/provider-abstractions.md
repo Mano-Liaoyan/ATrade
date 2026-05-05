@@ -109,8 +109,11 @@ Core types:
   Client Portal `conid`. Search results, trending symbols, candle series,
   indicators, and latest updates carry `MarketDataSymbolIdentity` where provider
   metadata is available while preserving the existing symbol/source fields for
-  callers that only know a bare symbol. Downstream watchlist pins must treat this
-  provider/market tuple as the exact instrument identity rather than collapsing
+  callers that only know a bare symbol. A `CandleSeriesResponse` with an empty
+  `candles` array is a truthful no-data result for the requested normalized chart
+  range; frontend chart surfaces must show explicit empty/provider states and
+  must not synthesize candles to make a chart appear. Downstream watchlist pins
+  must treat this provider/market tuple as the exact instrument identity rather than collapsing
   results to a bare symbol or display name; `ATrade.Workspaces` delegates key
   construction to the backend identity helper and exposes the normalized tuple as
   `instrumentKey` and `pinKey` when a result is persisted. Other payloads include
