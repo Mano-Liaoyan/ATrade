@@ -25,12 +25,12 @@
 ### Step 1: Audit active frontend routes and legacy leftovers
 **Status:** 🟨 In Progress
 
-> ⚠️ Hydrate: Expand after reading the completed TP-047 through TP-049 implementation state.
+> ⚠️ Hydrate: Expanded after reading completed TP-047 through TP-049 state. TP-047 routed home/symbol pages through the terminal frame and kept dependency-free resizable layout; TP-048 wrapped search/watchlist workflows behind `terminalMarketMonitorWorkflow`; TP-049 kept `CandlestickChart` while retiring old page-level chart/analysis panels.
 
-- [ ] Verify active routes render only through the new terminal frame
-- [ ] Delete obsolete legacy rendering components/CSS no longer imported
+- [ ] Inventory active route imports and component references to prove home/symbol routes enter only the terminal app frame
+- [ ] Delete or retire unused legacy rendering components/CSS while preserving active clients/workflows/types/chart primitives
 - [ ] Remove stale old copy/test markers from active frontend code/tests
-- [ ] Add cutover assertions for no old-shell imports/copy and terminal markers present
+- [ ] Add and run cutover assertions for no old-shell imports/copy and terminal markers present
 
 ---
 
@@ -109,6 +109,7 @@
 | 2026-05-05 11:28 | Step 0 started | Preflight |
 | 2026-05-05 13:29 | Step 0 completed | Required paths and dependencies verified; frontend npm dependencies installed with npm ci |
 | 2026-05-05 13:29 | Step 1 started | Audit active frontend routes and legacy leftovers |
+| 2026-05-05 13:31 | Step 1 hydrated | Read TP-047 through TP-049 completion state and expanded route/component cutover audit outcomes |
 
 ---
 
