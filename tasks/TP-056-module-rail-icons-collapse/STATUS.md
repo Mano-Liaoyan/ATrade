@@ -1,6 +1,6 @@
 # TP-056: Add module rail icons and collapse behavior — Status
 
-**Current Step:** Step 2: Implement collapsible rail behavior accessibly
+**Current Step:** Step 3: Add navigation rail validation coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Implement collapsible rail behavior accessibly
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add accessible collapse/expand control
-- [ ] Render expanded icon+label and collapsed icon-first modes
-- [ ] Preserve active, focus, keyboard, and disabled-module behaviors in both states
-- [ ] Update layout CSS without reintroducing retired chrome, page scroll, persistence, commands, or unsafe state
+- [x] Add accessible collapse/expand control
+- [x] Render expanded icon+label and collapsed icon-first modes
+- [x] Preserve active, focus, keyboard, and disabled-module behaviors in both states
+- [x] Update layout CSS without reintroducing retired chrome, page scroll, persistence, commands, or unsafe state
 
 ---
 
 ### Step 3: Add navigation rail validation coverage
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-module-rail-icons-collapse-tests.sh`
 - [ ] Update existing shell/layout validation scripts only if affected
@@ -98,6 +98,7 @@
 | 2026-05-06 | Step 0 completed | Required paths and tool/dependency availability verified |
 | 2026-05-06 | Step 1 started | Module icon contract work |
 | 2026-05-06 | Step 1 completed | Registry icon metadata and lucide rendering added; frontend build passed |
+| 2026-05-06 | Step 2 completed | Accessible local rail collapse state, collapsed CSS, and frontend build verified |
 
 ---
 

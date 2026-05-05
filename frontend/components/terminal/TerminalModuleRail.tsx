@@ -1,5 +1,7 @@
 "use client";
 
+import { useId, useState } from "react";
+
 import type { DisabledTerminalModuleId, EnabledTerminalModuleId, TerminalModuleIconId } from "@/types/terminal";
 import {
   getDisabledTerminalModules,
@@ -20,6 +22,8 @@ import {
   Home,
   Landmark,
   Newspaper,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   SlidersHorizontal,
   Workflow,
@@ -59,10 +63,33 @@ export function TerminalModuleRail({
 }: TerminalModuleRailProps) {
   const enabledModules = getEnabledTerminalModules();
   const disabledModules = getDisabledTerminalModules();
+  const moduleGroupsId = useId();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const ToggleIcon = isCollapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
-    <nav className="terminal-module-rail" data-testid="terminal-module-rail" aria-label="Workspace modules">
-      <div className="terminal-module-rail__group" aria-label="Enabled modules">
+    <nav
+      className={cn("terminal-module-rail", isCollapsed && "terminal-module-rail--collapsed")}
+      data-collapsed={isCollapsed ? "true" : "false"}
+      data-rail-state={isCollapsed ? "collapsed" : "expanded"}
+      data-testid="terminal-module-rail"
+      aria-label="Workspace modules"
+    >
+      <button
+        className="terminal-module-rail__toggle"
+        type="button"
+        aria-controls={moduleGroupsId}
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed ? "Expand module rail" : "Collapse module rail"}
+        title={isCollapsed ? "Expand module rail" : "Collapse module rail"}
+        onClick={() => setIsCollapsed((current) => !current)}
+      >
+        <ToggleIcon aria-hidden="true" focusable="false" size={18} strokeWidth={2.2} />
+        <span className="terminal-module-rail__toggle-label">{isCollapsed ? "Expand" : "Collapse"}</span>
+      </button>
+
+      <div className="terminal-module-rail__navigation" id={moduleGroupsId}>
+        <div className="terminal-module-rail__group" aria-label="Enabled modules">
         {enabledModules.map((module) => {
           const Icon = TERMINAL_MODULE_ICON_COMPONENTS[module.icon];
 
@@ -76,6 +103,7 @@ export function TerminalModuleRail({
               data-module-id={module.id}
               data-module-short-label={module.shortLabel}
               key={module.id}
+              title={isCollapsed ? module.label : undefined}
               type="button"
               aria-current={activeModuleId === module.id && !disabledModuleId ? "page" : undefined}
               onClick={() => onModuleSelect(module.id)}
@@ -117,6 +145,7 @@ export function TerminalModuleRail({
             </button>
           );
         })}
+      </div>
       </div>
     </nav>
   );
