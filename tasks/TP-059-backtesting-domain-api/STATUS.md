@@ -1,7 +1,7 @@
 # TP-059: Backtesting domain, persistence, and API — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-06
 **Review Level:** 3
 **Review Counter:** 0
@@ -65,12 +65,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] New `docs/architecture/backtesting.md` created
-- [ ] Docs index and architecture docs updated
-- [ ] README/PLAN updated if affected
-- [ ] Discoveries logged
+- [x] New `docs/architecture/backtesting.md` created
+- [x] Docs index and architecture docs updated
+- [x] README/PLAN updated if affected
+- [x] Discoveries logged
 
 ---
 
@@ -85,6 +85,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| No additional out-of-scope discoveries during TP-059; implementation/docs/tests stayed within the saved backtesting domain/API scope. | Logged | Step 5 |
 
 ---
 
