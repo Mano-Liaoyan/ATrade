@@ -1,6 +1,6 @@
 # TP-053: Remove top chrome and compact market filters — Status
 
-**Current Step:** Step 3: Add focused validation for removed chrome and filter density
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 1
@@ -43,17 +43,17 @@
 ---
 
 ### Step 3: Add focused validation for removed chrome and filter density
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-top-chrome-filter-density-tests.sh`
-- [ ] Assert removed header/safety-strip source/rendered markup stays absent
-- [ ] Assert preserved module rail/workspace/market-monitor/safety/API-boundary surfaces stay present
-- [ ] Update affected existing apphost frontend validation scripts
+- [x] Create `tests/apphost/frontend-top-chrome-filter-density-tests.sh`
+- [x] Assert removed header/safety-strip source/rendered markup stays absent
+- [x] Assert preserved module rail/workspace/market-monitor/safety/API-boundary surfaces stay present
+- [x] Update affected existing apphost frontend validation scripts
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] New chrome/filter validation passing
 - [ ] Affected layout and market-monitor validations passing

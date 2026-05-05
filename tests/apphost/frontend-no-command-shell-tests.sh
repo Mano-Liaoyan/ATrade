@@ -113,10 +113,11 @@ assert_safety_boundaries_preserved() {
   local diagnostics="$frontend_root/components/terminal/TerminalProviderDiagnostics.tsx"
   local disabled="$frontend_root/components/terminal/TerminalDisabledModule.tsx"
   local module_registry="$frontend_root/lib/terminalModuleRegistry.ts"
+  local monitor="$frontend_root/components/terminal/TerminalMarketMonitor.tsx"
 
-  assert_file_contains "$app" 'ATrade.Api boundary'
-  assert_file_contains "$app" 'exact instrument identity'
+  assert_file_contains "$app" 'exact provider identity'
   assert_file_contains "$app" 'Orders are disabled by the paper-only safety contract.'
+  assert_file_contains "$monitor" 'Backend-owned exact Postgres pins through ATrade.Api.'
   assert_file_contains "$help" 'All browser-visible data flows through ATrade.Api'
   assert_file_contains "$help" 'Provider-not-configured, provider-unavailable, authentication-required, and no-analysis-engine states remain explicit'
   assert_file_contains "$help" 'no order tickets, buy/sell controls, previews, or submit actions'
