@@ -98,6 +98,7 @@
 |-----------|-------------|----------|
 | Layout-only change did not alter provider/source labels or analysis user-facing states | Check-if-affected provider and analysis docs reviewed; no edits required | `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md` |
 | Simplified layout validation now covers removed chrome, grid, full-width shell, page-scroll prevention, and preserved workflow/safety surfaces | Added and ran dedicated apphost validation | `tests/apphost/frontend-simplified-workspace-layout-tests.sh` |
+| Final merge verification found one stale source assertion in the legacy trading-workspace apphost script that still expected removed shell monitor copy | Updated the assertion to the simplified workspace market-monitor copy and reran `frontend-trading-workspace-tests.sh` successfully | `tests/apphost/frontend-trading-workspace-tests.sh` |
 
 ---
 
@@ -123,6 +124,7 @@
 | 2026-05-05 15:04 | Task complete | Delivery documentation verified and discoveries logged |
 | 2026-05-05 14:48 | Worker iter 1 | done in 2212s, tools: 202 |
 | 2026-05-05 14:48 | Task complete | .DONE created |
+| 2026-05-05 14:57 | Merge verification repair | Updated stale `frontend-trading-workspace-tests.sh` source assertion and reran the script successfully |
 
 ---
 

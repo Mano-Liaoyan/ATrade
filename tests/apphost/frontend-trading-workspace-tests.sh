@@ -182,7 +182,7 @@ assert_frontend_dependencies_and_source() {
   assert_file_contains "$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts" 'createChartNavigationIntent'
   assert_file_contains "$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts" 'createAnalysisNavigationIntent'
   assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TerminalMarketMonitor'
-  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Market monitor owns provider state'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Unified bounded search, provider trending, and backend-owned exact pins.'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx" 'data-testid="terminal-market-monitor"'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx" 'Backend-owned exact Postgres pins through ATrade.Api.'
   assert_file_contains "$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx" 'data-testid="market-monitor-search-input"'
