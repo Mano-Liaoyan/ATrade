@@ -1,6 +1,6 @@
 # TP-052: Simplify workspace layout and remove extra chrome — Status
 
-**Current Step:** Step 2: Refactor layout and persistence to a single full-viewport workspace
+**Current Step:** Step 3: Remove background grid styling and add layout validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -43,12 +43,12 @@
 ---
 
 ### Step 3: Remove background grid styling and add layout validation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Remove active background grid CSS
-- [ ] Create `tests/apphost/frontend-simplified-workspace-layout-tests.sh`
-- [ ] Update shell/cutover tests for simplified layout expectations
-- [ ] Preserve workflow, provider-boundary, disabled-module, and no-order assertions
+- [x] Remove active background grid CSS
+- [x] Create `tests/apphost/frontend-simplified-workspace-layout-tests.sh`
+- [x] Update shell/cutover tests for simplified layout expectations
+- [x] Preserve workflow, provider-boundary, disabled-module, and no-order assertions
 
 ---
 
@@ -110,6 +110,8 @@
 | 2026-05-05 14:18 | Step 1 targeted check | Market monitor validation passed after app composition changes |
 | 2026-05-05 14:19 | Step 2 started | Refactoring layout persistence and viewport shell behavior |
 | 2026-05-05 14:25 | Step 2 targeted check | Frontend build passed after single-workspace layout/persistence changes |
+| 2026-05-05 14:26 | Step 3 started | Removing grid styling and refreshing shell/cutover validations |
+| 2026-05-05 14:35 | Step 3 targeted checks | Simplified layout, shell UI, cutover, and no-command validations passed |
 
 ---
 

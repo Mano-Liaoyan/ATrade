@@ -223,33 +223,44 @@ assert_clean_room_branding_guardrails() {
   fi
 }
 
-assert_resizable_layout_persistence_and_responsive_fallback() {
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-context-splitter"'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-monitor-splitter"'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-layout-reset"'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'window.addEventListener("pointermove", handlePointerMove, { passive: false })'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'setPointerCapture?.(event.pointerId)'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'readTerminalLayoutPreferences()'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'writeTerminalLayoutPreferences(preferences)'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'resetTerminalLayoutPreferences()'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" '--terminal-primary-size'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" '--terminal-context-size'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" '--terminal-monitor-size'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'TERMINAL_LAYOUT_STORAGE_KEY = "atrade.terminal.layout.v1"'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'const MIN_CONTEXT_PERCENT = 20'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'const MAX_CONTEXT_PERCENT = 44'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'const MIN_MONITOR_PERCENT = 16'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'const MAX_MONITOR_PERCENT = 42'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'typeof window === "undefined"'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'window.localStorage.setItem(probeKey, "1")'
-  assert_file_contains "$frontend_root/lib/terminalLayoutPersistence.ts" 'Math.min(Math.max(value, min), max)'
-  assert_file_contains "$frontend_root/app/globals.css" '@media (max-width: 1100px)'
-  assert_file_contains "$frontend_root/app/globals.css" 'grid-template-areas:'
-  assert_file_contains "$frontend_root/app/globals.css" 'grid-template-columns: 1fr;'
-  assert_file_contains "$frontend_root/app/globals.css" 'height: auto;'
-  assert_file_contains "$frontend_root/app/globals.css" '.terminal-workspace-layout__splitter {'
-  assert_file_contains "$frontend_root/app/globals.css" 'display: none;'
-  assert_file_contains "$frontend_root/app/globals.css" '@media (max-width: 720px)'
+assert_simplified_full_viewport_layout() {
+  local layout="$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx"
+  local css="$frontend_root/app/globals.css"
+
+  assert_file_contains "$layout" 'data-testid="terminal-workspace-layout"'
+  assert_file_contains "$layout" 'data-layout-region="primary"'
+  assert_file_not_contains "$layout" 'data-layout-region="context"'
+  assert_file_not_contains "$layout" 'data-layout-region="monitor"'
+  assert_file_not_contains "$layout" 'data-testid="terminal-context-splitter"'
+  assert_file_not_contains "$layout" 'data-testid="terminal-monitor-splitter"'
+  assert_file_not_contains "$layout" 'data-testid="terminal-layout-reset"'
+  assert_file_not_contains "$layout" 'window.addEventListener("pointermove"'
+  assert_file_not_contains "$layout" 'setPointerCapture?.(event.pointerId)'
+  assert_file_not_contains "$layout" 'readTerminalLayoutPreferences()'
+  assert_file_not_contains "$layout" 'writeTerminalLayoutPreferences(preferences)'
+  assert_file_not_contains "$layout" 'resetTerminalLayoutPreferences()'
+  assert_file_not_contains "$layout" '--terminal-primary-size'
+  assert_file_not_contains "$layout" '--terminal-context-size'
+  assert_file_not_contains "$layout" '--terminal-monitor-size'
+  assert_path_missing "$frontend_root/lib/terminalLayoutPersistence.ts"
+  assert_file_not_contains "$frontend_root/types/terminal.ts" 'TerminalLayoutPreferences'
+  assert_file_contains "$css" '@media (max-width: 1100px)'
+  assert_file_contains "$css" '@media (max-width: 720px)'
+  assert_file_contains "$css" 'width: 100%;'
+  assert_file_contains "$css" 'height: 100dvh;'
+  assert_file_contains "$css" 'overflow: hidden;'
+  assert_file_contains "$css" 'overflow: auto;'
+  assert_file_not_contains "$css" 'grid-template-areas:'
+  assert_file_not_contains "$css" 'height: auto;'
+  assert_file_not_contains "$css" '.terminal-workspace-layout__splitter {'
+  assert_file_not_contains "$css" '.terminal-workspace-layout__context'
+  assert_file_not_contains "$css" '.terminal-workspace-layout__monitor'
+  assert_file_not_contains "$css" '.terminal-status-strip'
+  assert_file_not_contains "$css" '.terminal-context-summary'
+  assert_file_not_contains "$css" '.terminal-monitor-panel'
+  assert_file_not_contains "$css" '--terminal-grid-line'
+  assert_file_not_contains "$css" 'background-size: 40px 40px'
+  assert_file_not_contains "$css" 'margin: 0 auto'
 }
 
 assert_disabled_future_modules_visible_and_honest() {
@@ -289,14 +300,15 @@ assert_terminal_markers_present() {
   assert_path_missing "$frontend_root/lib/terminalCommandRegistry.ts"
   assert_file_contains "$frontend_root/components/terminal/TerminalModuleRail.tsx" 'data-testid="terminal-module-rail"'
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-workspace-layout"'
-  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-layout-reset"'
+  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-layout-region="primary"'
+  assert_file_not_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-layout-reset"'
   assert_file_contains "$frontend_root/components/terminal/TerminalMarketMonitor.tsx" 'data-testid="terminal-market-monitor"'
   assert_file_contains "$frontend_root/components/terminal/TerminalChartWorkspace.tsx" 'data-testid="terminal-chart-workspace"'
   assert_file_contains "$frontend_root/components/terminal/TerminalAnalysisWorkspace.tsx" 'data-testid="terminal-analysis-workspace"'
   assert_file_contains "$frontend_root/components/terminal/TerminalProviderDiagnostics.tsx" 'data-testid="terminal-provider-diagnostics"'
   assert_file_contains "$frontend_root/components/terminal/TerminalStatusModule.tsx" 'data-testid="terminal-status-module"'
   assert_file_contains "$frontend_root/components/terminal/TerminalHelpModule.tsx" 'data-testid="terminal-help-module"'
-  assert_file_contains "$frontend_root/components/terminal/TerminalStatusStrip.tsx" 'data-testid="terminal-status-strip"'
+  assert_path_missing "$frontend_root/components/terminal/TerminalStatusStrip.tsx"
 }
 
 main() {
@@ -309,7 +321,7 @@ main() {
   assert_atrade_api_client_boundaries
   assert_terminal_workflows_reachable
   assert_disabled_future_modules_visible_and_honest
-  assert_resizable_layout_persistence_and_responsive_fallback
+  assert_simplified_full_viewport_layout
   assert_terminal_markers_present
 
   printf 'Frontend cutover validation passed.\n'

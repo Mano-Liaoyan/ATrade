@@ -35,7 +35,6 @@
   --terminal-surface-inset: 225 43% 5%;
   --terminal-border: 215 25% 20%;
   --terminal-border-strong: 211 28% 29%;
-  --terminal-grid: 194 85% 41%;
   --terminal-splitter: 215 24% 18%;
   --terminal-text: 213 33% 91%;
   --terminal-text-muted: 215 17% 63%;
@@ -85,7 +84,6 @@
   --positive: hsl(var(--terminal-accent-green));
   --warning: hsl(var(--terminal-accent-amber));
   --danger: hsl(var(--terminal-accent-red));
-  --terminal-grid-line: hsl(var(--terminal-grid) / 0.14);
   --terminal-panel: hsl(var(--terminal-surface) / 0.86);
   --terminal-panel-strong: hsl(var(--terminal-surface-elevated) / 0.94);
   --terminal-focus: hsl(var(--terminal-focus-ring) / 0.38);
@@ -701,11 +699,7 @@ select:focus-visible,
   padding: clamp(0.75rem, 1.4vw, 1.35rem);
   overflow: hidden;
   border: 1px solid hsl(var(--terminal-border) / 0.72);
-  background:
-    linear-gradient(90deg, var(--terminal-grid-line) 1px, transparent 1px),
-    linear-gradient(var(--terminal-grid-line) 1px, transparent 1px),
-    linear-gradient(135deg, hsl(var(--terminal-canvas) / 0.98), hsl(222 44% 7% / 0.96));
-  background-size: 40px 40px, 40px 40px, auto;
+  background: linear-gradient(135deg, hsl(var(--terminal-canvas) / 0.98), hsl(222 44% 7% / 0.96));
   color: hsl(var(--terminal-text));
 }
 
