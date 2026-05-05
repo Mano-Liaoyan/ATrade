@@ -1,6 +1,6 @@
 # TP-055: Fincept-inspired terminal theme refactor — Status
 
-**Current Step:** Step 1: Define the original ATrade institutional terminal palette
+**Current Step:** Step 2: Apply the theme refactor across the workspace shell and primitives
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Apply the theme refactor across the workspace shell and primitives
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Apply new theme tokens to global CSS and Tailwind config
-- [ ] Reduce cyan/blue dominant gradients/glows while preserving accessible focus/information contrast
-- [ ] Restyle terminal and UI primitives into crisp dense terminal controls
-- [ ] Align chart colors with the new theme without breaking chart behavior or truthful states
+- [x] Apply new theme tokens to global CSS and Tailwind config
+- [x] Reduce cyan/blue dominant gradients/glows while preserving accessible focus/information contrast
+- [x] Restyle terminal and UI primitives into crisp dense terminal controls
+- [x] Align chart colors with the new theme without breaking chart behavior or truthful states
 
 ---
 
@@ -90,6 +90,10 @@
 | Defined the original ATrade terminal token direction as near-black canvas, graphite layers, warm gray dividers, amber/orange primary emphasis/focus, muted steel info, green/red market states, compact density, and chart-specific token hooks; no Fincept/Bloomberg names, assets, exact palette values, or proprietary copy are introduced. | Apply these repository-owned tokens across CSS, Tailwind, primitives, and chart styling. | `frontend/app/globals.css` |
 | Fixed token plumbing discovered during inventory: `terminal-border-strong` / `terminal-splitter-active` are now Tailwind-backed, the stale `--terminal-grid` reference points at the chart grid token, and plain CSS helper aliases no longer overwrite shadcn HSL tokens such as `--muted`/`--accent`. | Continue the visual refactor using the corrected token contract. | `frontend/tailwind.config.ts`, `frontend/app/globals.css` |
 | Clean-room constraint recorded for the refactor: use only repository-authored ATrade token names, CSS, copy, components, and chart settings; do not import or reproduce Fincept/Bloomberg source, assets, branding strings, exact palette values, layouts, screenshots, command taxonomies, or proprietary copy. | Enforce with source-based validation and docs. | `STATUS.md`, upcoming `tests/apphost/frontend-terminal-theme-refactor-tests.sh`, `docs/design/atrade-terminal-ui.md` |
+| Applied the token direction to global CSS/Tailwind: canvas/panel/shadcn/status/chart tokens now resolve through black/graphite/amber variables, Tailwind exposes the missing strong border/splitter/amber/orange/focus contract, and legacy helper aliases use `--ui-*` names instead of clobbering HSL tokens. | Verify through new theme validation and frontend build. | `frontend/app/globals.css`, `frontend/tailwind.config.ts` |
+| Removed cyan/blue as the dominant visual layer: no active frontend CSS/classes now use `terminal-cyan`, cyan raw RGB/hex values, sky tokens, or blue gradients; amber now owns focus/active/selection/primary emphasis while muted info remains available through status tokens. | Keep provider/info badges readable without making blue the primary theme. | `frontend/app/globals.css`, `frontend/components/ui/*`, `frontend/components/terminal/*`, grep verification |
+| Restyled primitives toward crisp dense terminal controls: buttons/inputs/tabs/dialog focus states now use amber, terminal headers/panels are tighter, scroll thumbs and CSS card/chip/analysis/chart regions use rectangular radii, and legacy rounded dashboard cards/pills were removed. | Validate via UI stack/shell scripts and frontend build. | `frontend/components/ui/*`, `frontend/components/terminal/*`, `frontend/app/globals.css` |
+| Chart colors now match the original terminal palette: chart background/grid/axes use near-black and warm dividers, volume/SMA overlays use amber/steel, and candle red/green market states remain truthful while the existing sizing, legend, resize, and empty-provider behavior code paths stay intact. | Cover through stock/chart validations and frontend build. | `frontend/components/CandlestickChart.tsx`, `frontend/app/globals.css` |
 
 ---
 

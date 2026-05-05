@@ -20,7 +20,7 @@ function TerminalSectionHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-3 border-b border-terminal-border/70 pb-3 terminal:flex-row terminal:items-start terminal:justify-between",
+        "flex flex-col gap-2 border-b border-terminal-border/70 pb-2 terminal:flex-row terminal:items-start terminal:justify-between",
         className,
       )}
       data-terminal-section-header
@@ -28,14 +28,14 @@ function TerminalSectionHeader({
     >
       <div className="min-w-0 space-y-1">
         {eyebrow ? (
-          <p className="m-0 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-terminal-cyan">
+          <p className="m-0 font-mono text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-terminal-amber">
             {eyebrow}
           </p>
         ) : null}
         <h2 className="m-0 truncate font-mono text-sm font-semibold uppercase tracking-[0.14em] text-terminal-text">
           {title}
         </h2>
-        {description ? <p className="m-0 max-w-3xl text-sm leading-6 text-terminal-muted">{description}</p> : null}
+        {description ? <p className="m-0 max-w-3xl text-[0.82rem] leading-5 text-terminal-muted">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </header>

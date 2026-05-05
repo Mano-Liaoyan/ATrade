@@ -37,6 +37,20 @@ const MinimumChartWidth = 1;
 const MinimumChartHeight = 420;
 const FallbackChartHeight = 440;
 
+const ChartColors = {
+  background: '#090806',
+  text: '#e9e4d8',
+  grid: 'rgba(126, 118, 102, 0.2)',
+  axis: 'rgba(126, 118, 102, 0.34)',
+  up: '#36bf73',
+  down: '#e35d6a',
+  upVolume: 'rgba(54, 191, 115, 0.28)',
+  downVolume: 'rgba(227, 93, 106, 0.28)',
+  neutralVolume: 'rgba(196, 124, 28, 0.28)',
+  smaFast: '#ee9f22',
+  smaSlow: '#9aa8ba',
+} as const;
+
 export function CandlestickChart({ candles, indicators }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [legend, setLegend] = useState<LegendSnapshot | null>(() => toLegendSnapshot(candles.candles.at(-1)));
@@ -77,21 +91,21 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
       width: initialSize.width,
       height: initialSize.height,
       layout: {
-        background: { type: ColorType.Solid, color: '#0f1b2e' },
-        textColor: '#cbd5e1',
+        background: { type: ColorType.Solid, color: ChartColors.background },
+        textColor: ChartColors.text,
       },
       grid: {
-        horzLines: { color: 'rgba(148, 163, 184, 0.14)' },
-        vertLines: { color: 'rgba(148, 163, 184, 0.12)' },
+        horzLines: { color: ChartColors.grid },
+        vertLines: { color: ChartColors.grid },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
       },
       rightPriceScale: {
-        borderColor: 'rgba(148, 163, 184, 0.24)',
+        borderColor: ChartColors.axis,
       },
       timeScale: {
-        borderColor: 'rgba(148, 163, 184, 0.24)',
+        borderColor: ChartColors.axis,
         timeVisible: true,
         secondsVisible: false,
       },
@@ -115,19 +129,19 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
     };
 
     const candleSeries: ISeriesApi<'Candlestick'> = chart.addSeries(CandlestickSeries, {
-      upColor: '#34d399',
-      borderUpColor: '#34d399',
-      wickUpColor: '#34d399',
-      downColor: '#fb7185',
-      borderDownColor: '#fb7185',
-      wickDownColor: '#fb7185',
+      upColor: ChartColors.up,
+      borderUpColor: ChartColors.up,
+      wickUpColor: ChartColors.up,
+      downColor: ChartColors.down,
+      borderDownColor: ChartColors.down,
+      wickDownColor: ChartColors.down,
     });
     candleSeries.setData(chartData);
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
       priceScaleId: '',
-      color: 'rgba(56, 189, 248, 0.28)',
+      color: ChartColors.neutralVolume,
     });
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
@@ -137,10 +151,10 @@ export function CandlestickChart({ candles, indicators }: CandlestickChartProps)
     });
     volumeSeries.setData(volumeData);
 
-    const sma20Series = chart.addSeries(LineSeries, { color: '#f59e0b', lineWidth: 2, title: 'SMA 20' });
+    const sma20Series = chart.addSeries(LineSeries, { color: ChartColors.smaFast, lineWidth: 2, title: 'SMA 20' });
     sma20Series.setData(sma20Data);
 
-    const sma50Series = chart.addSeries(LineSeries, { color: '#38bdf8', lineWidth: 2, title: 'SMA 50' });
+    const sma50Series = chart.addSeries(LineSeries, { color: ChartColors.smaSlow, lineWidth: 2, title: 'SMA 50' });
     sma50Series.setData(sma50Data);
 
     const handleCrosshairMove = (param: MouseEventParams<Time>) => {
@@ -245,7 +259,7 @@ function toVolumeData(candle: OhlcvCandle): HistogramData<Time> {
   return {
     time: toChartTime(candle.time),
     value: candle.volume,
-    color: candle.close >= candle.open ? 'rgba(52, 211, 153, 0.28)' : 'rgba(251, 113, 133, 0.28)',
+    color: candle.close >= candle.open ? ChartColors.upVolume : ChartColors.downVolume,
   };
 }
 

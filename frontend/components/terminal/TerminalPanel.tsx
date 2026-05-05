@@ -5,13 +5,13 @@ import { cn } from "@/lib/utils";
 import { TerminalSectionHeader } from "./TerminalSectionHeader";
 
 const terminalPanelVariants = cva(
-  "grid gap-3 border text-terminal-text shadow-terminal-panel",
+  "grid gap-2 border text-terminal-text shadow-terminal-panel",
   {
     variants: {
       density: {
-        compact: "p-3",
-        default: "p-4",
-        roomy: "p-5",
+        compact: "p-2.5",
+        default: "p-3",
+        roomy: "p-4",
       },
       tone: {
         surface: "border-terminal-border bg-terminal-surface",
