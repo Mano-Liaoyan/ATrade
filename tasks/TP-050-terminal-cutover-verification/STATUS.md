@@ -1,11 +1,11 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-05-04
+**Current Step:** Step 1: Audit active frontend routes and legacy leftovers
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,15 +15,15 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Audit active frontend routes and legacy leftovers
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand after reading the completed TP-047 through TP-049 implementation state.
 
@@ -105,6 +105,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-04 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-05 11:28 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-05 11:28 | Step 0 started | Preflight |
+| 2026-05-05 13:29 | Step 0 completed | Required paths and dependencies verified; frontend npm dependencies installed with npm ci |
+| 2026-05-05 13:29 | Step 1 started | Audit active frontend routes and legacy leftovers |
 
 ---
 
