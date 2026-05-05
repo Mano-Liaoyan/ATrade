@@ -56,6 +56,7 @@ public sealed class BacktestRunFactory(
         var run = new BacktestRunEnvelope(
             Id: BacktestRunId.New().Value,
             Status: BacktestRunStatuses.Queued,
+            SourceRunId: null,
             Request: requestSnapshot,
             Capital: capitalSnapshot,
             CreatedAtUtc: observedAtUtc,

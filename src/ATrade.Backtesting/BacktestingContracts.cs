@@ -198,6 +198,7 @@ public sealed record BacktestError(string Code, string Message);
 public sealed record BacktestRunEnvelope(
     string Id,
     string Status,
+    string? SourceRunId,
     BacktestRequestSnapshot Request,
     BacktestCapitalSnapshot Capital,
     DateTimeOffset CreatedAtUtc,

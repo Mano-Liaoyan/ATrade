@@ -1,11 +1,11 @@
 # TP-059: Backtesting domain, persistence, and API — Status
 
-**Current Step:** Step 1: Create provider-neutral backtesting contracts and validation
+**Current Step:** Step 2: Add Postgres persistence for saved backtest runs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 3
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Add Postgres persistence for saved backtest runs
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Idempotent saved-run schema initialization added
-- [ ] Repository supports create/list/get/status/cancel/retry operations
-- [ ] Persistence excludes secrets, account identifiers, gateway URLs, tokens, cookies, and direct bars
-- [ ] Repository tests added
+- [x] Idempotent saved-run schema initialization added
+- [x] Repository supports create/list/get/status/cancel/retry operations
+- [x] Persistence excludes secrets, account identifiers, gateway URLs, tokens, cookies, and direct bars
+- [x] Repository tests added
 
 ---
 
@@ -95,6 +95,7 @@
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-05 22:59 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 22:59 | Step 0 started | Preflight |
+| 2026-05-05 23:09 | Worker iter 1 | done in 599s, tools: 86 |
 
 ---
 
