@@ -3,7 +3,6 @@ export * from "./MarketMonitorDetailPanel";
 export * from "./MarketMonitorFilters";
 export * from "./MarketMonitorSearch";
 export * from "./MarketMonitorTable";
-export * from "./TerminalCommandInput";
 export * from "./TerminalMarketMonitor";
 export * from "./TerminalDisabledModule";
 export * from "./TerminalHelpModule";

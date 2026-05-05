@@ -22,7 +22,7 @@ export type TerminalMarketMonitorProps = {
   className?: string;
   compact?: boolean;
   initialSearchQuery?: string;
-  onOpenIntent?: (intent: TerminalNavigationIntent, feedback: string) => void;
+  onOpenIntent?: (intent: TerminalNavigationIntent, statusMessage: string) => void;
   title?: string;
 };
 
@@ -31,24 +31,24 @@ export function TerminalMarketMonitor({
   compact = false,
   initialSearchQuery = '',
   onOpenIntent,
-  title = 'Terminal market monitor',
+  title = 'Market monitor',
 }: TerminalMarketMonitorProps) {
   const workflow = useTerminalMarketMonitorWorkflow({ initialSearchQuery });
   const handleOpenChart = React.useMemo(
     () => onOpenIntent
-      ? (row: TerminalMarketMonitorRow) => onOpenIntent(workflow.openChartIntent(row), buildOpenFeedback('CHART', row))
+      ? (row: TerminalMarketMonitorRow) => onOpenIntent(workflow.openChartIntent(row), buildOpenStatusMessage('CHART', row))
       : undefined,
     [onOpenIntent, workflow],
   );
   const handleOpenAnalysis = React.useMemo(
     () => onOpenIntent
-      ? (row: TerminalMarketMonitorRow) => onOpenIntent(workflow.openAnalysisIntent(row), buildOpenFeedback('ANALYSIS', row))
+      ? (row: TerminalMarketMonitorRow) => onOpenIntent(workflow.openAnalysisIntent(row), buildOpenStatusMessage('ANALYSIS', row))
       : undefined,
     [onOpenIntent, workflow],
   );
 
   return (
-    <section className={cn('terminal-market-monitor', compact && 'terminal-market-monitor--compact', className)} data-testid="terminal-market-monitor" aria-label="ATrade Terminal market monitor">
+    <section className={cn('terminal-market-monitor', compact && 'terminal-market-monitor--compact', className)} data-testid="terminal-market-monitor" aria-label="Market monitor">
       <TerminalPanel
         className="terminal-market-monitor__shell"
         density="compact"
@@ -176,7 +176,7 @@ function MarketMonitorExplorationControls({ workflow }: { workflow: TerminalMark
   );
 }
 
-function buildOpenFeedback(moduleId: 'CHART' | 'ANALYSIS', row: TerminalMarketMonitorRow): string {
+function buildOpenStatusMessage(moduleId: 'CHART' | 'ANALYSIS', row: TerminalMarketMonitorRow): string {
   const providerId = row.providerSymbolId ? ` provider id ${row.providerSymbolId}` : ' no provider id';
   const exchange = row.exchange ? ` on ${row.exchange}` : ' with market unavailable';
   return `Opening ${moduleId} for ${row.symbol} (${row.provider.toUpperCase()}${providerId}${exchange}, ${row.currency}, ${row.assetClass}).`;

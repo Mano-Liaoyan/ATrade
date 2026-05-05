@@ -708,15 +708,11 @@ select:focus-visible,
 
 .atrade-terminal-app__header {
   display: grid;
-  grid-template-columns: minmax(18rem, 0.42fr) minmax(24rem, 1fr);
   gap: 0.75rem;
   align-items: stretch;
 }
 
 .atrade-terminal-app__brand,
-
-
-.terminal-command-input,
 
 
 .terminal-module-rail,
@@ -765,19 +761,6 @@ select:focus-visible,
   min-width: 0;
 }
 
-.terminal-command-input {
-  display: grid;
-  gap: 0.35rem;
-  min-width: 0;
-  padding: 0.8rem;
-}
-
-.terminal-command-input__label,
-
-
-.terminal-command-input__prompt,
-
-
 .terminal-monitor-panel__label {
   color: hsl(var(--terminal-accent-amber));
   font-family: var(--font-mono);
@@ -786,33 +769,6 @@ select:focus-visible,
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
-
-.terminal-command-input__control {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.terminal-command-input__field {
-  min-width: 0;
-  border: 1px solid hsl(var(--terminal-border-strong) / 0.8);
-  background: hsl(var(--terminal-surface-inset));
-  color: hsl(var(--terminal-text));
-  font-family: var(--font-mono);
-  font-size: 0.92rem;
-  outline: none;
-  padding: 0.6rem 0.7rem;
-  text-transform: uppercase;
-}
-
-.terminal-command-input__field:focus-visible {
-  border-color: hsl(var(--terminal-focus-ring));
-  box-shadow: var(--shadow-terminal-glow);
-}
-
-.terminal-command-input__submit,
-
 
 .terminal-workspace-layout__reset {
   border: 1px solid hsl(var(--terminal-accent-cyan) / 0.46);
@@ -825,16 +781,6 @@ select:focus-visible,
   letter-spacing: 0.12em;
   padding: 0.55rem 0.75rem;
   text-transform: uppercase;
-}
-
-.terminal-command-input__help,
-
-
-.terminal-command-input__feedback {
-  margin: 0;
-  color: hsl(var(--terminal-text-muted));
-  font-size: 0.76rem;
-  line-height: 1.45;
 }
 
 .terminal-module-rail {
@@ -1177,9 +1123,6 @@ select:focus-visible,
   gap: 0.75rem;
 }
 
-.terminal-help-module__commands,
-
-
 .terminal-help-module__list {
   display: grid;
   gap: 0.55rem;
@@ -1187,9 +1130,6 @@ select:focus-visible,
   padding: 0;
   list-style: none;
 }
-
-.terminal-help-module__commands div,
-
 
 .terminal-help-module__list li,
 
@@ -1200,9 +1140,6 @@ select:focus-visible,
   padding: 0.55rem;
 }
 
-.terminal-help-module__commands dt,
-
-
 .terminal-help-module__list strong,
 
 
@@ -1212,9 +1149,6 @@ select:focus-visible,
   font-size: 0.78rem;
   font-weight: 900;
 }
-
-.terminal-help-module__commands dd,
-
 
 .terminal-help-module__list span,
 
@@ -1843,10 +1777,6 @@ select:focus-visible,
   .terminal-module-rail__item {
     width: auto;
     min-width: 5.5rem;
-  }
-
-  .terminal-command-input__control {
-    grid-template-columns: 1fr;
   }
 
   .terminal-help-module__grid {

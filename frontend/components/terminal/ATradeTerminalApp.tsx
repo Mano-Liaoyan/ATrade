@@ -9,11 +9,9 @@ import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
 import type {
   DisabledTerminalModuleId,
   EnabledTerminalModuleId,
-  TerminalCommandParseResult,
   TerminalNavigationIntent,
 } from "@/types/terminal";
 import { getTerminalDisabledModuleState } from "@/lib/terminalModuleRegistry";
-import { TerminalCommandInput } from "./TerminalCommandInput";
 import { TerminalDisabledModule } from "./TerminalDisabledModule";
 import { TerminalHelpModule } from "./TerminalHelpModule";
 import { TerminalModuleRail } from "./TerminalModuleRail";
@@ -42,7 +40,7 @@ export function ATradeTerminalApp({
   const router = useRouter();
   const [activeModuleId, setActiveModuleId] = useState<EnabledTerminalModuleId>(initialModuleId);
   const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(null);
-  const [commandFeedback, setCommandFeedback] = useState("Ready for deterministic terminal commands.");
+  const [navigationStatus, setNavigationStatus] = useState("Ready for module navigation.");
   const [pendingFocusRequest, setPendingFocusRequest] = useState<{ targetId: string } | null>(null);
   const [seededSearchQuery, setSeededSearchQuery] = useState("");
   const normalizedInitialSymbol = initialSymbol?.toUpperCase() ?? null;
@@ -81,9 +79,9 @@ export function ATradeTerminalApp({
   }, [activeModuleId, disabledModuleId, pendingFocusRequest]);
 
   const openIntent = useCallback(
-    (intent: TerminalNavigationIntent, feedback: string) => {
+    (intent: TerminalNavigationIntent, statusMessage: string) => {
       setDisabledModuleId(null);
-      setCommandFeedback(feedback);
+      setNavigationStatus(statusMessage);
       setPendingFocusRequest({ targetId: intent.focusTargetId ?? getModuleFocusTargetId(intent.moduleId) });
 
       if (intent.moduleId === "SEARCH") {
@@ -131,23 +129,6 @@ export function ATradeTerminalApp({
     [normalizedInitialSymbol, router],
   );
 
-  function handleCommand(result: TerminalCommandParseResult) {
-    if (!result.ok) {
-      setDisabledModuleId(null);
-      setCommandFeedback(`${result.message} ${result.help}`);
-      return;
-    }
-
-    if (result.action.kind === "open-disabled-module") {
-      setDisabledModuleId(result.action.moduleId);
-      setCommandFeedback(result.feedback);
-      setPendingFocusRequest({ targetId: `terminal-disabled-${result.action.moduleId.toLowerCase()}` });
-      return;
-    }
-
-    openIntent(result.action.intent, result.feedback);
-  }
-
   function handleModuleSelect(moduleId: EnabledTerminalModuleId) {
     openIntent(
       { moduleId, focusTargetId: getModuleFocusTargetId(moduleId), route: moduleId === "HOME" ? "/" : undefined },
@@ -158,7 +139,7 @@ export function ATradeTerminalApp({
   function handleDisabledModule(moduleId: DisabledTerminalModuleId) {
     const unavailable = getTerminalDisabledModuleState(moduleId);
     setDisabledModuleId(moduleId);
-    setCommandFeedback(`${unavailable.title}: ${unavailable.message}`);
+    setNavigationStatus(`${unavailable.title}: ${unavailable.message}`);
     setPendingFocusRequest({ targetId: `terminal-disabled-${moduleId.toLowerCase()}` });
   }
 
@@ -178,18 +159,17 @@ export function ATradeTerminalApp({
   );
 
   return (
-    <section className="atrade-terminal-app" data-testid="atrade-terminal-app" aria-label="ATrade Terminal application frame">
+    <section className="atrade-terminal-app" data-testid="atrade-terminal-app" aria-label="ATrade paper workspace application frame">
       <header className="atrade-terminal-app__header">
         <div className="atrade-terminal-app__brand">
-          <p className="eyebrow">ATrade Terminal</p>
-          <h1>ATrade Terminal Shell</h1>
-          <p>Command-first paper workspace · ATrade.Api boundary · provider-truthful states</p>
+          <p className="eyebrow">ATrade Workspace</p>
+          <h1>Paper Trading Workspace</h1>
+          <p>Module-driven paper workspace · ATrade.Api boundary · provider-truthful states</p>
         </div>
-        <TerminalCommandInput feedback={commandFeedback} onCommand={handleCommand} />
       </header>
 
       <div className="terminal-safety-strip" data-testid="terminal-safety-strip" aria-label="Paper trading safety and provider identity notes">
-        <span>Paper-only workspace: ATrade Terminal exposes search, watchlist, charts, status, help, and analysis entry points only.</span>
+        <span>Paper-only workspace: search, watchlist, charts, status, help, and analysis entry points are exposed without order controls.</span>
         <span>Provider state and exact instrument identity stay visible; unavailable states are not replaced with fake market data.</span>
         <span>Orders are disabled by the paper-only safety contract.</span>
       </div>
@@ -221,8 +201,8 @@ export function ATradeTerminalApp({
 
       <TerminalStatusStrip
         activeModuleId={activeModuleId}
-        commandFeedback={commandFeedback}
         marketDataStatus={marketDataStatus}
+        statusMessage={navigationStatus}
         symbol={activeSymbol}
         watchlistStatus={watchlistStatus}
       />
@@ -279,7 +259,7 @@ function TerminalMonitorPanel() {
   return (
     <div className="terminal-monitor-panel" data-testid="terminal-monitor-panel">
       <span className="terminal-monitor-panel__label">Monitor</span>
-      <span>SEARCH, WATCHLIST, and HOME render the dense terminal market monitor.</span>
+      <span>SEARCH, WATCHLIST, and HOME render the dense market monitor.</span>
       <ul>
         <li>
           <strong>Search</strong>
@@ -302,7 +282,7 @@ type TerminalModuleContentProps = {
   activeModuleId: EnabledTerminalModuleId;
   chartRange: ChartRange;
   identity: InstrumentIdentityInput | null;
-  onOpenIntent: (intent: TerminalNavigationIntent, feedback: string) => void;
+  onOpenIntent: (intent: TerminalNavigationIntent, statusMessage: string) => void;
   searchQuery: string;
   symbol: string | null;
 };
@@ -336,7 +316,7 @@ function TerminalModuleContent({
 }
 
 type TerminalMarketMonitorModuleProps = {
-  onOpenIntent: (intent: TerminalNavigationIntent, feedback: string) => void;
+  onOpenIntent: (intent: TerminalNavigationIntent, statusMessage: string) => void;
   searchQuery?: string;
 };
 
@@ -345,8 +325,8 @@ function TerminalHomeModule({ onOpenIntent, searchQuery = "" }: TerminalMarketMo
     <section className="terminal-module terminal-module--home workspace-stack" data-testid="terminal-home-module" id="terminal-module-home" tabIndex={-1}>
       <TerminalPanel
         eyebrow="Home"
-        title="ATrade Terminal home"
-        description="Paper-only command workspace with provider state, search, watchlist, chart, analysis, status, help, and the dense market monitor."
+        title="Paper workspace home"
+        description="Paper-only module workspace with provider state, search, watchlist, chart, analysis, status, help, and the dense market monitor."
         actions={<TerminalStatusBadge tone="success">Paper only</TerminalStatusBadge>}
       >
         <div className="terminal-home-summary">
@@ -395,10 +375,10 @@ function TerminalChartPlaceholder() {
       <TerminalPanel
         eyebrow="Chart"
         title="Open a symbol chart"
-        description="Use CHART <symbol> or open a result from SEARCH/WATCHLIST so exact provider identity can flow through the route when available."
+        description="Open a result from SEARCH or WATCHLIST so exact provider identity can flow through the route when available."
         actions={<TerminalStatusBadge tone="info">CHART</TerminalStatusBadge>}
       >
-        <p>Example deterministic command: CHART AAPL. Missing provider/runtime states remain visible through the chart workflow.</p>
+        <p>Select Chart on a market monitor row to keep provider/runtime states visible through the chart workflow.</p>
       </TerminalPanel>
     </section>
   );
@@ -423,7 +403,7 @@ function TerminalAnalysisModule({ chartRange, identity, symbol }: { chartRange: 
         description="Provider-neutral analysis lists configured engines and surfaces no-engine or runtime-unavailable states without fake signals."
         actions={<TerminalStatusBadge tone="info">ANALYSIS</TerminalStatusBadge>}
       >
-        {symbol ? <p>Running over the selected {CHART_RANGE_LABELS[chartRange]} chart range from the route or chart workspace context.</p> : <p>Use ANALYSIS &lt;symbol&gt; from the command input or open a chart before selecting ANALYSIS.</p>}
+        {symbol ? <p>Running over the selected {CHART_RANGE_LABELS[chartRange]} chart range from the route or chart workspace context.</p> : <p>Open a chart or select Analyze from a market monitor row before viewing symbol analysis.</p>}
       </TerminalPanel>
       <TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />
     </section>
@@ -450,4 +430,3 @@ function getModuleFocusTargetId(moduleId: EnabledTerminalModuleId): string {
       return "terminal-workspace";
   }
 }
-

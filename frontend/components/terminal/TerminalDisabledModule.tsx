@@ -17,7 +17,6 @@ export function TerminalDisabledModule({ className, module, moduleId }: Terminal
         title: module.disabledTitle,
         message: module.disabledMessage,
         details: module.disabledDetails,
-        actionLabel: "HELP" as const,
       }
     : moduleId
       ? getTerminalDisabledModuleState(moduleId)
@@ -46,7 +45,7 @@ export function TerminalDisabledModule({ className, module, moduleId }: Terminal
           ))}
         </ul>
         <p className="terminal-disabled-module__footer">
-          This surface is intentionally empty: no fake data, no demo provider responses, and no order-entry controls are rendered here. Type HELP for enabled commands.
+          This surface is intentionally empty: no fake data, no demo provider responses, and no order-entry controls are rendered here. Use the HELP module for enabled workspace navigation.
         </p>
       </div>
     </TerminalPanel>

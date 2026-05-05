@@ -41,7 +41,6 @@ export type TerminalModuleDefinition = {
   description: string;
   availability: TerminalModuleAvailability;
   placement: TerminalModulePlacement;
-  commandLabel?: string;
   route?: string;
   disabledTitle?: string;
   disabledMessage?: string;
@@ -53,7 +52,6 @@ export type EnabledTerminalModuleDefinition = TerminalModuleDefinition & {
   id: EnabledTerminalModuleId;
   availability: "enabled";
   placement: "primary";
-  commandLabel: string;
 };
 
 export type DisabledTerminalModuleDefinition = TerminalModuleDefinition & {
@@ -70,7 +68,6 @@ export type TerminalDisabledModuleState = {
   title: string;
   message: string;
   details: string[];
-  actionLabel: "HELP";
 };
 
 export type TerminalNavigationIntent = {
@@ -82,37 +79,6 @@ export type TerminalNavigationIntent = {
   identity?: MarketDataSymbolIdentity | null;
   chartRange?: ChartRange;
 };
-
-export type TerminalCommandAction =
-  | {
-      kind: "open-module";
-      intent: TerminalNavigationIntent;
-    }
-  | {
-      kind: "open-disabled-module";
-      moduleId: DisabledTerminalModuleId;
-      unavailable: TerminalDisabledModuleState;
-    };
-
-export type TerminalCommandParseSuccess = {
-  ok: true;
-  input: string;
-  normalizedInput: string;
-  command: string;
-  action: TerminalCommandAction;
-  feedback: string;
-};
-
-export type TerminalCommandParseFailure = {
-  ok: false;
-  input: string;
-  normalizedInput: string;
-  command: string | null;
-  message: string;
-  help: string;
-};
-
-export type TerminalCommandParseResult = TerminalCommandParseSuccess | TerminalCommandParseFailure;
 
 export type TerminalLayoutRegion = "primary" | "context" | "monitor";
 

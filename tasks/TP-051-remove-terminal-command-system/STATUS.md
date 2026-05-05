@@ -1,6 +1,6 @@
 # TP-051: Remove terminal branding and command system — Status
 
-**Current Step:** Step 1: Remove the command system from active frontend source
+**Current Step:** Step 2: Remove user-facing ATrade Terminal and command-first copy
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Remove the command system from active frontend source
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Remove `TerminalCommandInput` and `terminalCommandRegistry` from active shell source
-- [ ] Remove command parse/action/result types, command feedback, and command help constants from active source
-- [ ] Preserve non-command module rail and market-monitor chart/analysis navigation
-- [ ] Run targeted source validation for command removal
+- [x] Remove `TerminalCommandInput` and `terminalCommandRegistry` from active shell source
+- [x] Remove command parse/action/result types, command feedback, and command help constants from active source
+- [x] Preserve non-command module rail and market-monitor chart/analysis navigation
+- [x] Run targeted source validation for command removal
 
 ---
 
 ### Step 2: Remove user-facing ATrade Terminal and command-first copy
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Remove visible `ATrade Terminal`, `ATrade Terminal Shell`, and command-first header copy
 - [ ] Update HELP/status/safety/accessibility copy that references command-first terminal behavior
