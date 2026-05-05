@@ -94,7 +94,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, a compact-filtered dense market monitor for trending/search/watchlist rows, chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, a compact-filtered dense market monitor for trending/search/watchlist rows, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -130,7 +130,9 @@ and stable password are reused. Browser `localStorage` is only a
 non-authoritative symbol-only cache / one-time manual migration source. Users can search IBKR/iBeam stocks through
 `/api/market-data/search`, see explicit provider/market/exchange/currency/asset
 class metadata with local market badges, open result chart pages that preserve
-exact identity in query state when available, and pin exact provider-market
+exact identity in query state when available and render a visible `CandlestickChart`
+when provider candles exist (empty/provider-unavailable states remain explicit
+with no synthetic bars), and pin exact provider-market
 metadata (`provider`, provider symbol id / IBKR `conid`, name, exchange,
 currency, and asset class) into the backend watchlist without a production
 hard-coded symbol catalog. Analysis engine discovery/run contracts are available through
@@ -230,6 +232,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-terminal-cutover-tests.sh`
 - `tests/apphost/frontend-terminal-ui-stack-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
+- `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
 - `tests/apphost/frontend-terminal-market-monitor-tests.sh`

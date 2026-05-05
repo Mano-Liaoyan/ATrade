@@ -195,6 +195,13 @@ implementation while leaving room for a desktop wrapper later.
   not-configured, provider unavailable, authentication required, no analysis
   engine configured, no watchlist pins, and disabled module states each get
   explicit copy.
+- The `CHART` workspace must reserve non-collapsing vertical space inside the
+  scroll-owned workspace. `TerminalChartWorkspace`, its chart region, the chart
+  shell, and `.chart-container` keep explicit minimum heights; `CandlestickChart`
+  measures the container, supplies `lightweight-charts` non-zero dimensions, and
+  resizes/refits after module or viewport layout changes. Empty candle responses
+  and provider-unavailable states render explicit status copy rather than a blank
+  or synthetic chart.
 
 ### 6.2 Layout Persistence
 

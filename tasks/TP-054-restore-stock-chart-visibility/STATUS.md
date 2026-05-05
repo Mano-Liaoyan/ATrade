@@ -1,7 +1,7 @@
 # TP-054: Restore stock chart visibility — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
@@ -69,12 +69,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged, including root cause and local-provider verification availability
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged, including root cause and local-provider verification availability
 
 ---
 
@@ -94,6 +94,7 @@
 | `CandlestickChart` preserves legend, crosshair, volume, SMA 20/50, fit-content, and `chart.remove()` cleanup, but relies on `autoSize: true` plus CSS-only `min-height`; it never supplies a measured width/height, never guards/deferred-resizes when the container initially reports zero dimensions, and recreates the chart on every data/indicator update. | Root-cause candidate for invisible charts after layout/module changes; fix dimensions/resize lifecycle while preserving overlays. | `frontend/components/CandlestickChart.tsx`, `frontend/app/globals.css` |
 | The full-viewport shell intentionally hides page-level overflow, but the chart region itself has no explicit minimum/available height beyond the inner `.chart-container` min-height, and `.terminal-chart-workspace__chart-region` uses `overflow: auto`/`resize: vertical` inside nested grid panels. Compact market-monitor CSS is separate; the layout risk is chart-region/container sizing and internal overflow after the TP-053 viewport cleanup. | Fix CSS in Step 3 so chart workspace, chart region, shell, and container advertise non-collapsing dimensions without reintroducing page-level scrolling. | `frontend/app/globals.css`, `frontend/components/terminal/TerminalWorkspaceLayout.tsx` |
 | Root cause: stock chart data can reach the CHART workspace, but the visible canvas depends on implicit CSS sizing and `lightweight-charts` autosize at effect time; after the full-viewport/nested-overflow layout cleanup the container can be measured at zero or not resized/refit when the module becomes visible. A secondary state bug renders empty candle responses as a blank chart instead of the explicit empty state. | Implement measured non-zero chart dimensions/resizing, refit after resize/data changes, explicit empty-array state, and CSS/validation coverage. | `frontend/components/CandlestickChart.tsx`, `frontend/components/terminal/TerminalChartWorkspace.tsx`, `frontend/app/globals.css`, `tests/apphost/*chart*`, `tests/apphost/frontend-simplified-workspace-layout-tests.sh` |
+| Real-provider local verification was skipped for TP-054. The required verification was source/build/test based and used no live IBKR/iBeam credentials or ignored `.env` values; unavailable/empty provider states were preserved through source validation rather than a live provider smoke. | Documented for delivery; future real-provider checks should use ignored local `.env` values and cleanly skip when iBeam/authentication is unavailable. | `tests/apphost/frontend-stock-chart-visibility-tests.sh`, Step 4 verification commands |
 
 ---
 
@@ -109,6 +110,7 @@
 | 2026-05-05 19:10 | Step 3 started | Adding non-collapsing CSS and validation coverage |
 | 2026-05-05 18:50 | Worker iter 1 | done in 700s, tools: 123 |
 | 2026-05-05 18:50 | Step 4 started | Testing & Verification |
+| 2026-05-05 20:58 | Step 5 completed | Documentation updated; delivery discoveries recorded |
 
 ---
 
@@ -123,4 +125,7 @@
 - Step 2 sizing check: `cd frontend && npx tsc --noEmit --pretty false --ignoreDeprecations 6.0` passed after adding explicit chart measurement and ResizeObserver/window resize handling. `npm run lint -- --file components/CandlestickChart.tsx` was attempted first, but this frontend package has no lint script.
 - Step 2 route/identity check: `bash tests/apphost/frontend-terminal-chart-analysis-tests.sh` passed after preserving CHART module/exact identity behavior.
 - Step 3 validation check: new stock chart visibility, chart-analysis, chart-range, and simplified-layout scripts passed after CSS/validation updates.
+- Step 5 affected-doc review: `docs/architecture/analysis-engines.md` was reviewed for chart-to-analysis handoff, selected range, and analysis workspace state changes; no update was needed because TP-054 preserved existing handoff/range behavior and only restored chart render sizing plus truthful empty-state gating.
+- Step 5 delivery note: root cause remains recorded in Discoveries and local real-provider verification was skipped without reading ignored credentials; source validations, frontend build, full `dotnet test`, and `dotnet build` passed in Step 4.
+- Step 5 context alignment: `tasks/CONTEXT.md` was updated to match README/PLAN after TP-053/TP-054 and point the next packet to `TP-055`; no task folders were archived or moved.
 

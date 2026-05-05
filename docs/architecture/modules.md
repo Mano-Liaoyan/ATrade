@@ -593,9 +593,14 @@ references.
   adapts `symbolChartWorkflow` into terminal source/range/identity/stream view
   models consumed by `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
   `TerminalIndicatorGrid`; the chart module keeps `CandlestickChart` as a
-  reusable low-level renderer while retiring `TimeframeSelector` and
-  `IndicatorPanel`. `frontend/lib/terminalAnalysisWorkflow.ts` adapts
-  `analysisClient` discovery/run behavior for `TerminalAnalysisWorkspace`, which
+  reusable low-level `lightweight-charts` renderer that receives measured
+  non-zero dimensions, observes resize/layout changes, preserves the OHLC legend,
+  volume, SMA overlays, fit-content, crosshair behavior, and cleanup, and is only
+  mounted by `TerminalChartWorkspace` when actual candle rows exist. Empty candle
+  arrays stay explicit no-data states instead of synthetic bars while
+  `TimeframeSelector` and `IndicatorPanel` remain retired.
+  `frontend/lib/terminalAnalysisWorkflow.ts` adapts `analysisClient`
+  discovery/run behavior for `TerminalAnalysisWorkspace`, which
   replaces `AnalysisPanel`; `TerminalProviderDiagnostics` replaces
   `BrokerPaperStatus` as diagnostics-only broker/IBKR/iBeam/source state. The
   old `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,

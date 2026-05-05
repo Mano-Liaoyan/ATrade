@@ -149,8 +149,12 @@ intents while `MarketMonitorFilters` presents those filters as compact controls;
 candle/indicator HTTP reads, source-label formatting, SignalR subscription
 state, stream update application, and HTTP polling fallback when streaming closes
 or is unavailable; `terminalChartWorkspaceWorkflow` adapts that contract into
-workspace-ready range/source/identity/stream view models; and
-`terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
+workspace-ready range/source/identity/stream view models, including
+`hasCandleData` so empty candle arrays remain explicit no-data states;
+`TerminalChartWorkspace` only mounts `CandlestickChart` when real candle rows
+exist, and `CandlestickChart` measures/resizes its `lightweight-charts` canvas so
+stock charts receive non-zero dimensions after module or viewport layout changes;
+and `terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
 explicit no-engine, unavailable, running, and result states. The workspace frame
 composes those workflow/client modules through `ATradeTerminalApp`,
 `TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
