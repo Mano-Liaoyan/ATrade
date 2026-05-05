@@ -1,6 +1,6 @@
 # TP-053: Remove top chrome and compact market filters — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 1
@@ -53,21 +53,21 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] New chrome/filter validation passing
-- [ ] Affected layout and market-monitor validations passing
-- [ ] No-command/shell/cutover validations passing if touched
-- [ ] Touched bootstrap/trading workspace validations passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] New chrome/filter validation passing
+- [x] Affected layout and market-monitor validations passing
+- [x] No-command/shell/cutover validations passing if touched
+- [x] Touched bootstrap/trading workspace validations passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] README/PLAN verification/current-surface text updated if affected
