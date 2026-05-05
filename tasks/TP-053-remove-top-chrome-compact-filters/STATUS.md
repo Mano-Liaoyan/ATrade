@@ -101,6 +101,8 @@
 | 2026-05-05 18:01 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 18:01 | Step 0 started | Preflight |
 | 2026-05-05 18:30 | Worker iter 1 | done in 1760s, tools: 133 |
+| 2026-05-05 18:36 | Worker iter 2 | done in 338s, tools: 51 |
+| 2026-05-05 18:36 | Task complete | .DONE created |
 
 ---
 
