@@ -28,6 +28,15 @@ assert_file_not_contains() {
   fi
 }
 
+assert_path_missing() {
+  local file_path="$1"
+
+  if [[ -e "$file_path" ]]; then
+    printf 'expected obsolete path to be removed: %s\n' "$file_path" >&2
+    return 1
+  fi
+}
+
 assert_renderer_has_no_watchlist_io() {
   local file_path="$1"
 
@@ -55,6 +64,24 @@ assert_watchlist_workflow_module() {
   assert_file_contains "$workflow" "Backend persisted pinKey/instrumentKey values are authoritative"
   assert_file_contains "$workflow" "unpinWatchlistInstrument(authoritativePinKey)"
   assert_file_contains "$workflow" "createCachedWatchlistSymbol"
+}
+
+assert_terminal_monitor_workflow_module() {
+  local workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
+
+  assert_file_contains "$workflow" "export function useTerminalMarketMonitorWorkflow"
+  assert_file_contains "$workflow" "useSymbolSearchWorkflow({"
+  assert_file_contains "$workflow" "useWatchlistWorkflow()"
+  assert_file_contains "$workflow" "getTrendingSymbols()"
+  assert_file_contains "$workflow" "createTerminalMarketMonitorViewModel"
+  assert_file_contains "$workflow" "createTrendingMonitorRow"
+  assert_file_contains "$workflow" "createSearchMonitorRow"
+  assert_file_contains "$workflow" "createWatchlistMonitorRow"
+  assert_file_contains "$workflow" "providerState"
+  assert_file_contains "$workflow" "watchlistCachedFallback: watchlist.source === 'cache'"
+  assert_file_contains "$workflow" "toggleRowPin"
+  assert_file_contains "$workflow" "createChartNavigationIntent"
+  assert_file_contains "$workflow" "createAnalysisNavigationIntent"
 }
 
 assert_storage_authority_boundary() {
@@ -95,13 +122,14 @@ assert_frontend_api_boundary() {
 
 assert_behavioral_fallbacks() {
   local workflow="$repo_root/frontend/lib/watchlistWorkflow.ts"
+  local monitor_workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
   local market_client="$repo_root/frontend/lib/marketDataClient.ts"
   local search_workflow="$repo_root/frontend/lib/symbolSearchWorkflow.ts"
   local chart_workflow="$repo_root/frontend/lib/symbolChartWorkflow.ts"
-  local workspace="$repo_root/frontend/components/TradingWorkspace.tsx"
-  local search="$repo_root/frontend/components/SymbolSearch.tsx"
-  local chart="$repo_root/frontend/components/SymbolChartView.tsx"
-  local watchlist="$repo_root/frontend/components/Watchlist.tsx"
+  local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
+  local search="$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx"
+  local detail="$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx"
+  local chart="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
 
   assert_file_contains "$workflow" "getTrendingPinState"
   assert_file_contains "$workflow" "getSearchResultPinState"
@@ -115,12 +143,14 @@ assert_behavioral_fallbacks() {
   assert_file_contains "$market_client" "provider-not-configured"
   assert_file_contains "$market_client" "provider-unavailable"
   assert_file_contains "$market_client" "authentication-required"
-  assert_file_contains "$workspace" "IBKR market data unavailable"
-  assert_file_contains "$search" "IBKR stock search unavailable."
+  assert_file_contains "$monitor" "label: 'Search'"
+  assert_file_contains "$monitor" "Cached legacy pins are read-only until backend returns."
+  assert_file_contains "$monitor_workflow" "formatTerminalMarketMonitorError"
+  assert_file_contains "$search" "Search unavailable"
   assert_file_contains "$search_workflow" "IBKR stock search is unavailable."
   assert_file_contains "$chart" "IBKR chart data unavailable."
   assert_file_contains "$chart_workflow" "IBKR chart data is unavailable."
-  assert_file_contains "$watchlist" "Watchlist backend unavailable."
+  assert_file_contains "$detail" "No row selected."
 
   assert_file_contains "$chart_workflow" "connectMarketDataStream"
   assert_file_contains "$chart_workflow" "startPollingFallback"
@@ -130,33 +160,35 @@ assert_behavioral_fallbacks() {
 }
 
 assert_renderer_boundaries() {
-  local workspace="$repo_root/frontend/components/TradingWorkspace.tsx"
-  local trending="$repo_root/frontend/components/TrendingList.tsx"
-  local search="$repo_root/frontend/components/SymbolSearch.tsx"
-  local watchlist="$repo_root/frontend/components/Watchlist.tsx"
+  local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
+  local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
+  local table="$repo_root/frontend/components/terminal/MarketMonitorTable.tsx"
+  local detail="$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx"
+  local search="$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx"
+  local filters="$repo_root/frontend/components/terminal/MarketMonitorFilters.tsx"
 
-  assert_file_contains "$workspace" "useWatchlistWorkflow"
-  assert_file_contains "$workspace" "getSearchResultPinState"
-  assert_file_contains "$workspace" "getTrendingPinState"
-  assert_file_contains "$workspace" "getWatchlistSymbolPinState"
-  assert_file_not_contains "$workspace" "from '../lib/watchlistClient'"
-  assert_file_not_contains "$workspace" "from '../lib/watchlistStorage'"
-  assert_file_not_contains "$workspace" "migrateCachedWatchlistAfterBackendLoad"
-  assert_file_not_contains "$workspace" "createManualWatchlistInput"
+  assert_file_contains "$terminal_app" "TerminalMarketMonitor"
+  assert_file_contains "$terminal_app" "onOpenIntent={onOpenIntent}"
+  assert_file_contains "$monitor" "useTerminalMarketMonitorWorkflow"
+  assert_file_contains "$monitor" "MarketMonitorTable"
+  assert_file_contains "$monitor" "MarketMonitorDetailPanel"
+  assert_file_contains "$table" "TerminalMarketMonitorRow"
+  assert_file_contains "$detail" "TerminalMarketMonitorRow"
+  assert_file_contains "$search" "MarketMonitorSearch"
+  assert_file_contains "$filters" "MarketMonitorFilterOrder"
 
-  for renderer in "$trending" "$search" "$watchlist"; do
+  for renderer in "$terminal_app" "$monitor" "$table" "$detail" "$search" "$filters"; do
     assert_renderer_has_no_watchlist_io "$renderer"
-    assert_file_contains "$renderer" "WatchlistPinState"
-    assert_file_contains "$renderer" "getPinState"
-    assert_file_not_contains "$renderer" "pinnedSet"
-    assert_file_not_contains "$renderer" "pinnedInstrumentKeys"
-    assert_file_not_contains "$renderer" "savingPinKey"
-    assert_file_not_contains "$renderer" "actionsDisabled"
   done
+
+  assert_path_missing "$repo_root/frontend/components/SymbolSearch.tsx"
+  assert_path_missing "$repo_root/frontend/components/TrendingList.tsx"
+  assert_path_missing "$repo_root/frontend/components/Watchlist.tsx"
 }
 
 main() {
   assert_watchlist_workflow_module
+  assert_terminal_monitor_workflow_module
   assert_storage_authority_boundary
   assert_frontend_api_boundary
   assert_behavioral_fallbacks

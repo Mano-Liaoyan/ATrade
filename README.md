@@ -8,6 +8,7 @@ see_also:
   - docs/INDEX.md
   - scripts/README.md
   - docs/architecture/overview.md
+  - docs/design/atrade-terminal-ui.md
   - docs/architecture/modules.md
   - docs/architecture/provider-abstractions.md
   - docs/architecture/analysis-engines.md
@@ -93,7 +94,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js paper-trading workspace with a shared terminal-style shell for home/chart navigation, trending symbols, chart pages, SignalR fallback, backend-saved watchlists, and a provider-neutral analysis panel.
+- `frontend/` — Next.js ATrade Terminal paper-trading workspace with a deterministic command input, enabled/disabled module registry and rail, resizable primary/context/monitor layout with local-only persistence, a dense terminal market monitor for trending/search/watchlist rows, terminal chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -182,6 +183,7 @@ agents used by the orchestrator.
 
 - Use `docs/INDEX.md` as the documentation discovery layer.
 - Only documents marked `active` are implementation authority.
+- `docs/design/atrade-terminal-ui.md` defines the active clean-room ATrade Terminal UI target for the frontend reconstruction queue.
 - `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md`, and `docs/architecture/paper-trading-workspace.md` define the provider seams, analysis engine contract, and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
@@ -218,8 +220,12 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/lean-analysis-engine-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `tests/apphost/frontend-terminal-ui-stack-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
+- `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
+- `tests/apphost/frontend-terminal-market-monitor-tests.sh`
+- `tests/apphost/frontend-terminal-shell-command-tests.sh`
 - `tests/apphost/frontend-terminal-shell-ui-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 - `tests/apphost/frontend-workspace-workflow-module-tests.sh`

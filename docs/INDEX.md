@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
+updated: 2026-05-04
 summary: Documentation discovery layer for active ATrade repository docs.
 see_also:
   - ../README.md
@@ -22,6 +22,7 @@ documents listed as `active` should guide implementation work.
 | [`../AGENTS.md`](../AGENTS.md)                                                       | maintainer | Repository guidance and introduction of repo-local Pi skills.                                                                           |
 | [`../PLAN.md`](../PLAN.md)                                                           | maintainer | Current implementation plan for the provider-backed ATrade paper-trading workspace upgrade.                                             |
 | [`../scripts/README.md`](../scripts/README.md)                                       | maintainer | Bootstrap status and contract for the cross-platform `start run` entrypoints.                                                           |
+| [`design/atrade-terminal-ui.md`](design/atrade-terminal-ui.md)                       | maintainer | Active clean-room ATrade Terminal UI design authority for the frontend reconstruction queue.                                             |
 | [`tooling/taskplane-runtime-artifacts.md`](tooling/taskplane-runtime-artifacts.md)   | maintainer | Defines which Taskplane and Pi files are committed project config versus local runtime artifacts, including repo-local Pi skills.       |
 | [`architecture/overview.md`](architecture/overview.md)                               | maintainer | Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract.                |
 | [`architecture/provider-abstractions.md`](architecture/provider-abstractions.md)       | maintainer | Provider-neutral broker and market-data contract for swapping ATrade providers without changing API or frontend payloads.               |

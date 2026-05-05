@@ -49,6 +49,11 @@ assert_process_environment_contains() {
   local pid="$1"
   local needle="$2"
 
+  if [[ ! -r "/proc/$pid/environ" ]]; then
+    printf 'skipping process environment check for %s because /proc environ is not readable on this platform.\n' "$needle"
+    return 0
+  fi
+
   if ! tr '\0' '\n' </proc/"$pid"/environ | grep -Fqx -- "$needle"; then
     printf 'expected process %s environment to contain %s\n' "$pid" "$needle" >&2
     tr '\0' '\n' </proc/"$pid"/environ >&2
@@ -134,9 +139,10 @@ assert_frontend_contract_files() {
   assert_file_contains "$repo_root/frontend/package.json" '"dev": "next dev --hostname 0.0.0.0"'
   assert_file_contains "$repo_root/frontend/package.json" '"build": "next build"'
   assert_file_contains "$repo_root/frontend/package.json" '"start": "next start"'
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'ATrade Frontend Home'
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'Next.js Bootstrap Slice'
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'ATradeTerminalApp'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'ATrade Terminal Shell'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'Command-first paper workspace'
+  assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-safety-strip"'
   assert_file_contains "$repo_root/frontend/app/layout.tsx" "import './globals.css';"
   assert_file_contains "$repo_root/frontend/next-env.d.ts" '/// <reference types="next" />'
   assert_file_contains "$repo_root/frontend/tsconfig.json" '"name": "next"'
@@ -164,14 +170,15 @@ assert_direct_frontend_startup() {
   response_file="$(mktemp)"
 
   wait_for_http_200 "$frontend_url/" "$response_file" "$frontend_pid" "$frontend_log"
-  assert_file_contains "$response_file" 'ATrade Frontend Home'
-  assert_file_contains "$response_file" 'Next.js Bootstrap Slice'
-  assert_file_contains "$response_file" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$response_file" 'ATrade Terminal Shell'
+  assert_file_contains "$response_file" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$response_file" 'data-testid="terminal-command-input"'
+  assert_file_contains "$response_file" 'Orders are disabled by the paper-only safety contract.'
   rm -f "$response_file"
 }
 
 assert_apphost_manifest_preserves_frontend_resource() {
-  manifest_path="$(mktemp --suffix=.json)"
+  manifest_path="$(mktemp "${TMPDIR:-/tmp}/atrade-apphost-manifest.XXXXXX.json")"
   dotnet run --project "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" -- --publisher manifest --output-path "$manifest_path" >/dev/null
   assert_file_contains "$manifest_path" '"api"'
   assert_file_contains "$manifest_path" '"frontend"'
@@ -208,7 +215,7 @@ assert_apphost_frontend_runtime_is_warning_free() {
   local attempt
 
   for attempt in {1..120}; do
-    session_folder_candidate="$(grep -oE '/tmp/aspire-dcp[^"[:space:]]+/kubeconfig' "$apphost_log" | tail -n 1 | sed 's#/kubeconfig$##' || true)"
+    session_folder_candidate="$(grep -oE '/[^"[:space:]]*aspire-dcp[^"[:space:]]+/kubeconfig' "$apphost_log" | tail -n 1 | sed 's#/kubeconfig$##' || true)"
     if [[ -n "$session_folder_candidate" && -d "$session_folder_candidate" ]]; then
       session_folder="$session_folder_candidate"
       break
@@ -253,9 +260,10 @@ assert_apphost_frontend_runtime_is_warning_free() {
   local response_file
   response_file="$(mktemp)"
   wait_for_http_200 "$apphost_frontend_url/" "$response_file" "$apphost_pid" "$apphost_log"
-  assert_file_contains "$response_file" 'ATrade Frontend Home'
-  assert_file_contains "$response_file" 'Next.js Bootstrap Slice'
-  assert_file_contains "$response_file" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$response_file" 'ATrade Terminal Shell'
+  assert_file_contains "$response_file" 'data-testid="atrade-terminal-app"'
+  assert_file_contains "$response_file" 'data-testid="terminal-command-input"'
+  assert_file_contains "$response_file" 'Orders are disabled by the paper-only safety contract.'
   rm -f "$response_file"
 
   for attempt in {1..120}; do

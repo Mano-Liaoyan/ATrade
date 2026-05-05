@@ -1,5 +1,6 @@
-import Link from 'next/link';
-import { SymbolChartView } from '../../../components/SymbolChartView';
+import { ATradeTerminalApp } from '@/components/terminal/ATradeTerminalApp';
+import { SUPPORTED_CHART_RANGES, type ChartRange } from '@/types/marketData';
+import type { EnabledTerminalModuleId } from '@/types/terminal';
 
 type SymbolPageProps = {
   params: Promise<{
@@ -13,16 +14,30 @@ export default async function SymbolPage({ params, searchParams }: SymbolPagePro
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const normalizedSymbol = decodeURIComponent(symbol).toUpperCase();
   const identity = createQueryIdentity(normalizedSymbol, resolvedSearchParams);
-
-  return (
-    <div className="workspace-shell">
-      <Link className="back-link" href="/">
-        ← Back to trading workspace
-      </Link>
-
-      <SymbolChartView symbol={normalizedSymbol} identity={identity} />
-    </div>
+  const initialModuleId = createInitialModuleId(firstQueryValue(resolvedSearchParams.module));
+  const initialChartRange = createInitialChartRange(
+    firstQueryValue(resolvedSearchParams.range)
+      ?? firstQueryValue(resolvedSearchParams.chartRange)
+      ?? firstQueryValue(resolvedSearchParams.timeframe),
   );
+
+  return <ATradeTerminalApp initialChartRange={initialChartRange} initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />;
+}
+
+function createInitialModuleId(moduleQuery: string | null): EnabledTerminalModuleId {
+  const normalizedModule = moduleQuery?.trim().toUpperCase();
+
+  if (normalizedModule === 'ANALYSIS' || normalizedModule === 'STATUS' || normalizedModule === 'HELP') {
+    return normalizedModule;
+  }
+
+  return 'CHART';
+}
+
+function createInitialChartRange(rangeQuery: string | null): ChartRange {
+  const normalizedRange = rangeQuery?.trim() as ChartRange | undefined;
+
+  return normalizedRange && SUPPORTED_CHART_RANGES.includes(normalizedRange) ? normalizedRange : '1D';
 }
 
 function createQueryIdentity(symbol: string, searchParams: Record<string, string | string[] | undefined>) {

@@ -1,11 +1,11 @@
 # TP-048: Rebuild search, trending, and watchlist as a terminal market monitor — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-04
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** L
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,65 +15,65 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Model market monitor state and actions
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-> ⚠️ Hydrate: Expand after deciding whether to wrap, reuse, or retire existing search/watchlist workflow modules.
+> ⚠️ Hydrate: Decision — wrap and reuse the existing `symbolSearchWorkflow` and `watchlistWorkflow` hooks so debounce, capped search, provider/error copy, backend watchlist authority, and exact identity behavior remain centralized; add a new terminal monitor workflow above them for trending rows, unified view state, sorting/filtering, selection, and terminal action intents.
 
-- [ ] Create combined monitor workflow/view model
-- [ ] Preserve API clients, exact identity, and capped search behavior
-- [ ] Preserve backend watchlist authority and provider/error copy
-- [ ] Add source assertions for no unbounded/direct access paths
+- [x] Wrap existing search/watchlist workflows with a combined terminal monitor workflow/view model
+- [x] Preserve `ATrade.Api` clients, exact identity helpers, explicit capped search limits, and exact chart/analysis action payloads
+- [x] Preserve backend watchlist authority, optimistic pin/unpin states, cached fallback copy, provider/authentication error copy, and debounce/minimum-query behavior
+- [x] Add source assertions for bounded search and no direct provider/database/browser secrets access
 
 ---
 
 ### Step 2: Implement dense terminal monitor components
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create terminal market monitor component set
-- [ ] Render dense identity/source/pin/rank rows with explicit states
-- [ ] Add sorting, filters, show-more/less, selection, and accessible controls
-- [ ] Add chart/analysis actions preserving exact identity
+- [x] Create terminal market monitor component set
+- [x] Render dense identity/source/pin/rank rows with explicit states
+- [x] Add sorting, filters, show-more/less, selection, and accessible controls
+- [x] Add chart/analysis actions preserving exact identity
 
 ---
 
 ### Step 3: Integrate monitor into commands and retire old list UI
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Wire SEARCH/WATCH/HOME commands to the monitor
-- [ ] Replace old SymbolSearch/TrendingList/Watchlist usage
-- [ ] Keep SCREENER visible-disabled rather than fake
-- [ ] Update old search/list tests to terminal monitor markers
+- [x] Wire SEARCH/WATCH/HOME commands to the monitor
+- [x] Replace old SymbolSearch/TrendingList/Watchlist usage
+- [x] Keep SCREENER visible-disabled rather than fake
+- [x] Update old search/list tests to terminal monitor markers
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Market monitor validation passing
-- [ ] Search exploration validation passing
-- [ ] Workflow module validation passing
-- [ ] Frontend workspace validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Market monitor validation passing
+- [x] Search exploration validation passing
+- [x] Workflow module validation passing
+- [x] Frontend workspace validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -88,6 +88,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Existing `symbolSearchWorkflow` and `watchlistWorkflow` were reusable behind a new terminal monitor wrapper, preserving debounce, bounded search, backend watchlist authority, cached fallback, and provider/authentication error copy while retiring only the old renderers. | Implemented through `terminalMarketMonitorWorkflow` and documented in architecture docs. | `frontend/lib/terminalMarketMonitorWorkflow.ts`, `docs/architecture/paper-trading-workspace.md`, `docs/architecture/modules.md` |
+| `docs/design/atrade-terminal-ui.md` and `docs/architecture/provider-abstractions.md` were reviewed as check-if-affected docs; no changes were needed because the implementation stayed within the approved dense monitor interactions and did not alter provider payload interpretation. | Reviewed; no document changes required. | Step 5 documentation review |
 
 ---
 
@@ -96,6 +98,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-04 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-04 22:30 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-04 22:30 | Step 0 started | Preflight |
+| 2026-05-04 22:52 | Worker iter 1 | done in 1349s, tools: 225 |
+| 2026-05-04 22:52 | Task complete | .DONE created |
 
 ---
 
