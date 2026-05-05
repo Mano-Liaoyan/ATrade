@@ -16,22 +16,22 @@
       }
     },
     "worker": {
-      "model": "github-copilot/claude-sonnet-4.6",
-      "thinking": "high"
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium"
     },
     "reviewer": {
-      "model": "github-copilot/claude-opus-4.7",
-      "thinking": "high"
+      "model": "deepseek/deepseek-v4-pro",
+      "thinking": "xhigh"
     }
   },
   "orchestrator": {
     "supervisor": {
-      "model": "github-copilot/gpt-5.5",
+      "model": "openai-codex/gpt-5.5",
       "thinking": "xhigh"
     },
     "merge": {
-      "model": "github-copilot/gpt-5.4",
-      "thinking": "none"
+      "model": "openai-codex/gpt-5.5",
+      "thinking": "medium"
     },
     "orchestrator": {
       "maxLanes": 5,
