@@ -1,7 +1,7 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-05
 **Review Level:** 2
 **Review Counter:** 0
@@ -78,11 +78,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -99,6 +99,9 @@
 |-----------|-------------|----------|
 | Active Next.js routes are limited to `frontend/app/page.tsx`, `frontend/app/symbols/[symbol]/page.tsx`, and `frontend/app/layout.tsx`; both user-facing route pages import `ATradeTerminalApp` directly and do not import the retired `TradingWorkspace` or `SymbolChartView` wrappers. | Used as the Step 1 route cutover inventory; obsolete wrappers remain candidates for deletion because only tests/source self references mention them. | `frontend/app/page.tsx`, `frontend/app/symbols/[symbol]/page.tsx` |
 | `TradingWorkspace` and `SymbolChartView` were compatibility wrappers around `ATradeTerminalApp` with no active route imports after TP-047/TP-049. | Deleted the wrappers, updated chart-analysis tests to assert direct route ownership, and purged unused old-shell/search/watchlist/timeframe/indicator CSS selectors while preserving active terminal clients, workflows, types, and `CandlestickChart`. | `frontend/components/TradingWorkspace.tsx`, `frontend/components/SymbolChartView.tsx`, `frontend/app/globals.css`, `tests/apphost/frontend-terminal-chart-analysis-tests.sh` |
+| Re-running the same terminal command with the same focus target did not necessarily produce a new focus effect because the old focus state was a plain string. | Switched the pending focus state to an object request, added command focus assertions, and cleared stale seeded search state when leaving SEARCH. | `frontend/components/terminal/ATradeTerminalApp.tsx`, `tests/apphost/frontend-terminal-shell-command-tests.sh` |
+| `frontend-nextjs-bootstrap-tests.sh` used an early-exiting `awk` in a pipefail shell, which could terminate with SIGPIPE once `ps` wrote after `awk` exited. | Replaced the lookup with an awk guard that records the first match without exiting early. | `tests/apphost/frontend-nextjs-bootstrap-tests.sh` |
+| Analysis user-facing states did not change during cutover; the final terminal still exposes no-engine, unavailable, running, and result states through `TerminalAnalysisWorkspace`. | Documented the review and added cutover verification coverage for ATrade.Api/no-order analysis guardrails. | `docs/architecture/analysis-engines.md`, `tests/apphost/frontend-terminal-cutover-tests.sh` |
 
 ---
 
@@ -145,6 +148,11 @@
 | 2026-05-05 14:31 | Step 5 dotnet build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed with 0 warnings/errors |
 | 2026-05-05 14:32 | Step 5 completed | Full frontend, solution test, and solution build quality gate passed |
 | 2026-05-05 14:32 | Step 6 started | Documentation and delivery review |
+| 2026-05-05 14:33 | Step 6 must-update docs | Verified `docs/architecture/paper-trading-workspace.md`, `docs/architecture/modules.md`, `README.md`, and `PLAN.md` were modified for terminal cutover delivery |
+| 2026-05-05 14:34 | Step 6 check-if-affected docs | Reviewed `docs/design/atrade-terminal-ui.md` and `docs/architecture/provider-abstractions.md`; implementation stayed within approved command/layout/disabled-module/API/provider identity contracts. `docs/architecture/analysis-engines.md` was updated for cutover verification notes. |
+| 2026-05-05 14:35 | Step 6 discoveries | Logged cutover discoveries for deleted wrappers, focus requests, bootstrap pipefail fix, and unchanged analysis state semantics |
+| 2026-05-05 14:36 | Step 6 completed | Documentation and delivery checklist complete |
+| 2026-05-05 14:36 | Task complete | All TP-050 steps complete; final status set to complete |
 
 ---
 
