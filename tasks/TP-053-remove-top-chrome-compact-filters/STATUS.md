@@ -1,6 +1,6 @@
 # TP-053: Remove top chrome and compact market filters — Status
 
-**Current Step:** Step 1: Remove the visible app header and safety strip
+**Current Step:** Step 2: Compact market-monitor filters without losing behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 1
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Remove the visible app header and safety strip
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Remove the rendered app header/brand and visible safety strip from `ATradeTerminalApp`
-- [ ] Preserve navigation status, module rail, workspace layout, module content, and module-level safety messaging
-- [ ] Remove unused header/brand/safety-strip CSS and grid row allocation
-- [ ] Verify the workspace still fills the viewport without page-level vertical scrolling
+- [x] Remove the rendered app header/brand and visible safety strip from `ATradeTerminalApp`
+- [x] Preserve navigation status, module rail, workspace layout, module content, and module-level safety messaging
+- [x] Remove unused header/brand/safety-strip CSS and grid row allocation
+- [x] Verify the workspace still fills the viewport without page-level vertical scrolling
 
 ---
 
 ### Step 2: Compact market-monitor filters without losing behavior
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Refactor `MarketMonitorFilters` into a denser filter bar/section without the long explanatory paragraph
 - [ ] Preserve filter accessibility, test IDs/data attributes, selected state, counts, and Clear-all behavior
