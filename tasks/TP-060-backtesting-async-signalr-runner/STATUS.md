@@ -1,6 +1,6 @@
 # TP-060: Backtesting async runner and SignalR updates — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Add durable async job runner and restart recovery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Add durable async job runner and restart recovery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Hosted runner claims queued runs and records status/timestamps durably
-- [ ] Startup recovery fails interrupted running jobs and preserves queued jobs
-- [ ] Duplicate-claim safeguards implemented
-- [ ] Runner/recovery tests added
+- [x] Hosted runner claims queued runs and records status/timestamps durably
+- [x] Startup recovery fails interrupted running jobs and preserves queued jobs
+- [x] Duplicate-claim safeguards implemented
+- [x] Runner/recovery tests added
 
 ---
 
