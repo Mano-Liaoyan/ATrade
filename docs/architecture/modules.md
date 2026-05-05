@@ -576,11 +576,13 @@ references.
   `WATCH` / `WATCHLIST`, `ANALYSIS <symbol>`, `STATUS`, and `HELP`; and
   `frontend/lib/terminalLayoutPersistence.ts` owns versioned local-only layout
   preferences under `atrade.terminal.layout.v1`. Home and symbol routes now render
-  through `ATradeTerminalApp`, `TerminalCommandInput`, `TerminalModuleRail`,
-  `TerminalWorkspaceLayout`, `TerminalStatusStrip`, `TerminalHelpModule`, and
-  `TerminalStatusModule` instead of the retired `TerminalWorkspaceShell` /
-  `WorkspaceCommandBar` / `WorkspaceNavigation` / `WorkspaceContextPanel`
-  primitives. `frontend/lib/terminalMarketMonitorWorkflow.ts` wraps the existing
+  directly through `ATradeTerminalApp`, `TerminalCommandInput`,
+  `TerminalModuleRail`, `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
+  `TerminalHelpModule`, and `TerminalStatusModule`; the old `TradingWorkspace`
+  and `SymbolChartView` compatibility wrappers have been deleted, and the
+  retired `TerminalWorkspaceShell` / `WorkspaceCommandBar` /
+  `WorkspaceNavigation` / `WorkspaceContextPanel` primitives remain absent.
+  `frontend/lib/terminalMarketMonitorWorkflow.ts` wraps the existing
   watchlist and symbol-search workflow hooks with provider-backed trending state,
   source/provider/market filters, sorting, selected-row state, bounded
   show-more/show-less exploration, exact pin state projection, and exact
@@ -597,9 +599,14 @@ references.
   `BrokerPaperStatus` as diagnostics-only broker/IBKR/iBeam/source state. The
   old `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
   `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and
-  `BrokerPaperStatus` renderers are retired. Visible-disabled modules such as
-  `SCREENER`, `PORTFOLIO`, and `ORDERS` stay honest unavailable states rather
-  than fake filters, portfolio rows, or order-entry controls.
+  `BrokerPaperStatus` renderers are retired and no longer exist as active
+  frontend source files. Visible-disabled modules such as `NEWS`, `PORTFOLIO`,
+  `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and `ORDERS` stay honest
+  unavailable states rather than fake news, portfolio rows, research output,
+  screeners, macro calendars, assistant text, node graphs, or order-entry
+  controls. The cutover guardrail lives in
+  `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the terminal
+  shell/market/chart/analysis validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible

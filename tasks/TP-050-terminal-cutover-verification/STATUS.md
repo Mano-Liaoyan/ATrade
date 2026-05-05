@@ -1,6 +1,6 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
-**Current Step:** Step 4: Update docs, plan, and verification inventory
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -55,17 +55,17 @@
 ---
 
 ### Step 4: Update docs, plan, and verification inventory
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update paper-trading workspace architecture for current terminal UI
-- [ ] Update modules doc for terminal ownership and retired old shell
-- [ ] Update analysis docs if user-facing analysis states changed
-- [ ] Update README verification list and PLAN completion/follow-up state
+- [x] Update paper-trading workspace architecture for current terminal UI
+- [x] Update modules doc for terminal ownership and retired old shell
+- [x] Update analysis docs if user-facing analysis states changed
+- [x] Update README verification list and PLAN completion/follow-up state
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Cutover validation passing
 - [ ] All terminal frontend validations passing
@@ -130,6 +130,12 @@
 | 2026-05-05 14:09 | Step 3 secrets guardrail | Added cutover assertions scanning frontend/config, frontend apphost tests, and active docs for high-confidence secrets, account IDs, tokens, and session cookie patterns; cutover validation passed |
 | 2026-05-05 14:10 | Step 3 completed | Clean-room, no-order/direct-runtime, ATrade.Api boundary, and secrets guardrails enforced through cutover assertions |
 | 2026-05-05 14:10 | Step 4 started | Update docs, plan, and verification inventory |
+| 2026-05-05 14:13 | Step 4 paper workspace docs | Updated paper-trading workspace architecture to describe the completed terminal surface, supported commands, disabled modules, layout persistence, market/chart/analysis/status/diagnostics ownership, and retired wrappers/renderers |
+| 2026-05-05 14:14 | Step 4 modules docs | Updated modules architecture to record direct terminal route ownership, deleted `TradingWorkspace`/`SymbolChartView` wrappers, retired legacy renderers, disabled-module inventory, and cutover validation ownership |
+| 2026-05-05 14:15 | Step 4 analysis docs | Reviewed analysis behavior and updated analysis docs to note the cutover kept existing no-engine/unavailable/running/result states while adding cutover API/no-order guardrail verification |
+| 2026-05-05 14:17 | Step 4 README/PLAN | Added cutover validation to README verification entry points and updated PLAN to mark `TP-045` through `TP-050` terminal reconstruction complete/follow-up-ready with `TP-051` as next ID |
+| 2026-05-05 14:18 | Step 4 completed | Docs, plan, and verification inventory updated for the terminal cutover |
+| 2026-05-05 14:18 | Step 5 started | Testing and verification quality gate |
 
 ---
 

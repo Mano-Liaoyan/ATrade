@@ -151,15 +151,16 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-Ready implementation tasks are queued as `TP-045` through `TP-050` for the
-ATrade Terminal frontend reconstruction: active design spec, shadcn/Tailwind/Radix
-terminal UI foundation, command/module shell, dense market monitor, terminal
-chart/analysis workspaces, and final cutover verification. The recommended order
-is sequential because each task establishes a frontend reconstruction seam used
-by the next.
+The `TP-045` through `TP-050` ATrade Terminal frontend reconstruction batch now
+covers the active design spec, shadcn/Tailwind/Radix terminal UI foundation,
+command/module shell, dense market monitor, terminal chart/analysis workspaces,
+and final cutover verification. The current frontend surface is the ATrade
+Terminal; follow-up implementation packets should start at `TP-051` and build on
+that terminal frame rather than the retired old shell/list route wrappers.
 
 Completed Taskplane packets through `TP-044` are present in `tasks/`; completed
-packets should be archived when convenient.
+packets should be archived when convenient. During orchestrated runs the runtime
+handles post-merge archival for active task folders.
 
 ## Repository Map
 
@@ -220,6 +221,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/lean-analysis-engine-tests.sh`
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
+- `tests/apphost/frontend-terminal-cutover-tests.sh`
 - `tests/apphost/frontend-terminal-ui-stack-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`

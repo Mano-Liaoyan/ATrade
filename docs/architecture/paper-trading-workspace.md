@@ -93,18 +93,23 @@ Next.js application:
 
 The workspace is intentionally **frontend-rich but backend-governed**:
 Next.js owns layout and interaction, while the backend owns trading rules,
-state transitions, data access, and streaming contracts. The current target
-state is the clean-room ATrade Terminal defined in
-[`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a full frontend
+state transitions, data access, and streaming contracts. The current frontend
+surface is the clean-room ATrade Terminal defined in
+[`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a completed frontend
 replacement with deterministic commands, enabled modules for current API-backed
 workflows, visible-disabled future modules, resizable multi-panel layout, and a
-simplified mobile fallback. The home and symbol routes now render through
-`ATradeTerminalApp`, which provides the ATrade Terminal frame, deterministic
-command input, module rail, safety strip, resizable primary/context/monitor
-workspace, local-only layout reset/persistence, status strip, help module, and
-honest disabled-module surfaces for future modules. The terminal direction is
-inspired only by broad finance-terminal information architecture; it does not
-copy proprietary terminal layouts, assets, trademarks, or colors.
+simplified mobile fallback. The home and symbol routes now render directly
+through `ATradeTerminalApp`, which provides the ATrade Terminal frame,
+deterministic command input, module rail, safety strip, resizable
+primary/context/monitor workspace, local-only bounded layout reset/persistence,
+status strip, help module, and honest disabled-module surfaces for future
+modules (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
+`ORDERS`). Supported commands are `HOME`, `SEARCH <query>`, `WATCH` /
+`WATCHLIST`, `CHART <symbol>`, `ANALYSIS <symbol>`, `STATUS`, and `HELP`; they
+open/focus terminal modules without natural-language or backend command routing.
+The terminal direction is inspired only by broad finance-terminal information
+architecture; it does not copy proprietary terminal layouts, assets, trademarks,
+or colors.
 
 ## 3. Runtime Boundaries
 
@@ -116,10 +121,12 @@ No extra deployable services are introduced.
 The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
-- terminal market monitor, chart, analysis, status, help, and account/status widgets
+- terminal market monitor, chart, analysis, status, help, and provider/status widgets
 - browser-side session state for active modules, open panels, non-authoritative
-  watchlist cache/migration state, and optimistic UI interactions
-- SignalR subscriptions for real-time account, order, and market updates
+  watchlist cache/migration state, optimistic UI interactions, and bounded
+  local-only resizable layout preferences
+- SignalR subscriptions for market-data stream updates plus HTTP fallback; broker
+  status is diagnostics-only and no order-entry or order-submit UI is rendered
 
 The frontend does **not** talk directly to IBKR, Redis, NATS, Postgres, or
 TimescaleDB. All durable and broker-aware behavior goes through the API.
@@ -146,11 +153,12 @@ composes those workflow/client modules through `ATradeTerminalApp`,
 `MarketMonitorFilters`, `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
 `TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
 `TerminalProviderDiagnostics`, `TerminalCommandInput`, `TerminalModuleRail`, and
-`TerminalWorkspaceLayout`; the old `SymbolSearch`, `TrendingList`, `Watchlist`,
-`MarketLogo`, `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and
-`BrokerPaperStatus` renderers plus the retired `TerminalWorkspaceShell`,
-`WorkspaceCommandBar`, `WorkspaceNavigation`, and `WorkspaceContextPanel`
-primitives are no longer active route dependencies.
+`TerminalWorkspaceLayout`; the old `TradingWorkspace` / `SymbolChartView` route
+wrappers, `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
+`TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and `BrokerPaperStatus`
+renderers plus the retired `TerminalWorkspaceShell`, `WorkspaceCommandBar`,
+`WorkspaceNavigation`, and `WorkspaceContextPanel` primitives are no longer
+present as active route dependencies.
 
 ### 3.2 `ATrade.Api`
 
@@ -610,8 +618,14 @@ Current implementation:
 - `frontend/lib/symbolChartWorkflow.ts` owns the selected lookback chart range,
   HTTP candle/indicator fetches, source-label formatting, SignalR subscription
   state and updates from `/hubs/market-data`, and HTTP polling fallback when
-  streaming closes or is unavailable while `frontend/components/terminal/ATradeTerminalApp.tsx`
-  renders the chart workflow state inside the terminal frame
+  streaming closes or is unavailable while `frontend/lib/terminalChartWorkspaceWorkflow.ts`
+  adapts range/source/identity/stream state for `TerminalChartWorkspace`,
+  `TerminalInstrumentHeader`, and `TerminalIndicatorGrid`
+- `frontend/lib/terminalAnalysisWorkflow.ts` owns provider-neutral engine
+  discovery/run states for `TerminalAnalysisWorkspace`, including no-engine,
+  runtime-unavailable, running, and result states; `TerminalProviderDiagnostics`
+  shows broker/provider/source diagnostics without credentials, account IDs,
+  order tickets, or broker-routing controls
 
 Licensing guardrail:
 

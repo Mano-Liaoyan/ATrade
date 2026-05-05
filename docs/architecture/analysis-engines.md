@@ -113,6 +113,10 @@ instrument identity when available by sending the normalized symbol identity in
 `/api/analysis/run` requests while retaining the legacy `symbolCode` fallback for
 bare `ANALYSIS <symbol>` commands. `AnalysisPanel` was retired; terminal routes
 use `TerminalAnalysisWorkspace` inside `ATradeTerminalApp` and the chart module.
+The final terminal cutover did not add new user-facing analysis states; it keeps
+`analysis-engine-not-configured`, `analysis-engine-unavailable`, running, and
+result rendering unchanged while adding cutover assertions that the browser still
+uses `ATrade.Api` analysis clients and renders no order-routing controls.
 
 ## 4. LEAN Provider Implementation
 
@@ -248,6 +252,9 @@ The contract and LEAN provider are verified by:
   optional managed-runtime smoke skipping
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh` for terminal chart,
   analysis, exact identity, and no direct provider/order access assertions
+- `tests/apphost/frontend-terminal-cutover-tests.sh` for final terminal cutover
+  assertions that analysis remains behind `ATrade.Api`, preserves no-order
+  guardrails, and has no direct provider/runtime/browser secrets access
 - `tests/apphost/frontend-trading-workspace-tests.sh` for terminal analysis
   workspace source markers in the paper-trading UI
 
