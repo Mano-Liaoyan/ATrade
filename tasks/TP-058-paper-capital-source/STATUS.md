@@ -1,6 +1,6 @@
 # TP-058: Paper capital source — Status
 
-**Current Step:** Step 1: Add provider-neutral paper-capital contracts and local ledger persistence
+**Current Step:** Step 2: Add safe IBKR/iBeam paper balance read seam
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -33,14 +33,15 @@
 ---
 
 ### Step 2: Add safe IBKR/iBeam paper balance read seam
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 > ⚠️ Hydrate: Expand based on the existing broker gateway transport/client patterns and selected safe Client Portal balance endpoint.
 
-- [ ] Authenticated paper balance read seam added
-- [ ] Account id use remains internal and redacted
-- [ ] Disabled/unavailable/error states mapped safely
-- [ ] IBKR broker tests cover balance success, unavailable states, and redaction
+- [ ] Client Portal account-summary read client parses `/v1/api/portfolio/{configuredPaperAccountId}/summary` for `totalcashvalue`/`netliquidation`
+- [ ] Authenticated-readiness gate and Accounts `IIbkrPaperCapitalProvider` adapter added
+- [ ] Account id use remains internal and redacted from availability/messages/logs/tests
+- [ ] Disabled/missing credentials/unauthenticated/rejected-live/timeout/provider failure states mapped safely
+- [ ] IBKR broker tests cover balance success, unavailable states, timeout/error redaction, and no leaked account identifiers
 
 ---
 
