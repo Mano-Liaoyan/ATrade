@@ -54,11 +54,11 @@ see_also:
 > `frontend/` directory now hosts the first paper-trading workspace UI slice,
 > and the target frontend reconstruction is governed by
 > [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a
-> clean-room ATrade Terminal with enabled API-backed modules, visible-disabled
-> future modules, deterministic commands, resizable panels, and shadcn/Tailwind/
-> Radix-compatible original primitives. The current slice routes home and symbol
-> pages through `ATradeTerminalApp`: a deterministic command input,
-> enabled/disabled module registry and rail, resizable primary/context/monitor
+> clean-room ATrade paper workspace with enabled API-backed modules,
+> visible-disabled future modules, direct workflow navigation, resizable panels,
+> and shadcn/Tailwind/Radix-compatible original primitives. The current slice
+> routes home and symbol pages through `ATradeTerminalApp`: an enabled/disabled
+> module registry and rail, resizable primary/context/monitor
 > layout with versioned browser-local persistence, status/help surfaces, and a
 > dense terminal market monitor over backend-driven trending symbols,
 > bounded/ranked/filterable IBKR stock search, and Postgres-backed exact
@@ -566,18 +566,16 @@ references.
   account views, API-served IBKR/iBeam market data with fresh Timescale cache
   hits when available, clear provider-not-configured/provider-unavailable/
   authentication-required states, and transparent trending-factor/source
-  explanations. The current frontend shell is the clean-room ATrade Terminal
-  described in [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
+  explanations. The current frontend shell is the clean-room ATrade paper
+  workspace described in [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
   `frontend/types/terminal.ts` and `frontend/lib/terminalModuleRegistry.ts` own
   enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`,
   `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
-  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`); `frontend/lib/terminalCommandRegistry.ts`
-  owns deterministic local parsing for `HOME`, `SEARCH <query>`, `CHART <symbol>`,
-  `WATCH` / `WATCHLIST`, `ANALYSIS <symbol>`, `STATUS`, and `HELP`; and
+  `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`), and
   `frontend/lib/terminalLayoutPersistence.ts` owns versioned local-only layout
   preferences under `atrade.terminal.layout.v1`. Home and symbol routes now render
-  directly through `ATradeTerminalApp`, `TerminalCommandInput`,
-  `TerminalModuleRail`, `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
+  directly through `ATradeTerminalApp`, `TerminalModuleRail`,
+  `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
   `TerminalHelpModule`, and `TerminalStatusModule`; the old `TradingWorkspace`
   and `SymbolChartView` compatibility wrappers have been deleted, and the
   retired `TerminalWorkspaceShell` / `WorkspaceCommandBar` /
@@ -605,7 +603,7 @@ references.
   unavailable states rather than fake news, portfolio rows, research output,
   screeners, macro calendars, assistant text, node graphs, or order-entry
   controls. The cutover guardrail lives in
-  `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the terminal
+  `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
   shell/market/chart/analysis validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
@@ -614,11 +612,11 @@ references.
   downstream terminal modules. Minimal shadcn-style wrappers live under
   `frontend/components/ui/` and are limited to reusable Radix/accessibility
   primitives (button, input, badge, tabs, dialog, popover, scroll area,
-  separator, and tooltip) with ATrade Terminal tokens applied. Original
+  separator, and tooltip) with ATrade workspace tokens applied. Original
   ATrade-only foundation components live under `frontend/components/terminal/`
   (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
-  `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalCommandInput`,
-  `TerminalModuleRail`, `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
+  `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalModuleRail`,
+  `TerminalWorkspaceLayout`, `TerminalStatusStrip`,
   `TerminalHelpModule`, `TerminalStatusModule`, `TerminalChartWorkspace`,
   `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
   `TerminalAnalysisWorkspace`, `TerminalProviderDiagnostics`, and

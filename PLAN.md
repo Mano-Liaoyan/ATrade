@@ -1,8 +1,8 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-04
-summary: Current implementation plan after the ATrade Terminal frontend reconstruction queue.
+updated: 2026-05-05
+summary: Current implementation plan after the ATrade paper workspace frontend reconstruction and no-command cutover.
 see_also:
   - README.md
   - docs/INDEX.md
@@ -21,13 +21,13 @@ The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, exact
 provider/market pins, configurable local AppHost ports, optional
 AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045` through
-`TP-050` ATrade Terminal frontend reconstruction. The current frontend surface is
-the clean-room ATrade Terminal: deterministic command navigation, enabled/current
-workflow modules, visible-disabled future modules, dense market monitor,
-terminal chart/analysis workspaces, provider diagnostics, resizable local-only
-layout persistence, and final cutover guardrails for clean-room, no-order, and
-`ATrade.Api` browser boundaries. The active clean-room UI design authority
-remains `docs/design/atrade-terminal-ui.md`.
+`TP-051` frontend reconstruction and no-command cutover. The current frontend
+surface is the clean-room ATrade paper workspace: direct module/workflow
+navigation, enabled/current workflow modules, visible-disabled future modules,
+dense market monitor, chart/analysis workspaces, provider diagnostics,
+resizable local-only layout persistence, and final cutover/no-command guardrails
+for clean-room, no-order, and `ATrade.Api` browser boundaries. The active
+clean-room UI design authority remains `docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
 
@@ -39,16 +39,18 @@ Current repository contracts remain:
 
 ## Active Task Queue
 
-The terminal reconstruction queue is complete/follow-up-ready:
+The frontend reconstruction queue is complete/follow-up-ready through the
+no-command cutover:
 
-- `TP-045` — defined the active ATrade Terminal UI design spec and clean-room visual guardrails
-- `TP-046` — bootstrapped the shadcn/Tailwind/Radix terminal UI stack and original ATrade primitives
-- `TP-047` — built the terminal shell, deterministic command registry, module rail, and resizable layout persistence
-- `TP-048` — rebuilt search, trending, and watchlist as a dense terminal market monitor
-- `TP-049` — rebuilt chart and analysis as terminal workspaces inside the new shell
+- `TP-045` — defined the active UI design spec and clean-room visual guardrails
+- `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
+- `TP-047` — built the module shell, module rail, and resizable layout persistence
+- `TP-048` — rebuilt search, trending, and watchlist as a dense market monitor
+- `TP-049` — rebuilt chart and analysis workspaces inside the new shell
 - `TP-050` — completed frontend cutover, cleanup, verification, and documentation updates
+- `TP-051` — removed visible terminal branding plus the command input/parser/registry and added no-command validation
 
-The next new Taskplane packet should use `TP-051`.
+The next new Taskplane packet should use `TP-052`.
 
 Completed task packets through `TP-044` are present in `tasks/`; completed
 packets should be archived when convenient. The orchestrator handles active task
@@ -56,13 +58,14 @@ folder archival after merge.
 
 ## Follow-Up Direction
 
-Future frontend work should build on the terminal frame established by
-`ATradeTerminalApp`, `frontend/types/terminal.ts`, `terminalModuleRegistry`,
-`terminalCommandRegistry`, `terminalMarketMonitorWorkflow`,
-`terminalChartWorkspaceWorkflow`, and `terminalAnalysisWorkflow`. New modules
-should remain visible-disabled until backed by real `ATrade.Api` contracts,
-provider-neutral data, and documentation/tests; do not reintroduce old shell,
-list-page, fake-data, direct provider/database, or order-entry UI paths.
+Future frontend work should build on the direct module/workflow frame established
+by `ATradeTerminalApp`, `frontend/types/terminal.ts`, `terminalModuleRegistry`,
+`terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`, and
+`terminalAnalysisWorkflow`. New modules should remain visible-disabled until
+backed by real `ATrade.Api` contracts, provider-neutral data, and
+documentation/tests; do not reintroduce the removed command system, the old
+shell/list-page paths, fake data, direct provider/database access, or order-entry
+UI paths.
 
 ## Guardrails
 
@@ -76,4 +79,4 @@ list-page, fake-data, direct provider/database, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-051`
+`TP-052`

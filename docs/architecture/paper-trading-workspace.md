@@ -18,12 +18,12 @@ see_also:
 # Paper-Trading Workspace Architecture
 
 > **Status note:** This document defines the staged architecture and safety
-> contract for the broader paper-trading workspace. The active ATrade Terminal
-> frontend reconstruction authority is
-> [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): it
-> governs the clean-room visual target, command/module model, resizable layout,
-> disabled future surfaces, and frontend replacement constraints while this
-> document continues to govern paper-only safety and backend/API boundaries. The current repository now
+> contract for the broader paper-trading workspace. The active frontend UI
+> authority is [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
+> it governs the clean-room visual target, direct module/workflow navigation,
+> resizable layout, disabled future surfaces, and frontend replacement
+> constraints while this document continues to govern paper-only safety and
+> backend/API boundaries. The current repository now
 > uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
 > first real market-data provider behind API/frontend-stable seams. The current
 > repository ships `ATrade.Brokers.Ibkr` as a paper-only broker adapter,
@@ -38,9 +38,9 @@ see_also:
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
 > AppHost-managed Postgres resource, a TimescaleDB-backed market-data
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
-> broker/iBeam configuration wiring, and a Next.js ATrade Terminal workspace
-> with deterministic command routing, enabled/disabled module registry and rail,
-> resizable primary/context/monitor panels with versioned local-only layout
+> broker/iBeam configuration wiring, and a Next.js ATrade paper workspace
+> with direct module/workflow navigation, enabled/disabled module registry and
+> rail, resizable primary/context/monitor panels with versioned local-only layout
 > persistence, IBKR scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/filterable IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, terminal chart workspaces
@@ -94,20 +94,19 @@ Next.js application:
 The workspace is intentionally **frontend-rich but backend-governed**:
 Next.js owns layout and interaction, while the backend owns trading rules,
 state transitions, data access, and streaming contracts. The current frontend
-surface is the clean-room ATrade Terminal defined in
+surface is the clean-room ATrade paper workspace defined in
 [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a completed frontend
-replacement with deterministic commands, enabled modules for current API-backed
-workflows, visible-disabled future modules, resizable multi-panel layout, and a
-simplified mobile fallback. The home and symbol routes now render directly
-through `ATradeTerminalApp`, which provides the ATrade Terminal frame,
-deterministic command input, module rail, safety strip, resizable
-primary/context/monitor workspace, local-only bounded layout reset/persistence,
-status strip, help module, and honest disabled-module surfaces for future
-modules (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
-`ORDERS`). Supported commands are `HOME`, `SEARCH <query>`, `WATCH` /
-`WATCHLIST`, `CHART <symbol>`, `ANALYSIS <symbol>`, `STATUS`, and `HELP`; they
-open/focus terminal modules without natural-language or backend command routing.
-The terminal direction is inspired only by broad finance-terminal information
+replacement with enabled modules for current API-backed workflows,
+visible-disabled future modules, resizable multi-panel layout, and a simplified
+mobile fallback. The home and symbol routes now render directly through
+`ATradeTerminalApp`, which provides the direct module/workflow frame, module
+rail, safety strip, resizable primary/context/monitor workspace, local-only
+bounded layout reset/persistence, status strip, help module, and honest
+disabled-module surfaces for future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
+`SCREENER`, `ECON`, `AI`, `NODE`, and `ORDERS`). Users open modules through the
+rail, market-monitor chart/analysis actions, and symbol route state; no command
+input, command parser, or backend command route is part of the active frontend.
+The visual direction is inspired only by broad finance-workstation information
 architecture; it does not copy proprietary terminal layouts, assets, trademarks,
 or colors.
 
@@ -121,7 +120,7 @@ No extra deployable services are introduced.
 The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
-- terminal market monitor, chart, analysis, status, help, and provider/status widgets
+- market monitor, chart, analysis, status, help, and provider/status widgets
 - browser-side session state for active modules, open panels, non-authoritative
   watchlist cache/migration state, optimistic UI interactions, and bounded
   local-only resizable layout preferences
@@ -131,13 +130,13 @@ The `frontend/` application owns:
 The frontend does **not** talk directly to IBKR, Redis, NATS, Postgres, or
 TimescaleDB. All durable and broker-aware behavior goes through the API.
 Frontend orchestration is centralized in `frontend/lib/*Workflow.ts` modules so
-rendering components receive normalized state and commands: `watchlistWorkflow`
+rendering components receive normalized state and operations: `watchlistWorkflow`
 owns backend watchlist loads, one-time symbol-only legacy cache migration,
-read-only cached fallback, exact pin/unpin/remove commands, saving state, and
+read-only cached fallback, exact pin/unpin/remove operations, saving state, and
 stable watchlist error copy; `symbolSearchWorkflow` owns search query debounce,
 minimum-length validation, provider/authentication error copy, explicit bounded
 search limits, ranked result view models, metadata filter state, short visible
-result limits, and show-more/show-less exploration commands;
+result limits, and show-more/show-less exploration operations;
 `terminalMarketMonitorWorkflow` wraps those hooks with provider-backed trending
 state, unified dense row view models, source/provider/pin filters, sorting,
 selection, show-more/show-less row exploration, and exact chart/analysis action
@@ -145,15 +144,15 @@ intents; `symbolChartWorkflow` owns the selected chart range lookback,
 candle/indicator HTTP reads, source-label formatting, SignalR subscription
 state, stream update application, and HTTP polling fallback when streaming closes
 or is unavailable; `terminalChartWorkspaceWorkflow` adapts that contract into
-terminal-ready range/source/identity/stream view models; and
+workspace-ready range/source/identity/stream view models; and
 `terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
-explicit no-engine, unavailable, running, and result states. The terminal frame
+explicit no-engine, unavailable, running, and result states. The workspace frame
 composes those workflow/client modules through `ATradeTerminalApp`,
 `TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
 `MarketMonitorFilters`, `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
 `TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
-`TerminalProviderDiagnostics`, `TerminalCommandInput`, `TerminalModuleRail`, and
-`TerminalWorkspaceLayout`; the old `TradingWorkspace` / `SymbolChartView` route
+`TerminalProviderDiagnostics`, `TerminalModuleRail`, and `TerminalWorkspaceLayout`;
+the old `TradingWorkspace` / `SymbolChartView` route
 wrappers, `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
 `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and `BrokerPaperStatus`
 renderers plus the retired `TerminalWorkspaceShell`, `WorkspaceCommandBar`,
@@ -168,7 +167,7 @@ present as active route dependencies.
   account state, paper orders, and chart history
 - SignalR hubs that push account, order, quote, bar, and trending updates to
   the browser
-- translation between browser commands and internal module calls / NATS events
+- translation between browser workflow actions and internal module calls / NATS events
 - enforcement of the paper-only guardrails described in this document
 
 The current backend slice exposes `GET /api/broker/ibkr/status`,
@@ -529,13 +528,13 @@ server-owned.
 
 The Next.js frontend may own short-lived UI state such as:
 
-- active terminal module, rail/collapsed preference, and resizable panel layout
+- active workspace module, rail/collapsed preference, and resizable panel layout
   under the versioned local-only `atrade.terminal.layout.v1` key
 - a non-authoritative cached copy of backend watchlist symbols under
   `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
   and one-time migration of pre-Postgres pins
 - unsaved chart drawing state that is not yet persisted
-- optimistic rendering between command submission and SignalR confirmation
+- optimistic rendering between direct workflow actions and SignalR confirmation
 
 ### 7.2 Backend-owned state
 
@@ -598,12 +597,11 @@ Current implementation:
   zooming, and panning
 - `frontend/lib/watchlistWorkflow.ts` owns backend watchlist API load/retry,
   one-time symbol-only legacy cache migration, read-only cached fallback, exact
-  pin/unpin/remove commands, backend-authoritative `instrumentKey`/`pinKey`
-  matching, saving state, and stable watchlist error text for the terminal market
-  monitor
+  pin/unpin/remove operations, backend-authoritative `instrumentKey`/`pinKey`
+  matching, saving state, and stable watchlist error text for the market monitor
 - `frontend/lib/symbolSearchWorkflow.ts` owns reusable IBKR stock search query
   state, debounce, minimum-length validation, result state, ranked/filterable
-  bounded result view models, show-more/show-less exploration commands, and
+  bounded result view models, show-more/show-less exploration operations, and
   provider / authentication error text
 - `frontend/lib/terminalMarketMonitorWorkflow.ts` owns the combined market
   monitor view model over provider trending rows, bounded search rows, and

@@ -1,6 +1,6 @@
 # TP-051: Remove terminal branding and command system — Status
 
-**Current Step:** Step 4: Update active documentation and plan state
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -53,17 +53,17 @@
 ---
 
 ### Step 4: Update active documentation and plan state
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Update design doc away from command-first terminal requirements
-- [ ] Update paper workspace and module docs for direct module/workflow navigation
-- [ ] Update README verification inventory
-- [ ] Update PLAN follow-up direction
+- [x] Update design doc away from command-first terminal requirements
+- [x] Update paper workspace and module docs for direct module/workflow navigation
+- [x] Update README verification inventory
+- [x] Update PLAN follow-up direction
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] No-command validation passing
 - [ ] Updated shell/cutover validations passing

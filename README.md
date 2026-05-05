@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-04
+updated: 2026-05-05
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -94,7 +94,7 @@ The current runnable slice includes:
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade Terminal paper-trading workspace with a deterministic command input, enabled/disabled module registry and rail, resizable primary/context/monitor layout with local-only persistence, a dense terminal market monitor for trending/search/watchlist rows, terminal chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, direct module/workflow navigation, resizable primary/context/monitor layout with local-only persistence, a dense market monitor for trending/search/watchlist rows, chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -151,12 +151,14 @@ unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-The `TP-045` through `TP-050` ATrade Terminal frontend reconstruction batch now
-covers the active design spec, shadcn/Tailwind/Radix terminal UI foundation,
-command/module shell, dense market monitor, terminal chart/analysis workspaces,
-and final cutover verification. The current frontend surface is the ATrade
-Terminal; follow-up implementation packets should start at `TP-051` and build on
-that terminal frame rather than the retired old shell/list route wrappers.
+The `TP-045` through `TP-051` frontend reconstruction and no-command cutover
+batch now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
+module/workflow shell, dense market monitor, chart/analysis workspaces, final
+cutover verification, and removal of the visible terminal branding plus command
+input/parser. The current frontend surface is the direct module/workflow ATrade
+paper workspace; follow-up implementation packets should start at `TP-052` and
+build on module rail navigation plus explicit workflow actions rather than the
+retired old shell/list route wrappers or a command system.
 
 Completed Taskplane packets through `TP-044` are present in `tasks/`; completed
 packets should be archived when convenient. During orchestrated runs the runtime
@@ -184,7 +186,7 @@ agents used by the orchestrator.
 
 - Use `docs/INDEX.md` as the documentation discovery layer.
 - Only documents marked `active` are implementation authority.
-- `docs/design/atrade-terminal-ui.md` defines the active clean-room ATrade Terminal UI target for the frontend reconstruction queue.
+- `docs/design/atrade-terminal-ui.md` defines the active clean-room ATrade paper workspace UI target for the frontend reconstruction queue.
 - `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md`, and `docs/architecture/paper-trading-workspace.md` define the provider seams, analysis engine contract, and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
@@ -227,7 +229,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
 - `tests/apphost/frontend-terminal-market-monitor-tests.sh`
-- `tests/apphost/frontend-terminal-shell-command-tests.sh`
+- `tests/apphost/frontend-no-command-shell-tests.sh`
 - `tests/apphost/frontend-terminal-shell-ui-tests.sh`
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 - `tests/apphost/frontend-workspace-workflow-module-tests.sh`
