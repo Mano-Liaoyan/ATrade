@@ -1,6 +1,6 @@
 # TP-055: Fincept-inspired terminal theme refactor — Status
 
-**Current Step:** Step 2: Apply the theme refactor across the workspace shell and primitives
+**Current Step:** Step 3: Add theme validation coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -43,11 +43,11 @@
 ---
 
 ### Step 3: Add theme validation coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
-- [ ] Update existing frontend terminal validation scripts only if affected
-- [ ] Ensure validation is source/build based and provider-independent
+- [x] Create `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
+- [x] Update existing frontend terminal validation scripts only if affected
+- [x] Ensure validation is source/build based and provider-independent
 
 ---
 
@@ -94,6 +94,9 @@
 | Removed cyan/blue as the dominant visual layer: no active frontend CSS/classes now use `terminal-cyan`, cyan raw RGB/hex values, sky tokens, or blue gradients; amber now owns focus/active/selection/primary emphasis while muted info remains available through status tokens. | Keep provider/info badges readable without making blue the primary theme. | `frontend/app/globals.css`, `frontend/components/ui/*`, `frontend/components/terminal/*`, grep verification |
 | Restyled primitives toward crisp dense terminal controls: buttons/inputs/tabs/dialog focus states now use amber, terminal headers/panels are tighter, scroll thumbs and CSS card/chip/analysis/chart regions use rectangular radii, and legacy rounded dashboard cards/pills were removed. | Validate via UI stack/shell scripts and frontend build. | `frontend/components/ui/*`, `frontend/components/terminal/*`, `frontend/app/globals.css` |
 | Chart colors now match the original terminal palette: chart background/grid/axes use near-black and warm dividers, volume/SMA overlays use amber/steel, and candle red/green market states remain truthful while the existing sizing, legend, resize, and empty-provider behavior code paths stay intact. | Cover through stock/chart validations and frontend build. | `frontend/components/CandlestickChart.tsx`, `frontend/app/globals.css` |
+| Added source/build theme validation for black/graphite shell tokens, amber primary/focus states, red/green market chart states, gray dividers, Tailwind token consistency, no cyan/blue-dominant utilities, and clean-room/no-provider-source guardrails; initial run passed. | Run again in Step 4 as the quality gate. | `tests/apphost/frontend-terminal-theme-refactor-tests.sh` |
+| Reviewed existing frontend terminal validation scripts after the palette refactor: UI stack/shell validations still pass without changing their no-command/no-top-chrome/API-boundary assertions, and stock chart visibility validation still passes with the chart color refactor. | No existing validation script update required. | `tests/apphost/frontend-terminal-ui-stack-tests.sh`, `tests/apphost/frontend-terminal-shell-ui-tests.sh`, `tests/apphost/frontend-stock-chart-visibility-tests.sh` |
+| Confirmed the new theme validation uses source/build assertions only: it runs `npm ci` plus `npm run build`, does not launch `next dev` or call provider endpoints, and includes guardrails against provider/runtime direct references in active frontend source. | Provider credentials/runtimes are not required for the script. | `tests/apphost/frontend-terminal-theme-refactor-tests.sh` |
 
 ---
 
