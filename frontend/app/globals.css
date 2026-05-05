@@ -1019,8 +1019,13 @@ select:focus-visible,
 
 .market-monitor-filters {
   display: grid;
-  gap: 0.65rem;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+
+.market-monitor-filters {
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
 }
 
 .market-monitor-search__field {
@@ -1071,9 +1076,6 @@ select:focus-visible,
 
 
 .market-monitor-search__status span,
-
-
-.market-monitor-filters__header p,
 
 
 .market-monitor-state-strip__item p,
@@ -1153,24 +1155,29 @@ select:focus-visible,
 }
 
 .market-monitor-filters__header {
-  align-items: flex-start;
+  align-items: center;
 }
 
 .market-monitor-filters__eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  margin: 0 0 0.2rem;
+  gap: 0.3rem;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .market-monitor-filters__groups {
-  display: grid;
-  gap: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
 }
 
 .market-monitor-filters__group {
-  display: grid;
-  gap: 0.35rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1178,18 +1185,28 @@ select:focus-visible,
 }
 
 .market-monitor-filters__group legend {
+  margin: 0;
+  padding: 0;
   color: hsl(var(--terminal-text-muted));
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .market-monitor-filters__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.25rem;
+}
+
+.market-monitor-filters__chip {
+  gap: 0.25rem;
+  min-height: 1.65rem;
+  padding-inline: 0.45rem;
 }
 
 .market-monitor-filters__chip span {
@@ -1514,6 +1531,23 @@ select:focus-visible,
 
   .atrade-terminal-app__body {
     grid-template-columns: 1fr;
+  }
+
+  .market-monitor-filters {
+    padding: 0.5rem;
+  }
+
+  .market-monitor-filters__header {
+    align-items: flex-start;
+  }
+
+  .market-monitor-filters__groups {
+    gap: 0.35rem;
+  }
+
+  .market-monitor-filters__group {
+    width: 100%;
+    align-items: flex-start;
   }
 
   .terminal-module-rail,

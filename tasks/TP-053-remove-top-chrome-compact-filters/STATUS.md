@@ -1,6 +1,6 @@
 # TP-053: Remove top chrome and compact market filters — Status
 
-**Current Step:** Step 2: Compact market-monitor filters without losing behavior
+**Current Step:** Step 3: Add focused validation for removed chrome and filter density
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 1
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Compact market-monitor filters without losing behavior
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Refactor `MarketMonitorFilters` into a denser filter bar/section without the long explanatory paragraph
-- [ ] Preserve filter accessibility, test IDs/data attributes, selected state, counts, and Clear-all behavior
-- [ ] Reduce filter padding/gaps/chip wrapping footprint in CSS across breakpoints
-- [ ] Keep filtering local to existing capped payloads without changing workflow semantics
+- [x] Refactor `MarketMonitorFilters` into a denser filter bar/section without the long explanatory paragraph
+- [x] Preserve filter accessibility, test IDs/data attributes, selected state, counts, and Clear-all behavior
+- [x] Reduce filter padding/gaps/chip wrapping footprint in CSS across breakpoints
+- [x] Keep filtering local to existing capped payloads without changing workflow semantics
 
 ---
 
 ### Step 3: Add focused validation for removed chrome and filter density
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-top-chrome-filter-density-tests.sh`
 - [ ] Assert removed header/safety-strip source/rendered markup stays absent
