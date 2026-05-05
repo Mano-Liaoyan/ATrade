@@ -2,23 +2,24 @@
 status: active
 owner: maintainer
 updated: 2026-05-06
-summary: Provider-neutral broker, account-capital, market-data, and analysis provider contracts for swapping ATrade providers without changing API or frontend payloads.
+summary: Provider-neutral broker, account-capital, market-data, analysis, and saved backtesting provider contracts for swapping ATrade providers without changing API or frontend payloads.
 see_also:
   - ../INDEX.md
   - overview.md
   - modules.md
   - paper-trading-workspace.md
   - analysis-engines.md
+  - backtesting.md
   - ../../README.md
   - ../../PLAN.md
 ---
 
 # Provider Abstractions
 
-ATrade composes broker, account-capital, market-data, and analysis
-implementations behind provider-neutral contracts. The API and frontend must
-depend on ATrade contracts and payloads, not on the concrete IBKR Gateway/iBeam
-runtime, Polygon, LEAN, or any future provider runtime.
+ATrade composes broker, account-capital, market-data, analysis, and saved
+backtesting implementations behind provider-neutral contracts. The API and
+frontend must depend on ATrade contracts and payloads, not on the concrete IBKR
+Gateway/iBeam runtime, Polygon, LEAN, or any future provider runtime.
 
 This document is the switching overview for the provider seams introduced in
 `TP-019` and extended by the analysis engine contract. The detailed analysis
@@ -31,6 +32,8 @@ engine contract lives in `analysis-engines.md`.
   payloads used by future backtest initialization.
 - Allow market-data providers to change without changing HTTP/SignalR payloads.
 - Allow analysis engines to change without changing API/frontend request or result payloads.
+- Keep saved backtest request/history payloads provider-neutral so future runners
+  can change without changing API route names or frontend DTOs.
 - Keep paper-only safety explicit: real order placement is not supported by the
   current contract.
 - Keep provider unavailable and not-configured states explicit so runtime,
@@ -221,8 +224,9 @@ Core rules:
 
 - API endpoint handlers may depend on provider-neutral contracts such as
   `IBrokerProvider`, `IPaperCapitalService`, `IMarketDataService`,
-  `IAnalysisEngineRegistry`, `IAnalysisRequestIntake`,
-  `IWorkspaceWatchlistIntake`, and SignalR-facing market-data services.
+  `IAnalysisEngineRegistry`, `IAnalysisRequestIntake`, `IBacktestRunFactory`,
+  `IBacktestRunRepository`, `IWorkspaceWatchlistIntake`, and SignalR-facing
+  market-data services.
 - API endpoint handlers must not instantiate concrete providers such as the
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
@@ -230,14 +234,16 @@ Core rules:
   frontend type names. The current API composes `AddMarketDataModule()`,
   `AddTimescaleMarketDataPersistence(builder.Configuration)`,
   `AddIbkrMarketDataProvider()`, `AddTimescaleMarketDataCacheAside()`,
-  `AddAnalysisModule()`, and `AddLeanAnalysisEngine(...)`; LEAN only becomes
-  active when configuration selects it. Endpoint handlers still depend only on
-  provider-neutral services while the Timescale decorator owns cache-aside reads,
-  writes, freshness checks, and storage-unavailable fallback; `ATrade.Analysis`
-  intake owns analysis request construction/engine handoff; `ATrade.Workspaces`
-  intake owns watchlist request normalization/storage error shaping; and
-  `ATrade.Accounts` owns paper-capital source selection plus local ledger
-  storage/error shaping.
+  `AddAnalysisModule()`, `AddLeanAnalysisEngine(...)`, and
+  `AddBacktestingModule(...)`; LEAN only becomes active when configuration
+  selects it. Endpoint handlers still depend only on provider-neutral services
+  while the Timescale decorator owns cache-aside reads, writes, freshness checks,
+  and storage-unavailable fallback; `ATrade.Analysis` intake owns analysis
+  request construction/engine handoff; `ATrade.Backtesting` owns saved-run
+  validation, capital snapshots, Postgres history, cancel/retry rules, and
+  redaction; `ATrade.Workspaces` intake owns watchlist request
+  normalization/storage error shaping; and `ATrade.Accounts` owns paper-capital
+  source selection plus local ledger storage/error shaping.
 - Workers may compose concrete provider modules, but worker-to-API state must be
   normalized through provider-neutral status/event shapes before reaching the
   browser.

@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-05-06
-summary: Current implementation plan after the ATrade paper workspace frontend reconstruction and the first paper-capital source/backend backtesting seam.
+summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, paper-capital source, and saved backtesting API seams.
 see_also:
   - README.md
   - docs/INDEX.md
@@ -19,32 +19,36 @@ see_also:
 
 The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, durable
-Postgres local paper-capital fallback storage, exact provider/market pins,
-configurable local AppHost ports, optional AppHost-managed LEAN Docker runtime
-wiring, and the completed `TP-045` through `TP-055` frontend reconstruction,
+Postgres local paper-capital fallback storage, durable Postgres saved backtest
+run history, exact provider/market pins, configurable local AppHost ports,
+optional AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045`
+through `TP-056` frontend reconstruction,
 no-command cutover, layout simplification,
-top-chrome/filter-density cleanup, stock chart visibility restoration, and
-original terminal theme foundation. The current frontend surface is the
+top-chrome/filter-density cleanup, stock chart visibility restoration, original
+terminal theme foundation, and module rail icon/collapse behavior. The current frontend surface is the
 clean-room ATrade paper workspace: direct module/workflow navigation,
-enabled/current workflow modules, visible-disabled future modules, compact dense
-market monitor, visibly sized chart/analysis workspaces, provider diagnostics,
+enabled/current workflow modules, visible-disabled future modules, purpose-matched
+module rail icons with local icon-first collapse behavior, compact dense market
+monitor, visibly sized chart/analysis workspaces, provider diagnostics,
 a rail-first full-bleed single-primary workspace layout with no app-level brand header,
 visible global safety strip, shell context/monitor/footer chrome, or page-level
 vertical scrolling, an original black/graphite/amber institutional terminal
 palette with red/green market states, and final cutover/no-command/simplified-layout/top-chrome
 filter-density/chart-visibility/theme-refactor guardrails for clean-room,
 no-order, truthful provider-state, and `ATrade.Api` browser boundaries. The
-first backend/backtesting MVP seam (`TP-058`) adds paper-capital source
-selection through `ATrade.Api`: effective capital prefers a safe authenticated
-IBKR paper balance, falls back to a user-configured local Postgres ledger value,
-and reports explicit unavailable/unconfigured state when neither exists. The
-active clean-room UI design authority remains `docs/design/atrade-terminal-ui.md`.
+first backend/backtesting MVP seams (`TP-058` and `TP-059`) add paper-capital
+source selection and saved backtest APIs through `ATrade.Api`: effective capital
+prefers a safe authenticated IBKR paper balance, falls back to a user-configured
+local Postgres ledger value, reports explicit unavailable/unconfigured state when
+neither exists, and is snapshotted on queued saved backtest runs persisted in
+Postgres. The active clean-room UI design authority remains
+`docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
 
 - use `ATrade.slnx` as the authoritative solution reference for active build/test guidance
 - keep the local IBKR/iBeam refresh transport on the HTTPS Client Portal contract
-- keep paper-capital and future backtest initialization behind `ATrade.Api`, with IBKR account ids used only internally and local fallback capital persisted in Postgres without secrets
+- keep paper-capital and saved backtest initialization/history behind `ATrade.Api`, with IBKR account ids used only internally and local fallback capital/backtest rows persisted in Postgres without secrets, gateway URLs, direct bars, custom code, or order-routing fields
 - keep credentials, account identifiers, tokens, cookies, and live-trading behavior out of committed files and active defaults
 - keep frontend/browser data access behind `ATrade.Api`; the frontend must not connect directly to Postgres or TimescaleDB
 - keep durable runtime/code changes paired with active documentation updates
@@ -53,7 +57,8 @@ Current repository contracts remain:
 
 The frontend reconstruction queue is complete/follow-up-ready through the
 rail-first top-chrome/filter-density cleanup, stock chart visibility restoration,
-and original black/graphite/amber terminal theme foundation:
+original black/graphite/amber terminal theme foundation, and module rail
+icon/collapse behavior:
 
 - `TP-045` — defined the active UI design spec and clean-room visual guardrails
 - `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
@@ -66,22 +71,25 @@ and original black/graphite/amber terminal theme foundation:
 - `TP-053` — removed the remaining top app brand header/global safety strip and compacted market-monitor filters while preserving module safety surfaces
 - `TP-054` — restored visible stock chart rendering with measured `lightweight-charts` sizing, non-collapsing chart layout, truthful empty/provider states, and chart visibility validation
 - `TP-055` — refactored the frontend into an original black/graphite/amber institutional terminal palette, reduced cyan/blue-gradient dominance, aligned chart colors, and added theme validation
+- `TP-056` — added purpose-matched icons for enabled and visible-disabled rail modules, local accessible icon-first rail collapse behavior, and rail validation
 
-`TP-058` is the active paper-capital source packet for the backend/backtesting
-MVP wave. The next new Taskplane packet should use `TP-059` unless an operator
-stages an intervening packet explicitly.
+`TP-058` delivered the paper-capital source packet for the backend/backtesting
+MVP wave. `TP-059` adds the first-class saved backtesting domain, Postgres
+persistence, REST API, and contract validation; the next runner-oriented packet
+should build on the queued saved-run contract rather than changing public route
+names.
 
-Completed task packets through `TP-055` are present in `tasks/`; `TP-058` is
-currently staged in `tasks/` and should remain in place during orchestrated
-runs. Completed packets should be archived when convenient. The orchestrator
-handles active task folder archival after merge.
+Completed task packets through `TP-055` are present in `tasks/`; `TP-058` and
+`TP-059` are staged as the backend/backtesting MVP foundation during orchestrated
+runs and should remain in place until the runtime handles post-merge archival.
+Completed packets should be archived when convenient.
 
 ## Follow-Up Direction
 
 Future frontend work should build on the direct module/workflow frame,
 rail-first full-viewport workspace, compact market-monitor filters,
-non-collapsing chart visibility contract, and original black/graphite/amber
-terminal palette established by `ATradeTerminalApp`,
+non-collapsing chart visibility contract, original black/graphite/amber
+terminal palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`, and
@@ -104,4 +112,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-059`
+`TP-060`

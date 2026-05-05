@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-05
+updated: 2026-05-06
 summary: Active ATrade paper workspace UI design authority for the direct module/workflow frontend.
 see_also:
   - ../INDEX.md
@@ -122,7 +122,11 @@ backend cannot supply.
 | `HELP` | In-product module/workflow reference, safety reminders, provider-state explanations, and direct-navigation guidance. | Static frontend content derived from this spec and active architecture docs; no backend data required. |
 
 Enabled modules share `frontend/lib/terminalModuleRegistry.ts` so rail entries,
-module labels, disabled states, and help copy stay consistent.
+module labels, icons, disabled states, and help copy stay consistent. The rail
+uses purpose-matched `lucide-react` icons from the registry contract: `HOME`
+uses a home/house glyph, `SEARCH` a magnifier, `WATCHLIST` a bookmark, `CHART`
+a candlestick chart, `ANALYSIS` a flask/analysis glyph, `STATUS` an activity
+heartbeat, and `HELP` a circle-question glyph.
 
 ### 4.2 Visible-Disabled Future Modules
 
@@ -146,7 +150,10 @@ Disabled modules should use direct unavailable states such as "Not available in
 this release", "No provider configured in ATrade yet", or "Orders are disabled
 by the paper-only safety contract". They must not display fake tables, sample
 positions, placeholder news, example orders, or demo AI output that could be
-mistaken for live data.
+mistaken for live data. Their visible rail entries also use purpose-matched
+icons: `NEWS` newspaper, `PORTFOLIO` briefcase, `RESEARCH` file search,
+`SCREENER` sliders/filter, `ECON` landmark, `AI` bot, `NODE` workflow/network,
+and `ORDERS` ban/disabled.
 
 ## 5. Direct Navigation And Workflow Actions
 
@@ -219,12 +226,19 @@ implementation while leaving room for a desktop wrapper later.
 ### 6.3 Module Rail
 
 - The rail lists enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`,
-  `ANALYSIS`, `STATUS`, `HELP`) first with clear active/focus/keyboard states.
+  `ANALYSIS`, `STATUS`, `HELP`) first with clear active/focus/keyboard states
+  and a purpose-matched icon next to each module label.
 - Visible-disabled future modules may appear below a separator with disabled
-  styling, explanatory tooltips/popovers, and no active workspace route.
+  styling, purpose-matched icons, explanatory title/tooltip copy, and no active
+  workspace route.
 - Rail labels should use ATrade module names, not third-party product branding.
-- The rail may collapse to icons/short codes on laptop screens if tooltips and
-  keyboard labels remain available.
+- The rail may collapse to an icon-first compact state on laptop/desktop
+  screens. Collapse/expand must be a visible button with accessible state
+  semantics; collapsed module labels remain available to assistive technology
+  and pointer users through visually hidden text and/or titles.
+- Rail collapse state is non-sensitive, local UI state. It is not persisted to
+  localStorage and does not reintroduce a command system, top app chrome, global
+  safety strip, layout reset, or order-entry affordance.
 
 ### 6.4 Retired App-Level Top Chrome
 

@@ -10,6 +10,7 @@ see_also:
   - modules.md
   - provider-abstractions.md
   - analysis-engines.md
+  - backtesting.md
   - ../../README.md
   - ../../PLAN.md
   - ../../scripts/README.md
@@ -21,8 +22,8 @@ see_also:
 > contract for the broader paper-trading workspace. The active frontend UI
 > authority is [`docs/design/atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
 > it governs the clean-room visual target, direct module/workflow navigation,
-> simplified full-viewport layout, disabled future surfaces, and frontend
-> replacement constraints while this document continues to govern paper-only safety and
+> simplified full-viewport layout, purpose-matched rail icons/collapse behavior,
+> disabled future surfaces, and frontend replacement constraints while this document continues to govern paper-only safety and
 > backend/API boundaries. The current repository now
 > uses provider-neutral broker and market-data contracts with IBKR/iBeam as the
 > first real market-data provider behind API/frontend-stable seams. The current
@@ -33,7 +34,9 @@ see_also:
 > `POST /api/orders/simulate`, `GET /api/market-data/trending`,
 > `GET /api/market-data/search`, `GET /api/market-data/{symbol}/candles`, and
 > `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
-> `POST /api/analysis/run`, a `/hubs/market-data` SignalR hub,
+> `POST /api/analysis/run`, `POST /api/backtests`, `GET /api/backtests`,
+> `GET /api/backtests/{id}`, `POST /api/backtests/{id}/cancel`,
+> `POST /api/backtests/{id}/retry`, a `/hubs/market-data` SignalR hub,
 > backend-owned `GET` / `PUT` / `POST` / legacy symbol `DELETE`
 > `/api/workspace/watchlist` endpoints plus exact
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
@@ -41,8 +44,9 @@ see_also:
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js ATrade paper workspace
 > with direct module/workflow navigation, enabled/disabled module registry and
-> rail, a rail-first full-bleed single-primary workspace with no top app brand
-> header, visible global safety strip, shell context panel, monitor strip,
+> rail with purpose-matched icons plus local icon-first collapse behavior, a
+> rail-first full-bleed single-primary workspace with no top app brand header,
+> visible global safety strip, shell context panel, monitor strip,
 > footer/status strip, resizable splitters, layout reset, or page-level vertical
 > scrolling, IBKR scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/compact-filterable IBKR stock search, exact market-specific
@@ -56,8 +60,9 @@ see_also:
 > runtime, credentials, or authentication returns safe
 > provider-not-configured/provider-unavailable/authentication-required errors
 > rather than fallback data. Durable paper-order storage and real broker order
-> placement remain future work; paper-capital fallback storage is durable in
-> Postgres and remains paper-only/read-only from the broker side.
+> placement remain future work; paper-capital fallback storage and saved backtest
+> run history are durable in Postgres and remain paper-only/read-only from the
+> broker side.
 
 ## 1. Scope And Non-Negotiable Safety Rules
 
@@ -101,9 +106,10 @@ state transitions, data access, and streaming contracts. The current frontend
 surface is the clean-room ATrade paper workspace defined in
 [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a completed frontend
 replacement with enabled modules for current API-backed workflows,
-visible-disabled future modules, a rail-first simplified full-viewport
-single-primary layout without a top app brand header or global visible safety
-strip, and a responsive fallback. The home and symbol routes now render directly through
+visible-disabled future modules, purpose-matched rail icons, local icon-first
+rail collapse behavior, a rail-first simplified full-viewport single-primary
+layout without a top app brand header or global visible safety strip, and a
+responsive fallback. The home and symbol routes now render directly through
 `ATradeTerminalApp`, which provides the direct module/workflow frame, module
 rail, single primary workspace region, module-owned scrolling, STATUS/HELP
 modules, and honest disabled-module surfaces for future modules
@@ -192,7 +198,9 @@ The current backend slice exposes `GET /api/broker/ibkr/status`,
 `PUT /api/workspace/watchlist`, `POST /api/workspace/watchlist`,
 exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
 `DELETE /api/workspace/watchlist/{symbol}` for unambiguous symbol-only rows,
-`GET /api/analysis/engines`, `POST /api/analysis/run`, and the
+`GET /api/analysis/engines`, `POST /api/analysis/run`, `POST /api/backtests`,
+`GET /api/backtests`, `GET /api/backtests/{id}`,
+`POST /api/backtests/{id}/cancel`, `POST /api/backtests/{id}/retry`, and the
 `/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
 strictly server-side. The broker endpoint resolves the provider-neutral
 `IBrokerProvider` contract. The market-data endpoints await the async
@@ -265,6 +273,21 @@ the local fallback amount/currency, and returns the same effective-capital
 payload. Storage failures use a stable 503 `paper-capital-storage-unavailable`
 error shape. Browser payloads and logs must never include configured account
 identifiers, credentials, gateway URLs, tokens, cookies, or session details.
+
+Backtest endpoints use `ATrade.Backtesting`; the API only binds HTTP and projects
+safe results. `POST /api/backtests` accepts one stock symbol or exact symbol
+identity, a built-in strategy id (`sma-crossover`, `rsi-mean-reversion`, or
+`breakout`), bounded JSON parameters, chart range, cost/slippage settings, and
+benchmark mode. Creation snapshots the current effective paper capital/source and
+returns a queued saved run with `202 Accepted`; it returns
+`backtest-capital-unavailable` when Accounts reports no positive effective
+capital. `GET /api/backtests` and `GET /api/backtests/{id}` expose local
+workspace history/status/result placeholders, `POST /api/backtests/{id}/cancel`
+cancels queued/running saved runs best-effort, and
+`POST /api/backtests/{id}/retry` creates a new queued run from the failed or
+cancelled source run's saved request snapshot. Backtest persistence rejects and
+omits direct browser bars, custom strategy code, order-routing fields, account
+identifiers, credentials, gateway URLs, tokens, cookies, and session details.
 NATS remains the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
@@ -317,6 +340,12 @@ The paper-trading slice extends existing planned responsibilities as follows:
   CLI or AppHost-managed Docker runtime (`lean-engine`), parses
   provider-neutral signals/metrics, and rejects brokerage/order-routing source
   tokens.
+- `ATrade.Backtesting` owns provider-neutral saved backtest contracts,
+  single-symbol/built-in-strategy validation, capital snapshots through
+  `ATrade.Accounts`, Postgres saved-run schema/repository operations, local
+  workspace history, cancel/retry status rules, and persistence redaction for
+  secrets, account identifiers, gateway URLs, direct bars, custom code, and
+  order-routing fields.
 - `ATrade.Workspaces` owns backend workspace preferences and watchlist request
   intake, including the current Postgres schema/repository for exact pinned
   watchlist instruments. Rows store a durable `instrument_key` / API
@@ -570,9 +599,9 @@ server-owned.
 The Next.js frontend may own short-lived UI state such as:
 
 - active workspace module, selected symbol/range route state, visible-disabled
-  module selection, and short-lived focus/navigation status; the simplified
-  shell does not use a versioned local layout-persistence key for
-  context/monitor split sizes
+  module selection, local rail collapse state, and short-lived focus/navigation
+  status; the simplified shell does not use a versioned local
+  layout-persistence key for context/monitor split sizes or rail collapse
 - a non-authoritative cached copy of backend watchlist symbols under
   `atrade.paperTrading.watchlist.v1`, used only for read-only unavailable states
   and one-time migration of pre-Postgres pins
@@ -622,8 +651,9 @@ is unavailable, but it must not be treated as saved state and must not contain
 secrets, broker account identifiers, provider ids, or tokens. The simplified
 workspace removed the separate `atrade.terminal.layout.v1` context/monitor split
 preference key and its reset behavior; there is no active browser-local layout
-size authority. Any future non-sensitive UI preference key must be versioned,
-reset stale data safely, and never write broker/provider data to a backend.
+size authority, and the rail collapse state is local component state rather than
+persisted preference data. Any future non-sensitive UI preference key must be
+versioned, reset stale data safely, and never write broker/provider data to a backend.
 Local cleanup is a manual developer action: stop AppHost first, then remove only
 a volume you own (for example an isolated test volume), never a shared/default
 volume that may contain desired watchlist state.
