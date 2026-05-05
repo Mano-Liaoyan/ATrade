@@ -135,6 +135,94 @@ assert_terminal_workflows_reachable() {
   assert_file_contains "$frontend_root/components/terminal/TerminalDisabledModule.tsx" 'data-testid={`terminal-disabled-module-${unavailable.module.id.toLowerCase()}`}'
 }
 
+assert_no_frontend_secrets_or_account_identifiers() {
+  local secret_pattern
+  secret_pattern=$(cat <<'REGEX'
+DU[0-9]{6,}|U[0-9]{7,}|account(Id|Number)[[:space:]]*[:=][[:space:]]*['"][A-Za-z0-9_-]+|IBKR_(USERNAME|PASSWORD)[[:space:]]*=|([Aa]ccess|[Rr]efresh|[Ss]ession)[_-]?[Tt]oken[[:space:]]*[:=]|Cookie:|Set-Cookie|sessionid=|JSESSIONID=|Bearer[[:space:]]+[A-Za-z0-9._-]{20,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.|password[[:space:]]*[:=][[:space:]]*['"][^'"]+
+REGEX
+)
+
+  if grep -RInE \
+    --exclude-dir=.next \
+    --exclude-dir=node_modules \
+    --exclude='package-lock.json' \
+    --exclude='frontend-terminal-cutover-tests.sh' \
+    "$secret_pattern" \
+    "$frontend_root" \
+    "$repo_root/tests/apphost"/frontend-*.sh \
+    "$repo_root/docs/architecture/paper-trading-workspace.md" \
+    "$repo_root/docs/architecture/modules.md" \
+    "$repo_root/docs/architecture/analysis-engines.md" \
+    "$repo_root/README.md" \
+    "$repo_root/PLAN.md"; then
+    printf 'unexpected secret, account identifier, token, or session cookie pattern found in frontend/config/frontend tests/active docs.\n' >&2
+    return 1
+  fi
+}
+
+assert_atrade_api_client_boundaries() {
+  assert_file_contains "$frontend_root/lib/apiBaseUrl.ts" 'NEXT_PUBLIC_ATRADE_API_BASE_URL'
+  assert_file_contains "$frontend_root/lib/marketDataClient.ts" "fetchJson<TrendingSymbolsResponse>('/api/market-data/trending')"
+  assert_file_contains "$frontend_root/lib/marketDataClient.ts" '`/api/market-data/search?${params.toString()}`'
+  assert_file_contains "$frontend_root/lib/marketDataClient.ts" '`/api/market-data/${encodedSymbol}/candles?${params.toString()}`'
+  assert_file_contains "$frontend_root/lib/marketDataClient.ts" '`/api/market-data/${encodedSymbol}/indicators?${params.toString()}`'
+  assert_file_contains "$frontend_root/lib/marketDataStream.ts" "withUrl(buildApiUrl('/hubs/market-data'))"
+  assert_file_contains "$frontend_root/lib/watchlistClient.ts" "fetchWatchlist('/api/workspace/watchlist')"
+  assert_file_contains "$frontend_root/lib/watchlistClient.ts" "fetchWatchlist('/api/workspace/watchlist', {"
+  assert_file_contains "$frontend_root/lib/watchlistClient.ts" '`/api/workspace/watchlist/pins/${encodedInstrumentKey}`'
+  assert_file_contains "$frontend_root/lib/watchlistClient.ts" '`/api/workspace/watchlist/${encodedSymbol}`'
+  assert_file_contains "$frontend_root/lib/brokerStatusClient.ts" "buildApiUrl('/api/broker/ibkr/status')"
+  assert_file_contains "$frontend_root/lib/analysisClient.ts" "fetchJson<AnalysisEngineDescriptor[]>('/api/analysis/engines')"
+  assert_file_contains "$frontend_root/lib/analysisClient.ts" "fetchJson<AnalysisResult>('/api/analysis/run'"
+  assert_file_contains "$frontend_root/lib/terminalMarketMonitorWorkflow.ts" 'getTrendingSymbols()'
+  assert_file_contains "$frontend_root/lib/symbolSearchWorkflow.ts" 'searchSymbols(trimmedQuery'
+  assert_file_contains "$frontend_root/lib/watchlistWorkflow.ts" 'getWatchlist()'
+  assert_file_contains "$frontend_root/lib/symbolChartWorkflow.ts" 'getCandles(normalizedSymbol, chartRange, chartIdentity)'
+  assert_file_contains "$frontend_root/lib/symbolChartWorkflow.ts" 'getIndicators(normalizedSymbol, chartRange, chartIdentity)'
+  assert_file_contains "$frontend_root/lib/symbolChartWorkflow.ts" 'connectMarketDataStream({'
+  assert_file_contains "$frontend_root/lib/terminalAnalysisWorkflow.ts" 'getAnalysisEngines()'
+  assert_file_contains "$frontend_root/lib/terminalAnalysisWorkflow.ts" 'runProviderNeutralAnalysis(createTerminalAnalysisRunRequest'
+  assert_file_contains "$frontend_root/components/terminal/TerminalProviderDiagnostics.tsx" 'getBrokerStatus()'
+}
+
+assert_no_order_entry_or_direct_runtime_access() {
+  if grep -RInE \
+    --exclude-dir=.next \
+    --exclude-dir=node_modules \
+    --exclude='TerminalCommandInput.tsx' \
+    'Place order|Submit order|Buy button|Sell button|buy-button|sell-button|OrderTicket|Preview order|Confirm order|/api/orders|orders/simulate|simulateOrder|MarketOrder|LimitOrder|SetBrokerageModel|SetLiveMode|type="submit"' \
+    "$frontend_root/app" "$frontend_root/components" "$frontend_root/lib" "$frontend_root/types"; then
+    printf 'unexpected order-entry, simulated-submit, or live-trading UI/runtime token found in frontend source.\n' >&2
+    return 1
+  fi
+
+  assert_no_grep_matches \
+    'direct database/provider/runtime access token in frontend source' \
+    'Npgsql|TimescaleConnection|PostgresConnection|Host=|User ID=|Password=|postgres://|redis://|nats://|ibkr-gateway|/iserver/|/hmds/|localhost:5000|127\.0\.0\.1:5000|Client Portal|ATRADE_IBKR|IBKR_USERNAME|IBKR_PASSWORD|ATRADE_LEAN|docker exec|QuantConnect\.Lean|lean-engine|LeanRuntime' \
+    "$frontend_root/app" "$frontend_root/components" "$frontend_root/lib" "$frontend_root/types" "$frontend_root/package.json" "$frontend_root/next.config.ts"
+}
+
+assert_clean_room_branding_guardrails() {
+  assert_no_grep_matches \
+    'Fincept/Bloomberg copied branding or proprietary terminal asset reference in active frontend files' \
+    'Fincept|fincept|Bloomberg|BLOOMBERG|bbg-terminal|bloomberg-terminal|BLP|blpapi|Bloomberg Professional|Terminal screenshot' \
+    "$frontend_root/app" "$frontend_root/components" "$frontend_root/lib" "$frontend_root/types" "$frontend_root/package.json" "$frontend_root/tailwind.config.ts" "$frontend_root/components.json"
+
+  if find "$frontend_root" \
+    -path '*/node_modules' -prune -o \
+    -path '*/.next' -prune -o \
+    -type f \( -iname '*fincept*' -o -iname '*bloomberg*' -o -iname '*bbg*' -o -iname '*blp*' \) \
+    -print | grep -q .; then
+    find "$frontend_root" \
+      -path '*/node_modules' -prune -o \
+      -path '*/.next' -prune -o \
+      -type f \( -iname '*fincept*' -o -iname '*bloomberg*' -o -iname '*bbg*' -o -iname '*blp*' \) \
+      -print >&2
+    printf 'unexpected proprietary-terminal-named frontend asset or source file found.\n' >&2
+    return 1
+  fi
+}
+
 assert_resizable_layout_persistence_and_responsive_fallback() {
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-context-splitter"'
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-monitor-splitter"'
@@ -214,6 +302,10 @@ main() {
   assert_active_routes_use_terminal_app
   assert_obsolete_renderers_removed
   assert_old_copy_and_shell_css_removed
+  assert_clean_room_branding_guardrails
+  assert_no_order_entry_or_direct_runtime_access
+  assert_no_frontend_secrets_or_account_identifiers
+  assert_atrade_api_client_boundaries
   assert_terminal_workflows_reachable
   assert_disabled_future_modules_visible_and_honest
   assert_resizable_layout_persistence_and_responsive_fallback

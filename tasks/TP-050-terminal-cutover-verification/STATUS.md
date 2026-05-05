@@ -1,6 +1,6 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
-**Current Step:** Step 3: Enforce clean-room, safety, and browser-boundary guardrails
+**Current Step:** Step 4: Update docs, plan, and verification inventory
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -45,17 +45,17 @@
 ---
 
 ### Step 3: Enforce clean-room, safety, and browser-boundary guardrails
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Assert no copied Fincept/Bloomberg active assets/branding references
-- [ ] Assert no order-entry/live/simulated-submit UI or direct provider/database access
-- [ ] Verify frontend uses ATrade.Api clients for data/provider/analysis behavior
-- [ ] Verify no secrets/account identifiers/tokens/session cookies are introduced
+- [x] Assert no copied Fincept/Bloomberg active assets/branding references
+- [x] Assert no order-entry/live/simulated-submit UI or direct provider/database access
+- [x] Verify frontend uses ATrade.Api clients for data/provider/analysis behavior
+- [x] Verify no secrets/account identifiers/tokens/session cookies are introduced
 
 ---
 
 ### Step 4: Update docs, plan, and verification inventory
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Update paper-trading workspace architecture for current terminal UI
 - [ ] Update modules doc for terminal ownership and retired old shell
@@ -124,6 +124,12 @@
 | 2026-05-05 14:00 | Step 2 layout verification | Added cutover assertions for splitters, localStorage persistence, bounds, reset, SSR-safe storage, and responsive stacked fallback; updated shell UI chart SSR markers and passed cutover, shell UI, and frontend build checks |
 | 2026-05-05 14:01 | Step 2 completed | Supported commands, current workflows, disabled future modules, and resizable layout behavior verified through source assertions and targeted tests |
 | 2026-05-05 14:01 | Step 3 started | Enforce clean-room, safety, and browser-boundary guardrails |
+| 2026-05-05 14:03 | Step 3 clean-room branding | Added cutover assertions rejecting Fincept/Bloomberg/BBG/BLP active frontend references and proprietary-terminal-named assets; cutover validation passed |
+| 2026-05-05 14:05 | Step 3 safety boundary | Added cutover assertions rejecting order-entry/simulated-submit/live-trading tokens and direct database/provider/runtime access; reran cutover, chart-analysis, and market-monitor tests |
+| 2026-05-05 14:07 | Step 3 ATrade.Api boundary | Added cutover assertions proving market data, SignalR, watchlist, broker status, and analysis behavior flow through `ATrade.Api` clients; reran cutover and workflow-module tests |
+| 2026-05-05 14:09 | Step 3 secrets guardrail | Added cutover assertions scanning frontend/config, frontend apphost tests, and active docs for high-confidence secrets, account IDs, tokens, and session cookie patterns; cutover validation passed |
+| 2026-05-05 14:10 | Step 3 completed | Clean-room, no-order/direct-runtime, ATrade.Api boundary, and secrets guardrails enforced through cutover assertions |
+| 2026-05-05 14:10 | Step 4 started | Update docs, plan, and verification inventory |
 
 ---
 
