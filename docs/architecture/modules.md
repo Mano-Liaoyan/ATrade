@@ -58,12 +58,14 @@ see_also:
 > visible-disabled future modules, direct workflow navigation, a simplified
 > full-viewport layout, and shadcn/Tailwind/Radix-compatible original primitives.
 > The current slice routes home and symbol pages through `ATradeTerminalApp`: an
-> enabled/disabled module registry and rail, a full-bleed single-primary
-> `TerminalWorkspaceLayout` with no context/monitor shell chrome, footer/status
-> strip, splitters, layout reset, or page-level vertical scrolling, status/help
-> surfaces, and a dense terminal market monitor over backend-driven trending symbols,
-> bounded/ranked/filterable IBKR stock search, and Postgres-backed exact
-> watchlists plus terminal chart/analysis workspaces. `TerminalMarketMonitor`,
+> enabled/disabled module registry and rail, a rail-first full-bleed
+> single-primary `TerminalWorkspaceLayout` with no top app brand header, visible
+> global safety strip, context/monitor shell chrome, footer/status strip,
+> splitters, layout reset, or page-level vertical scrolling, status/help
+> surfaces, and a dense terminal market monitor over backend-driven trending
+> symbols, bounded/ranked/compact-filterable IBKR stock search, and
+> Postgres-backed exact watchlists plus terminal chart/analysis workspaces.
+> `TerminalMarketMonitor`,
 > `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
 > `MarketMonitorDetailPanel` replace the old long/list search, trending, and
 > watchlist renderers while preserving exact identity for chart/analysis actions.
@@ -575,8 +577,9 @@ references.
   `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`). Home and symbol routes now render
   directly through `ATradeTerminalApp`, `TerminalModuleRail`,
   `TerminalWorkspaceLayout`, `TerminalHelpModule`, and `TerminalStatusModule`;
-  the simplified shell removed the former context/monitor split-size persistence,
-  shell monitor strip, context aside, footer/status strip, and layout reset. The old `TradingWorkspace`
+  the simplified rail-first shell removed the former app-level brand header,
+  visible global safety strip, context/monitor split-size persistence, shell
+  monitor strip, context aside, footer/status strip, and layout reset. The old `TradingWorkspace`
   and `SymbolChartView` compatibility wrappers have been deleted, and the
   retired `TerminalWorkspaceShell` / `WorkspaceCommandBar` /
   `WorkspaceNavigation` / `WorkspaceContextPanel` primitives remain absent.
@@ -585,7 +588,7 @@ references.
   source/provider/market filters, sorting, selected-row state, bounded
   show-more/show-less exploration, exact pin state projection, and exact
   chart/analysis navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
-  and its table/search/filter/detail components render that monitor for `HOME`,
+  and its table/search/compact-filter/detail components render that monitor for `HOME`,
   `SEARCH`, and `WATCHLIST`. `frontend/lib/terminalChartWorkspaceWorkflow.ts`
   adapts `symbolChartWorkflow` into terminal source/range/identity/stream view
   models consumed by `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
@@ -604,7 +607,7 @@ references.
   screeners, macro calendars, assistant text, node graphs, or order-entry
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
-  shell/market/chart/analysis validation scripts.
+  top-chrome/filter-density, shell/market/chart/analysis validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible

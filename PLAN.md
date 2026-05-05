@@ -21,15 +21,17 @@ The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, exact
 provider/market pins, configurable local AppHost ports, optional
 AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045` through
-`TP-052` frontend reconstruction, no-command cutover, and layout simplification.
-The current frontend surface is the clean-room ATrade paper workspace: direct
-module/workflow navigation, enabled/current workflow modules, visible-disabled
-future modules, dense market monitor, chart/analysis workspaces, provider
-diagnostics, a full-bleed single-primary workspace layout with no shell
-context/monitor/footer chrome and no page-level vertical scrolling, and final
-cutover/no-command/simplified-layout guardrails for clean-room, no-order, and
-`ATrade.Api` browser boundaries. The active clean-room UI design authority
-remains `docs/design/atrade-terminal-ui.md`.
+`TP-053` frontend reconstruction, no-command cutover, layout simplification, and
+top-chrome/filter-density cleanup. The current frontend surface is the
+clean-room ATrade paper workspace: direct module/workflow navigation,
+enabled/current workflow modules, visible-disabled future modules, compact dense
+market monitor, chart/analysis workspaces, provider diagnostics, a rail-first
+full-bleed single-primary workspace layout with no app-level brand header,
+visible global safety strip, shell context/monitor/footer chrome, or page-level
+vertical scrolling, and final cutover/no-command/simplified-layout/top-chrome
+filter-density guardrails for clean-room, no-order, and `ATrade.Api` browser
+boundaries. The active clean-room UI design authority remains
+`docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
 
@@ -42,7 +44,7 @@ Current repository contracts remain:
 ## Active Task Queue
 
 The frontend reconstruction queue is complete/follow-up-ready through the
-simplified workspace layout:
+rail-first top-chrome and filter-density cleanup:
 
 - `TP-045` — defined the active UI design spec and clean-room visual guardrails
 - `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
@@ -52,24 +54,27 @@ simplified workspace layout:
 - `TP-050` — completed frontend cutover, cleanup, verification, and documentation updates
 - `TP-051` — removed visible terminal branding plus the command input/parser/registry and added no-command validation
 - `TP-052` — simplified the workspace to a full-bleed single-primary layout with no context/monitor/footer chrome, background grid, page-level scroll, or layout persistence
+- `TP-053` — removed the remaining top app brand header/global safety strip and compacted market-monitor filters while preserving module safety surfaces
 
-The next new Taskplane packet should use `TP-053`.
+The next new Taskplane packet should use `TP-054`.
 
-Completed task packets through `TP-052` are present in `tasks/`; completed
+Completed task packets through `TP-053` are present in `tasks/`; completed
 packets should be archived when convenient. The orchestrator handles active task
 folder archival after merge.
 
 ## Follow-Up Direction
 
-Future frontend work should build on the direct module/workflow frame and
-simplified full-viewport workspace established by `ATradeTerminalApp`,
-`frontend/types/terminal.ts`, `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
+Future frontend work should build on the direct module/workflow frame,
+rail-first full-viewport workspace, and compact market-monitor filters
+established by `ATradeTerminalApp`, `frontend/types/terminal.ts`,
+`TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`, and
 `terminalAnalysisWorkflow`. New modules should remain visible-disabled until
 backed by real `ATrade.Api` contracts, provider-neutral data, and
 documentation/tests; do not reintroduce the removed command system, the old
-shell/list-page paths, context/monitor/footer chrome, page-level scrolling, fake
-data, direct provider/database access, or order-entry UI paths.
+shell/list-page paths, app-level brand header, visible global safety strip,
+context/monitor/footer chrome, page-level scrolling, fake data, direct
+provider/database access, or order-entry UI paths.
 
 ## Guardrails
 
@@ -83,4 +88,4 @@ data, direct provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-053`
+`TP-054`

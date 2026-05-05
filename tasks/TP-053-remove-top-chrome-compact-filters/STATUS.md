@@ -1,11 +1,11 @@
 # TP-053: Remove top chrome and compact market filters — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-05
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -67,12 +67,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -87,6 +87,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Active design/workspace/module docs still described an app-level top header or visible global safety strip. | Updated docs to describe the rail-first frame, module-owned safety surfaces, and compact market-monitor filters. | `docs/design/atrade-terminal-ui.md`; `docs/architecture/paper-trading-workspace.md`; `docs/architecture/modules.md` |
+| README and PLAN still treated `TP-053` as the next packet and did not list the new top-chrome/filter-density guardrail. | Updated current surface/queue text, moved follow-up guidance to `TP-054`, and listed `tests/apphost/frontend-top-chrome-filter-density-tests.sh`. | `README.md`; `PLAN.md` |
+| Provider/source label semantics and analysis user-facing states were unchanged by TP-053. | Reviewed check-if-affected docs; no updates required. | `docs/architecture/provider-abstractions.md`; `docs/architecture/analysis-engines.md` |
 
 ---
 
@@ -97,6 +100,7 @@
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-05 18:01 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 18:01 | Step 0 started | Preflight |
+| 2026-05-05 18:30 | Worker iter 1 | done in 1760s, tools: 133 |
 
 ---
 
@@ -108,4 +112,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- 2026-05-05 Step 5 check-if-affected docs reviewed: `docs/architecture/provider-abstractions.md` and `docs/architecture/analysis-engines.md` need no edits because TP-053 did not change provider/source labels, market-data state semantics, analysis payloads, or analysis user-facing states.

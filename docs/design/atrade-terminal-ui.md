@@ -50,8 +50,8 @@ Current non-goals:
 - Do not reintroduce a command input, command parser, command registry, command
   palette, natural-language router, fuzzy route parser, backend AI command route,
   or broker-command surface under another name.
-- Do not restore retired terminal branding, shell headers, or command-first
-  product copy.
+- Do not restore retired terminal branding, app-level brand headers, visible
+  global safety strips, shell headers, or command-first product copy.
 - Do not remove the module rail or the API-backed HOME, SEARCH, WATCHLIST,
   CHART, ANALYSIS, STATUS, HELP, and visible-disabled module surfaces.
 
@@ -157,8 +157,10 @@ without a command system.
   `STATUS`, and `HELP` and exposes visible-disabled future modules with honest
   unavailable states.
 - The market monitor is the primary workflow handoff surface for search,
-  watchlist, and trending rows. Row actions open chart and analysis workspaces
-  while preserving exact provider identity when available.
+  watchlist, and trending rows. It uses a compact filter bar with count chips,
+  active-count/Clear-all controls, accessible filter groups, and no long
+  explanatory paragraph. Row actions open chart and analysis workspaces while
+  preserving exact provider identity when available.
 - Symbol routes may initialize `CHART` or `ANALYSIS` directly from route/query
   state, including chart range and exact identity metadata.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
@@ -180,10 +182,11 @@ implementation while leaving room for a desktop wrapper later.
 - Use a full-bleed rectangular workspace frame that spans the viewport width with
   no centered max-width wrapper, no left/right outer gutters, and no active
   background grid.
-- The active page uses a top header, paper-only safety strip, left module rail,
-  and one primary workspace region. It does not render shell-only context aside,
-  monitor strip, footer/status strip, context/monitor splitters, or a layout
-  reset control.
+- The active page is rail-first: the module rail and one primary workspace
+  region start directly inside the application frame with no visible app-level
+  brand header and no persistent paper-only safety strip. It does not render
+  shell-only context aside, monitor strip, footer/status strip, context/monitor
+  splitters, or a layout reset control.
 - The main page and body should not vertically scroll. The application frame is
   viewport-height with page-level `overflow: hidden`; long market-monitor,
   chart, analysis, status, help, and disabled-module content scrolls inside the
@@ -216,15 +219,18 @@ implementation while leaving room for a desktop wrapper later.
 - The rail may collapse to icons/short codes on laptop screens if tooltips and
   keyboard labels remain available.
 
-### 6.4 Top Header Region
+### 6.4 Retired App-Level Top Chrome
 
-- The top region contains ATrade workspace branding, current product copy,
-  paper-only/provider-boundary status, and concise provider-truthful messaging.
-- Header copy should reinforce that the browser talks only to `ATrade.Api`,
-  provider/runtime unavailable states are expected safe outcomes, and orders are
-  disabled.
-- The header must not include a command input, command prompt, command grammar,
-  or command-first product tagline.
+- `ATradeTerminalApp` no longer renders a persistent top brand header, product
+  subtitle, or global visible paper-safety strip. The workspace begins with the
+  module rail and active module content so dense workflows get the full viewport.
+- Browser/API boundary copy, provider/runtime unavailable explanations, and
+  no-order safety reminders live inside module-owned surfaces such as HOME,
+  STATUS, HELP, disabled modules, chart/analysis headers, and market monitor
+  state rows.
+- Future chrome must not reintroduce a command input, command prompt, command
+  grammar, command-first product tagline, or persistent top strip that consumes
+  workspace height.
 
 ### 6.5 Status And Safety Surfaces
 
@@ -235,8 +241,9 @@ implementation while leaving room for a desktop wrapper later.
 - These surfaces must not show fabricated price ticks. If SignalR or HTTP market
   data is unavailable, show explicit stale/unavailable labels and retry
   affordances.
-- Paper-only/no-live-orders safety remains visible in the header/safety strip and
-  in module content when order or broker terms appear elsewhere on the screen.
+- Paper-only/no-live-orders safety remains visible in module content when order
+  or broker terms appear elsewhere on the screen; it is not a persistent
+  app-level strip.
 
 ### 6.6 Responsive And Laptop Fallback Rules
 
@@ -244,11 +251,12 @@ implementation while leaving room for a desktop wrapper later.
   1280px-wide and larger screens.
 - At narrower laptop widths, let the module rail shrink or wrap while the single
   primary workspace remains the scroll-owning content region.
-- At tablet/mobile widths, collapse to a single-column flow with header,
-  safety copy, module rail/picker, and active module content.
+- At tablet/mobile widths, collapse to a single-column flow with module
+  rail/picker and active module content; safety copy remains module-owned rather
+  than a global top strip.
 - Mobile fallback may omit simultaneous side-by-side context; it must still
-  expose enabled modules, safety copy, provider unavailable states, and
-  HELP/STATUS guidance.
+  expose enabled modules, module-level safety copy, provider unavailable states,
+  and HELP/STATUS guidance.
 
 ## 7. Visual System Direction
 

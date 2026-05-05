@@ -40,10 +40,11 @@ see_also:
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js ATrade paper workspace
 > with direct module/workflow navigation, enabled/disabled module registry and
-> rail, a full-bleed single-primary workspace with no shell context panel,
-> monitor strip, footer/status strip, resizable splitters, layout reset, or
-> page-level vertical scrolling, IBKR scanner-driven or fresh persisted trending symbols,
-> bounded/ranked/filterable IBKR stock search, exact market-specific
+> rail, a rail-first full-bleed single-primary workspace with no top app brand
+> header, visible global safety strip, shell context panel, monitor strip,
+> footer/status strip, resizable splitters, layout reset, or page-level vertical
+> scrolling, IBKR scanner-driven or fresh persisted trending symbols,
+> bounded/ranked/compact-filterable IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, terminal chart workspaces
 > that reuse `lightweight-charts` candlesticks, chart range lookback controls
 > (`1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and All time),
@@ -98,11 +99,12 @@ state transitions, data access, and streaming contracts. The current frontend
 surface is the clean-room ATrade paper workspace defined in
 [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md): a completed frontend
 replacement with enabled modules for current API-backed workflows,
-visible-disabled future modules, a simplified full-viewport single-primary
-layout, and a responsive fallback. The home and symbol routes now render directly through
+visible-disabled future modules, a rail-first simplified full-viewport
+single-primary layout without a top app brand header or global visible safety
+strip, and a responsive fallback. The home and symbol routes now render directly through
 `ATradeTerminalApp`, which provides the direct module/workflow frame, module
-rail, safety strip, single primary workspace region, module-owned scrolling,
-STATUS/HELP modules, and honest disabled-module surfaces for future modules
+rail, single primary workspace region, module-owned scrolling, STATUS/HELP
+modules, and honest disabled-module surfaces for future modules
 (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
 `ORDERS`). Users open modules through the
 rail, market-monitor chart/analysis actions, and symbol route state; no command
@@ -140,9 +142,10 @@ minimum-length validation, provider/authentication error copy, explicit bounded
 search limits, ranked result view models, metadata filter state, short visible
 result limits, and show-more/show-less exploration operations;
 `terminalMarketMonitorWorkflow` wraps those hooks with provider-backed trending
-state, unified dense row view models, source/provider/pin filters, sorting,
+state, unified dense row view models, local source/provider/pin filters, sorting,
 selection, show-more/show-less row exploration, and exact chart/analysis action
-intents; `symbolChartWorkflow` owns the selected chart range lookback,
+intents while `MarketMonitorFilters` presents those filters as compact controls;
+`symbolChartWorkflow` owns the selected chart range lookback,
 candle/indicator HTTP reads, source-label formatting, SignalR subscription
 state, stream update application, and HTTP polling fallback when streaming closes
 or is unavailable; `terminalChartWorkspaceWorkflow` adapts that contract into
@@ -614,8 +617,8 @@ Current implementation:
   selected-row state, pin state projection, cached-watchlist fallback copy, and
   exact chart/analysis navigation intents
 - `frontend/components/terminal/TerminalMarketMonitor.tsx` with
-  `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
-  `MarketMonitorDetailPanel` renders the dense terminal monitor for `HOME`,
+  `MarketMonitorTable`, `MarketMonitorSearch`, compact `MarketMonitorFilters`,
+  and `MarketMonitorDetailPanel` renders the dense terminal monitor for `HOME`,
   `SEARCH`, and `WATCHLIST`; the old long/list `SymbolSearch`, `TrendingList`,
   `Watchlist`, and `MarketLogo` renderers are retired
 - `frontend/lib/symbolChartWorkflow.ts` owns the selected lookback chart range,
@@ -673,8 +676,9 @@ iBeam is not ready.
 Users are no longer constrained to a trending/default list. The terminal market
 monitor calls `GET /api/market-data/search` through
 `frontend/lib/marketDataClient.ts` via `symbolSearchWorkflow`, always supplies an
-explicit capped limit, ranks and filters the bounded result set locally, and
-renders IBKR/iBeam stock results as dense rows with explicit provider,
+explicit capped limit, ranks and filters the bounded result set locally through
+compact source/provider/pin/market controls, and renders IBKR/iBeam stock
+results as dense rows with explicit provider,
 provider-symbol-id/IBKR `conid`, market/exchange, currency, asset class, source,
 rank/score, and saved-pin state. Chart and analysis actions route through the
 terminal app using `/symbols/{symbol}` query state that preserves exact identity
