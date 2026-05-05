@@ -1,6 +1,6 @@
 # TP-056: Add module rail icons and collapse behavior — Status
 
-**Current Step:** Step 3: Add navigation rail validation coverage
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -43,16 +43,16 @@
 ---
 
 ### Step 3: Add navigation rail validation coverage
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-module-rail-icons-collapse-tests.sh`
-- [ ] Update existing shell/layout validation scripts only if affected
-- [ ] Ensure validation is deterministic and provider-independent
+- [x] Create `tests/apphost/frontend-module-rail-icons-collapse-tests.sh`
+- [x] Update existing shell/layout validation scripts only if affected
+- [x] Ensure validation is deterministic and provider-independent
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] New rail validation passing
 - [ ] Shell validation passing
@@ -99,6 +99,7 @@
 | 2026-05-06 | Step 1 started | Module icon contract work |
 | 2026-05-06 | Step 1 completed | Registry icon metadata and lucide rendering added; frontend build passed |
 | 2026-05-06 | Step 2 completed | Accessible local rail collapse state, collapsed CSS, and frontend build verified |
+| 2026-05-06 | Step 3 completed | Source-only rail icon/collapse validation added; existing shell/layout validation remained compatible |
 
 ---
 
