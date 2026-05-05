@@ -1,8 +1,8 @@
 # TP-057: Make market monitor table scrollbars visible — Status
 
 **Current Step:** Step 5: Documentation & Delivery
-**Status:** 🟡 In Progress
-**Last Updated:** 2026-05-05
+**Status:** ✅ Complete
+**Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
 **Iteration:** 1
@@ -66,12 +66,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -90,6 +90,8 @@
 | Scrollbar strategy chosen: use the shared Radix `ScrollArea` with `type="always"`, render both vertical and horizontal `ScrollBar`s, constrain the market-monitor table root/viewport, and add market-monitor CSS/native fallback styling for visible tracks/thumbs and stable scroll gutters. | Implement in Step 2 without enabling page-level scrolling or removing dense table columns/actions. | Step 1 audit: `scroll-area.tsx`, `MarketMonitorTable.tsx`, `globals.css`, Radix `@radix-ui/react-scroll-area` 1.2.10 types |
 | Radix tradeoff: the existing primitive only renders a vertical scrollbar and `type="auto"` can make visibility depend on overflow/interaction; horizontal support must be explicitly mounted and native scrollbar CSS is needed as a scoped browser fallback. | Keep the primitive generally reusable but allow horizontal scrollbar rendering; scope native scrollbar styling to the market-monitor viewport to avoid broad UI changes. | Step 1 audit: `frontend/components/ui/scroll-area.tsx`, `frontend/app/globals.css` |
 | Existing market-monitor validation now asserts the new scroll owner/type/slot contract; top-chrome and simplified layout scripts already cover page-level overflow and compact filters and did not need weakening. | Updated only `frontend-terminal-market-monitor-tests.sh`; full validation remains in the new scrollbar script. | Step 3 validation coverage |
+| Check-if-affected docs review: paper-trading workspace architecture describes the visible market-monitor scrollbar contract; provider-abstractions did not need source changes because provider identity/source/unavailable payload semantics were preserved. | Keep provider-abstractions unchanged for TP-057; no API/provider contract changed. | Step 5 docs review |
+| Final provider-verification status: scrollbar work is frontend/source/CSS validation only and intentionally does not require live IBKR/iBeam, LEAN, provider data, or credentials; provider identity columns/actions are preserved by source and build/test coverage. | No live provider verification needed for TP-057; deterministic validation and full .NET/frontend build/test gates passed. | Step 4/5 verification |
 
 ---
 

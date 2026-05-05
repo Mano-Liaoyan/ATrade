@@ -48,7 +48,9 @@ see_also:
 > rail-first full-bleed single-primary workspace with no top app brand header,
 > visible global safety strip, shell context panel, monitor strip,
 > footer/status strip, resizable splitters, layout reset, or page-level vertical
-> scrolling, IBKR scanner-driven or fresh persisted trending symbols,
+> scrolling, a dense market monitor table with visible internal vertical and
+> horizontal scrollbars for wide exact-identity/action columns, IBKR
+> scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/compact-filterable IBKR stock search, exact market-specific
 > Postgres-backed watchlists, local market badges, terminal chart workspaces
 > that reuse `lightweight-charts` candlesticks, chart range lookback controls
@@ -109,9 +111,11 @@ replacement with enabled modules for current API-backed workflows,
 visible-disabled future modules, purpose-matched rail icons, local icon-first
 rail collapse behavior, a rail-first simplified full-viewport single-primary
 layout without a top app brand header or global visible safety strip, and a
-responsive fallback. The home and symbol routes now render directly through
-`ATradeTerminalApp`, which provides the direct module/workflow frame, module
-rail, single primary workspace region, module-owned scrolling, STATUS/HELP
+responsive fallback. The market monitor table owns visible vertical and
+horizontal scrolling for wide exact-identity and action columns while the page
+frame remains non-scrolling. The home and symbol routes now render directly
+through `ATradeTerminalApp`, which provides the direct module/workflow frame,
+module rail, single primary workspace region, module-owned scrolling, STATUS/HELP
 modules, and honest disabled-module surfaces for future modules
 (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
 `ORDERS`). Users open modules through the
@@ -155,6 +159,9 @@ result limits, and show-more/show-less exploration operations;
 state, unified dense row view models, local source/provider/pin filters, sorting,
 selection, show-more/show-less row exploration, and exact chart/analysis action
 intents while `MarketMonitorFilters` presents those filters as compact controls;
+`MarketMonitorTable` keeps sticky headers and exact provider/source/pin/action
+columns inside an internal Radix/native-compatible scroll viewport with visible
+vertical and horizontal scrollbars;
 `symbolChartWorkflow` owns the selected chart range lookback,
 candle/indicator HTTP reads, source-label formatting, SignalR subscription
 state, stream update application, and HTTP polling fallback when streaming closes

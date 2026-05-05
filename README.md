@@ -104,7 +104,7 @@ The current runnable slice includes:
 - `src/ATrade.Backtesting` — provider-neutral saved backtest run module with single-symbol/built-in-strategy request validation, paper-capital source snapshots, Postgres saved-run history, cancel/retry contracts, and persistence redaction for secrets, account identifiers, gateway URLs, direct bars, custom code, and order-routing fields.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -177,16 +177,17 @@ code, or order-routing fields.
 Ready Taskplane packets live directly under `tasks/`; completed packets are
 archived under `tasks/archive/`.
 
-The `TP-045` through `TP-056` frontend reconstruction, no-command cutover,
-layout-simplification, chart-visibility restoration, theme-foundation, and rail
-icon/collapse batch now covers the active design spec, shadcn/Tailwind/Radix UI
-foundation, module/workflow shell, dense market monitor, chart/analysis
-workspaces, final cutover verification, removal of the visible terminal branding
-plus command input/parser, the simplified rail-first full-bleed single-primary
-workspace layout, removal of the remaining app-level brand header/global safety
-strip, compact market-monitor filters, visible stock chart rendering, the
-original black/graphite/amber ATrade terminal palette validation, and
-purpose-matched module rail icon/collapse validation. The current frontend
+The `TP-045` through `TP-057` frontend reconstruction, no-command cutover,
+layout-simplification, chart-visibility restoration, theme-foundation, rail
+icon/collapse, and market-monitor scrollbar batch now covers the active design
+spec, shadcn/Tailwind/Radix UI foundation, module/workflow shell, dense market
+monitor, chart/analysis workspaces, final cutover verification, removal of the
+visible terminal branding plus command input/parser, the simplified rail-first
+full-bleed single-primary workspace layout, removal of the remaining app-level
+brand header/global safety strip, compact market-monitor filters, visible stock
+chart rendering, the original black/graphite/amber ATrade terminal palette
+validation, purpose-matched module rail icon/collapse validation, and visible
+vertical/horizontal market-monitor table scrollbar validation. The current frontend
 surface is the direct module/workflow ATrade paper workspace. The active
 backend/backtesting MVP wave now includes `TP-058` paper-capital source work and
 `TP-059` first-class saved backtesting domain/API work, and should build on
@@ -195,7 +196,7 @@ old shell/list route wrappers, a command system, cyan/blue-gradient-dominant
 styling, or the removed app-level, context, monitor, footer, and top-safety
 chrome.
 
-Completed Taskplane packets through `TP-055` are present in `tasks/`; `TP-058`
+Completed Taskplane packets through `TP-057` are present in `tasks/`; `TP-058`
 and `TP-059` cover the backend/backtesting MVP foundation currently staged in
 the active wave. Completed packets should be archived when convenient. During
 orchestrated runs the runtime handles post-merge archival for active task folders.
@@ -270,6 +271,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
 - `tests/apphost/frontend-terminal-market-monitor-tests.sh`
+- `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
 - `tests/apphost/frontend-no-command-shell-tests.sh`
 - `tests/apphost/frontend-simplified-workspace-layout-tests.sh`
 - `tests/apphost/frontend-top-chrome-filter-density-tests.sh`

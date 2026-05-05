@@ -166,8 +166,11 @@ without a command system.
 - The market monitor is the primary workflow handoff surface for search,
   watchlist, and trending rows. It uses a compact filter bar with count chips,
   active-count/Clear-all controls, accessible filter groups, and no long
-  explanatory paragraph. Row actions open chart and analysis workspaces while
-  preserving exact provider identity when available.
+  explanatory paragraph. Its dense table owns an internal scroll viewport with
+  visible vertical and horizontal scrollbar tracks/thumbs so wide provider,
+  identity, source, score, pin, and action columns remain available without page
+  scrolling. Row actions open chart and analysis workspaces while preserving
+  exact provider identity when available.
 - Symbol routes may initialize `CHART` or `ANALYSIS` directly from route/query
   state, including chart range and exact identity metadata.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
@@ -197,7 +200,10 @@ implementation while leaving room for a desktop wrapper later.
 - The main page and body should not vertically scroll. The application frame is
   viewport-height with page-level `overflow: hidden`; long market-monitor,
   chart, analysis, status, help, and disabled-module content scrolls inside the
-  primary workspace or module-owned scroll regions.
+  primary workspace or module-owned scroll regions. The market monitor table is
+  its own module-owned scroll region: row overflow stays inside the table
+  viewport with sticky headers, and horizontal overflow remains visible through a
+  dedicated table scrollbar rather than clipping identity/action columns.
 - Panel content must remain honest about backend state: loading, provider
   not-configured, provider unavailable, authentication required, no analysis
   engine configured, no watchlist pins, and disabled module states each get
@@ -301,7 +307,8 @@ while staying clearly separate from proprietary product identities.
   for symbols, instrument keys, provider/source labels, and route/state chips.
 - **Grid/table density:** market lists, watchlists, search results, indicators,
   and status diagnostics should use dense rows, sticky headings where useful,
-  right-aligned numeric columns, and scan-friendly separators.
+  right-aligned numeric columns, scan-friendly separators, and explicit visible
+  scrollbars when an internal table viewport owns overflow.
 - **Workspace accents:** use amber/orange as the primary emphasis for selected,
   active, focused, chart overlay, and paper-safety attention states; use green
   and red only for truthful positive/negative market movement and danger; use
