@@ -95,7 +95,7 @@ export function TerminalProviderDiagnostics({
           <DiagnosticItem label="Market data source" value={marketDataSourceLabel} detail="Chart, monitor, candles, indicators, and Timescale cache labels remain payload-owned." />
           <DiagnosticItem label="SignalR stream" value={signalRStateLabel} detail="HTTP polling fallback remains visible when stream state is closed or unavailable." />
           <DiagnosticItem label="Analysis provider" value={analysisStateLabel} detail="No-engine and runtime-unavailable states are explicit; no fake signals are generated." />
-          <DiagnosticItem label="Order placement capability" value={status?.capabilities.supportsBrokerOrderPlacement ? 'provider reports enabled' : 'disabled'} detail="Diagnostics only — the terminal renders no order-entry controls and does not call broker order routes." />
+          <DiagnosticItem label="Order placement capability" value={status?.capabilities.supportsBrokerOrderPlacement ? 'provider reports enabled' : 'disabled'} detail="Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes." />
           <DiagnosticItem label="Credential UI" value="not rendered" detail="Secrets, account identifiers, tokens, cookies, gateway URLs, and session values stay out of the browser UI." />
         </dl>
       </TerminalPanel>

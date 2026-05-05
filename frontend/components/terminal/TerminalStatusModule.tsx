@@ -8,7 +8,7 @@ export function TerminalStatusModule() {
       <TerminalPanel
         eyebrow="Operational status"
         title="ATrade.Api, provider, and paper-mode boundary"
-        description="The terminal keeps runtime status visible while preserving explicit unavailable states and browser/API separation."
+        description="The workspace keeps runtime status visible while preserving explicit unavailable states and browser/API separation."
         actions={<TerminalStatusBadge tone="success">Paper only</TerminalStatusBadge>}
       >
         <dl className="terminal-status-module__grid">
@@ -26,7 +26,7 @@ export function TerminalStatusModule() {
           </div>
           <div>
             <dt>Order controls</dt>
-            <dd>Disabled in this terminal reconstruction batch.</dd>
+            <dd>Disabled in this paper workspace.</dd>
           </div>
         </dl>
       </TerminalPanel>

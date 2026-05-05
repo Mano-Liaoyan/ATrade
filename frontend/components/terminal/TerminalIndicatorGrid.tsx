@@ -12,7 +12,7 @@ export function TerminalIndicatorGrid({ chart }: TerminalIndicatorGridProps) {
   const latestMacd = chart.indicators?.macd.at(-1);
 
   return (
-    <aside className="terminal-indicator-grid" aria-label="Terminal chart indicator summary" data-testid="terminal-indicator-grid">
+    <aside className="terminal-indicator-grid" aria-label="Chart indicator summary" data-testid="terminal-indicator-grid">
       <div className="terminal-indicator-grid__header">
         <div>
           <p className="eyebrow">Indicators</p>

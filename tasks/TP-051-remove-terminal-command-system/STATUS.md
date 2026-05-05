@@ -1,6 +1,6 @@
 # TP-051: Remove terminal branding and command system — Status
 
-**Current Step:** Step 2: Remove user-facing ATrade Terminal and command-first copy
+**Current Step:** Step 3: Update and add frontend validation scripts
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Remove user-facing ATrade Terminal and command-first copy
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Remove visible `ATrade Terminal`, `ATrade Terminal Shell`, and command-first header copy
-- [ ] Update HELP/status/safety/accessibility copy that references command-first terminal behavior
-- [ ] Preserve `ATrade.Api`, provider-truthful, exact-identity, and no-order safety copy
-- [ ] Run targeted source validation for removed copy and preserved safety facts
+- [x] Remove visible `ATrade Terminal`, `ATrade Terminal Shell`, and command-first header copy
+- [x] Update HELP/status/safety/accessibility copy that references command-first terminal behavior
+- [x] Preserve `ATrade.Api`, provider-truthful, exact-identity, and no-order safety copy
+- [x] Run targeted source validation for removed copy and preserved safety facts
 
 ---
 
 ### Step 3: Update and add frontend validation scripts
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-no-command-shell-tests.sh`
 - [ ] Delete or retire `tests/apphost/frontend-terminal-shell-command-tests.sh`

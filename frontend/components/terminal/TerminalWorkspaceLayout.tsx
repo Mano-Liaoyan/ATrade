@@ -124,7 +124,7 @@ export function TerminalWorkspaceLayout({ activeModuleId, children, context, mon
         onPointerDown={(event) => startResize("context", event)}
       />
 
-      <aside className="terminal-workspace-layout__context" data-layout-region="context" aria-label="Terminal context panel">
+      <aside className="terminal-workspace-layout__context" data-layout-region="context" aria-label="Workspace context panel">
         {context}
       </aside>
 
@@ -136,7 +136,7 @@ export function TerminalWorkspaceLayout({ activeModuleId, children, context, mon
         onPointerDown={(event) => startResize("monitor", event)}
       />
 
-      <section className="terminal-workspace-layout__monitor" data-layout-region="monitor" aria-label="Terminal monitor strip">
+      <section className="terminal-workspace-layout__monitor" data-layout-region="monitor" aria-label="Workspace monitor strip">
         {monitor}
       </section>
 

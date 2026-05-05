@@ -61,11 +61,11 @@ export function MarketMonitorTable({
   sort,
 }: MarketMonitorTableProps) {
   return (
-    <section className={cn('market-monitor-table-shell', compact && 'market-monitor-table-shell--compact', className)} data-testid="market-monitor-table" aria-label="Terminal market monitor rows">
+    <section className={cn('market-monitor-table-shell', compact && 'market-monitor-table-shell--compact', className)} data-testid="market-monitor-table" aria-label="Market monitor rows">
       <ScrollArea className="market-monitor-table-scroll" type="auto">
         <table className="market-monitor-table">
           <caption>
-            Dense terminal market monitor combining backend watchlist pins, bounded ranked search results, and provider-backed trending rows.
+            Dense market monitor combining backend watchlist pins, bounded ranked search results, and provider-backed trending rows.
           </caption>
           <thead>
             <tr>

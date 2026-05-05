@@ -132,7 +132,7 @@ function TerminalAnalysisPlaceholder({ className }: { className?: string }) {
         density="compact"
         eyebrow="Analysis"
         title="Open analysis for a symbol"
-        description="Use ANALYSIS <symbol> or select analysis from a chart/monitor row. Engine discovery remains provider-neutral and no fake signals are shown."
+        description="Select analysis from a chart or market monitor row. Engine discovery remains provider-neutral and no fake signals are shown."
         actions={<TerminalStatusBadge tone="info">ANALYSIS</TerminalStatusBadge>}
       >
         <div className="terminal-analysis-workspace__unavailable" data-testid="analysis-unavailable" role="status">

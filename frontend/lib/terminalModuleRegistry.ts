@@ -131,7 +131,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
     disabledMessage: "The current backend supports scanner/trending and bounded symbol search only.",
     disabledDetails: [
       "No arbitrary multi-factor screen-building API exists yet.",
-      "The terminal does not display fake factor tables or prebuilt demo screens.",
+      "The workspace does not display fake factor tables or prebuilt demo screens.",
     ],
   },
   {

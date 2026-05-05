@@ -25,7 +25,7 @@ export function TerminalModuleRail({
   const disabledModules = getDisabledTerminalModules();
 
   return (
-    <nav className="terminal-module-rail" data-testid="terminal-module-rail" aria-label="ATrade Terminal modules">
+    <nav className="terminal-module-rail" data-testid="terminal-module-rail" aria-label="Workspace modules">
       <div className="terminal-module-rail__group" aria-label="Enabled modules">
         {enabledModules.map((module) => (
           <button

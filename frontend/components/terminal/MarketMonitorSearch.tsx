@@ -80,7 +80,7 @@ export function MarketMonitorSearch({
           {loading ? 'Searching' : error ? 'Search unavailable' : validationMessage ? 'Waiting for query' : searchedQuery ? `${resultCount} ranked` : 'Ready'}
         </TerminalStatusBadge>
         <span>
-          {error ?? validationMessage ?? (searchedQuery ? `Showing ranked results for ${searchedQuery}.` : 'Type a command or query; all browser data flows through ATrade.Api.')}
+          {error ?? validationMessage ?? (searchedQuery ? `Showing ranked results for ${searchedQuery}.` : 'Type a symbol or company query; all browser data flows through ATrade.Api.')}
         </span>
       </div>
     </section>
