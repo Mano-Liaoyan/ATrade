@@ -1,6 +1,6 @@
 # TP-052: Simplify workspace layout and remove extra chrome — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Remove context, monitor-strip, and footer chrome from app composition
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Remove context, monitor-strip, and footer chrome from app composition
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Remove context/monitor/status-strip rendering from `ATradeTerminalApp`
-- [ ] Delete unused context/monitor/status-strip components
-- [ ] Remove shell-only context and monitor HTML regions
-- [ ] Preserve real module content and workflow surfaces
+- [x] Remove context/monitor/status-strip rendering from `ATradeTerminalApp`
+- [x] Delete unused context/monitor/status-strip components
+- [x] Remove shell-only context and monitor HTML regions
+- [x] Preserve real module content and workflow surfaces
 
 ---
 
@@ -106,6 +106,8 @@
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-05 14:12 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 14:12 | Step 0 started | Preflight |
+| 2026-05-05 14:13 | Step 1 started | Removing shell-only context, monitor, and footer chrome |
+| 2026-05-05 14:18 | Step 1 targeted check | Market monitor validation passed after app composition changes |
 
 ---
 

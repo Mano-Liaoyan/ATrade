@@ -11,14 +11,12 @@ import type {
   EnabledTerminalModuleId,
   TerminalNavigationIntent,
 } from "@/types/terminal";
-import { getTerminalDisabledModuleState } from "@/lib/terminalModuleRegistry";
 import { TerminalDisabledModule } from "./TerminalDisabledModule";
 import { TerminalHelpModule } from "./TerminalHelpModule";
 import { TerminalModuleRail } from "./TerminalModuleRail";
 import { TerminalPanel } from "./TerminalPanel";
 import { TerminalStatusBadge } from "./TerminalStatusBadge";
 import { TerminalStatusModule } from "./TerminalStatusModule";
-import { TerminalStatusStrip } from "./TerminalStatusStrip";
 import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
 import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
@@ -47,8 +45,6 @@ export function ATradeTerminalApp({
   const [activeSymbol, setActiveSymbol] = useState<string | null>(normalizedInitialSymbol);
   const [activeIdentity, setActiveIdentity] = useState<InstrumentIdentityInput | null>(initialIdentity);
   const [activeChartRange, setActiveChartRange] = useState<ChartRange>(initialChartRange);
-  const marketDataStatus = "Market monitor owns provider state";
-  const watchlistStatus = "Backend-owned pins in monitor";
 
   useEffect(() => {
     setActiveModuleId(initialModuleId);
@@ -137,9 +133,8 @@ export function ATradeTerminalApp({
   }
 
   function handleDisabledModule(moduleId: DisabledTerminalModuleId) {
-    const unavailable = getTerminalDisabledModuleState(moduleId);
     setDisabledModuleId(moduleId);
-    setNavigationStatus(`${unavailable.title}: ${unavailable.message}`);
+    setNavigationStatus(`${moduleId} is visible-disabled and unavailable in the paper workspace.`);
     setPendingFocusRequest({ targetId: `terminal-disabled-${moduleId.toLowerCase()}` });
   }
 
@@ -173,6 +168,9 @@ export function ATradeTerminalApp({
         <span>Provider state and exact instrument identity stay visible; unavailable states are not replaced with fake market data.</span>
         <span>Orders are disabled by the paper-only safety contract.</span>
       </div>
+      <p className="sr-only" aria-live="polite" role="status">
+        {navigationStatus}
+      </p>
 
       <div className="atrade-terminal-app__body">
         <TerminalModuleRail
@@ -182,99 +180,12 @@ export function ATradeTerminalApp({
           onModuleSelect={handleModuleSelect}
         />
         <main className="atrade-terminal-app__workspace" data-testid="terminal-workspace" aria-label={`${activeModuleId} workspace`}>
-          <TerminalWorkspaceLayout
-            activeModuleId={activeModuleId}
-            context={(
-              <TerminalContextSummary
-                activeModuleId={activeModuleId}
-                marketDataStatus={marketDataStatus}
-                symbol={activeSymbol}
-                watchlistStatus={watchlistStatus}
-              />
-            )}
-            monitor={<TerminalMonitorPanel />}
-          >
+          <TerminalWorkspaceLayout activeModuleId={activeModuleId}>
             {moduleContent}
           </TerminalWorkspaceLayout>
         </main>
       </div>
-
-      <TerminalStatusStrip
-        activeModuleId={activeModuleId}
-        marketDataStatus={marketDataStatus}
-        statusMessage={navigationStatus}
-        symbol={activeSymbol}
-        watchlistStatus={watchlistStatus}
-      />
     </section>
-  );
-}
-
-function TerminalContextSummary({
-  activeModuleId,
-  marketDataStatus,
-  symbol,
-  watchlistStatus,
-}: {
-  activeModuleId: EnabledTerminalModuleId;
-  marketDataStatus: string;
-  symbol: string | null;
-  watchlistStatus: string;
-}) {
-  return (
-    <div className="terminal-context-summary" data-testid="terminal-context-summary">
-      <TerminalPanel
-        eyebrow="Context"
-        title="Provider and safety map"
-        description="Context stays visible while modules change, so provider state and paper-only constraints are never hidden by navigation."
-        tone="inset"
-      >
-        <dl className="terminal-context-summary__grid">
-          <div>
-            <dt>Active module</dt>
-            <dd>{activeModuleId}</dd>
-          </div>
-          <div>
-            <dt>Market data</dt>
-            <dd>{marketDataStatus}</dd>
-          </div>
-          <div>
-            <dt>Watchlist</dt>
-            <dd>{watchlistStatus}</dd>
-          </div>
-          <div>
-            <dt>Symbol</dt>
-            <dd>{symbol ?? "No symbol selected"}</dd>
-          </div>
-        </dl>
-      </TerminalPanel>
-      <TerminalPanel eyebrow="Safety" title="Paper-only status" tone="inset" actions={<TerminalStatusBadge tone="warning">No orders</TerminalStatusBadge>}>
-        <p>Orders are disabled by the paper-only safety contract. Browser-visible data flows through ATrade.Api.</p>
-      </TerminalPanel>
-    </div>
-  );
-}
-
-function TerminalMonitorPanel() {
-  return (
-    <div className="terminal-monitor-panel" data-testid="terminal-monitor-panel">
-      <span className="terminal-monitor-panel__label">Monitor</span>
-      <span>SEARCH, WATCHLIST, and HOME render the dense market monitor.</span>
-      <ul>
-        <li>
-          <strong>Search</strong>
-          <span>Capped ranked IBKR stock results</span>
-        </li>
-        <li>
-          <strong>Watch</strong>
-          <span>Backend-owned exact pins</span>
-        </li>
-        <li>
-          <strong>Actions</strong>
-          <span>Chart/analysis preserve identity</span>
-        </li>
-      </ul>
-    </div>
   );
 }
 
