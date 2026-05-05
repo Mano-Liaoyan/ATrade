@@ -129,7 +129,7 @@ assert_behavioral_fallbacks() {
   local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
   local search="$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx"
   local detail="$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx"
-  local chart="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
+  local chart="$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx"
 
   assert_file_contains "$workflow" "getTrendingPinState"
   assert_file_contains "$workflow" "getSearchResultPinState"

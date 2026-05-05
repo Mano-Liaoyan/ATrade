@@ -6,6 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 types_file="$repo_root/frontend/types/terminal.ts"
 module_registry="$repo_root/frontend/lib/terminalModuleRegistry.ts"
 command_registry="$repo_root/frontend/lib/terminalCommandRegistry.ts"
+terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
 disabled_component="$repo_root/frontend/components/terminal/TerminalDisabledModule.tsx"
 
 assert_file_contains() {
@@ -83,6 +84,16 @@ assert_terminal_command_registry_contract() {
   assert_file_contains "$command_registry" 'CHART requires a symbol, for example CHART AAPL.'
   assert_file_contains "$command_registry" 'isDisabledTerminalModuleId(command)'
   assert_file_contains "$command_registry" 'getTerminalDisabledModuleState(moduleId)'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-module-home"'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-search"'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-watchlist"'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-chart"'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-analysis"'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-status"'
+  assert_file_contains "$command_registry" 'focusTargetId: "terminal-help"'
+  assert_file_contains "$command_registry" 'searchQuery: argument || undefined'
+  assert_file_contains "$command_registry" 'route: `/symbols/${encodeURIComponent(symbol)}`'
+  assert_file_contains "$command_registry" 'route: symbol ? `/symbols/${encodeURIComponent(symbol)}?module=ANALYSIS&range=1D` : "/"'
 
   assert_file_not_contains "$command_registry" 'command: "QUOTE"'
   assert_file_not_contains "$command_registry" 'command: "ORDER"'
@@ -93,6 +104,25 @@ assert_terminal_command_registry_contract() {
   assert_file_not_contains "$command_registry" 'command: "W"'
   assert_file_not_contains "$command_registry" 'command: "WL"'
   assert_file_not_contains "$command_registry" 'command: "HELP ME"'
+}
+
+assert_terminal_command_focus_contract() {
+  assert_file_contains "$terminal_app" 'const [pendingFocusRequest, setPendingFocusRequest] = useState<{ targetId: string } | null>(null);'
+  assert_file_contains "$terminal_app" 'const { targetId } = pendingFocusRequest;'
+  assert_file_contains "$terminal_app" 'document.getElementById(targetId)'
+  assert_file_contains "$terminal_app" 'target?.focus({ preventScroll: true })'
+  assert_file_contains "$terminal_app" 'target?.scrollIntoView({ block: "start", behavior: "smooth" })'
+  assert_file_contains "$terminal_app" 'setPendingFocusRequest({ targetId: intent.focusTargetId ?? getModuleFocusTargetId(intent.moduleId) })'
+  assert_file_contains "$terminal_app" 'setSeededSearchQuery(intent.searchQuery ?? "")'
+  assert_file_contains "$terminal_app" 'setSeededSearchQuery("")'
+  assert_file_contains "$terminal_app" 'getModuleFocusTargetId(moduleId)'
+  assert_file_contains "$terminal_app" 'return "terminal-module-home"'
+  assert_file_contains "$terminal_app" 'return "terminal-search"'
+  assert_file_contains "$terminal_app" 'return "terminal-watchlist"'
+  assert_file_contains "$terminal_app" 'return "terminal-chart"'
+  assert_file_contains "$terminal_app" 'return "terminal-analysis"'
+  assert_file_contains "$terminal_app" 'return "terminal-status"'
+  assert_file_contains "$terminal_app" 'return "terminal-help"'
 }
 
 assert_no_natural_language_or_backend_command_routing() {
@@ -123,6 +153,7 @@ assert_disabled_module_component_contract() {
 main() {
   assert_terminal_module_registry_contract
   assert_terminal_command_registry_contract
+  assert_terminal_command_focus_contract
   assert_no_natural_language_or_backend_command_routing
   assert_disabled_module_component_contract
 }

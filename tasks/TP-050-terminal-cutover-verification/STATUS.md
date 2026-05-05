@@ -1,6 +1,6 @@
 # TP-050: Complete terminal cutover, cleanup, and verification — Status
 
-**Current Step:** Step 2: Verify full functional replacement behavior
+**Current Step:** Step 3: Enforce clean-room, safety, and browser-boundary guardrails
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -35,17 +35,17 @@
 ---
 
 ### Step 2: Verify full functional replacement behavior
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Verify all supported commands open/focus correct terminal modules
-- [ ] Verify current workflows remain reachable in terminal UI
-- [ ] Verify future modules are visible-disabled with no fake data/order controls
-- [ ] Verify resizable layout persistence and responsive fallback
+- [x] Verify all supported commands open/focus correct terminal modules
+- [x] Verify current workflows remain reachable in terminal UI
+- [x] Verify future modules are visible-disabled with no fake data/order controls
+- [x] Verify resizable layout persistence and responsive fallback
 
 ---
 
 ### Step 3: Enforce clean-room, safety, and browser-boundary guardrails
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Assert no copied Fincept/Bloomberg active assets/branding references
 - [ ] Assert no order-entry/live/simulated-submit UI or direct provider/database access
@@ -118,6 +118,12 @@
 | 2026-05-05 13:45 | Step 1 cutover validation | Added `frontend-terminal-cutover-tests.sh` and passed source assertions for terminal routes, obsolete renderer deletion, old copy/CSS absence, and terminal markers |
 | 2026-05-05 13:46 | Step 1 completed | Active routes cut over to terminal app frame; obsolete wrappers/CSS retired; cutover validation added |
 | 2026-05-05 13:46 | Step 2 started | Verify full functional replacement behavior |
+| 2026-05-05 13:50 | Step 2 command verification | Added source assertions for every supported command route/focus target, made repeated same-target commands request focus deterministically, cleared seeded search on non-search modules, and passed command test plus frontend build |
+| 2026-05-05 13:54 | Step 2 workflow reachability | Extended cutover/workflow assertions for market monitor, search, watchlist pin/unpin, chart/range, SignalR-to-HTTP fallback, analysis, provider diagnostics, and disabled module rail reachability; reran cutover, market-monitor, chart-analysis, and workflow-module tests |
+| 2026-05-05 13:56 | Step 2 disabled module verification | Added cutover assertions that NEWS/PORTFOLIO/RESEARCH/SCREENER/ECON/AI/NODE/ORDERS remain visible-disabled with honest no-data/no-order copy and reran cutover plus command tests |
+| 2026-05-05 14:00 | Step 2 layout verification | Added cutover assertions for splitters, localStorage persistence, bounds, reset, SSR-safe storage, and responsive stacked fallback; updated shell UI chart SSR markers and passed cutover, shell UI, and frontend build checks |
+| 2026-05-05 14:01 | Step 2 completed | Supported commands, current workflows, disabled future modules, and resizable layout behavior verified through source assertions and targeted tests |
+| 2026-05-05 14:01 | Step 3 started | Enforce clean-room, safety, and browser-boundary guardrails |
 
 ---
 

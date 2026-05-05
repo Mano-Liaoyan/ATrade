@@ -43,7 +43,7 @@ export function ATradeTerminalApp({
   const [activeModuleId, setActiveModuleId] = useState<EnabledTerminalModuleId>(initialModuleId);
   const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(null);
   const [commandFeedback, setCommandFeedback] = useState("Ready for deterministic terminal commands.");
-  const [pendingFocusTargetId, setPendingFocusTargetId] = useState<string | null>(null);
+  const [pendingFocusRequest, setPendingFocusRequest] = useState<{ targetId: string } | null>(null);
   const [seededSearchQuery, setSeededSearchQuery] = useState("");
   const normalizedInitialSymbol = initialSymbol?.toUpperCase() ?? null;
   const [activeSymbol, setActiveSymbol] = useState<string | null>(normalizedInitialSymbol);
@@ -66,27 +66,30 @@ export function ATradeTerminalApp({
   }, [initialChartRange]);
 
   useEffect(() => {
-    if (!pendingFocusTargetId) {
+    if (!pendingFocusRequest) {
       return;
     }
 
+    const { targetId } = pendingFocusRequest;
     const animationFrame = window.requestAnimationFrame(() => {
-      const target = document.getElementById(pendingFocusTargetId);
+      const target = document.getElementById(targetId);
       target?.focus({ preventScroll: true });
       target?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
 
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [activeModuleId, disabledModuleId, pendingFocusTargetId]);
+  }, [activeModuleId, disabledModuleId, pendingFocusRequest]);
 
   const openIntent = useCallback(
     (intent: TerminalNavigationIntent, feedback: string) => {
       setDisabledModuleId(null);
       setCommandFeedback(feedback);
-      setPendingFocusTargetId(intent.focusTargetId ?? `terminal-module-${intent.moduleId.toLowerCase()}`);
+      setPendingFocusRequest({ targetId: intent.focusTargetId ?? getModuleFocusTargetId(intent.moduleId) });
 
-      if (intent.moduleId === "SEARCH" && intent.searchQuery) {
-        setSeededSearchQuery(intent.searchQuery);
+      if (intent.moduleId === "SEARCH") {
+        setSeededSearchQuery(intent.searchQuery ?? "");
+      } else if (intent.moduleId === "HOME" || intent.moduleId === "WATCHLIST") {
+        setSeededSearchQuery("");
       }
 
       if ((intent.moduleId === "CHART" || intent.moduleId === "ANALYSIS") && intent.symbol) {
@@ -138,7 +141,7 @@ export function ATradeTerminalApp({
     if (result.action.kind === "open-disabled-module") {
       setDisabledModuleId(result.action.moduleId);
       setCommandFeedback(result.feedback);
-      setPendingFocusTargetId(`terminal-disabled-${result.action.moduleId.toLowerCase()}`);
+      setPendingFocusRequest({ targetId: `terminal-disabled-${result.action.moduleId.toLowerCase()}` });
       return;
     }
 
@@ -156,7 +159,7 @@ export function ATradeTerminalApp({
     const unavailable = getTerminalDisabledModuleState(moduleId);
     setDisabledModuleId(moduleId);
     setCommandFeedback(`${unavailable.title}: ${unavailable.message}`);
-    setPendingFocusTargetId(`terminal-disabled-${moduleId.toLowerCase()}`);
+    setPendingFocusRequest({ targetId: `terminal-disabled-${moduleId.toLowerCase()}` });
   }
 
   const moduleContent = disabledModuleId ? (
