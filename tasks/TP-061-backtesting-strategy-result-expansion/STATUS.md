@@ -1,6 +1,6 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
-**Current Step:** Step 5: Testing & Verification
+**Current Step:** Step 6: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -62,20 +62,20 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Targeted backtesting tests passing
-- [ ] Targeted LEAN tests passing
-- [ ] Targeted analysis tests passing
-- [ ] Strategy/result validation passing
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Targeted backtesting tests passing
+- [x] Targeted LEAN tests passing
+- [x] Targeted analysis tests passing
+- [x] Strategy/result validation passing
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] README/PLAN verification/current-surface text updated if affected
@@ -129,6 +129,13 @@
 | 2026-05-06 01:09 | Step 4 validation script | Added and passed `tests/apphost/backtesting-strategy-result-tests.sh` source contract validation. |
 | 2026-05-06 01:14 | Step 4 existing scripts | Updated affected backtesting, analysis, and LEAN apphost validations; backtesting API, analysis contract, LEAN, and strategy/result scripts passed. |
 | 2026-05-06 01:20 | Step 4 frontend contract | Updated `frontend/types/analysis.ts` for rich backtest details/settings and verified `bash tests/apphost/backtesting-strategy-result-tests.sh` passes. |
+| 2026-05-06 01:21 | Step 5 backtesting tests | `dotnet test tests/ATrade.Backtesting.Tests/ATrade.Backtesting.Tests.csproj --nologo --verbosity minimal` passed: 47/47. |
+| 2026-05-06 01:22 | Step 5 LEAN tests | `dotnet test tests/ATrade.Analysis.Lean.Tests/ATrade.Analysis.Lean.Tests.csproj --nologo --verbosity minimal` passed: 15/15. |
+| 2026-05-06 01:23 | Step 5 analysis tests | `dotnet test tests/ATrade.Analysis.Tests/ATrade.Analysis.Tests.csproj --nologo --verbosity minimal` passed: 10/10. |
+| 2026-05-06 01:24 | Step 5 strategy/result validation | `bash tests/apphost/backtesting-strategy-result-tests.sh` passed. |
+| 2026-05-06 01:25 | Step 5 full test suite | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed with zero failures across all listed test projects. |
+| 2026-05-06 01:26 | Step 5 failures | No test failures remained after targeted validation and the full-suite gate. |
+| 2026-05-06 01:27 | Step 5 build | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
 | 2026-05-06 00:36 | Worker iter 1 | done in 1149s, tools: 133 |
 
 ---
