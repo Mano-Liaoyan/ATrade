@@ -1,11 +1,11 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 2
+**Iteration:** 3
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -75,12 +75,12 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -95,6 +95,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| README and PLAN needed TP-061 delivery/current-surface text plus next task id advancement after strategy/result expansion. | Addressed in Step 6 documentation updates. | `README.md`; `PLAN.md` |
+| Provider-neutral rich backtest result and parameterized LEAN behavior affected the check-if-affected module/provider abstraction docs. | Addressed in Step 6 documentation updates. | `docs/architecture/modules.md`; `docs/architecture/provider-abstractions.md` |
 
 ---
 
@@ -137,6 +139,12 @@
 | 2026-05-06 01:26 | Step 5 failures | No test failures remained after targeted validation and the full-suite gate. |
 | 2026-05-06 01:27 | Step 5 build | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
 | 2026-05-06 00:36 | Worker iter 1 | done in 1149s, tools: 133 |
+| 2026-05-06 00:43 | Worker iter 2 | done in 395s, tools: 67 |
+| 2026-05-06 01:34 | Step 6 must-update docs | Updated and verified backtesting, analysis-engine, and paper-trading workspace docs for built-in strategies, parameter/default validation, costs/slippage accounting, benchmarks, rich results, and LEAN-only/no-custom-code/no-order guardrails. |
+| 2026-05-06 01:36 | Step 6 README/PLAN | Verified README current-surface and verification inventory include TP-061 strategy/result expansion and added PLAN updates for TP-061 delivery plus next task id TP-062. |
+| 2026-05-06 01:38 | Step 6 affected-doc review | Reviewed `docs/architecture/modules.md` and `docs/architecture/provider-abstractions.md`; both affected docs reflect rich backtest details, parameterized LEAN simulations, cost/slippage accounting, and analysis-only/order-free guardrails. |
+| 2026-05-06 01:39 | Step 6 discoveries | Logged README/PLAN and affected-doc review discoveries with addressed dispositions. |
+| 2026-05-06 01:40 | Step 6 completed | Documentation and delivery updates complete; all TP-061 steps are checked. |
 
 ---
 

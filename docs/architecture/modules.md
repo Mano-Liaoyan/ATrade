@@ -43,15 +43,17 @@ see_also:
 > scanner/trending snapshots while preserving provider/market identity metadata.
 > `ATrade.Analysis` now defines the
 > provider-neutral analysis engine seam, API-facing registry, normalized request/result shapes, engine/source
-> metadata, and no-configured-engine fallback. `ATrade.Analysis.Lean` now
-> implements LEAN as the first analysis engine provider behind that seam using
-> a generated analysis-only LEAN workspace, AppHost-managed Docker metadata when
-> Docker mode is selected, and safe runtime-unavailable states.
+> metadata, rich backtest detail contracts, and no-configured-engine fallback.
+> `ATrade.Analysis.Lean` now implements LEAN as the first analysis engine
+> provider behind that seam using a generated analysis-only LEAN workspace,
+> AppHost-managed Docker metadata when Docker mode is selected, parameterized
+> built-in strategy simulation, and safe runtime-unavailable states.
 > `ATrade.Accounts` now also owns the provider-neutral paper-capital contract,
 > Postgres-backed local paper-capital fallback ledger, and `IPaperCapitalService`
 > selection flow that prefers an authenticated IBKR paper balance before local
 > fallback and explicit unavailable states. `ATrade.Backtesting` owns saved
-> asynchronous single-symbol backtest run contracts, built-in strategy validation,
+> asynchronous single-symbol backtest run contracts, built-in strategy/parameter
+> validation, cost/slippage/benchmark snapshots, rich completed result envelopes,
 > Postgres-backed run history, capital-source snapshots, an API-hosted runner
 > with restart recovery, server-side market-data/analysis execution, best-effort
 > cancellation, `/hubs/backtests` SignalR updates, and secret/direct-bar/runtime
@@ -421,8 +423,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `IAnalysisRequestIntake`, engine metadata/capability/status shapes,
   HTTP-facing provider-neutral `AnalysisRunRequest` / `AnalysisRunIntakeResult`
   intake records, normalized `AnalysisRequest` and `AnalysisResult` records,
-  signal/metric/backtest output contracts, and the `NoConfiguredAnalysisEngine`
-  fallback. The intake owns symbol/range (`timeframe` payload field) defaults,
+  signal/metric/backtest output contracts including rich backtest details, and
+  the `NoConfiguredAnalysisEngine` fallback. The intake owns symbol/range
+  (`timeframe` payload field) defaults,
   direct-bar validation, cache-aware candle acquisition through `IMarketDataService`,
   symbol identity resolution/fallback, invalid-request and provider-error propagation, and
   engine handoff. The current API surface exposes `GET /api/analysis/engines`
@@ -443,7 +446,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   project workspaces from ATrade-normalized OHLCV bars, execute the configured
   official LEAN CLI or the AppHost-managed Docker runtime (`lean-engine` via
   `docker exec` with a shared workspace mount), parse the emitted analysis result
-  marker, and return provider-neutral signals, metrics, and backtest summaries.
+  marker, and return provider-neutral signals, metrics, backtest summaries,
+  equity curves, simulated trades, benchmarks, and accounting details.
   Docker mode without managed-container metadata, a missing container, runtime
   timeouts, non-zero exits, and parse failures become explicit
   `analysis-engine-unavailable` results rather than hidden fallback success. The
@@ -453,9 +457,10 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   hosting/configuration abstractions, and either an optional local official LEAN
   CLI or the AppHost-managed `lean-engine` container selected through ignored
   `.env` values.
-- **First-phase focus:** Provide moving-average crossover analysis/backtest
-  output over the same market-data-provider bars the API and frontend already
-  use, while cleanly reporting runtime-unavailable/timeout states.
+- **First-phase focus:** Provide SMA crossover, RSI mean-reversion, and breakout
+  analysis/backtest output over the same market-data-provider bars the API and
+  frontend already use, while cleanly reporting runtime-unavailable/timeout
+  states.
 
 ### 2.9 `ATrade.Backtesting` *(exists today, async runner and saved run persistence)*
 
@@ -475,8 +480,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   source is available. The Postgres repository owns idempotent schema
   initialization, create/list/get/status/cancel/retry operations, queued-run
   claiming with duplicate-execution guards, startup interruption recovery,
-  canonical request JSON persistence, result JSON placeholders, and safe storage
-  errors. The hosted runner fetches candles server-side through
+  canonical request JSON persistence, rich result JSON envelopes, and safe
+  storage errors. The hosted runner fetches candles server-side through
   `IMarketDataService`, invokes `IAnalysisEngineRegistry`, persists completed or
   failed terminal envelopes, and publishes best-effort `/hubs/backtests` updates.
 - **Expected dependencies:** `ATrade.Accounts` for effective paper-capital source
@@ -490,8 +495,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   code, frontend code, or market-data providers directly.
 - **First-phase focus:** Execute queued saved runs inside the API process,
   recover interrupted running jobs safely on restart, cancel queued/running jobs
-  best-effort, stream safe status/result/error updates to browsers, and keep
-  provider/runtime details out of browser contracts and persisted unsafe fields.
+  best-effort, persist and stream safe rich strategy result/error updates to
+  browsers, and keep provider/runtime details out of browser contracts and
+  persisted unsafe fields.
 
 ### 2.10 `ATrade.Workspaces` *(exists today, first backend-owned preference slice)*
 
