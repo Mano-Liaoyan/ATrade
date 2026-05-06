@@ -21,6 +21,8 @@ public static class BacktestingModuleServiceCollectionExtensions
             serviceProvider.GetRequiredService<IPaperCapitalIdentityProvider>()));
         services.Configure<BacktestRunCoordinatorOptions>(configuration.GetSection("Backtesting:Runner"));
         services.TryAddSingleton<IBacktestRunExecutionPipeline, BacktestRunAnalysisExecutionPipeline>();
+        services.TryAddSingleton<IBacktestRunCancellationRegistry, BacktestRunCancellationRegistry>();
+        services.TryAddSingleton<IBacktestRunUpdatePublisher, SignalRBacktestRunUpdatePublisher>();
         services.AddSingleton<IBacktestRunCoordinator, BacktestRunCoordinator>();
         services.AddHostedService<BacktestRunHostedService>();
 

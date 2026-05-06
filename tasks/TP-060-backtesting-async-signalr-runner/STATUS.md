@@ -1,6 +1,6 @@
 # TP-060: Backtesting async runner and SignalR updates — Status
 
-**Current Step:** Step 2: Execute runs through market data and analysis/LEAN seams
+**Current Step:** Step 3: Add best-effort cancellation and SignalR job updates
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -43,12 +43,12 @@
 ---
 
 ### Step 3: Add best-effort cancellation and SignalR job updates
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Queued and running cancel behavior implemented
-- [ ] `/hubs/backtests` or equivalent SignalR hub added
-- [ ] Update payloads redacted and safe
-- [ ] Hub/cancellation validation added
+- [x] Queued and running cancel behavior implemented
+- [x] `/hubs/backtests` or equivalent SignalR hub added
+- [x] Update payloads redacted and safe
+- [x] Hub/cancellation validation added
 
 ---
 

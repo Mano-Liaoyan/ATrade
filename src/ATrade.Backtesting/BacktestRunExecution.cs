@@ -14,6 +14,9 @@ public sealed record BacktestRunExecutionResult(string Status, BacktestError? Er
 
     public static BacktestRunExecutionResult Failed(string code, string message) =>
         new(BacktestRunStatuses.Failed, new BacktestError(code, message), null);
+
+    public static BacktestRunExecutionResult Cancelled() =>
+        new(BacktestRunStatuses.Cancelled, null, null);
 }
 
 public sealed class UnavailableBacktestRunExecutionPipeline : IBacktestRunExecutionPipeline

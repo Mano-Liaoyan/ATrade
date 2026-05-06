@@ -93,6 +93,26 @@ public sealed class BacktestRunCoordinatorTests
     }
 
     [Fact]
+    public async Task ProcessNextQueuedRunAsync_CancelsRunningPipelineThroughRunnerOwnedToken()
+    {
+        var repository = new InMemoryBacktestRunRepository([Run("bt_cancel", BacktestRunStatuses.Queued)]);
+        var pipeline = new CancellableBacktestRunPipeline();
+        var cancellationRegistry = new BacktestRunCancellationRegistry();
+        var publisher = new CapturingBacktestRunUpdatePublisher();
+        var coordinator = CreateCoordinator(repository, pipeline, cancellationRegistry, publisher);
+
+        var processing = coordinator.ProcessNextQueuedRunAsync();
+        await pipeline.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(cancellationRegistry.RequestCancellation("bt_cancel"));
+        var processed = await processing.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(processed);
+        var savedRun = Assert.Single(repository.Runs).Run;
+        Assert.Equal(BacktestRunStatuses.Cancelled, savedRun.Status);
+        Assert.Equal([BacktestRunUpdateEvents.StatusChanged, BacktestRunUpdateEvents.RunCancelled], publisher.Events);
+    }
+
+    [Fact]
     public void PostgresSql_ClaimsQueuedRowsWithSkipLockedAndFailsInterruptedRunningRows()
     {
         Assert.Contains("WHERE status = 'queued'", PostgresBacktestRunSql.ClaimNextQueuedRun, StringComparison.Ordinal);
@@ -101,6 +121,7 @@ public sealed class BacktestRunCoordinatorTests
         Assert.Contains("AND run.status = 'queued'", PostgresBacktestRunSql.ClaimNextQueuedRun, StringComparison.Ordinal);
         Assert.Contains("SET status = 'running'", PostgresBacktestRunSql.ClaimNextQueuedRun, StringComparison.Ordinal);
         Assert.Contains("started_at_utc = COALESCE(started_at_utc, @observed_at_utc)", PostgresBacktestRunSql.ClaimNextQueuedRun, StringComparison.Ordinal);
+        Assert.Contains("AND (status = 'running' OR @status = 'running')", PostgresBacktestRunSql.UpdateStatus, StringComparison.Ordinal);
 
         Assert.Contains("WHERE status = 'running'", PostgresBacktestRunSql.FailInterruptedRunningRuns, StringComparison.Ordinal);
         Assert.Contains("SET status = 'failed'", PostgresBacktestRunSql.FailInterruptedRunningRuns, StringComparison.Ordinal);
@@ -109,8 +130,16 @@ public sealed class BacktestRunCoordinatorTests
 
     private static BacktestRunCoordinator CreateCoordinator(
         InMemoryBacktestRunRepository repository,
-        IBacktestRunExecutionPipeline pipeline) =>
-        new(new NoopSchemaInitializer(), repository, pipeline, new NoopLogger<BacktestRunCoordinator>());
+        IBacktestRunExecutionPipeline pipeline,
+        IBacktestRunCancellationRegistry? cancellationRegistry = null,
+        IBacktestRunUpdatePublisher? updatePublisher = null) =>
+        new(
+            new NoopSchemaInitializer(),
+            repository,
+            pipeline,
+            cancellationRegistry ?? new BacktestRunCancellationRegistry(),
+            updatePublisher ?? new NoopBacktestRunUpdatePublisher(),
+            new NoopLogger<BacktestRunCoordinator>());
 
     private static BacktestRunRecord Run(string id, string status)
     {
@@ -179,6 +208,29 @@ public sealed class BacktestRunCoordinatorTests
             }
 
             return Task.FromResult((BacktestRunExecutionResult)response);
+        }
+    }
+
+    private sealed class CancellableBacktestRunPipeline : IBacktestRunExecutionPipeline
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<BacktestRunExecutionResult> ExecuteAsync(BacktestRunRecord run, CancellationToken cancellationToken = default)
+        {
+            Started.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return BacktestRunExecutionResult.Completed();
+        }
+    }
+
+    private sealed class CapturingBacktestRunUpdatePublisher : IBacktestRunUpdatePublisher
+    {
+        public List<string> Events { get; } = [];
+
+        public Task PublishAsync(string eventName, BacktestRunEnvelope run, CancellationToken cancellationToken = default)
+        {
+            Events.Add(eventName);
+            return Task.CompletedTask;
         }
     }
 
@@ -324,6 +376,11 @@ public sealed class BacktestRunCoordinatorTests
             BacktestRunRecord retryRun,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class NoopBacktestRunUpdatePublisher : IBacktestRunUpdatePublisher
+    {
+        public Task PublishAsync(string eventName, BacktestRunEnvelope run, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class NoopLogger<T> : ILogger<T>

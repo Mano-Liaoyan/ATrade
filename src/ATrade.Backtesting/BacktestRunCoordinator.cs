@@ -22,6 +22,8 @@ public sealed class BacktestRunCoordinator(
     IBacktestRunSchemaInitializer schemaInitializer,
     IBacktestRunRepository runRepository,
     IBacktestRunExecutionPipeline executionPipeline,
+    IBacktestRunCancellationRegistry cancellationRegistry,
+    IBacktestRunUpdatePublisher updatePublisher,
     ILogger<BacktestRunCoordinator> logger) : IBacktestRunCoordinator
 {
     public async Task<int> RecoverInterruptedRunsAsync(CancellationToken cancellationToken = default)
@@ -48,10 +50,13 @@ public sealed class BacktestRunCoordinator(
             return false;
         }
 
-        var executionResult = await ExecuteSafelyAsync(claimed, cancellationToken).ConfigureAwait(false);
+        await PublishSafelyAsync(BacktestRunUpdateEvents.StatusChanged, claimed.Run, cancellationToken).ConfigureAwait(false);
+
+        using var cancellationLease = cancellationRegistry.RegisterRunningRun(claimed.Run.Id, cancellationToken);
+        var executionResult = await ExecuteSafelyAsync(claimed, cancellationLease, cancellationToken).ConfigureAwait(false);
         var terminalResult = NormalizeTerminalExecutionResult(executionResult);
 
-        await runRepository.UpdateStatusAsync(
+        var updated = await runRepository.UpdateStatusAsync(
             claimed.Scope,
             claimed.Run.Id,
             terminalResult.Status,
@@ -59,20 +64,30 @@ public sealed class BacktestRunCoordinator(
             terminalResult.Result,
             cancellationToken).ConfigureAwait(false);
 
+        if (updated is not null)
+        {
+            await PublishSafelyAsync(BacktestRunUpdateEvents.ForRunStatus(updated.Run.Status), updated.Run, cancellationToken).ConfigureAwait(false);
+        }
+
         return true;
     }
 
     private async Task<BacktestRunExecutionResult> ExecuteSafelyAsync(
         BacktestRunRecord claimed,
-        CancellationToken cancellationToken)
+        BacktestRunCancellationLease cancellationLease,
+        CancellationToken runnerCancellationToken)
     {
         try
         {
-            return await executionPipeline.ExecuteAsync(claimed, cancellationToken).ConfigureAwait(false);
+            return await executionPipeline.ExecuteAsync(claimed, cancellationLease.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (runnerCancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException) when (cancellationLease.IsCancellationRequested)
+        {
+            return BacktestRunExecutionResult.Cancelled();
         }
         catch (Exception exception)
         {
@@ -80,6 +95,25 @@ public sealed class BacktestRunCoordinator(
             return BacktestRunExecutionResult.Failed(
                 BacktestErrorCodes.RunnerFailed,
                 BacktestSafeMessages.RunnerFailed);
+        }
+    }
+
+    private async Task PublishSafelyAsync(
+        string eventName,
+        BacktestRunEnvelope run,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await updatePublisher.PublishAsync(eventName, run, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Backtest run update publication failed for {BacktestRunId}.", run.Id);
         }
     }
 
@@ -95,6 +129,11 @@ public sealed class BacktestRunCoordinator(
         if (string.Equals(result.Status, BacktestRunStatuses.Completed, StringComparison.OrdinalIgnoreCase))
         {
             return BacktestRunExecutionResult.Completed(result.Result);
+        }
+
+        if (string.Equals(result.Status, BacktestRunStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+        {
+            return BacktestRunExecutionResult.Cancelled();
         }
 
         var safeError = BacktestPersistenceSafety.NormalizeSafeError(result.Error) ?? new BacktestError(

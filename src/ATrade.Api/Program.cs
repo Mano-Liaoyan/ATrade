@@ -89,6 +89,7 @@ app.MapPost(
         IBacktestRunFactory runFactory,
         IBacktestRunSchemaInitializer schemaInitializer,
         IBacktestRunRepository runRepository,
+        IBacktestRunUpdatePublisher runUpdatePublisher,
         CancellationToken cancellationToken) =>
     {
         var createResult = await runFactory.CreateQueuedRunAsync(request, cancellationToken);
@@ -101,6 +102,7 @@ app.MapPost(
         {
             await schemaInitializer.InitializeAsync(cancellationToken);
             var savedRun = await runRepository.CreateAsync(createResult.Run, cancellationToken);
+            await PublishBacktestRunUpdateAsync(runUpdatePublisher, BacktestRunUpdateEvents.RunCreated, savedRun.Run, cancellationToken);
             return Results.Accepted($"/api/backtests/{savedRun.Run.Id}", savedRun.Run);
         }
         catch (BacktestStorageUnavailableException)
@@ -165,6 +167,8 @@ app.MapPost(
         IPaperCapitalIdentityProvider identityProvider,
         IBacktestRunSchemaInitializer schemaInitializer,
         IBacktestRunRepository runRepository,
+        IBacktestRunCancellationRegistry cancellationRegistry,
+        IBacktestRunUpdatePublisher runUpdatePublisher,
         CancellationToken cancellationToken) =>
     {
         try
@@ -184,8 +188,21 @@ app.MapPost(
                     "Backtest run is not queued or running and cannot be cancelled."));
             }
 
+            if (string.Equals(existing.Run.Status, BacktestRunStatuses.Running, StringComparison.OrdinalIgnoreCase))
+            {
+                cancellationRegistry.RequestCancellation(id);
+            }
+
             var cancelled = await runRepository.CancelAsync(scope, id, cancellationToken);
-            return Results.Ok((cancelled ?? existing).Run);
+            if (cancelled is null || !string.Equals(cancelled.Run.Status, BacktestRunStatuses.Cancelled, StringComparison.OrdinalIgnoreCase))
+            {
+                return ToBacktestErrorResult(new BacktestError(
+                    BacktestErrorCodes.InvalidStatusTransition,
+                    "Backtest run is no longer queued or running and cannot be cancelled."));
+            }
+
+            await PublishBacktestRunUpdateAsync(runUpdatePublisher, BacktestRunUpdateEvents.RunCancelled, cancelled.Run, cancellationToken);
+            return Results.Ok(cancelled.Run);
         }
         catch (BacktestStorageUnavailableException)
         {
@@ -204,6 +221,7 @@ app.MapPost(
         IBacktestRunFactory runFactory,
         IBacktestRunSchemaInitializer schemaInitializer,
         IBacktestRunRepository runRepository,
+        IBacktestRunUpdatePublisher runUpdatePublisher,
         CancellationToken cancellationToken) =>
     {
         try
@@ -231,11 +249,15 @@ app.MapPost(
             }
 
             var retryRun = await runRepository.CreateRetryAsync(scope, source.Run.Id, retryCreateResult.Run, cancellationToken);
-            return retryRun is not null
-                ? Results.Accepted($"/api/backtests/{retryRun.Run.Id}", retryRun.Run)
-                : ToBacktestErrorResult(new BacktestError(
-                    BacktestErrorCodes.InvalidStatusTransition,
-                    "Backtest retry source is no longer failed or cancelled."));
+            if (retryRun is not null)
+            {
+                await PublishBacktestRunUpdateAsync(runUpdatePublisher, BacktestRunUpdateEvents.RunCreated, retryRun.Run, cancellationToken);
+                return Results.Accepted($"/api/backtests/{retryRun.Run.Id}", retryRun.Run);
+            }
+
+            return ToBacktestErrorResult(new BacktestError(
+                BacktestErrorCodes.InvalidStatusTransition,
+                "Backtest retry source is no longer failed or cancelled."));
         }
         catch (BacktestStorageUnavailableException)
         {
@@ -302,6 +324,7 @@ app.MapDelete(
         ToWorkspaceWatchlistResult(await watchlistIntake.UnpinBySymbolAsync(symbol, cancellationToken)));
 
 app.MapHub<MarketDataHub>("/hubs/market-data");
+app.MapHub<BacktestRunsHub>("/hubs/backtests");
 
 app.Run();
 
@@ -370,6 +393,26 @@ static IResult ToBacktestErrorResult(BacktestError? error)
 
 static BacktestWorkspaceScope GetBacktestScope(IPaperCapitalIdentityProvider identityProvider) =>
     BacktestWorkspaceScope.From(identityProvider.Current);
+
+static async Task PublishBacktestRunUpdateAsync(
+    IBacktestRunUpdatePublisher publisher,
+    string eventName,
+    BacktestRunEnvelope run,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        await publisher.PublishAsync(eventName, run, cancellationToken);
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+        throw;
+    }
+    catch
+    {
+        // SignalR updates are best-effort; persisted HTTP state remains authoritative.
+    }
+}
 
 static string? SelectChartRange(params string?[] requestedRanges) =>
     requestedRanges.FirstOrDefault(requestedRange => !string.IsNullOrWhiteSpace(requestedRange));

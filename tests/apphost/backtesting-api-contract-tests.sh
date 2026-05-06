@@ -154,6 +154,7 @@ start_api() {
   ASPNETCORE_URLS="$api_url" \
     ATRADE_IBKR_INTEGRATION_ENABLED='false' \
     ATRADE_ANALYSIS_ENGINE='none' \
+    Backtesting__Runner__Enabled='false' \
     ConnectionStrings__postgres="$connection_string" \
     dotnet run --project "$api_project" >"$api_log" 2>&1 &
   api_pid=$!

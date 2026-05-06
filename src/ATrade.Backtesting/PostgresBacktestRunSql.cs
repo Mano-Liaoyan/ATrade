@@ -222,6 +222,7 @@ internal static class PostgresBacktestRunSql
          WHERE user_id = @user_id
            AND workspace_id = @workspace_id
            AND run_id = @run_id
+           AND (status = 'running' OR @status = 'running')
         RETURNING
         """ + SelectRunColumns + """
         ;
