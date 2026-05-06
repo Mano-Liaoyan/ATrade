@@ -73,6 +73,9 @@ export function TerminalBacktestWorkspace({
         <BacktestCapitalPanel workflow={workflow} />
         <BacktestRunForm workflow={workflow} />
         <BacktestLiveStatusPanel workflow={workflow} />
+        <BacktestHistoryPanel workflow={workflow} />
+        <BacktestRunDetailPanel workflow={workflow} />
+        <BacktestTruthfulStatesPanel />
       </TerminalPanel>
     </section>
   );
@@ -164,6 +167,189 @@ function BacktestCapitalPanel({ workflow }: { workflow: TerminalBacktestWorkflow
   );
 }
 
+function BacktestTruthfulStatesPanel() {
+  return (
+    <div className="terminal-backtest-truth" data-testid="backtest-no-fake-results-note" role="note">
+      <strong>Truthful empty states only.</strong>
+      <span>No demo runs, fixture strategies, synthetic equity curves, browser-supplied bars, or fabricated trades are rendered when ATrade.Api has no saved result.</span>
+    </div>
+  );
+}
+
+function BacktestRunDetailPanel({ workflow }: { workflow: TerminalBacktestWorkflow }) {
+  const run = workflow.selectedRun;
+  const result = run?.result ?? null;
+
+  return (
+    <div className="terminal-backtest-detail" data-testid="backtest-run-detail">
+      <div className="terminal-backtest-detail__header">
+        <div>
+          <span>Selected run detail</span>
+          <strong>{run ? `${run.id}` : 'No run selected'}</strong>
+          <small>{run ? `${run.request.symbol.symbol} · ${run.request.strategyId} · ${run.request.chartRange}` : 'Select a saved run to inspect persisted backend metadata.'}</small>
+        </div>
+        {run ? <TerminalStatusBadge tone={getBacktestRunTone(run)}>{formatBacktestStatusLabel(run.status)}</TerminalStatusBadge> : null}
+      </div>
+
+      {!run ? (
+        <div className="terminal-backtest-history__empty" role="status">
+          <strong>No selected run detail.</strong>
+          <span>No summary, benchmark, trades, signals, source metadata, or equity data is fabricated for an empty selection.</span>
+        </div>
+      ) : null}
+
+      {run && !result ? (
+        <div className="terminal-backtest-history__empty" data-testid="backtest-detail-no-result" role="status">
+          <strong>{run.status === 'failed' ? 'Run failed.' : run.status === 'cancelled' ? 'Run cancelled.' : 'Result pending.'}</strong>
+          <span>{run.error?.message ?? 'Completed result fields appear only after ATrade.Api persists a result envelope.'}</span>
+        </div>
+      ) : null}
+
+      {run && result ? (
+        <div className="terminal-backtest-detail__body">
+          <div className="terminal-backtest-detail__metrics" data-testid="backtest-summary-metrics">
+            <Metric label="Initial capital" value={formatCurrency(result.backtest?.initialCapital ?? run.capital.initialCapital, run.capital.currency)} />
+            <Metric label="Final equity" value={result.backtest ? formatCurrency(result.backtest.finalEquity, run.capital.currency) : 'n/a'} />
+            <Metric label="Total return" value={result.backtest ? `${result.backtest.totalReturnPercent.toFixed(2)}%` : 'n/a'} />
+            <Metric label="Max drawdown" value={result.backtest ? `${result.backtest.maxDrawdownPercent.toFixed(2)}%` : 'n/a'} />
+            <Metric label="Trades" value={String(result.backtest?.tradeCount ?? result.trades.length)} />
+            <Metric label="Win rate" value={result.backtest ? `${result.backtest.winRatePercent.toFixed(1)}%` : 'n/a'} />
+          </div>
+
+          <div className="terminal-backtest-detail__source" data-testid="backtest-source-metadata">
+            <div>
+              <span>Engine</span>
+              <strong>{result.engine.displayName}</strong>
+              <small>{result.engine.provider} · {result.engine.version} · {result.engine.state}</small>
+            </div>
+            <div>
+              <span>Market data source</span>
+              <strong>{result.source.marketDataSource}</strong>
+              <small>{result.source.provider} · generated {formatDateTime(result.source.generatedAtUtc)}</small>
+            </div>
+            <div>
+              <span>Symbol metadata</span>
+              <strong>{result.symbol.symbol} · {result.symbol.provider.toUpperCase()}</strong>
+              <small>{result.symbol.providerSymbolId ?? 'no provider id'} · {result.symbol.exchange || 'market unavailable'} · {result.symbol.currency} · {result.symbol.assetClass}</small>
+            </div>
+          </div>
+
+          <div className="terminal-backtest-detail__benchmark" data-testid="backtest-benchmark-summary">
+            <span>Benchmark</span>
+            {result.benchmark ? (
+              <strong>{result.benchmark.label}: {result.benchmark.totalReturnPercent.toFixed(2)}% · final {formatCurrency(result.benchmark.finalEquity, run.capital.currency)}</strong>
+            ) : <strong>No benchmark requested.</strong>}
+            <small>{result.benchmark ? `${result.benchmark.equityCurve.length} buy-and-hold equity points persisted.` : 'Backend returned a null benchmark envelope.'}</small>
+          </div>
+
+          <div className="terminal-backtest-detail__lists">
+            <BacktestSignalList run={run} />
+            <BacktestTradeList run={run} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function BacktestSignalList({ run }: { run: BacktestRunEnvelope }) {
+  const signals = run.result?.signals ?? [];
+
+  return (
+    <div className="terminal-backtest-detail__list" data-testid="backtest-signals-list">
+      <h3>Signals</h3>
+      {signals.length === 0 ? <p>No strategy signals were persisted for this run.</p> : null}
+      <ul>
+        {signals.slice(0, 8).map((signal) => (
+          <li key={`${signal.time}-${signal.kind}-${signal.direction}`}>
+            <strong>{signal.direction}</strong>
+            <span>{signal.kind} · confidence {(signal.confidence * 100).toFixed(0)}%</span>
+            <small>{formatDateTime(signal.time)} · {signal.rationale}</small>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BacktestTradeList({ run }: { run: BacktestRunEnvelope }) {
+  const trades = run.result?.trades ?? [];
+
+  return (
+    <div className="terminal-backtest-detail__list" data-testid="backtest-trades-list">
+      <h3>Simulated trades</h3>
+      {trades.length === 0 ? <p>No simulated trades were persisted for this run.</p> : null}
+      <ul>
+        {trades.slice(0, 8).map((trade, index) => (
+          <li key={`${trade.entryTime}-${trade.exitTime ?? 'open'}-${index}`}>
+            <strong>{trade.direction} · {formatCurrency(trade.netPnl, run.capital.currency)}</strong>
+            <span>{formatDateTime(trade.entryTime)} → {formatDateTime(trade.exitTime)} · qty {trade.quantity}</span>
+            <small>Entry {trade.entryPrice.toFixed(2)} · exit {trade.exitPrice?.toFixed(2) ?? 'open'} · {trade.exitReason}</small>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function BacktestHistoryPanel({ workflow }: { workflow: TerminalBacktestWorkflow }) {
+  return (
+    <div className="terminal-backtest-history" data-testid="backtest-run-history">
+      <div className="terminal-backtest-history__header">
+        <div>
+          <span>Saved run history</span>
+          <strong>{workflow.historyLoading ? 'Loading…' : `${workflow.runs.length} saved runs`}</strong>
+          <small>History is loaded from GET /api/backtests; no demo runs are inserted for empty states.</small>
+        </div>
+        <Button data-testid="backtest-reload-history-button" onClick={() => void workflow.reloadHistory()} size="sm" type="button" variant="ghost">
+          Reload history
+        </Button>
+      </div>
+
+      {workflow.runs.length === 0 ? (
+        <div className="terminal-backtest-history__empty" data-testid="backtest-history-empty" role="status">
+          <strong>No saved backtest runs.</strong>
+          <span>Create a run after paper capital is available. The workspace does not show fixture strategies, synthetic completed results, or demo run history.</span>
+        </div>
+      ) : (
+        <div className="terminal-backtest-history__list" role="list" aria-label="Saved backtest runs">
+          {workflow.runs.map((run) => {
+            const selected = run.id === workflow.selectedRunId;
+            return (
+              <button
+                aria-current={selected ? 'true' : undefined}
+                className={cn('terminal-backtest-history__item', selected && 'terminal-backtest-history__item--selected')}
+                data-testid="backtest-history-row"
+                key={run.id}
+                onClick={() => workflow.setSelectedRunId(run.id)}
+                type="button"
+              >
+                <span className="terminal-backtest-history__item-heading">
+                  <strong>{run.request.symbol.symbol}</strong>
+                  <TerminalStatusBadge tone={getBacktestRunTone(run)}>{formatBacktestStatusLabel(run.status)}</TerminalStatusBadge>
+                </span>
+                <span>{run.request.strategyId} · {run.request.chartRange}</span>
+                <span>{formatBacktestCapitalSource(run.capital.capitalSource)} · {formatCurrency(run.capital.initialCapital, run.capital.currency)}</span>
+                <span>Created {formatDateTime(run.createdAtUtc)}{run.completedAtUtc ? ` · finished ${formatDateTime(run.completedAtUtc)}` : ''}</span>
+                <small>{getRunPreview(run)}</small>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BacktestLiveStatusPanel({ workflow }: { workflow: TerminalBacktestWorkflow }) {
   const run = workflow.selectedRun;
   const statusTone = getBacktestRunTone(run);
@@ -188,7 +374,7 @@ function BacktestLiveStatusPanel({ workflow }: { workflow: TerminalBacktestWorkf
           <div>
             <span>Created</span>
             <strong>{formatDateTime(run.createdAtUtc)}</strong>
-            <small>Updated {formatDateTime(run.updatedAtUtc)}</small>
+            <small>{run.sourceRunId ? `Retry of ${run.sourceRunId}` : `Updated ${formatDateTime(run.updatedAtUtc)}`}</small>
           </div>
           <div>
             <span>Capital</span>
@@ -218,23 +404,23 @@ function BacktestLiveStatusPanel({ workflow }: { workflow: TerminalBacktestWorkf
       <div className="terminal-backtest-live__actions">
         <Button
           data-testid="backtest-cancel-run-button"
-          disabled={!workflow.canCancelRun(run)}
+          disabled={!workflow.canCancelRun(run) || workflow.runActionPending !== null}
           onClick={() => void workflow.cancelRun(run?.id)}
           size="sm"
           type="button"
           variant="destructive"
         >
-          Cancel run
+          {workflow.runActionPending === 'cancel' ? 'Cancelling run…' : 'Cancel run'}
         </Button>
         <Button
           data-testid="backtest-retry-run-button"
-          disabled={!workflow.canRetryRun(run)}
+          disabled={!workflow.canRetryRun(run) || workflow.runActionPending !== null}
           onClick={() => void workflow.retryRun(run?.id)}
           size="sm"
           type="button"
           variant="terminal"
         >
-          Retry as new run
+          {workflow.runActionPending === 'retry' ? 'Creating retry…' : 'Retry as new run'}
         </Button>
         <Button data-testid="backtest-reload-status-button" onClick={() => void workflow.reloadSelectedRun()} size="sm" type="button" variant="ghost">
           Reload detail
@@ -397,6 +583,22 @@ function BacktestRunForm({ workflow }: { workflow: TerminalBacktestWorkflow }) {
       </div>
     </form>
   );
+}
+
+function getRunPreview(run: BacktestRunEnvelope): string {
+  if (run.sourceRunId && (run.status === 'queued' || run.status === 'running')) {
+    return `Retry created as a new saved run from ${run.sourceRunId}; source run remains unchanged.`;
+  }
+
+  if (run.error) {
+    return `${run.error.code}: ${run.error.message}`;
+  }
+
+  if (run.result?.backtest) {
+    return `Return ${run.result.backtest.totalReturnPercent.toFixed(2)}% · ${run.result.backtest.tradeCount} simulated trades · final equity ${formatCurrency(run.result.backtest.finalEquity, run.capital.currency)}.`;
+  }
+
+  return getBacktestRunStatusCopy(run);
 }
 
 function getBacktestRunTone(run: BacktestRunEnvelope | null): TerminalStatusTone {

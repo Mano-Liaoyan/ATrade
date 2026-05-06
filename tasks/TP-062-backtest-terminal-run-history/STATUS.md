@@ -1,6 +1,6 @@
 # TP-062: Terminal backtest run, history, retry, and status streaming — Status
 
-**Current Step:** Step 3: Add run history, detail, cancel, and retry views
+**Current Step:** Step 4: Add frontend validation coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -43,12 +43,12 @@
 ---
 
 ### Step 3: Add run history, detail, cancel, and retry views
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Saved run history rendered
-- [ ] Run detail includes summary, benchmark, trades/signals, and source metadata
-- [ ] Cancel and retry controls call backend endpoints correctly
-- [ ] Empty/unavailable states avoid fake runs/results
+- [x] Saved run history rendered
+- [x] Run detail includes summary, benchmark, trades/signals, and source metadata
+- [x] Cancel and retry controls call backend endpoints correctly
+- [x] Empty/unavailable states avoid fake runs/results
 
 ---
 

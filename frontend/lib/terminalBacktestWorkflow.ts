@@ -111,6 +111,7 @@ export type TerminalBacktestWorkflow = {
   streamState: BacktestStreamState;
   streamError: string | null;
   creatingRun: boolean;
+  runActionPending: 'cancel' | 'retry' | null;
   actionError: string | null;
   canCreateRun: boolean;
   createRun: () => Promise<void>;
@@ -161,6 +162,7 @@ export function useTerminalBacktestWorkflow({
   const [streamState, setStreamState] = useState<BacktestStreamState>('connecting');
   const [streamError, setStreamError] = useState<string | null>(null);
   const [creatingRun, setCreatingRun] = useState(false);
+  const [runActionPending, setRunActionPending] = useState<'cancel' | 'retry' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const reconnectingRef = useRef(false);
   const selectedRunIdRef = useRef<string | null>(null);
@@ -411,6 +413,7 @@ export function useTerminalBacktestWorkflow({
     }
 
     setActionError(null);
+    setRunActionPending('cancel');
 
     try {
       const run = await cancelBacktestRun(id);
@@ -419,6 +422,8 @@ export function useTerminalBacktestWorkflow({
       setSelectedRunDetail(run);
     } catch (caughtError) {
       setActionError(formatBacktestWorkflowError(caughtError, 'Backtest cancellation failed.'));
+    } finally {
+      setRunActionPending(null);
     }
   }, [selectedRunId]);
 
@@ -428,6 +433,7 @@ export function useTerminalBacktestWorkflow({
     }
 
     setActionError(null);
+    setRunActionPending('retry');
 
     try {
       const run = await retryBacktestRun(id);
@@ -439,6 +445,8 @@ export function useTerminalBacktestWorkflow({
       if (caughtError instanceof BacktestClientError && caughtError.code === 'backtest-capital-unavailable') {
         void loadCapital();
       }
+    } finally {
+      setRunActionPending(null);
     }
   }, [loadCapital, selectedRunId]);
 
@@ -494,6 +502,7 @@ export function useTerminalBacktestWorkflow({
     streamState,
     streamError,
     creatingRun,
+    runActionPending,
     actionError,
     canCreateRun,
     createRun,
