@@ -78,19 +78,22 @@ see_also:
 > splitters, layout reset, or page-level vertical scrolling, status/help
 > surfaces, and a dense terminal market monitor over backend-driven trending
 > symbols, bounded/ranked/compact-filterable IBKR stock search, and
-> Postgres-backed exact watchlists plus terminal chart/analysis workspaces.
+> Postgres-backed exact watchlists plus terminal chart/analysis/backtest
+> workspaces.
 > `TerminalMarketMonitor`,
 > `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
 > `MarketMonitorDetailPanel` replace the old long/list search, trending, and
-> watchlist renderers while preserving exact identity for chart/analysis actions.
-> `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
+> watchlist renderers while preserving exact identity for chart/analysis/backtest
+> actions. `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
 > `TerminalIndicatorGrid` own the chart module around the reusable
 > `CandlestickChart`; `TerminalAnalysisWorkspace` owns provider-neutral analysis
+> states; `TerminalBacktestWorkspace` owns saved backtest run/capital/history
 > states; and `TerminalProviderDiagnostics` replaces the old broker status card.
 > The `frontend/lib/*Workflow.ts` hooks continue to centralize watchlist,
 > bounded search result view models, terminal monitor rows/actions, chart range
-> loading, source labeling, streaming fallback orchestration, and analysis engine
-> discovery/run view models behind the terminal frame.
+> loading, source labeling, streaming fallback orchestration, analysis engine
+> discovery/run view models, and backtest capital/history/status workflows behind
+> the terminal frame.
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
@@ -672,8 +675,8 @@ references.
   explanations. The current frontend shell is the clean-room ATrade paper
   workspace described in [`atrade-terminal-ui.md`](../design/atrade-terminal-ui.md):
   `frontend/types/terminal.ts` and `frontend/lib/terminalModuleRegistry.ts` own
-  enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `STATUS`,
-  `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
+  enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `BACKTEST`,
+  `STATUS`, `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
   `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`) and their purpose-matched rail
   icon metadata. Home and symbol routes now render directly through
   `ATradeTerminalApp`, `TerminalModuleRail`, `TerminalWorkspaceLayout`,
@@ -690,7 +693,7 @@ references.
   watchlist and symbol-search workflow hooks with provider-backed trending state,
   source/provider/market filters, sorting, selected-row state, bounded
   show-more/show-less exploration, exact pin state projection, and exact
-  chart/analysis navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
+  chart/analysis/backtest navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
   and its table/search/compact-filter/detail components render that monitor for `HOME`,
   `SEARCH`, and `WATCHLIST`. `frontend/lib/terminalChartWorkspaceWorkflow.ts`
   adapts `symbolChartWorkflow` into terminal source/range/identity/stream view
@@ -704,7 +707,12 @@ references.
   `TimeframeSelector` and `IndicatorPanel` remain retired.
   `frontend/lib/terminalAnalysisWorkflow.ts` adapts `analysisClient`
   discovery/run behavior for `TerminalAnalysisWorkspace`, which
-  replaces `AnalysisPanel`; `TerminalProviderDiagnostics` replaces
+  replaces `AnalysisPanel`; `frontend/types/backtesting.ts`,
+  `frontend/lib/backtestClient.ts`, and `frontend/lib/terminalBacktestWorkflow.ts`
+  own the `BACKTEST` rail module's safe saved-run/capital contracts, ATrade.Api
+  HTTP/SignalR calls, form validation, create/cancel/retry actions, history/detail
+  selection, reconnect recovery, and no-fake-result status state for
+  `TerminalBacktestWorkspace`; `TerminalProviderDiagnostics` replaces
   `BrokerPaperStatus` as diagnostics-only broker/IBKR/iBeam/source state. The
   old `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
   `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and
@@ -715,8 +723,8 @@ references.
   screeners, macro calendars, assistant text, node graphs, or order-entry
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
-  top-chrome/filter-density, shell/market/chart/analysis/theme, and module rail
-  icon/collapse validation scripts.
+  top-chrome/filter-density, shell/market/chart/analysis/theme, backtest
+  workspace, and module rail icon/collapse validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
@@ -731,8 +739,9 @@ references.
   `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalModuleRail`,
   `TerminalWorkspaceLayout`, `TerminalHelpModule`, `TerminalStatusModule`,
   `TerminalChartWorkspace`, `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
-  `TerminalAnalysisWorkspace`, `TerminalProviderDiagnostics`, and
-  `TerminalDisabledModule`) and intentionally avoid legacy page-shell layout
+  `TerminalAnalysisWorkspace`, `TerminalBacktestWorkspace`,
+  `TerminalProviderDiagnostics`, and `TerminalDisabledModule`) and intentionally
+  avoid legacy page-shell layout
   assumptions, backend access, provider runtime calls, order-entry behavior, or
   third-party terminal branding.
 

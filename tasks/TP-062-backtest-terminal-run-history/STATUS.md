@@ -1,7 +1,7 @@
 # TP-062: Terminal backtest run, history, retry, and status streaming — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
@@ -75,12 +75,12 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -95,6 +95,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| TP-062 did not alter analysis/LEAN payload semantics; BACKTEST frontend consumes existing saved-backtest contracts through ATrade.Api. | Reviewed affected analysis docs; no update required. | `docs/architecture/analysis-engines.md` |
 
 ---
 
@@ -108,6 +109,10 @@
 | 2026-05-06 01:11 | Worker iter 1 | done in 1401s, tools: 201 |
 | 2026-05-06 | Step 5 verification | Re-ran `dotnet test ATrade.slnx --nologo --verbosity minimal`; 0 failures across test projects before marking failures fixed. |
 | 2026-05-06 | Step 5 build | `dotnet build ATrade.slnx --nologo --verbosity minimal` succeeded with 0 warnings and 0 errors. |
+| 2026-05-06 | Step 6 docs | Updated active BACKTEST docs in UI design, backtesting, paper workspace, modules, README, and PLAN. |
+| 2026-05-06 | Step 6 README/PLAN | README current runtime surface/verification inventory and PLAN current focus/queue/next ID include TP-062 BACKTEST frontend coverage. |
+| 2026-05-06 | Step 6 affected docs | Reviewed `docs/architecture/analysis-engines.md`; no change needed because TP-062 consumes existing saved-backtest/analysis contracts without altering analysis/LEAN frontend payload semantics. |
+| 2026-05-06 | Step 6 discoveries | Logged the only Step 6 discovery in STATUS.md. |
 
 ---
 

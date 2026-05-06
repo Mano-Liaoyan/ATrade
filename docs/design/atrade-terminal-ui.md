@@ -53,7 +53,7 @@ Current non-goals:
 - Do not restore retired terminal branding, app-level brand headers, visible
   global safety strips, shell headers, or command-first product copy.
 - Do not remove the module rail or the API-backed HOME, SEARCH, WATCHLIST,
-  CHART, ANALYSIS, STATUS, HELP, and visible-disabled module surfaces.
+  CHART, ANALYSIS, BACKTEST, STATUS, HELP, and visible-disabled module surfaces.
 
 ## 2. Clean-Room Visual And Source Guardrails
 
@@ -118,6 +118,7 @@ backend cannot supply.
 | `WATCHLIST` | Backend-owned watchlist view for exact provider/market pins with pin/unpin/remove, stable `instrumentKey` / `pinKey`, read-only cached fallback copy, and no browser-owned authority. | `GET` / `PUT` / `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy unambiguous `DELETE /api/workspace/watchlist/{symbol}`, and `watchlistWorkflow`. |
 | `CHART` | Dense chart workspace for an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis handoff. | `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, and `symbolChartWorkflow`. |
 | `ANALYSIS` | Provider-neutral analysis workspace that lists available engines, runs analysis over market-data bars, and surfaces explicit no-engine or runtime-unavailable states without fake signals. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
+| `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, cancel, retry, and truthful empty/unavailable states. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
 | `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and explicit unavailable states. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata. |
 | `HELP` | In-product module/workflow reference, safety reminders, provider-state explanations, and direct-navigation guidance. | Static frontend content derived from this spec and active architecture docs; no backend data required. |
 
@@ -125,8 +126,9 @@ Enabled modules share `frontend/lib/terminalModuleRegistry.ts` so rail entries,
 module labels, icons, disabled states, and help copy stay consistent. The rail
 uses purpose-matched `lucide-react` icons from the registry contract: `HOME`
 uses a home/house glyph, `SEARCH` a magnifier, `WATCHLIST` a bookmark, `CHART`
-a candlestick chart, `ANALYSIS` a flask/analysis glyph, `STATUS` an activity
-heartbeat, and `HELP` a circle-question glyph.
+a candlestick chart, `ANALYSIS` a flask/analysis glyph, `BACKTEST` an activity
+run/status glyph, `STATUS` an activity heartbeat, and `HELP` a circle-question
+glyph.
 
 ### 4.2 Visible-Disabled Future Modules
 
@@ -161,18 +163,18 @@ The first-release navigation model is intentionally explicit and deterministic
 without a command system.
 
 - The module rail opens `HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`,
-  `STATUS`, and `HELP` and exposes visible-disabled future modules with honest
-  unavailable states.
+  `BACKTEST`, `STATUS`, and `HELP` and exposes visible-disabled future modules
+  with honest unavailable states.
 - The market monitor is the primary workflow handoff surface for search,
   watchlist, and trending rows. It uses a compact filter bar with count chips,
   active-count/Clear-all controls, accessible filter groups, and no long
   explanatory paragraph. Its dense table owns an internal scroll viewport with
   visible vertical and horizontal scrollbar tracks/thumbs so wide provider,
   identity, source, score, pin, and action columns remain available without page
-  scrolling. Row actions open chart and analysis workspaces while preserving
-  exact provider identity when available.
-- Symbol routes may initialize `CHART` or `ANALYSIS` directly from route/query
-  state, including chart range and exact identity metadata.
+  scrolling. Row actions open chart, analysis, and backtest workspaces while
+  preserving exact provider identity when available.
+- Symbol routes may initialize `CHART`, `ANALYSIS`, or `BACKTEST` directly from
+  route/query state, including chart range and exact identity metadata.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
   provider-state meanings, and paper-only safety constraints.
 - STATUS surfaces `ATrade.Api`, broker/iBeam/provider, cache/source, and analysis
@@ -200,8 +202,10 @@ implementation while leaving room for a desktop wrapper later.
 - The main page and body should not vertically scroll. The application frame is
   viewport-height with page-level `overflow: hidden`; long market-monitor,
   chart, analysis, status, help, and disabled-module content scrolls inside the
-  primary workspace or module-owned scroll regions. The market monitor table is
-  its own module-owned scroll region: row overflow stays inside the table
+  primary workspace or module-owned scroll regions. Backtest run forms, status,
+  history, and detail content use module-owned scroll space and must not force
+  page-level scrolling. The market monitor table is its own module-owned scroll
+  region: row overflow stays inside the table
   viewport with sticky headers, and horizontal overflow remains visible through a
   dedicated table scrollbar rather than clipping identity/action columns.
 - Panel content must remain honest about backend state: loading, provider
@@ -232,8 +236,9 @@ implementation while leaving room for a desktop wrapper later.
 ### 6.3 Module Rail
 
 - The rail lists enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`,
-  `ANALYSIS`, `STATUS`, `HELP`) first with clear active/focus/keyboard states
-  and a purpose-matched icon next to each module label.
+  `ANALYSIS`, `BACKTEST`, `STATUS`, `HELP`) first with clear
+  active/focus/keyboard states and a purpose-matched icon next to each module
+  label.
 - Visible-disabled future modules may appear below a separator with disabled
   styling, purpose-matched icons, explanatory title/tooltip copy, and no active
   workspace route.
@@ -375,7 +380,8 @@ paper-trading slice honest and safe.
   handling.
 - Preserve exact instrument identity handoff (`provider`, provider symbol id /
   IBKR `conid`, symbol, exchange, currency, asset class, `instrumentKey`, and
-  `pinKey`) across search, watchlist, chart, analysis, and status surfaces.
+  `pinKey`) across search, watchlist, chart, analysis, backtest, and status
+  surfaces.
 - Reuse types, API clients, data mappers, and tests when they keep provider
   behavior honest; rewrite rendering components and CSS around the workspace
   model.
