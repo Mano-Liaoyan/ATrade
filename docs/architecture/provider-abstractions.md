@@ -152,8 +152,9 @@ Core types:
 Compatibility layer:
 
 - `IMarketDataService` is the async HTTP-facing read seam used by market-data
-  endpoints, SignalR-adjacent callers, and `ATrade.Analysis` request intake.
-  Trending, search, symbol lookup, candle, indicator, and latest-update reads all
+  endpoints, SignalR-adjacent callers, `ATrade.Analysis` request intake, and the
+  `ATrade.Backtesting` async runner. Trending, search, symbol lookup, candle,
+  indicator, and latest-update reads all
   return `MarketDataReadResult<T>` with the same `MarketDataError` codes the
   browser already understands.
 - `MarketDataService` composes `IMarketDataProvider`, validates stock search
@@ -222,11 +223,12 @@ Core rules:
 
 ## 5. Composition Rules
 
-- API endpoint handlers may depend on provider-neutral contracts such as
-  `IBrokerProvider`, `IPaperCapitalService`, `IMarketDataService`,
-  `IAnalysisEngineRegistry`, `IAnalysisRequestIntake`, `IBacktestRunFactory`,
-  `IBacktestRunRepository`, `IWorkspaceWatchlistIntake`, and SignalR-facing
-  market-data services.
+- API endpoint handlers and hosted module services may depend on
+  provider-neutral contracts such as `IBrokerProvider`, `IPaperCapitalService`,
+  `IMarketDataService`, `IAnalysisEngineRegistry`, `IAnalysisRequestIntake`,
+  `IBacktestRunFactory`, `IBacktestRunRepository`,
+  `IBacktestRunCancellationRegistry`, `IBacktestRunUpdatePublisher`,
+  `IWorkspaceWatchlistIntake`, and SignalR-facing market-data/backtest services.
 - API endpoint handlers must not instantiate concrete providers such as the
   IBKR Gateway client or any market-data provider implementation.
 - Concrete providers are registered in module composition methods and can be
@@ -240,8 +242,9 @@ Core rules:
   while the Timescale decorator owns cache-aside reads, writes, freshness checks,
   and storage-unavailable fallback; `ATrade.Analysis` intake owns analysis
   request construction/engine handoff; `ATrade.Backtesting` owns saved-run
-  validation, capital snapshots, Postgres history, cancel/retry rules, and
-  redaction; `ATrade.Workspaces` intake owns watchlist request
+  validation, capital snapshots, Postgres history, async runner claim/recovery
+  state, server-side market-data/analysis execution, cancel/retry rules, safe
+  SignalR update payloads, and redaction; `ATrade.Workspaces` intake owns watchlist request
   normalization/storage error shaping; and `ATrade.Accounts` owns paper-capital
   source selection plus local ledger storage/error shaping.
 - Workers may compose concrete provider modules, but worker-to-API state must be
@@ -325,7 +328,8 @@ Future plug-ins:
 - LEAN is now the first analysis-engine provider behind `ATrade.Analysis`; it
   consumes normalized market-data/signal contracts and must not become an API or
   UI type assumption. Runtime-unavailable or timeout states surface as explicit
-  analysis errors instead of fake results.
+  analysis errors instead of fake results, including when the saved backtest
+  runner invokes the provider-neutral registry.
 - Additional analysis engines can replace or complement LEAN by implementing
   `IAnalysisEngine` in their own provider modules and preserving the same
   request/result contracts.

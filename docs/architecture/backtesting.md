@@ -17,8 +17,9 @@ see_also:
 
 `ATrade.Backtesting` is the provider-neutral backend module for saved,
 asynchronous paper backtest requests. It owns the browser-facing contract for
-creating, listing, reading, cancelling, and retrying saved runs while later runner
-work can attach execution/result production behind the same persisted run IDs.
+creating, listing, reading, cancelling, retrying, executing, and streaming saved
+runs while keeping market-data, analysis/LEAN runtime, and persistence details
+behind provider-neutral seams.
 
 ## Module Responsibilities
 
@@ -31,6 +32,12 @@ work can attach execution/result production behind the same persisted run IDs.
   at run creation time.
 - Persist saved runs in Postgres under the namespaced
   `atrade_backtesting.saved_backtest_runs` table.
+- Run queued jobs inside the API process with a hosted coordinator that claims
+  one queued row at a time, marks it `running`, and finalizes terminal state
+  durably.
+- Fetch candles server-side through `IMarketDataService`, then invoke
+  `IAnalysisEngineRegistry` with the saved strategy and optional engine id.
+- Broadcast safe browser-facing job updates over `/hubs/backtests`.
 - Keep all API and persisted payloads provider-neutral; LEAN or any future runner
   must remain an implementation detail rather than a route name or frontend type.
 
@@ -42,19 +49,22 @@ A saved run envelope contains:
 - `status` — one of `queued`, `running`, `completed`, `failed`, or `cancelled`.
 - `sourceRunId` — populated only for retry-created runs.
 - `request` — normalized request snapshot with symbol identity, built-in strategy
-  id, JSON parameter bag, chart range, cost model, slippage bps, and benchmark
-  mode.
+  id, optional analysis engine id, JSON parameter bag, chart range, cost model,
+  slippage bps, and benchmark mode.
 - `capital` — `initialCapital`, `currency`, and `capitalSource` captured at
   creation time.
 - timestamps for creation/update/start/completion.
 - safe `error` details and an optional provider-neutral `result` JSON placeholder.
 
-Created runs start as `queued`. Runner tasks in later work may transition to
-`running`, `completed`, `failed`, or `cancelled`. `POST /api/backtests/{id}/cancel`
-performs best-effort contract-level cancellation for `queued` or `running` runs.
-`POST /api/backtests/{id}/retry` is allowed only for `failed` or `cancelled`
-runs and creates a new queued run from the saved source request snapshot instead
-of mutating the source run.
+Created runs start as `queued`. The hosted runner transitions claimed jobs to
+`running`, then to `completed`, `failed`, or `cancelled`. On API startup,
+interrupted rows left in `running` are marked `failed` with
+`backtest-run-interrupted`; queued rows are preserved for normal execution.
+`POST /api/backtests/{id}/cancel` deterministically cancels queued rows and
+requests best-effort cancellation for running rows through runner-owned
+cancellation tokens before marking the row `cancelled`. `POST /api/backtests/{id}/retry`
+is allowed only for `failed` or `cancelled` runs and creates a new queued run
+from the saved source request snapshot instead of mutating the source run.
 
 ## Capital Snapshot
 
@@ -86,6 +96,45 @@ Validation failures return safe `BacktestError` payloads. Storage failures retur
 `503 backtest-storage-unavailable`. Missing capital and invalid status
 transitions return `409`.
 
+## Runner Lifecycle And Provider Handling
+
+`BacktestRunHostedService` initializes the schema, fails interrupted `running`
+rows on startup, and drains queued rows on a polling loop. `ClaimNextQueuedRun`
+uses a Postgres `FOR UPDATE SKIP LOCKED` claim and a status guard so overlapping
+service ticks or multiple local API instances do not execute the same run twice.
+Terminal runner updates only finalize rows still in `running`, so a concurrent
+cancel request cannot be overwritten by a late completion.
+
+The execution pipeline never accepts browser-submitted bars. It uses the saved
+`MarketDataSymbolIdentity` and chart range to call `IMarketDataService.GetCandlesAsync(...)`.
+Provider-not-configured, provider-unavailable, authentication-required,
+unsupported-symbol, unsupported-range, and empty-candle states become failed
+saved runs with safe market-data error codes/messages; no synthetic candles or
+fake successful results are created.
+
+When candles are available, the runner calls `IAnalysisEngineRegistry.AnalyzeAsync(...)`
+with normalized OHLCV bars, the saved optional `engineId`, and the saved built-in
+strategy id as strategy metadata. `analysis-engine-not-configured`,
+`analysis-engine-unavailable`, and invalid analysis requests become failed saved
+runs with generic safe messages. Completed analysis results are persisted as a
+provider-neutral `tp-060.backtest-result.v1` JSON placeholder containing engine,
+symbol, chart range, market-data source, signals, metrics, and optional backtest
+summary fields for TP-061 enrichment. The placeholder intentionally omits LEAN
+workspace paths, process command lines, credentials, account identifiers,
+gateway URLs, tokens, cookies, session details, and raw direct-bar submissions.
+
+## SignalR Updates
+
+`ATrade.Api` maps `/hubs/backtests` to `BacktestRunsHub`. The runner and REST
+handlers publish best-effort events named `backtestRunCreated`,
+`backtestRunStatusChanged`, `backtestRunCompleted`, `backtestRunFailed`, and
+`backtestRunCancelled`. Payloads include safe run id/status/timestamps,
+symbol identity, strategy id, optional engine id, chart range, safe error, and
+safe result placeholder only; paper-capital amounts, account identifiers,
+credentials, gateway URLs, LEAN workspace paths, raw command lines, tokens,
+cookies, and sessions are not broadcast. SignalR delivery is best-effort and
+HTTP/Postgres state remains authoritative when no clients are connected.
+
 ## Persistence And Redaction
 
 The Postgres schema stores local `user_id` / `workspace_id` scope, `run_id`,
@@ -103,8 +152,8 @@ Request validation and persistence safety checks reject:
   broker/order-routing fields;
 - multi-symbol or portfolio payloads.
 
-Backtests load market-data bars on the server in later runner work. The browser
-must submit only provider-neutral identity, built-in strategy id, bounded JSON
+Backtests load market-data bars on the server. The browser must submit only
+provider-neutral identity, built-in strategy id, optional engine id, bounded JSON
 parameters, chart range, cost/slippage settings, and benchmark mode.
 
 ## Verification
@@ -114,9 +163,12 @@ Primary verification entry points:
 ```bash
 dotnet test tests/ATrade.Backtesting.Tests/ATrade.Backtesting.Tests.csproj --nologo --verbosity minimal
 bash tests/apphost/backtesting-api-contract-tests.sh
+bash tests/apphost/backtesting-runner-signalr-tests.sh
 dotnet test ATrade.slnx --nologo --verbosity minimal
 ```
 
-The apphost contract test covers successful queued creation, validation failures,
-missing capital, not-found responses, cancel/retry behavior, and redaction of
-sensitive values from API responses and persisted saved-run rows.
+The apphost contract tests cover successful queued creation with the runner
+disabled for REST-only assertions, validation failures, missing capital,
+not-found responses, cancel/retry behavior, runner/SignalR source wiring, and
+redaction of sensitive values from API responses, SignalR payloads, and persisted
+saved-run rows.

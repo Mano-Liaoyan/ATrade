@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-02
+updated: 2026-05-06
 summary: Provider-neutral analysis engine contract and the LEAN provider implementation for backtesting, signal, and metric providers without coupling API/frontend payloads to LEAN.
 see_also:
   - ../INDEX.md
@@ -99,7 +99,12 @@ The LEAN provider is registered only when configuration selects it.
   `ATrade.Analysis.Lean` through the registry.
 
 These endpoints are not LEAN endpoints. They must not expose QuantConnect types,
-LEAN project files, or provider-specific DTO names.
+LEAN project files, or provider-specific DTO names. The saved backtest runner is
+an internal consumer of the same `IAnalysisEngineRegistry`: it supplies
+server-fetched normalized OHLCV bars, the saved optional engine id, and strategy
+metadata, then persists failed saved runs for `analysis-engine-not-configured` or
+`analysis-engine-unavailable` results instead of manufacturing successful
+signals, metrics, equity curves, or trades.
 
 ### 3.1 Frontend Terminal Behavior
 

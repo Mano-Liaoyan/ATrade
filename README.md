@@ -31,7 +31,7 @@ workspace.
 - Local orchestrator: `Aspire 13.2`
 - Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
 - Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract, IBKR/iBeam-backed market data, and a paper-capital source that prefers authenticated IBKR paper balances before local fallback capital
-- Analysis/backtesting direction: provider-neutral `ATrade.Analysis` contracts with `ATrade.Analysis.Lean` as the first optional analysis provider when the official LEAN runtime is configured locally, plus provider-neutral saved backtest run contracts in `ATrade.Backtesting` backed by Postgres history and paper-capital snapshots
+- Analysis/backtesting direction: provider-neutral `ATrade.Analysis` contracts with `ATrade.Analysis.Lean` as the first optional analysis provider when the official LEAN runtime is configured locally, plus provider-neutral saved backtest run contracts in `ATrade.Backtesting` backed by Postgres history, paper-capital snapshots, an API-hosted async runner, and safe SignalR job updates
 
 ## Run Contract
 
@@ -91,6 +91,7 @@ The current runnable slice includes:
   - `GET /api/backtests/{id}`
   - `POST /api/backtests/{id}/cancel`
   - `POST /api/backtests/{id}/retry`
+  - `/hubs/backtests`
   - `GET /api/workspace/watchlist`
   - `PUT /api/workspace/watchlist`
   - `POST /api/workspace/watchlist`
@@ -101,7 +102,7 @@ The current runnable slice includes:
 - `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence and cache-aside for OHLCV candles and scanner/trending snapshots, with configurable freshness for browser-facing market-data endpoints.
 - `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads, engine/source metadata, and explicit no-engine fallback behavior.
 - `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries without order routing.
-- `src/ATrade.Backtesting` — provider-neutral saved backtest run module with single-symbol/built-in-strategy request validation, paper-capital source snapshots, Postgres saved-run history, cancel/retry contracts, and persistence redaction for secrets, account identifiers, gateway URLs, direct bars, custom code, and order-routing fields.
+- `src/ATrade.Backtesting` — provider-neutral saved backtest run module with single-symbol/built-in-strategy request validation, optional analysis engine ids, paper-capital source snapshots, Postgres saved-run history, an API-hosted async runner with startup recovery, server-side market-data/analysis execution, best-effort cancellation, `/hubs/backtests` SignalR updates, and persistence/broadcast redaction for secrets, account identifiers, gateway URLs, LEAN workspace paths, direct bars, custom code, and order-routing fields.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
 - `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, visibly sized chart/indicator/analysis workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis handoff, and provider-neutral analysis states.
@@ -165,12 +166,17 @@ authenticated and a positive Client Portal account-summary balance is available;
 it otherwise falls back to the Postgres-backed local paper ledger, or reports
 `source = "unavailable"` with safe messages when neither source exists. Saved
 backtest APIs (`POST /api/backtests`, `GET /api/backtests`,
-`GET /api/backtests/{id}`, cancel, and retry) create queued single-symbol runs,
+`GET /api/backtests/{id}`, cancel, and retry) create single-symbol runs,
 snapshot that effective capital/source, persist run history in Postgres, and
-block creation when no positive capital source exists. Browser payloads, logs,
-docs, and tests must not expose IBKR account identifiers, credentials, gateway
-URLs, tokens, cookies, session details, direct browser bars, custom strategy
-code, or order-routing fields.
+block creation when no positive capital source exists. The API-hosted runner
+claims queued rows, marks interrupted running rows failed on restart, fetches
+candles server-side through `IMarketDataService`, invokes the configured
+analysis engine through `IAnalysisEngineRegistry`, persists safe completed or
+failed result/error envelopes, supports best-effort running cancellation, and
+broadcasts safe updates on `/hubs/backtests`. Browser payloads, logs, docs,
+and tests must not expose IBKR account identifiers, credentials, gateway URLs,
+LEAN workspace paths, raw process command lines, tokens, cookies, session
+details, direct browser bars, custom strategy code, or order-routing fields.
 
 ## Active Task Queue
 
@@ -189,16 +195,17 @@ chart rendering, the original black/graphite/amber ATrade terminal palette
 validation, purpose-matched module rail icon/collapse validation, and visible
 vertical/horizontal market-monitor table scrollbar validation. The current frontend
 surface is the direct module/workflow ATrade paper workspace. The active
-backend/backtesting MVP wave now includes `TP-058` paper-capital source work and
-`TP-059` first-class saved backtesting domain/API work, and should build on
-module rail navigation plus explicit workflow actions rather than the retired
-old shell/list route wrappers, a command system, cyan/blue-gradient-dominant
+backend/backtesting MVP wave now includes `TP-058` paper-capital source work,
+`TP-059` first-class saved backtesting domain/API work, and `TP-060` async
+runner/SignalR job updates, and should build on module rail navigation plus
+explicit workflow actions rather than the retired old shell/list route wrappers,
+a command system, cyan/blue-gradient-dominant
 styling, or the removed app-level, context, monitor, footer, and top-safety
 chrome.
 
 Completed Taskplane packets through `TP-057` are present in `tasks/`; `TP-058`
-and `TP-059` cover the backend/backtesting MVP foundation currently staged in
-the active wave. Completed packets should be archived when convenient. During
+through `TP-060` cover the backend/backtesting MVP foundation currently staged
+in the active wave. Completed packets should be archived when convenient. During
 orchestrated runs the runtime handles post-merge archival for active task folders.
 
 ## Repository Map
@@ -261,6 +268,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/postgres-watchlist-persistence-tests.sh`
 - `tests/apphost/paper-capital-source-tests.sh`
 - `tests/apphost/backtesting-api-contract-tests.sh`
+- `tests/apphost/backtesting-runner-signalr-tests.sh`
 - `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
 - `tests/apphost/frontend-terminal-cutover-tests.sh`
 - `tests/apphost/frontend-terminal-ui-stack-tests.sh`

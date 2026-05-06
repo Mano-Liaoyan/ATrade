@@ -36,8 +36,9 @@ see_also:
 > `GET /api/market-data/{symbol}/indicators`, `GET /api/analysis/engines`,
 > `POST /api/analysis/run`, `POST /api/backtests`, `GET /api/backtests`,
 > `GET /api/backtests/{id}`, `POST /api/backtests/{id}/cancel`,
-> `POST /api/backtests/{id}/retry`, a `/hubs/market-data` SignalR hub,
-> backend-owned `GET` / `PUT` / `POST` / legacy symbol `DELETE`
+> `POST /api/backtests/{id}/retry`, `/hubs/market-data` and
+> `/hubs/backtests` SignalR hubs, backend-owned `GET` / `PUT` / `POST` / legacy
+> symbol `DELETE`
 > `/api/workspace/watchlist` endpoints plus exact
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
 > AppHost-managed Postgres resource, a TimescaleDB-backed market-data
@@ -63,8 +64,8 @@ see_also:
 > provider-not-configured/provider-unavailable/authentication-required errors
 > rather than fallback data. Durable paper-order storage and real broker order
 > placement remain future work; paper-capital fallback storage and saved backtest
-> run history are durable in Postgres and remain paper-only/read-only from the
-> broker side.
+> run history/runner state are durable in Postgres, and backtest status streaming
+> remains paper-only/read-only from the broker side.
 
 ## 1. Scope And Non-Negotiable Safety Rules
 
@@ -142,8 +143,10 @@ The `frontend/` application owns:
   cache/migration state, optimistic UI interactions, and route-local workflow
   state; the active shell no longer persists context/monitor split sizes or
   layout reset state
-- SignalR subscriptions for market-data stream updates plus HTTP fallback; broker
-  status is diagnostics-only and no order-entry or order-submit UI is rendered
+- SignalR subscriptions for market-data stream updates plus HTTP fallback;
+  browser-facing backtest status streaming uses safe `/hubs/backtests` payloads
+  with HTTP/Postgres state remaining authoritative; broker status is
+  diagnostics-only and no order-entry or order-submit UI is rendered
 
 The frontend does **not** talk directly to IBKR, Redis, NATS, Postgres, or
 TimescaleDB. All durable and broker-aware behavior goes through the API.
@@ -191,8 +194,8 @@ present as active route dependencies.
 
 - HTTP endpoints for workspace bootstrap data, Postgres-backed watchlists,
   account state, paper orders, and chart history
-- SignalR hubs that push account, order, quote, bar, and trending updates to
-  the browser
+- SignalR hubs that push account, order, quote, bar, trending, and backtest
+  status/result/error updates to the browser
 - translation between browser workflow actions and internal module calls / NATS events
 - enforcement of the paper-only guardrails described in this document
 
@@ -208,8 +211,8 @@ exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
 `GET /api/analysis/engines`, `POST /api/analysis/run`, `POST /api/backtests`,
 `GET /api/backtests`, `GET /api/backtests/{id}`,
 `POST /api/backtests/{id}/cancel`, `POST /api/backtests/{id}/retry`, and the
-`/hubs/market-data` SignalR hub while keeping the browser-to-broker boundary
-strictly server-side. The broker endpoint resolves the provider-neutral
+`/hubs/market-data` and `/hubs/backtests` SignalR hubs while keeping the
+browser-to-broker boundary strictly server-side. The broker endpoint resolves the provider-neutral
 `IBrokerProvider` contract. The market-data endpoints await the async
 `IMarketDataService` read seam; in the current API composition that contract is a
 Timescale-backed cache-aside service over the provider-backed `MarketDataService`
@@ -281,20 +284,26 @@ payload. Storage failures use a stable 503 `paper-capital-storage-unavailable`
 error shape. Browser payloads and logs must never include configured account
 identifiers, credentials, gateway URLs, tokens, cookies, or session details.
 
-Backtest endpoints use `ATrade.Backtesting`; the API only binds HTTP and projects
-safe results. `POST /api/backtests` accepts one stock symbol or exact symbol
-identity, a built-in strategy id (`sma-crossover`, `rsi-mean-reversion`, or
-`breakout`), bounded JSON parameters, chart range, cost/slippage settings, and
-benchmark mode. Creation snapshots the current effective paper capital/source and
-returns a queued saved run with `202 Accepted`; it returns
-`backtest-capital-unavailable` when Accounts reports no positive effective
-capital. `GET /api/backtests` and `GET /api/backtests/{id}` expose local
-workspace history/status/result placeholders, `POST /api/backtests/{id}/cancel`
-cancels queued/running saved runs best-effort, and
+Backtest endpoints use `ATrade.Backtesting`; the API only binds HTTP, maps
+`/hubs/backtests`, and projects safe results. `POST /api/backtests` accepts one
+stock symbol or exact symbol identity, a built-in strategy id (`sma-crossover`,
+`rsi-mean-reversion`, or `breakout`), optional analysis engine id, bounded JSON
+parameters, chart range, cost/slippage settings, and benchmark mode. Creation
+snapshots the current effective paper capital/source and returns a queued saved
+run with `202 Accepted`; it returns `backtest-capital-unavailable` when Accounts
+reports no positive effective capital. The API-hosted runner claims queued rows,
+marks interrupted running rows failed on restart, fetches candles server-side
+through `IMarketDataService`, invokes `IAnalysisEngineRegistry`, persists safe
+completed/failed/cancelled envelopes, and never accepts browser-submitted bars or
+fake market-data/LEAN success. `GET /api/backtests` and
+`GET /api/backtests/{id}` expose local workspace history/status/results,
+`POST /api/backtests/{id}/cancel` deterministically cancels queued runs and
+requests best-effort cancellation for running runs, and
 `POST /api/backtests/{id}/retry` creates a new queued run from the failed or
-cancelled source run's saved request snapshot. Backtest persistence rejects and
-omits direct browser bars, custom strategy code, order-routing fields, account
-identifiers, credentials, gateway URLs, tokens, cookies, and session details.
+cancelled source run's saved request snapshot. Backtest persistence and SignalR
+payloads reject or omit direct browser bars, custom strategy code,
+order-routing fields, account identifiers, credentials, gateway URLs, LEAN
+workspace paths, raw process command lines, tokens, cookies, and session details.
 NATS remains the internal event backbone between API and workers.
 
 ### 3.3 Backend modules and workers
@@ -348,10 +357,13 @@ The paper-trading slice extends existing planned responsibilities as follows:
   provider-neutral signals/metrics, and rejects brokerage/order-routing source
   tokens.
 - `ATrade.Backtesting` owns provider-neutral saved backtest contracts,
-  single-symbol/built-in-strategy validation, capital snapshots through
-  `ATrade.Accounts`, Postgres saved-run schema/repository operations, local
-  workspace history, cancel/retry status rules, and persistence redaction for
-  secrets, account identifiers, gateway URLs, direct bars, custom code, and
+  single-symbol/built-in-strategy validation, optional analysis engine ids,
+  capital snapshots through `ATrade.Accounts`, Postgres saved-run
+  schema/repository operations, API-hosted async execution with restart recovery,
+  server-side market-data/analysis invocation, local workspace history,
+  cancel/retry status rules, `/hubs/backtests` update payloads, and persistence
+  and broadcast redaction for secrets, account identifiers, gateway URLs, LEAN
+  workspace paths, raw process command lines, direct bars, custom code, and
   order-routing fields.
 - `ATrade.Workspaces` owns backend workspace preferences and watchlist request
   intake, including the current Postgres schema/repository for exact pinned

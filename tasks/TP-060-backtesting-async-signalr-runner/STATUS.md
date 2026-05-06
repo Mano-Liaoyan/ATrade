@@ -1,11 +1,11 @@
 # TP-060: Backtesting async runner and SignalR updates — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
-**Last Updated:** 2026-05-05
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
+**Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -65,12 +65,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -85,6 +85,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Optional real LEAN runtime smoke was not run during TP-060 delivery; Step 4 covered automated backtesting/apphost/analysis/full-suite checks with fake or unavailable-safe seams, and real LEAN/iBeam smoke remains an ignored-local `.env` exercise when configured. | Logged for delivery; no code/docs change required beyond preserving optional-runtime skip guidance. | Step 4 verification; `docs/architecture/analysis-engines.md` |
+| Check-if-affected docs showed analysis and market-data provider contracts did not need semantic changes; docs were updated only to describe `ATrade.Backtesting` as a safe internal consumer of those seams. | Documented in affected architecture docs. | `docs/architecture/analysis-engines.md`; `docs/architecture/provider-abstractions.md` |
 
 ---
 
@@ -95,6 +97,8 @@
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-05 23:46 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-05 23:46 | Step 0 started | Preflight |
+| 2026-05-06 00:08 | Worker iter 1 | done in 1357s, tools: 179 |
+| 2026-05-06 | Step 5 completed | Documentation delivery updated and discoveries logged |
 
 ---
 
@@ -106,4 +110,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Reviewed `docs/architecture/analysis-engines.md` and `docs/architecture/provider-abstractions.md`; updated affected runner-consumer notes while preserving existing analysis/market-data unavailable contracts.

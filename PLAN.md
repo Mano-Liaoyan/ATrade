@@ -20,7 +20,8 @@ see_also:
 The provider-backed paper-trading workspace slice is runnable with IBKR/iBeam
 market data, TimescaleDB cache-aside, durable Postgres watchlists, durable
 Postgres local paper-capital fallback storage, durable Postgres saved backtest
-run history, exact provider/market pins, configurable local AppHost ports,
+run history, an API-hosted async backtest runner with SignalR job updates,
+exact provider/market pins, configurable local AppHost ports,
 optional AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045`
 through `TP-057` frontend reconstruction,
 no-command cutover, layout simplification,
@@ -39,12 +40,14 @@ original black/graphite/amber institutional terminal
 palette with red/green market states, and final cutover/no-command/simplified-layout/top-chrome
 filter-density/chart-visibility/theme-refactor guardrails for clean-room,
 no-order, truthful provider-state, and `ATrade.Api` browser boundaries. The
-first backend/backtesting MVP seams (`TP-058` and `TP-059`) add paper-capital
-source selection and saved backtest APIs through `ATrade.Api`: effective capital
-prefers a safe authenticated IBKR paper balance, falls back to a user-configured
-local Postgres ledger value, reports explicit unavailable/unconfigured state when
-neither exists, and is snapshotted on queued saved backtest runs persisted in
-Postgres. The active clean-room UI design authority remains
+first backend/backtesting MVP seams (`TP-058` through `TP-060`) add
+paper-capital source selection, saved backtest APIs, and API-hosted async
+execution through `ATrade.Api`: effective capital prefers a safe authenticated
+IBKR paper balance, falls back to a user-configured local Postgres ledger value,
+reports explicit unavailable/unconfigured state when neither exists, and is
+snapshotted on saved backtest runs persisted in Postgres before queued jobs are
+claimed, executed through market-data/analysis seams, cancelled best-effort, and
+broadcast over `/hubs/backtests`. The active clean-room UI design authority remains
 `docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
@@ -78,15 +81,16 @@ icon/collapse behavior:
 - `TP-057` — made the market monitor table own visible vertical and horizontal scrollbars for wide exact-identity/action columns and added scrollbar validation
 
 `TP-058` delivered the paper-capital source packet for the backend/backtesting
-MVP wave. `TP-059` adds the first-class saved backtesting domain, Postgres
-persistence, REST API, and contract validation; the next runner-oriented packet
-should build on the queued saved-run contract rather than changing public route
-names.
+MVP wave. `TP-059` added the first-class saved backtesting domain, Postgres persistence,
+REST API, and contract validation. `TP-060` builds on that queued saved-run
+contract with an API-hosted async runner, restart recovery, server-side
+market-data/analysis execution, best-effort cancellation, and `/hubs/backtests`
+SignalR updates without changing public REST route names.
 
-Completed task packets through `TP-057` are present in `tasks/`; `TP-058` and
-`TP-059` are staged as the backend/backtesting MVP foundation during orchestrated
-runs and should remain in place until the runtime handles post-merge archival.
-Completed packets should be archived when convenient.
+Completed task packets through `TP-057` are present in `tasks/`; `TP-058`
+through `TP-060` are staged as the backend/backtesting MVP foundation during
+orchestrated runs and should remain in place until the runtime handles
+post-merge archival. Completed packets should be archived when convenient.
 
 ## Follow-Up Direction
 
@@ -116,4 +120,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-060`
+`TP-061`
