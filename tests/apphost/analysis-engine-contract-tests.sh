@@ -90,6 +90,11 @@ assert_contract_sources() {
   assert_file_contains "$contracts" 'public sealed record AnalysisResult'
   assert_file_contains "$contracts" 'AnalysisEngineMetadata Engine'
   assert_file_contains "$contracts" 'AnalysisDataSource Source'
+  assert_file_contains "$contracts" 'StrategyParameters'
+  assert_file_contains "$contracts" 'AnalysisBacktestSettings'
+  assert_file_contains "$contracts" 'AnalysisBacktestDetails'
+  assert_file_contains "$contracts" 'AnalysisEquityCurvePoint'
+  assert_file_contains "$contracts" 'AnalysisSimulatedTrade'
   assert_file_contains "$engine_contract" 'public interface IAnalysisEngine'
   assert_file_contains "$engine_contract" 'ValueTask<AnalysisResult> AnalyzeAsync'
   assert_file_contains "$no_engine" 'analysis-engine-not-configured'
@@ -206,7 +211,7 @@ if error.get("code") != "analysis-engine-not-configured":
 source = payload.get("source", {})
 if source.get("source") != "analysis-engine-not-configured":
     raise SystemExit(f"expected not-configured result source, got {source!r}")
-if payload.get("signals") != [] or payload.get("metrics") != [] or payload.get("backtest") is not None:
+if payload.get("signals") != [] or payload.get("metrics") != [] or payload.get("backtest") is not None or payload.get("backtestDetails") is not None:
     raise SystemExit(f"not-configured analysis must not include fake signals, metrics, or backtest output: {payload!r}")
 PY
 }

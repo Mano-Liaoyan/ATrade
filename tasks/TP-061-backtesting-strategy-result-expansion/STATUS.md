@@ -1,11 +1,11 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
-**Current Step:** Step 4: Add validation scripts and compatibility checks
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -53,16 +53,16 @@
 ---
 
 ### Step 4: Add validation scripts and compatibility checks
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] `tests/apphost/backtesting-strategy-result-tests.sh` created
-- [ ] Existing analysis/LEAN apphost tests updated only if required
-- [ ] Shared frontend types updated only if contract compatibility requires it
+- [x] `tests/apphost/backtesting-strategy-result-tests.sh` created
+- [x] Existing analysis/LEAN apphost tests updated only if required
+- [x] Shared frontend types updated only if contract compatibility requires it
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Targeted backtesting tests passing
 - [ ] Targeted LEAN tests passing
@@ -126,6 +126,10 @@
 | 2026-05-06 01:03 | Step 3 tests | Backtesting targeted tests passed: 47/47; LEAN targeted tests passed: 15/15; analysis targeted tests passed: 10/10. |
 | 2026-05-06 01:04 | Step 3 completed | Rich saved-run result envelopes, benchmark calculation, safe errors, and no-fake-result tests are in place. |
 | 2026-05-06 01:04 | Step 4 started | Validation scripts and compatibility checks. |
+| 2026-05-06 01:09 | Step 4 validation script | Added and passed `tests/apphost/backtesting-strategy-result-tests.sh` source contract validation. |
+| 2026-05-06 01:14 | Step 4 existing scripts | Updated affected backtesting, analysis, and LEAN apphost validations; backtesting API, analysis contract, LEAN, and strategy/result scripts passed. |
+| 2026-05-06 01:20 | Step 4 frontend contract | Updated `frontend/types/analysis.ts` for rich backtest details/settings and verified `bash tests/apphost/backtesting-strategy-result-tests.sh` passes. |
+| 2026-05-06 00:36 | Worker iter 1 | done in 1149s, tools: 133 |
 
 ---
 

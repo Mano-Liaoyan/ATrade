@@ -54,6 +54,59 @@ export type BacktestSummary = {
   totalReturnPercent: number;
   tradeCount: number;
   winRatePercent: number;
+  maxDrawdownPercent: number;
+  totalCost: number;
+};
+
+export type AnalysisBacktestSettings = {
+  initialCapital: number;
+  commissionPerTrade: number;
+  commissionBps: number;
+  slippageBps: number;
+  currency: string;
+};
+
+export type AnalysisEquityCurvePoint = {
+  time: string;
+  equity: number;
+  drawdownPercent: number;
+};
+
+export type AnalysisSimulatedTrade = {
+  entryTime: string;
+  exitTime?: string | null;
+  direction: string;
+  entryPrice: number;
+  exitPrice?: number | null;
+  quantity: number;
+  grossPnl: number;
+  netPnl: number;
+  returnPercent: number;
+  totalCost: number;
+  exitReason: string;
+};
+
+export type AnalysisBenchmark = {
+  mode: string;
+  label: string;
+  initialCapital: number;
+  finalEquity: number;
+  totalReturnPercent: number;
+  equityCurve: AnalysisEquityCurvePoint[];
+};
+
+export type AnalysisBacktestAccounting = {
+  commissionPerTrade: number;
+  commissionBps: number;
+  slippageBps: number;
+  currency: string;
+};
+
+export type AnalysisBacktestDetails = {
+  equityCurve: AnalysisEquityCurvePoint[];
+  trades: AnalysisSimulatedTrade[];
+  benchmark: AnalysisBenchmark | null;
+  accounting: AnalysisBacktestAccounting;
 };
 
 export type AnalysisError = {
@@ -72,6 +125,7 @@ export type AnalysisResult = {
   metrics: AnalysisMetric[];
   backtest: BacktestSummary | null;
   error: AnalysisError | null;
+  backtestDetails?: AnalysisBacktestDetails | null;
 };
 
 export type RunAnalysisRequest = {
@@ -82,4 +136,6 @@ export type RunAnalysisRequest = {
   bars?: OhlcvCandle[];
   engineId?: string;
   strategyName?: string;
+  strategyParameters?: Record<string, unknown>;
+  backtestSettings?: AnalysisBacktestSettings | null;
 };
