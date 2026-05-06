@@ -120,8 +120,9 @@ module rail, single primary workspace region, module-owned scrolling, STATUS/HEL
 modules, and honest disabled-module surfaces for future modules
 (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
 `ORDERS`). Users open modules through the
-rail, market-monitor chart/analysis actions, and symbol route state; no command
-input, command parser, or backend command route is part of the active frontend.
+rail, market-monitor chart/analysis/backtest actions, and symbol route state; no
+command input, command parser, or backend command route is part of the active
+frontend.
 The visual direction is inspired only by broad finance-workstation information
 architecture and is implemented with original ATrade black/graphite/amber tokens,
 red/green market-state colors, warm gray dividers, and restrained information
@@ -138,7 +139,8 @@ No extra deployable services are introduced.
 The `frontend/` application owns:
 
 - route composition for the paper-trading workspace
-- market monitor, chart, analysis, status, help, and provider/status widgets
+- market monitor, chart, analysis, backtest, status, help, and provider/status
+  widgets
 - browser-side session state for active modules, non-authoritative watchlist
   cache/migration state, optimistic UI interactions, and route-local workflow
   state; the active shell no longer persists context/monitor split sizes or
@@ -160,8 +162,9 @@ search limits, ranked result view models, metadata filter state, short visible
 result limits, and show-more/show-less exploration operations;
 `terminalMarketMonitorWorkflow` wraps those hooks with provider-backed trending
 state, unified dense row view models, local source/provider/pin filters, sorting,
-selection, show-more/show-less row exploration, and exact chart/analysis action
-intents while `MarketMonitorFilters` presents those filters as compact controls;
+selection, show-more/show-less row exploration, and exact chart/analysis/backtest
+action intents while `MarketMonitorFilters` presents those filters as compact
+controls;
 `MarketMonitorTable` keeps sticky headers and exact provider/source/pin/action
 columns inside an internal Radix/native-compatible scroll viewport with visible
 vertical and horizontal scrollbars;
@@ -174,13 +177,17 @@ workspace-ready range/source/identity/stream view models, including
 `TerminalChartWorkspace` only mounts `CandlestickChart` when real candle rows
 exist, and `CandlestickChart` measures/resizes its `lightweight-charts` canvas so
 stock charts receive non-zero dimensions after module or viewport layout changes;
-and `terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
-explicit no-engine, unavailable, running, and result states. The workspace frame
-composes those workflow/client modules through `ATradeTerminalApp`,
+`terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
+explicit no-engine, unavailable, running, and result states; and
+`terminalBacktestWorkflow` adapts `backtestClient` capital, single-symbol draft,
+strategy validation, saved history/detail, cancel/retry, and `/hubs/backtests`
+status updates into the `BACKTEST` workspace. The workspace frame composes those
+workflow/client modules through `ATradeTerminalApp`,
 `TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
 `MarketMonitorFilters`, `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
 `TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
-`TerminalProviderDiagnostics`, `TerminalModuleRail`, and `TerminalWorkspaceLayout`;
+`TerminalBacktestWorkspace`, `TerminalProviderDiagnostics`, `TerminalModuleRail`,
+and `TerminalWorkspaceLayout`;
 the old `TradingWorkspace` / `SymbolChartView` route
 wrappers, `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
 `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and `BrokerPaperStatus`
@@ -714,7 +721,7 @@ Current implementation:
   monitor view model over provider trending rows, bounded search rows, and
   backend watchlist rows, including source/provider/market filters, sorting,
   selected-row state, pin state projection, cached-watchlist fallback copy, and
-  exact chart/analysis navigation intents
+  exact chart/analysis/backtest navigation intents
 - `frontend/components/terminal/TerminalMarketMonitor.tsx` with
   `MarketMonitorTable`, `MarketMonitorSearch`, compact `MarketMonitorFilters`,
   and `MarketMonitorDetailPanel` renders the dense terminal monitor for `HOME`,
@@ -731,6 +738,15 @@ Current implementation:
   runtime-unavailable, running, and result states; `TerminalProviderDiagnostics`
   shows broker/provider/source diagnostics without credentials, account IDs,
   order tickets, or broker-routing controls
+- `frontend/lib/backtestClient.ts` and
+  `frontend/lib/terminalBacktestWorkflow.ts` own the enabled `BACKTEST` terminal
+  module's ATrade.Api-only capital/history/detail/create/cancel/retry and
+  `/hubs/backtests` status-stream state; `TerminalBacktestWorkspace` renders the
+  single-symbol strategy form, effective/local paper-capital panel, live status,
+  saved history, completed summary/benchmark/trades/signals/source detail, retry
+  as a new run, and truthful empty/unavailable states without order-entry,
+  direct provider/runtime/database access, account identifiers, demo runs, or
+  fake result envelopes
 
 Licensing guardrail:
 
@@ -785,8 +801,9 @@ metadata when available, and pin/unpin actions use the backend watchlist API for
 the selected exact provider-market instrument. The frontend uses the centralized
 `frontend/lib/instrumentIdentity.ts` adapter to compute provisional optimistic
 keys, normalize asset classes, parse an IBKR `conid` only when the provider is
-`ibkr` and the provider symbol id is numeric, and build exact chart/analysis
-handoff query strings without changing the selected chart range.
+`ibkr` and the provider symbol id is numeric, and build exact
+chart/analysis/backtest handoff query strings without changing the selected chart
+range.
 Backend-owned `instrumentKey` / `pinKey` values returned by watchlist responses
 remain authoritative for persisted pins. Duplicate search results sharing a
 symbol or company name are keyed and rendered by exact instrument identity, not

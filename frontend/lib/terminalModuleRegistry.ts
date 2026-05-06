@@ -63,6 +63,16 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     route: "/#terminal-analysis",
   },
   {
+    id: "BACKTEST",
+    label: "Backtest",
+    shortLabel: "BT",
+    icon: "activity",
+    description: "Saved single-symbol backtest runs, paper capital, live status, history, cancel, and retry through ATrade.Api.",
+    availability: "enabled",
+    placement: "primary",
+    route: "/#terminal-backtest",
+  },
+  {
     id: "STATUS",
     label: "Status",
     shortLabel: "ST",

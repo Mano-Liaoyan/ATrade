@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-05-06
-summary: Authoritative contract for the provider-neutral saved backtesting backend module and REST API.
+summary: Authoritative contract for provider-neutral saved backtesting backend APIs, SignalR updates, and terminal frontend usage.
 see_also:
   - ../INDEX.md
   - modules.md
@@ -126,6 +126,38 @@ Validation failures return safe `BacktestError` payloads. Storage failures retur
 `503 backtest-storage-unavailable`. Missing capital and invalid status
 transitions return `409`.
 
+## Frontend Terminal Workspace Contract
+
+The enabled `BACKTEST` rail module is implemented only through browser-facing
+`ATrade.Api` contracts:
+
+- `frontend/types/backtesting.ts` mirrors the safe saved-run, capital, strategy,
+  result, error, and SignalR update payloads plus the built-in strategy catalog
+  used by the form.
+- `frontend/lib/backtestClient.ts` builds all HTTP and SignalR URLs with the
+  centralized API base-url helper. It calls only `GET /api/accounts/paper-capital`,
+  `PUT /api/accounts/local-paper-capital`, the `/api/backtests` create/list/get,
+  cancel, retry endpoints, and `/hubs/backtests`; it must not import or connect
+  to Postgres, TimescaleDB, Redis, NATS, IBKR/iBeam, LEAN, or any provider
+  runtime.
+- `frontend/lib/terminalBacktestWorkflow.ts` owns the terminal state machine for
+  loading effective capital, updating local fallback capital, validating a
+  single-symbol built-in-strategy draft, creating runs, selecting history/detail,
+  cancelling queued/running runs, retrying failed/cancelled runs as newly
+  created saved runs, and merging SignalR status/result/error updates.
+- SignalR is the live status path. HTTP is used for initial capital/history/detail
+  loads, explicit reload actions, run creation/actions, and reconnect recovery;
+  the frontend must not invent polling-only success states or fake result
+  envelopes when streaming is unavailable.
+- `frontend/components/terminal/TerminalBacktestWorkspace.tsx` renders the
+  paper-capital panel, strategy/range/cost/benchmark form, live status panel,
+  saved history, completed detail summaries/benchmark/trades/signals/source
+  metadata, cancel/retry controls, and truthful empty/unavailable states. Create
+  is disabled until a positive effective capital source is available, and the UI
+  never shows order tickets, buy/sell controls, broker routing, account
+  identifiers, direct bars, demo runs, synthetic equity curves, or fixture
+  trades.
+
 ## Runner Lifecycle And Provider Handling
 
 `BacktestRunHostedService` initializes the schema, fails interrupted `running`
@@ -216,6 +248,8 @@ dotnet test tests/ATrade.Backtesting.Tests/ATrade.Backtesting.Tests.csproj --nol
 bash tests/apphost/backtesting-api-contract-tests.sh
 bash tests/apphost/backtesting-runner-signalr-tests.sh
 bash tests/apphost/backtesting-strategy-result-tests.sh
+bash tests/apphost/frontend-terminal-backtest-workspace-tests.sh
+cd frontend && npm run build
 dotnet test ATrade.slnx --nologo --verbosity minimal
 ```
 
@@ -224,4 +258,7 @@ disabled for REST-only assertions, validation failures, missing capital,
 not-found responses, cancel/retry behavior, runner/SignalR source wiring,
 built-in strategy/result contract strings, no-custom-code/no-order guardrails,
 and redaction of sensitive values from API responses, SignalR payloads, and
-persisted saved-run rows.
+persisted saved-run rows. The terminal backtest workspace validation covers the
+enabled rail registration, API/hub paths, capital panel, strategy form strings,
+history/detail/cancel/retry/status UI, no fake result states, no order controls,
+and frontend-only `ATrade.Api` browser boundary.

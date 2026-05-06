@@ -46,6 +46,12 @@ export function TerminalMarketMonitor({
       : undefined,
     [onOpenIntent, workflow],
   );
+  const handleOpenBacktest = React.useMemo(
+    () => onOpenIntent
+      ? (row: TerminalMarketMonitorRow) => onOpenIntent(workflow.openBacktestIntent(row), buildOpenStatusMessage('BACKTEST', row))
+      : undefined,
+    [onOpenIntent, workflow],
+  );
 
   return (
     <section className={cn('terminal-market-monitor', compact && 'terminal-market-monitor--compact', className)} data-testid="terminal-market-monitor" aria-label="Market monitor">
@@ -95,6 +101,7 @@ export function TerminalMarketMonitor({
               <MarketMonitorTable
                 compact={compact}
                 onOpenAnalysis={handleOpenAnalysis}
+                onOpenBacktest={handleOpenBacktest}
                 onOpenChart={handleOpenChart}
                 onSelectRow={workflow.selectRow}
                 onSort={workflow.setSort}
@@ -109,6 +116,7 @@ export function TerminalMarketMonitor({
             <MarketMonitorDetailPanel
               compact={compact}
               onOpenAnalysis={handleOpenAnalysis}
+              onOpenBacktest={handleOpenBacktest}
               onOpenChart={handleOpenChart}
               onTogglePin={(row) => void workflow.toggleRowPin(row)}
               row={workflow.view.selectedRow}
@@ -176,7 +184,7 @@ function MarketMonitorExplorationControls({ workflow }: { workflow: TerminalMark
   );
 }
 
-function buildOpenStatusMessage(moduleId: 'CHART' | 'ANALYSIS', row: TerminalMarketMonitorRow): string {
+function buildOpenStatusMessage(moduleId: 'CHART' | 'ANALYSIS' | 'BACKTEST', row: TerminalMarketMonitorRow): string {
   const providerId = row.providerSymbolId ? ` provider id ${row.providerSymbolId}` : ' no provider id';
   const exchange = row.exchange ? ` on ${row.exchange}` : ' with market unavailable';
   return `Opening ${moduleId} for ${row.symbol} (${row.provider.toUpperCase()}${providerId}${exchange}, ${row.currency}, ${row.assetClass}).`;

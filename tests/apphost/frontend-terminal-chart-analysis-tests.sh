@@ -102,9 +102,9 @@ assert_exact_identity_chart_and_analysis_handoff() {
   assert_file_contains "$identity" 'providerSymbolId=${encodeSegment(normalized.providerSymbolId)}'
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
   assert_file_contains "$monitor_workflow" 'createSymbolChartHref(identity)'
-  assert_file_contains "$monitor_workflow" "params.set('module', 'ANALYSIS');"
+  assert_file_contains "$monitor_workflow" "params.set('module', moduleId);"
   assert_file_contains "$monitor_workflow" 'identity: row.exactIdentity'
-  assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : row.chartHref"
+  assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : moduleId === 'BACKTEST' ? row.backtestHref : row.chartHref"
   assert_file_contains "$monitor_workflow" "chartRange: '1D'"
   assert_file_contains "$terminal_app" 'setActiveSymbol(intent.symbol.toUpperCase())'
   assert_file_contains "$terminal_app" 'setActiveIdentity(intent.identity ?? null)'

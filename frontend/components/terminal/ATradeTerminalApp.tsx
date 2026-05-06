@@ -20,6 +20,7 @@ import { TerminalStatusModule } from "./TerminalStatusModule";
 import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
 import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
+import { TerminalBacktestWorkspace } from "./TerminalBacktestWorkspace";
 import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
@@ -86,7 +87,7 @@ export function ATradeTerminalApp({
         setSeededSearchQuery("");
       }
 
-      if ((intent.moduleId === "CHART" || intent.moduleId === "ANALYSIS") && intent.symbol) {
+      if ((intent.moduleId === "CHART" || intent.moduleId === "ANALYSIS" || intent.moduleId === "BACKTEST") && intent.symbol) {
         setActiveSymbol(intent.symbol.toUpperCase());
         setActiveIdentity(intent.identity ?? null);
         if (intent.chartRange) {
@@ -114,6 +115,15 @@ export function ATradeTerminalApp({
       if (intent.moduleId === "ANALYSIS" && intent.symbol) {
         setActiveModuleId("ANALYSIS");
         const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}?module=ANALYSIS`;
+        if (normalizedInitialSymbol !== intent.symbol || intent.route) {
+          router.push(route);
+        }
+        return;
+      }
+
+      if (intent.moduleId === "BACKTEST" && intent.symbol) {
+        setActiveModuleId("BACKTEST");
+        const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}?module=BACKTEST`;
         if (normalizedInitialSymbol !== intent.symbol || intent.route) {
           router.push(route);
         }
@@ -204,6 +214,8 @@ function TerminalModuleContent({
       return symbol ? <TerminalChartModule identity={identity} initialChartRange={chartRange} symbol={symbol} /> : <TerminalChartPlaceholder />;
     case "ANALYSIS":
       return <TerminalAnalysisModule chartRange={chartRange} identity={identity} symbol={symbol} />;
+    case "BACKTEST":
+      return <TerminalBacktestModule chartRange={chartRange} identity={identity} symbol={symbol} />;
     case "STATUS":
       return <TerminalStatusModule />;
     case "HELP":
@@ -292,6 +304,14 @@ function TerminalChartModule({ identity, initialChartRange, symbol }: { identity
   );
 }
 
+function TerminalBacktestModule({ chartRange, identity, symbol }: { chartRange: ChartRange; identity: InstrumentIdentityInput | null; symbol: string | null }) {
+  return (
+    <section className="terminal-module terminal-module--backtest workspace-stack" data-testid="terminal-backtest-module" id="terminal-backtest" tabIndex={-1}>
+      <TerminalBacktestWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />
+    </section>
+  );
+}
+
 function TerminalAnalysisModule({ chartRange, identity, symbol }: { chartRange: ChartRange; identity: InstrumentIdentityInput | null; symbol: string | null }) {
   return (
     <section className="terminal-module terminal-module--analysis workspace-stack" data-testid="terminal-analysis-module" id="terminal-analysis" tabIndex={-1}>
@@ -320,6 +340,8 @@ function getModuleFocusTargetId(moduleId: EnabledTerminalModuleId): string {
       return "terminal-chart";
     case "ANALYSIS":
       return "terminal-analysis";
+    case "BACKTEST":
+      return "terminal-backtest";
     case "STATUS":
       return "terminal-status";
     case "HELP":

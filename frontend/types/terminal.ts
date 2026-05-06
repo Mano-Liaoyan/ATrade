@@ -6,6 +6,7 @@ export const ENABLED_TERMINAL_MODULE_IDS = [
   "WATCHLIST",
   "CHART",
   "ANALYSIS",
+  "BACKTEST",
   "STATUS",
   "HELP",
 ] as const;

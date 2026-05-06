@@ -32,8 +32,9 @@ clean-room ATrade paper workspace: direct module/workflow navigation,
 enabled/current workflow modules, visible-disabled future modules, purpose-matched
 module rail icons with local icon-first collapse behavior, compact dense market
 monitor with visible internal vertical/horizontal table scrollbars for wide
-exact-identity and action columns, visibly sized chart/analysis workspaces,
-provider diagnostics, a rail-first full-bleed single-primary workspace layout
+exact-identity and action columns, visibly sized chart/analysis/backtest
+workspaces, provider diagnostics, a rail-first full-bleed single-primary
+workspace layout
 with no app-level brand header, visible global safety strip,
 shell context/monitor/footer chrome, or page-level vertical scrolling, an
 original black/graphite/amber institutional terminal
@@ -51,8 +52,12 @@ cancelled best-effort, and broadcast over `/hubs/backtests`. Saved runs now carr
 server-validated `sma-crossover`, `rsi-mean-reversion`, and `breakout`
 parameters, cost/slippage settings, buy-and-hold benchmark mode, and
 provider-neutral summary/equity-curve/simulated-trade result envelopes without
-custom code or order routing. The active clean-room UI design authority remains
-`docs/design/atrade-terminal-ui.md`.
+custom code or order routing. `TP-062` adds the first user-facing terminal
+BACKTEST module on top of those contracts: an effective/local paper-capital
+panel, single-symbol SMA/RSI/breakout strategy form, SignalR live status,
+Postgres-backed history/detail, cancel, retry-as-new-run behavior, and truthful
+empty/unavailable states with no order controls or fake results. The active
+clean-room UI design authority remains `docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
 
@@ -94,12 +99,15 @@ saved-run contract with SMA crossover, RSI mean-reversion, and breakout built-in
 validated parameters/costs/slippage, rich provider-neutral result envelopes, and
 buy-and-hold benchmarks while keeping LEAN-only/no-custom-code/no-order
 guardrails.
+`TP-062` adds the enabled terminal BACKTEST rail module, API-only backtest
+client/workflow, paper-capital-backed run form, live status, saved history/detail,
+cancel, retry, and frontend backtest workspace validation.
 
 Completed task packets through `TP-057` are present in `tasks/`; `TP-058`
-through `TP-061` are staged as the backend/backtesting MVP foundation and
-strategy/result expansion during orchestrated runs and should remain in place
-until the runtime handles post-merge archival. Completed packets should be
-archived when convenient.
+through `TP-062` are staged as the backend/backtesting MVP foundation,
+strategy/result expansion, and first terminal BACKTEST workspace during
+orchestrated runs and should remain in place until the runtime handles post-merge
+archival. Completed packets should be archived when convenient.
 
 ## Follow-Up Direction
 
@@ -109,8 +117,8 @@ market-monitor table scrollbars, non-collapsing chart visibility contract,
 original black/graphite/amber terminal palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
-`terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`, and
-`terminalAnalysisWorkflow`. New modules should remain visible-disabled until
+`terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`,
+`terminalAnalysisWorkflow`, and `terminalBacktestWorkflow`. New modules should remain visible-disabled until
 backed by real `ATrade.Api` contracts, provider-neutral data, and
 documentation/tests; do not reintroduce the removed command system, the old
 shell/list-page paths, app-level brand header, visible global safety strip,
@@ -129,4 +137,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-062`
+`TP-063`
