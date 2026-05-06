@@ -1,6 +1,6 @@
 # TP-062: Terminal backtest run, history, retry, and status streaming — Status
 
-**Current Step:** Step 4: Add frontend validation coverage
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -53,11 +53,11 @@
 ---
 
 ### Step 4: Add frontend validation coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `tests/apphost/frontend-terminal-backtest-workspace-tests.sh` created
-- [ ] Existing terminal validations updated only if required
-- [ ] Validation remains provider/runtime independent
+- [x] `tests/apphost/frontend-terminal-backtest-workspace-tests.sh` created
+- [x] Existing terminal validations updated only if required
+- [x] Validation remains provider/runtime independent
 
 ---
 

@@ -114,13 +114,9 @@ function BacktestCapitalPanel({ workflow }: { workflow: TerminalBacktestWorkflow
         </div>
       ) : null}
 
-      <form
+      <div
         className="terminal-backtest-capital__form"
         data-testid="backtest-local-capital-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void workflow.updateCapital();
-        }}
       >
         <label className="terminal-field">
           <span>Set local paper capital</span>
@@ -146,10 +142,10 @@ function BacktestCapitalPanel({ workflow }: { workflow: TerminalBacktestWorkflow
           />
           <small>ISO currency code.</small>
         </label>
-        <Button data-testid="backtest-update-capital-button" disabled={workflow.updatingCapital} size="sm" type="submit" variant="terminal">
+        <Button data-testid="backtest-update-capital-button" disabled={workflow.updatingCapital} onClick={() => void workflow.updateCapital()} size="sm" type="button" variant="terminal">
           {workflow.updatingCapital ? 'Saving capital…' : 'Set local capital'}
         </Button>
-      </form>
+      </div>
 
       {workflow.validation.fieldErrors.capital ? (
         <div className="terminal-backtest-workspace__alert" data-testid="backtest-capital-unavailable" role="status">
@@ -435,13 +431,9 @@ function BacktestRunForm({ workflow }: { workflow: TerminalBacktestWorkflow }) {
   const firstError = workflow.validation.errors[0] ?? workflow.actionError ?? workflow.capitalError;
 
   return (
-    <form
+    <div
       className="terminal-backtest-form"
       data-testid="backtest-run-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void workflow.createRun();
-      }}
     >
       <div className="terminal-backtest-form__grid">
         <label className="terminal-field">
@@ -576,12 +568,12 @@ function BacktestRunForm({ workflow }: { workflow: TerminalBacktestWorkflow }) {
       ) : null}
 
       <div className="terminal-backtest-form__actions">
-        <Button data-testid="backtest-create-run-button" disabled={!workflow.canCreateRun} type="submit" variant="amber">
+        <Button data-testid="backtest-create-run-button" disabled={!workflow.canCreateRun} onClick={() => void workflow.createRun()} type="button" variant="amber">
           {workflow.creatingRun ? 'Creating run…' : 'Create backtest run'}
         </Button>
         <span>{workflow.signalRCopy}</span>
       </div>
-    </form>
+    </div>
   );
 }
 
