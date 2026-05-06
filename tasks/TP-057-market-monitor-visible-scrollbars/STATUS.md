@@ -1,11 +1,11 @@
 # TP-057: Make market monitor table scrollbars visible — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-05-05
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
+**Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,63 +15,63 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Audit current table scroll ownership and overflow paths
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Inspect table, parent monitor, scroll-area primitive, and CSS overflow behavior
-- [ ] Verify wide table columns/identity/actions remain required
-- [ ] Identify final Radix/native/CSS scrollbar strategy
-- [ ] Record chosen strategy and tradeoffs in discoveries
+- [x] Inspect table, parent monitor, scroll-area primitive, and CSS overflow behavior
+- [x] Verify wide table columns/identity/actions remain required
+- [x] Identify final Radix/native/CSS scrollbar strategy
+- [x] Record chosen strategy and tradeoffs in discoveries
 
 ---
 
 ### Step 2: Implement visible vertical and horizontal table scrolling
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Constrain vertical overflow to an internal table viewport
-- [ ] Enable horizontal scrolling for the wide table while preserving sticky headers and row actions
-- [ ] Make scrollbar tracks/thumbs visible when overflow exists
-- [ ] Preserve full-viewport and responsive behavior without page-level scrolling
+- [x] Constrain vertical overflow to an internal table viewport
+- [x] Enable horizontal scrolling for the wide table while preserving sticky headers and row actions
+- [x] Make scrollbar tracks/thumbs visible when overflow exists
+- [x] Preserve full-viewport and responsive behavior without page-level scrolling
 
 ---
 
 ### Step 3: Add scrollbar validation coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
-- [ ] Update existing market-monitor/top-chrome/layout validation scripts only if affected
-- [ ] Ensure validation is deterministic and provider-independent
+- [x] Create `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
+- [x] Update existing market-monitor/top-chrome/layout validation scripts only if affected
+- [x] Ensure validation is deterministic and provider-independent
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] New scrollbar validation passing
-- [ ] Market monitor validation passing
-- [ ] Top chrome/filter density validation passing
-- [ ] Simplified layout validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] New scrollbar validation passing
+- [x] Market monitor validation passing
+- [x] Top chrome/filter density validation passing
+- [x] Simplified layout validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,12 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Wide market-monitor columns remain required: provider, provider symbol id/IBKR conid, market/exchange, currency, asset class, source, score/rank, pin state, and chart/analysis/pin actions preserve exact provider-market identity across search/watchlist/trending handoffs. | Keep wide minimum table width and add horizontal scrolling instead of removing columns or actions. | Step 1 audit: `MarketMonitorTable.tsx`, `MarketMonitorDetailPanel.tsx`, `terminalMarketMonitorWorkflow.ts`, `docs/design/atrade-terminal-ui.md`, `docs/architecture/provider-abstractions.md` |
+| Scrollbar strategy chosen: use the shared Radix `ScrollArea` with `type="always"`, render both vertical and horizontal `ScrollBar`s, constrain the market-monitor table root/viewport, and add market-monitor CSS/native fallback styling for visible tracks/thumbs and stable scroll gutters. | Implement in Step 2 without enabling page-level scrolling or removing dense table columns/actions. | Step 1 audit: `scroll-area.tsx`, `MarketMonitorTable.tsx`, `globals.css`, Radix `@radix-ui/react-scroll-area` 1.2.10 types |
+| Radix tradeoff: the existing primitive only renders a vertical scrollbar and `type="auto"` can make visibility depend on overflow/interaction; horizontal support must be explicitly mounted and native scrollbar CSS is needed as a scoped browser fallback. | Keep the primitive generally reusable but allow horizontal scrollbar rendering; scope native scrollbar styling to the market-monitor viewport to avoid broad UI changes. | Step 1 audit: `frontend/components/ui/scroll-area.tsx`, `frontend/app/globals.css` |
+| Existing market-monitor validation now asserts the new scroll owner/type/slot contract; top-chrome and simplified layout scripts already cover page-level overflow and compact filters and did not need weakening. | Updated only `frontend-terminal-market-monitor-tests.sh`; full validation remains in the new scrollbar script. | Step 3 validation coverage |
+| Check-if-affected docs review: paper-trading workspace architecture describes the visible market-monitor scrollbar contract; provider-abstractions did not need source changes because provider identity/source/unavailable payload semantics were preserved. | Keep provider-abstractions unchanged for TP-057; no API/provider contract changed. | Step 5 docs review |
+| Final provider-verification status: scrollbar work is frontend/source/CSS validation only and intentionally does not require live IBKR/iBeam, LEAN, provider data, or credentials; provider identity columns/actions are preserved by source and build/test coverage. | No live provider verification needed for TP-057; deterministic validation and full .NET/frontend build/test gates passed. | Step 4/5 verification |
 
 ---
 
@@ -94,6 +100,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-05 23:32 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-05 23:32 | Step 0 started | Preflight |
+| 2026-05-05 23:46 | Worker iter 1 | done in 820s, tools: 146 |
+| 2026-05-05 23:46 | Task complete | .DONE created |
 
 ---
 

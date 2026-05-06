@@ -52,8 +52,10 @@ see_also:
 > selection flow that prefers an authenticated IBKR paper balance before local
 > fallback and explicit unavailable states. `ATrade.Backtesting` owns saved
 > asynchronous single-symbol backtest run contracts, built-in strategy validation,
-> Postgres-backed run history, capital-source snapshots, cancel/retry contracts,
-> and secret/direct-bar persistence redaction. `ATrade.Workspaces` owns the first
+> Postgres-backed run history, capital-source snapshots, an API-hosted runner
+> with restart recovery, server-side market-data/analysis execution, best-effort
+> cancellation, `/hubs/backtests` SignalR updates, and secret/direct-bar/runtime
+> detail redaction. `ATrade.Workspaces` owns the first
 > backend-persisted workspace preference: Postgres-backed exact instrument
 > watchlists with stable `instrumentKey`/`pinKey` payloads derived from provider,
 > provider id / IBKR `conid`, symbol, exchange, currency, and asset class, plus a
@@ -104,8 +106,9 @@ see_also:
 > `POST /api/backtests/{id}/retry`, `GET` / `PUT` / `POST`
 > `/api/workspace/watchlist`, exact `DELETE`
 > `/api/workspace/watchlist/pins/{instrumentKey}`, legacy `DELETE`
-> `/api/workspace/watchlist/{symbol}`, and `/hubs/market-data` while the worker limits itself to paper-safe
-> session/status monitoring. `/api/market-data/trending`, candle, and indicator
+> `/api/workspace/watchlist/{symbol}`, `/hubs/market-data`, and
+> `/hubs/backtests` while the worker limits itself to paper-safe session/status
+> monitoring. `/api/market-data/trending`, candle, and indicator
 > HTTP reads now use TimescaleDB first when rows are fresh under
 > `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`; because the AppHost `timescaledb`
 > resource is volume-backed, fresh cache rows can survive full local AppHost
@@ -204,7 +207,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `POST /api/backtests/{id}/cancel`, `POST /api/backtests/{id}/retry`,
   `GET /api/workspace/watchlist`, `PUT /api/workspace/watchlist`,
   `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy
-  `DELETE /api/workspace/watchlist/{symbol}`, and `/hubs/market-data`. The overview endpoint still returns deterministic
+  `DELETE /api/workspace/watchlist/{symbol}`, `/hubs/market-data`, and
+  `/hubs/backtests`. The overview endpoint still returns deterministic
   bootstrap JSON from `ATrade.Accounts` (`module`, `status`,
   `brokerConnection`, `accounts`); the broker status endpoint resolves the
   provider-neutral `IBrokerProvider` contract and projects the safe IBKR/iBeam status
@@ -231,13 +235,18 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   provider/market pin normalization, exact unpin validation, Postgres
   persistence, stable `instrumentKey`/`pinKey` metadata payloads, and stable
   validation/storage error shapes while the API only binds HTTP requests and
-  projects HTTP responses. The backtest endpoints resolve `IBacktestRunFactory`,
-  `IBacktestRunRepository`, and the backtesting schema initializer, so
-  `ATrade.Backtesting` owns single-symbol request validation, built-in strategy
-  ids, capital snapshotting through Accounts, saved-run Postgres persistence,
-  cancel/retry status rules, and redaction of account identifiers, credentials,
-  gateway URLs, tokens, cookies, session details, direct bars, custom code, and
-  order-routing fields. The paper-capital endpoints resolve
+  projects HTTP responses. The backtest REST handlers resolve
+  `IBacktestRunFactory`, `IBacktestRunRepository`, the backtesting schema
+  initializer, and `IBacktestRunCancellationRegistry`, while the mapped
+  `/hubs/backtests` surface publishes payloads through
+  `IBacktestRunUpdatePublisher`; `ATrade.Backtesting` owns single-symbol request
+  validation, built-in strategy ids, optional analysis engine ids, capital
+  snapshotting through Accounts, saved-run Postgres persistence, async runner
+  claim/recovery/finalization state, server-side market-data/analysis execution,
+  cancel/retry status rules, SignalR update payload shape, and redaction of
+  account identifiers, credentials, gateway URLs, LEAN workspace paths, raw
+  process command lines, tokens, cookies, session details, direct bars, custom
+  code, and order-routing fields. The paper-capital endpoints resolve
   `IPaperCapitalService`, so `ATrade.Accounts` owns local capital validation,
   Postgres schema initialization, stable storage-unavailable errors, IBKR-first
   effective-capital selection, and redaction; the API returns only the safe
@@ -259,14 +268,16 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `TimescaleDB`, `Redis`, `NATS`, and optional LEAN Docker-mode environment
   handoff / workspace mapping information. `Postgres` is consumed by
   `ATrade.Accounts` for local paper-capital fallback storage,
-  `ATrade.Backtesting` for saved run history, and `ATrade.Workspaces` for exact
-  watchlists; the other infrastructure references remain ready for later slices.
+  `ATrade.Backtesting` for saved run history and async runner state, and
+  `ATrade.Workspaces` for exact watchlists; the other infrastructure references
+  remain ready for later slices.
 - **First-phase focus:** The backend now proves the paper-safe composition
   pattern: official IBKR session status, deterministic order simulation,
   IBKR/iBeam-backed market-data HTTP/SignalR surfaces with safe unavailable
   states, provider-neutral analysis discovery/run contracts with an explicit
   no-engine fallback plus optional LEAN execution, first-class saved backtest
-  APIs backed by Postgres run history and paper-capital snapshots,
+  APIs backed by Postgres run history, paper-capital snapshots, API-hosted async
+  execution, restart recovery, cancellation, and SignalR job updates,
   Postgres-backed workspace watchlists for the frontend workspace, and
   paper-capital source selection without browser-visible broker account data.
 
@@ -446,33 +457,41 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   output over the same market-data-provider bars the API and frontend already
   use, while cleanly reporting runtime-unavailable/timeout states.
 
-### 2.9 `ATrade.Backtesting` *(exists today, saved run domain and persistence)*
+### 2.9 `ATrade.Backtesting` *(exists today, async runner and saved run persistence)*
 
 - **Purpose:** Provider-neutral saved asynchronous backtest run contracts,
-  validation, persistence, and local-workspace API orchestration.
+  validation, API-hosted execution, persistence, SignalR updates, and
+  local-workspace API orchestration.
 - **Responsibilities:** Own `BacktestCreateRequest`, normalized request
   snapshots, run ids, run statuses (`queued`, `running`, `completed`, `failed`,
-  `cancelled`), built-in strategy ids, cost/slippage/benchmark options, capital
-  snapshots, safe errors, retry source ids, and saved run envelopes. Creation is
+  `cancelled`), built-in strategy ids, optional analysis engine ids,
+  cost/slippage/benchmark options, capital snapshots, safe errors, retry source
+  ids, SignalR update payloads, and saved run envelopes. Creation is
   single-symbol and stock-only, rejects direct browser-submitted bars, custom
   strategy code, multi-symbol/portfolio payloads, broker/order-routing fields,
   credentials, gateway URLs, tokens, cookies, session details, and account
   identifiers. The run factory snapshots effective paper capital from
   `ATrade.Accounts.IPaperCapitalService` and blocks creation when no positive
   source is available. The Postgres repository owns idempotent schema
-  initialization, create/list/get/status/cancel/retry operations, canonical
-  request JSON persistence, result JSON placeholders, and safe storage errors.
+  initialization, create/list/get/status/cancel/retry operations, queued-run
+  claiming with duplicate-execution guards, startup interruption recovery,
+  canonical request JSON persistence, result JSON placeholders, and safe storage
+  errors. The hosted runner fetches candles server-side through
+  `IMarketDataService`, invokes `IAnalysisEngineRegistry`, persists completed or
+  failed terminal envelopes, and publishes best-effort `/hubs/backtests` updates.
 - **Expected dependencies:** `ATrade.Accounts` for effective paper-capital source
   selection and temporary local user/workspace identity, `ATrade.MarketData` for
-  symbol identity and chart range presets, `Postgres` via AppHost-provided
-  `ConnectionStrings:postgres`, `Microsoft.Extensions.Configuration`,
+  symbol identity/chart range presets and server-side candle reads,
+  `ATrade.Analysis` for provider-neutral analysis/LEAN engine invocation,
+  `Postgres` via AppHost-provided `ConnectionStrings:postgres`,
+  `Microsoft.AspNetCore.SignalR`, `Microsoft.Extensions.Configuration`,
   `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. The module is
-  composed by `ATrade.Api`; it does not call brokers, LEAN, frontend code, or
-  market-data providers directly in this slice.
-- **First-phase focus:** Persist queued saved runs and expose cancel/retry/history
-  contracts so a later runner can execute server-side market-data backtests
-  without changing browser contracts or persisting sensitive broker/runtime
-  details.
+  composed by `ATrade.Api`; it does not call brokers, concrete LEAN process
+  code, frontend code, or market-data providers directly.
+- **First-phase focus:** Execute queued saved runs inside the API process,
+  recover interrupted running jobs safely on restart, cancel queued/running jobs
+  best-effort, stream safe status/result/error updates to browsers, and keep
+  provider/runtime details out of browser contracts and persisted unsafe fields.
 
 ### 2.10 `ATrade.Workspaces` *(exists today, first backend-owned preference slice)*
 
@@ -726,7 +745,8 @@ ATrade.Api ──► ATrade.Accounts ──► Postgres
           ├──► ATrade.Workspaces ──► Postgres
           ├──► ATrade.Backtesting ──► Postgres
           │              ├────► ATrade.Accounts
-          │              └────► ATrade.MarketData
+          │              ├────► ATrade.MarketData
+          │              └────► ATrade.Analysis
           ├──► ATrade.Analysis ──► ATrade.MarketData
           ├──► ATrade.Strategies ◄── strategy-worker
           └──► ATrade.MarketData ◄──── ATrade.MarketData.Ibkr

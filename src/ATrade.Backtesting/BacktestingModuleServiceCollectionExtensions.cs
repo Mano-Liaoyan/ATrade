@@ -1,6 +1,7 @@
 using ATrade.Accounts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ATrade.Backtesting;
 
@@ -18,6 +19,12 @@ public static class BacktestingModuleServiceCollectionExtensions
         services.AddSingleton<IBacktestRunFactory>(serviceProvider => new BacktestRunFactory(
             serviceProvider.GetRequiredService<IPaperCapitalService>(),
             serviceProvider.GetRequiredService<IPaperCapitalIdentityProvider>()));
+        services.Configure<BacktestRunCoordinatorOptions>(configuration.GetSection("Backtesting:Runner"));
+        services.TryAddSingleton<IBacktestRunExecutionPipeline, BacktestRunAnalysisExecutionPipeline>();
+        services.TryAddSingleton<IBacktestRunCancellationRegistry, BacktestRunCancellationRegistry>();
+        services.TryAddSingleton<IBacktestRunUpdatePublisher, SignalRBacktestRunUpdatePublisher>();
+        services.AddSingleton<IBacktestRunCoordinator, BacktestRunCoordinator>();
+        services.AddHostedService<BacktestRunHostedService>();
 
         return services;
     }

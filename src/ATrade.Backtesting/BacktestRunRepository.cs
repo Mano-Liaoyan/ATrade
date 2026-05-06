@@ -20,6 +20,10 @@ public interface IBacktestRunRepository
 
     Task<BacktestRunRecord?> GetAsync(BacktestWorkspaceScope scope, string runId, CancellationToken cancellationToken = default);
 
+    Task<int> FailInterruptedRunningAsync(BacktestError error, CancellationToken cancellationToken = default);
+
+    Task<BacktestRunRecord?> ClaimNextQueuedAsync(CancellationToken cancellationToken = default);
+
     Task<BacktestRunRecord?> UpdateStatusAsync(
         BacktestWorkspaceScope scope,
         string runId,
@@ -139,6 +143,44 @@ public sealed class PostgresBacktestRunRepository(
         catch (NpgsqlException exception)
         {
             throw new BacktestStorageUnavailableException("Postgres saved backtest run read failed.", exception);
+        }
+    }
+
+    public async Task<int> FailInterruptedRunningAsync(
+        BacktestError error,
+        CancellationToken cancellationToken = default)
+    {
+        var safeError = BacktestPersistenceSafety.NormalizeSafeError(error) ?? new BacktestError(
+            BacktestErrorCodes.RunInterrupted,
+            BacktestSafeMessages.RunInterrupted);
+
+        try
+        {
+            await using var command = dataSourceProvider.GetDataSource().CreateCommand(PostgresBacktestRunSql.FailInterruptedRunningRuns);
+            AddErrorParameters(command, safeError);
+            command.Parameters.AddWithValue("observed_at_utc", NpgsqlDbType.TimestampTz, timeProvider.GetUtcNow());
+
+            return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (NpgsqlException exception)
+        {
+            throw new BacktestStorageUnavailableException("Postgres saved backtest run recovery failed.", exception);
+        }
+    }
+
+    public async Task<BacktestRunRecord?> ClaimNextQueuedAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var command = dataSourceProvider.GetDataSource().CreateCommand(PostgresBacktestRunSql.ClaimNextQueuedRun);
+            command.Parameters.AddWithValue("observed_at_utc", NpgsqlDbType.TimestampTz, timeProvider.GetUtcNow());
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? ReadRecord(reader) : null;
+        }
+        catch (NpgsqlException exception)
+        {
+            throw new BacktestStorageUnavailableException("Postgres saved backtest run queue claim failed.", exception);
         }
     }
 

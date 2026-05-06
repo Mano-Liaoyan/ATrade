@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ATrade.Accounts\ATrade.Accounts.csproj" />
+    <ProjectReference Include="..\ATrade.Analysis\ATrade.Analysis.csproj" />
     <ProjectReference Include="..\ATrade.MarketData\ATrade.MarketData.csproj" />
   </ItemGroup>
 

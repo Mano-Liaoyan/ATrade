@@ -104,7 +104,8 @@ public static partial class BacktestPersistenceSafety
                     requestSnapshot.CostModel.CommissionBps,
                     requestSnapshot.CostModel.Currency),
             SlippageBps: requestSnapshot.SlippageBps,
-            BenchmarkMode: requestSnapshot.BenchmarkMode);
+            BenchmarkMode: requestSnapshot.BenchmarkMode,
+            EngineId: requestSnapshot.EngineId);
 
         return BacktestRequestValidator.Validate(equivalentRequest);
     }
@@ -161,7 +162,8 @@ public static partial class BacktestPersistenceSafety
             ChartRange: null,
             CostModel: null,
             SlippageBps: null,
-            BenchmarkMode: null)
+            BenchmarkMode: null,
+            EngineId: null)
         {
             AdditionalProperties = new Dictionary<string, JsonElement>
             {

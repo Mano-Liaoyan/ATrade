@@ -164,6 +164,45 @@ internal static class PostgresBacktestRunSql
            AND run_id = @run_id;
         """;
 
+    public const string FailInterruptedRunningRuns = """
+        UPDATE atrade_backtesting.saved_backtest_runs
+           SET status = 'failed',
+               error_code = @error_code,
+               error_message = @error_message,
+               updated_at_utc = @observed_at_utc,
+               completed_at_utc = COALESCE(completed_at_utc, @observed_at_utc)
+         WHERE status = 'running';
+        """;
+
+    public const string ClaimNextQueuedRun = """
+        WITH next_queued_run AS (
+            SELECT user_id,
+                   workspace_id,
+                   run_id
+              FROM atrade_backtesting.saved_backtest_runs
+             WHERE status = 'queued'
+             ORDER BY created_at_utc ASC, run_id ASC
+             FOR UPDATE SKIP LOCKED
+             LIMIT 1
+        )
+        UPDATE atrade_backtesting.saved_backtest_runs AS run
+           SET status = 'running',
+               error_code = NULL,
+               error_message = NULL,
+               result_json = NULL,
+               updated_at_utc = @observed_at_utc,
+               started_at_utc = COALESCE(started_at_utc, @observed_at_utc),
+               completed_at_utc = NULL
+          FROM next_queued_run
+         WHERE run.user_id = next_queued_run.user_id
+           AND run.workspace_id = next_queued_run.workspace_id
+           AND run.run_id = next_queued_run.run_id
+           AND run.status = 'queued'
+        RETURNING
+        """ + SelectRunColumns + """
+        ;
+        """;
+
     public const string UpdateStatus = """
         UPDATE atrade_backtesting.saved_backtest_runs
            SET status = @status,
@@ -183,6 +222,7 @@ internal static class PostgresBacktestRunSql
          WHERE user_id = @user_id
            AND workspace_id = @workspace_id
            AND run_id = @run_id
+           AND (status = 'running' OR @status = 'running')
         RETURNING
         """ + SelectRunColumns + """
         ;

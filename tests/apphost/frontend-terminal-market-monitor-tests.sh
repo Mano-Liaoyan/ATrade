@@ -112,12 +112,17 @@ assert_dense_terminal_components() {
   local detail="$repo_root/frontend/components/terminal/MarketMonitorDetailPanel.tsx"
   local search="$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx"
   local filters="$repo_root/frontend/components/terminal/MarketMonitorFilters.tsx"
+  local scroll_area="$repo_root/frontend/components/ui/scroll-area.tsx"
   local css="$repo_root/frontend/app/globals.css"
 
   assert_file_contains "$monitor" "data-testid=\"terminal-market-monitor\""
   assert_file_contains "$monitor" "MarketMonitorStateStrip"
   assert_file_contains "$monitor" "workflow.statusSummary"
   assert_file_contains "$table" "data-testid=\"market-monitor-row\""
+  assert_file_contains "$table" 'data-scroll-owner="market-monitor-table"'
+  assert_file_contains "$table" 'data-scrollbars="vertical horizontal"'
+  assert_file_contains "$table" 'data-scroll-axis="vertical horizontal"'
+  assert_file_contains "$table" 'type="always"'
   assert_file_contains "$table" "row.rankLabel"
   assert_file_contains "$table" "row.providerSymbolId"
   assert_file_contains "$table" "row.exchange"
@@ -135,9 +140,14 @@ assert_dense_terminal_components() {
   assert_file_contains "$filters" "Filter rows"
   assert_file_contains "$filters" "aria-label=\"Clear all market monitor filters\""
   assert_file_not_contains "$filters" "Refine by source, pin state, provider, market, currency, or asset class without fetching more than the capped search payload."
+  assert_file_contains "$scroll_area" '<ScrollBar orientation="horizontal" />'
+  assert_file_contains "$scroll_area" 'data-slot="scroll-area-scrollbar"'
+  assert_file_contains "$scroll_area" 'data-slot="scroll-area-thumb"'
   assert_file_contains "$css" ".market-monitor-table"
   assert_file_contains "$css" "min-width: 78rem;"
+  assert_file_contains "$css" "height: min(34rem, 62vh);"
   assert_file_contains "$css" "max-height: min(34rem, 62vh);"
+  assert_file_contains "$css" "scrollbar-gutter: stable both-edges;"
   assert_file_contains "$css" ".market-monitor-filters__groups"
   assert_file_contains "$css" "gap: 0.35rem 0.55rem;"
 }
