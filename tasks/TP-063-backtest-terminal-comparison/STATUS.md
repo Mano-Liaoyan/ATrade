@@ -1,6 +1,6 @@
 # TP-063: Terminal backtest comparison and equity overlay — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Add comparison selection state and view-model helpers
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 1
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Add comparison selection state and view-model helpers
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Comparison selection state and eligibility helpers added
-- [ ] Only completed runs with persisted result/equity data are selectable
-- [ ] Deterministic curve color/label helpers added
-- [ ] Selection/normalization checks added as appropriate
+- [x] Comparison selection state and eligibility helpers added
+- [x] Only completed runs with persisted result/equity data are selectable
+- [x] Deterministic curve color/label helpers added
+- [x] Selection/normalization checks added as appropriate
 
 ---
 
