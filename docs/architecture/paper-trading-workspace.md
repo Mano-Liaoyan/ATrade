@@ -180,14 +180,16 @@ stock charts receive non-zero dimensions after module or viewport layout changes
 `terminalAnalysisWorkflow` adapts `analysisClient` discovery/run behavior into
 explicit no-engine, unavailable, running, and result states; and
 `terminalBacktestWorkflow` adapts `backtestClient` capital, single-symbol draft,
-strategy validation, saved history/detail, cancel/retry, and `/hubs/backtests`
-status updates into the `BACKTEST` workspace. The workspace frame composes those
+strategy validation, saved history/detail, completed-run-only comparison
+eligibility, persisted metric/equity-curve normalization, cancel/retry, and
+`/hubs/backtests` status updates into the `BACKTEST` workspace. The workspace frame composes those
 workflow/client modules through `ATradeTerminalApp`,
 `TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
 `MarketMonitorFilters`, `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
 `TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
-`TerminalBacktestWorkspace`, `TerminalProviderDiagnostics`, `TerminalModuleRail`,
-and `TerminalWorkspaceLayout`;
+`TerminalBacktestWorkspace`, `BacktestComparisonPanel`,
+`TerminalProviderDiagnostics`, `TerminalModuleRail`, and
+`TerminalWorkspaceLayout`;
 the old `TradingWorkspace` / `SymbolChartView` route
 wrappers, `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
 `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and `BrokerPaperStatus`
@@ -309,7 +311,12 @@ persists safe completed/failed/cancelled envelopes, and never accepts
 browser-submitted bars or fake market-data/LEAN success. Completed result
 envelopes include provider-neutral summary metrics, strategy equity curve,
 simulated trades/signals, buy-and-hold benchmark data from the same candle
-window, accounting inputs, engine/source metadata, and safe errors. `GET
+window, accounting inputs, engine/source metadata, and safe errors. The browser
+comparison surface reuses these persisted list/detail result payloads only: it
+lets users select completed runs with saved strategy equity data, compares saved
+summary/source/capital fields, and overlays persisted strategy plus buy-and-hold
+benchmark curves without export controls, optimization controls, synthetic
+curves, or new provider/runtime/database access. `GET
 /api/backtests` and
 `GET /api/backtests/{id}` expose local workspace history/status/results,
 `POST /api/backtests/{id}/cancel` deterministically cancels queued runs and

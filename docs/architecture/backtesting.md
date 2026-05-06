@@ -143,8 +143,11 @@ The enabled `BACKTEST` rail module is implemented only through browser-facing
 - `frontend/lib/terminalBacktestWorkflow.ts` owns the terminal state machine for
   loading effective capital, updating local fallback capital, validating a
   single-symbol built-in-strategy draft, creating runs, selecting history/detail,
-  cancelling queued/running runs, retrying failed/cancelled runs as newly
-  created saved runs, and merging SignalR status/result/error updates.
+  selecting only completed runs with persisted result/equity data for comparison,
+  projecting comparison metrics/source/capital metadata from saved envelopes,
+  normalizing strategy and buy-and-hold benchmark equity curves from saved
+  result payloads, cancelling queued/running runs, retrying failed/cancelled runs
+  as newly created saved runs, and merging SignalR status/result/error updates.
 - SignalR is the live status path. HTTP is used for initial capital/history/detail
   loads, explicit reload actions, run creation/actions, and reconnect recovery;
   the frontend must not invent polling-only success states or fake result
@@ -152,11 +155,18 @@ The enabled `BACKTEST` rail module is implemented only through browser-facing
 - `frontend/components/terminal/TerminalBacktestWorkspace.tsx` renders the
   paper-capital panel, strategy/range/cost/benchmark form, live status panel,
   saved history, completed detail summaries/benchmark/trades/signals/source
-  metadata, cancel/retry controls, and truthful empty/unavailable states. Create
-  is disabled until a positive effective capital source is available, and the UI
-  never shows order tickets, buy/sell controls, broker routing, account
-  identifiers, direct bars, demo runs, synthetic equity curves, or fixture
-  trades.
+  metadata, completed-run comparison selection, a side-by-side metric table,
+  selected-run cards, and an SVG equity overlay that draws only persisted
+  strategy equity curves and persisted buy-and-hold benchmark curves from saved
+  result envelopes. Comparison introduces no new backend endpoint: it reuses
+  saved `/api/backtests` list/detail result fields for strategy, symbol, range,
+  capital source, return, drawdown, win rate, trade count, final equity,
+  benchmark return, status, and source metadata. Queued, running, failed, and
+  cancelled runs remain visible in history but are not selectable for comparison.
+  Create is disabled until a positive effective capital source is available, and
+  the UI never shows order tickets, buy/sell controls, broker routing, export
+  controls, optimization, account identifiers, direct bars, demo runs, synthetic
+  equity curves, or fixture trades.
 
 ## Runner Lifecycle And Provider Handling
 
@@ -249,6 +259,7 @@ bash tests/apphost/backtesting-api-contract-tests.sh
 bash tests/apphost/backtesting-runner-signalr-tests.sh
 bash tests/apphost/backtesting-strategy-result-tests.sh
 bash tests/apphost/frontend-terminal-backtest-workspace-tests.sh
+bash tests/apphost/frontend-terminal-backtest-comparison-tests.sh
 cd frontend && npm run build
 dotnet test ATrade.slnx --nologo --verbosity minimal
 ```
@@ -261,4 +272,7 @@ and redaction of sensitive values from API responses, SignalR payloads, and
 persisted saved-run rows. The terminal backtest workspace validation covers the
 enabled rail registration, API/hub paths, capital panel, strategy form strings,
 history/detail/cancel/retry/status UI, no fake result states, no order controls,
-and frontend-only `ATrade.Api` browser boundary.
+and frontend-only `ATrade.Api` browser boundary. The comparison validation covers
+completed-run-only selection, comparison metric labels, strategy/benchmark equity
+overlay strings, no export controls, no fake/demo comparison data, and no direct
+provider/runtime/database access.

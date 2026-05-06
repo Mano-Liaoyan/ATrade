@@ -2,7 +2,7 @@
 status: active
 owner: maintainer
 updated: 2026-05-06
-summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, paper-capital source, and saved backtesting API seams.
+summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, paper-capital source, saved backtesting API seams, and terminal comparison surface.
 see_also:
   - README.md
   - docs/INDEX.md
@@ -56,7 +56,10 @@ custom code or order routing. `TP-062` adds the first user-facing terminal
 BACKTEST module on top of those contracts: an effective/local paper-capital
 panel, single-symbol SMA/RSI/breakout strategy form, SignalR live status,
 Postgres-backed history/detail, cancel, retry-as-new-run behavior, and truthful
-empty/unavailable states with no order controls or fake results. The active
+empty/unavailable states with no order controls or fake results. `TP-063` adds
+completed-run-only saved-run comparison, side-by-side metrics, and persisted
+strategy/buy-and-hold benchmark equity overlays without export, optimization,
+fake demo data, direct provider access, or order-routing scope. The active
 clean-room UI design authority remains `docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
@@ -101,13 +104,15 @@ buy-and-hold benchmarks while keeping LEAN-only/no-custom-code/no-order
 guardrails.
 `TP-062` adds the enabled terminal BACKTEST rail module, API-only backtest
 client/workflow, paper-capital-backed run form, live status, saved history/detail,
-cancel, retry, and frontend backtest workspace validation.
+cancel, retry, and frontend backtest workspace validation. `TP-063` adds
+completed-run-only saved-run comparison, metrics table/cards, persisted
+strategy/buy-and-hold equity overlays, and comparison validation.
 
 Completed task packets through `TP-057` are present in `tasks/`; `TP-058`
-through `TP-062` are staged as the backend/backtesting MVP foundation,
-strategy/result expansion, and first terminal BACKTEST workspace during
-orchestrated runs and should remain in place until the runtime handles post-merge
-archival. Completed packets should be archived when convenient.
+through `TP-063` are staged as the backend/backtesting MVP foundation,
+strategy/result expansion, and first terminal BACKTEST workspace plus comparison
+surface during orchestrated runs and should remain in place until the runtime
+handles post-merge archival. Completed packets should be archived when convenient.
 
 ## Follow-Up Direction
 
@@ -118,7 +123,8 @@ original black/graphite/amber terminal palette, and accessible icon-first rail c
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`,
-`terminalAnalysisWorkflow`, and `terminalBacktestWorkflow`. New modules should remain visible-disabled until
+`terminalAnalysisWorkflow`, `terminalBacktestWorkflow`, and
+`BacktestComparisonPanel`. New modules should remain visible-disabled until
 backed by real `ATrade.Api` contracts, provider-neutral data, and
 documentation/tests; do not reintroduce the removed command system, the old
 shell/list-page paths, app-level brand header, visible global safety strip,
@@ -137,4 +143,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-063`
+`TP-064`

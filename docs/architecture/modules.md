@@ -711,8 +711,9 @@ references.
   `frontend/lib/backtestClient.ts`, and `frontend/lib/terminalBacktestWorkflow.ts`
   own the `BACKTEST` rail module's safe saved-run/capital contracts, ATrade.Api
   HTTP/SignalR calls, form validation, create/cancel/retry actions, history/detail
-  selection, reconnect recovery, and no-fake-result status state for
-  `TerminalBacktestWorkspace`; `TerminalProviderDiagnostics` replaces
+  selection, completed-run comparison eligibility, saved-envelope metric/curve
+  normalization, reconnect recovery, and no-fake-result status state for
+  `TerminalBacktestWorkspace` and `BacktestComparisonPanel`; `TerminalProviderDiagnostics` replaces
   `BrokerPaperStatus` as diagnostics-only broker/IBKR/iBeam/source state. The
   old `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
   `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and
@@ -724,7 +725,7 @@ references.
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
   top-chrome/filter-density, shell/market/chart/analysis/theme, backtest
-  workspace, and module rail icon/collapse validation scripts.
+  workspace/comparison, and module rail icon/collapse validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
@@ -740,7 +741,8 @@ references.
   `TerminalWorkspaceLayout`, `TerminalHelpModule`, `TerminalStatusModule`,
   `TerminalChartWorkspace`, `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
   `TerminalAnalysisWorkspace`, `TerminalBacktestWorkspace`,
-  `TerminalProviderDiagnostics`, and `TerminalDisabledModule`) and intentionally
+  `BacktestComparisonPanel`, `TerminalProviderDiagnostics`, and
+  `TerminalDisabledModule`) and intentionally
   avoid legacy page-shell layout
   assumptions, backend access, provider runtime calls, order-entry behavior, or
   third-party terminal branding.

@@ -150,6 +150,7 @@ assert_no_order_controls_or_direct_runtime_access() {
     "$frontend_root/app/symbols/[symbol]/page.tsx"
     "$frontend_root/components/terminal/ATradeTerminalApp.tsx"
     "$frontend_root/components/terminal/TerminalBacktestWorkspace.tsx"
+    "$frontend_root/components/terminal/BacktestComparisonPanel.tsx"
     "$frontend_root/components/terminal/TerminalMarketMonitor.tsx"
     "$frontend_root/components/terminal/MarketMonitorTable.tsx"
     "$frontend_root/components/terminal/MarketMonitorDetailPanel.tsx"

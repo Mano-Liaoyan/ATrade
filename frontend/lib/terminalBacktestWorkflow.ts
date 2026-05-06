@@ -19,6 +19,7 @@ import {
   BACKTEST_STRATEGY_DEFINITIONS,
   type BacktestBenchmarkMode,
   type BacktestCreateRequest,
+  type BacktestResultEquityCurvePointEnvelope,
   type BacktestRunEnvelope,
   type BacktestRunStatus,
   type BacktestRunUpdatePayload,
@@ -31,6 +32,10 @@ import { CHART_RANGE_DESCRIPTIONS, CHART_RANGE_LABELS, type ChartRange, type Mar
 export const TERMINAL_BACKTEST_NO_ORDER_COPY = 'Backtests are simulation-only: no order tickets, buy/sell buttons, broker routing, previews, or live-trading controls are available.';
 export const TERMINAL_BACKTEST_SIGNALR_COPY = 'Status updates stream from ATrade.Api /hubs/backtests; HTTP is used for initial load and reconnect recovery without polling or fake results.';
 export const TERMINAL_BACKTEST_CAPITAL_COPY = 'Backtest creation uses the effective paper-capital source from ATrade.Api and blocks runs when capital is unavailable.';
+export const TERMINAL_BACKTEST_COMPARISON_COPY = 'Comparison uses only completed saved runs with persisted result/equity curves from /api/backtests; queued, running, failed, and cancelled runs stay visible but are not selectable.';
+
+const BACKTEST_COMPARISON_STRATEGY_COLORS = ['#f59e0b', '#22c55e', '#60a5fa', '#f97316', '#a78bfa', '#14b8a6', '#f43f5e', '#eab308'] as const;
+const BACKTEST_COMPARISON_BENCHMARK_COLORS = ['#fcd34d', '#86efac', '#93c5fd', '#fdba74', '#c4b5fd', '#5eead4', '#fda4af', '#fde047'] as const;
 
 export type TerminalBacktestWorkflowOptions = {
   initialChartRange?: ChartRange;
@@ -61,6 +66,65 @@ export type TerminalBacktestDraft = {
   slippageBps: string;
   benchmarkMode: BacktestBenchmarkMode;
   capital?: PaperCapitalResponse | null;
+};
+
+export type TerminalBacktestComparisonCurveKind = 'strategy' | 'benchmark';
+
+export type TerminalBacktestComparisonPoint = {
+  time: string;
+  timestamp: number;
+  equity: number;
+  drawdownPercent: number | null;
+  normalizedReturnPercent: number;
+};
+
+export type TerminalBacktestComparisonCurve = {
+  id: string;
+  runId: string;
+  kind: TerminalBacktestComparisonCurveKind;
+  label: string;
+  color: string;
+  points: TerminalBacktestComparisonPoint[];
+  finalEquity: number | null;
+  totalReturnPercent: number | null;
+};
+
+export type TerminalBacktestComparisonRunSummary = {
+  run: BacktestRunEnvelope;
+  runId: string;
+  label: string;
+  symbol: string;
+  strategyLabel: string;
+  chartRangeLabel: string;
+  capitalSourceLabel: string;
+  statusLabel: string;
+  sourceLabel: string;
+  createdAtUtc: string;
+  completedAtUtc: string | null;
+  startUtc: string | null;
+  endUtc: string | null;
+  initialCapital: number | null;
+  finalEquity: number | null;
+  totalReturnPercent: number | null;
+  maxDrawdownPercent: number | null;
+  winRatePercent: number | null;
+  tradeCount: number | null;
+  benchmarkReturnPercent: number | null;
+  benchmarkFinalEquity: number | null;
+  strategyCurve: TerminalBacktestComparisonCurve;
+  benchmarkCurve: TerminalBacktestComparisonCurve | null;
+};
+
+export type TerminalBacktestComparisonViewModel = {
+  selectedRunIds: string[];
+  eligibleRuns: BacktestRunEnvelope[];
+  eligibleRunIds: string[];
+  selectedSummaries: TerminalBacktestComparisonRunSummary[];
+  strategyCurves: TerminalBacktestComparisonCurve[];
+  benchmarkCurves: TerminalBacktestComparisonCurve[];
+  curves: TerminalBacktestComparisonCurve[];
+  hasMinimumSelection: boolean;
+  emptyState: string;
 };
 
 export type TerminalBacktestWorkflow = {
@@ -102,6 +166,16 @@ export type TerminalBacktestWorkflow = {
   selectedRunId: string | null;
   selectedRun: BacktestRunEnvelope | null;
   setSelectedRunId: (id: string | null) => void;
+  comparison: TerminalBacktestComparisonViewModel;
+  comparisonSelectedRunIds: string[];
+  comparisonEligibleRuns: BacktestRunEnvelope[];
+  comparisonSelectedSummaries: TerminalBacktestComparisonRunSummary[];
+  comparisonCurves: TerminalBacktestComparisonCurve[];
+  setComparisonSelectedRunIds: (ids: string[]) => void;
+  toggleComparisonRunSelection: (id: string) => void;
+  removeComparisonRunSelection: (id: string) => void;
+  clearComparisonSelection: () => void;
+  canCompareRun: (run?: BacktestRunEnvelope | null) => boolean;
   historyLoading: boolean;
   historyError: string | null;
   detailLoading: boolean;
@@ -122,6 +196,7 @@ export type TerminalBacktestWorkflow = {
   noOrderCopy: string;
   signalRCopy: string;
   capitalCopy: string;
+  comparisonCopy: string;
 };
 
 const DEFAULT_HISTORY_LIMIT = 50;
@@ -155,6 +230,7 @@ export function useTerminalBacktestWorkflow({
   const [runs, setRuns] = useState<BacktestRunEnvelope[]>([]);
   const [selectedRunId, setSelectedRunIdState] = useState<string | null>(null);
   const [selectedRunDetail, setSelectedRunDetail] = useState<BacktestRunEnvelope | null>(null);
+  const [comparisonSelectedRunIds, setComparisonSelectedRunIdsState] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -316,10 +392,25 @@ export function useTerminalBacktestWorkflow({
     () => selectedRunDetail ?? runs.find((run) => run.id === selectedRunId) ?? null,
     [runs, selectedRunDetail, selectedRunId],
   );
+  const comparisonSourceRuns = useMemo(
+    () => (selectedRunDetail ? upsertBacktestRun(runs, selectedRunDetail) : runs),
+    [runs, selectedRunDetail],
+  );
+  const comparison = useMemo(
+    () => buildBacktestComparisonViewModel(comparisonSourceRuns, comparisonSelectedRunIds),
+    [comparisonSelectedRunIds, comparisonSourceRuns],
+  );
+  const comparisonEligibleRunIdKey = comparison.eligibleRunIds.join('|');
   const identitySummary = useMemo(
     () => formatBacktestIdentitySummary(normalizedSymbol, validation.requestIdentity, identity),
     [identity, normalizedSymbol, validation.requestIdentity],
   );
+
+  useEffect(() => {
+    setComparisonSelectedRunIdsState((currentRunIds) => pruneBacktestComparisonSelection(currentRunIds, comparison.eligibleRunIds));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comparisonEligibleRunIdKey]);
+
   const canCreateRun = validation.canSubmit && !creatingRun && !capitalLoading && !updatingCapital;
 
   const setSymbol = useCallback((value: string) => {
@@ -335,6 +426,36 @@ export function useTerminalBacktestWorkflow({
 
   const setParameterValue = useCallback((name: string, value: string) => {
     setParameterValues((currentValues) => ({ ...currentValues, [name]: value }));
+    setActionError(null);
+  }, []);
+
+  const setComparisonSelectedRunIds = useCallback((ids: string[]) => {
+    setComparisonSelectedRunIdsState(pruneBacktestComparisonSelection(ids, comparison.eligibleRunIds));
+    setActionError(null);
+  }, [comparison.eligibleRunIds]);
+
+  const toggleComparisonRunSelection = useCallback((id: string) => {
+    setComparisonSelectedRunIdsState((currentRunIds) => {
+      if (currentRunIds.includes(id)) {
+        return currentRunIds.filter((runId) => runId !== id);
+      }
+
+      if (!comparison.eligibleRunIds.includes(id)) {
+        return currentRunIds;
+      }
+
+      return [...currentRunIds, id];
+    });
+    setActionError(null);
+  }, [comparison.eligibleRunIds]);
+
+  const removeComparisonRunSelection = useCallback((id: string) => {
+    setComparisonSelectedRunIdsState((currentRunIds) => currentRunIds.filter((runId) => runId !== id));
+    setActionError(null);
+  }, []);
+
+  const clearComparisonSelection = useCallback(() => {
+    setComparisonSelectedRunIdsState([]);
     setActionError(null);
   }, []);
 
@@ -493,6 +614,16 @@ export function useTerminalBacktestWorkflow({
     selectedRunId,
     selectedRun,
     setSelectedRunId: setSelectedRunIdState,
+    comparison,
+    comparisonSelectedRunIds: comparison.selectedRunIds,
+    comparisonEligibleRuns: comparison.eligibleRuns,
+    comparisonSelectedSummaries: comparison.selectedSummaries,
+    comparisonCurves: comparison.curves,
+    setComparisonSelectedRunIds,
+    toggleComparisonRunSelection,
+    removeComparisonRunSelection,
+    clearComparisonSelection,
+    canCompareRun: canCompareBacktestRun,
     historyLoading,
     historyError,
     detailLoading,
@@ -513,6 +644,7 @@ export function useTerminalBacktestWorkflow({
     noOrderCopy: TERMINAL_BACKTEST_NO_ORDER_COPY,
     signalRCopy: TERMINAL_BACKTEST_SIGNALR_COPY,
     capitalCopy: TERMINAL_BACKTEST_CAPITAL_COPY,
+    comparisonCopy: TERMINAL_BACKTEST_COMPARISON_COPY,
   };
 }
 
@@ -658,6 +790,222 @@ export function sortBacktestRuns(runs: BacktestRunEnvelope[]): BacktestRunEnvelo
   return [...runs].sort((left, right) => Date.parse(right.createdAtUtc) - Date.parse(left.createdAtUtc));
 }
 
+export function canCompareBacktestRun(run?: BacktestRunEnvelope | null): boolean {
+  if (!run || !isBacktestStatus(run.status, 'completed') || !run.result?.backtest) {
+    return false;
+  }
+
+  return normalizeBacktestEquitySeries(run.result.equityCurve, run.result.backtest.initialCapital).length > 0;
+}
+
+export function getBacktestComparisonEligibleRuns(runs: BacktestRunEnvelope[]): BacktestRunEnvelope[] {
+  return sortBacktestRuns(runs).filter((run) => canCompareBacktestRun(run));
+}
+
+export function pruneBacktestComparisonSelection(selectedRunIds: readonly string[], eligibleRunIds: readonly string[]): string[] {
+  const eligible = new Set(eligibleRunIds);
+  const seen = new Set<string>();
+  const pruned: string[] = [];
+
+  for (const runId of selectedRunIds) {
+    if (!eligible.has(runId) || seen.has(runId)) {
+      continue;
+    }
+
+    seen.add(runId);
+    pruned.push(runId);
+  }
+
+  return pruned;
+}
+
+export function buildBacktestComparisonViewModel(
+  runs: BacktestRunEnvelope[],
+  selectedRunIds: readonly string[],
+): TerminalBacktestComparisonViewModel {
+  const eligibleRuns = getBacktestComparisonEligibleRuns(runs);
+  const eligibleRunIds = eligibleRuns.map((run) => run.id);
+  const selectedIds = pruneBacktestComparisonSelection(selectedRunIds, eligibleRunIds);
+  const eligibleById = new Map(eligibleRuns.map((run) => [run.id, run]));
+  const selectedSummaries = selectedIds
+    .map((runId) => createBacktestComparisonRunSummary(eligibleById.get(runId) ?? null))
+    .filter((summary): summary is TerminalBacktestComparisonRunSummary => summary !== null);
+  const strategyCurves = selectedSummaries.map((summary) => summary.strategyCurve);
+  const benchmarkCurves = selectedSummaries
+    .map((summary) => summary.benchmarkCurve)
+    .filter((curve): curve is TerminalBacktestComparisonCurve => curve !== null);
+  const selectedCount = selectedSummaries.length;
+
+  return {
+    selectedRunIds: selectedIds,
+    eligibleRuns,
+    eligibleRunIds,
+    selectedSummaries,
+    strategyCurves,
+    benchmarkCurves,
+    curves: [...strategyCurves, ...benchmarkCurves],
+    hasMinimumSelection: selectedCount >= 2,
+    emptyState: selectedCount === 0
+      ? 'Select at least two completed saved runs with persisted equity curves to compare strategy and buy-and-hold performance.'
+      : selectedCount === 1
+        ? 'Select one more completed saved run to enable side-by-side comparison.'
+        : '',
+  };
+}
+
+export function createBacktestComparisonRunSummary(run?: BacktestRunEnvelope | null): TerminalBacktestComparisonRunSummary | null {
+  const result = run?.result ?? null;
+  const backtest = result?.backtest ?? null;
+  if (!run || !canCompareBacktestRun(run) || !result || !backtest) {
+    return null;
+  }
+
+  const strategyCurve = createBacktestComparisonCurve(run, 'strategy');
+  if (!strategyCurve) {
+    return null;
+  }
+
+  const benchmarkCurve = createBacktestComparisonCurve(run, 'benchmark');
+  const symbol = result.symbol?.symbol || run.request.symbol.symbol;
+  const strategyLabel = formatBacktestStrategyDisplayName(run.request.strategyId);
+  const chartRangeLabel = formatBacktestChartRangeLabel(run.request.chartRange);
+  const sourceLabel = `${result.source.marketDataSource || 'market data source'} · ${result.engine.displayName || result.engine.provider}`;
+
+  return {
+    run,
+    runId: run.id,
+    label: `${symbol} · ${strategyLabel} · ${chartRangeLabel}`,
+    symbol,
+    strategyLabel,
+    chartRangeLabel,
+    capitalSourceLabel: formatBacktestCapitalSource(run.capital.capitalSource),
+    statusLabel: formatBacktestStatusLabel(run.status),
+    sourceLabel,
+    createdAtUtc: run.createdAtUtc,
+    completedAtUtc: run.completedAtUtc ?? null,
+    startUtc: backtest.startUtc ?? null,
+    endUtc: backtest.endUtc ?? null,
+    initialCapital: backtest.initialCapital,
+    finalEquity: backtest.finalEquity,
+    totalReturnPercent: backtest.totalReturnPercent,
+    maxDrawdownPercent: backtest.maxDrawdownPercent,
+    winRatePercent: backtest.winRatePercent,
+    tradeCount: backtest.tradeCount,
+    benchmarkReturnPercent: result.benchmark?.totalReturnPercent ?? null,
+    benchmarkFinalEquity: result.benchmark?.finalEquity ?? null,
+    strategyCurve,
+    benchmarkCurve,
+  };
+}
+
+export function createBacktestComparisonCurve(
+  run: BacktestRunEnvelope,
+  kind: TerminalBacktestComparisonCurveKind,
+): TerminalBacktestComparisonCurve | null {
+  const result = run.result;
+  if (!result) {
+    return null;
+  }
+
+  const sourcePoints = kind === 'strategy' ? result.equityCurve : result.benchmark?.equityCurve;
+  const baseline = kind === 'strategy'
+    ? result.backtest?.initialCapital ?? run.capital.initialCapital
+    : result.benchmark?.initialCapital ?? result.backtest?.initialCapital ?? run.capital.initialCapital;
+  const points = normalizeBacktestEquitySeries(sourcePoints, baseline);
+  if (points.length === 0) {
+    return null;
+  }
+
+  const finalPoint = points[points.length - 1];
+  const finalEquity = kind === 'strategy'
+    ? result.backtest?.finalEquity ?? finalPoint.equity
+    : result.benchmark?.finalEquity ?? finalPoint.equity;
+  const totalReturnPercent = kind === 'strategy'
+    ? result.backtest?.totalReturnPercent ?? finalPoint.normalizedReturnPercent
+    : result.benchmark?.totalReturnPercent ?? finalPoint.normalizedReturnPercent;
+
+  return {
+    id: `${run.id}:${kind}`,
+    runId: run.id,
+    kind,
+    label: formatBacktestComparisonCurveLabel(run, kind),
+    color: getBacktestComparisonCurveColor(run.id, kind),
+    points,
+    finalEquity,
+    totalReturnPercent,
+  };
+}
+
+export function normalizeBacktestEquitySeries(
+  points: readonly BacktestResultEquityCurvePointEnvelope[] | null | undefined,
+  fallbackInitialEquity?: number | null,
+): TerminalBacktestComparisonPoint[] {
+  const normalizedPoints: Omit<TerminalBacktestComparisonPoint, 'normalizedReturnPercent'>[] = [];
+
+  for (const point of points ?? []) {
+    const timestamp = Date.parse(point.time);
+    if (!Number.isFinite(timestamp) || !Number.isFinite(point.equity)) {
+      continue;
+    }
+
+    normalizedPoints.push({
+      time: point.time,
+      timestamp,
+      equity: point.equity,
+      drawdownPercent: Number.isFinite(point.drawdownPercent) ? point.drawdownPercent : null,
+    });
+  }
+
+  normalizedPoints.sort((left, right) => left.timestamp - right.timestamp);
+
+  const fallback = typeof fallbackInitialEquity === 'number' && Number.isFinite(fallbackInitialEquity) && fallbackInitialEquity > 0
+    ? fallbackInitialEquity
+    : null;
+  const baseline = fallback ?? normalizedPoints.find((point) => point.equity > 0)?.equity ?? null;
+  if (!baseline) {
+    return [];
+  }
+
+  return normalizedPoints.map((point) => ({
+    ...point,
+    normalizedReturnPercent: roundFourDecimals(((point.equity - baseline) / baseline) * 100),
+  }));
+}
+
+export function getBacktestComparisonCurveColor(runId: string, kind: TerminalBacktestComparisonCurveKind): string {
+  const palette = kind === 'strategy' ? BACKTEST_COMPARISON_STRATEGY_COLORS : BACKTEST_COMPARISON_BENCHMARK_COLORS;
+  return palette[hashBacktestComparisonKey(`${kind}:${runId}`) % palette.length];
+}
+
+export function formatBacktestComparisonCurveLabel(run: BacktestRunEnvelope, kind: TerminalBacktestComparisonCurveKind): string {
+  const symbol = run.result?.symbol?.symbol || run.request.symbol.symbol;
+  if (kind === 'benchmark') {
+    return `${symbol} ${run.result?.benchmark?.label || 'buy-and-hold'} benchmark`;
+  }
+
+  return `${symbol} ${formatBacktestStrategyDisplayName(run.request.strategyId)} strategy`;
+}
+
+export function getBacktestComparisonEligibilityCopy(run?: BacktestRunEnvelope | null): string {
+  if (!run) {
+    return 'No saved run is available for comparison.';
+  }
+
+  if (!isBacktestStatus(run.status, 'completed')) {
+    return 'Comparison is available only after a saved run reaches completed status.';
+  }
+
+  if (!run.result?.backtest) {
+    return 'Completed runs need a persisted result summary before comparison.';
+  }
+
+  if (!canCompareBacktestRun(run)) {
+    return 'Completed runs need persisted strategy equity curve points before comparison.';
+  }
+
+  return 'Selectable completed run with persisted result and strategy equity curve data.';
+}
+
 export function canCancelBacktestRun(run?: BacktestRunEnvelope | null): boolean {
   return Boolean(run && (isBacktestStatus(run.status, 'queued') || isBacktestStatus(run.status, 'running')));
 }
@@ -709,6 +1057,14 @@ export function formatBacktestCapitalSource(source: string | null | undefined): 
   }
 
   return source || 'Unknown';
+}
+
+export function formatBacktestStrategyDisplayName(strategyId: BacktestStrategyId | string): string {
+  return BACKTEST_STRATEGY_DEFINITIONS.find((strategy) => strategy.id === strategyId)?.displayName ?? strategyId;
+}
+
+export function formatBacktestChartRangeLabel(chartRange: ChartRange | string): string {
+  return CHART_RANGE_LABELS[chartRange as ChartRange] ?? chartRange;
 }
 
 function resolveBacktestRequestIdentity(identity: InstrumentIdentityInput | null | undefined, normalizedSymbol: string): MarketDataSymbolIdentity | null {
@@ -764,6 +1120,15 @@ function roundFourDecimals(value: number): number {
 
 function isBacktestStatus(status: BacktestRunStatus, expected: string): boolean {
   return status.trim().toLowerCase() === expected;
+}
+
+function hashBacktestComparisonKey(input: string): number {
+  let hash = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    hash = ((hash * 31) + input.charCodeAt(index)) | 0;
+  }
+
+  return Math.abs(hash);
 }
 
 function formatBacktestIdentitySummary(
