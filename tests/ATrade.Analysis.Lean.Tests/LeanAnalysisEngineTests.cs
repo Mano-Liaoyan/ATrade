@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using ATrade.Analysis;
 using ATrade.Analysis.Lean;
 using ATrade.MarketData;
@@ -21,6 +22,13 @@ public sealed class LeanAnalysisEngineTests
         Assert.Equal(request.Symbol, input.Symbol);
         Assert.Equal(MarketDataTimeframes.OneDay, input.Timeframe);
         Assert.Equal(input.Bars.OrderBy(bar => bar.TimeUtc).ToArray(), input.Bars);
+        Assert.Equal("sma-crossover", input.StrategyId);
+        Assert.Equal(10, input.StrategyParameters["shortWindow"].GetInt32());
+        Assert.Equal(125000m, input.InitialCapital);
+        Assert.Equal(1.25m, input.CommissionPerTrade);
+        Assert.Equal(2.5m, input.CommissionBps);
+        Assert.Equal(3.75m, input.SlippageBps);
+        Assert.Equal("USD", input.Currency);
         Assert.StartsWith("time,open,high,low,close,volume", csv, StringComparison.Ordinal);
         Assert.Contains("2026-04-01T00:00:00.0000000+00:00,100,101,99,100.5,1000000", csv, StringComparison.Ordinal);
     }
@@ -250,7 +258,7 @@ public sealed class LeanAnalysisEngineTests
         var input = LeanInputConverter.FromRequest(request);
         var execution = new LeanRuntimeExecutionResult(
             0,
-            "noise\nATRADE_ANALYSIS_RESULT:{\"generatedAtUtc\":\"2026-04-30T10:00:00Z\",\"signals\":[{\"time\":\"2026-04-25T00:00:00Z\",\"kind\":\"moving-average-crossover\",\"direction\":\"bullish\",\"confidence\":0.72,\"rationale\":\"cross\"}],\"metrics\":[{\"name\":\"total-return\",\"value\":12.34,\"unit\":\"percent\"}],\"backtest\":{\"startUtc\":\"2026-04-01T00:00:00Z\",\"endUtc\":\"2026-04-25T00:00:00Z\",\"initialCapital\":100000,\"finalEquity\":112340,\"totalReturnPercent\":12.34,\"tradeCount\":1,\"winRatePercent\":100}}",
+            "noise\nATRADE_ANALYSIS_RESULT:{\"generatedAtUtc\":\"2026-04-30T10:00:00Z\",\"signals\":[{\"time\":\"2026-04-25T00:00:00Z\",\"kind\":\"moving-average-crossover\",\"direction\":\"long\",\"confidence\":0.72,\"rationale\":\"cross\",\"price\":125.0}],\"metrics\":[{\"name\":\"total-return\",\"value\":12.34,\"unit\":\"percent\"}],\"backtest\":{\"startUtc\":\"2026-04-01T00:00:00Z\",\"endUtc\":\"2026-04-25T00:00:00Z\",\"initialCapital\":100000,\"finalEquity\":112340,\"totalReturnPercent\":12.34,\"tradeCount\":1,\"winRatePercent\":100,\"maxDrawdownPercent\":2.5,\"totalCost\":7.5},\"equityCurve\":[{\"time\":\"2026-04-01T00:00:00Z\",\"equity\":100000,\"drawdownPercent\":0},{\"time\":\"2026-04-25T00:00:00Z\",\"equity\":112340,\"drawdownPercent\":0}],\"trades\":[{\"entryTime\":\"2026-04-10T00:00:00Z\",\"exitTime\":\"2026-04-25T00:00:00Z\",\"direction\":\"long\",\"entryPrice\":110,\"exitPrice\":125,\"quantity\":10,\"grossPnl\":150,\"netPnl\":142.5,\"returnPercent\":0.1425,\"totalCost\":7.5,\"exitReason\":\"strategy-exit\"}],\"accounting\":{\"commissionPerTrade\":1.25,\"commissionBps\":2.5,\"slippageBps\":3.75,\"currency\":\"USD\"}}",
             string.Empty,
             TimedOut: false);
 
@@ -267,6 +275,11 @@ public sealed class LeanAnalysisEngineTests
         Assert.Equal("moving-average-crossover", Assert.Single(result.Signals).Kind);
         Assert.Equal("total-return", Assert.Single(result.Metrics).Name);
         Assert.Equal(112340m, result.Backtest?.FinalEquity);
+        Assert.Equal(2.5m, result.Backtest?.MaxDrawdownPercent);
+        Assert.Equal(7.5m, result.Backtest?.TotalCost);
+        Assert.Equal(2, result.BacktestDetails?.EquityCurve.Count);
+        Assert.Equal(142.5m, Assert.Single(result.BacktestDetails!.Trades).NetPnl);
+        Assert.Equal(3.75m, result.BacktestDetails.Accounting.SlippageBps);
         Assert.Null(result.Error);
     }
 
@@ -391,11 +404,27 @@ public sealed class LeanAnalysisEngineTests
     [Fact]
     public void AlgorithmTemplateStaysAnalysisOnlyAndRejectsTradingCalls()
     {
-        var algorithm = LeanAlgorithmTemplate.Create(LeanInputConverter.FromRequest(CreateRequest(barCount: 25)));
+        var strategies = new[]
+        {
+            ("sma-crossover", new Dictionary<string, JsonElement> { ["shortWindow"] = Json("10"), ["longWindow"] = Json("30") }),
+            ("rsi-mean-reversion", new Dictionary<string, JsonElement> { ["rsiPeriod"] = Json("14"), ["oversoldThreshold"] = Json("25"), ["overboughtThreshold"] = Json("75") }),
+            ("breakout", new Dictionary<string, JsonElement> { ["lookbackWindow"] = Json("15") }),
+        };
 
-        Assert.DoesNotContain("MarketOrder(", algorithm, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("SetBrokerageModel", algorithm, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("/api/orders", algorithm, StringComparison.OrdinalIgnoreCase);
+        foreach (var (strategyId, parameters) in strategies)
+        {
+            var algorithm = LeanAlgorithmTemplate.Create(LeanInputConverter.FromRequest(CreateRequest(
+                barCount: 60,
+                strategyName: strategyId,
+                strategyParameters: parameters)));
+
+            Assert.Contains($"self.strategy_id = \"{strategyId}\"", algorithm, StringComparison.Ordinal);
+            Assert.DoesNotContain("MarketOrder(", algorithm, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("SetBrokerageModel", algorithm, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("/api/orders", algorithm, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("SetLiveMode", algorithm, StringComparison.OrdinalIgnoreCase);
+        }
+
         Assert.Throws<LeanAnalysisOnlyViolationException>(() => LeanAnalysisGuardrails.EnsureAnalysisOnly("self.MarketOrder(\"SPY\", 1)"));
     }
 
@@ -438,7 +467,11 @@ public sealed class LeanAnalysisEngineTests
         return path;
     }
 
-    private static AnalysisRequest CreateRequest(int barCount, bool reverseBars = false)
+    private static AnalysisRequest CreateRequest(
+        int barCount,
+        bool reverseBars = false,
+        string strategyName = "sma-crossover",
+        IReadOnlyDictionary<string, JsonElement>? strategyParameters = null)
     {
         var bars = Enumerable.Range(0, barCount)
             .Select(index => new OhlcvCandle(
@@ -461,7 +494,24 @@ public sealed class LeanAnalysisEngineTests
             DateTimeOffset.UtcNow,
             bars,
             EngineId: LeanAnalysisOptions.EngineId,
-            StrategyName: "unit-test-moving-average-crossover");
+            StrategyName: strategyName,
+            StrategyParameters: strategyParameters ?? new Dictionary<string, JsonElement>
+            {
+                ["shortWindow"] = Json("10"),
+                ["longWindow"] = Json("30"),
+            },
+            BacktestSettings: new AnalysisBacktestSettings(
+                InitialCapital: 125000m,
+                CommissionPerTrade: 1.25m,
+                CommissionBps: 2.5m,
+                SlippageBps: 3.75m,
+                Currency: "usd"));
+    }
+
+    private static JsonElement Json(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
     }
 
     private sealed class FakeLeanRuntimeExecutor(Func<LeanRuntimeExecutionRequest, LeanRuntimeExecutionResult> execute) : ILeanRuntimeExecutor

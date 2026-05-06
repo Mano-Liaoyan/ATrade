@@ -49,7 +49,14 @@ public sealed class BacktestRunAnalysisExecutionPipeline(
             timeProvider.GetUtcNow(),
             candles.Candles,
             EngineId: request.EngineId,
-            StrategyName: request.StrategyId);
+            StrategyName: request.StrategyId,
+            StrategyParameters: request.Parameters,
+            BacktestSettings: new AnalysisBacktestSettings(
+                run.Run.Capital.InitialCapital,
+                request.CostModel.CommissionPerTrade,
+                request.CostModel.CommissionBps,
+                request.SlippageBps,
+                request.CostModel.Currency));
 
         var analysisResult = await analysisEngines.AnalyzeAsync(analysisRequest, cancellationToken).ConfigureAwait(false);
         if (!string.Equals(analysisResult.Status, AnalysisResultStatuses.Completed, StringComparison.OrdinalIgnoreCase))

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using ATrade.Analysis;
 using ATrade.MarketData;
 
@@ -10,7 +11,14 @@ public sealed record LeanInputData(
     string Timeframe,
     DateTimeOffset StartUtc,
     DateTimeOffset EndUtc,
-    IReadOnlyList<LeanInputBar> Bars);
+    IReadOnlyList<LeanInputBar> Bars,
+    string StrategyId,
+    IReadOnlyDictionary<string, JsonElement> StrategyParameters,
+    decimal InitialCapital,
+    decimal CommissionPerTrade,
+    decimal CommissionBps,
+    decimal SlippageBps,
+    string Currency);
 
 public sealed record LeanInputBar(
     DateTimeOffset TimeUtc,
@@ -38,12 +46,26 @@ public static class LeanInputConverter
             .OrderBy(bar => bar.TimeUtc)
             .ToArray();
 
+        var backtestSettings = request.BacktestSettings ?? new AnalysisBacktestSettings(
+            InitialCapital: 100_000m,
+            CommissionPerTrade: 0m,
+            CommissionBps: 0m,
+            SlippageBps: 0m,
+            Currency: "USD");
+
         return new LeanInputData(
             request.Symbol,
             string.IsNullOrWhiteSpace(request.Timeframe) ? MarketDataTimeframes.OneDay : request.Timeframe.Trim(),
             bars[0].TimeUtc,
             bars[^1].TimeUtc,
-            bars);
+            bars,
+            NormalizeStrategyId(request.StrategyName),
+            NormalizeStrategyParameters(request.StrategyParameters),
+            decimal.Round(backtestSettings.InitialCapital, 2, MidpointRounding.AwayFromZero),
+            decimal.Round(backtestSettings.CommissionPerTrade, 4, MidpointRounding.AwayFromZero),
+            decimal.Round(backtestSettings.CommissionBps, 4, MidpointRounding.AwayFromZero),
+            decimal.Round(backtestSettings.SlippageBps, 4, MidpointRounding.AwayFromZero),
+            string.IsNullOrWhiteSpace(backtestSettings.Currency) ? "USD" : backtestSettings.Currency.Trim().ToUpperInvariant());
     }
 
     public static string ToCsv(LeanInputData input)
@@ -66,6 +88,34 @@ public static class LeanInputConverter
         }
 
         return builder.ToString();
+    }
+
+    private static string NormalizeStrategyId(string? strategyName)
+    {
+        if (string.IsNullOrWhiteSpace(strategyName))
+        {
+            return "sma-crossover";
+        }
+
+        var normalized = strategyName.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "sma-crossover" or "rsi-mean-reversion" or "breakout" => normalized,
+            _ => "sma-crossover",
+        };
+    }
+
+    private static IReadOnlyDictionary<string, JsonElement> NormalizeStrategyParameters(IReadOnlyDictionary<string, JsonElement>? parameters)
+    {
+        if (parameters is null || parameters.Count == 0)
+        {
+            return new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        }
+
+        return parameters.ToDictionary(
+            parameter => parameter.Key,
+            parameter => parameter.Value.Clone(),
+            StringComparer.Ordinal);
     }
 
     private static LeanInputBar ToLeanBar(OhlcvCandle candle)

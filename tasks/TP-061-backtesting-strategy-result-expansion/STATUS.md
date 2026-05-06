@@ -1,6 +1,6 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
-**Current Step:** Step 2: Expand LEAN input/template/parser for parameterized built-ins
+**Current Step:** Step 3: Persist and expose rich backtest results
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Expand LEAN input/template/parser for parameterized built-ins
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] LEAN input/template supports selected built-in strategy and parameters
-- [ ] Generated algorithms remain analysis-only and order-free
-- [ ] Commission/slippage included in internal simulated accounting
-- [ ] Guardrail tests cover generated templates
+- [x] LEAN input/template supports selected built-in strategy and parameters
+- [x] Generated algorithms remain analysis-only and order-free
+- [x] Commission/slippage included in internal simulated accounting
+- [x] Guardrail tests cover generated templates
 
 ---
 
 ### Step 3: Persist and expose rich backtest results
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Rich result shapes added
 - [ ] LEAN output maps into saved backtest result envelopes
@@ -114,6 +114,12 @@
 | 2026-05-06 00:34 | Step 1 tests | Backtesting targeted tests passed: 44/44. |
 | 2026-05-06 00:35 | Step 1 completed | Strategy definitions, validation, guardrails, and snapshots are in place. |
 | 2026-05-06 00:35 | Step 2 started | LEAN input/template/parser expansion for parameterized strategies. |
+| 2026-05-06 00:45 | Step 2 LEAN input/template | Analysis requests now carry strategy parameters/accounting settings into LEAN input and generated built-in strategy code. |
+| 2026-05-06 00:46 | Step 2 analysis-only guardrail | Generated LEAN source remains free of broker/order/live-trading tokens across all built-ins. |
+| 2026-05-06 00:47 | Step 2 simulated accounting | Commission, bps costs, slippage, equity, signals, and trades are simulated internally without LEAN order APIs. |
+| 2026-05-06 00:48 | Step 2 tests | LEAN targeted tests passed: 15/15; backtesting targeted tests passed: 44/44. |
+| 2026-05-06 00:49 | Step 2 completed | LEAN parameterized built-ins, internal simulated accounting, parser support, and guardrails are in place. |
+| 2026-05-06 00:49 | Step 3 started | Rich result persistence/envelopes and benchmark expansion. |
 
 ---
 

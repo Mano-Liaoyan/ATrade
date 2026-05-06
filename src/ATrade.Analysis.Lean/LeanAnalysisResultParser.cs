@@ -34,7 +34,8 @@ public static class LeanAnalysisResultParser
             ReadSignals(root),
             ReadMetrics(root),
             ReadBacktest(root, input),
-            Error: null);
+            Error: null,
+            ReadBacktestDetails(root, input));
     }
 
     private static string FindResultPayload(params string[] outputs)
@@ -110,7 +111,90 @@ public static class LeanAnalysisResultParser
             ReadDecimal(backtestElement, "finalEquity"),
             ReadDecimal(backtestElement, "totalReturnPercent"),
             ReadInt32(backtestElement, "tradeCount"),
-            ReadDecimal(backtestElement, "winRatePercent"));
+            ReadDecimal(backtestElement, "winRatePercent"),
+            ReadDecimal(backtestElement, "maxDrawdownPercent"),
+            ReadDecimal(backtestElement, "totalCost"));
+    }
+
+    private static AnalysisBacktestDetails ReadBacktestDetails(JsonElement root, LeanInputData input)
+    {
+        return new AnalysisBacktestDetails(
+            ReadEquityCurve(root, "equityCurve"),
+            ReadTrades(root),
+            ReadBenchmark(root),
+            ReadAccounting(root, input));
+    }
+
+    private static IReadOnlyList<AnalysisEquityCurvePoint> ReadEquityCurve(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var curveElement) || curveElement.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<AnalysisEquityCurvePoint>();
+        }
+
+        return curveElement.EnumerateArray()
+            .Select(static point => new AnalysisEquityCurvePoint(
+                ReadDateTimeOffset(point, "time") ?? DateTimeOffset.UtcNow,
+                ReadDecimal(point, "equity"),
+                ReadDecimal(point, "drawdownPercent")))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<AnalysisSimulatedTrade> ReadTrades(JsonElement root)
+    {
+        if (!root.TryGetProperty("trades", out var tradesElement) || tradesElement.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<AnalysisSimulatedTrade>();
+        }
+
+        return tradesElement.EnumerateArray()
+            .Select(static trade => new AnalysisSimulatedTrade(
+                ReadDateTimeOffset(trade, "entryTime") ?? DateTimeOffset.UtcNow,
+                ReadDateTimeOffset(trade, "exitTime"),
+                ReadString(trade, "direction", "long"),
+                ReadDecimal(trade, "entryPrice"),
+                ReadNullableDecimal(trade, "exitPrice"),
+                ReadDecimal(trade, "quantity"),
+                ReadDecimal(trade, "grossPnl"),
+                ReadDecimal(trade, "netPnl"),
+                ReadDecimal(trade, "returnPercent"),
+                ReadDecimal(trade, "totalCost"),
+                ReadString(trade, "exitReason", "strategy-exit")))
+            .ToArray();
+    }
+
+    private static AnalysisBenchmark? ReadBenchmark(JsonElement root)
+    {
+        if (!root.TryGetProperty("benchmark", out var benchmarkElement) || benchmarkElement.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return new AnalysisBenchmark(
+            ReadString(benchmarkElement, "mode", "buy-and-hold"),
+            ReadString(benchmarkElement, "label", "Buy and hold"),
+            ReadDecimal(benchmarkElement, "initialCapital"),
+            ReadDecimal(benchmarkElement, "finalEquity"),
+            ReadDecimal(benchmarkElement, "totalReturnPercent"),
+            ReadEquityCurve(benchmarkElement, "equityCurve"));
+    }
+
+    private static AnalysisBacktestAccounting ReadAccounting(JsonElement root, LeanInputData input)
+    {
+        if (!root.TryGetProperty("accounting", out var accountingElement) || accountingElement.ValueKind != JsonValueKind.Object)
+        {
+            return new AnalysisBacktestAccounting(
+                input.CommissionPerTrade,
+                input.CommissionBps,
+                input.SlippageBps,
+                input.Currency);
+        }
+
+        return new AnalysisBacktestAccounting(
+            ReadDecimal(accountingElement, "commissionPerTrade"),
+            ReadDecimal(accountingElement, "commissionBps"),
+            ReadDecimal(accountingElement, "slippageBps"),
+            ReadString(accountingElement, "currency", input.Currency));
     }
 
     private static string ReadString(JsonElement element, string propertyName, string fallback) =>
@@ -131,11 +215,14 @@ public static class LeanAnalysisResultParser
             : null;
     }
 
-    private static decimal ReadDecimal(JsonElement element, string propertyName)
+    private static decimal ReadDecimal(JsonElement element, string propertyName) =>
+        ReadNullableDecimal(element, propertyName) ?? 0m;
+
+    private static decimal? ReadNullableDecimal(JsonElement element, string propertyName)
     {
-        if (!element.TryGetProperty(propertyName, out var property))
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null)
         {
-            return 0m;
+            return null;
         }
 
         if (property.ValueKind == JsonValueKind.Number && property.TryGetDecimal(out var decimalValue))
@@ -148,7 +235,7 @@ public static class LeanAnalysisResultParser
             return stringValue;
         }
 
-        return 0m;
+        return null;
     }
 
     private static int ReadInt32(JsonElement element, string propertyName)

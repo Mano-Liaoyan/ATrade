@@ -29,6 +29,11 @@ public sealed class BacktestRunAnalysisExecutionPipelineTests
         Assert.NotNull(analysis.Request);
         Assert.Equal(run.Run.Request.StrategyId, analysis.Request.StrategyName);
         Assert.Equal("lean", analysis.Request.EngineId);
+        Assert.Equal(run.Run.Request.Parameters, analysis.Request.StrategyParameters);
+        Assert.Equal(run.Run.Capital.InitialCapital, analysis.Request.BacktestSettings?.InitialCapital);
+        Assert.Equal(run.Run.Request.CostModel.CommissionPerTrade, analysis.Request.BacktestSettings?.CommissionPerTrade);
+        Assert.Equal(run.Run.Request.CostModel.CommissionBps, analysis.Request.BacktestSettings?.CommissionBps);
+        Assert.Equal(run.Run.Request.SlippageBps, analysis.Request.BacktestSettings?.SlippageBps);
         Assert.Equal(candles.Candles, analysis.Request.Bars);
         Assert.Equal(candles.Timeframe, analysis.Request.Timeframe);
         Assert.Equal(ObservedAtUtc, analysis.Request.RequestedAtUtc);
