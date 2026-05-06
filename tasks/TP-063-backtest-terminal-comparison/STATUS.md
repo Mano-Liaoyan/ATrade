@@ -1,11 +1,11 @@
 # TP-063: Terminal backtest comparison and equity overlay — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-05-05
+**Current Step:** Step 0: Preflight
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-05-06
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,10 +15,10 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
@@ -92,6 +92,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-06 01:20 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-06 01:20 | Step 0 started | Preflight |
 
 ---
 
