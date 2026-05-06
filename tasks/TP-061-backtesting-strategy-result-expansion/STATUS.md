@@ -1,11 +1,11 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-05-05
+**Current Step:** Step 1: Add built-in strategy definitions and parameter validation
+**Status:** 🟡 In Progress
+**Last Updated:** 2026-05-06
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,15 +15,15 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Add built-in strategy definitions and parameter validation
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] SMA, RSI, and breakout definitions/defaults added
 - [ ] Parameter, cost, and slippage validation implemented
@@ -103,6 +103,11 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-06 00:17 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-06 00:17 | Step 0 started | Preflight |
+| 2026-05-06 00:20 | Step 0 preflight | Verified TP-060 status is complete, required projects/tests/docs exist, and .NET SDK 10.0.102 is available. |
+| 2026-05-06 00:21 | Step 0 completed | Preflight checks passed. |
+| 2026-05-06 00:21 | Step 1 started | Built-in strategy definitions and validation. |
 
 ---
 
