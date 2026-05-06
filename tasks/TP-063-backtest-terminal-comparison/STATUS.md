@@ -1,6 +1,6 @@
 # TP-063: Terminal backtest comparison and equity overlay — Status
 
-**Current Step:** Step 2: Render comparison table and equity overlay
+**Current Step:** Step 3: Add comparison validation coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 1
@@ -43,11 +43,11 @@
 ---
 
 ### Step 3: Add comparison validation coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] `tests/apphost/frontend-terminal-backtest-comparison-tests.sh` created
-- [ ] Backtest workspace validation updated only if affected
-- [ ] Validation remains provider/runtime independent
+- [x] `tests/apphost/frontend-terminal-backtest-comparison-tests.sh` created
+- [x] Backtest workspace validation updated only if affected
+- [x] Validation remains provider/runtime independent
 
 ---
 
