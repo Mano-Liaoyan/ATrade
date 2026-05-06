@@ -1,6 +1,6 @@
 # TP-060: Backtesting async runner and SignalR updates — Status
 
-**Current Step:** Step 3: Add best-effort cancellation and SignalR job updates
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-05
 **Review Level:** 2
@@ -53,14 +53,14 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Targeted backtesting tests passing
-- [ ] SignalR/runner apphost validation passing
-- [ ] Existing analysis tests passing
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Targeted backtesting tests passing
+- [x] SignalR/runner apphost validation passing
+- [x] Existing analysis tests passing
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
