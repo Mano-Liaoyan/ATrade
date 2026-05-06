@@ -1,11 +1,11 @@
 # TP-063: Terminal backtest comparison and equity overlay — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-06
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -64,12 +64,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -84,6 +84,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Check-if-affected architecture docs were affected by the new comparison workflow/component ownership. | Updated modules and paper-trading workspace docs; no out-of-scope tech debt found. | `docs/architecture/modules.md`; `docs/architecture/paper-trading-workspace.md` |
 
 ---
 
@@ -94,6 +95,8 @@
 | 2026-05-05 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-06 01:20 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-06 01:20 | Step 0 started | Preflight |
+| 2026-05-06 01:36 | Worker iter 1 | done in 923s, tools: 133 |
+| 2026-05-06 | Step 5 completed | Documentation updated for comparison surface and delivery notes logged |
 
 ---
 

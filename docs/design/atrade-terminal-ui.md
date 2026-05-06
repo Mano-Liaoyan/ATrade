@@ -118,7 +118,7 @@ backend cannot supply.
 | `WATCHLIST` | Backend-owned watchlist view for exact provider/market pins with pin/unpin/remove, stable `instrumentKey` / `pinKey`, read-only cached fallback copy, and no browser-owned authority. | `GET` / `PUT` / `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy unambiguous `DELETE /api/workspace/watchlist/{symbol}`, and `watchlistWorkflow`. |
 | `CHART` | Dense chart workspace for an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis handoff. | `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, and `symbolChartWorkflow`. |
 | `ANALYSIS` | Provider-neutral analysis workspace that lists available engines, runs analysis over market-data bars, and surfaces explicit no-engine or runtime-unavailable states without fake signals. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
-| `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, cancel, retry, and truthful empty/unavailable states. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
+| `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, completed-run-only comparison, metric table/cards, persisted strategy/buy-and-hold equity overlay, cancel, retry, and truthful empty/unavailable states without export or optimization controls. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
 | `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and explicit unavailable states. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata. |
 | `HELP` | In-product module/workflow reference, safety reminders, provider-state explanations, and direct-navigation guidance. | Static frontend content derived from this spec and active architecture docs; no backend data required. |
 
@@ -203,7 +203,7 @@ implementation while leaving room for a desktop wrapper later.
   viewport-height with page-level `overflow: hidden`; long market-monitor,
   chart, analysis, status, help, and disabled-module content scrolls inside the
   primary workspace or module-owned scroll regions. Backtest run forms, status,
-  history, and detail content use module-owned scroll space and must not force
+  history, completed-run comparison tables/overlays, and detail content use module-owned scroll space and must not force
   page-level scrolling. The market monitor table is its own module-owned scroll
   region: row overflow stays inside the table
   viewport with sticky headers, and horizontal overflow remains visible through a

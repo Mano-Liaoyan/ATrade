@@ -105,7 +105,7 @@ The current runnable slice includes:
 - `src/ATrade.Backtesting` — provider-neutral saved backtest run module with single-symbol/built-in-strategy and parameter request validation, optional analysis engine ids, paper-capital source snapshots, cost/slippage/benchmark settings, Postgres saved-run history, an API-hosted async runner with startup recovery, server-side market-data/analysis execution, rich completed result envelopes, best-effort cancellation, `/hubs/backtests` SignalR updates, and persistence/broadcast redaction for secrets, account identifiers, gateway URLs, LEAN workspace paths, direct bars, custom code, and order-routing fields.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, visibly sized chart/indicator/analysis/backtest workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis/backtest handoff, provider-neutral analysis states, and an enabled BACKTEST module for paper-capital-backed saved runs, live status, history/detail, cancel, and retry.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, direct module/workflow navigation, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, visibly sized chart/indicator/analysis/backtest workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis/backtest handoff, provider-neutral analysis states, and an enabled BACKTEST module for paper-capital-backed saved runs, live status, history/detail, completed-run comparison with metrics and persisted strategy/buy-and-hold equity overlays, cancel, and retry.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -187,9 +187,13 @@ frontend BACKTEST rail module consumes those contracts through
 `frontend/lib/backtestClient.ts` and `terminalBacktestWorkflow`: users can review
 or set local paper capital, create a single-symbol built-in strategy run, watch
 SignalR status, inspect saved history/detail with summary/benchmark/trades/
-signals/source metadata, cancel queued/running jobs, and retry failed/cancelled
-runs as new saved runs without exposing order controls, fake results, direct
-provider/runtime/database access, or account identifiers.
+signals/source metadata, select only completed runs with persisted result/equity
+data for side-by-side comparison, review comparison metrics/source/capital
+metadata, and overlay persisted strategy equity curves plus buy-and-hold
+benchmark curves. Users can cancel queued/running jobs and retry failed/cancelled
+runs as new saved runs without exposing export controls, optimization, order
+controls, fake results, direct provider/runtime/database access, or account
+identifiers.
 
 ## Active Task Queue
 
@@ -211,8 +215,9 @@ surface is the direct module/workflow ATrade paper workspace. The active
 backend/backtesting MVP wave now includes `TP-058` paper-capital source work,
 `TP-059` first-class saved backtesting domain/API work, `TP-060` async
 runner/SignalR job updates, `TP-061` built-in strategy/rich result
-expansion, and `TP-062` the enabled terminal BACKTEST workspace for run creation,
-status, history/detail, cancel, and retry. Follow-up frontend work should build
+expansion, `TP-062` the enabled terminal BACKTEST workspace for run creation,
+status, history/detail, cancel, and retry, and `TP-063` completed-run comparison
+with persisted strategy/benchmark equity overlays. Follow-up frontend work should build
 on module rail navigation plus explicit workflow actions rather than the retired
 old shell/list route wrappers,
 a command system, cyan/blue-gradient-dominant
@@ -220,9 +225,10 @@ styling, or the removed app-level, context, monitor, footer, and top-safety
 chrome.
 
 Completed Taskplane packets through `TP-057` are present in `tasks/`; `TP-058`
-through `TP-062` cover the backend/backtesting MVP foundation, strategy/result
-expansion, and first user-facing terminal BACKTEST workspace currently staged in
-the active wave. Completed packets should be archived when convenient. During
+through `TP-063` cover the backend/backtesting MVP foundation, strategy/result
+expansion, and the user-facing terminal BACKTEST workspace plus comparison
+surface currently staged in the active wave. Completed packets should be archived
+when convenient. During
 orchestrated runs the runtime handles post-merge archival for active task folders.
 
 ## Repository Map
@@ -296,6 +302,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
 - `tests/apphost/frontend-terminal-backtest-workspace-tests.sh`
+- `tests/apphost/frontend-terminal-backtest-comparison-tests.sh`
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
 - `tests/apphost/frontend-terminal-market-monitor-tests.sh`
 - `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
