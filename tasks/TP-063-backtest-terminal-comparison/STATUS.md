@@ -1,6 +1,6 @@
 # TP-063: Terminal backtest comparison and equity overlay — Status
 
-**Current Step:** Step 1: Add comparison selection state and view-model helpers
+**Current Step:** Step 2: Render comparison table and equity overlay
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 1
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Render comparison table and equity overlay
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Comparison metrics table/cards rendered
-- [ ] Accessible equity overlay rendered without unnecessary new dependencies
-- [ ] Strategy and benchmark curves/legends shown with honest empty states
-- [ ] Module layout remains responsive and shell guardrails preserved
+- [x] Comparison metrics table/cards rendered
+- [x] Accessible equity overlay rendered without unnecessary new dependencies
+- [x] Strategy and benchmark curves/legends shown with honest empty states
+- [x] Module layout remains responsive and shell guardrails preserved
 
 ---
 

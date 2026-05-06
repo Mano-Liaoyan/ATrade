@@ -4,6 +4,7 @@ import type { InstrumentIdentityInput } from '@/lib/instrumentIdentity';
 import {
   formatBacktestCapitalSource,
   formatBacktestStatusLabel,
+  getBacktestComparisonEligibilityCopy,
   useTerminalBacktestWorkflow,
   type TerminalBacktestWorkflow,
 } from '@/lib/terminalBacktestWorkflow';
@@ -13,6 +14,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { TerminalPanel } from './TerminalPanel';
 import type { BacktestRunEnvelope } from '@/types/backtesting';
+import { BacktestComparisonPanel } from './BacktestComparisonPanel';
 import { TerminalStatusBadge, type TerminalStatusTone } from './TerminalStatusBadge';
 
 export type TerminalBacktestWorkspaceProps = {
@@ -74,6 +76,7 @@ export function TerminalBacktestWorkspace({
         <BacktestRunForm workflow={workflow} />
         <BacktestLiveStatusPanel workflow={workflow} />
         <BacktestHistoryPanel workflow={workflow} />
+        <BacktestComparisonPanel workflow={workflow} />
         <BacktestRunDetailPanel workflow={workflow} />
         <BacktestTruthfulStatesPanel />
       </TerminalPanel>
@@ -320,24 +323,52 @@ function BacktestHistoryPanel({ workflow }: { workflow: TerminalBacktestWorkflow
         <div className="terminal-backtest-history__list" role="list" aria-label="Saved backtest runs">
           {workflow.runs.map((run) => {
             const selected = run.id === workflow.selectedRunId;
+            const comparisonSelected = workflow.comparisonSelectedRunIds.includes(run.id);
+            const comparable = workflow.canCompareRun(run);
+            const comparisonCopy = getBacktestComparisonEligibilityCopy(run);
             return (
-              <button
-                aria-current={selected ? 'true' : undefined}
-                className={cn('terminal-backtest-history__item', selected && 'terminal-backtest-history__item--selected')}
+              <article
+                className={cn(
+                  'terminal-backtest-history__item',
+                  selected && 'terminal-backtest-history__item--selected',
+                  comparisonSelected && 'terminal-backtest-history__item--comparison-selected',
+                )}
                 data-testid="backtest-history-row"
                 key={run.id}
-                onClick={() => workflow.setSelectedRunId(run.id)}
-                type="button"
+                role="listitem"
               >
-                <span className="terminal-backtest-history__item-heading">
-                  <strong>{run.request.symbol.symbol}</strong>
-                  <TerminalStatusBadge tone={getBacktestRunTone(run)}>{formatBacktestStatusLabel(run.status)}</TerminalStatusBadge>
-                </span>
-                <span>{run.request.strategyId} · {run.request.chartRange}</span>
-                <span>{formatBacktestCapitalSource(run.capital.capitalSource)} · {formatCurrency(run.capital.initialCapital, run.capital.currency)}</span>
-                <span>Created {formatDateTime(run.createdAtUtc)}{run.completedAtUtc ? ` · finished ${formatDateTime(run.completedAtUtc)}` : ''}</span>
-                <small>{getRunPreview(run)}</small>
-              </button>
+                <button
+                  aria-current={selected ? 'true' : undefined}
+                  className="terminal-backtest-history__detail-button"
+                  data-testid="backtest-history-detail-button"
+                  onClick={() => workflow.setSelectedRunId(run.id)}
+                  type="button"
+                >
+                  <span className="terminal-backtest-history__item-heading">
+                    <strong>{run.request.symbol.symbol}</strong>
+                    <TerminalStatusBadge tone={getBacktestRunTone(run)}>{formatBacktestStatusLabel(run.status)}</TerminalStatusBadge>
+                  </span>
+                  <span>{run.request.strategyId} · {run.request.chartRange}</span>
+                  <span>{formatBacktestCapitalSource(run.capital.capitalSource)} · {formatCurrency(run.capital.initialCapital, run.capital.currency)}</span>
+                  <span>Created {formatDateTime(run.createdAtUtc)}{run.completedAtUtc ? ` · finished ${formatDateTime(run.completedAtUtc)}` : ''}</span>
+                  <small>{getRunPreview(run)}</small>
+                </button>
+                <div className="terminal-backtest-history__compare">
+                  <Button
+                    aria-label={`${comparisonSelected ? 'Remove' : 'Add'} ${run.request.symbol.symbol} ${run.request.strategyId} run ${run.id} ${comparisonSelected ? 'from' : 'to'} comparison`}
+                    aria-pressed={comparisonSelected}
+                    data-testid="backtest-comparison-select-run"
+                    disabled={!comparable}
+                    onClick={() => workflow.toggleComparisonRunSelection(run.id)}
+                    size="sm"
+                    type="button"
+                    variant={comparisonSelected ? 'amber' : 'terminal'}
+                  >
+                    {comparisonSelected ? 'Selected for comparison' : comparable ? 'Compare completed run' : 'Completed result required'}
+                  </Button>
+                  <small>{comparisonCopy}</small>
+                </div>
+              </article>
             );
           })}
         </div>

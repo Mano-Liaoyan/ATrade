@@ -1951,6 +1951,221 @@ select:focus-visible,
   font-size: 0.82rem;
 }
 
+.terminal-backtest-history__detail-button {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.terminal-backtest-history__detail-button:focus-visible {
+  outline: 2px solid hsl(var(--terminal-accent-amber));
+  outline-offset: 3px;
+}
+
+.terminal-backtest-history__compare {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+  border-top: 1px solid hsl(var(--terminal-border) / 0.5);
+  padding-top: 0.55rem;
+}
+
+.terminal-backtest-history__item--comparison-selected {
+  border-color: hsl(var(--terminal-accent-green) / 0.55);
+  background: hsl(var(--terminal-accent-green) / 0.08);
+}
+
+.terminal-backtest-comparison {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid hsl(var(--terminal-border) / 0.72);
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface-inset) / 0.56);
+  padding: 0.75rem;
+}
+
+.terminal-backtest-comparison__header,
+.terminal-backtest-comparison__overlay-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.terminal-backtest-comparison__actions,
+.terminal-backtest-comparison__card,
+.terminal-backtest-comparison__legend li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-backtest-comparison__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.terminal-backtest-comparison__card,
+.terminal-backtest-comparison__empty,
+.terminal-backtest-comparison__overlay,
+.terminal-backtest-comparison__table-wrap {
+  border: 1px solid hsl(var(--terminal-border) / 0.58);
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface-inset) / 0.56);
+  padding: 0.65rem;
+}
+
+.terminal-backtest-comparison__card {
+  justify-content: space-between;
+}
+
+.terminal-backtest-comparison__header > div:first-child,
+.terminal-backtest-comparison__overlay-header > div,
+.terminal-backtest-comparison__card > div {
+  min-width: 0;
+}
+
+.terminal-backtest-comparison__header span,
+.terminal-backtest-comparison__overlay-header span,
+.terminal-backtest-comparison__card span,
+.terminal-backtest-comparison__table th {
+  color: hsl(var(--terminal-text-subtle));
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.terminal-backtest-comparison__header strong,
+.terminal-backtest-comparison__overlay-header strong,
+.terminal-backtest-comparison__card strong {
+  display: block;
+  margin: 0.2rem 0 0;
+  color: hsl(var(--terminal-text));
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.terminal-backtest-comparison__header small,
+.terminal-backtest-comparison__overlay-header small,
+.terminal-backtest-comparison__card small,
+.terminal-backtest-comparison__empty span,
+.terminal-backtest-comparison__table small,
+.terminal-backtest-comparison__legend span,
+.terminal-backtest-history__compare small {
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.terminal-backtest-comparison__empty {
+  display: grid;
+  gap: 0.25rem;
+  border-style: dashed;
+}
+
+.terminal-backtest-comparison__table-wrap {
+  overflow-x: auto;
+}
+
+.terminal-backtest-comparison__table {
+  width: 100%;
+  min-width: 62rem;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.terminal-backtest-comparison__table caption {
+  margin-bottom: 0.5rem;
+  color: hsl(var(--terminal-text-muted));
+  text-align: left;
+}
+
+.terminal-backtest-comparison__table th,
+.terminal-backtest-comparison__table td {
+  border-bottom: 1px solid hsl(var(--terminal-border) / 0.55);
+  padding: 0.45rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.terminal-backtest-comparison__table td {
+  color: hsl(var(--terminal-text));
+  font-family: var(--font-mono);
+}
+
+.terminal-backtest-comparison__overlay {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.terminal-backtest-comparison__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 16rem;
+  border: 1px solid hsl(var(--terminal-border) / 0.5);
+  background: linear-gradient(180deg, hsl(var(--terminal-surface-panel) / 0.7), hsl(var(--terminal-surface-inset) / 0.9));
+}
+
+.terminal-backtest-comparison__plot {
+  fill: hsl(var(--terminal-canvas) / 0.42);
+}
+
+.terminal-backtest-comparison__grid-line {
+  stroke: hsl(var(--terminal-border) / 0.46);
+  stroke-width: 1;
+}
+
+.terminal-backtest-comparison__zero-line {
+  stroke: hsl(var(--terminal-text-muted) / 0.75);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.terminal-backtest-comparison__axis-label {
+  fill: hsl(var(--terminal-text-muted));
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.terminal-backtest-comparison__curve {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.terminal-backtest-comparison__legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.terminal-backtest-comparison__legend li {
+  justify-content: flex-start;
+  border-left: 2px solid hsl(var(--terminal-border) / 0.58);
+  padding-left: 0.5rem;
+}
+
+.terminal-backtest-comparison__legend-swatch {
+  width: 1.45rem;
+  height: 0.22rem;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px hsl(var(--terminal-canvas) / 0.5);
+}
+
 @media (max-width: 720px) {
   .atrade-terminal-app {
     padding: 0.5rem;
@@ -2058,10 +2273,31 @@ select:focus-visible,
   .analysis-result-summary,
 
 
-  .analysis-metrics {
+  .analysis-metrics,
+
+
+  .terminal-backtest-workspace__summary,
+  .terminal-backtest-form__grid,
+  .terminal-backtest-form__parameters,
+  .terminal-backtest-form__costs,
+  .terminal-backtest-detail__metrics,
+  .terminal-backtest-detail__lists,
+  .terminal-backtest-capital__sources,
+  .terminal-backtest-live__grid,
+  .terminal-backtest-detail__source,
+  .terminal-backtest-comparison__cards,
+  .terminal-backtest-comparison__legend,
+  .terminal-backtest-comparison__header,
+  .terminal-backtest-comparison__overlay-header,
+  .terminal-backtest-history__compare {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-backtest-capital__form {
     grid-template-columns: 1fr;
   }
 }
+
 
 @media (max-width: 540px) {
   body {
