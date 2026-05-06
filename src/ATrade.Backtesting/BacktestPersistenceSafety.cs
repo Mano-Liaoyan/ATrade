@@ -12,6 +12,76 @@ public static partial class BacktestPersistenceSafety
         PropertyNameCaseInsensitive = true,
     };
 
+    private static readonly HashSet<string> SafeResultPropertyNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "schemaVersion",
+        "status",
+        "strategyId",
+        "parameters",
+        "engine",
+        "symbol",
+        "chartRange",
+        "generatedAtUtc",
+        "source",
+        "signals",
+        "metrics",
+        "backtest",
+        "equityCurve",
+        "trades",
+        "benchmark",
+        "accounting",
+        "engineId",
+        "displayName",
+        "provider",
+        "version",
+        "state",
+        "message",
+        "providerSymbolId",
+        "assetClass",
+        "exchange",
+        "currency",
+        "marketDataSource",
+        "time",
+        "kind",
+        "direction",
+        "confidence",
+        "rationale",
+        "name",
+        "value",
+        "unit",
+        "startUtc",
+        "endUtc",
+        "initialCapital",
+        "finalEquity",
+        "totalReturnPercent",
+        "tradeCount",
+        "winRatePercent",
+        "maxDrawdownPercent",
+        "totalCost",
+        "equity",
+        "drawdownPercent",
+        "entryTime",
+        "exitTime",
+        "entryPrice",
+        "exitPrice",
+        "quantity",
+        "grossPnl",
+        "netPnl",
+        "returnPercent",
+        "exitReason",
+        "mode",
+        "label",
+        "commissionPerTrade",
+        "commissionBps",
+        "slippageBps",
+        BacktestStrategyParameterNames.SmaShortWindow,
+        BacktestStrategyParameterNames.SmaLongWindow,
+        BacktestStrategyParameterNames.RsiPeriod,
+        BacktestStrategyParameterNames.RsiOversoldThreshold,
+        BacktestStrategyParameterNames.RsiOverboughtThreshold,
+        BacktestStrategyParameterNames.BreakoutLookbackWindow,
+    };
+
     public static string SerializeRequestSnapshot(BacktestRequestSnapshot requestSnapshot)
     {
         var safeSnapshot = NormalizeSafeRequestSnapshot(requestSnapshot);
@@ -153,6 +223,11 @@ public static partial class BacktestPersistenceSafety
 
     private static void EnsureSafeJsonPropertyName(string propertyName)
     {
+        if (SafeResultPropertyNames.Contains(propertyName))
+        {
+            return;
+        }
+
         using var document = JsonDocument.Parse("null");
         var probe = new BacktestCreateRequest(
             Symbol: null,

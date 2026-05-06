@@ -39,16 +39,46 @@ public sealed class BacktestRunAnalysisExecutionPipelineTests
         Assert.Equal(ObservedAtUtc, analysis.Request.RequestedAtUtc);
 
         var persistedResult = result.Result.Value;
-        Assert.Equal("tp-060.backtest-result.v1", persistedResult.GetProperty("schemaVersion").GetString());
+        Assert.Equal("tp-061.backtest-result.v1", persistedResult.GetProperty("schemaVersion").GetString());
         Assert.Equal("completed", persistedResult.GetProperty("status").GetString());
         Assert.Equal(run.Run.Request.StrategyId, persistedResult.GetProperty("strategyId").GetString());
+        Assert.Equal(run.Run.Request.Parameters[BacktestStrategyParameterNames.BreakoutLookbackWindow].GetInt32(), persistedResult.GetProperty("parameters").GetProperty(BacktestStrategyParameterNames.BreakoutLookbackWindow).GetInt32());
         Assert.Equal("lean", persistedResult.GetProperty("engine").GetProperty("engineId").GetString());
         Assert.True(persistedResult.GetProperty("metrics").GetArrayLength() > 0);
         Assert.True(persistedResult.GetProperty("signals").GetArrayLength() > 0);
+        Assert.True(persistedResult.GetProperty("equityCurve").GetArrayLength() > 0);
+        Assert.True(persistedResult.GetProperty("trades").GetArrayLength() > 0);
+        Assert.Equal(BacktestBenchmarkModes.BuyAndHold, persistedResult.GetProperty("benchmark").GetProperty("mode").GetString());
+        Assert.Equal("Buy and hold", persistedResult.GetProperty("benchmark").GetProperty("label").GetString());
+        Assert.Equal(run.Run.Request.SlippageBps, persistedResult.GetProperty("accounting").GetProperty("slippageBps").GetDecimal());
         Assert.Equal("ibkr-ibeam-history", persistedResult.GetProperty("source").GetProperty("marketDataSource").GetString());
         Assert.DoesNotContain("workspace", persistedResult.GetRawText(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/tmp", persistedResult.GetRawText(), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("docker exec", persistedResult.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(BacktestStrategyIds.SmaCrossover)]
+    [InlineData(BacktestStrategyIds.RsiMeanReversion)]
+    [InlineData(BacktestStrategyIds.Breakout)]
+    public async Task ExecuteAsync_CompletesRichResultsForEachBuiltInStrategy(string strategyId)
+    {
+        var run = Run(strategyId);
+        var candles = CandleSeries(run.Run.Request.Symbol, ChartRangePresets.SixMonths);
+        var marketData = new FakeMarketDataService(MarketDataReadResult<CandleSeriesResponse>.Success(candles));
+        var analysis = new CapturingAnalysisEngineRegistry(CompletedAnalysis(run.Run.Request.Symbol, candles));
+        var pipeline = new BacktestRunAnalysisExecutionPipeline(marketData, analysis, new StaticTimeProvider(ObservedAtUtc));
+
+        var result = await pipeline.ExecuteAsync(run);
+
+        Assert.Equal(BacktestRunStatuses.Completed, result.Status);
+        var persistedResult = result.Result!.Value;
+        Assert.Equal(strategyId, persistedResult.GetProperty("strategyId").GetString());
+        Assert.Equal(BacktestRunStatuses.Completed, persistedResult.GetProperty("status").GetString());
+        Assert.True(persistedResult.GetProperty("backtest").GetProperty("finalEquity").GetDecimal() > 0m);
+        Assert.True(persistedResult.GetProperty("equityCurve").GetArrayLength() > 0);
+        Assert.True(persistedResult.GetProperty("trades").GetArrayLength() > 0);
+        Assert.Equal(BacktestBenchmarkModes.BuyAndHold, persistedResult.GetProperty("benchmark").GetProperty("mode").GetString());
     }
 
     [Theory]
@@ -113,7 +143,7 @@ public sealed class BacktestRunAnalysisExecutionPipelineTests
         Assert.NotNull(analysis.Request);
     }
 
-    private static BacktestRunRecord Run() => new(
+    private static BacktestRunRecord Run(string strategyId = BacktestStrategyIds.Breakout) => new(
         new BacktestWorkspaceScope("local-user", "paper-workspace"),
         new BacktestRunEnvelope(
             Id: "bt_pipeline",
@@ -121,12 +151,12 @@ public sealed class BacktestRunAnalysisExecutionPipelineTests
             SourceRunId: null,
             Request: new BacktestRequestSnapshot(
                 MarketDataSymbolIdentity.Create("AAPL", "ibkr", "265598", MarketDataAssetClasses.Stock, "NASDAQ", "USD"),
-                BacktestStrategyIds.Breakout,
-                new Dictionary<string, JsonElement>(StringComparer.Ordinal),
+                strategyId,
+                DefaultParameters(strategyId),
                 ChartRangePresets.SixMonths,
-                new BacktestCostModelSnapshot(0m, 0m, "USD"),
-                SlippageBps: 0m,
-                BacktestBenchmarkModes.None,
+                new BacktestCostModelSnapshot(1.25m, 2.5m, "USD"),
+                SlippageBps: 3.75m,
+                BacktestBenchmarkModes.BuyAndHold,
                 EngineId: "lean"),
             Capital: new BacktestCapitalSnapshot(100000m, "USD", "local-paper-ledger"),
             CreatedAtUtc: ObservedAtUtc.AddMinutes(-5),
@@ -135,6 +165,12 @@ public sealed class BacktestRunAnalysisExecutionPipelineTests
             CompletedAtUtc: null,
             Error: null,
             Result: null));
+
+    private static IReadOnlyDictionary<string, JsonElement> DefaultParameters(string strategyId) =>
+        BacktestStrategyCatalog.CreateDefaultParameters(strategyId).ToDictionary(
+            parameter => parameter.Key,
+            parameter => parameter.Value.Clone(),
+            StringComparer.Ordinal);
 
     private static CandleSeriesResponse CandleSeries(MarketDataSymbolIdentity identity, string chartRange) => new(
         identity.Symbol,
@@ -163,8 +199,37 @@ public sealed class BacktestRunAnalysisExecutionPipelineTests
             FinalEquity: 101500m,
             TotalReturnPercent: 1.5m,
             TradeCount: 1,
-            WinRatePercent: 100m),
-        Error: null);
+            WinRatePercent: 100m,
+            MaxDrawdownPercent: 0.5m,
+            TotalCost: 9.25m),
+        Error: null,
+        BacktestDetails: new AnalysisBacktestDetails(
+            [
+                new AnalysisEquityCurvePoint(ObservedAtUtc.AddDays(-2), 100000m, 0m),
+                new AnalysisEquityCurvePoint(ObservedAtUtc.AddDays(-1), 101500m, 0m),
+            ],
+            [
+                new AnalysisSimulatedTrade(
+                    ObservedAtUtc.AddDays(-2),
+                    ObservedAtUtc.AddDays(-1),
+                    "long",
+                    104m,
+                    107m,
+                    10m,
+                    30m,
+                    20.75m,
+                    0.0208m,
+                    9.25m,
+                    "strategy-exit"),
+            ],
+            Benchmark: null,
+            Accounting: new AnalysisBacktestAccounting(1.25m, 2.5m, 3.75m, "USD")));
+
+    private static JsonElement Json(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
 
     private static AnalysisResult FailedAnalysis(MarketDataSymbolIdentity symbol, CandleSeriesResponse candles, string errorCode) => new(
         errorCode == AnalysisEngineErrorCodes.EngineNotConfigured ? AnalysisResultStatuses.NotConfigured : AnalysisResultStatuses.Failed,

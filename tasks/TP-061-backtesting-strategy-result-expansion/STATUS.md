@@ -1,6 +1,6 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
-**Current Step:** Step 3: Persist and expose rich backtest results
+**Current Step:** Step 4: Add validation scripts and compatibility checks
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -43,17 +43,17 @@
 ---
 
 ### Step 3: Persist and expose rich backtest results
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Rich result shapes added
-- [ ] LEAN output maps into saved backtest result envelopes
-- [ ] Buy-and-hold benchmark calculated from same candle window
-- [ ] Result, benchmark, unavailable-engine, and no-fake-result tests added
+- [x] Rich result shapes added
+- [x] LEAN output maps into saved backtest result envelopes
+- [x] Buy-and-hold benchmark calculated from same candle window
+- [x] Result, benchmark, unavailable-engine, and no-fake-result tests added
 
 ---
 
 ### Step 4: Add validation scripts and compatibility checks
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] `tests/apphost/backtesting-strategy-result-tests.sh` created
 - [ ] Existing analysis/LEAN apphost tests updated only if required
@@ -120,6 +120,12 @@
 | 2026-05-06 00:48 | Step 2 tests | LEAN targeted tests passed: 15/15; backtesting targeted tests passed: 44/44. |
 | 2026-05-06 00:49 | Step 2 completed | LEAN parameterized built-ins, internal simulated accounting, parser support, and guardrails are in place. |
 | 2026-05-06 00:49 | Step 3 started | Rich result persistence/envelopes and benchmark expansion. |
+| 2026-05-06 01:00 | Step 3 result shapes | Added provider-neutral summary, equity curve, simulated trade, benchmark, accounting, source, and engine result records. |
+| 2026-05-06 01:01 | Step 3 result mapping | LEAN parser details now map into saved TP-061 result envelopes with safe source/engine metadata. |
+| 2026-05-06 01:02 | Step 3 benchmark | Buy-and-hold benchmark equity/return is computed from the same server-side candle window and labeled separately. |
+| 2026-05-06 01:03 | Step 3 tests | Backtesting targeted tests passed: 47/47; LEAN targeted tests passed: 15/15; analysis targeted tests passed: 10/10. |
+| 2026-05-06 01:04 | Step 3 completed | Rich saved-run result envelopes, benchmark calculation, safe errors, and no-fake-result tests are in place. |
+| 2026-05-06 01:04 | Step 4 started | Validation scripts and compatibility checks. |
 
 ---
 

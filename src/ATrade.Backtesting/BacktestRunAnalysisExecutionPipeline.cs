@@ -65,7 +65,7 @@ public sealed class BacktestRunAnalysisExecutionPipeline(
             return BacktestRunExecutionResult.Failed(error.Code, error.Message);
         }
 
-        var resultEnvelope = BacktestCompletedResultEnvelope.From(run.Run, candles, analysisResult);
+        var resultEnvelope = CreateCompletedResultEnvelope(run.Run, candles, analysisResult);
         return BacktestRunExecutionResult.Completed(JsonSerializer.SerializeToElement(resultEnvelope, ResultSerializerOptions));
     }
 
@@ -108,103 +108,127 @@ public sealed class BacktestRunAnalysisExecutionPipeline(
             BacktestSafeMessages.AnalysisUnavailable);
     }
 
-    private sealed record BacktestCompletedResultEnvelope(
-        string SchemaVersion,
-        string Status,
-        string StrategyId,
-        BacktestResultEngineEnvelope Engine,
-        BacktestResultSymbolEnvelope Symbol,
-        string ChartRange,
-        DateTimeOffset GeneratedAtUtc,
-        BacktestResultSourceEnvelope Source,
-        IReadOnlyList<BacktestResultSignalEnvelope> Signals,
-        IReadOnlyList<BacktestResultMetricEnvelope> Metrics,
-        BacktestResultSummaryEnvelope? Backtest)
+    private static BacktestCompletedResultEnvelope CreateCompletedResultEnvelope(
+        BacktestRunEnvelope run,
+        CandleSeriesResponse candles,
+        AnalysisResult analysis) =>
+        new(
+            SchemaVersion: "tp-061.backtest-result.v1",
+            Status: BacktestRunStatuses.Completed,
+            StrategyId: run.Request.StrategyId,
+            Parameters: run.Request.Parameters.ToDictionary(
+                parameter => parameter.Key,
+                parameter => parameter.Value.Clone(),
+                StringComparer.Ordinal),
+            Engine: new BacktestResultEngineEnvelope(
+                analysis.Engine.EngineId,
+                analysis.Engine.DisplayName,
+                analysis.Engine.Provider,
+                analysis.Engine.Version,
+                analysis.Engine.State,
+                analysis.Engine.Message),
+            Symbol: new BacktestResultSymbolEnvelope(
+                analysis.Symbol.Symbol,
+                analysis.Symbol.Provider,
+                analysis.Symbol.ProviderSymbolId,
+                analysis.Symbol.AssetClass,
+                analysis.Symbol.Exchange,
+                analysis.Symbol.Currency),
+            ChartRange: candles.Timeframe,
+            GeneratedAtUtc: analysis.GeneratedAtUtc,
+            Source: new BacktestResultSourceEnvelope(
+                analysis.Source.Provider,
+                candles.Source,
+                analysis.Source.GeneratedAtUtc),
+            Signals: analysis.Signals.Select(signal => new BacktestResultSignalEnvelope(
+                signal.Time,
+                signal.Kind,
+                signal.Direction,
+                signal.Confidence,
+                signal.Rationale)).ToArray(),
+            Metrics: analysis.Metrics.Select(metric => new BacktestResultMetricEnvelope(
+                metric.Name,
+                metric.Value,
+                metric.Unit)).ToArray(),
+            Backtest: analysis.Backtest is null
+                ? null
+                : new BacktestResultSummaryEnvelope(
+                    analysis.Backtest.StartUtc,
+                    analysis.Backtest.EndUtc,
+                    analysis.Backtest.InitialCapital,
+                    analysis.Backtest.FinalEquity,
+                    analysis.Backtest.TotalReturnPercent,
+                    analysis.Backtest.TradeCount,
+                    analysis.Backtest.WinRatePercent,
+                    analysis.Backtest.MaxDrawdownPercent,
+                    analysis.Backtest.TotalCost),
+            EquityCurve: analysis.BacktestDetails?.EquityCurve.Select(point => new BacktestResultEquityCurvePointEnvelope(
+                point.Time,
+                point.Equity,
+                point.DrawdownPercent)).ToArray() ?? [],
+            Trades: analysis.BacktestDetails?.Trades.Select(trade => new BacktestResultTradeEnvelope(
+                trade.EntryTime,
+                trade.ExitTime,
+                trade.Direction,
+                trade.EntryPrice,
+                trade.ExitPrice,
+                trade.Quantity,
+                trade.GrossPnl,
+                trade.NetPnl,
+                trade.ReturnPercent,
+                trade.TotalCost,
+                trade.ExitReason)).ToArray() ?? [],
+            Benchmark: CreateBuyAndHoldBenchmark(run, candles),
+            Accounting: new BacktestResultAccountingEnvelope(
+                run.Request.CostModel.CommissionPerTrade,
+                run.Request.CostModel.CommissionBps,
+                run.Request.SlippageBps,
+                run.Request.CostModel.Currency));
+
+    private static BacktestResultBenchmarkEnvelope? CreateBuyAndHoldBenchmark(
+        BacktestRunEnvelope run,
+        CandleSeriesResponse candles)
     {
-        public static BacktestCompletedResultEnvelope From(
-            BacktestRunEnvelope run,
-            CandleSeriesResponse candles,
-            AnalysisResult analysis) =>
-            new(
-                SchemaVersion: "tp-060.backtest-result.v1",
-                Status: BacktestRunStatuses.Completed,
-                StrategyId: run.Request.StrategyId,
-                Engine: new BacktestResultEngineEnvelope(
-                    analysis.Engine.EngineId,
-                    analysis.Engine.DisplayName,
-                    analysis.Engine.Provider,
-                    analysis.Engine.Version,
-                    analysis.Engine.State),
-                Symbol: new BacktestResultSymbolEnvelope(
-                    analysis.Symbol.Symbol,
-                    analysis.Symbol.Provider,
-                    analysis.Symbol.ProviderSymbolId,
-                    analysis.Symbol.AssetClass,
-                    analysis.Symbol.Exchange,
-                    analysis.Symbol.Currency),
-                ChartRange: candles.Timeframe,
-                GeneratedAtUtc: analysis.GeneratedAtUtc,
-                Source: new BacktestResultSourceEnvelope(
-                    analysis.Source.Provider,
-                    candles.Source,
-                    analysis.Source.GeneratedAtUtc),
-                Signals: analysis.Signals.Select(signal => new BacktestResultSignalEnvelope(
-                    signal.Time,
-                    signal.Kind,
-                    signal.Direction,
-                    signal.Confidence,
-                    signal.Rationale)).ToArray(),
-                Metrics: analysis.Metrics.Select(metric => new BacktestResultMetricEnvelope(
-                    metric.Name,
-                    metric.Value,
-                    metric.Unit)).ToArray(),
-                Backtest: analysis.Backtest is null
-                    ? null
-                    : new BacktestResultSummaryEnvelope(
-                        analysis.Backtest.StartUtc,
-                        analysis.Backtest.EndUtc,
-                        analysis.Backtest.InitialCapital,
-                        analysis.Backtest.FinalEquity,
-                        analysis.Backtest.TotalReturnPercent,
-                        analysis.Backtest.TradeCount,
-                        analysis.Backtest.WinRatePercent));
+        if (!string.Equals(run.Request.BenchmarkMode, BacktestBenchmarkModes.BuyAndHold, StringComparison.OrdinalIgnoreCase) ||
+            candles.Candles.Count == 0)
+        {
+            return null;
+        }
+
+        var firstClose = candles.Candles[0].Close;
+        if (firstClose <= 0)
+        {
+            return null;
+        }
+
+        var equityCurve = candles.Candles
+            .Select(candle => new BacktestResultEquityCurvePointEnvelope(
+                candle.Time.ToUniversalTime(),
+                decimal.Round(run.Capital.InitialCapital * (candle.Close / firstClose), 4, MidpointRounding.AwayFromZero),
+                0m))
+            .ToArray();
+
+        var peak = 0m;
+        for (var index = 0; index < equityCurve.Length; index++)
+        {
+            peak = Math.Max(peak, equityCurve[index].Equity);
+            var drawdownPercent = peak <= 0m
+                ? 0m
+                : decimal.Round(Math.Max(0m, ((peak - equityCurve[index].Equity) / peak) * 100m), 4, MidpointRounding.AwayFromZero);
+            equityCurve[index] = equityCurve[index] with { DrawdownPercent = drawdownPercent };
+        }
+
+        var finalEquity = equityCurve[^1].Equity;
+        var totalReturnPercent = run.Capital.InitialCapital <= 0m
+            ? 0m
+            : decimal.Round(((finalEquity / run.Capital.InitialCapital) - 1m) * 100m, 4, MidpointRounding.AwayFromZero);
+
+        return new BacktestResultBenchmarkEnvelope(
+            BacktestBenchmarkModes.BuyAndHold,
+            "Buy and hold",
+            run.Capital.InitialCapital,
+            finalEquity,
+            totalReturnPercent,
+            equityCurve);
     }
-
-    private sealed record BacktestResultEngineEnvelope(
-        string EngineId,
-        string DisplayName,
-        string Provider,
-        string Version,
-        string State);
-
-    private sealed record BacktestResultSymbolEnvelope(
-        string Symbol,
-        string Provider,
-        string? ProviderSymbolId,
-        string AssetClass,
-        string Exchange,
-        string Currency);
-
-    private sealed record BacktestResultSourceEnvelope(
-        string Provider,
-        string MarketDataSource,
-        DateTimeOffset GeneratedAtUtc);
-
-    private sealed record BacktestResultSignalEnvelope(
-        DateTimeOffset Time,
-        string Kind,
-        string Direction,
-        decimal Confidence,
-        string Rationale);
-
-    private sealed record BacktestResultMetricEnvelope(string Name, decimal Value, string? Unit);
-
-    private sealed record BacktestResultSummaryEnvelope(
-        DateTimeOffset StartUtc,
-        DateTimeOffset EndUtc,
-        decimal InitialCapital,
-        decimal FinalEquity,
-        decimal TotalReturnPercent,
-        int TradeCount,
-        decimal WinRatePercent);
 }
