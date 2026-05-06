@@ -1,6 +1,6 @@
 # TP-063: Terminal backtest comparison and equity overlay — Status
 
-**Current Step:** Step 3: Add comparison validation coverage
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 1
@@ -52,14 +52,14 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Comparison validation passing
-- [ ] Backtest workspace validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Comparison validation passing
+- [x] Backtest workspace validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
