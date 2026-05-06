@@ -18,9 +18,9 @@ orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
 ## Current Coordination Model
 
 - Implementation work is tracked as Taskplane packets under `tasks/`.
-- No ready implementation tasks are currently queued after the completed `TP-053` through `TP-054` wave.
-- Completed task packets through `TP-054` are present in `tasks/`; completed packets should be archived when convenient.
-- `TP-053` removed the remaining visible app header/safety strip and compacted market-monitor filters; `TP-054` restored visible stock chart rendering after that layout cleanup.
+- No ready implementation tasks are currently queued after the completed frontend polish wave (`TP-055` through `TP-057`) and backtesting MVP wave (`TP-058` through `TP-063`).
+- Completed task packets through `TP-063` are present in `tasks/`; completed packets should be archived when convenient.
+- `TP-055` through `TP-057` finalized the terminal palette, rail icon/collapse behavior, and visible market-monitor table scrollbars; `TP-058` through `TP-063` added the paper-capital/backtesting MVP and terminal BACKTEST comparison surface.
 - The next task ID is recorded in `tasks/CONTEXT.md`.
 
 ## Repo-local Pi Skills

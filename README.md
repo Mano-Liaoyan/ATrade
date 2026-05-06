@@ -197,39 +197,28 @@ identifiers.
 
 ## Active Task Queue
 
-Ready Taskplane packets live directly under `tasks/`; completed packets are
-archived under `tasks/archive/`.
+Taskplane packets live directly under `tasks/`; completed packets are archived
+under `tasks/archive/`.
 
-The `TP-045` through `TP-057` frontend reconstruction, no-command cutover,
-layout-simplification, chart-visibility restoration, theme-foundation, rail
-icon/collapse, and market-monitor scrollbar batch now covers the active design
-spec, shadcn/Tailwind/Radix UI foundation, module/workflow shell, dense market
-monitor, chart/analysis workspaces, final cutover verification, removal of the
-visible terminal branding plus command input/parser, the simplified rail-first
-full-bleed single-primary workspace layout, removal of the remaining app-level
-brand header/global safety strip, compact market-monitor filters, visible stock
-chart rendering, the original black/graphite/amber ATrade terminal palette
-validation, purpose-matched module rail icon/collapse validation, and visible
-vertical/horizontal market-monitor table scrollbar validation. The current frontend
-surface is the direct module/workflow ATrade paper workspace. The active
-backend/backtesting MVP wave now includes `TP-058` paper-capital source work,
-`TP-059` first-class saved backtesting domain/API work, `TP-060` async
-runner/SignalR job updates, `TP-061` built-in strategy/rich result
-expansion, `TP-062` the enabled terminal BACKTEST workspace for run creation,
-status, history/detail, cancel, and retry, and `TP-063` completed-run comparison
-with persisted strategy/benchmark equity overlays. Follow-up frontend work should build
-on module rail navigation plus explicit workflow actions rather than the retired
-old shell/list route wrappers,
-a command system, cyan/blue-gradient-dominant
-styling, or the removed app-level, context, monitor, footer, and top-safety
-chrome.
+The `TP-045` through `TP-063` frontend polish and backtesting MVP work now
+covers the active design spec, shadcn/Tailwind/Radix UI foundation,
+module/workflow shell, dense market monitor, chart/analysis workspaces, final
+no-command cutover, simplified rail-first full-bleed workspace, compact filters,
+visible stock chart rendering, original black/graphite/amber terminal palette,
+purpose-matched collapsible rail icons, visible market-monitor table scrollbars,
+paper-capital source selection, first-class saved backtest domain/API contracts,
+async runner/SignalR updates, built-in strategy/rich result expansion, the
+enabled terminal BACKTEST workspace, and completed-run comparison with persisted
+strategy/benchmark equity overlays. Follow-up frontend work should build on
+module rail navigation plus explicit workflow actions rather than the retired old
+shell/list route wrappers, a command system, cyan/blue-gradient-dominant styling,
+or the removed app-level, context, monitor, footer, and top-safety chrome.
 
-Completed Taskplane packets through `TP-057` are present in `tasks/`; `TP-058`
-through `TP-063` cover the backend/backtesting MVP foundation, strategy/result
-expansion, and the user-facing terminal BACKTEST workspace plus comparison
-surface currently staged in the active wave. Completed packets should be archived
-when convenient. During
-orchestrated runs the runtime handles post-merge archival for active task folders.
+No ready implementation tasks are currently queued. The next new Taskplane
+packet should use `TP-064`. Completed Taskplane packets through `TP-063` are
+present in `tasks/`; completed packets should be archived when convenient.
+During orchestrated runs the runtime handles post-merge archival for active task
+folders.
 
 ## Repository Map
 

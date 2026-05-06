@@ -73,10 +73,10 @@ Current repository contracts remain:
 
 ## Active Task Queue
 
-The frontend reconstruction queue is complete/follow-up-ready through the
-rail-first top-chrome/filter-density cleanup, stock chart visibility restoration,
-original black/graphite/amber terminal theme foundation, and module rail
-icon/collapse behavior:
+The frontend reconstruction queue is complete through the rail-first
+top-chrome/filter-density cleanup, stock chart visibility restoration, original
+black/graphite/amber terminal theme foundation, module rail icon/collapse
+behavior, and market-monitor visible scrollbar work:
 
 - `TP-045` — defined the active UI design spec and clean-room visual guardrails
 - `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
@@ -93,26 +93,23 @@ icon/collapse behavior:
 - `TP-057` — made the market monitor table own visible vertical and horizontal scrollbars for wide exact-identity/action columns and added scrollbar validation
 
 `TP-058` delivered the paper-capital source packet for the backend/backtesting
-MVP wave. `TP-059` added the first-class saved backtesting domain, Postgres persistence,
-REST API, and contract validation. `TP-060` builds on that queued saved-run
-contract with an API-hosted async runner, restart recovery, server-side
-market-data/analysis execution, best-effort cancellation, and `/hubs/backtests`
-SignalR updates without changing public REST route names. `TP-061` expands the
-saved-run contract with SMA crossover, RSI mean-reversion, and breakout built-ins,
-validated parameters/costs/slippage, rich provider-neutral result envelopes, and
+MVP wave. `TP-059` added the first-class saved backtesting domain, Postgres
+persistence, REST API, and contract validation. `TP-060` added the API-hosted
+async runner, restart recovery, server-side market-data/analysis execution,
+best-effort cancellation, and `/hubs/backtests` SignalR updates without changing
+public REST route names. `TP-061` expanded the saved-run contract with SMA
+crossover, RSI mean-reversion, and breakout built-ins, validated
+parameters/costs/slippage, rich provider-neutral result envelopes, and
 buy-and-hold benchmarks while keeping LEAN-only/no-custom-code/no-order
-guardrails.
-`TP-062` adds the enabled terminal BACKTEST rail module, API-only backtest
-client/workflow, paper-capital-backed run form, live status, saved history/detail,
-cancel, retry, and frontend backtest workspace validation. `TP-063` adds
-completed-run-only saved-run comparison, metrics table/cards, persisted
-strategy/buy-and-hold equity overlays, and comparison validation.
+guardrails. `TP-062` added the enabled terminal BACKTEST rail module, API-only
+backtest client/workflow, paper-capital-backed run form, live status, saved
+history/detail, cancel, retry, and frontend backtest workspace validation.
+`TP-063` added completed-run-only saved-run comparison, metrics table/cards,
+persisted strategy/buy-and-hold equity overlays, and comparison validation.
 
-Completed task packets through `TP-057` are present in `tasks/`; `TP-058`
-through `TP-063` are staged as the backend/backtesting MVP foundation,
-strategy/result expansion, and first terminal BACKTEST workspace plus comparison
-surface during orchestrated runs and should remain in place until the runtime
-handles post-merge archival. Completed packets should be archived when convenient.
+No ready implementation tasks are currently queued. Completed task packets
+through `TP-063` are present in `tasks/`; completed packets should be archived
+when convenient. The next new Taskplane packet should use `TP-064`.
 
 ## Follow-Up Direction
 

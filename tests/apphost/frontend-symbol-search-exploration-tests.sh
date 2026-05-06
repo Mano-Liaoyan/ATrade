@@ -120,7 +120,10 @@ assert_terminal_monitor_search_contract() {
   assert_file_contains "$table_component" 'aria-sort={getAriaSort(column.key, sort)}'
   assert_file_contains "$table_component" 'data-testid="market-monitor-row"'
   assert_file_contains "$css" '.market-monitor-table-scroll'
+  assert_file_contains "$css" 'height: min(34rem, 62vh);'
   assert_file_contains "$css" 'max-height: min(34rem, 62vh);'
+  assert_file_contains "$css" 'min-height: 16rem;'
+  assert_file_contains "$repo_root/frontend/components/ui/scroll-area.tsx" '<ScrollBar orientation="horizontal" />'
 }
 
 assert_old_search_list_components_retired() {
