@@ -208,8 +208,8 @@ write_valid_backtest_request() {
   },
   "strategyId": "sma-crossover",
   "parameters": {
-    "fastPeriod": 20,
-    "slowPeriod": 50
+    "shortWindow": 20,
+    "longWindow": 50
   },
   "chartRange": "1y",
   "costModel": {
@@ -295,6 +295,8 @@ request = payload["request"]
 assert request["symbol"]["symbol"] == "AAPL", payload
 assert request["symbol"]["provider"] == "ibkr", payload
 assert request["strategyId"] == "sma-crossover", payload
+assert request["parameters"]["shortWindow"] == 20, payload
+assert request["parameters"]["longWindow"] == 50, payload
 assert request["chartRange"] == "1y", payload
 assert "bars" not in request, payload
 assert "accountId" not in request, payload

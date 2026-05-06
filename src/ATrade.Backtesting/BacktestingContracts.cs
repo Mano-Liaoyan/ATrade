@@ -67,7 +67,7 @@ public static class BacktestBenchmarkModes
 {
     public const string None = "none";
     public const string BuyAndHold = "buy-and-hold";
-    public const string Default = None;
+    public const string Default = BuyAndHold;
 
     public static IReadOnlyList<string> Supported { get; } = [None, BuyAndHold];
 
@@ -235,3 +235,94 @@ public sealed record BacktestCreateResult(BacktestRunRecord? Run, BacktestError?
     public static BacktestCreateResult Failure(string code, string message) =>
         new(null, new BacktestError(code, message));
 }
+
+public sealed record BacktestCompletedResultEnvelope(
+    string SchemaVersion,
+    string Status,
+    string StrategyId,
+    IReadOnlyDictionary<string, JsonElement> Parameters,
+    BacktestResultEngineEnvelope Engine,
+    BacktestResultSymbolEnvelope Symbol,
+    string ChartRange,
+    DateTimeOffset GeneratedAtUtc,
+    BacktestResultSourceEnvelope Source,
+    IReadOnlyList<BacktestResultSignalEnvelope> Signals,
+    IReadOnlyList<BacktestResultMetricEnvelope> Metrics,
+    BacktestResultSummaryEnvelope? Backtest,
+    IReadOnlyList<BacktestResultEquityCurvePointEnvelope> EquityCurve,
+    IReadOnlyList<BacktestResultTradeEnvelope> Trades,
+    BacktestResultBenchmarkEnvelope? Benchmark,
+    BacktestResultAccountingEnvelope Accounting);
+
+public sealed record BacktestResultEngineEnvelope(
+    string EngineId,
+    string DisplayName,
+    string Provider,
+    string Version,
+    string State,
+    string? Message = null);
+
+public sealed record BacktestResultSymbolEnvelope(
+    string Symbol,
+    string Provider,
+    string? ProviderSymbolId,
+    string AssetClass,
+    string Exchange,
+    string Currency);
+
+public sealed record BacktestResultSourceEnvelope(
+    string Provider,
+    string MarketDataSource,
+    DateTimeOffset GeneratedAtUtc);
+
+public sealed record BacktestResultSignalEnvelope(
+    DateTimeOffset Time,
+    string Kind,
+    string Direction,
+    decimal Confidence,
+    string Rationale);
+
+public sealed record BacktestResultMetricEnvelope(string Name, decimal Value, string? Unit);
+
+public sealed record BacktestResultSummaryEnvelope(
+    DateTimeOffset StartUtc,
+    DateTimeOffset EndUtc,
+    decimal InitialCapital,
+    decimal FinalEquity,
+    decimal TotalReturnPercent,
+    int TradeCount,
+    decimal WinRatePercent,
+    decimal MaxDrawdownPercent,
+    decimal TotalCost);
+
+public sealed record BacktestResultEquityCurvePointEnvelope(
+    DateTimeOffset Time,
+    decimal Equity,
+    decimal DrawdownPercent);
+
+public sealed record BacktestResultTradeEnvelope(
+    DateTimeOffset EntryTime,
+    DateTimeOffset? ExitTime,
+    string Direction,
+    decimal EntryPrice,
+    decimal? ExitPrice,
+    decimal Quantity,
+    decimal GrossPnl,
+    decimal NetPnl,
+    decimal ReturnPercent,
+    decimal TotalCost,
+    string ExitReason);
+
+public sealed record BacktestResultBenchmarkEnvelope(
+    string Mode,
+    string Label,
+    decimal InitialCapital,
+    decimal FinalEquity,
+    decimal TotalReturnPercent,
+    IReadOnlyList<BacktestResultEquityCurvePointEnvelope> EquityCurve);
+
+public sealed record BacktestResultAccountingEnvelope(
+    decimal CommissionPerTrade,
+    decimal CommissionBps,
+    decimal SlippageBps,
+    string Currency);

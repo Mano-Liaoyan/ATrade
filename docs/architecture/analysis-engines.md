@@ -60,13 +60,17 @@ Core types:
   `ATrade.Analysis` to ASP.NET result types.
 - `AnalysisRequest` — normalized engine request containing
   `MarketDataSymbolIdentity`, the selected chart range value in the existing
-  `timeframe` field, requested time, and `IReadOnlyList<OhlcvCandle>` bars from
-  `ATrade.MarketData`.
+  `timeframe` field, requested time, `IReadOnlyList<OhlcvCandle>` bars from
+  `ATrade.MarketData`, optional strategy metadata, normalized strategy
+  parameters, and optional backtest accounting settings.
 - `AnalysisResult` — status, engine metadata, source metadata, normalized
   symbol/chart-range value (still named `timeframe` in the payload), generated
-  time, signals, metrics, optional backtest summary, and optional error.
-- `AnalysisSignal`, `AnalysisMetric`, and `BacktestSummary` — provider-neutral
-  output shapes for UI display and later persistence.
+  time, signals, metrics, optional backtest summary, optional rich backtest
+  details, and optional error.
+- `AnalysisSignal`, `AnalysisMetric`, `BacktestSummary`, and
+  `AnalysisBacktestDetails` — provider-neutral output shapes for UI display and
+  saved-run persistence; rich details include equity-curve points, simulated
+  trades, benchmark data, and accounting settings.
 - `NoConfiguredAnalysisEngine` — safe fallback implementation returning
   `analysis-engine-not-configured` with empty signals/metrics/backtest output.
 
@@ -133,8 +137,10 @@ integration approach is an official LEAN runtime process boundary:
    `config.json`, and, for managed Docker execution, a generated
    `lean-engine-config.json` launcher configuration.
 2. `main.py` defines an analysis-only `QCAlgorithm` that reads the ATrade CSV,
-   calculates a moving-average crossover signal set, risk/return metrics, and a
-   backtest summary, and emits a single `ATRADE_ANALYSIS_RESULT:` JSON marker.
+   evaluates the requested built-in strategy (`sma-crossover`,
+   `rsi-mean-reversion`, or `breakout`) with normalized parameter values,
+   performs internal simulated trade/equity accounting with commission and
+   slippage inputs, and emits a single `ATRADE_ANALYSIS_RESULT:` JSON marker.
 3. `LeanRuntimeExecutor` supports two explicit runtime paths. CLI mode invokes
    the configured official LEAN CLI command (`lean backtest ...`) and therefore
    inherits any local QuantConnect CLI/account requirements. Docker mode avoids
@@ -147,16 +153,17 @@ integration approach is an official LEAN runtime process boundary:
    container instead of calling `lean backtest` or starting a hidden `docker run`
    container.
 4. `LeanAnalysisResultParser` maps the emitted marker into provider-neutral
-   `AnalysisResult`, `AnalysisSignal`, `AnalysisMetric`, and `BacktestSummary`
-   records.
+   `AnalysisResult`, `AnalysisSignal`, `AnalysisMetric`, `BacktestSummary`, and
+   `AnalysisBacktestDetails` records.
 5. Runtime absence, timeouts, non-zero exits, and parse failures return explicit
    `analysis-engine-unavailable` errors rather than fake successful analysis.
 
 The provider includes guardrails that reject generated algorithm source
 containing brokerage/order-routing tokens such as `MarketOrder`,
 `SetBrokerageModel`, `SetLiveMode`, or `/api/orders`. The generated algorithm
-sets cash for backtest accounting but does not add brokerage models, route
-orders, call IBKR order endpoints, or enable live mode.
+sets cash only for internal accounting; commission and slippage affect simulated
+fills in the emitted result and do not add brokerage models, submit LEAN orders,
+route broker orders, call IBKR/ATrade order endpoints, or enable live mode.
 
 ## 5. Configuration Contract
 
@@ -212,11 +219,16 @@ engine must return:
 - `engine.engineId = "lean"` and provider/display/version metadata
 - `source.provider = "LEAN"` plus runtime/workspace source text
 - the input `MarketDataSymbolIdentity` and chart range value carried in the `timeframe` field
-- zero or more `AnalysisSignal` entries, currently moving-average crossover
-  signals with direction, confidence, time, and rationale
-- `AnalysisMetric` entries such as total return, max drawdown, and signal count
+- zero or more `AnalysisSignal` entries with direction, confidence, time, and
+  rationale from the requested built-in strategy
+- `AnalysisMetric` entries such as total return, max drawdown, trade count,
+  signal count, and total cost
 - `BacktestSummary` with start/end window, initial capital, final equity, total
-  return, trade count, and win rate
+  return, trade count, win rate, max drawdown percent, and total cost
+- optional `backtestDetails` with strategy equity curve, simulated trades,
+  optional benchmark data, and commission/slippage accounting settings. Saved
+  backtest envelopes currently compute the buy-and-hold benchmark from the same
+  candle window in `ATrade.Backtesting`.
 
 Errors use the same `AnalysisResult` envelope with `status = "failed"` or
 `not-configured`, an `AnalysisError`, and empty signal/metric/backtest payloads
@@ -251,6 +263,9 @@ The contract and LEAN provider are verified by:
 - `tests/apphost/lean-analysis-engine-tests.sh` for LEAN registration,
   managed-runtime configuration placeholders, provider-neutral boundaries,
   optional runtime skip behavior, and no trading side effects
+- `tests/apphost/backtesting-strategy-result-tests.sh` for strategy parameter,
+  rich-result, benchmark, frontend shared-type, no-custom-code, and no-order
+  source-contract assertions
 - `tests/apphost/lean-aspire-runtime-tests.sh` for disabled-default AppHost
   manifests, Docker-mode `lean-engine` manifest/resource assertions, API engine
   discovery from AppHost handoff, explicit unavailable runtime responses, and

@@ -40,14 +40,18 @@ original black/graphite/amber institutional terminal
 palette with red/green market states, and final cutover/no-command/simplified-layout/top-chrome
 filter-density/chart-visibility/theme-refactor guardrails for clean-room,
 no-order, truthful provider-state, and `ATrade.Api` browser boundaries. The
-first backend/backtesting MVP seams (`TP-058` through `TP-060`) add
-paper-capital source selection, saved backtest APIs, and API-hosted async
-execution through `ATrade.Api`: effective capital prefers a safe authenticated
-IBKR paper balance, falls back to a user-configured local Postgres ledger value,
-reports explicit unavailable/unconfigured state when neither exists, and is
-snapshotted on saved backtest runs persisted in Postgres before queued jobs are
-claimed, executed through market-data/analysis seams, cancelled best-effort, and
-broadcast over `/hubs/backtests`. The active clean-room UI design authority remains
+backend/backtesting MVP seams (`TP-058` through `TP-061`) add paper-capital
+source selection, saved backtest APIs, API-hosted async execution, and built-in
+strategy/rich result expansion through `ATrade.Api`: effective capital prefers a
+safe authenticated IBKR paper balance, falls back to a user-configured local
+Postgres ledger value, reports explicit unavailable/unconfigured state when
+neither exists, and is snapshotted on saved backtest runs persisted in Postgres
+before queued jobs are claimed, executed through market-data/analysis seams,
+cancelled best-effort, and broadcast over `/hubs/backtests`. Saved runs now carry
+server-validated `sma-crossover`, `rsi-mean-reversion`, and `breakout`
+parameters, cost/slippage settings, buy-and-hold benchmark mode, and
+provider-neutral summary/equity-curve/simulated-trade result envelopes without
+custom code or order routing. The active clean-room UI design authority remains
 `docs/design/atrade-terminal-ui.md`.
 
 Current repository contracts remain:
@@ -85,12 +89,17 @@ MVP wave. `TP-059` added the first-class saved backtesting domain, Postgres pers
 REST API, and contract validation. `TP-060` builds on that queued saved-run
 contract with an API-hosted async runner, restart recovery, server-side
 market-data/analysis execution, best-effort cancellation, and `/hubs/backtests`
-SignalR updates without changing public REST route names.
+SignalR updates without changing public REST route names. `TP-061` expands the
+saved-run contract with SMA crossover, RSI mean-reversion, and breakout built-ins,
+validated parameters/costs/slippage, rich provider-neutral result envelopes, and
+buy-and-hold benchmarks while keeping LEAN-only/no-custom-code/no-order
+guardrails.
 
 Completed task packets through `TP-057` are present in `tasks/`; `TP-058`
-through `TP-060` are staged as the backend/backtesting MVP foundation during
-orchestrated runs and should remain in place until the runtime handles
-post-merge archival. Completed packets should be archived when convenient.
+through `TP-061` are staged as the backend/backtesting MVP foundation and
+strategy/result expansion during orchestrated runs and should remain in place
+until the runtime handles post-merge archival. Completed packets should be
+archived when convenient.
 
 ## Follow-Up Direction
 
@@ -120,4 +129,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-061`
+`TP-062`

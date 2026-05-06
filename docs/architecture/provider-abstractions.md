@@ -211,13 +211,15 @@ Core rules:
 - API callers use `GET /api/analysis/engines` and `POST /api/analysis/run`, not
   provider-specific endpoints.
 - `AnalysisResult` always carries engine metadata, source metadata, signals,
-  metrics, optional backtest summary, and optional error information.
+  metrics, optional backtest summary, optional rich backtest details (equity
+  curve, simulated trades, benchmark, accounting), and optional error information.
 - With no concrete provider configured, the fallback returns the explicit
   `analysis-engine-not-configured` result instead of synthetic signals.
 - `ATrade.Analysis.Lean` is selected by `ATRADE_ANALYSIS_ENGINE=Lean`, converts
-  ATrade bars into a temporary official-LEAN workspace, invokes the configured
-  LEAN CLI/Docker runtime, and maps results back into the provider-neutral
-  `AnalysisResult` shape.
+  ATrade bars into a temporary official-LEAN workspace, evaluates the selected
+  built-in strategy with normalized parameters and internal simulated
+  commission/slippage accounting, invokes the configured LEAN CLI/Docker runtime,
+  and maps results back into the provider-neutral `AnalysisResult` shape.
 - LEAN and future runtimes belong in concrete provider modules; API/core and
   frontend contracts remain provider-neutral.
 
@@ -326,10 +328,11 @@ Future plug-ins:
   provider/source/symbol identity instead of introducing provider-specific
   persistence columns.
 - LEAN is now the first analysis-engine provider behind `ATrade.Analysis`; it
-  consumes normalized market-data/signal contracts and must not become an API or
-  UI type assumption. Runtime-unavailable or timeout states surface as explicit
-  analysis errors instead of fake results, including when the saved backtest
-  runner invokes the provider-neutral registry.
+  consumes normalized market-data/signal/backtest contracts and must not become
+  an API or UI type assumption. Runtime-unavailable or timeout states surface as
+  explicit analysis errors instead of fake results, including when the saved
+  backtest runner invokes the provider-neutral registry. Generated LEAN code must
+  remain analysis-only and order-free.
 - Additional analysis engines can replace or complement LEAN by implementing
   `IAnalysisEngine` in their own provider modules and preserving the same
   request/result contracts.

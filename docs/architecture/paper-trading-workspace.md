@@ -288,14 +288,22 @@ Backtest endpoints use `ATrade.Backtesting`; the API only binds HTTP, maps
 `/hubs/backtests`, and projects safe results. `POST /api/backtests` accepts one
 stock symbol or exact symbol identity, a built-in strategy id (`sma-crossover`,
 `rsi-mean-reversion`, or `breakout`), optional analysis engine id, bounded JSON
-parameters, chart range, cost/slippage settings, and benchmark mode. Creation
-snapshots the current effective paper capital/source and returns a queued saved
-run with `202 Accepted`; it returns `backtest-capital-unavailable` when Accounts
-reports no positive effective capital. The API-hosted runner claims queued rows,
-marks interrupted running rows failed on restart, fetches candles server-side
-through `IMarketDataService`, invokes `IAnalysisEngineRegistry`, persists safe
-completed/failed/cancelled envelopes, and never accepts browser-submitted bars or
-fake market-data/LEAN success. `GET /api/backtests` and
+parameters, chart range, cost/slippage settings, and benchmark mode. Strategy
+parameters default server-side (`shortWindow`/`longWindow`, `rsiPeriod` plus
+oversold/overbought thresholds, or `lookbackWindow`) and are validated before
+persistence; costs/slippage are used only for internal simulated accounting and
+never configure brokerage models or order endpoints. Creation snapshots the
+current effective paper capital/source and returns a queued saved run with `202
+Accepted`; it returns `backtest-capital-unavailable`
+when Accounts reports no positive effective capital. The API-hosted runner claims
+queued rows, marks interrupted running rows failed on restart, fetches candles
+server-side through `IMarketDataService`, invokes `IAnalysisEngineRegistry`,
+persists safe completed/failed/cancelled envelopes, and never accepts
+browser-submitted bars or fake market-data/LEAN success. Completed result
+envelopes include provider-neutral summary metrics, strategy equity curve,
+simulated trades/signals, buy-and-hold benchmark data from the same candle
+window, accounting inputs, engine/source metadata, and safe errors. `GET
+/api/backtests` and
 `GET /api/backtests/{id}` expose local workspace history/status/results,
 `POST /api/backtests/{id}/cancel` deterministically cancels queued runs and
 requests best-effort cancellation for running runs, and
@@ -351,16 +359,17 @@ The paper-trading slice extends existing planned responsibilities as follows:
   API-facing registry, cache-aware candle acquisition for analysis runs, and
   no-configured-engine fallback for LEAN or alternate analysis runtimes
 - `ATrade.Analysis.Lean` owns the first concrete analysis provider. It builds a
-  temporary official-LEAN workspace from ATrade OHLCV bars, runs an
-  analysis-only moving-average/backtest algorithm through the configured LEAN
-  CLI or AppHost-managed Docker runtime (`lean-engine`), parses
-  provider-neutral signals/metrics, and rejects brokerage/order-routing source
-  tokens.
+  temporary official-LEAN workspace from ATrade OHLCV bars, runs analysis-only
+  SMA crossover, RSI mean-reversion, or breakout simulations through the
+  configured LEAN CLI or AppHost-managed Docker runtime (`lean-engine`), parses
+  provider-neutral signals/metrics/backtest details, and rejects brokerage,
+  live-mode, order-placement, and ATrade order-endpoint source tokens.
 - `ATrade.Backtesting` owns provider-neutral saved backtest contracts,
-  single-symbol/built-in-strategy validation, optional analysis engine ids,
-  capital snapshots through `ATrade.Accounts`, Postgres saved-run
-  schema/repository operations, API-hosted async execution with restart recovery,
-  server-side market-data/analysis invocation, local workspace history,
+  single-symbol/built-in-strategy and parameter validation, optional analysis
+  engine ids, cost/slippage/benchmark snapshots, capital snapshots through
+  `ATrade.Accounts`, Postgres saved-run schema/repository operations, API-hosted
+  async execution with restart recovery, server-side market-data/analysis
+  invocation, local workspace history, rich completed result envelopes,
   cancel/retry status rules, `/hubs/backtests` update payloads, and persistence
   and broadcast redaction for secrets, account identifiers, gateway URLs, LEAN
   workspace paths, raw process command lines, direct bars, custom code, and

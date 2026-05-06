@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ATrade.MarketData;
 
 namespace ATrade.Analysis;
@@ -42,13 +43,22 @@ public sealed record AnalysisEngineDescriptor(
     AnalysisEngineMetadata Metadata,
     AnalysisEngineCapabilities Capabilities);
 
+public sealed record AnalysisBacktestSettings(
+    decimal InitialCapital,
+    decimal CommissionPerTrade,
+    decimal CommissionBps,
+    decimal SlippageBps,
+    string Currency);
+
 public sealed record AnalysisRequest(
     MarketDataSymbolIdentity Symbol,
     string Timeframe,
     DateTimeOffset RequestedAtUtc,
     IReadOnlyList<OhlcvCandle> Bars,
     string? EngineId = null,
-    string? StrategyName = null);
+    string? StrategyName = null,
+    IReadOnlyDictionary<string, JsonElement>? StrategyParameters = null,
+    AnalysisBacktestSettings? BacktestSettings = null);
 
 public sealed record AnalysisDataSource(
     string Provider,
@@ -65,7 +75,8 @@ public sealed record AnalysisResult(
     IReadOnlyList<AnalysisSignal> Signals,
     IReadOnlyList<AnalysisMetric> Metrics,
     BacktestSummary? Backtest,
-    AnalysisError? Error);
+    AnalysisError? Error,
+    AnalysisBacktestDetails? BacktestDetails = null);
 
 public sealed record AnalysisSignal(
     DateTimeOffset Time,
@@ -86,6 +97,46 @@ public sealed record BacktestSummary(
     decimal FinalEquity,
     decimal TotalReturnPercent,
     int TradeCount,
-    decimal WinRatePercent);
+    decimal WinRatePercent,
+    decimal MaxDrawdownPercent = 0m,
+    decimal TotalCost = 0m);
+
+public sealed record AnalysisBacktestDetails(
+    IReadOnlyList<AnalysisEquityCurvePoint> EquityCurve,
+    IReadOnlyList<AnalysisSimulatedTrade> Trades,
+    AnalysisBenchmark? Benchmark,
+    AnalysisBacktestAccounting Accounting);
+
+public sealed record AnalysisEquityCurvePoint(
+    DateTimeOffset Time,
+    decimal Equity,
+    decimal DrawdownPercent);
+
+public sealed record AnalysisSimulatedTrade(
+    DateTimeOffset EntryTime,
+    DateTimeOffset? ExitTime,
+    string Direction,
+    decimal EntryPrice,
+    decimal? ExitPrice,
+    decimal Quantity,
+    decimal GrossPnl,
+    decimal NetPnl,
+    decimal ReturnPercent,
+    decimal TotalCost,
+    string ExitReason);
+
+public sealed record AnalysisBenchmark(
+    string Mode,
+    string Label,
+    decimal InitialCapital,
+    decimal FinalEquity,
+    decimal TotalReturnPercent,
+    IReadOnlyList<AnalysisEquityCurvePoint> EquityCurve);
+
+public sealed record AnalysisBacktestAccounting(
+    decimal CommissionPerTrade,
+    decimal CommissionBps,
+    decimal SlippageBps,
+    string Currency);
 
 public sealed record AnalysisError(string Code, string Message);

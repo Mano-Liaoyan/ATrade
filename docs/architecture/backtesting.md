@@ -25,7 +25,8 @@ behind provider-neutral seams.
 
 - Validate single-symbol backtest creation requests before persistence.
 - Allow only built-in strategy IDs: `sma-crossover`, `rsi-mean-reversion`, and
-  `breakout`.
+  `breakout`, with server-side defaulting and validation for each strategy's
+  bounded parameter set.
 - Use the shared market-data chart range presets (`1min`, `5mins`, `1h`, `6h`,
   `1D`, `1m`, `6m`, `1y`, `5y`, and `all`) and `MarketDataSymbolIdentity`.
 - Snapshot effective paper capital from `ATrade.Accounts.IPaperCapitalService`
@@ -54,7 +55,10 @@ A saved run envelope contains:
 - `capital` — `initialCapital`, `currency`, and `capitalSource` captured at
   creation time.
 - timestamps for creation/update/start/completion.
-- safe `error` details and an optional provider-neutral `result` JSON placeholder.
+- safe `error` details and an optional provider-neutral completed `result` JSON
+  envelope containing summary metrics, equity curve, simulated trades/signals,
+  buy-and-hold benchmark, accounting inputs, source metadata, and engine
+  metadata.
 
 Created runs start as `queued`. The hosted runner transitions claimed jobs to
 `running`, then to `completed`, `failed`, or `cancelled`. On API startup,
@@ -78,6 +82,32 @@ The saved run captures the amount, currency, and source string at creation time;
 later changes to local fallback capital or broker availability do not rewrite
 existing run snapshots. Retry creates a new run and therefore captures current
 effective capital for the retry while reusing the original request snapshot.
+
+## Built-In Strategy And Cost Inputs
+
+Saved backtests currently accept only three built-in strategy ids; custom code,
+script/workspace fields, order-routing fields, direct bars, and multi-symbol or
+portfolio payloads are rejected before persistence and before any LEAN invocation.
+The supported strategy catalog is:
+
+| Strategy id | Parameters and defaults | Validation notes |
+| --- | --- | --- |
+| `sma-crossover` | `shortWindow = 20`, `longWindow = 50` | Integer windows; short is bounded 2-250, long is bounded 3-500, and long must be greater than short. |
+| `rsi-mean-reversion` | `rsiPeriod = 14`, `oversoldThreshold = 30`, `overboughtThreshold = 70` | Period is an integer 2-100; thresholds are decimals 1-99, and oversold must be below overbought. |
+| `breakout` | `lookbackWindow = 20` | Integer lookback bounded 2-250. |
+
+The cost model is part of the saved request snapshot. `commissionPerTrade`,
+`commissionBps`, and `slippageBps` default to `0`, are non-negative, round to 4
+decimal places, and are each bounded at `1000` (currency units for per-trade
+commission, basis points for commission/slippage). Currency defaults to the
+paper-capital currency (`USD` today). Commission and slippage are applied to
+internal simulated entry/exit accounting only. They must not route broker orders,
+configure LEAN brokerage models, or call ATrade order endpoints.
+
+`benchmarkMode` defaults to `buy-and-hold`; `none` is the only opt-out. The
+buy-and-hold benchmark is calculated from the same server-fetched candle window
+and initial capital as the strategy result and is labelled separately from the
+strategy return.
 
 ## REST API
 
@@ -113,15 +143,36 @@ saved runs with safe market-data error codes/messages; no synthetic candles or
 fake successful results are created.
 
 When candles are available, the runner calls `IAnalysisEngineRegistry.AnalyzeAsync(...)`
-with normalized OHLCV bars, the saved optional `engineId`, and the saved built-in
-strategy id as strategy metadata. `analysis-engine-not-configured`,
+with normalized OHLCV bars, the saved optional `engineId`, strategy id,
+strategy parameters, and backtest settings. `analysis-engine-not-configured`,
 `analysis-engine-unavailable`, and invalid analysis requests become failed saved
 runs with generic safe messages. Completed analysis results are persisted as a
-provider-neutral `tp-060.backtest-result.v1` JSON placeholder containing engine,
-symbol, chart range, market-data source, signals, metrics, and optional backtest
-summary fields for TP-061 enrichment. The placeholder intentionally omits LEAN
-workspace paths, process command lines, credentials, account identifiers,
-gateway URLs, tokens, cookies, session details, and raw direct-bar submissions.
+provider-neutral `tp-061.backtest-result.v1` JSON envelope containing engine,
+symbol, chart range, market-data source, signals, metrics, backtest summary,
+equity curve, simulated trades, buy-and-hold benchmark, accounting inputs, and
+source metadata. The envelope intentionally omits LEAN workspace paths, process
+command lines, credentials, account identifiers, gateway URLs, tokens, cookies,
+session details, and raw direct-bar submissions.
+
+## Completed Result Envelope
+
+A completed saved run's `result` uses provider-neutral names rather than LEAN
+DTOs:
+
+- `schemaVersion = "tp-061.backtest-result.v1"`, `status`, `strategyId`, and the
+  normalized parameter bag used for execution.
+- `engine`, `symbol`, `chartRange`, `generatedAtUtc`, and `source` metadata.
+- `signals` and `metrics` projected from the analysis result.
+- `backtest` summary with `startUtc`, `endUtc`, `initialCapital`, `finalEquity`,
+  `totalReturnPercent`, `tradeCount`, `winRatePercent`, `maxDrawdownPercent`,
+  and `totalCost`.
+- `equityCurve` points with time, equity, and drawdown percent.
+- `trades` with entry/exit times, direction, prices, quantity, gross/net P&L,
+  return percent, total cost, and exit reason.
+- `benchmark` when enabled, currently `mode = "buy-and-hold"`, label, initial
+  capital, final equity, total return percent, and benchmark equity curve.
+- `accounting` with commission-per-trade, commission bps, slippage bps, and
+  currency.
 
 ## SignalR Updates
 
@@ -130,7 +181,7 @@ handlers publish best-effort events named `backtestRunCreated`,
 `backtestRunStatusChanged`, `backtestRunCompleted`, `backtestRunFailed`, and
 `backtestRunCancelled`. Payloads include safe run id/status/timestamps,
 symbol identity, strategy id, optional engine id, chart range, safe error, and
-safe result placeholder only; paper-capital amounts, account identifiers,
+safe result envelope only; paper-capital amounts, account identifiers,
 credentials, gateway URLs, LEAN workspace paths, raw command lines, tokens,
 cookies, and sessions are not broadcast. SignalR delivery is best-effort and
 HTTP/Postgres state remains authoritative when no clients are connected.
@@ -164,11 +215,13 @@ Primary verification entry points:
 dotnet test tests/ATrade.Backtesting.Tests/ATrade.Backtesting.Tests.csproj --nologo --verbosity minimal
 bash tests/apphost/backtesting-api-contract-tests.sh
 bash tests/apphost/backtesting-runner-signalr-tests.sh
+bash tests/apphost/backtesting-strategy-result-tests.sh
 dotnet test ATrade.slnx --nologo --verbosity minimal
 ```
 
 The apphost contract tests cover successful queued creation with the runner
 disabled for REST-only assertions, validation failures, missing capital,
-not-found responses, cancel/retry behavior, runner/SignalR source wiring, and
-redaction of sensitive values from API responses, SignalR payloads, and persisted
-saved-run rows.
+not-found responses, cancel/retry behavior, runner/SignalR source wiring,
+built-in strategy/result contract strings, no-custom-code/no-order guardrails,
+and redaction of sensitive values from API responses, SignalR payloads, and
+persisted saved-run rows.

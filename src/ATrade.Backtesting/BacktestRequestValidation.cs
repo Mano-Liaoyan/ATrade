@@ -101,7 +101,7 @@ public static class BacktestRequestValidator
 
         var symbol = NormalizeSymbol(request.Symbol, request.SymbolCode);
         var strategyId = NormalizeStrategy(request.StrategyId);
-        var parameters = NormalizeParameters(request.Parameters);
+        var parameters = NormalizeParameters(strategyId, request.Parameters);
         var chartRange = NormalizeChartRange(request.ChartRange);
         var costModel = NormalizeCostModel(request.CostModel);
         var slippageBps = NormalizeSlippage(request.SlippageBps);
@@ -178,11 +178,20 @@ public static class BacktestRequestValidator
         return normalizedStrategyId;
     }
 
-    private static IReadOnlyDictionary<string, JsonElement> NormalizeParameters(IDictionary<string, JsonElement>? parameters)
+    private static IReadOnlyDictionary<string, JsonElement> NormalizeParameters(
+        string strategyId,
+        IDictionary<string, JsonElement>? parameters)
     {
+        var definition = BacktestStrategyCatalog.GetDefinition(strategyId);
+        var normalized = BacktestStrategyCatalog.CreateDefaultParameters(strategyId).ToDictionary(
+            parameter => parameter.Key,
+            parameter => parameter.Value.Clone(),
+            StringComparer.Ordinal);
+
         if (parameters is null || parameters.Count == 0)
         {
-            return new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            ValidateStrategyParameterRelationships(strategyId, normalized);
+            return normalized;
         }
 
         if (parameters.Count > BacktestValidationLimits.MaximumParameterCount)
@@ -193,7 +202,6 @@ public static class BacktestRequestValidator
                 nameof(parameters));
         }
 
-        var normalized = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var parameter in parameters)
         {
             var key = parameter.Key?.Trim();
@@ -212,11 +220,107 @@ public static class BacktestRequestValidator
 
             RejectForbiddenPropertyName(key);
             ValidateParameterValue(key, parameter.Value, depth: 0);
-            normalized[key] = parameter.Value.Clone();
+
+            var parameterDefinition = definition.Parameters.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.Ordinal));
+            if (parameterDefinition is null)
+            {
+                throw new BacktestValidationException(
+                    BacktestErrorCodes.InvalidParameters,
+                    $"Parameter '{key}' is not supported for strategy '{strategyId}'. Supported parameters: {string.Join(", ", definition.ParameterNames)}.",
+                    nameof(parameters));
+            }
+
+            normalized[key] = NormalizeStrategyParameterValue(parameterDefinition, parameter.Value);
         }
 
+        ValidateStrategyParameterRelationships(strategyId, normalized);
         return normalized;
     }
+
+    private static JsonElement NormalizeStrategyParameterValue(BacktestStrategyParameterDefinition definition, JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Number)
+        {
+            throw new BacktestValidationException(
+                BacktestErrorCodes.InvalidParameters,
+                $"Parameter '{definition.Name}' must be a numeric {definition.ValueType} value.",
+                definition.Name);
+        }
+
+        if (string.Equals(definition.ValueType, BacktestStrategyParameterTypes.Integer, StringComparison.Ordinal))
+        {
+            if (!value.TryGetInt32(out var integerValue))
+            {
+                throw new BacktestValidationException(
+                    BacktestErrorCodes.InvalidParameters,
+                    $"Parameter '{definition.Name}' must be a whole number.",
+                    definition.Name);
+            }
+
+            if (integerValue < definition.MinimumValue || integerValue > definition.MaximumValue)
+            {
+                throw new BacktestValidationException(
+                    BacktestErrorCodes.InvalidParameters,
+                    $"Parameter '{definition.Name}' must be between {definition.MinimumValue:0} and {definition.MaximumValue:0}.",
+                    definition.Name);
+            }
+
+            return JsonSerializer.SerializeToElement(integerValue);
+        }
+
+        if (!value.TryGetDecimal(out var decimalValue))
+        {
+            throw new BacktestValidationException(
+                BacktestErrorCodes.InvalidParameters,
+                $"Parameter '{definition.Name}' must be a valid decimal value.",
+                definition.Name);
+        }
+
+        if (decimalValue < definition.MinimumValue || decimalValue > definition.MaximumValue)
+        {
+            throw new BacktestValidationException(
+                BacktestErrorCodes.InvalidParameters,
+                $"Parameter '{definition.Name}' must be between {definition.MinimumValue:0.####} and {definition.MaximumValue:0.####}.",
+                definition.Name);
+        }
+
+        return JsonSerializer.SerializeToElement(decimal.Round(decimalValue, 4, MidpointRounding.AwayFromZero));
+    }
+
+    private static void ValidateStrategyParameterRelationships(string strategyId, IReadOnlyDictionary<string, JsonElement> parameters)
+    {
+        if (string.Equals(strategyId, BacktestStrategyIds.SmaCrossover, StringComparison.Ordinal))
+        {
+            var shortWindow = ReadIntParameter(parameters, BacktestStrategyParameterNames.SmaShortWindow);
+            var longWindow = ReadIntParameter(parameters, BacktestStrategyParameterNames.SmaLongWindow);
+            if (shortWindow >= longWindow)
+            {
+                throw new BacktestValidationException(
+                    BacktestErrorCodes.InvalidParameters,
+                    "SMA shortWindow must be less than longWindow.",
+                    BacktestStrategyParameterNames.SmaShortWindow);
+            }
+        }
+
+        if (string.Equals(strategyId, BacktestStrategyIds.RsiMeanReversion, StringComparison.Ordinal))
+        {
+            var oversold = ReadDecimalParameter(parameters, BacktestStrategyParameterNames.RsiOversoldThreshold);
+            var overbought = ReadDecimalParameter(parameters, BacktestStrategyParameterNames.RsiOverboughtThreshold);
+            if (oversold >= overbought)
+            {
+                throw new BacktestValidationException(
+                    BacktestErrorCodes.InvalidParameters,
+                    "RSI oversoldThreshold must be less than overboughtThreshold.",
+                    BacktestStrategyParameterNames.RsiOversoldThreshold);
+            }
+        }
+    }
+
+    private static int ReadIntParameter(IReadOnlyDictionary<string, JsonElement> parameters, string key) =>
+        parameters.TryGetValue(key, out var value) && value.TryGetInt32(out var parsed) ? parsed : 0;
+
+    private static decimal ReadDecimalParameter(IReadOnlyDictionary<string, JsonElement> parameters, string key) =>
+        parameters.TryGetValue(key, out var value) && value.TryGetDecimal(out var parsed) ? parsed : 0m;
 
     private static string NormalizeChartRange(string? chartRange)
     {
