@@ -129,8 +129,8 @@ public sealed class PostgresBacktestRunRepositoryTests
         StrategyId: BacktestStrategyIds.SmaCrossover,
         Parameters: new Dictionary<string, JsonElement>
         {
-            ["fastPeriod"] = Json("20"),
-            ["slowPeriod"] = Json("50"),
+            [BacktestStrategyParameterNames.SmaShortWindow] = Json("20"),
+            [BacktestStrategyParameterNames.SmaLongWindow] = Json("50"),
         },
         ChartRange: ChartRangePresets.OneYear,
         CostModel: new BacktestCostModel(0m, 0m, "USD"),

@@ -1,6 +1,6 @@
 # TP-061: Backtesting strategy and result expansion — Status
 
-**Current Step:** Step 1: Add built-in strategy definitions and parameter validation
+**Current Step:** Step 2: Expand LEAN input/template/parser for parameterized built-ins
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Add built-in strategy definitions and parameter validation
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] SMA, RSI, and breakout definitions/defaults added
-- [ ] Parameter, cost, and slippage validation implemented
-- [ ] Unknown/custom/multi-symbol/direct-bar/order-field requests rejected
-- [ ] Strategy validation and snapshot tests added
+- [x] SMA, RSI, and breakout definitions/defaults added
+- [x] Parameter, cost, and slippage validation implemented
+- [x] Unknown/custom/multi-symbol/direct-bar/order-field requests rejected
+- [x] Strategy validation and snapshot tests added
 
 ---
 
 ### Step 2: Expand LEAN input/template/parser for parameterized built-ins
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] LEAN input/template supports selected built-in strategy and parameters
 - [ ] Generated algorithms remain analysis-only and order-free
@@ -108,6 +108,12 @@
 | 2026-05-06 00:20 | Step 0 preflight | Verified TP-060 status is complete, required projects/tests/docs exist, and .NET SDK 10.0.102 is available. |
 | 2026-05-06 00:21 | Step 0 completed | Preflight checks passed. |
 | 2026-05-06 00:21 | Step 1 started | Built-in strategy definitions and validation. |
+| 2026-05-06 00:31 | Step 1 strategy catalog | Added built-in SMA/RSI/breakout strategy definitions, stable parameter names, and default values. |
+| 2026-05-06 00:32 | Step 1 validation | Added strategy-specific parameter defaulting/range/relationship validation and cost/slippage failure tests. |
+| 2026-05-06 00:33 | Step 1 guardrails | Unknown parameters, custom code, multi-symbol, direct-bar, and order-routing payloads are rejected before LEAN invocation. |
+| 2026-05-06 00:34 | Step 1 tests | Backtesting targeted tests passed: 44/44. |
+| 2026-05-06 00:35 | Step 1 completed | Strategy definitions, validation, guardrails, and snapshots are in place. |
+| 2026-05-06 00:35 | Step 2 started | LEAN input/template/parser expansion for parameterized strategies. |
 
 ---
 
