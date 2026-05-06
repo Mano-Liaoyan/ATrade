@@ -1,6 +1,6 @@
 # TP-062: Terminal backtest run, history, retry, and status streaming — Status
 
-**Current Step:** Step 1: Add BACKTEST module registration and typed client/workflow contracts
+**Current Step:** Step 2: Build the Backtest workspace form, capital panel, and live status UI
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Add BACKTEST module registration and typed client/workflow contracts
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] BACKTEST enabled module registered
-- [ ] Backtesting frontend types added
-- [ ] Backtest/capital HTTP and SignalR client added
-- [ ] Terminal backtest workflow coordinates capital, create/cancel/retry, history/detail, and SignalR updates
+- [x] BACKTEST enabled module registered
+- [x] Backtesting frontend types added
+- [x] Backtest/capital HTTP and SignalR client added
+- [x] Terminal backtest workflow coordinates capital, create/cancel/retry, history/detail, and SignalR updates
 
 ---
 
