@@ -1657,6 +1657,174 @@ select:focus-visible,
   }
 }
 
+.terminal-backtest-workspace {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.terminal-backtest-workspace__badges,
+.terminal-backtest-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-backtest-workspace__summary,
+.terminal-backtest-form__grid,
+.terminal-backtest-form__parameters,
+.terminal-backtest-form__costs {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.terminal-backtest-workspace__summary,
+.terminal-backtest-form__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.terminal-backtest-form__parameters,
+.terminal-backtest-form__costs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.terminal-backtest-form,
+.terminal-backtest-capital,
+.terminal-backtest-capital__form,
+.terminal-backtest-capital__messages,
+.terminal-backtest-live {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.terminal-backtest-capital,
+.terminal-backtest-live {
+  border: 1px solid hsl(var(--terminal-border) / 0.72);
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface-inset) / 0.56);
+  padding: 0.75rem;
+}
+
+.terminal-backtest-capital__status,
+.terminal-backtest-capital__form,
+.terminal-backtest-live__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.terminal-backtest-capital__sources,
+.terminal-backtest-live__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.terminal-backtest-capital__form {
+  grid-template-columns: minmax(12rem, 1fr) minmax(5rem, 0.25fr) auto;
+}
+
+.terminal-backtest-workspace__summary div,
+.terminal-backtest-capital__sources div,
+.terminal-backtest-capital__status > div,
+.terminal-backtest-live__grid div,
+.terminal-backtest-live__header > div {
+  border-bottom: 1px solid hsl(var(--terminal-border) / 0.58);
+  padding-bottom: 0.45rem;
+}
+
+.terminal-backtest-workspace__summary span,
+.terminal-backtest-capital__status span,
+.terminal-backtest-capital__sources span,
+.terminal-backtest-live__grid span,
+.terminal-backtest-live__header span,
+.terminal-field > span {
+  color: hsl(var(--terminal-text-subtle));
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.terminal-backtest-workspace__summary strong,
+.terminal-backtest-capital__status strong,
+.terminal-backtest-capital__sources strong,
+.terminal-backtest-live__grid strong,
+.terminal-backtest-live__header strong {
+  display: block;
+  margin: 0.2rem 0 0;
+  color: hsl(var(--terminal-text));
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.terminal-backtest-workspace__summary small,
+.terminal-backtest-capital__status small,
+.terminal-backtest-capital__sources small,
+.terminal-backtest-live__grid small,
+.terminal-backtest-live__header small,
+.terminal-field small,
+.terminal-backtest-form__actions span,
+.terminal-backtest-live__actions span {
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.terminal-field {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.terminal-select {
+  min-height: 2.25rem;
+  width: 100%;
+  border: 1px solid hsl(var(--terminal-border));
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface-inset));
+  color: hsl(var(--terminal-text));
+  padding: 0.45rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.terminal-select:focus {
+  border-color: hsl(var(--terminal-accent-amber));
+  box-shadow: 0 0 0 2px hsl(var(--terminal-accent-amber) / 0.28);
+}
+
+.terminal-backtest-live__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-backtest-capital__messages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.terminal-backtest-capital__messages li {
+  border-left: 2px solid hsl(var(--terminal-accent-amber) / 0.58);
+  padding-left: 0.55rem;
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.8rem;
+}
+
+.terminal-backtest-workspace__alert {
+  border: 1px solid hsl(var(--terminal-accent-red) / 0.42);
+  border-radius: 2px;
+  background: hsl(var(--terminal-accent-red) / 0.09);
+  color: hsl(var(--terminal-text));
+  padding: 0.65rem;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 720px) {
   .atrade-terminal-app {
     padding: 0.5rem;

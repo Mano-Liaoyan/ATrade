@@ -1,6 +1,6 @@
 # TP-062: Terminal backtest run, history, retry, and status streaming — Status
 
-**Current Step:** Step 2: Build the Backtest workspace form, capital panel, and live status UI
+**Current Step:** Step 3: Add run history, detail, cancel, and retry views
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-06
 **Review Level:** 2
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Build the Backtest workspace form, capital panel, and live status UI
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Single-symbol strategy run form created
-- [ ] Paper-capital panel shows source and supports local capital update
-- [ ] Status, cancel, retry, unavailable/error states rendered truthfully
-- [ ] ATradeTerminalApp/rail/handoff routing wired without breaking existing modules
+- [x] Single-symbol strategy run form created
+- [x] Paper-capital panel shows source and supports local capital update
+- [x] Status, cancel, retry, unavailable/error states rendered truthfully
+- [x] ATradeTerminalApp/rail/handoff routing wired without breaking existing modules
 
 ---
 

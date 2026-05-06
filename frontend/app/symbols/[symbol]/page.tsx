@@ -27,7 +27,7 @@ export default async function SymbolPage({ params, searchParams }: SymbolPagePro
 function createInitialModuleId(moduleQuery: string | null): EnabledTerminalModuleId {
   const normalizedModule = moduleQuery?.trim().toUpperCase();
 
-  if (normalizedModule === 'ANALYSIS' || normalizedModule === 'STATUS' || normalizedModule === 'HELP') {
+  if (normalizedModule === 'ANALYSIS' || normalizedModule === 'BACKTEST' || normalizedModule === 'STATUS' || normalizedModule === 'HELP') {
     return normalizedModule;
   }
 

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDownAZ, ArrowDownZA, BarChart3, FlaskConical, Pin, PinOff } from 'lucide-react';
+import { Activity, ArrowDownAZ, ArrowDownZA, BarChart3, FlaskConical, Pin, PinOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,6 +18,7 @@ export type MarketMonitorTableProps = {
   className?: string;
   compact?: boolean;
   onOpenAnalysis?: (row: TerminalMarketMonitorRow) => void;
+  onOpenBacktest?: (row: TerminalMarketMonitorRow) => void;
   onOpenChart?: (row: TerminalMarketMonitorRow) => void;
   onSelectRow: (rowId: string) => void;
   onSort: (key: TerminalMarketMonitorSortKey) => void;
@@ -52,6 +53,7 @@ export function MarketMonitorTable({
   className,
   compact = false,
   onOpenAnalysis,
+  onOpenBacktest,
   onOpenChart,
   onSelectRow,
   onSort,
@@ -165,6 +167,10 @@ export function MarketMonitorTable({
                       <MarketMonitorLinkButton href={row.analysisHref} label={`Open analysis for ${row.symbol}`} onClick={onOpenAnalysis ? () => onOpenAnalysis(row) : undefined} variant="outline">
                         <FlaskConical aria-hidden="true" />
                         Analysis
+                      </MarketMonitorLinkButton>
+                      <MarketMonitorLinkButton href={row.backtestHref} label={`Open backtest for ${row.symbol}`} onClick={onOpenBacktest ? () => onOpenBacktest(row) : undefined} variant="outline">
+                        <Activity aria-hidden="true" />
+                        Backtest
                       </MarketMonitorLinkButton>
                     </div>
                   </td>

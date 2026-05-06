@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { BarChart3, FlaskConical, Pin, PinOff } from 'lucide-react';
+import { Activity, BarChart3, FlaskConical, Pin, PinOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ export type MarketMonitorDetailPanelProps = {
   className?: string;
   compact?: boolean;
   onOpenAnalysis?: (row: TerminalMarketMonitorRow) => void;
+  onOpenBacktest?: (row: TerminalMarketMonitorRow) => void;
   onOpenChart?: (row: TerminalMarketMonitorRow) => void;
   onTogglePin: (row: TerminalMarketMonitorRow) => void;
   row: TerminalMarketMonitorRow | null;
@@ -23,6 +24,7 @@ export function MarketMonitorDetailPanel({
   className,
   compact = false,
   onOpenAnalysis,
+  onOpenBacktest,
   onOpenChart,
   onTogglePin,
   row,
@@ -118,6 +120,10 @@ export function MarketMonitorDetailPanel({
           <DetailActionButton href={row.analysisHref} label={`Open analysis for ${row.symbol}`} onClick={onOpenAnalysis ? () => onOpenAnalysis(row) : undefined} variant="outline">
             <FlaskConical aria-hidden="true" />
             Open analysis
+          </DetailActionButton>
+          <DetailActionButton href={row.backtestHref} label={`Open backtest for ${row.symbol}`} onClick={onOpenBacktest ? () => onOpenBacktest(row) : undefined} variant="outline">
+            <Activity aria-hidden="true" />
+            Open backtest
           </DetailActionButton>
         </div>
       </div>

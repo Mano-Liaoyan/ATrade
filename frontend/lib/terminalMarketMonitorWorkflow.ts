@@ -80,8 +80,10 @@ type TerminalMarketMonitorBaseRow = {
   exactIdentity: MarketDataSymbolIdentity;
   chartHref: string;
   analysisHref: string;
+  backtestHref: string;
   chartIntent: TerminalNavigationIntent;
   analysisIntent: TerminalNavigationIntent;
+  backtestIntent: TerminalNavigationIntent;
   pinState: WatchlistPinState;
   saved: boolean;
   saving: boolean;
@@ -174,6 +176,7 @@ export type TerminalMarketMonitorWorkflow = {
   toggleRowPin: (row: TerminalMarketMonitorRow) => Promise<void>;
   openChartIntent: (row: TerminalMarketMonitorRow) => TerminalNavigationIntent;
   openAnalysisIntent: (row: TerminalMarketMonitorRow) => TerminalNavigationIntent;
+  openBacktestIntent: (row: TerminalMarketMonitorRow) => TerminalNavigationIntent;
   statusSummary: string;
 };
 
@@ -426,6 +429,7 @@ export function useTerminalMarketMonitorWorkflow({
     toggleRowPin,
     openChartIntent: createChartNavigationIntent,
     openAnalysisIntent: createAnalysisNavigationIntent,
+    openBacktestIntent: createBacktestNavigationIntent,
     statusSummary,
   };
 }
@@ -589,6 +593,10 @@ export function createAnalysisNavigationIntent(row: TerminalMarketMonitorRow): T
   return createRowNavigationIntent(row, 'ANALYSIS');
 }
 
+export function createBacktestNavigationIntent(row: TerminalMarketMonitorRow): TerminalNavigationIntent {
+  return createRowNavigationIntent(row, 'BACKTEST');
+}
+
 export function formatTerminalMarketMonitorError(caughtError: unknown): string {
   return caughtError instanceof Error ? caughtError.message : 'Provider-backed market monitor data is unavailable.';
 }
@@ -622,7 +630,8 @@ function createBaseMonitorRow({
 }): TerminalMarketMonitorBaseRow {
   const exactIdentity = toMarketDataSymbolIdentity(identity);
   const chartHref = createSymbolChartHref(identity);
-  const analysisHref = createAnalysisHref(identity);
+  const analysisHref = createModuleHref(identity, 'ANALYSIS');
+  const backtestHref = createModuleHref(identity, 'BACKTEST');
   const pinKey = pinState.pinKey || instrumentKey;
   const rowId = `${source}:${pinKey}:${sourceRank}`;
   const base = {
@@ -644,6 +653,7 @@ function createBaseMonitorRow({
     exactIdentity,
     chartHref,
     analysisHref,
+    backtestHref,
     pinState,
     saved: pinState.pinned,
     saving: pinState.saving,
@@ -659,32 +669,33 @@ function createBaseMonitorRow({
     ...base,
     chartIntent: createRowNavigationIntentFromBase(base, 'CHART'),
     analysisIntent: createRowNavigationIntentFromBase(base, 'ANALYSIS'),
+    backtestIntent: createRowNavigationIntentFromBase(base, 'BACKTEST'),
   };
 }
 
-function createRowNavigationIntent(row: TerminalMarketMonitorRow, moduleId: Extract<EnabledTerminalModuleId, 'CHART' | 'ANALYSIS'>): TerminalNavigationIntent {
+function createRowNavigationIntent(row: TerminalMarketMonitorRow, moduleId: Extract<EnabledTerminalModuleId, 'CHART' | 'ANALYSIS' | 'BACKTEST'>): TerminalNavigationIntent {
   return createRowNavigationIntentFromBase(row, moduleId);
 }
 
 function createRowNavigationIntentFromBase(
-  row: Pick<TerminalMarketMonitorBaseRow, 'analysisHref' | 'chartHref' | 'exactIdentity' | 'symbol'>,
-  moduleId: Extract<EnabledTerminalModuleId, 'CHART' | 'ANALYSIS'>,
+  row: Pick<TerminalMarketMonitorBaseRow, 'analysisHref' | 'backtestHref' | 'chartHref' | 'exactIdentity' | 'symbol'>,
+  moduleId: Extract<EnabledTerminalModuleId, 'CHART' | 'ANALYSIS' | 'BACKTEST'>,
 ): TerminalNavigationIntent {
   return {
     moduleId,
-    route: moduleId === 'ANALYSIS' ? row.analysisHref : row.chartHref,
-    focusTargetId: moduleId === 'ANALYSIS' ? 'terminal-analysis' : 'terminal-chart',
+    route: moduleId === 'ANALYSIS' ? row.analysisHref : moduleId === 'BACKTEST' ? row.backtestHref : row.chartHref,
+    focusTargetId: moduleId === 'ANALYSIS' ? 'terminal-analysis' : moduleId === 'BACKTEST' ? 'terminal-backtest' : 'terminal-chart',
     symbol: row.symbol,
     identity: row.exactIdentity,
     chartRange: '1D',
   };
 }
 
-function createAnalysisHref(identity: InstrumentIdentityInput): string {
+function createModuleHref(identity: InstrumentIdentityInput, moduleId: Extract<EnabledTerminalModuleId, 'ANALYSIS' | 'BACKTEST'>): string {
   const chartHref = createSymbolChartHref(identity);
   const [path, query = ''] = chartHref.split('?');
   const params = new URLSearchParams(query);
-  params.set('module', 'ANALYSIS');
+  params.set('module', moduleId);
   const serialized = params.toString();
   return serialized ? `${path}?${serialized}` : path;
 }
