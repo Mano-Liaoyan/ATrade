@@ -26,12 +26,16 @@ optional AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045`
 through `TP-057` frontend reconstruction,
 no-command cutover, layout simplification,
 top-chrome/filter-density cleanup, stock chart visibility restoration, original
-terminal theme foundation, module rail icon/collapse behavior, and visible
-market-monitor table scrollbars. The current frontend surface is the
-clean-room ATrade paper workspace: direct module/workflow navigation,
-enabled/current workflow modules, visible-disabled future modules, purpose-matched
-module rail icons with local icon-first collapse behavior, compact dense market
-monitor with visible internal vertical/horizontal table scrollbars for wide
+terminal theme foundation, module rail icon/collapse behavior, visible
+market-monitor table scrollbars, `/chart` Stored stocks default behavior, and
+purpose-built Home/Search/Watchlist page composition. The current frontend
+surface is the clean-room ATrade paper workspace: direct module/workflow
+navigation, enabled/current workflow modules, visible-disabled future modules,
+purpose-matched module rail icons with local icon-first collapse behavior, a
+Home dashboard with provider/API status, paper safety, quick actions, and compact
+truthful market/watchlist context, Search-first bounded/ranked stock discovery,
+Watchlist-first backend saved-stock pins, reusable compact dense market-monitor
+primitives with visible internal vertical/horizontal table scrollbars for wide
 exact-identity and action columns, visibly sized chart/analysis/backtest
 workspaces, provider diagnostics, a `/chart` Stored stocks selector that defaults
 to the first backend watchlist instrument when available, canonical enabled routes
@@ -121,10 +125,12 @@ a redirect or alias. `TP-066` added `/chart` Stored stocks selector/list behavio
 first-backend-watchlist-instrument default chart rendering, exact identity
 handoff including optional `ibkrConid`, explicit empty/unavailable Search and
 Watchlist links, and chart-default validation without fake default symbols.
+`TP-067` made Home, Search, and Watchlist purpose-built instead of three
+identical market-monitor wrappers, while preserving shared lower-level search,
+filter, table, detail, exact identity, and backend watchlist behavior.
 
 Remaining ready implementation tasks are queued for the frontend route/visibility UX batch:
 
-- `TP-067` — purpose-built Home, Search, and Watchlist modules with distinct user intent
 - `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
 
 Completed task packets through `TP-063` are present in `tasks/`; completed

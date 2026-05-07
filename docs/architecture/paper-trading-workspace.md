@@ -170,13 +170,19 @@ minimum-length validation, provider/authentication error copy, explicit bounded
 search limits, ranked result view models, metadata filter state, short visible
 result limits, and show-more/show-less exploration operations;
 `terminalMarketMonitorWorkflow` wraps those hooks with provider-backed trending
-state, unified dense row view models, local source/provider/pin filters, sorting,
-selection, show-more/show-less row exploration, and exact chart/analysis/backtest
-action intents while `MarketMonitorFilters` presents those filters as compact
-controls;
-`MarketMonitorTable` keeps sticky headers and exact provider/source/pin/action
-columns inside an internal Radix/native-compatible scroll viewport with visible
-vertical and horizontal scrollbars;
+state, reusable dense row view models, local source/provider/pin filters,
+sorting, selection, show-more/show-less row exploration, initial source-filter
+support, and exact chart/analysis/backtest action intents while
+`MarketMonitorFilters` presents those filters as compact controls;
+`TerminalHomeModule` renders a dashboard/overview with provider diagnostics,
+paper-only safety, canonical quick actions, and compact truthful trending/
+watchlist previews instead of the full monitor table; `TerminalSearchModule`
+uses the shared search/filter/table/detail primitives in a search-first layout;
+`TerminalWatchlistModule` uses the same primitives in a saved-stocks-first layout
+with backend source/empty/unavailable states and a route back to Search for
+adding pins; `MarketMonitorTable` keeps sticky headers and exact provider/source/
+pin/action columns inside an internal Radix/native-compatible scroll viewport
+with visible vertical and horizontal scrollbars;
 `TerminalChartLandingModule` reuses `watchlistWorkflow` on `/chart` to load
 backend-owned stored stocks, render a Stored stocks selector/list, select the
 first available watchlist instrument as the default chart candidate, and keep
@@ -197,9 +203,10 @@ explicit no-engine, unavailable, running, and result states; and
 strategy validation, saved history/detail, completed-run-only comparison
 eligibility, persisted metric/equity-curve normalization, cancel/retry, and
 `/hubs/backtests` status updates into the `BACKTEST` workspace. The workspace frame composes those
-workflow/client modules through `ATradeTerminalApp`,
-`TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
-`MarketMonitorFilters`, `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
+workflow/client modules through `ATradeTerminalApp`, `TerminalHomeModule`,
+`TerminalSearchModule`, `TerminalWatchlistModule`, `TerminalMarketMonitor`,
+`MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`,
+`MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
 `TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
 `TerminalBacktestWorkspace`, `BacktestComparisonPanel`,
 `TerminalProviderDiagnostics`, `TerminalModuleRail`, and
@@ -741,13 +748,19 @@ Current implementation:
 - `frontend/lib/terminalMarketMonitorWorkflow.ts` owns the combined market
   monitor view model over provider trending rows, bounded search rows, and
   backend watchlist rows, including source/provider/market filters, sorting,
-  selected-row state, pin state projection, cached-watchlist fallback copy, and
-  exact chart/analysis/backtest navigation intents
-- `frontend/components/terminal/TerminalMarketMonitor.tsx` with
-  `MarketMonitorTable`, `MarketMonitorSearch`, compact `MarketMonitorFilters`,
-  and `MarketMonitorDetailPanel` renders the dense terminal monitor for `HOME`,
-  `SEARCH`, and `WATCHLIST`; the old long/list `SymbolSearch`, `TrendingList`,
-  `Watchlist`, and `MarketLogo` renderers are retired
+  selected-row state, initial source-filter defaults, pin state projection,
+  cached-watchlist fallback copy, and exact chart/analysis/backtest navigation
+  intents
+- `frontend/components/terminal/TerminalHomeModule.tsx`,
+  `TerminalSearchModule.tsx`, and `TerminalWatchlistModule.tsx` give Home,
+  Search, and Watchlist distinct composition and copy: Home is a dashboard with
+  compact truthful previews, Search is search-input-first with ranked results,
+  and Watchlist is saved-stocks-first with backend pins, retry/add/manage/remove
+  states. They reuse `TerminalMarketMonitor.tsx`, `MarketMonitorTable`,
+  `MarketMonitorSearch`, compact `MarketMonitorFilters`, and
+  `MarketMonitorDetailPanel` as lower-level monitor primitives rather than
+  cloning identical page wrappers; the old long/list `SymbolSearch`,
+  `TrendingList`, `Watchlist`, and `MarketLogo` renderers are retired
 - `frontend/lib/symbolChartWorkflow.ts` owns the selected lookback chart range,
   HTTP candle/indicator fetches, source-label formatting, SignalR subscription
   state and updates from `/hubs/market-data`, and HTTP polling fallback when
@@ -809,12 +822,12 @@ iBeam is not ready.
 
 ### 9.1 IBKR stock search and pin-any-symbol workflow
 
-Users are no longer constrained to a trending/default list. The terminal market
-monitor calls `GET /api/market-data/search` through
-`frontend/lib/marketDataClient.ts` via `symbolSearchWorkflow`, always supplies an
-explicit capped limit, ranks and filters the bounded result set locally through
-compact source/provider/pin/market controls, and renders IBKR/iBeam stock
-results as dense rows with explicit provider,
+Users are no longer constrained to a trending/default list. The Search module
+puts the bounded search input first and calls `GET /api/market-data/search`
+through `frontend/lib/marketDataClient.ts` via `symbolSearchWorkflow`, always
+supplies an explicit capped limit, ranks and filters the bounded result set
+locally through compact source/provider/pin/market controls, and renders
+IBKR/iBeam stock results as dense rows with explicit provider,
 provider-symbol-id/IBKR `conid`, market/exchange, currency, asset class, source,
 rank/score, and saved-pin state. Chart, analysis, and backtest actions route
 through the terminal app using canonical `/chart/{symbol}`,

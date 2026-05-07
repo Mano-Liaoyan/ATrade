@@ -1,6 +1,6 @@
 # TP-067: Purpose-built Home, Search, and Watchlist modules — Status
 
-**Current Step:** Step 5: Testing & Verification
+**Current Step:** Step 6: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -73,12 +73,12 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Distinct Home/Search/Watchlist docs updated
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] Distinct Home/Search/Watchlist docs updated
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -93,6 +93,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| `docs/architecture/modules.md` was affected because Home/Search/Watchlist component ownership changed; `docs/architecture/provider-abstractions.md` was reviewed and did not need edits because exact identity semantics did not change. | Modules doc updated; provider-abstractions left unchanged. | Step 6 docs review |
+| Direct `npx tsc --noEmit` reports the repo's TypeScript 6 `baseUrl` deprecation unless `ignoreDeprecations` is set; task verification uses `npm run build`, which passes. | Logged as existing tooling behavior; no config change in TP-067 scope. | Step 2/5 verification |
 
 ---
 

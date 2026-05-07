@@ -76,15 +76,17 @@ see_also:
 > full-bleed single-primary `TerminalWorkspaceLayout` with no top app brand header, visible
 > global safety strip, context/monitor shell chrome, footer/status strip,
 > splitters, layout reset, or page-level vertical scrolling, status/help
-> surfaces, and a dense terminal market monitor over backend-driven trending
-> symbols, bounded/ranked/compact-filterable IBKR stock search,
-> Postgres-backed exact watchlists, a `/chart` Stored stocks default landing, and
-> terminal chart/analysis/backtest workspaces.
-> `TerminalMarketMonitor`,
-> `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
-> `MarketMonitorDetailPanel` replace the old long/list search, trending, and
-> watchlist renderers while preserving exact identity for chart/analysis/backtest
-> actions. `TerminalChartLandingModule` owns the `/chart` Stored stocks selector
+> surfaces, purpose-built Home/Search/Watchlist compositions, dense reusable
+> market-monitor primitives over backend-driven trending symbols,
+> bounded/ranked/compact-filterable IBKR stock search, Postgres-backed exact
+> watchlists, a `/chart` Stored stocks default landing, and terminal chart/
+> analysis/backtest workspaces. `TerminalHomeModule`, `TerminalSearchModule`,
+> and `TerminalWatchlistModule` split the three page purposes while
+> `TerminalMarketMonitor`, `MarketMonitorTable`, `MarketMonitorSearch`,
+> `MarketMonitorFilters`, and `MarketMonitorDetailPanel` remain reusable lower-
+> level primitives that replace the old long/list search, trending, and watchlist
+> renderers while preserving exact identity for chart/analysis/backtest actions.
+> `TerminalChartLandingModule` owns the `/chart` Stored stocks selector
 > and first-watchlist-instrument default behavior on top of `watchlistWorkflow`;
 > `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and `TerminalIndicatorGrid`
 > own the symbol chart module around the reusable
@@ -698,11 +700,17 @@ references.
   `WorkspaceNavigation` / `WorkspaceContextPanel` primitives remain absent.
   `frontend/lib/terminalMarketMonitorWorkflow.ts` wraps the existing
   watchlist and symbol-search workflow hooks with provider-backed trending state,
-  source/provider/market filters, sorting, selected-row state, bounded
-  show-more/show-less exploration, exact pin state projection, and exact
-  chart/analysis/backtest navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
-  and its table/search/compact-filter/detail components render that monitor for `HOME`,
-  `SEARCH`, and `WATCHLIST`. `TerminalChartLandingModule` reuses
+  source/provider/market filters, initial source-filter defaults, sorting,
+  selected-row state, bounded show-more/show-less exploration, exact pin state
+  projection, and exact chart/analysis/backtest navigation intents.
+  `frontend/components/terminal/TerminalHomeModule.tsx` renders Home as a
+  dashboard with provider diagnostics, paper safety, quick actions, and compact
+  truthful market/watchlist previews; `TerminalSearchModule.tsx` renders the
+  bounded search input first with ranked results; `TerminalWatchlistModule.tsx`
+  renders backend saved stocks first with add/retry/manage/remove states. Those
+  modules reuse `TerminalMarketMonitor.tsx` and its table/search/compact-filter/
+  detail components as lower-level primitives instead of exposing identical
+  page wrappers. `TerminalChartLandingModule` reuses
   `watchlistWorkflow` on `/chart` to load backend-owned stored stocks, render a
   Stored stocks selector/list, default to the first available watchlist
   instrument, and surface empty/cached-fallback/backend-unavailable states
@@ -736,7 +744,8 @@ references.
   controls. The cutover guardrail lives in
   `tests/apphost/frontend-terminal-cutover-tests.sh` alongside the no-command,
   top-chrome/filter-density, shell/market/chart/analysis/theme, backtest
-  workspace/comparison, and module rail icon/collapse validation scripts.
+  workspace/comparison, purpose-built Home/Search/Watchlist, and module rail
+  icon/collapse validation scripts.
 - **UI stack foundation:** `frontend/tailwind.config.ts`,
   `frontend/postcss.config.mjs`, `frontend/components.json`, and
   `frontend/lib/utils.ts` establish the Tailwind/PostCSS/shadcn-compatible
