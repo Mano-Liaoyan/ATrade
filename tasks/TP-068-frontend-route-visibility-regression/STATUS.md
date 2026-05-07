@@ -1,6 +1,6 @@
 # TP-068: Frontend route and visibility regression suite — Status
 
-**Current Step:** Step 1: Consolidate route regression coverage
+**Current Step:** Step 2: Consolidate visibility and page-purpose regression coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Consolidate visibility and page-purpose regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Validate TP-064 desktop browser/no-clipping/visible-scrollbar guardrails
-- [ ] Validate TP-066 `/chart` Stored stocks/default-watchlist behavior and no demo default symbol
-- [ ] Validate TP-067 distinct Home/Search/Watchlist components/copy/test IDs
-- [ ] Keep validation provider/runtime independent
+- [x] Validate TP-064 desktop browser/no-clipping/visible-scrollbar guardrails
+- [x] Validate TP-066 `/chart` Stored stocks/default-watchlist behavior and no demo default symbol
+- [x] Validate TP-067 distinct Home/Search/Watchlist components/copy/test IDs
+- [x] Keep validation provider/runtime independent
 
 ---
 

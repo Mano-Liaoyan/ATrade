@@ -181,11 +181,62 @@ assert_exact_identity_query_preservation() {
   assert_file_contains "$workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : moduleId === 'BACKTEST' ? row.backtestHref : row.chartHref"
 }
 
+run_static_validation_script() {
+  local script_path="$1"
+
+  assert_path_exists "$script_path"
+  bash "$script_path" >/dev/null
+}
+
+assert_layout_visibility_guardrails() {
+  run_static_validation_script "$repo_root/tests/apphost/frontend-terminal-layout-visibility-tests.sh"
+}
+
+assert_chart_landing_default_guardrails() {
+  run_static_validation_script "$repo_root/tests/apphost/frontend-chart-watchlist-default-tests.sh"
+}
+
+assert_purpose_built_module_guardrails() {
+  run_static_validation_script "$repo_root/tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh"
+}
+
+assert_provider_runtime_independent_validation() {
+  local validation_scripts=(
+    "${BASH_SOURCE[0]}"
+    "$repo_root/tests/apphost/frontend-terminal-route-architecture-tests.sh"
+    "$repo_root/tests/apphost/frontend-terminal-layout-visibility-tests.sh"
+    "$repo_root/tests/apphost/frontend-chart-watchlist-default-tests.sh"
+    "$repo_root/tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh"
+  )
+  local forbidden_tokens=(
+    "NEXT_PUBLIC_ATRADE_API""_BASE""_URL"
+    "ATRADE_""IBKR"
+    "IBKR_""PASSWORD"
+    "cu""rl "
+    "npm ""run ""dev"
+    "npm ""run ""build"
+    "dot""net "
+    "doc""ker "
+  )
+
+  local validation_script forbidden_token
+  for validation_script in "${validation_scripts[@]}"; do
+    assert_path_exists "$validation_script"
+    for forbidden_token in "${forbidden_tokens[@]}"; do
+      assert_file_not_contains "$validation_script" "$forbidden_token"
+    done
+  done
+}
+
 main() {
   assert_accepted_enabled_route_matrix
   assert_accepted_disabled_route_matrix
   assert_old_symbol_route_absent_without_alias
   assert_exact_identity_query_preservation
+  assert_layout_visibility_guardrails
+  assert_chart_landing_default_guardrails
+  assert_purpose_built_module_guardrails
+  assert_provider_runtime_independent_validation
 
   printf 'frontend terminal consolidated regression validation passed.\n'
 }
