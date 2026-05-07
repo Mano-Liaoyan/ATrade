@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "ask-and-plan": {
+      "source": "repo-local",
+      "sourceType": "local",
+      "skillPath": ".agents/skills/ask-and-plan/SKILL.md",
+      "computedHash": "cd4f7c4182b25f5777724f9972fe3a48165c0dca80a4e522ba641f1778ae7831"
+    },
     "caveman": {
       "source": "mattpocock/skills",
       "sourceType": "github",
