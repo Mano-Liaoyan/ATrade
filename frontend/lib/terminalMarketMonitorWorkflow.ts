@@ -142,6 +142,7 @@ export type TerminalMarketMonitorWorkflowOptions = {
   searchLimit?: number;
   minimumQueryLength?: number;
   initialSort?: TerminalMarketMonitorSortState;
+  initialSelectedFilters?: TerminalMarketMonitorSelectedFilters;
 };
 
 export type TerminalMarketMonitorProviderState = {
@@ -205,13 +206,14 @@ export function useTerminalMarketMonitorWorkflow({
   searchLimit = DefaultTerminalMarketMonitorSearchLimit,
   minimumQueryLength = MinimumSymbolSearchQueryLength,
   initialSort = DefaultMonitorSort,
+  initialSelectedFilters = {},
 }: TerminalMarketMonitorWorkflowOptions = {}): TerminalMarketMonitorWorkflow {
   const [trendingSymbols, setTrendingSymbols] = useState<TrendingSymbol[]>([]);
   const [trendingSource, setTrendingSource] = useState<string | null>(null);
   const [trendingGeneratedAt, setTrendingGeneratedAt] = useState<string | null>(null);
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [trendingError, setTrendingError] = useState<string | null>(null);
-  const [selectedFilters, setSelectedFilters] = useState<TerminalMarketMonitorSelectedFilters>({});
+  const [selectedFilters, setSelectedFilters] = useState<TerminalMarketMonitorSelectedFilters>(() => normalizeMonitorFilters(initialSelectedFilters));
   const [sort, setSortState] = useState<TerminalMarketMonitorSortState>(initialSort);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [visibleRowLimit, setVisibleRowLimit] = useState(DefaultTerminalMarketMonitorVisibleRowLimit);

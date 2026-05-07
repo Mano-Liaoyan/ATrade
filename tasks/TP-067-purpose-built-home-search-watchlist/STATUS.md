@@ -1,6 +1,6 @@
 # TP-067: Purpose-built Home, Search, and Watchlist modules — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Split page composition by purpose
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -23,11 +23,11 @@
 ---
 
 ### Step 1: Split page composition by purpose
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Extract or restructure Home/Search/Watchlist module rendering into distinct compositions
-- [ ] Keep shared workflow/table/filter/detail primitives reusable underneath where helpful
-- [ ] Preserve exact identity, bounded search, backend watchlist authority, unavailable states, and no-order guardrails
+- [x] Extract or restructure Home/Search/Watchlist module rendering into distinct compositions
+- [x] Keep shared workflow/table/filter/detail primitives reusable underneath where helpful
+- [x] Preserve exact identity, bounded search, backend watchlist authority, unavailable states, and no-order guardrails
 
 ---
 
