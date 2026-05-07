@@ -1,6 +1,6 @@
 # TP-068: Frontend route and visibility regression suite — Status
 
-**Current Step:** Step 4: Testing & Verification
+**Current Step:** Step 5: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -67,12 +67,12 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Verification scripts listed in README/PLAN if appropriate
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Verification scripts listed in README/PLAN if appropriate
+- [x] Discoveries logged
 
 ---
 
@@ -87,6 +87,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| TP-068 completion made the ready-queue wording stale in active docs/context. | Resolved by updating README.md, PLAN.md, and tasks/CONTEXT.md to mark the frontend route/visibility UX batch complete and keep TP-069 as the next packet. | README.md; PLAN.md; tasks/CONTEXT.md |
 
 ---
 
@@ -110,3 +111,4 @@
 ## Notes
 
 - Step 3 design-doc review: consolidated/layout validation passed; `docs/design/atrade-terminal-ui.md` already contains accepted route removal, desktop browser overflow/scroll affordance, `/chart` Stored stocks, and Home/Search/Watchlist purpose language, so no design-doc content edit was needed.
+- Step 5 check-if-affected docs review: `docs/INDEX.md` still marks `docs/design/atrade-terminal-ui.md` as active; the design doc already covers the route matrix, `/symbols/{symbol}` removal, Stored stocks chart landing, distinct Home/Search/Watchlist purposes, and desktop scroll-ownership guardrails. `tasks/CONTEXT.md` was updated to remove stale ready-queue wording now that TP-068 completes the batch.

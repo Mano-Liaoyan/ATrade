@@ -205,7 +205,7 @@ identifiers.
 Taskplane packets live directly under `tasks/`; completed packets are archived
 under `tasks/archive/`.
 
-The `TP-045` through `TP-067` frontend polish, routing, page-purpose, and backtesting MVP work
+The `TP-045` through `TP-068` frontend polish, routing, page-purpose, and backtesting MVP work
 now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
 module/workflow shell, dense market monitor, chart/analysis workspaces, final
 no-command cutover, simplified rail-first full-bleed workspace, compact filters,
@@ -214,18 +214,17 @@ purpose-matched collapsible rail icons, visible market-monitor table scrollbars,
 paper-capital source selection, first-class saved backtest domain/API contracts,
 async runner/SignalR updates, built-in strategy/rich result expansion, the
 enabled terminal BACKTEST workspace, completed-run comparison with persisted
-strategy/benchmark equity overlays, desktop route/visibility guardrails, and
+strategy/benchmark equity overlays, desktop route/visibility guardrails,
 canonical enabled/disabled/symbol routes without a `/symbols/{symbol}` alias,
-`/chart` Stored stocks defaults, and purpose-built Home/Search/Watchlist page
-compositions.
+`/chart` Stored stocks defaults, purpose-built Home/Search/Watchlist page
+compositions, and a consolidated route/visibility/chart-default/page-purpose
+regression net.
 Follow-up frontend work should build on module rail navigation plus explicit
 workflow actions rather than the retired old shell/list route wrappers, a command
 system, cyan/blue-gradient-dominant styling, or the removed app-level, context,
 monitor, footer, and top-safety chrome.
 
-Remaining ready implementation tasks are queued for the frontend route/visibility UX batch. `TP-066` added `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols, and `TP-067` made Home, Search, and Watchlist purpose-built instead of identical market-monitor wrappers.
-
-- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+The frontend route/visibility UX batch through `TP-068` is complete. Future frontend tasks should build on the verified route matrix, `/symbols/{symbol}` removal, desktop scroll-ownership guardrails, `/chart` Stored stocks behavior, and distinct Home/Search/Watchlist page purposes.
 
 The next new Taskplane packet should use `TP-069`. Completed Taskplane packets
 through `TP-063` are present in `tasks/`; completed packets should be archived

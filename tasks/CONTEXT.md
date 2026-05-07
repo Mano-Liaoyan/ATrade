@@ -30,7 +30,8 @@ implementation queue.
   AppHost-managed LEAN Docker runtime wiring, durable AppHost Postgres
   watchlists, durable TimescaleDB cache rows, frontend workflow module seams,
   the completed `TP-045` through `TP-057` frontend reconstruction/polish wave,
-  and the completed `TP-058` through `TP-063` paper-capital/backtesting MVP wave
+  the completed `TP-058` through `TP-063` paper-capital/backtesting MVP wave,
+  and the completed `TP-064` through `TP-068` frontend route/visibility UX wave
   are present.
 
 ## Domain Vocabulary
@@ -48,13 +49,7 @@ implementation queue.
 
 ## Active Task Queue
 
-Ready implementation tasks are queued for the frontend route/visibility UX batch:
-
-- `TP-064` — frontend layout and browser visibility guardrails, including durable memory in `AGENTS.md`, `tasks/CONTEXT.md`, and the active UI design doc
-- `TP-065` — canonical terminal route architecture for enabled/disabled modules and removal of the old `/symbols/[symbol]` route
-- `TP-066` — `/chart` stored-stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
-- `TP-067` — purpose-built Home, Search, and Watchlist modules so the three pages no longer look like identical market-monitor clones
-- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+No ready implementation tasks are currently queued after completion of the frontend route/visibility UX batch through `TP-068`. The next new Taskplane packet should use `TP-069`.
 
 The most recent completed work includes:
 
@@ -67,11 +62,17 @@ The most recent completed work includes:
 - `TP-061` — expanded built-in strategy support and rich backtest results for SMA, RSI, and breakout strategies
 - `TP-062` — added the BACKTEST terminal module with run form, capital settings, SignalR status, history, cancel, and retry
 - `TP-063` — added saved-run comparison and equity/benchmark overlays in the BACKTEST module
+- `TP-064` — added frontend layout/browser visibility guardrails and durable desktop scroll-ownership memory
+- `TP-065` — added canonical terminal route architecture and removed the old `/symbols/[symbol]` route without redirect/alias behavior
+- `TP-066` — added `/chart` Stored stocks defaults without fake demo symbols
+- `TP-067` — made Home, Search, and Watchlist purpose-built instead of identical market-monitor wrappers
+- `TP-068` — added consolidated frontend route, visibility, chart-default, and page-purpose regression validation
 
 The next new Taskplane packet should use `TP-069`.
 
-Completed task packets through `TP-063` are present in `tasks/`; completed
-packets should be archived when convenient.
+Completed task packets through `TP-068` are present in `tasks/`; completed
+packets should be archived when convenient. During orchestrated runs the runtime
+handles post-merge archival for active task folders.
 
 ## Taskplane Usage
 
@@ -124,8 +125,8 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | `TP-064` through `TP-068` frontend route/visibility UX batch |
-| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-063-*`                 |
+| Active tasks        | None currently queued; next packet should use `TP-069`    |
+| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-068-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |
 | AppHost             | `src/ATrade.AppHost/Program.cs`                           |
@@ -145,6 +146,6 @@ All variants delegate to the Aspire AppHost.
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
 - [ ] Review TP-046 frontend npm audit advisories for `next` and `postcss` after the terminal UI stack bootstrap; do not force breaking upgrades inside the reconstruction queue.
 - [x] Archive completed `TP-019` through `TP-041` task packets before starting the previous queued run.
-- [ ] Archive completed `TP-042` through `TP-063` task packets when convenient.
+- [ ] Archive completed `TP-042` through `TP-068` task packets when convenient.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
 - [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.
