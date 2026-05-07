@@ -74,7 +74,7 @@ export function TerminalHomeModule({ onOpenIntent, searchQuery = '' }: TerminalH
           <HomeStatusTile label="ATrade.Api boundary" badge="API only" tone="success" detail="Browser data stays behind committed ATrade.Api clients; Home does not call providers, databases, or broker runtimes directly." />
           <HomeStatusTile label="Provider scanner" badge={workflow.trendingLoading ? 'Checking' : workflow.trendingError ? 'Unavailable' : `${workflow.trendingSymbols.length} rows`} tone={workflow.trendingLoading ? 'info' : workflow.trendingError ? 'warning' : 'success'} detail={workflow.trendingError ?? (workflow.trendingSource ? `${workflow.trendingSource}${workflow.trendingGeneratedAt ? ` · ${workflow.trendingGeneratedAt}` : ''}` : 'Provider trending source pending.')} />
           <HomeStatusTile label="Stored stocks" badge={workflow.watchlist.loading ? 'Loading' : workflow.watchlist.error ? 'Fallback/error' : `${workflow.watchlist.symbols.length} pins`} tone={workflow.watchlist.loading ? 'info' : workflow.watchlist.error ? 'warning' : 'success'} detail={workflow.watchlist.error ?? (workflow.providerState.watchlistCachedFallback ? 'Cached legacy pins are read-only until backend preferences load.' : 'Backend-owned exact Postgres pins through ATrade.Api.')} />
-          <HomeStatusTile label="Paper safety" badge="No order entry" tone="success" detail="Orders, buy/sell tickets, broker execution, and live-trading controls are not rendered in this workspace." />
+          <HomeStatusTile label="Paper safety" badge="No live orders" tone="success" detail="Orders are disabled by the paper-only safety contract. Buy/sell tickets, broker execution, and live-trading controls are not rendered in this workspace." />
         </div>
       </TerminalPanel>
 

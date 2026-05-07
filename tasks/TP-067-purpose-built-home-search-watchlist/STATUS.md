@@ -1,6 +1,6 @@
 # TP-067: Purpose-built Home, Search, and Watchlist modules — Status
 
-**Current Step:** Step 3: Implement search-first and watchlist-first modules
+**Current Step:** Step 4: Add purpose-built module validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -50,11 +50,11 @@
 ---
 
 ### Step 4: Add purpose-built module validation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh`
-- [ ] Update existing shared tests only where strings or structure changed
-- [ ] Keep validation provider/runtime independent
+- [x] Create `tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh`
+- [x] Update existing shared tests only where strings or structure changed
+- [x] Keep validation provider/runtime independent
 
 ---
 

@@ -110,6 +110,8 @@ assert_module_and_workflow_navigation_preserved() {
 
 assert_safety_boundaries_preserved() {
   local app="$frontend_root/components/terminal/ATradeTerminalApp.tsx"
+  local home="$frontend_root/components/terminal/TerminalHomeModule.tsx"
+  local detail="$frontend_root/components/terminal/MarketMonitorDetailPanel.tsx"
   local help="$frontend_root/components/terminal/TerminalHelpModule.tsx"
   local status="$frontend_root/components/terminal/TerminalStatusModule.tsx"
   local diagnostics="$frontend_root/components/terminal/TerminalProviderDiagnostics.tsx"
@@ -117,8 +119,8 @@ assert_safety_boundaries_preserved() {
   local module_registry="$frontend_root/lib/terminalModuleRegistry.ts"
   local monitor="$frontend_root/components/terminal/TerminalMarketMonitor.tsx"
 
-  assert_file_contains "$app" 'exact provider identity'
-  assert_file_contains "$app" 'Orders are disabled by the paper-only safety contract.'
+  assert_file_contains "$detail" 'exact provider identity'
+  assert_file_contains "$home" 'Orders are disabled by the paper-only safety contract.'
   assert_file_contains "$monitor" 'Backend-owned exact Postgres pins through ATrade.Api.'
   assert_file_contains "$help" 'All browser-visible data flows through ATrade.Api'
   assert_file_contains "$help" 'Provider-not-configured, provider-unavailable, authentication-required, and no-analysis-engine states remain explicit'
