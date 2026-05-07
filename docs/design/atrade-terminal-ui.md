@@ -20,7 +20,8 @@ workspace. The historical filename is retained for continuity with the
 `TP-045` through `TP-051` reconstruction queue, but the current product surface
 is no longer a command-led shell. The UI is a direct
 module/workflow workspace: users navigate through the module rail, explicit
-market-monitor actions, chart/analysis route state, and HELP/STATUS surfaces.
+market-monitor actions, canonical module/symbol routes, and HELP/STATUS
+surfaces.
 
 ## Related Active Authorities
 
@@ -132,10 +133,11 @@ glyph.
 
 ### 4.2 Visible-Disabled Future Modules
 
-Future modules may appear in the rail and HELP surfaces as disabled entries to
-communicate intended product breadth. A disabled module must be visually distinct
-from enabled modules, must not be keyboard-selectable as an active workspace,
-and must show honest unavailable copy instead of mock data.
+Future modules may appear in the rail, their own canonical routes, and HELP
+surfaces as visible-disabled entries to communicate intended product breadth. A
+disabled module must be visually distinct from enabled modules, may be selected
+to reveal the disabled route state, and must show honest unavailable copy instead
+of mock data.
 
 | Future module | Disabled-state meaning |
 | ------------- | ---------------------- |
@@ -162,9 +164,11 @@ and `ORDERS` ban/disabled.
 The first-release navigation model is intentionally explicit and deterministic
 without a command system.
 
-- The module rail opens `HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`,
-  `BACKTEST`, `STATUS`, and `HELP` and exposes visible-disabled future modules
-  with honest unavailable states.
+- The module rail opens canonical enabled routes `/`, `/search`, `/watchlist`,
+  `/chart`, `/analysis`, `/backtest`, `/status`, and `/help`; it also exposes
+  visible-disabled future module routes `/news`, `/portfolio`, `/research`,
+  `/screener`, `/econ`, `/ai`, `/node`, and `/orders` with honest unavailable
+  states.
 - The market monitor is the primary workflow handoff surface for search,
   watchlist, and trending rows. It uses a compact filter bar with count chips,
   active-count/Clear-all controls, accessible filter groups, and no long
@@ -173,8 +177,11 @@ without a command system.
   identity, source, score, pin, and action columns remain available without page
   scrolling. Row actions open chart, analysis, and backtest workspaces while
   preserving exact provider identity when available.
-- Symbol routes may initialize `CHART`, `ANALYSIS`, or `BACKTEST` directly from
-  route/query state, including chart range and exact identity metadata.
+- Symbol routes initialize `CHART`, `ANALYSIS`, or `BACKTEST` directly from
+  `/chart/{symbol}`, `/analysis/{symbol}`, and `/backtest/{symbol}` route/query
+  state, including chart range and exact identity metadata (`provider`,
+  `providerSymbolId`, `exchange`, `currency`, and `assetClass`). The retired
+  `/symbols/{symbol}` route is removed instead of redirected or aliased.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
   provider-state meanings, and paper-only safety constraints.
 - STATUS surfaces `ATrade.Api`, broker/iBeam/provider, cache/source, and analysis
@@ -247,10 +254,11 @@ implementation while leaving room for a desktop wrapper later.
   active/focus/keyboard states and a purpose-matched icon next to each module
   label.
 - Visible-disabled future modules may appear below a separator with disabled
-  styling, purpose-matched icons, explanatory title/tooltip copy, and no active
-  workspace route. The rail owns its own overflow on desktop so late-list items
-  such as NODE and ORDERS remain fully reachable and no module button is clipped
-  half-visible at the viewport edge.
+  styling, purpose-matched icons, explanatory title/tooltip copy, and canonical
+  disabled routes that render unavailable states inside the terminal shell. The
+  rail owns its own overflow on desktop so late-list items such as NODE and
+  ORDERS remain fully reachable and no module button is clipped half-visible at
+  the viewport edge.
 - Rail labels should use ATrade module names, not third-party product branding.
 - The rail may collapse to an icon-first compact state on laptop/desktop
   screens. Collapse/expand must be a visible button with accessible state

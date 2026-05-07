@@ -33,9 +33,12 @@ enabled/current workflow modules, visible-disabled future modules, purpose-match
 module rail icons with local icon-first collapse behavior, compact dense market
 monitor with visible internal vertical/horizontal table scrollbars for wide
 exact-identity and action columns, visibly sized chart/analysis/backtest
-workspaces, provider diagnostics, a rail-first full-bleed single-primary
-workspace layout
-with no app-level brand header, visible global safety strip,
+workspaces, provider diagnostics, canonical enabled routes (`/`, `/search`,
+`/watchlist`, `/chart`, `/analysis`, `/backtest`, `/status`, `/help`), canonical
+symbol routes (`/chart/{symbol}`, `/analysis/{symbol}`, `/backtest/{symbol}`),
+visible-disabled routes (`/news`, `/portfolio`, `/research`, `/screener`,
+`/econ`, `/ai`, `/node`, `/orders`), a rail-first full-bleed single-primary
+workspace layout with no app-level brand header, visible global safety strip,
 shell context/monitor/footer chrome, or page-level vertical scrolling, a desktop
 Safari/Firefox/Chrome/Edge no-clipping contract with visible internal/custom
 rail, workspace, panel, table, and module scroll affordances, an original
@@ -109,11 +112,14 @@ backtest client/workflow, paper-capital-backed run form, live status, saved
 history/detail, cancel, retry, and frontend backtest workspace validation.
 `TP-063` added completed-run-only saved-run comparison, metrics table/cards,
 persisted strategy/buy-and-hold equity overlays, and comparison validation.
+`TP-064` added frontend layout/browser visibility guardrails plus durable memory
+in agent/context/UI docs. `TP-065` added canonical terminal route architecture
+for enabled/disabled modules, exact chart/analysis/backtest symbol routes, route
+architecture validation, and removal of the old `/symbols/{symbol}` route without
+a redirect or alias.
 
-Ready implementation tasks are queued for the frontend route/visibility UX batch:
+Remaining ready implementation tasks are queued for the frontend route/visibility UX batch:
 
-- `TP-064` — frontend layout and browser visibility guardrails plus durable memory in agent/context/UI docs
-- `TP-065` — canonical terminal route architecture for enabled/disabled modules and removal of `/symbols/[symbol]`
 - `TP-066` — `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
 - `TP-067` — purpose-built Home, Search, and Watchlist modules with distinct user intent
 - `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
@@ -125,10 +131,11 @@ use `TP-069`.
 ## Follow-Up Direction
 
 Future frontend work should build on the direct module/workflow frame,
-rail-first full-viewport workspace, compact market-monitor filters, visible
-market-monitor table scrollbars, desktop Safari/Firefox/Chrome/Edge visibility
-and scroll-ownership guardrail, non-collapsing chart visibility contract,
-original black/graphite/amber terminal palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
+canonical enabled/disabled/symbol routes, rail-first full-viewport workspace,
+compact market-monitor filters, visible market-monitor table scrollbars, desktop
+Safari/Firefox/Chrome/Edge visibility and scroll-ownership guardrail,
+non-collapsing chart visibility contract, original black/graphite/amber terminal
+palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`,
@@ -136,9 +143,9 @@ original black/graphite/amber terminal palette, and accessible icon-first rail c
 `BacktestComparisonPanel`. New modules should remain visible-disabled until
 backed by real `ATrade.Api` contracts, provider-neutral data, and
 documentation/tests; do not reintroduce the removed command system, the old
-shell/list-page paths, app-level brand header, visible global safety strip,
-context/monitor/footer chrome, page-level scrolling, fake data, direct
-provider/database access, or order-entry UI paths.
+`/symbols/{symbol}` route, shell/list-page paths, app-level brand header, visible
+global safety strip, context/monitor/footer chrome, page-level scrolling, fake
+data, direct provider/database access, or order-entry UI paths.
 
 ## Guardrails
 

@@ -55,21 +55,22 @@ PY
 }
 
 assert_chart_route_and_identity_wiring() {
-  local symbol_page="$frontend_root/app/symbols/[symbol]/page.tsx"
+  local chart_symbol_page="$frontend_root/app/chart/[symbol]/page.tsx"
+  local routes="$frontend_root/lib/terminalRoutes.ts"
   local terminal_app="$frontend_root/components/terminal/ATradeTerminalApp.tsx"
   local monitor_workflow="$frontend_root/lib/terminalMarketMonitorWorkflow.ts"
   local identity="$frontend_root/lib/instrumentIdentity.ts"
 
-  assert_file_contains "$symbol_page" "return 'CHART';"
-  assert_file_contains "$symbol_page" 'createQueryIdentity(normalizedSymbol, resolvedSearchParams)'
-  assert_file_contains "$symbol_page" 'providerSymbolId'
-  assert_file_contains "$symbol_page" 'initialModuleId={initialModuleId}'
-  assert_file_contains "$symbol_page" 'initialIdentity={identity}'
+  assert_file_contains "$chart_symbol_page" 'moduleId="CHART"'
+  assert_file_contains "$routes" 'createTerminalRouteIdentity(initialSymbol, searchParams)'
+  assert_file_contains "$routes" 'providerSymbolId'
+  assert_file_contains "$chart_symbol_page" 'symbol={symbol}'
+  assert_file_contains "$chart_symbol_page" 'searchParams={resolvedSearchParams}'
 
   assert_file_contains "$monitor_workflow" 'createChartNavigationIntent(row: TerminalMarketMonitorRow)'
   assert_file_contains "$monitor_workflow" "return createRowNavigationIntent(row, 'CHART');"
-  assert_file_contains "$monitor_workflow" 'createSymbolChartHref(identity)'
-  assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : row.chartHref"
+  assert_file_contains "$monitor_workflow" "createTerminalSymbolRoute('CHART', identity)"
+  assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : moduleId === 'BACKTEST' ? row.backtestHref : row.chartHref"
   assert_file_contains "$monitor_workflow" 'identity: row.exactIdentity'
   assert_file_contains "$monitor_workflow" "chartRange: '1D'"
 
@@ -78,7 +79,7 @@ assert_chart_route_and_identity_wiring() {
   assert_file_contains "$identity" "params.set('currency', identity.currency);"
   assert_file_contains "$identity" "params.set('assetClass', identity.assetClass);"
 
-  assert_file_contains "$terminal_app" 'setActiveModuleId("CHART")'
+  assert_file_contains "$terminal_app" 'setActiveModuleId(intent.moduleId)'
   assert_file_contains "$terminal_app" 'setActiveSymbol(intent.symbol.toUpperCase())'
   assert_file_contains "$terminal_app" 'setActiveIdentity(intent.identity ?? null)'
   assert_file_contains "$terminal_app" '<TerminalChartWorkspace chart={chart} identity={identity} />'

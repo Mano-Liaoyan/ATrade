@@ -294,7 +294,7 @@ start_frontend_and_assert_markers() {
   assert_file_not_contains "$root_response" 'Trading workspace MVP'
   assert_file_not_contains "$root_response" 'workspace-navigation'
 
-  wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
+  wait_for_http_200 "$frontend_url/chart/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$chart_response" 'AAPL'
   assert_file_contains "$chart_response" 'chart workspace'
   assert_file_contains "$chart_response" 'data-testid="atrade-terminal-app"'

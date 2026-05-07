@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getTrendingSymbols } from './marketDataClient';
 import {
   createProvisionalInstrumentKey,
-  createSymbolChartHref,
   getSearchResultIdentity,
   getTrendingSymbolIdentity,
   normalizeInstrumentIdentity,
@@ -20,6 +19,7 @@ import {
   useSymbolSearchWorkflow,
 } from './symbolSearchWorkflow';
 import { getWatchlistPinKey, type WatchlistSymbol } from './watchlistClient';
+import { createTerminalSymbolRoute } from './terminalRoutes';
 import { type WatchlistPinState, type WatchlistWorkflow, useWatchlistWorkflow } from './watchlistWorkflow';
 import type { MarketDataSymbolIdentity, MarketDataSymbolSearchResult, TrendingSymbol } from '../types/marketData';
 import type { EnabledTerminalModuleId, TerminalNavigationIntent } from '../types/terminal';
@@ -629,7 +629,7 @@ function createBaseMonitorRow({
   instrumentKey?: string;
 }): TerminalMarketMonitorBaseRow {
   const exactIdentity = toMarketDataSymbolIdentity(identity);
-  const chartHref = createSymbolChartHref(identity);
+  const chartHref = createTerminalSymbolRoute('CHART', identity);
   const analysisHref = createModuleHref(identity, 'ANALYSIS');
   const backtestHref = createModuleHref(identity, 'BACKTEST');
   const pinKey = pinState.pinKey || instrumentKey;
@@ -692,12 +692,7 @@ function createRowNavigationIntentFromBase(
 }
 
 function createModuleHref(identity: InstrumentIdentityInput, moduleId: Extract<EnabledTerminalModuleId, 'ANALYSIS' | 'BACKTEST'>): string {
-  const chartHref = createSymbolChartHref(identity);
-  const [path, query = ''] = chartHref.split('?');
-  const params = new URLSearchParams(query);
-  params.set('module', moduleId);
-  const serialized = params.toString();
-  return serialized ? `${path}?${serialized}` : path;
+  return createTerminalSymbolRoute(moduleId, identity);
 }
 
 function toMarketDataSymbolIdentity(identity: NormalizedInstrumentIdentity): MarketDataSymbolIdentity {

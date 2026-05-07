@@ -71,8 +71,8 @@ see_also:
 > visible-disabled future modules, purpose-matched rail icons, local icon-first
 > rail collapse behavior, direct workflow navigation, a simplified full-viewport
 > layout, and shadcn/Tailwind/Radix-compatible original primitives.
-> The current slice routes home and symbol pages through `ATradeTerminalApp`: an
-> enabled/disabled module registry and rail with icon metadata, a rail-first
+> The current slice routes canonical enabled, disabled, and symbol pages through
+> `ATradeTerminalApp`: an enabled/disabled module registry and rail with icon metadata, a rail-first
 > full-bleed single-primary `TerminalWorkspaceLayout` with no top app brand header, visible
 > global safety strip, context/monitor shell chrome, footer/status strip,
 > splitters, layout reset, or page-level vertical scrolling, status/help
@@ -678,11 +678,16 @@ references.
   enabled modules (`HOME`, `SEARCH`, `WATCHLIST`, `CHART`, `ANALYSIS`, `BACKTEST`,
   `STATUS`, `HELP`) plus visible-disabled future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`,
   `SCREENER`, `ECON`, `AI`, `NODE`, `ORDERS`) and their purpose-matched rail
-  icon metadata. Home and symbol routes now render directly through
-  `ATradeTerminalApp`, `TerminalModuleRail`, `TerminalWorkspaceLayout`,
-  `TerminalHelpModule`, and `TerminalStatusModule`; `TerminalModuleRail` keeps
-  local non-persisted icon-first collapse state while preserving accessible
-  labels, active/focus states, and disabled-module explanations.
+  icon metadata. Canonical enabled routes (`/`, `/search`, `/watchlist`, `/chart`,
+  `/analysis`, `/backtest`, `/status`, `/help`), symbol routes (`/chart/{symbol}`,
+  `/analysis/{symbol}`, `/backtest/{symbol}`), and visible-disabled routes
+  (`/news`, `/portfolio`, `/research`, `/screener`, `/econ`, `/ai`, `/node`,
+  `/orders`) render directly through `ATradeTerminalApp`, `TerminalModuleRail`,
+  `TerminalWorkspaceLayout`, `TerminalHelpModule`, and `TerminalStatusModule`;
+  the retired `/symbols/{symbol}` route is not kept as a redirect or alias.
+  `TerminalModuleRail` keeps local non-persisted icon-first collapse state while
+  preserving accessible labels, active/focus states, route metadata, and
+  disabled-module explanations.
   the simplified rail-first shell removed the former app-level brand header,
   visible global safety strip, context/monitor split-size persistence, shell
   monitor strip, context aside, footer/status strip, and layout reset. The old `TradingWorkspace`

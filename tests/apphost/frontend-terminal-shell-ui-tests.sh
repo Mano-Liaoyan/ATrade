@@ -245,7 +245,7 @@ PY
   assert_file_contains "$root_response" 'Paper-only module workspace'
   assert_file_contains "$root_response" 'Orders are disabled by the paper-only safety contract.'
 
-  wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
+  wait_for_http_200 "$frontend_url/chart/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$chart_response" 'data-testid="atrade-terminal-app"'
   assert_file_not_contains "$chart_response" 'data-testid="terminal-command-input"'
   assert_file_contains "$chart_response" 'data-testid="terminal-module-rail"'

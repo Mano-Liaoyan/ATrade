@@ -120,15 +120,16 @@ frame remains non-scrolling. Latest stable desktop Safari, Firefox, Chrome, and
 Edge are supported targets for this no-clipping contract; rail, workspace,
 panel, table, chart, analysis, backtest, status, help, and disabled-module
 overflow must stay reachable through module-owned visible/custom scroll
-affordances rather than page scroll. The home and symbol routes now render
-directly through `ATradeTerminalApp`, which provides the direct module/workflow
-frame, module rail, single primary workspace region, module-owned scrolling,
-STATUS/HELP modules, and honest disabled-module surfaces for future modules
-(`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
-`ORDERS`). Users open modules through the
-rail, market-monitor chart/analysis/backtest actions, and symbol route state; no
-command input, command parser, or backend command route is part of the active
-frontend.
+affordances rather than page scroll. Canonical enabled, symbol, and
+disabled-module routes now render directly through `ATradeTerminalApp`, which
+provides the direct module/workflow frame, module rail, single primary workspace
+region, module-owned scrolling, STATUS/HELP modules, and honest disabled-module
+surfaces for future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`,
+`ECON`, `AI`, `NODE`, and `ORDERS`). Users open modules through the rail,
+market-monitor chart/analysis/backtest actions, and `/chart/{symbol}`,
+`/analysis/{symbol}`, or `/backtest/{symbol}` route state; no command input,
+command parser, old `/symbols/{symbol}` compatibility route, or backend command
+route is part of the active frontend.
 The visual direction is inspired only by broad finance-workstation information
 architecture and is implemented with original ATrade black/graphite/amber tokens,
 red/green market-state colors, warm gray dividers, and restrained information
@@ -808,15 +809,17 @@ explicit capped limit, ranks and filters the bounded result set locally through
 compact source/provider/pin/market controls, and renders IBKR/iBeam stock
 results as dense rows with explicit provider,
 provider-symbol-id/IBKR `conid`, market/exchange, currency, asset class, source,
-rank/score, and saved-pin state. Chart and analysis actions route through the
-terminal app using `/symbols/{symbol}` query state that preserves exact identity
-metadata when available, and pin/unpin actions use the backend watchlist API for
-the selected exact provider-market instrument. The frontend uses the centralized
-`frontend/lib/instrumentIdentity.ts` adapter to compute provisional optimistic
-keys, normalize asset classes, parse an IBKR `conid` only when the provider is
-`ibkr` and the provider symbol id is numeric, and build exact
-chart/analysis/backtest handoff query strings without changing the selected chart
-range.
+rank/score, and saved-pin state. Chart, analysis, and backtest actions route
+through the terminal app using canonical `/chart/{symbol}`,
+`/analysis/{symbol}`, and `/backtest/{symbol}` paths with query state that
+preserves exact identity metadata when available, and pin/unpin actions use the
+backend watchlist API for the selected exact provider-market instrument. The
+frontend uses the centralized `frontend/lib/instrumentIdentity.ts` adapter to
+compute provisional optimistic keys, normalize asset classes, parse an IBKR
+`conid` only when the provider is `ibkr` and the provider symbol id is numeric,
+and build exact chart/analysis/backtest handoff query strings without changing
+the selected chart range. The old `/symbols/{symbol}` route is not retained as a
+redirect or compatibility alias.
 Backend-owned `instrumentKey` / `pinKey` values returned by watchlist responses
 remain authoritative for persisted pins. Duplicate search results sharing a
 symbol or company name are keyed and rendered by exact instrument identity, not

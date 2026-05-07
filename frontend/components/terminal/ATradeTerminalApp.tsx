@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
+import { createTerminalModuleRoute, createTerminalSymbolRoute, isTerminalSymbolModuleId } from "@/lib/terminalRoutes";
 import { useTerminalChartWorkspaceWorkflow } from "@/lib/terminalChartWorkspaceWorkflow";
 import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
 import type {
@@ -25,6 +26,7 @@ import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
   initialChartRange?: ChartRange;
+  initialDisabledModuleId?: DisabledTerminalModuleId | null;
   initialIdentity?: InstrumentIdentityInput | null;
   initialModuleId?: EnabledTerminalModuleId;
   initialSymbol?: string | null;
@@ -32,13 +34,14 @@ type ATradeTerminalAppProps = {
 
 export function ATradeTerminalApp({
   initialChartRange = "1D",
+  initialDisabledModuleId = null,
   initialIdentity = null,
   initialModuleId = "HOME",
   initialSymbol = null,
 }: ATradeTerminalAppProps) {
   const router = useRouter();
   const [activeModuleId, setActiveModuleId] = useState<EnabledTerminalModuleId>(initialModuleId);
-  const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(null);
+  const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(initialDisabledModuleId);
   const [navigationStatus, setNavigationStatus] = useState("Ready for module navigation.");
   const [pendingFocusRequest, setPendingFocusRequest] = useState<{ targetId: string } | null>(null);
   const [seededSearchQuery, setSeededSearchQuery] = useState("");
@@ -50,6 +53,18 @@ export function ATradeTerminalApp({
   useEffect(() => {
     setActiveModuleId(initialModuleId);
   }, [initialModuleId]);
+
+  useEffect(() => {
+    setDisabledModuleId(initialDisabledModuleId);
+    if (initialDisabledModuleId) {
+      setNavigationStatus(`${initialDisabledModuleId} is visible-disabled and unavailable in the paper workspace.`);
+      setPendingFocusRequest({ targetId: `terminal-disabled-${initialDisabledModuleId.toLowerCase()}` });
+      return;
+    }
+
+    setNavigationStatus(`Opened ${initialModuleId} from the URL route.`);
+    setPendingFocusRequest({ targetId: getModuleFocusTargetId(initialModuleId) });
+  }, [initialDisabledModuleId, initialModuleId]);
 
   useEffect(() => {
     setActiveSymbol(normalizedInitialSymbol);
@@ -87,7 +102,7 @@ export function ATradeTerminalApp({
         setSeededSearchQuery("");
       }
 
-      if ((intent.moduleId === "CHART" || intent.moduleId === "ANALYSIS" || intent.moduleId === "BACKTEST") && intent.symbol) {
+      if (isTerminalSymbolModuleId(intent.moduleId) && intent.symbol) {
         setActiveSymbol(intent.symbol.toUpperCase());
         setActiveIdentity(intent.identity ?? null);
         if (intent.chartRange) {
@@ -95,49 +110,21 @@ export function ATradeTerminalApp({
         }
       }
 
-      if (intent.moduleId === "HOME") {
-        setActiveModuleId("HOME");
-        if (window.location.pathname !== "/") {
-          router.push("/");
-        }
-        return;
-      }
-
-      if (intent.moduleId === "CHART" && intent.symbol) {
-        setActiveModuleId("CHART");
-        const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}`;
-        if (normalizedInitialSymbol !== intent.symbol || intent.route) {
-          router.push(route);
-        }
-        return;
-      }
-
-      if (intent.moduleId === "ANALYSIS" && intent.symbol) {
-        setActiveModuleId("ANALYSIS");
-        const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}?module=ANALYSIS`;
-        if (normalizedInitialSymbol !== intent.symbol || intent.route) {
-          router.push(route);
-        }
-        return;
-      }
-
-      if (intent.moduleId === "BACKTEST" && intent.symbol) {
-        setActiveModuleId("BACKTEST");
-        const route = intent.route ?? `/symbols/${encodeURIComponent(intent.symbol)}?module=BACKTEST`;
-        if (normalizedInitialSymbol !== intent.symbol || intent.route) {
-          router.push(route);
-        }
-        return;
-      }
-
       setActiveModuleId(intent.moduleId);
+
+      const route = intent.route ?? (
+        isTerminalSymbolModuleId(intent.moduleId) && intent.symbol
+          ? createTerminalSymbolRoute(intent.moduleId, intent.identity ?? { symbol: intent.symbol }, { chartRange: intent.chartRange })
+          : createTerminalModuleRoute(intent.moduleId)
+      );
+      pushTerminalRoute(route, router.push);
     },
-    [normalizedInitialSymbol, router],
+    [router],
   );
 
   function handleModuleSelect(moduleId: EnabledTerminalModuleId) {
     openIntent(
-      { moduleId, focusTargetId: getModuleFocusTargetId(moduleId), route: moduleId === "HOME" ? "/" : undefined },
+      { moduleId, focusTargetId: getModuleFocusTargetId(moduleId), route: createTerminalModuleRoute(moduleId) },
       `Opened ${moduleId} from the module rail.`,
     );
   }
@@ -146,6 +133,7 @@ export function ATradeTerminalApp({
     setDisabledModuleId(moduleId);
     setNavigationStatus(`${moduleId} is visible-disabled and unavailable in the paper workspace.`);
     setPendingFocusRequest({ targetId: `terminal-disabled-${moduleId.toLowerCase()}` });
+    pushTerminalRoute(createTerminalModuleRoute(moduleId), router.push);
   }
 
   const moduleContent = disabledModuleId ? (
@@ -326,6 +314,14 @@ function TerminalAnalysisModule({ chartRange, identity, symbol }: { chartRange: 
       <TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />
     </section>
   );
+}
+
+function pushTerminalRoute(route: string, push: (href: string) => void) {
+  const currentRoute = `${window.location.pathname}${window.location.search}`;
+
+  if (currentRoute !== route) {
+    push(route);
+  }
 }
 
 function getModuleFocusTargetId(moduleId: EnabledTerminalModuleId): string {
