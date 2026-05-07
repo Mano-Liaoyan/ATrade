@@ -91,7 +91,8 @@ assert_exact_identity_actions() {
   assert_file_contains "$workflow" "return createTerminalSymbolRoute(moduleId, identity);"
   assert_file_contains "$workflow" "identity: row.exactIdentity"
   assert_file_contains "$workflow" "providerSymbolId: identity.providerSymbolId"
-  assert_file_contains "$workflow" "exchange: identity.exchange ?? ''"
+  assert_file_contains "$workflow" "exchange: identity.exchange,"
+  assert_file_contains "$workflow" "ibkrConid: identity.ibkrConid"
   assert_file_contains "$workflow" "assetClass: identity.assetClass"
   assert_file_contains "$workflow" "createChartNavigationIntent"
   assert_file_contains "$workflow" "createAnalysisNavigationIntent"
@@ -107,7 +108,7 @@ assert_exact_identity_actions() {
   assert_file_contains "$detail" "href={row.backtestHref}"
   assert_file_contains "$identity" 'providerSymbolId=${encodeSegment(normalized.providerSymbolId)}'
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
-  assert_file_contains "$terminal_types" "identity?: MarketDataSymbolIdentity | null"
+  assert_file_contains "$terminal_types" "identity?: InstrumentIdentityInput | null"
 }
 
 assert_dense_terminal_components() {

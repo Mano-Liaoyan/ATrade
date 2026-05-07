@@ -1,6 +1,6 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
-**Current Step:** Step 4: Add chart landing validation
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -52,16 +52,16 @@
 ---
 
 ### Step 4: Add chart landing validation
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-chart-watchlist-default-tests.sh`
-- [ ] Update existing route/chart tests only where shared paths or strings changed
-- [ ] Keep validation provider/runtime independent
+- [x] Create `tests/apphost/frontend-chart-watchlist-default-tests.sh`
+- [x] Update existing route/chart tests only where shared paths or strings changed
+- [x] Keep validation provider/runtime independent
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Chart landing validation passing
 - [ ] Stock chart visibility validation passing
@@ -109,6 +109,7 @@
 | 2026-05-07 04:15 | Step 1 completed | Added chart landing workflow using backend watchlist workflow, first stored-stock default selection, canonical handoffs, explicit fallback/empty/unavailable states; `cd frontend && npm run build` passed |
 | 2026-05-07 04:25 | Step 2 completed | `/chart` now renders Stored stocks selector/list plus default chart region with explicit empty/unavailable links and internal scroll CSS; `cd frontend && npm run build` passed |
 | 2026-05-07 04:35 | Step 3 completed | Preserved direct `/chart/[symbol]` path, added `ibkrConid` route parsing/handoff, and kept chart/analysis/backtest canonical symbol routes; `cd frontend && npm run build` passed |
+| 2026-05-07 04:45 | Step 4 completed | Added provider-independent chart watchlist default validation and updated shared route/identity test expectations; targeted apphost validations passed |
 
 ---
 

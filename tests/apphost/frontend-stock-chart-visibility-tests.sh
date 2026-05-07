@@ -64,6 +64,7 @@ assert_chart_route_and_identity_wiring() {
   assert_file_contains "$chart_symbol_page" 'moduleId="CHART"'
   assert_file_contains "$routes" 'createTerminalRouteIdentity(initialSymbol, searchParams)'
   assert_file_contains "$routes" 'providerSymbolId'
+  assert_file_contains "$routes" 'ibkrConid'
   assert_file_contains "$chart_symbol_page" 'symbol={symbol}'
   assert_file_contains "$chart_symbol_page" 'searchParams={resolvedSearchParams}'
 
@@ -75,6 +76,7 @@ assert_chart_route_and_identity_wiring() {
   assert_file_contains "$monitor_workflow" "chartRange: '1D'"
 
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
+  assert_file_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
   assert_file_contains "$identity" "params.set('exchange', identity.exchange);"
   assert_file_contains "$identity" "params.set('currency', identity.currency);"
   assert_file_contains "$identity" "params.set('assetClass', identity.assetClass);"

@@ -143,6 +143,7 @@ assert_terminal_route_helpers() {
   assert_file_contains "$routes" 'createTerminalRouteIdentity(initialSymbol, searchParams)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.provider)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.providerSymbolId)'
+  assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.ibkrConid)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.exchange)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.currency)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.assetClass)'
