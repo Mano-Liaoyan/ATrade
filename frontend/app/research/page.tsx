@@ -5,8 +5,8 @@ type TerminalPageProps = {
   searchParams?: Promise<TerminalRouteSearchParams>;
 };
 
-export default async function HomePage({ searchParams }: TerminalPageProps) {
+export default async function ResearchPage({ searchParams }: TerminalPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
 
-  return <TerminalRoutePage moduleId="HOME" searchParams={resolvedSearchParams} />;
+  return <TerminalRoutePage disabledModuleId="RESEARCH" searchParams={resolvedSearchParams} />;
 }

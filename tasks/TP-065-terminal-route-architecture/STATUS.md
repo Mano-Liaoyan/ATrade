@@ -1,6 +1,6 @@
 # TP-065: Terminal route architecture and old symbol route removal — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Add canonical route helpers and page entrypoints
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Add canonical route helpers and page entrypoints
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Add reusable route parsing/creation helpers or page wrappers for terminal app initialization
-- [ ] Create enabled module route entrypoints for home/search/watchlist/chart/analysis/backtest/status/help
-- [ ] Create disabled module route entrypoints for news/portfolio/research/screener/econ/ai/node/orders
-- [ ] Preserve exact identity and chart range query parsing on symbol routes
+- [x] Add reusable route parsing/creation helpers or page wrappers for terminal app initialization
+- [x] Create enabled module route entrypoints for home/search/watchlist/chart/analysis/backtest/status/help
+- [x] Create disabled module route entrypoints for news/portfolio/research/screener/econ/ai/node/orders
+- [x] Preserve exact identity and chart range query parsing on symbol routes
 
 ---
 
@@ -105,6 +105,10 @@
 | 2026-05-07 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-07 01:32 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-07 01:32 | Step 0 started | Preflight |
+| 2026-05-07 03:10 | Step 0 completed | Required paths and TP-064/runtime dependencies verified |
+| 2026-05-07 03:10 | Step 1 started | Canonical route helpers and page entrypoints |
+| 2026-05-07 03:10 | Step 1 targeted validation | `NEXT_PUBLIC_ATRADE_API_BASE_URL=http://127.0.0.1:1 npm run build` passed with canonical routes plus pending old symbols route |
+| 2026-05-07 03:10 | Step 1 completed | Enabled/disabled route entrypoints share route helpers and preserve symbol query parsing |
 
 ---
 

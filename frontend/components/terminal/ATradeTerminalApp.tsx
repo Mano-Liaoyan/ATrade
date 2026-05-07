@@ -25,6 +25,7 @@ import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
   initialChartRange?: ChartRange;
+  initialDisabledModuleId?: DisabledTerminalModuleId | null;
   initialIdentity?: InstrumentIdentityInput | null;
   initialModuleId?: EnabledTerminalModuleId;
   initialSymbol?: string | null;
@@ -32,13 +33,14 @@ type ATradeTerminalAppProps = {
 
 export function ATradeTerminalApp({
   initialChartRange = "1D",
+  initialDisabledModuleId = null,
   initialIdentity = null,
   initialModuleId = "HOME",
   initialSymbol = null,
 }: ATradeTerminalAppProps) {
   const router = useRouter();
   const [activeModuleId, setActiveModuleId] = useState<EnabledTerminalModuleId>(initialModuleId);
-  const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(null);
+  const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(initialDisabledModuleId);
   const [navigationStatus, setNavigationStatus] = useState("Ready for module navigation.");
   const [pendingFocusRequest, setPendingFocusRequest] = useState<{ targetId: string } | null>(null);
   const [seededSearchQuery, setSeededSearchQuery] = useState("");
@@ -50,6 +52,14 @@ export function ATradeTerminalApp({
   useEffect(() => {
     setActiveModuleId(initialModuleId);
   }, [initialModuleId]);
+
+  useEffect(() => {
+    setDisabledModuleId(initialDisabledModuleId);
+    if (initialDisabledModuleId) {
+      setNavigationStatus(`${initialDisabledModuleId} is visible-disabled and unavailable in the paper workspace.`);
+      setPendingFocusRequest({ targetId: `terminal-disabled-${initialDisabledModuleId.toLowerCase()}` });
+    }
+  }, [initialDisabledModuleId]);
 
   useEffect(() => {
     setActiveSymbol(normalizedInitialSymbol);
