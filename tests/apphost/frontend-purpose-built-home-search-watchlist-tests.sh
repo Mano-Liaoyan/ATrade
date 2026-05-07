@@ -44,9 +44,9 @@ assert_distinct_module_components() {
   assert_file_not_contains "$app" 'function TerminalHomeModule'
   assert_file_not_contains "$app" 'function TerminalSearchModule'
   assert_file_not_contains "$app" 'function TerminalWatchlistModule'
-  assert_file_not_contains "$app" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title="Home market monitor" />'
-  assert_file_not_contains "$app" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title={searchQuery ? `Search monitor · ${searchQuery}` : "Search market monitor"} />'
-  assert_file_not_contains "$app" '<TerminalMarketMonitor onOpenIntent={onOpenIntent} title="Watchlist market monitor" />'
+  assert_file_not_contains "$app" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title="Home '"market monitor"'" />'
+  assert_file_not_contains "$app" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title={searchQuery ? `Search monitor · ${searchQuery}` : "Search '"market monitor"'"} />'
+  assert_file_not_contains "$app" '<TerminalMarketMonitor onOpenIntent={onOpenIntent} title="Watchlist '"market monitor"'" />'
 
   assert_file_not_contains "$home" '<TerminalMarketMonitor'
   assert_file_not_contains "$search" '<TerminalMarketMonitor'

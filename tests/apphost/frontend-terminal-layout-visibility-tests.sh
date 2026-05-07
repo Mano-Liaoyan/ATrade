@@ -70,7 +70,8 @@ assert_guardrail_docs() {
   assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'Safari, Firefox, Chrome, or Edge'
   assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'page-level `overflow: hidden`'
   assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'ATrade-owned custom tracks/thumbs'
-  assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'NODE and ORDERS remain fully reachable'
+  assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'late-list items such as NODE'
+  assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'ORDERS remain fully reachable'
 }
 
 assert_shell_scroll_source_contract() {

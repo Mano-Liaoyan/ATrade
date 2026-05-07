@@ -1,11 +1,11 @@
 # TP-068: Frontend route and visibility regression suite — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 2
 **Size:** S
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,64 +15,64 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Consolidate route regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Validate accepted enabled route matrix
-- [ ] Validate accepted disabled route matrix
-- [ ] Validate `/symbols/[symbol]` absence with no redirect/alias expectation
-- [ ] Validate exact identity query preservation for chart/analysis/backtest links
+- [x] Validate accepted enabled route matrix
+- [x] Validate accepted disabled route matrix
+- [x] Validate `/symbols/[symbol]` absence with no redirect/alias expectation
+- [x] Validate exact identity query preservation for chart/analysis/backtest links
 
 ---
 
 ### Step 2: Consolidate visibility and page-purpose regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Validate TP-064 desktop browser/no-clipping/visible-scrollbar guardrails
-- [ ] Validate TP-066 `/chart` Stored stocks/default-watchlist behavior and no demo default symbol
-- [ ] Validate TP-067 distinct Home/Search/Watchlist components/copy/test IDs
-- [ ] Keep validation provider/runtime independent
+- [x] Validate TP-064 desktop browser/no-clipping/visible-scrollbar guardrails
+- [x] Validate TP-066 `/chart` Stored stocks/default-watchlist behavior and no demo default symbol
+- [x] Validate TP-067 distinct Home/Search/Watchlist components/copy/test IDs
+- [x] Keep validation provider/runtime independent
 
 ---
 
 ### Step 3: Sweep stale tests and docs
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Remove/update stale `/symbols`, hash-route-only, or identical-market-monitor expectations
-- [ ] Update README/PLAN verification inventories if new scripts were added
-- [ ] Update design doc only if final validation exposes missing acceptance language
+- [x] Remove/update stale `/symbols`, hash-route-only, or identical-market-monitor expectations
+- [x] Update README/PLAN verification inventories if new scripts were added
+- [x] Update design doc only if final validation exposes missing acceptance language
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Consolidated regression validation passing
-- [ ] Route architecture validation passing
-- [ ] Layout visibility validation passing
-- [ ] Chart landing validation passing
-- [ ] Purpose-built module validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Consolidated regression validation passing
+- [x] Route architecture validation passing
+- [x] Layout visibility validation passing
+- [x] Chart landing validation passing
+- [x] Purpose-built module validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Verification scripts listed in README/PLAN if appropriate
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Verification scripts listed in README/PLAN if appropriate
+- [x] Discoveries logged
 
 ---
 
@@ -87,6 +87,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| TP-068 completion made the ready-queue wording stale in active docs/context. | Resolved by updating README.md, PLAN.md, and tasks/CONTEXT.md to mark the frontend route/visibility UX batch complete and keep TP-069 as the next packet. | README.md; PLAN.md; tasks/CONTEXT.md |
 
 ---
 
@@ -95,6 +96,11 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-07 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-07 07:14 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-07 07:14 | Step 0 started | Preflight |
+| 2026-05-07 07:27 | Worker iter 1 | done in 738s, tools: 114 |
+| 2026-05-07 07:33 | Worker iter 2 | done in 397s, tools: 59 |
+| 2026-05-07 07:33 | Task complete | .DONE created |
 
 ---
 
@@ -106,4 +112,5 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Step 3 design-doc review: consolidated/layout validation passed; `docs/design/atrade-terminal-ui.md` already contains accepted route removal, desktop browser overflow/scroll affordance, `/chart` Stored stocks, and Home/Search/Watchlist purpose language, so no design-doc content edit was needed.
+- Step 5 check-if-affected docs review: `docs/INDEX.md` still marks `docs/design/atrade-terminal-ui.md` as active; the design doc already covers the route matrix, `/symbols/{symbol}` removal, Stored stocks chart landing, distinct Home/Search/Watchlist purposes, and desktop scroll-ownership guardrails. `tasks/CONTEXT.md` was updated to remove stale ready-queue wording now that TP-068 completes the batch.

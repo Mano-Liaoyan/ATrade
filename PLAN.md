@@ -127,11 +127,14 @@ handoff including optional `ibkrConid`, explicit empty/unavailable Search and
 Watchlist links, and chart-default validation without fake default symbols.
 `TP-067` made Home, Search, and Watchlist purpose-built instead of three
 identical market-monitor wrappers, while preserving shared lower-level search,
-filter, table, detail, exact identity, and backend watchlist behavior.
+filter, table, detail, exact identity, and backend watchlist behavior. `TP-068`
+added `tests/apphost/frontend-terminal-regression-suite-tests.sh`, a consolidated
+frontend regression suite covering accepted enabled and visible-disabled routes,
+`/symbols/{symbol}` removal, exact identity link preservation, desktop
+visibility/scroll-ownership guardrails, `/chart` Stored stocks defaults, and
+distinct Home/Search/Watchlist page purposes.
 
-Remaining ready implementation tasks are queued for the frontend route/visibility UX batch:
-
-- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+The frontend route/visibility UX batch through `TP-068` is complete.
 
 Completed task packets through `TP-063` are present in `tasks/`; completed
 packets should be archived when convenient. The next new Taskplane packet should
@@ -140,12 +143,12 @@ use `TP-069`.
 ## Follow-Up Direction
 
 Future frontend work should build on the direct module/workflow frame,
-canonical enabled/disabled/symbol routes, rail-first full-viewport workspace,
-compact market-monitor filters, visible market-monitor table scrollbars, `/chart`
-Stored stocks default selector behavior, desktop
-Safari/Firefox/Chrome/Edge visibility and scroll-ownership guardrail,
-non-collapsing chart visibility contract, original black/graphite/amber terminal
-palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
+canonical enabled/disabled/symbol routes, the consolidated route/visibility
+regression suite, rail-first full-viewport workspace, compact market-monitor
+filters, visible market-monitor table scrollbars, `/chart` Stored stocks default
+selector behavior, desktop Safari/Firefox/Chrome/Edge visibility and
+scroll-ownership guardrail, non-collapsing chart visibility contract, original
+black/graphite/amber terminal palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,
 `terminalMarketMonitorWorkflow`, `terminalChartWorkspaceWorkflow`,

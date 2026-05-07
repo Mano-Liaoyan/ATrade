@@ -202,13 +202,18 @@ assert_registry_rail_and_workflow_routes() {
 }
 
 assert_old_symbols_route_removed_without_alias() {
-  assert_path_missing "$frontend_root/app/symbols"
+  local old_route_segment="symbols"
+  local old_route="/""$old_route_segment"
+  local old_symbol_pattern="/""symbols|symbols/""\\[symbol\\]"
+  local stale_hash_pattern="module=""ANALYSIS|module=""BACKTEST|module=""HELP|module=""STATUS|#""terminal"
+
+  assert_path_missing "$frontend_root/app/$old_route_segment"
   assert_file_not_contains "$frontend_root/next.config.ts" 'redirects'
-  assert_file_not_contains "$frontend_root/next.config.ts" '/symbols'
+  assert_file_not_contains "$frontend_root/next.config.ts" "$old_route"
 
   assert_no_grep_matches \
     'old symbol route or redirect alias in active frontend source' \
-    '/symbols|symbols/\[symbol\]|NextResponse\.redirect|permanentRedirect|redirect\(' \
+    "$old_symbol_pattern|NextResponse\.redirect|permanentRedirect|redirect\(" \
     "$frontend_root/app" \
     "$frontend_root/components" \
     "$frontend_root/lib" \
@@ -216,7 +221,7 @@ assert_old_symbols_route_removed_without_alias() {
 
   assert_no_grep_matches \
     'stale old symbol route expectations in frontend apphost tests' \
-    '/symbols|symbols/\[symbol\]|module=ANALYSIS|module=BACKTEST|module=HELP|module=STATUS|#terminal' \
+    "$old_symbol_pattern|$stale_hash_pattern" \
     "$repo_root/tests/apphost"
 }
 
