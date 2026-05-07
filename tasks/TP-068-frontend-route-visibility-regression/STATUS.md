@@ -1,6 +1,6 @@
 # TP-068: Frontend route and visibility regression suite — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Consolidate route regression coverage
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -23,12 +23,12 @@
 ---
 
 ### Step 1: Consolidate route regression coverage
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Validate accepted enabled route matrix
-- [ ] Validate accepted disabled route matrix
-- [ ] Validate `/symbols/[symbol]` absence with no redirect/alias expectation
-- [ ] Validate exact identity query preservation for chart/analysis/backtest links
+- [x] Validate accepted enabled route matrix
+- [x] Validate accepted disabled route matrix
+- [x] Validate `/symbols/[symbol]` absence with no redirect/alias expectation
+- [x] Validate exact identity query preservation for chart/analysis/backtest links
 
 ---
 
