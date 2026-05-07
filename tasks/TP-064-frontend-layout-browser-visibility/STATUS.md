@@ -1,6 +1,6 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
-**Current Step:** Step 5: Testing & Verification
+**Current Step:** Step 6: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -61,21 +61,21 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Layout visibility validation passing
-- [ ] Market-monitor scrollbar validation passing
-- [ ] Simplified workspace validation passing
-- [ ] Rail icon/collapse validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Layout visibility validation passing
+- [x] Market-monitor scrollbar validation passing
+- [x] Simplified workspace validation passing
+- [x] Rail icon/collapse validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] "Must Update" docs modified
 - [ ] "Check If Affected" docs reviewed
@@ -115,6 +115,8 @@
 | 2026-05-07 01:28 | Step 4 started | Layout/browser visibility validation script and impacted test updates |
 | 2026-05-07 01:36 | Step 4 completed | Added static layout visibility validation and refreshed rail/scrollbar/simplified shell assertions |
 | 2026-05-07 01:36 | Step 5 started | Required verification commands |
+| 2026-05-07 01:47 | Step 5 completed | Layout, scrollbar, simplified workspace, rail, frontend build, dotnet test, and dotnet build passed |
+| 2026-05-07 01:47 | Step 6 started | Documentation/delivery inventory and discoveries |
 
 ---
 
