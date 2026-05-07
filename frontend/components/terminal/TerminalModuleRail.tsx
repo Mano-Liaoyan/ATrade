@@ -105,6 +105,7 @@ export function TerminalModuleRail({
               )}
               data-module-icon={module.icon}
               data-module-id={module.id}
+              data-module-route={module.route}
               data-module-short-label={module.shortLabel}
               key={module.id}
               title={isCollapsed ? module.label : undefined}
@@ -131,13 +132,14 @@ export function TerminalModuleRail({
 
           return (
             <button
+              aria-current={isSelected ? "page" : undefined}
               aria-disabled="true"
               className={cn("terminal-module-rail__item terminal-module-rail__item--disabled", isSelected && "terminal-module-rail__item--selected-disabled")}
               data-module-icon={module.icon}
               data-module-id={module.id}
+              data-module-route={module.route}
               data-module-short-label={module.shortLabel}
               key={module.id}
-              tabIndex={-1}
               title={`${unavailable.title}: ${unavailable.message}`}
               type="button"
               onClick={() => onDisabledModule?.(module.id)}

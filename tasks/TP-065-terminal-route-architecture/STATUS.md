@@ -1,6 +1,6 @@
 # TP-065: Terminal route architecture and old symbol route removal — Status
 
-**Current Step:** Step 1: Add canonical route helpers and page entrypoints
+**Current Step:** Step 2: Wire rail and workflow navigation to real routes
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -33,12 +33,12 @@
 ---
 
 ### Step 2: Wire rail and workflow navigation to real routes
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Update module registry route metadata to canonical paths
-- [ ] Update rail clicks to push real enabled and disabled routes with accessible state preserved
-- [ ] Update market-monitor hrefs/intents to `/chart/[symbol]`, `/analysis/[symbol]`, and `/backtest/[symbol]`
-- [ ] Keep browser back/forward route-derived behavior without command or hash-only fallback
+- [x] Update module registry route metadata to canonical paths
+- [x] Update rail clicks to push real enabled and disabled routes with accessible state preserved
+- [x] Update market-monitor hrefs/intents to `/chart/[symbol]`, `/analysis/[symbol]`, and `/backtest/[symbol]`
+- [x] Keep browser back/forward route-derived behavior without command or hash-only fallback
 
 ---
 
@@ -109,6 +109,9 @@
 | 2026-05-07 03:10 | Step 1 started | Canonical route helpers and page entrypoints |
 | 2026-05-07 03:10 | Step 1 targeted validation | `NEXT_PUBLIC_ATRADE_API_BASE_URL=http://127.0.0.1:1 npm run build` passed with canonical routes plus pending old symbols route |
 | 2026-05-07 03:10 | Step 1 completed | Enabled/disabled route entrypoints share route helpers and preserve symbol query parsing |
+| 2026-05-07 03:10 | Step 2 started | Rail/workflow navigation canonical route wiring |
+| 2026-05-07 03:10 | Step 2 targeted validation | `NEXT_PUBLIC_ATRADE_API_BASE_URL=http://127.0.0.1:1 npm run build` passed; generated `.next` removed afterward |
+| 2026-05-07 03:10 | Step 2 completed | Rail and market-monitor workflows now use canonical route pushes/hrefs without hash or module-query fallback |
 
 ---
 

@@ -1,4 +1,8 @@
 import {
+  TERMINAL_DISABLED_MODULE_ROUTES,
+  TERMINAL_ENABLED_MODULE_ROUTES,
+} from "@/lib/terminalRoutes";
+import {
   DISABLED_TERMINAL_MODULE_IDS,
   ENABLED_TERMINAL_MODULE_IDS,
   type DisabledTerminalModuleDefinition,
@@ -19,7 +23,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Landing workspace with paper safety, provider state, shortcuts, and current market context.",
     availability: "enabled",
     placement: "primary",
-    route: "/",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.HOME,
     tone: "positive",
   },
   {
@@ -30,7 +34,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Bounded stock search through ATrade.Api with exact provider and market identity badges.",
     availability: "enabled",
     placement: "primary",
-    route: "/#terminal-search",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.SEARCH,
   },
   {
     id: "WATCHLIST",
@@ -40,7 +44,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Backend-owned exact provider/market pins from the workspace watchlist API.",
     availability: "enabled",
     placement: "primary",
-    route: "/#terminal-watchlist",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.WATCHLIST,
   },
   {
     id: "CHART",
@@ -50,7 +54,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Symbol chart workspace with source labels, range controls, indicators, and safe fallback states.",
     availability: "enabled",
     placement: "primary",
-    route: "/symbols/[symbol]",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.CHART,
   },
   {
     id: "ANALYSIS",
@@ -60,7 +64,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Provider-neutral analysis workspace with explicit no-engine and runtime-unavailable states.",
     availability: "enabled",
     placement: "primary",
-    route: "/#terminal-analysis",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.ANALYSIS,
   },
   {
     id: "BACKTEST",
@@ -70,7 +74,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Saved single-symbol backtest runs, paper capital, live status, history, cancel, and retry through ATrade.Api.",
     availability: "enabled",
     placement: "primary",
-    route: "/#terminal-backtest",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.BACKTEST,
   },
   {
     id: "STATUS",
@@ -80,7 +84,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Operational status for API health, broker readiness, provider/cache/source metadata, and paper mode.",
     availability: "enabled",
     placement: "primary",
-    route: "/#terminal-status",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.STATUS,
   },
   {
     id: "HELP",
@@ -90,7 +94,7 @@ export const TERMINAL_ENABLED_MODULES: EnabledTerminalModuleDefinition[] = [
     description: "Module reference with provider-state explanations and paper-only safety reminders.",
     availability: "enabled",
     placement: "primary",
-    route: "/#terminal-help",
+    route: TERMINAL_ENABLED_MODULE_ROUTES.HELP,
   },
 ];
 
@@ -109,6 +113,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "The workspace does not show scraped headlines, stale fixture stories, or invented market narratives.",
       "Use provider-backed market data modules instead of mock news content.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.NEWS,
   },
   {
     id: "PORTFOLIO",
@@ -124,6 +129,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "The workspace does not synthesize holdings, balances, or account identifiers.",
       "Paper account status remains visible through STATUS without exposing order-entry controls.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.PORTFOLIO,
   },
   {
     id: "RESEARCH",
@@ -139,6 +145,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "The workspace does not ship placeholder analyst opinions or fixture research notes.",
       "Provider-neutral analysis remains separate under the ANALYSIS module.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.RESEARCH,
   },
   {
     id: "SCREENER",
@@ -154,6 +161,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "No arbitrary multi-factor screen-building API exists yet.",
       "The workspace does not display fake factor tables or prebuilt demo screens.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.SCREENER,
   },
   {
     id: "ECON",
@@ -169,6 +177,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "The workspace does not invent macro events, central-bank notes, or economic time series.",
       "Provider-unavailable states remain explicit rather than hidden behind sample data.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.ECON,
   },
   {
     id: "AI",
@@ -184,6 +193,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "Module navigation is local; no raw user navigation text is sent to an LLM.",
       "The workspace does not display demo assistant output or generated market commentary.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.AI,
   },
   {
     id: "NODE",
@@ -199,6 +209,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "The workspace does not render fake graph nodes, strategy wires, or simulated execution canvases.",
       "Analysis workflows remain provider-neutral and non-order-routing.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.NODE,
   },
   {
     id: "ORDERS",
@@ -214,6 +225,7 @@ export const TERMINAL_DISABLED_MODULES: DisabledTerminalModuleDefinition[] = [
       "This workspace does not provide order tickets, buy/sell buttons, staged submissions, previews, or confirmations.",
       "The browser remains behind ATrade.Api and no live-trading behavior is added in this reconstruction batch.",
     ],
+    route: TERMINAL_DISABLED_MODULE_ROUTES.ORDERS,
     tone: "warning",
   },
 ];

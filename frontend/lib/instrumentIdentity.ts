@@ -123,7 +123,7 @@ export function createSymbolChartHref(identity: InstrumentIdentityInput): string
   const normalized = normalizeInstrumentIdentity(identity);
   const params = toExactIdentitySearchParams(normalized);
   const query = params.toString();
-  return `/symbols/${encodeURIComponent(normalized.symbol)}${query ? `?${query}` : ''}`;
+  return `/chart/${encodeURIComponent(normalized.symbol)}${query ? `?${query}` : ''}`;
 }
 
 export function appendIdentityQueryParams(params: URLSearchParams, identity: InstrumentIdentityInput | null | undefined): URLSearchParams {
