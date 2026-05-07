@@ -22,11 +22,11 @@ export function TerminalChartWorkspace({
   includeAnalysis = true,
 }: TerminalChartWorkspaceProps) {
   return (
-    <section className={cn('terminal-chart-workspace workspace-stack', className)} data-testid="terminal-chart-workspace">
+    <section className={cn('terminal-chart-workspace terminal-module-scroll-surface workspace-stack', className)} data-scroll-owner="chart-module" data-testid="terminal-chart-workspace">
       <TerminalInstrumentHeader chart={chart} />
 
       <section className="workspace-panel terminal-data-panel chart-view terminal-chart-workspace__market-grid" data-testid="chart-workspace">
-        <div className="terminal-chart-workspace__chart-region">
+        <div className="terminal-chart-workspace__chart-region terminal-scroll-owned" data-scroll-owner="chart-workspace-region">
           <div className="panel-heading chart-heading terminal-panel-heading">
             <div>
               <p className="eyebrow">Lookback candlestick chart</p>

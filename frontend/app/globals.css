@@ -502,6 +502,7 @@ select:focus-visible,
   min-height: 30rem;
   resize: vertical;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .terminal-indicator-grid {
@@ -727,10 +728,14 @@ select:focus-visible,
 
 .terminal-module-rail {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
   gap: 0.65rem;
   inline-size: min(11rem, 24vw);
   min-inline-size: 9.25rem;
+  max-block-size: 100%;
+  min-height: 0;
+  overflow: hidden;
   padding: 0.55rem;
   transition:
     inline-size 160ms ease,
@@ -765,9 +770,49 @@ select:focus-visible,
   white-space: nowrap;
 }
 
+.terminal-scroll-owned {
+  overscroll-behavior: contain;
+  scrollbar-color: hsl(var(--terminal-accent-amber) / 0.74) hsl(var(--terminal-surface-elevated) / 0.9);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.terminal-scroll-owned::-webkit-scrollbar {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.terminal-scroll-owned::-webkit-scrollbar-track {
+  background: hsl(var(--terminal-surface-elevated) / 0.9);
+  border-left: 1px solid hsl(var(--terminal-border-strong) / 0.52);
+  border-top: 1px solid hsl(var(--terminal-border-strong) / 0.52);
+}
+
+.terminal-scroll-owned::-webkit-scrollbar-thumb {
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 2px solid hsl(var(--terminal-surface-elevated) / 0.9);
+  background: hsl(var(--terminal-accent-amber) / 0.74);
+}
+
+.terminal-scroll-owned::-webkit-scrollbar-corner {
+  background: hsl(var(--terminal-surface-elevated));
+}
+
+.terminal-module-scroll-surface {
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-wrap: anywhere;
+}
+
 .terminal-module-rail__navigation {
   display: grid;
+  align-content: start;
   gap: 0.65rem;
+  min-height: 0;
+  overflow: auto;
+  padding-inline-end: 0.16rem;
 }
 
 .terminal-module-rail__group {
@@ -869,7 +914,9 @@ select:focus-visible,
 .terminal-workspace-layout__primary {
   min-width: 0;
   min-height: 0;
+  max-block-size: 100%;
   overflow: auto;
+  scrollbar-gutter: stable both-edges;
   border: 1px solid hsl(var(--terminal-border) / 0.7);
   background: hsl(var(--terminal-surface-inset) / 0.56);
   padding: 0.75rem;
@@ -1532,6 +1579,11 @@ select:focus-visible,
 .market-monitor-detail {
   position: sticky;
   top: 0;
+  align-self: start;
+  max-block-size: min(34rem, calc(100dvh - 4rem));
+  min-width: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .market-monitor-detail__body,
@@ -1611,9 +1663,10 @@ select:focus-visible,
 }
 
 .market-monitor-detail__identity dd {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .market-monitor-detail__reasons ul {
@@ -1873,6 +1926,20 @@ select:focus-visible,
   font-size: 0.8rem;
 }
 
+.terminal-backtest-history__list {
+  max-block-size: min(24rem, 48dvh);
+  overflow: auto;
+  padding-inline-end: 0.16rem;
+  scrollbar-gutter: stable;
+}
+
+.terminal-backtest-detail__scroll-list {
+  max-block-size: min(16rem, 36dvh);
+  overflow: auto;
+  padding-inline-end: 0.16rem;
+  scrollbar-gutter: stable;
+}
+
 .terminal-backtest-history__item {
   display: grid;
   gap: 0.25rem;
@@ -2073,7 +2140,8 @@ select:focus-visible,
 }
 
 .terminal-backtest-comparison__table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .terminal-backtest-comparison__table {

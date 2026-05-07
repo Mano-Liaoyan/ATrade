@@ -58,7 +58,7 @@ function TerminalAnalysisWorkspaceContent({
   const stateTone = getAnalysisStateTone(analysis.engineState);
 
   return (
-    <section className={cn('terminal-analysis-workspace', className)} data-testid="terminal-analysis-workspace" aria-live="polite">
+    <section className={cn('terminal-analysis-workspace terminal-module-scroll-surface', className)} data-scroll-owner="analysis-module" data-testid="terminal-analysis-workspace" aria-live="polite">
       <TerminalPanel
         className="terminal-analysis-workspace__header"
         data-testid="analysis-panel"
@@ -127,7 +127,7 @@ function TerminalAnalysisWorkspaceContent({
 
 function TerminalAnalysisPlaceholder({ className }: { className?: string }) {
   return (
-    <section className={cn('terminal-analysis-workspace', className)} data-testid="terminal-analysis-workspace" aria-live="polite">
+    <section className={cn('terminal-analysis-workspace terminal-module-scroll-surface', className)} data-scroll-owner="analysis-module" data-testid="terminal-analysis-workspace" aria-live="polite">
       <TerminalPanel
         density="compact"
         eyebrow="Analysis"

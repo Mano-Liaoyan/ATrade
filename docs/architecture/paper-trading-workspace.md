@@ -49,7 +49,9 @@ see_also:
 > rail-first full-bleed single-primary workspace with no top app brand header,
 > visible global safety strip, shell context panel, monitor strip,
 > footer/status strip, resizable splitters, layout reset, or page-level vertical
-> scrolling, a dense market monitor table with visible internal vertical and
+> scrolling, guarded for latest stable desktop Safari, Firefox, Chrome, and Edge
+> with visible internal/custom rail, workspace, panel, table, and module scroll
+> affordances, a dense market monitor table with visible internal vertical and
 > horizontal scrollbars for wide exact-identity/action columns, IBKR
 > scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/compact-filterable IBKR stock search, exact market-specific
@@ -114,10 +116,14 @@ rail collapse behavior, a rail-first simplified full-viewport single-primary
 layout without a top app brand header or global visible safety strip, and a
 responsive fallback. The market monitor table owns visible vertical and
 horizontal scrolling for wide exact-identity and action columns while the page
-frame remains non-scrolling. The home and symbol routes now render directly
-through `ATradeTerminalApp`, which provides the direct module/workflow frame,
-module rail, single primary workspace region, module-owned scrolling, STATUS/HELP
-modules, and honest disabled-module surfaces for future modules
+frame remains non-scrolling. Latest stable desktop Safari, Firefox, Chrome, and
+Edge are supported targets for this no-clipping contract; rail, workspace,
+panel, table, chart, analysis, backtest, status, help, and disabled-module
+overflow must stay reachable through module-owned visible/custom scroll
+affordances rather than page scroll. The home and symbol routes now render
+directly through `ATradeTerminalApp`, which provides the direct module/workflow
+frame, module rail, single primary workspace region, module-owned scrolling,
+STATUS/HELP modules, and honest disabled-module surfaces for future modules
 (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
 `ORDERS`). Users open modules through the
 rail, market-monitor chart/analysis/backtest actions, and symbol route state; no

@@ -37,7 +37,7 @@ export function TerminalBacktestWorkspace({
   });
 
   return (
-    <section className={cn('terminal-backtest-workspace workspace-stack', className)} data-testid="terminal-backtest-workspace" aria-live="polite">
+    <section className={cn('terminal-backtest-workspace terminal-module-scroll-surface workspace-stack', className)} data-scroll-owner="backtest-module" data-testid="terminal-backtest-workspace" aria-live="polite">
       <TerminalPanel
         className="terminal-backtest-workspace__header"
         data-testid="backtest-run-form-panel"
@@ -267,7 +267,7 @@ function BacktestSignalList({ run }: { run: BacktestRunEnvelope }) {
     <div className="terminal-backtest-detail__list" data-testid="backtest-signals-list">
       <h3>Signals</h3>
       {signals.length === 0 ? <p>No strategy signals were persisted for this run.</p> : null}
-      <ul>
+      <ul className="terminal-backtest-detail__scroll-list terminal-scroll-owned" data-scroll-owner="backtest-signals-list">
         {signals.slice(0, 8).map((signal) => (
           <li key={`${signal.time}-${signal.kind}-${signal.direction}`}>
             <strong>{signal.direction}</strong>
@@ -287,7 +287,7 @@ function BacktestTradeList({ run }: { run: BacktestRunEnvelope }) {
     <div className="terminal-backtest-detail__list" data-testid="backtest-trades-list">
       <h3>Simulated trades</h3>
       {trades.length === 0 ? <p>No simulated trades were persisted for this run.</p> : null}
-      <ul>
+      <ul className="terminal-backtest-detail__scroll-list terminal-scroll-owned" data-scroll-owner="backtest-trades-list">
         {trades.slice(0, 8).map((trade, index) => (
           <li key={`${trade.entryTime}-${trade.exitTime ?? 'open'}-${index}`}>
             <strong>{trade.direction} · {formatCurrency(trade.netPnl, run.capital.currency)}</strong>
@@ -320,7 +320,7 @@ function BacktestHistoryPanel({ workflow }: { workflow: TerminalBacktestWorkflow
           <span>Create a run after paper capital is available. The workspace does not show fixture strategies, synthetic completed results, or demo run history.</span>
         </div>
       ) : (
-        <div className="terminal-backtest-history__list" role="list" aria-label="Saved backtest runs">
+        <div className="terminal-backtest-history__list terminal-scroll-owned" data-scroll-owner="backtest-history" role="list" aria-label="Saved backtest runs">
           {workflow.runs.map((run) => {
             const selected = run.id === workflow.selectedRunId;
             const comparisonSelected = workflow.comparisonSelectedRunIds.includes(run.id);

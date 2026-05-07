@@ -7,7 +7,7 @@ export function TerminalHelpModule() {
   const disabledModules = getDisabledTerminalModules();
 
   return (
-    <section className="terminal-help-module" data-testid="terminal-help-module" id="terminal-help" tabIndex={-1}>
+    <section className="terminal-help-module terminal-module-scroll-surface" data-scroll-owner="help-module" data-testid="terminal-help-module" id="terminal-help" tabIndex={-1}>
       <TerminalPanel
         eyebrow="Workspace help"
         title="Module and workflow reference"

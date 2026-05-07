@@ -35,7 +35,7 @@ export function BacktestComparisonPanel({ workflow }: BacktestComparisonPanelPro
   const missingBenchmarkCount = selectedSummaries.filter((summary) => !summary.benchmarkCurve).length;
 
   return (
-    <div className="terminal-backtest-comparison" data-testid="backtest-comparison-panel">
+    <div className="terminal-backtest-comparison terminal-module-scroll-surface" data-scroll-owner="backtest-comparison" data-testid="backtest-comparison-panel">
       <div className="terminal-backtest-comparison__header">
         <div>
           <span>Saved-run comparison</span>
@@ -106,7 +106,7 @@ export function BacktestComparisonPanel({ workflow }: BacktestComparisonPanelPro
 
 function ComparisonMetricsTable({ summaries }: { summaries: TerminalBacktestComparisonRunSummary[] }) {
   return (
-    <div className="terminal-backtest-comparison__table-wrap" data-testid="backtest-comparison-metrics">
+    <div className="terminal-backtest-comparison__table-wrap terminal-scroll-owned" data-scroll-owner="backtest-comparison-metrics" data-testid="backtest-comparison-metrics">
       <table className="terminal-backtest-comparison__table">
         <caption>Selected completed backtest run metrics from persisted ATrade.Api result payloads.</caption>
         <thead>
