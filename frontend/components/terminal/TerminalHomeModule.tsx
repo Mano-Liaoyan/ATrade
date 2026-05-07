@@ -1,7 +1,7 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { Activity, BarChart3, Bookmark, FlaskConical, LineChart, Search, ServerPulse } from 'lucide-react';
+import { Activity, BarChart3, Bookmark, FlaskConical, LineChart, Search, Server } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { createTerminalModuleRoute } from '@/lib/terminalRoutes';
@@ -34,7 +34,7 @@ const HomeQuickActions: HomeQuickAction[] = [
   { moduleId: 'CHART', label: '/chart', description: 'Open stored stocks or exact chart routes.', icon: BarChart3, tone: 'info' },
   { moduleId: 'ANALYSIS', label: '/analysis', description: 'Run provider-neutral analysis only.', icon: FlaskConical, tone: 'neutral' },
   { moduleId: 'BACKTEST', label: '/backtest', description: 'Create paper-capital saved runs.', icon: Activity, tone: 'warning' },
-  { moduleId: 'STATUS', label: '/status', description: 'Inspect API and provider readiness.', icon: ServerPulse, tone: 'neutral' },
+  { moduleId: 'STATUS', label: '/status', description: 'Inspect API and provider readiness.', icon: Server, tone: 'neutral' },
 ];
 
 export function TerminalHomeModule({ onOpenIntent, searchQuery = '' }: TerminalHomeModuleProps) {
@@ -90,7 +90,7 @@ export function TerminalHomeModule({ onOpenIntent, searchQuery = '' }: TerminalH
             const Icon = action.icon;
             return (
               <Button className="terminal-home-quick-actions__item" key={action.moduleId} onClick={() => openModule(action.moduleId, action.label)} size="sm" type="button" variant={action.moduleId === 'SEARCH' ? 'amber' : 'terminal'}>
-                <Icon aria-hidden="true" />
+                <Icon aria-hidden={true} />
                 <span className="terminal-home-quick-actions__copy">
                   <strong>{action.label}</strong>
                   <small>{action.description}</small>

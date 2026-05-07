@@ -1,6 +1,6 @@
 # TP-067: Purpose-built Home, Search, and Watchlist modules — Status
 
-**Current Step:** Step 2: Implement a dashboard-focused Home module
+**Current Step:** Step 3: Implement search-first and watchlist-first modules
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -41,11 +41,11 @@
 ---
 
 ### Step 3: Implement search-first and watchlist-first modules
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Render Search as prominent bounded stock search with ranked results, filters, and actions
-- [ ] Render Watchlist as saved-stocks-first with backend pins, manage/remove, identity metadata, and workflow actions
-- [ ] Avoid duplicated titles/descriptions/default layout between Home, Search, and Watchlist
+- [x] Render Search as prominent bounded stock search with ranked results, filters, and actions
+- [x] Render Watchlist as saved-stocks-first with backend pins, manage/remove, identity metadata, and workflow actions
+- [x] Avoid duplicated titles/descriptions/default layout between Home, Search, and Watchlist
 
 ---
 

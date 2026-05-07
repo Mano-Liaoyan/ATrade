@@ -10,6 +10,7 @@ import { MinimumSymbolSearchQueryLength } from '@/lib/symbolSearchWorkflow';
 import { TerminalStatusBadge } from './TerminalStatusBadge';
 
 export type MarketMonitorSearchProps = {
+  autoFocus?: boolean;
   className?: string;
   compact?: boolean;
   error: string | null;
@@ -22,6 +23,7 @@ export type MarketMonitorSearchProps = {
 };
 
 export function MarketMonitorSearch({
+  autoFocus = false,
   className,
   compact = false,
   error,
@@ -39,6 +41,7 @@ export function MarketMonitorSearch({
   return (
     <section
       className={cn('market-monitor-search', compact && 'market-monitor-search--compact', className)}
+      data-search-focus={autoFocus ? 'primary' : undefined}
       data-testid="market-monitor-search"
       aria-labelledby={`${searchInputId}-label`}
     >
@@ -52,6 +55,7 @@ export function MarketMonitorSearch({
           <Input
             aria-describedby={searchStatusId}
             autoComplete="off"
+            autoFocus={autoFocus}
             className="market-monitor-search__input"
             data-testid="market-monitor-search-input"
             id={searchInputId}

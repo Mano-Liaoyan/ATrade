@@ -1251,6 +1251,9 @@ select:focus-visible,
   list-style: none;
 }
 
+.terminal-module-purpose-copy,
+
+
 .terminal-home-dashboard__hero,
 
 
@@ -1263,14 +1266,45 @@ select:focus-visible,
 .terminal-home-preview__row,
 
 
-.terminal-home-status-grid__item {
+.terminal-home-status-grid__item,
+
+
+.terminal-search-module__hero,
+
+
+.terminal-search-module__results,
+
+
+.terminal-search-module__intro,
+
+
+.terminal-watchlist-module__hero,
+
+
+.terminal-watchlist-module__pins,
+
+
+.terminal-watchlist-module__summary {
   min-width: 0;
+}
+
+.terminal-module-purpose-copy {
+  margin: 0;
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .terminal-home-status-grid,
 
 
-.terminal-home-preview-grid {
+.terminal-home-preview-grid,
+
+
+.terminal-search-module__intro,
+
+
+.terminal-watchlist-module__summary {
   display: grid;
   gap: 0.75rem;
 }
@@ -1299,7 +1333,16 @@ select:focus-visible,
 .terminal-home-preview__row,
 
 
-.terminal-home-preview__row-actions {
+.terminal-home-preview__row-actions,
+
+
+.terminal-search-module__copy,
+
+
+.terminal-watchlist-module__summary > div,
+
+
+.terminal-watchlist-module__manage-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1318,7 +1361,13 @@ select:focus-visible,
 .terminal-home-preview__row strong,
 
 
-.terminal-home-preview__empty strong {
+.terminal-home-preview__empty strong,
+
+
+.terminal-search-module__copy strong,
+
+
+.terminal-watchlist-module__summary strong {
   color: hsl(var(--terminal-accent-amber));
   font-family: var(--font-mono);
   font-size: 0.72rem;
@@ -1336,7 +1385,16 @@ select:focus-visible,
 .terminal-home-preview__row small,
 
 
-.terminal-home-preview__empty span {
+.terminal-home-preview__empty span,
+
+
+.terminal-search-module__copy span,
+
+
+.terminal-watchlist-module__summary span,
+
+
+.terminal-watchlist-module__empty-state p {
   color: hsl(var(--terminal-text-muted));
   font-size: 0.78rem;
   line-height: 1.45;
@@ -1406,9 +1464,42 @@ select:focus-visible,
   white-space: nowrap;
 }
 
-.terminal-home-preview__row-actions {
+.terminal-home-preview__row-actions,
+
+
+.terminal-watchlist-module__manage-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
+}
+
+.terminal-search-module__intro,
+
+
+.terminal-watchlist-module__summary {
+  border: 1px solid hsl(var(--terminal-border) / 0.62);
+  background: hsl(var(--terminal-surface-inset) / 0.72);
+  padding: 0.75rem;
+}
+
+.terminal-search-module__copy svg,
+
+
+.terminal-watchlist-module__summary svg {
+  color: hsl(var(--terminal-accent-amber));
+}
+
+.terminal-search-module__primary-search {
+  border-color: hsl(var(--terminal-accent-amber) / 0.52);
+  background: hsl(var(--terminal-canvas) / 0.62);
+}
+
+.terminal-watchlist-module__summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.terminal-watchlist-module__empty-state p {
+  margin: 0;
 }
 
 .terminal-market-monitor,
@@ -2025,6 +2116,18 @@ select:focus-visible,
 
 
   .terminal-chart-landing__body,
+
+
+  .terminal-home-status-grid,
+
+
+  .terminal-home-quick-actions,
+
+
+  .terminal-home-preview-grid,
+
+
+  .terminal-watchlist-module__summary,
 
 
   .terminal-market-monitor__grid {
