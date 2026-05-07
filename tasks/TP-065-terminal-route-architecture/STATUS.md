@@ -1,6 +1,6 @@
 # TP-065: Terminal route architecture and old symbol route removal — Status
 
-**Current Step:** Step 3: Remove old `/symbols/[symbol]` route without aliasing
+**Current Step:** Step 4: Add route architecture validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -52,11 +52,11 @@
 ---
 
 ### Step 4: Add route architecture validation
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-terminal-route-architecture-tests.sh`
-- [ ] Update existing route-sensitive frontend tests only where required
-- [ ] Keep validation provider/runtime independent
+- [x] Create `tests/apphost/frontend-terminal-route-architecture-tests.sh`
+- [x] Update existing route-sensitive frontend tests only where required
+- [x] Keep validation provider/runtime independent
 
 ---
 
@@ -115,6 +115,9 @@
 | 2026-05-07 03:10 | Step 3 started | Old `/symbols/[symbol]` removal |
 | 2026-05-07 03:10 | Step 3 targeted validation | Updated route-sensitive shell tests, `bash -n` passed, and frontend build route list omitted `/symbols/[symbol]` |
 | 2026-05-07 03:10 | Step 3 completed | Old symbols route deleted with no redirect/alias/helper in frontend source |
+| 2026-05-07 03:10 | Step 4 started | Route architecture validation script and route-sensitive test updates |
+| 2026-05-07 03:10 | Step 4 targeted validation | Route architecture plus route-sensitive static frontend shell tests passed; new route validation remains provider/runtime independent |
+| 2026-05-07 03:10 | Step 4 completed | Added canonical route architecture validation and updated stale route assertions |
 
 ---
 
