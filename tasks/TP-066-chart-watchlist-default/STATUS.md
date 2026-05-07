@@ -1,7 +1,7 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
@@ -75,12 +75,12 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Chart landing/default stored-stock docs updated
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] Chart landing/default stored-stock docs updated
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -95,6 +95,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| `/chart` default required optional `ibkrConid` to survive canonical handoffs, and the new chart landing component changed chart frontend ownership docs. | Implemented route parsing/query emission and updated provider/modules "Check If Affected" docs; no out-of-scope tech debt found. | `frontend/lib/terminalRoutes.ts`, `frontend/lib/instrumentIdentity.ts`, `docs/architecture/provider-abstractions.md`, `docs/architecture/modules.md` |
 
 ---
 
@@ -111,6 +112,7 @@
 | 2026-05-07 04:35 | Step 3 completed | Preserved direct `/chart/[symbol]` path, added `ibkrConid` route parsing/handoff, and kept chart/analysis/backtest canonical symbol routes; `cd frontend && npm run build` passed |
 | 2026-05-07 04:45 | Step 4 completed | Added provider-independent chart watchlist default validation and updated shared route/identity test expectations; targeted apphost validations passed |
 | 2026-05-07 05:00 | Step 5 completed | Chart landing, stock chart, chart range, route architecture validations, frontend build, full `dotnet test ATrade.slnx`, and `dotnet build ATrade.slnx` passed with zero failures |
+| 2026-05-07 05:15 | Step 6 completed | Updated UI, paper workspace, provider, modules, README, and PLAN docs; discoveries logged |
 
 ---
 

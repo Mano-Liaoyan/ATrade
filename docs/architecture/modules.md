@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-06
+updated: 2026-05-07
 summary: Target module map for the ATrade modular monolith covering `src/`, `workers/`, and `frontend/` with provider-neutral broker, account-capital, and market-data seams.
 see_also:
   - ../INDEX.md
@@ -77,15 +77,17 @@ see_also:
 > global safety strip, context/monitor shell chrome, footer/status strip,
 > splitters, layout reset, or page-level vertical scrolling, status/help
 > surfaces, and a dense terminal market monitor over backend-driven trending
-> symbols, bounded/ranked/compact-filterable IBKR stock search, and
-> Postgres-backed exact watchlists plus terminal chart/analysis/backtest
-> workspaces.
+> symbols, bounded/ranked/compact-filterable IBKR stock search,
+> Postgres-backed exact watchlists, a `/chart` Stored stocks default landing, and
+> terminal chart/analysis/backtest workspaces.
 > `TerminalMarketMonitor`,
 > `MarketMonitorTable`, `MarketMonitorSearch`, `MarketMonitorFilters`, and
 > `MarketMonitorDetailPanel` replace the old long/list search, trending, and
 > watchlist renderers while preserving exact identity for chart/analysis/backtest
-> actions. `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
-> `TerminalIndicatorGrid` own the chart module around the reusable
+> actions. `TerminalChartLandingModule` owns the `/chart` Stored stocks selector
+> and first-watchlist-instrument default behavior on top of `watchlistWorkflow`;
+> `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and `TerminalIndicatorGrid`
+> own the symbol chart module around the reusable
 > `CandlestickChart`; `TerminalAnalysisWorkspace` owns provider-neutral analysis
 > states; `TerminalBacktestWorkspace` owns saved backtest run/capital/history
 > states; and `TerminalProviderDiagnostics` replaces the old broker status card.
@@ -700,7 +702,11 @@ references.
   show-more/show-less exploration, exact pin state projection, and exact
   chart/analysis/backtest navigation intents; `frontend/components/terminal/TerminalMarketMonitor.tsx`
   and its table/search/compact-filter/detail components render that monitor for `HOME`,
-  `SEARCH`, and `WATCHLIST`. `frontend/lib/terminalChartWorkspaceWorkflow.ts`
+  `SEARCH`, and `WATCHLIST`. `TerminalChartLandingModule` reuses
+  `watchlistWorkflow` on `/chart` to load backend-owned stored stocks, render a
+  Stored stocks selector/list, default to the first available watchlist
+  instrument, and surface empty/cached-fallback/backend-unavailable states
+  without hard-coded symbols. `frontend/lib/terminalChartWorkspaceWorkflow.ts`
   adapts `symbolChartWorkflow` into terminal source/range/identity/stream view
   models consumed by `TerminalChartWorkspace`, `TerminalInstrumentHeader`, and
   `TerminalIndicatorGrid`; the chart module keeps `CandlestickChart` as a
@@ -744,7 +750,8 @@ references.
   (`TerminalSurface`, `TerminalPanel`, `TerminalSectionHeader`,
   `TerminalStatusBadge`, `ATradeTerminalApp`, `TerminalModuleRail`,
   `TerminalWorkspaceLayout`, `TerminalHelpModule`, `TerminalStatusModule`,
-  `TerminalChartWorkspace`, `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
+  `TerminalChartLandingModule`, `TerminalChartWorkspace`,
+  `TerminalInstrumentHeader`, `TerminalIndicatorGrid`,
   `TerminalAnalysisWorkspace`, `TerminalBacktestWorkspace`,
   `BacktestComparisonPanel`, `TerminalProviderDiagnostics`, and
   `TerminalDisabledModule`) and intentionally

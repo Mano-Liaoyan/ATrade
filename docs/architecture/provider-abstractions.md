@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-06
+updated: 2026-05-07
 summary: Provider-neutral broker, account-capital, market-data, analysis, and saved backtesting provider contracts for swapping ATrade providers without changing API or frontend payloads.
 see_also:
   - ../INDEX.md
@@ -125,9 +125,12 @@ Core types:
   `timeframe` remains a compatibility alias in payloads and API methods, but the
   value is normalized as a chart range; `1m` means one month and one-minute reads
   use `1min`. `ExactInstrumentIdentity` is the backend-owned
-  normalization/key/equality helper for provider, provider symbol id, symbol,
-  exchange, currency, and asset class; for IBKR the provider symbol id is the
-  Client Portal `conid`. Search results, trending symbols, candle series,
+  normalization/key/equality helper for provider, provider symbol id, optional
+  IBKR `conid`, symbol, exchange, currency, and asset class; for IBKR the
+  provider symbol id is the Client Portal `conid`. Frontend canonical
+  chart/analysis/backtest routes may carry `ibkrConid` alongside
+  `providerSymbolId` so route-local handoffs can preserve the exact tuple.
+  Search results, trending symbols, candle series,
   indicators, and latest updates carry `MarketDataSymbolIdentity` where provider
   metadata is available while preserving the existing symbol/source fields for
   callers that only know a bare symbol. A `CandleSeriesResponse` with an empty
@@ -160,7 +163,8 @@ Compatibility layer:
 - `MarketDataService` composes `IMarketDataProvider`, validates stock search
   query length/asset class/result limit before provider calls, normalizes chart
   range values before candle/indicator/latest reads, forwards optional exact
-  identity metadata, and preserves endpoint payload/status behavior for callers
+  identity metadata (`provider`, `providerSymbolId`, optional `ibkrConid`,
+  `exchange`, `currency`, and `assetClass`), and preserves endpoint payload/status behavior for callers
   that only supply a symbol. HTTP callers should send `range` / `chartRange`;
   legacy `timeframe` query parameters are still accepted as aliases.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility

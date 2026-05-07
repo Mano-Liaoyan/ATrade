@@ -55,8 +55,9 @@ see_also:
 > horizontal scrollbars for wide exact-identity/action columns, IBKR
 > scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/compact-filterable IBKR stock search, exact market-specific
-> Postgres-backed watchlists, local market badges, terminal chart workspaces
-> that reuse `lightweight-charts` candlesticks, chart range lookback controls
+> Postgres-backed watchlists, a `/chart` Stored stocks selector that defaults to
+> the first backend watchlist instrument when available, local market badges,
+> terminal chart workspaces that reuse `lightweight-charts` candlesticks, chart range lookback controls
 > (`1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and All time),
 > indicator grids, source/exact-identity metadata, terminal analysis workspaces
 > that can run LEAN when the analysis runtime is configured, provider
@@ -126,10 +127,11 @@ provides the direct module/workflow frame, module rail, single primary workspace
 region, module-owned scrolling, STATUS/HELP modules, and honest disabled-module
 surfaces for future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`,
 `ECON`, `AI`, `NODE`, and `ORDERS`). Users open modules through the rail,
-market-monitor chart/analysis/backtest actions, and `/chart/{symbol}`,
-`/analysis/{symbol}`, or `/backtest/{symbol}` route state; no command input,
-command parser, old `/symbols/{symbol}` compatibility route, or backend command
-route is part of the active frontend.
+market-monitor chart/analysis/backtest actions, the `/chart` Stored stocks
+landing that defaults to the first backend watchlist instrument when available,
+and `/chart/{symbol}`, `/analysis/{symbol}`, or `/backtest/{symbol}` route state;
+no command input, command parser, old `/symbols/{symbol}` compatibility route,
+or backend command route is part of the active frontend.
 The visual direction is inspired only by broad finance-workstation information
 architecture and is implemented with original ATrade black/graphite/amber tokens,
 red/green market-state colors, warm gray dividers, and restrained information
@@ -175,6 +177,11 @@ controls;
 `MarketMonitorTable` keeps sticky headers and exact provider/source/pin/action
 columns inside an internal Radix/native-compatible scroll viewport with visible
 vertical and horizontal scrollbars;
+`TerminalChartLandingModule` reuses `watchlistWorkflow` on `/chart` to load
+backend-owned stored stocks, render a Stored stocks selector/list, select the
+first available watchlist instrument as the default chart candidate, and keep
+loading, empty, cached-fallback, and backend-unavailable states explicit without
+using browser cache as authority or substituting a hard-coded symbol;
 `symbolChartWorkflow` owns the selected chart range lookback,
 candle/indicator HTTP reads, source-label formatting, SignalR subscription
 state, stream update application, and HTTP polling fallback when streaming closes
@@ -245,7 +252,7 @@ accepting `range` / `chartRange` query values and still accepting legacy
 `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and `all`; they mean
 lookbacks from the current time, so `1D` means the past day, `1m` means the past
 month, and `6m` means the past six months. Optional `provider`,
-`providerSymbolId`, `exchange`, `currency`, and `assetClass` query metadata is
+`providerSymbolId`, `ibkrConid`, `exchange`, `currency`, and `assetClass` query metadata is
 accepted for exact cache filtering/chart handoff. The AppHost `timescaledb`
 resource is backed by a named data volume, so those fresh rows can survive a full
 `start run` / AppHost stop-start cycle and serve the API after reboot without

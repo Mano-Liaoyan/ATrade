@@ -105,7 +105,7 @@ The current runnable slice includes:
 - `src/ATrade.Backtesting` — provider-neutral saved backtest run module with single-symbol/built-in-strategy and parameter request validation, optional analysis engine ids, paper-capital source snapshots, cost/slippage/benchmark settings, Postgres saved-run history, an API-hosted async runner with startup recovery, server-side market-data/analysis execution, rich completed result envelopes, best-effort cancellation, `/hubs/backtests` SignalR updates, and persistence/broadcast redaction for secrets, account identifiers, gateway URLs, LEAN workspace paths, direct bars, custom code, and order-routing fields.
 - `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
 - `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, canonical enabled routes (`/`, `/search`, `/watchlist`, `/chart`, `/analysis`, `/backtest`, `/status`, `/help`), canonical symbol routes (`/chart/{symbol}`, `/analysis/{symbol}`, `/backtest/{symbol}`), visible-disabled routes (`/news`, `/portfolio`, `/research`, `/screener`, `/econ`, `/ai`, `/node`, `/orders`), direct module/workflow navigation without the retired `/symbols/{symbol}` route, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, a full-viewport desktop shell guarded for latest stable Safari, Firefox, Chrome, and Edge with visible internal/custom rail/workspace/panel/module scroll affordances, visibly sized chart/indicator/analysis/backtest workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, exact chart/analysis/backtest handoff, provider-neutral analysis states, and an enabled BACKTEST module for paper-capital-backed saved runs, live status, history/detail, completed-run comparison with metrics and persisted strategy/buy-and-hold equity overlays, cancel, and retry.
+- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, canonical enabled routes (`/`, `/search`, `/watchlist`, `/chart`, `/analysis`, `/backtest`, `/status`, `/help`), canonical symbol routes (`/chart/{symbol}`, `/analysis/{symbol}`, `/backtest/{symbol}`), visible-disabled routes (`/news`, `/portfolio`, `/research`, `/screener`, `/econ`, `/ai`, `/node`, `/orders`), direct module/workflow navigation without the retired `/symbols/{symbol}` route, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, an original black/graphite/amber institutional terminal palette with red/green market states, a compact-filtered dense market monitor for trending/search/watchlist rows with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, a full-viewport desktop shell guarded for latest stable Safari, Firefox, Chrome, and Edge with visible internal/custom rail/workspace/panel/module scroll affordances, visibly sized chart/indicator/analysis/backtest workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, a `/chart` Stored stocks selector that defaults to the first stored watchlist instrument when available, exact chart/analysis/backtest handoff, provider-neutral analysis states, and an enabled BACKTEST module for paper-capital-backed saved runs, live status, history/detail, completed-run comparison with metrics and persisted strategy/buy-and-hold equity overlays, cancel, and retry.
 
 Current market data is served through `ATrade.Api` using a Timescale-first
 cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
@@ -138,10 +138,15 @@ database through `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity; they
 survive full local AppHost stop/start cycles when the same Postgres data volume
 and stable password are reused. Browser `localStorage` is only a
-non-authoritative symbol-only cache / one-time manual migration source. Users can search IBKR/iBeam stocks through
+non-authoritative symbol-only cache / one-time manual migration source. The
+`/chart` route loads backend-owned stored stocks through the watchlist workflow,
+shows a Stored stocks selector/list, and automatically charts the first saved
+watchlist instrument when available; when no backend/cached stored stock can load,
+it shows explicit Search/Watchlist links instead of substituting a demo symbol.
+Users can search IBKR/iBeam stocks through
 `/api/market-data/search`, see explicit provider/market/exchange/currency/asset
 class metadata with local market badges, open result chart pages that preserve
-exact identity in query state when available and render a visible `CandlestickChart`
+exact identity in query state (including optional `ibkrConid`) when available and render a visible `CandlestickChart`
 when provider candles exist (empty/provider-unavailable states remain explicit
 with no synthetic bars), and pin exact provider-market
 metadata (`provider`, provider symbol id / IBKR `conid`, name, exchange,
@@ -216,9 +221,8 @@ workflow actions rather than the retired old shell/list route wrappers, a comman
 system, cyan/blue-gradient-dominant styling, or the removed app-level, context,
 monitor, footer, and top-safety chrome.
 
-Remaining ready implementation tasks are queued for the frontend route/visibility UX batch:
+Remaining ready implementation tasks are queued for the frontend route/visibility UX batch. `TP-066` has added `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols.
 
-- `TP-066` — `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
 - `TP-067` — purpose-built Home, Search, and Watchlist modules with distinct user intent
 - `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
 
@@ -296,6 +300,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
 - `tests/apphost/frontend-module-rail-icons-collapse-tests.sh`
 - `tests/apphost/frontend-terminal-layout-visibility-tests.sh`
+- `tests/apphost/frontend-chart-watchlist-default-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
 - `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
