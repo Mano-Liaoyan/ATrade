@@ -1,6 +1,6 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
-**Current Step:** Step 1: Build the chart landing selection workflow
+**Current Step:** Step 2: Render `/chart` with stored stocks plus default chart
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -23,17 +23,17 @@
 ---
 
 ### Step 1: Build the chart landing selection workflow
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Reuse backend watchlist APIs/workflows to load stored stocks for `/chart`
-- [ ] Select the first stored/watchlist instrument as the default chart candidate with exact identity preserved
-- [ ] Provide selection and canonical chart/analysis/backtest route handoff state
-- [ ] Preserve loading, empty, cached-fallback, and unavailable states without hard-coded symbols or synthetic bars
+- [x] Reuse backend watchlist APIs/workflows to load stored stocks for `/chart`
+- [x] Select the first stored/watchlist instrument as the default chart candidate with exact identity preserved
+- [x] Provide selection and canonical chart/analysis/backtest route handoff state
+- [x] Preserve loading, empty, cached-fallback, and unavailable states without hard-coded symbols or synthetic bars
 
 ---
 
 ### Step 2: Render `/chart` with stored stocks plus default chart
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Render a "Stored stocks" selector/list and chart region on `/chart`
 - [ ] Automatically render visible chart/provider state for the first stored stock when available
@@ -106,6 +106,7 @@
 | 2026-05-07 02:00 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-07 02:00 | Step 0 started | Preflight |
 | 2026-05-07 04:00 | Step 0 completed | Required paths verified; TP-065 canonical chart routes present and `/symbols` route absent |
+| 2026-05-07 04:15 | Step 1 completed | Added chart landing workflow using backend watchlist workflow, first stored-stock default selection, canonical handoffs, explicit fallback/empty/unavailable states; `cd frontend && npm run build` passed |
 
 ---
 

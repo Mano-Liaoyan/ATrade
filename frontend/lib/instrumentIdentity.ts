@@ -26,9 +26,10 @@ export type NormalizedInstrumentIdentity = {
 };
 
 export function normalizeInstrumentIdentity(identity: InstrumentIdentityInput): NormalizedInstrumentIdentity {
-  const ibkrConid = normalizeNullableNumber(identity.ibkrConid);
+  const providerSymbolIdInput = normalizeOptional(identity.providerSymbolId);
+  const ibkrConid = normalizeNullableNumber(identity.ibkrConid) ?? parseIbkrConid(identity.provider, providerSymbolIdInput);
   const provider = normalizeProvider(identity.provider, ibkrConid);
-  const providerSymbolId = normalizeOptional(identity.providerSymbolId) ?? (ibkrConid === null ? null : String(ibkrConid));
+  const providerSymbolId = providerSymbolIdInput ?? (ibkrConid === null ? null : String(ibkrConid));
 
   return {
     symbol: identity.symbol.trim().toUpperCase(),
@@ -147,6 +148,10 @@ function toExactIdentitySearchParams(identity: NormalizedInstrumentIdentity): UR
 
   if (identity.providerSymbolId) {
     params.set('providerSymbolId', identity.providerSymbolId);
+  }
+
+  if (identity.ibkrConid !== null) {
+    params.set('ibkrConid', String(identity.ibkrConid));
   }
 
   if (identity.exchange) {
