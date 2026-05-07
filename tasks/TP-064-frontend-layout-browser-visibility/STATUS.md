@@ -1,7 +1,7 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
@@ -75,12 +75,12 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Verification inventory updated if needed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Verification inventory updated if needed
+- [x] Discoveries logged
 
 ---
 
@@ -95,6 +95,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Existing no-command shell validation still expected only CHART/ANALYSIS row routes even though BACKTEST is an enabled workflow. | Resolved by updating the validation to include BACKTEST module navigation and route intent coverage. | `tests/apphost/frontend-no-command-shell-tests.sh` |
 
 ---
 
@@ -117,6 +118,7 @@
 | 2026-05-07 01:36 | Step 5 started | Required verification commands |
 | 2026-05-07 01:47 | Step 5 completed | Layout, scrollbar, simplified workspace, rail, frontend build, dotnet test, and dotnet build passed |
 | 2026-05-07 01:47 | Step 6 started | Documentation/delivery inventory and discoveries |
+| 2026-05-07 01:50 | Step 6 completed | Docs/inventory reviewed; discovery logged; task complete |
 
 ---
 

@@ -295,6 +295,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-terminal-ui-stack-tests.sh`
 - `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
 - `tests/apphost/frontend-module-rail-icons-collapse-tests.sh`
+- `tests/apphost/frontend-terminal-layout-visibility-tests.sh`
 - `tests/apphost/frontend-chart-range-preset-tests.sh`
 - `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
