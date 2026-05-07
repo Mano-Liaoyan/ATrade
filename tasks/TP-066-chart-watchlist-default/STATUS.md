@@ -1,11 +1,11 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 1: Build the chart landing selection workflow
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,15 +15,15 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Build the chart landing selection workflow
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Reuse backend watchlist APIs/workflows to load stored stocks for `/chart`
 - [ ] Select the first stored/watchlist instrument as the default chart candidate with exact identity preserved
@@ -103,6 +103,9 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-07 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-07 02:00 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-07 02:00 | Step 0 started | Preflight |
+| 2026-05-07 04:00 | Step 0 completed | Required paths verified; TP-065 canonical chart routes present and `/symbols` route absent |
 
 ---
 
