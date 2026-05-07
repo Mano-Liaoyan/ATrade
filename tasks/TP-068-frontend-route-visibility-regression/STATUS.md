@@ -1,6 +1,6 @@
 # TP-068: Frontend route and visibility regression suite — Status
 
-**Current Step:** Step 2: Consolidate visibility and page-purpose regression coverage
+**Current Step:** Step 3: Sweep stale tests and docs
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -43,11 +43,11 @@
 ---
 
 ### Step 3: Sweep stale tests and docs
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Remove/update stale `/symbols`, hash-route-only, or identical-market-monitor expectations
-- [ ] Update README/PLAN verification inventories if new scripts were added
-- [ ] Update design doc only if final validation exposes missing acceptance language
+- [x] Remove/update stale `/symbols`, hash-route-only, or identical-market-monitor expectations
+- [x] Update README/PLAN verification inventories if new scripts were added
+- [x] Update design doc only if final validation exposes missing acceptance language
 
 ---
 
@@ -108,4 +108,4 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- Step 3 design-doc review: consolidated/layout validation passed; `docs/design/atrade-terminal-ui.md` already contains accepted route removal, desktop browser overflow/scroll affordance, `/chart` Stored stocks, and Home/Search/Watchlist purpose language, so no design-doc content edit was needed.

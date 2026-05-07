@@ -131,7 +131,7 @@ filter, table, detail, exact identity, and backend watchlist behavior.
 
 Remaining ready implementation tasks are queued for the frontend route/visibility UX batch:
 
-- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation via `tests/apphost/frontend-terminal-regression-suite-tests.sh`
 
 Completed task packets through `TP-063` are present in `tasks/`; completed
 packets should be archived when convenient. The next new Taskplane packet should

@@ -306,6 +306,7 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-stock-chart-visibility-tests.sh`
 - `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
 - `tests/apphost/frontend-terminal-route-architecture-tests.sh`
+- `tests/apphost/frontend-terminal-regression-suite-tests.sh`
 - `tests/apphost/frontend-terminal-backtest-workspace-tests.sh`
 - `tests/apphost/frontend-terminal-backtest-comparison-tests.sh`
 - `tests/apphost/frontend-symbol-search-exploration-tests.sh`
