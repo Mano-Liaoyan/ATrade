@@ -1251,6 +1251,257 @@ select:focus-visible,
   list-style: none;
 }
 
+.terminal-module-purpose-copy,
+
+
+.terminal-home-dashboard__hero,
+
+
+.terminal-home-dashboard__actions,
+
+
+.terminal-home-preview,
+
+
+.terminal-home-preview__row,
+
+
+.terminal-home-status-grid__item,
+
+
+.terminal-search-module__hero,
+
+
+.terminal-search-module__results,
+
+
+.terminal-search-module__intro,
+
+
+.terminal-watchlist-module__hero,
+
+
+.terminal-watchlist-module__pins,
+
+
+.terminal-watchlist-module__summary {
+  min-width: 0;
+}
+
+.terminal-module-purpose-copy {
+  margin: 0;
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.terminal-home-status-grid,
+
+
+.terminal-home-preview-grid,
+
+
+.terminal-search-module__intro,
+
+
+.terminal-watchlist-module__summary {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.terminal-home-status-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.terminal-home-status-grid__item,
+
+
+.terminal-home-preview__row {
+  border: 1px solid hsl(var(--terminal-border) / 0.62);
+  background: hsl(var(--terminal-surface-inset) / 0.72);
+  padding: 0.65rem;
+}
+
+.terminal-home-status-grid__item {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.terminal-home-status-grid__item > div,
+
+
+.terminal-home-preview__row,
+
+
+.terminal-home-preview__row-actions,
+
+
+.terminal-search-module__copy,
+
+
+.terminal-watchlist-module__summary > div,
+
+
+.terminal-watchlist-module__manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.terminal-home-status-grid__item > div,
+
+
+.terminal-home-preview__row {
+  justify-content: space-between;
+}
+
+.terminal-home-status-grid__item span,
+
+
+.terminal-home-preview__row strong,
+
+
+.terminal-home-preview__empty strong,
+
+
+.terminal-search-module__copy strong,
+
+
+.terminal-watchlist-module__summary strong {
+  color: hsl(var(--terminal-accent-amber));
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.terminal-home-status-grid__item p,
+
+
+.terminal-home-preview__row span,
+
+
+.terminal-home-preview__row small,
+
+
+.terminal-home-preview__empty span,
+
+
+.terminal-search-module__copy span,
+
+
+.terminal-watchlist-module__summary span,
+
+
+.terminal-watchlist-module__empty-state p {
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.terminal-home-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.terminal-home-quick-actions__item {
+  justify-content: flex-start;
+  min-height: 4rem;
+  padding: 0.65rem;
+  text-align: left;
+}
+
+.terminal-home-quick-actions__copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.terminal-home-quick-actions__item small {
+  color: hsl(var(--terminal-text-muted));
+  font-size: 0.68rem;
+  letter-spacing: normal;
+  line-height: 1.35;
+  text-transform: none;
+  white-space: normal;
+}
+
+.terminal-home-preview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.terminal-home-preview {
+  max-block-size: min(25rem, 48vh);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.terminal-home-preview__list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.terminal-home-preview__row > div:first-child,
+
+
+.terminal-home-preview__empty {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.terminal-home-preview__row span,
+
+
+.terminal-home-preview__row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-home-preview__row-actions,
+
+
+.terminal-watchlist-module__manage-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.terminal-search-module__intro,
+
+
+.terminal-watchlist-module__summary {
+  border: 1px solid hsl(var(--terminal-border) / 0.62);
+  background: hsl(var(--terminal-surface-inset) / 0.72);
+  padding: 0.75rem;
+}
+
+.terminal-search-module__copy svg,
+
+
+.terminal-watchlist-module__summary svg {
+  color: hsl(var(--terminal-accent-amber));
+}
+
+.terminal-search-module__primary-search {
+  border-color: hsl(var(--terminal-accent-amber) / 0.52);
+  background: hsl(var(--terminal-canvas) / 0.62);
+}
+
+.terminal-watchlist-module__summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.terminal-watchlist-module__empty-state p {
+  margin: 0;
+}
+
 .terminal-market-monitor,
 
 
@@ -1865,6 +2116,18 @@ select:focus-visible,
 
 
   .terminal-chart-landing__body,
+
+
+  .terminal-home-status-grid,
+
+
+  .terminal-home-quick-actions,
+
+
+  .terminal-home-preview-grid,
+
+
+  .terminal-watchlist-module__summary,
 
 
   .terminal-market-monitor__grid {

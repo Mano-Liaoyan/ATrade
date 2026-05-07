@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   type TerminalMarketMonitorRow,
+  type TerminalMarketMonitorSelectedFilters,
   type TerminalMarketMonitorWorkflow,
   useTerminalMarketMonitorWorkflow,
 } from '@/lib/terminalMarketMonitorWorkflow';
@@ -22,6 +23,7 @@ export type TerminalMarketMonitorProps = {
   className?: string;
   compact?: boolean;
   initialSearchQuery?: string;
+  initialSelectedFilters?: TerminalMarketMonitorSelectedFilters;
   onOpenIntent?: (intent: TerminalNavigationIntent, statusMessage: string) => void;
   title?: string;
 };
@@ -30,10 +32,11 @@ export function TerminalMarketMonitor({
   className,
   compact = false,
   initialSearchQuery = '',
+  initialSelectedFilters,
   onOpenIntent,
   title = 'Market monitor',
 }: TerminalMarketMonitorProps) {
-  const workflow = useTerminalMarketMonitorWorkflow({ initialSearchQuery });
+  const workflow = useTerminalMarketMonitorWorkflow({ initialSearchQuery, initialSelectedFilters });
   const handleOpenChart = React.useMemo(
     () => onOpenIntent
       ? (row: TerminalMarketMonitorRow) => onOpenIntent(workflow.openChartIntent(row), buildOpenStatusMessage('CHART', row))
@@ -128,7 +131,7 @@ export function TerminalMarketMonitor({
   );
 }
 
-function MarketMonitorStateStrip({ compact, workflow }: { compact: boolean; workflow: TerminalMarketMonitorWorkflow }) {
+export function MarketMonitorStateStrip({ compact, workflow }: { compact: boolean; workflow: TerminalMarketMonitorWorkflow }) {
   const states = [
     {
       label: 'Trending',
@@ -165,7 +168,7 @@ function MarketMonitorStateStrip({ compact, workflow }: { compact: boolean; work
   );
 }
 
-function MarketMonitorExplorationControls({ workflow }: { workflow: TerminalMarketMonitorWorkflow }) {
+export function MarketMonitorExplorationControls({ workflow }: { workflow: TerminalMarketMonitorWorkflow }) {
   return (
     <div className="market-monitor-exploration" data-testid="market-monitor-exploration-controls">
       <div>

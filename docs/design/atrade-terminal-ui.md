@@ -114,9 +114,9 @@ backend cannot supply.
 
 | Module | First-release responsibility | Current contract backing it |
 | ------ | ---------------------------- | --------------------------- |
-| `HOME` | Landing workspace with market status, paper-only safety summary, provider state, trending entry points, recent watchlist context, and shortcuts into chart/search/analysis workflows. | `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `GET /api/market-data/trending`, current frontend workflow modules. |
-| `SEARCH` | Bounded/ranked stock search with exact provider/market identity badges, provider unavailable/authentication-required copy, and actions to chart or pin an exact instrument. | `GET /api/market-data/search?query=...&assetClass=stock&limit=...` plus `symbolSearchWorkflow`. |
-| `WATCHLIST` | Backend-owned watchlist view for exact provider/market pins with pin/unpin/remove, stable `instrumentKey` / `pinKey`, read-only cached fallback copy, and no browser-owned authority. | `GET` / `PUT` / `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy unambiguous `DELETE /api/workspace/watchlist/{symbol}`, and `watchlistWorkflow`. |
+| `HOME` | Dashboard/overview workspace with provider/API reachability, paper-only/no-order safety, canonical quick actions, and compact truthful trending/watchlist previews. It must not render the full market-monitor table clone by default. | `GET /api/broker/ibkr/status` through `TerminalProviderDiagnostics`, provider trending/watchlist workflow state, canonical route helpers, and reusable terminal workflow modules. |
+| `SEARCH` | Search-first bounded/ranked stock discovery with the query input as the primary surface, ranked result count/status, source/provider/market filters, exact provider/market identity badges, and chart/pin/analysis/backtest actions. | `GET /api/market-data/search?query=...&assetClass=stock&limit=...` plus `symbolSearchWorkflow` and reusable market-monitor table/filter/detail primitives. |
+| `WATCHLIST` | Saved-stocks-first backend watchlist workspace for exact provider/market pins with source-labeled backend/cached states, add-from-Search/retry/manage affordances, pin/unpin/remove, stable `instrumentKey` / `pinKey`, and chart/analysis/backtest actions. | `GET` / `PUT` / `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy unambiguous `DELETE /api/workspace/watchlist/{symbol}`, `watchlistWorkflow`, and reusable market-monitor row primitives. |
 | `CHART` | Stored-stock chart landing plus dense chart workspace: `/chart` loads backend-owned watchlist pins, shows a Stored stocks selector, defaults to the first stored instrument when available, and `/chart/{symbol}` renders an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis/backtest handoff. | `GET /api/workspace/watchlist` through `watchlistWorkflow`, `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, `symbolChartWorkflow`, and `TerminalChartLandingModule`. |
 | `ANALYSIS` | Provider-neutral analysis workspace that lists available engines, runs analysis over market-data bars, and surfaces explicit no-engine or runtime-unavailable states without fake signals. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
 | `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, completed-run-only comparison, metric table/cards, persisted strategy/buy-and-hold equity overlay, cancel, retry, and truthful empty/unavailable states without export or optimization controls. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
@@ -169,10 +169,19 @@ without a command system.
   visible-disabled future module routes `/news`, `/portfolio`, `/research`,
   `/screener`, `/econ`, `/ai`, `/node`, and `/orders` with honest unavailable
   states.
-- The market monitor is the primary workflow handoff surface for search,
-  watchlist, and trending rows. It uses a compact filter bar with count chips,
-  active-count/Clear-all controls, accessible filter groups, and no long
-  explanatory paragraph. Its dense table owns an internal scroll viewport with
+- Home, Search, and Watchlist must have distinct page purpose and default focus:
+  Home is a dashboard with quick actions plus compact truthful context; Search
+  opens on a prominent bounded stock-search input and source-filtered ranked
+  results; Watchlist opens on backend saved stocks with explicit empty,
+  cached-fallback, and unavailable states plus a route back to Search for adding
+  pins. They may reuse `terminalMarketMonitorWorkflow`, `MarketMonitorSearch`,
+  compact filters, `MarketMonitorTable`, exploration controls, and
+  `MarketMonitorDetailPanel`, but the three pages must not be thin wrappers
+  around identical market-monitor markup/copy.
+- The market-monitor primitives remain the primary row handoff surface for
+  search, watchlist, and trending rows. They use a compact filter bar with count
+  chips, active-count/Clear-all controls, accessible filter groups, and no long
+  explanatory paragraph. The dense table owns an internal scroll viewport with
   visible vertical and horizontal scrollbar tracks/thumbs so wide provider,
   identity, source, score, pin, and action columns remain available without page
   scrolling. Row actions open chart, analysis, and backtest workspaces while

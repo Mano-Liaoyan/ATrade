@@ -93,6 +93,7 @@ assert_bounded_backend_search() {
 
 assert_terminal_monitor_search_contract() {
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
+  local search_module="$repo_root/frontend/components/terminal/TerminalSearchModule.tsx"
   local monitor="$repo_root/frontend/components/terminal/TerminalMarketMonitor.tsx"
   local monitor_workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
   local search_component="$repo_root/frontend/components/terminal/MarketMonitorSearch.tsx"
@@ -100,13 +101,16 @@ assert_terminal_monitor_search_contract() {
   local table_component="$repo_root/frontend/components/terminal/MarketMonitorTable.tsx"
   local css="$repo_root/frontend/app/globals.css"
 
-  assert_file_contains "$terminal_app" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent}'
   assert_file_contains "$terminal_app" 'case "SEARCH"'
   assert_file_contains "$terminal_app" 'return <TerminalSearchModule onOpenIntent={onOpenIntent} searchQuery={searchQuery} />;'
+  assert_file_contains "$search_module" 'data-testid="terminal-search-primary-workflow"'
+  assert_file_contains "$search_module" 'Search-first workflow'
+  assert_file_contains "$search_module" 'initialSelectedFilters: { source: '\''search'\'' }'
+  assert_file_contains "$search_module" 'MarketMonitorSearch'
+  assert_file_contains "$search_module" 'MarketMonitorFilters'
+  assert_file_contains "$search_module" 'MarketMonitorTable'
+  assert_file_contains "$search_module" 'MarketMonitorExplorationControls'
   assert_file_contains "$monitor" 'data-testid="terminal-market-monitor"'
-  assert_file_contains "$monitor" 'MarketMonitorSearch'
-  assert_file_contains "$monitor" 'MarketMonitorFilters'
-  assert_file_contains "$monitor" 'MarketMonitorTable'
   assert_file_contains "$monitor" 'Show more rows'
   assert_file_contains "$monitor" 'Show less'
   assert_file_contains "$monitor_workflow" 'createSearchMonitorRow'

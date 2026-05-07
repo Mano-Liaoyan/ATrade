@@ -18,12 +18,14 @@ import { TerminalModuleRail } from "./TerminalModuleRail";
 import { TerminalPanel } from "./TerminalPanel";
 import { TerminalStatusBadge } from "./TerminalStatusBadge";
 import { TerminalStatusModule } from "./TerminalStatusModule";
-import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
 import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
 import { TerminalBacktestWorkspace } from "./TerminalBacktestWorkspace";
 import { TerminalChartLandingModule } from "./TerminalChartLandingModule";
 import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
+import { TerminalHomeModule } from "./TerminalHomeModule";
+import { TerminalSearchModule } from "./TerminalSearchModule";
+import { TerminalWatchlistModule } from "./TerminalWatchlistModule";
 
 type ATradeTerminalAppProps = {
   initialChartRange?: ChartRange;
@@ -212,60 +214,6 @@ function TerminalModuleContent({
     default:
       return <TerminalHelpModule />;
   }
-}
-
-type TerminalMarketMonitorModuleProps = {
-  onOpenIntent: (intent: TerminalNavigationIntent, statusMessage: string) => void;
-  searchQuery?: string;
-};
-
-function TerminalHomeModule({ onOpenIntent, searchQuery = "" }: TerminalMarketMonitorModuleProps) {
-  return (
-    <section className="terminal-module terminal-module--home workspace-stack" data-testid="terminal-home-module" id="terminal-module-home" tabIndex={-1}>
-      <TerminalPanel
-        eyebrow="Home"
-        title="Paper workspace home"
-        description="Paper-only module workspace with provider state, search, watchlist, chart, analysis, status, help, and the dense market monitor."
-        actions={<TerminalStatusBadge tone="success">Paper only</TerminalStatusBadge>}
-      >
-        <div className="terminal-home-summary">
-          <div>
-            <span>Market monitor</span>
-            <strong>Search · watch · trend</strong>
-            <small>Unified bounded search, provider trending, and backend-owned exact pins.</small>
-          </div>
-          <div>
-            <span>Identity</span>
-            <strong>Exact handoff</strong>
-            <small>Provider, provider ID, market, currency, and asset class stay on chart/analysis routes.</small>
-          </div>
-          <div>
-            <span>Safety</span>
-            <strong>No live orders</strong>
-            <small>Orders are disabled by the paper-only safety contract.</small>
-          </div>
-        </div>
-      </TerminalPanel>
-
-      <TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title="Home market monitor" />
-    </section>
-  );
-}
-
-function TerminalSearchModule({ onOpenIntent, searchQuery = "" }: TerminalMarketMonitorModuleProps) {
-  return (
-    <section className="terminal-module terminal-module--search" data-testid="terminal-search-module" id="terminal-search" tabIndex={-1}>
-      <TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title={searchQuery ? `Search monitor · ${searchQuery}` : "Search market monitor"} />
-    </section>
-  );
-}
-
-function TerminalWatchlistModule({ onOpenIntent }: TerminalMarketMonitorModuleProps) {
-  return (
-    <section className="terminal-module terminal-module--watchlist" data-testid="terminal-watchlist-module" id="terminal-watchlist" tabIndex={-1}>
-      <TerminalMarketMonitor onOpenIntent={onOpenIntent} title="Watchlist market monitor" />
-    </section>
-  );
 }
 
 function TerminalChartModule({ identity, initialChartRange, symbol }: { identity: InstrumentIdentityInput | null; initialChartRange: ChartRange; symbol: string }) {

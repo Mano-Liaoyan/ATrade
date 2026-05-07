@@ -113,9 +113,9 @@ assert_terminal_workflows_reachable() {
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'case "ANALYSIS":'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'case "STATUS":'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'case "HELP":'
-  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title="Home market monitor" />'
-  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalMarketMonitor initialSearchQuery={searchQuery} onOpenIntent={onOpenIntent} title={searchQuery ? `Search monitor · ${searchQuery}` : "Search market monitor"} />'
-  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalMarketMonitor onOpenIntent={onOpenIntent} title="Watchlist market monitor" />'
+  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalHomeModule onOpenIntent={onOpenIntent} searchQuery={searchQuery} />'
+  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalSearchModule onOpenIntent={onOpenIntent} searchQuery={searchQuery} />'
+  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalWatchlistModule onOpenIntent={onOpenIntent} />'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalChartWorkspace chart={chart} identity={identity} />'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />'
   assert_file_contains "$frontend_root/components/terminal/TerminalMarketMonitor.tsx" 'workflow.openChartIntent(row)'
@@ -295,9 +295,9 @@ assert_disabled_future_modules_visible_and_honest() {
 
 assert_terminal_markers_present() {
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="atrade-terminal-app"'
-  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-home-module"'
-  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-search-module"'
-  assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-watchlist-module"'
+  assert_file_contains "$frontend_root/components/terminal/TerminalHomeModule.tsx" 'data-testid="terminal-home-module"'
+  assert_file_contains "$frontend_root/components/terminal/TerminalSearchModule.tsx" 'data-testid="terminal-search-module"'
+  assert_file_contains "$frontend_root/components/terminal/TerminalWatchlistModule.tsx" 'data-testid="terminal-watchlist-module"'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-chart-module"'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'data-testid="terminal-analysis-module"'
   assert_path_missing "$frontend_root/components/terminal/TerminalCommandInput.tsx"
