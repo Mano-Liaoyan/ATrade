@@ -56,6 +56,7 @@ PY
 
 assert_table_scroll_source_contract() {
   local table="$frontend_root/components/terminal/MarketMonitorTable.tsx"
+  local detail="$frontend_root/components/terminal/MarketMonitorDetailPanel.tsx"
   local scroll_area="$frontend_root/components/ui/scroll-area.tsx"
   local css="$frontend_root/app/globals.css"
 
@@ -86,6 +87,13 @@ assert_table_scroll_source_contract() {
   assert_css_rule_contains '.market-monitor-table-scroll [data-slot="scroll-area-scrollbar"][data-orientation="horizontal"]' 'height: 0.85rem;'
   assert_css_rule_contains '.market-monitor-table-scroll [data-slot="scroll-area-thumb"]' 'background: hsl(var(--terminal-accent-amber) / 0.72);'
   assert_css_rule_contains '.market-monitor-table-scroll [data-slot="scroll-area-corner"]' 'background: hsl(var(--terminal-surface-elevated));'
+
+  assert_file_contains "$detail" 'market-monitor-detail terminal-scroll-owned'
+  assert_file_contains "$detail" 'data-scroll-owner="market-monitor-detail"'
+  assert_css_rule_contains '.market-monitor-detail' 'max-block-size: min(34rem, calc(100dvh - 4rem));'
+  assert_css_rule_contains '.market-monitor-detail' 'overflow: auto;'
+  assert_css_rule_contains '.market-monitor-detail__identity dd' 'overflow-wrap: anywhere;'
+  assert_css_rule_contains '.market-monitor-detail__identity dd' 'white-space: normal;'
 
   assert_file_contains "$css" '.terminal-market-monitor--compact .market-monitor-table-scroll,'
   assert_file_contains "$css" 'height: min(26rem, 54vh);'

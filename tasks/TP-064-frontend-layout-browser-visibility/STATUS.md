@@ -1,6 +1,6 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
-**Current Step:** Step 4: Add layout/browser visibility validation
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -52,16 +52,16 @@
 ---
 
 ### Step 4: Add layout/browser visibility validation
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Create `tests/apphost/frontend-terminal-layout-visibility-tests.sh`
-- [ ] Update existing shell/scrollbar/rail tests only where shared layout changes require it
-- [ ] Keep validation source/static or lightweight Next.js dev without real provider credentials
+- [x] Create `tests/apphost/frontend-terminal-layout-visibility-tests.sh`
+- [x] Update existing shell/scrollbar/rail tests only where shared layout changes require it
+- [x] Keep validation source/static or lightweight Next.js dev without real provider credentials
 
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Layout visibility validation passing
 - [ ] Market-monitor scrollbar validation passing
@@ -113,6 +113,8 @@
 | 2026-05-07 01:20 | Step 3 started | Module-owned panel visibility and overflow reachability |
 | 2026-05-07 01:28 | Step 3 completed | Detail, chart, analysis, backtest, status, help, and disabled module surfaces expose reachable module-owned overflow/reflow |
 | 2026-05-07 01:28 | Step 4 started | Layout/browser visibility validation script and impacted test updates |
+| 2026-05-07 01:36 | Step 4 completed | Added static layout visibility validation and refreshed rail/scrollbar/simplified shell assertions |
+| 2026-05-07 01:36 | Step 5 started | Required verification commands |
 
 ---
 
