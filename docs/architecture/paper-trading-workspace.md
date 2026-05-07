@@ -808,15 +808,17 @@ explicit capped limit, ranks and filters the bounded result set locally through
 compact source/provider/pin/market controls, and renders IBKR/iBeam stock
 results as dense rows with explicit provider,
 provider-symbol-id/IBKR `conid`, market/exchange, currency, asset class, source,
-rank/score, and saved-pin state. Chart and analysis actions route through the
-terminal app using `/symbols/{symbol}` query state that preserves exact identity
-metadata when available, and pin/unpin actions use the backend watchlist API for
-the selected exact provider-market instrument. The frontend uses the centralized
-`frontend/lib/instrumentIdentity.ts` adapter to compute provisional optimistic
-keys, normalize asset classes, parse an IBKR `conid` only when the provider is
-`ibkr` and the provider symbol id is numeric, and build exact
-chart/analysis/backtest handoff query strings without changing the selected chart
-range.
+rank/score, and saved-pin state. Chart, analysis, and backtest actions route
+through the terminal app using canonical `/chart/{symbol}`,
+`/analysis/{symbol}`, and `/backtest/{symbol}` paths with query state that
+preserves exact identity metadata when available, and pin/unpin actions use the
+backend watchlist API for the selected exact provider-market instrument. The
+frontend uses the centralized `frontend/lib/instrumentIdentity.ts` adapter to
+compute provisional optimistic keys, normalize asset classes, parse an IBKR
+`conid` only when the provider is `ibkr` and the provider symbol id is numeric,
+and build exact chart/analysis/backtest handoff query strings without changing
+the selected chart range. The old `/symbols/{symbol}` route is not retained as a
+redirect or compatibility alias.
 Backend-owned `instrumentKey` / `pinKey` values returned by watchlist responses
 remain authoritative for persisted pins. Duplicate search results sharing a
 symbol or company name are keyed and rendered by exact instrument identity, not

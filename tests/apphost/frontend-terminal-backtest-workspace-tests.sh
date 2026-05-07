@@ -44,13 +44,13 @@ assert_backtest_module_registration() {
   assert_file_contains "$frontend_root/types/terminal.ts" '"BACKTEST"'
   assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'id: "BACKTEST"'
   assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'label: "Backtest"'
-  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'route: "/#terminal-backtest"'
+  assert_file_contains "$frontend_root/lib/terminalModuleRegistry.ts" 'route: TERMINAL_ENABLED_MODULE_ROUTES.BACKTEST'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'case "BACKTEST":'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" '<TerminalBacktestWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />'
   assert_file_contains "$frontend_root/components/terminal/ATradeTerminalApp.tsx" 'return "terminal-backtest";'
-  assert_file_contains "$frontend_root/app/symbols/[symbol]/page.tsx" "normalizedModule === 'BACKTEST'"
+  assert_file_contains "$frontend_root/app/backtest/[symbol]/page.tsx" 'moduleId="BACKTEST"'
   assert_file_contains "$frontend_root/lib/terminalMarketMonitorWorkflow.ts" 'openBacktestIntent'
-  assert_file_contains "$frontend_root/lib/terminalMarketMonitorWorkflow.ts" "params.set('module', moduleId);"
+  assert_file_contains "$frontend_root/lib/terminalMarketMonitorWorkflow.ts" 'return createTerminalSymbolRoute(moduleId, identity);'
   assert_file_contains "$frontend_root/components/terminal/TerminalMarketMonitor.tsx" 'workflow.openBacktestIntent(row)'
   assert_file_contains "$frontend_root/components/terminal/MarketMonitorTable.tsx" 'Open backtest for'
   assert_file_contains "$frontend_root/components/terminal/MarketMonitorDetailPanel.tsx" 'Open backtest'
@@ -147,7 +147,7 @@ assert_backtest_workspace_surfaces() {
 
 assert_no_order_controls_or_direct_runtime_access() {
   local scan_paths=(
-    "$frontend_root/app/symbols/[symbol]/page.tsx"
+    "$frontend_root/app/backtest/[symbol]/page.tsx"
     "$frontend_root/components/terminal/ATradeTerminalApp.tsx"
     "$frontend_root/components/terminal/TerminalBacktestWorkspace.tsx"
     "$frontend_root/components/terminal/BacktestComparisonPanel.tsx"

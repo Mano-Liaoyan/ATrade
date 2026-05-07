@@ -51,15 +51,17 @@ assert_no_grep_matches() {
 
 assert_active_routes_use_terminal_app() {
   local home_page="$frontend_root/app/page.tsx"
-  local symbol_page="$frontend_root/app/symbols/[symbol]/page.tsx"
+  local chart_symbol_page="$frontend_root/app/chart/[symbol]/page.tsx"
+  local route_wrapper="$frontend_root/components/terminal/TerminalRoutePage.tsx"
 
-  assert_file_contains "$home_page" "import { ATradeTerminalApp } from '@/components/terminal/ATradeTerminalApp';"
-  assert_file_contains "$home_page" '<ATradeTerminalApp initialModuleId="HOME" />'
-  assert_file_contains "$symbol_page" "import { ATradeTerminalApp } from '@/components/terminal/ATradeTerminalApp';"
-  assert_file_contains "$symbol_page" 'initialChartRange={initialChartRange}'
-  assert_file_contains "$symbol_page" 'initialIdentity={identity}'
-  assert_file_contains "$symbol_page" 'initialModuleId={initialModuleId}'
-  assert_file_contains "$symbol_page" 'initialSymbol={normalizedSymbol}'
+  assert_file_contains "$home_page" "import { TerminalRoutePage } from '@/components/terminal/TerminalRoutePage';"
+  assert_file_contains "$home_page" 'moduleId="HOME"'
+  assert_file_contains "$chart_symbol_page" "import { TerminalRoutePage } from '@/components/terminal/TerminalRoutePage';"
+  assert_file_contains "$chart_symbol_page" 'moduleId="CHART"'
+  assert_file_contains "$chart_symbol_page" 'symbol={symbol}'
+  assert_file_contains "$chart_symbol_page" 'searchParams={resolvedSearchParams}'
+  assert_file_contains "$route_wrapper" 'createTerminalRouteAppState'
+  assert_file_contains "$route_wrapper" '<ATradeTerminalApp {...routeState} />'
 
   assert_no_grep_matches \
     'old route wrapper import or JSX usage in active app routes' \

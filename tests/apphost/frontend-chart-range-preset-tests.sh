@@ -83,13 +83,14 @@ assert_frontend_client_params() {
 }
 
 assert_symbol_page_ssr_markers() {
-  local symbol_page="$repo_root/frontend/app/symbols/[symbol]/page.tsx"
+  local chart_symbol_page="$repo_root/frontend/app/chart/[symbol]/page.tsx"
+  local routes="$repo_root/frontend/lib/terminalRoutes.ts"
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
   local chart_workspace="$repo_root/frontend/components/terminal/TerminalChartWorkspace.tsx"
 
-  assert_file_contains "$symbol_page" "<ATradeTerminalApp initialChartRange={initialChartRange} initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />"
-  assert_file_contains "$symbol_page" "createInitialChartRange"
-  assert_file_contains "$symbol_page" "SUPPORTED_CHART_RANGES.includes"
+  assert_file_contains "$chart_symbol_page" 'moduleId="CHART"'
+  assert_file_contains "$routes" "createTerminalRouteChartRange"
+  assert_file_contains "$routes" "SUPPORTED_CHART_RANGES.includes"
   assert_file_contains "$terminal_app" "data-testid=\"terminal-chart-module\""
   assert_file_contains "$chart_workspace" "data-testid=\"chart-workspace\""
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" "Dense chart workspace header"

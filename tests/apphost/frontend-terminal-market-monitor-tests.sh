@@ -87,8 +87,8 @@ assert_exact_identity_actions() {
   local identity="$repo_root/frontend/lib/instrumentIdentity.ts"
   local terminal_types="$repo_root/frontend/types/terminal.ts"
 
-  assert_file_contains "$workflow" "createSymbolChartHref(identity)"
-  assert_file_contains "$workflow" "params.set('module', moduleId);"
+  assert_file_contains "$workflow" "createTerminalSymbolRoute('CHART', identity)"
+  assert_file_contains "$workflow" "return createTerminalSymbolRoute(moduleId, identity);"
   assert_file_contains "$workflow" "identity: row.exactIdentity"
   assert_file_contains "$workflow" "providerSymbolId: identity.providerSymbolId"
   assert_file_contains "$workflow" "exchange: identity.exchange ?? ''"

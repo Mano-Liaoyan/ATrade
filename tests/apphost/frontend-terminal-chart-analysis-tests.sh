@@ -96,13 +96,15 @@ assert_terminal_chart_workflow_contract() {
 assert_exact_identity_chart_and_analysis_handoff() {
   local monitor_workflow="$repo_root/frontend/lib/terminalMarketMonitorWorkflow.ts"
   local terminal_app="$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx"
-  local symbol_page="$repo_root/frontend/app/symbols/[symbol]/page.tsx"
+  local chart_symbol_page="$repo_root/frontend/app/chart/[symbol]/page.tsx"
+  local analysis_symbol_page="$repo_root/frontend/app/analysis/[symbol]/page.tsx"
+  local routes="$repo_root/frontend/lib/terminalRoutes.ts"
   local identity="$repo_root/frontend/lib/instrumentIdentity.ts"
 
   assert_file_contains "$identity" 'providerSymbolId=${encodeSegment(normalized.providerSymbolId)}'
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
-  assert_file_contains "$monitor_workflow" 'createSymbolChartHref(identity)'
-  assert_file_contains "$monitor_workflow" "params.set('module', moduleId);"
+  assert_file_contains "$monitor_workflow" "createTerminalSymbolRoute('CHART', identity)"
+  assert_file_contains "$monitor_workflow" 'return createTerminalSymbolRoute(moduleId, identity);'
   assert_file_contains "$monitor_workflow" 'identity: row.exactIdentity'
   assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : moduleId === 'BACKTEST' ? row.backtestHref : row.chartHref"
   assert_file_contains "$monitor_workflow" "chartRange: '1D'"
@@ -110,9 +112,9 @@ assert_exact_identity_chart_and_analysis_handoff() {
   assert_file_contains "$terminal_app" 'setActiveIdentity(intent.identity ?? null)'
   assert_file_contains "$terminal_app" 'identity={activeIdentity}'
   assert_file_contains "$terminal_app" 'symbol={activeSymbol}'
-  assert_file_contains "$symbol_page" 'createQueryIdentity(normalizedSymbol, resolvedSearchParams)'
-  assert_file_contains "$symbol_page" 'initialModuleId={initialModuleId}'
-  assert_file_contains "$symbol_page" 'initialIdentity={identity}'
+  assert_file_contains "$routes" 'createTerminalRouteIdentity(initialSymbol, searchParams)'
+  assert_file_contains "$chart_symbol_page" 'moduleId="CHART"'
+  assert_file_contains "$analysis_symbol_page" 'moduleId="ANALYSIS"'
 }
 
 assert_retired_old_chart_shell_components() {
@@ -131,7 +133,7 @@ assert_retired_old_chart_shell_components() {
   done
 
   assert_path_missing "$repo_root/frontend/components/SymbolChartView.tsx"
-  assert_file_contains "$repo_root/frontend/app/symbols/[symbol]/page.tsx" '<ATradeTerminalApp initialChartRange={initialChartRange} initialIdentity={identity} initialModuleId={initialModuleId} initialSymbol={normalizedSymbol} />'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalRoutePage.tsx" '<ATradeTerminalApp {...routeState} />'
   assert_file_contains "$repo_root/frontend/components/terminal/ATradeTerminalApp.tsx" 'TerminalChartWorkspace'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalInstrumentHeader.tsx" 'TerminalInstrumentHeader'
   assert_file_contains "$repo_root/frontend/components/terminal/TerminalIndicatorGrid.tsx" 'TerminalIndicatorGrid'
@@ -188,7 +190,9 @@ assert_disabled_portfolio_orders_and_no_order_entry_ui() {
 assert_no_direct_provider_database_or_order_access() {
   local forbidden_pattern='Npgsql|TimescaleConnection|PostgresConnection|Host=|User ID=|Password=|redis://|nats://|ibkr-gateway|iserver/secdef|iserver/scanner|Client Portal|ATRADE_IBKR|IBKR_USERNAME|IBKR_PASSWORD|ATRADE_LEAN|docker exec|QuantConnect\.Lean|lean-engine|LeanRuntime|/api/orders|orders/simulate'
   local scan_paths=(
-    "$repo_root/frontend/app/symbols"
+    "$repo_root/frontend/app/chart"
+    "$repo_root/frontend/app/analysis"
+    "$repo_root/frontend/app/backtest"
     "$repo_root/frontend/components/terminal"
     "$repo_root/frontend/lib/analysisClient.ts"
     "$repo_root/frontend/lib/marketDataClient.ts"

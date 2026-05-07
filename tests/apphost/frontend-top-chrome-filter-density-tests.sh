@@ -271,18 +271,18 @@ PY
   assert_file_not_contains "$root_response" 'Paper Trading Workspace'
   assert_file_not_contains "$root_response" 'Refine by source, pin state, provider, market, currency, or asset class without fetching more than the capped search payload.'
 
-  wait_for_http_200 "$frontend_url/symbols/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
+  wait_for_http_200 "$frontend_url/chart/AAPL" "$chart_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$chart_response" 'data-testid="terminal-chart-workspace"'
   assert_file_not_contains "$chart_response" 'terminal-safety-strip'
   assert_file_not_contains "$chart_response" 'Paper Trading Workspace'
 
-  wait_for_http_200 "$frontend_url/symbols/AAPL?module=HELP" "$help_response" "$frontend_pid" "$frontend_log"
+  wait_for_http_200 "$frontend_url/help" "$help_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$help_response" 'data-testid="terminal-help-module"'
   assert_file_contains "$help_response" 'All browser-visible data flows through ATrade.Api'
   assert_file_contains "$help_response" 'Orders are disabled by the paper-only safety contract.'
   assert_file_not_contains "$help_response" 'terminal-safety-strip'
 
-  wait_for_http_200 "$frontend_url/symbols/AAPL?module=STATUS" "$status_response" "$frontend_pid" "$frontend_log"
+  wait_for_http_200 "$frontend_url/status" "$status_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$status_response" 'data-testid="terminal-status-module"'
   assert_file_contains "$status_response" 'data-testid="terminal-provider-diagnostics"'
   assert_file_contains "$status_response" 'Browser routes through ATrade.Api only.'

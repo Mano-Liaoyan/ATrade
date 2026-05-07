@@ -1,6 +1,6 @@
 # TP-065: Terminal route architecture and old symbol route removal — Status
 
-**Current Step:** Step 2: Wire rail and workflow navigation to real routes
+**Current Step:** Step 3: Remove old `/symbols/[symbol]` route without aliasing
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -43,11 +43,11 @@
 ---
 
 ### Step 3: Remove old `/symbols/[symbol]` route without aliasing
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Delete `frontend/app/symbols/[symbol]/page.tsx`
-- [ ] Replace `/symbols/[symbol]` references in source/tests/docs with canonical chart/analysis/backtest routes
-- [ ] Verify no redirect, alias, compatibility route, or helper keeps `/symbols/[symbol]` alive
+- [x] Delete `frontend/app/symbols/[symbol]/page.tsx`
+- [x] Replace `/symbols/[symbol]` references in source/tests/docs with canonical chart/analysis/backtest routes
+- [x] Verify no redirect, alias, compatibility route, or helper keeps `/symbols/[symbol]` alive
 
 ---
 
@@ -112,6 +112,9 @@
 | 2026-05-07 03:10 | Step 2 started | Rail/workflow navigation canonical route wiring |
 | 2026-05-07 03:10 | Step 2 targeted validation | `NEXT_PUBLIC_ATRADE_API_BASE_URL=http://127.0.0.1:1 npm run build` passed; generated `.next` removed afterward |
 | 2026-05-07 03:10 | Step 2 completed | Rail and market-monitor workflows now use canonical route pushes/hrefs without hash or module-query fallback |
+| 2026-05-07 03:10 | Step 3 started | Old `/symbols/[symbol]` removal |
+| 2026-05-07 03:10 | Step 3 targeted validation | Updated route-sensitive shell tests, `bash -n` passed, and frontend build route list omitted `/symbols/[symbol]` |
+| 2026-05-07 03:10 | Step 3 completed | Old symbols route deleted with no redirect/alias/helper in frontend source |
 
 ---
 
