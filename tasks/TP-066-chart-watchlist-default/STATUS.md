@@ -1,6 +1,6 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
-**Current Step:** Step 2: Render `/chart` with stored stocks plus default chart
+**Current Step:** Step 3: Preserve symbol-specific chart behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -33,17 +33,17 @@
 ---
 
 ### Step 2: Render `/chart` with stored stocks plus default chart
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Render a "Stored stocks" selector/list and chart region on `/chart`
-- [ ] Automatically render visible chart/provider state for the first stored stock when available
-- [ ] Show explicit empty/unavailable state with `/search` and `/watchlist` links when no stored stock can load
-- [ ] Preserve TP-064 internal-scroll/no-clipping guardrail
+- [x] Render a "Stored stocks" selector/list and chart region on `/chart`
+- [x] Automatically render visible chart/provider state for the first stored stock when available
+- [x] Show explicit empty/unavailable state with `/search` and `/watchlist` links when no stored stock can load
+- [x] Preserve TP-064 internal-scroll/no-clipping guardrail
 
 ---
 
 ### Step 3: Preserve symbol-specific chart behavior
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Keep `/chart/[symbol]` direct chart rendering with exact identity/range parsing
 - [ ] Ensure stored-stock selection updates chart and/or route without losing identity metadata
@@ -107,6 +107,7 @@
 | 2026-05-07 02:00 | Step 0 started | Preflight |
 | 2026-05-07 04:00 | Step 0 completed | Required paths verified; TP-065 canonical chart routes present and `/symbols` route absent |
 | 2026-05-07 04:15 | Step 1 completed | Added chart landing workflow using backend watchlist workflow, first stored-stock default selection, canonical handoffs, explicit fallback/empty/unavailable states; `cd frontend && npm run build` passed |
+| 2026-05-07 04:25 | Step 2 completed | `/chart` now renders Stored stocks selector/list plus default chart region with explicit empty/unavailable links and internal scroll CSS; `cd frontend && npm run build` passed |
 
 ---
 
