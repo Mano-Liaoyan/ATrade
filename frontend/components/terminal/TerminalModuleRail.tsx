@@ -88,7 +88,11 @@ export function TerminalModuleRail({
         <span className="terminal-module-rail__toggle-label">{isCollapsed ? "Expand" : "Collapse"}</span>
       </button>
 
-      <div className="terminal-module-rail__navigation" id={moduleGroupsId}>
+      <div
+        className="terminal-module-rail__navigation terminal-scroll-owned terminal-rail-scroll-owned"
+        data-scroll-owner="module-rail"
+        id={moduleGroupsId}
+      >
         <div className="terminal-module-rail__group" aria-label="Enabled modules">
         {enabledModules.map((module) => {
           const Icon = TERMINAL_MODULE_ICON_COMPONENTS[module.icon];

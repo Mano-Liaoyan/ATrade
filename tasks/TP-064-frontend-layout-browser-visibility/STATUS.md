@@ -1,6 +1,6 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
-**Current Step:** Step 2: Fix terminal shell, rail, and workspace scroll ownership
+**Current Step:** Step 3: Fix module-owned panel visibility
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -32,17 +32,17 @@
 ---
 
 ### Step 2: Fix terminal shell, rail, and workspace scroll ownership
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Make the module rail fully reachable without clipping enabled or visible-disabled module buttons
-- [ ] Make the primary workspace own visible internal scrolling while preserving page-level `overflow: hidden`
-- [ ] Add reusable visible/custom scrollbar styling for desktop Safari, Firefox, Chrome, and Edge
-- [ ] Preserve no-command/no-top-chrome/no-layout-persistence guardrails
+- [x] Make the module rail fully reachable without clipping enabled or visible-disabled module buttons
+- [x] Make the primary workspace own visible internal scrolling while preserving page-level `overflow: hidden`
+- [x] Add reusable visible/custom scrollbar styling for desktop Safari, Firefox, Chrome, and Edge
+- [x] Preserve no-command/no-top-chrome/no-layout-persistence guardrails
 
 ---
 
 ### Step 3: Fix module-owned panel visibility
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Make `MarketMonitorDetailPanel` content fully reachable without viewport-edge clipping
 - [ ] Ensure Analysis, Backtest, Status, Help, Chart, and disabled-module surfaces remain reachable through module-owned overflow/reflow
@@ -109,6 +109,8 @@
 | 2026-05-07 01:11 | Step 1 started | Project memory and UI documentation guardrail |
 | 2026-05-07 01:13 | Step 1 completed | Browser visibility guardrail stored in agent/context/design/current docs |
 | 2026-05-07 01:13 | Step 2 started | Terminal shell, rail, and primary workspace scroll ownership |
+| 2026-05-07 01:20 | Step 2 completed | Rail and primary workspace own native/custom styled scrolling; no-command guardrail tests pass |
+| 2026-05-07 01:20 | Step 3 started | Module-owned panel visibility and overflow reachability |
 
 ---
 

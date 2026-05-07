@@ -85,7 +85,7 @@ assert_module_and_workflow_navigation_preserved() {
   local module_registry="$frontend_root/lib/terminalModuleRegistry.ts"
   local terminal_types="$frontend_root/types/terminal.ts"
 
-  for enabled in HOME SEARCH WATCHLIST CHART ANALYSIS STATUS HELP; do
+  for enabled in HOME SEARCH WATCHLIST CHART ANALYSIS BACKTEST STATUS HELP; do
     assert_file_contains "$terminal_types" "\"$enabled\""
     assert_file_contains "$module_registry" "id: \"$enabled\""
     assert_file_contains "$module_registry" 'availability: "enabled"'
@@ -100,10 +100,12 @@ assert_module_and_workflow_navigation_preserved() {
   assert_file_contains "$rail" 'getDisabledTerminalModules'
   assert_file_contains "$monitor" 'workflow.openChartIntent(row)'
   assert_file_contains "$monitor" 'workflow.openAnalysisIntent(row)'
+  assert_file_contains "$monitor" 'workflow.openBacktestIntent(row)'
   assert_file_contains "$monitor_workflow" 'createChartNavigationIntent'
   assert_file_contains "$monitor_workflow" 'createAnalysisNavigationIntent'
+  assert_file_contains "$monitor_workflow" 'createBacktestNavigationIntent'
   assert_file_contains "$monitor_workflow" 'identity: row.exactIdentity'
-  assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : row.chartHref"
+  assert_file_contains "$monitor_workflow" "route: moduleId === 'ANALYSIS' ? row.analysisHref : moduleId === 'BACKTEST' ? row.backtestHref : row.chartHref"
 }
 
 assert_safety_boundaries_preserved() {
