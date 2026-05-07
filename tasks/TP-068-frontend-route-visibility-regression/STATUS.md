@@ -1,11 +1,11 @@
 # TP-068: Frontend route and visibility regression suite — Status
 
-**Current Step:** Step 3: Sweep stale tests and docs
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 1
+**Iteration:** 2
 **Size:** S
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -52,17 +52,17 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Consolidated regression validation passing
-- [ ] Route architecture validation passing
-- [ ] Layout visibility validation passing
-- [ ] Chart landing validation passing
-- [ ] Purpose-built module validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Consolidated regression validation passing
+- [x] Route architecture validation passing
+- [x] Layout visibility validation passing
+- [x] Chart landing validation passing
+- [x] Purpose-built module validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
@@ -97,6 +97,7 @@
 | 2026-05-07 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-07 07:14 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-07 07:14 | Step 0 started | Preflight |
+| 2026-05-07 07:27 | Worker iter 1 | done in 738s, tools: 114 |
 
 ---
 
