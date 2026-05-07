@@ -117,7 +117,7 @@ backend cannot supply.
 | `HOME` | Landing workspace with market status, paper-only safety summary, provider state, trending entry points, recent watchlist context, and shortcuts into chart/search/analysis workflows. | `GET /health`, `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`, `GET /api/market-data/trending`, current frontend workflow modules. |
 | `SEARCH` | Bounded/ranked stock search with exact provider/market identity badges, provider unavailable/authentication-required copy, and actions to chart or pin an exact instrument. | `GET /api/market-data/search?query=...&assetClass=stock&limit=...` plus `symbolSearchWorkflow`. |
 | `WATCHLIST` | Backend-owned watchlist view for exact provider/market pins with pin/unpin/remove, stable `instrumentKey` / `pinKey`, read-only cached fallback copy, and no browser-owned authority. | `GET` / `PUT` / `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy unambiguous `DELETE /api/workspace/watchlist/{symbol}`, and `watchlistWorkflow`. |
-| `CHART` | Dense chart workspace for an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis handoff. | `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, and `symbolChartWorkflow`. |
+| `CHART` | Stored-stock chart landing plus dense chart workspace: `/chart` loads backend-owned watchlist pins, shows a Stored stocks selector, defaults to the first stored instrument when available, and `/chart/{symbol}` renders an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis/backtest handoff. | `GET /api/workspace/watchlist` through `watchlistWorkflow`, `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, `symbolChartWorkflow`, and `TerminalChartLandingModule`. |
 | `ANALYSIS` | Provider-neutral analysis workspace that lists available engines, runs analysis over market-data bars, and surfaces explicit no-engine or runtime-unavailable states without fake signals. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
 | `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, completed-run-only comparison, metric table/cards, persisted strategy/buy-and-hold equity overlay, cancel, retry, and truthful empty/unavailable states without export or optimization controls. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
 | `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and explicit unavailable states. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata. |
@@ -177,10 +177,15 @@ without a command system.
   identity, source, score, pin, and action columns remain available without page
   scrolling. Row actions open chart, analysis, and backtest workspaces while
   preserving exact provider identity when available.
+- The `/chart` module route loads backend-owned stored stocks through
+  `watchlistWorkflow`, renders a Stored stocks selector/list, and selects the
+  first available watchlist instrument as the default chart candidate. Empty,
+  cached-fallback, and backend-unavailable states are explicit and link users to
+  Search and Watchlist instead of inventing a demo/default symbol.
 - Symbol routes initialize `CHART`, `ANALYSIS`, or `BACKTEST` directly from
   `/chart/{symbol}`, `/analysis/{symbol}`, and `/backtest/{symbol}` route/query
   state, including chart range and exact identity metadata (`provider`,
-  `providerSymbolId`, `exchange`, `currency`, and `assetClass`). The retired
+  `providerSymbolId`, `ibkrConid`, `exchange`, `currency`, and `assetClass`). The retired
   `/symbols/{symbol}` route is removed instead of redirected or aliased.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
   provider-state meanings, and paper-only safety constraints.
@@ -227,9 +232,11 @@ implementation while leaving room for a desktop wrapper later.
   engine configured, no watchlist pins, and disabled module states each get
   explicit copy.
 - The `CHART` workspace must reserve non-collapsing vertical space inside the
-  scroll-owned workspace. `TerminalChartWorkspace`, its chart region, the chart
-  shell, and `.chart-container` keep explicit minimum heights; `CandlestickChart`
-  measures the container, supplies `lightweight-charts` non-zero dimensions, and
+  scroll-owned workspace. `TerminalChartLandingModule` splits the Stored stocks
+  selector and selected/default chart into module-owned scroll regions, and
+  `TerminalChartWorkspace`, its chart region, the chart shell, and
+  `.chart-container` keep explicit minimum heights; `CandlestickChart` measures
+  the container, supplies `lightweight-charts` non-zero dimensions, and
   resizes/refits after module or viewport layout changes. Empty candle responses
   and provider-unavailable states render explicit status copy rather than a blank
   or synthetic chart.

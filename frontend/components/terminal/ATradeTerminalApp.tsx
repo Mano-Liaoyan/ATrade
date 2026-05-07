@@ -22,6 +22,7 @@ import { TerminalMarketMonitor } from "./TerminalMarketMonitor";
 import { TerminalWorkspaceLayout } from "./TerminalWorkspaceLayout";
 import { TerminalAnalysisWorkspace } from "./TerminalAnalysisWorkspace";
 import { TerminalBacktestWorkspace } from "./TerminalBacktestWorkspace";
+import { TerminalChartLandingModule } from "./TerminalChartLandingModule";
 import { TerminalChartWorkspace } from "./TerminalChartWorkspace";
 
 type ATradeTerminalAppProps = {
@@ -199,7 +200,7 @@ function TerminalModuleContent({
     case "WATCHLIST":
       return <TerminalWatchlistModule onOpenIntent={onOpenIntent} />;
     case "CHART":
-      return symbol ? <TerminalChartModule identity={identity} initialChartRange={chartRange} symbol={symbol} /> : <TerminalChartPlaceholder />;
+      return symbol ? <TerminalChartModule identity={identity} initialChartRange={chartRange} symbol={symbol} /> : <TerminalChartLandingModule initialChartRange={chartRange} onOpenIntent={onOpenIntent} />;
     case "ANALYSIS":
       return <TerminalAnalysisModule chartRange={chartRange} identity={identity} symbol={symbol} />;
     case "BACKTEST":
@@ -263,21 +264,6 @@ function TerminalWatchlistModule({ onOpenIntent }: TerminalMarketMonitorModulePr
   return (
     <section className="terminal-module terminal-module--watchlist" data-testid="terminal-watchlist-module" id="terminal-watchlist" tabIndex={-1}>
       <TerminalMarketMonitor onOpenIntent={onOpenIntent} title="Watchlist market monitor" />
-    </section>
-  );
-}
-
-function TerminalChartPlaceholder() {
-  return (
-    <section className="terminal-module terminal-module--chart" data-testid="terminal-chart-placeholder" id="terminal-chart" tabIndex={-1}>
-      <TerminalPanel
-        eyebrow="Chart"
-        title="Open a symbol chart"
-        description="Open a result from SEARCH or WATCHLIST so exact provider identity can flow through the route when available."
-        actions={<TerminalStatusBadge tone="info">CHART</TerminalStatusBadge>}
-      >
-        <p>Select Chart on a market monitor row to keep provider/runtime states visible through the chart workflow.</p>
-      </TerminalPanel>
     </section>
   );
 }

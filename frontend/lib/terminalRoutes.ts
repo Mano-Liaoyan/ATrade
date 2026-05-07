@@ -89,11 +89,12 @@ export function createTerminalRouteIdentity(
 ): InstrumentIdentityInput | null {
   const provider = firstTerminalQueryValue(searchParams.provider);
   const providerSymbolId = firstTerminalQueryValue(searchParams.providerSymbolId);
+  const ibkrConid = parseTerminalRouteNumber(firstTerminalQueryValue(searchParams.ibkrConid));
   const exchange = firstTerminalQueryValue(searchParams.exchange);
   const currency = firstTerminalQueryValue(searchParams.currency);
   const assetClass = firstTerminalQueryValue(searchParams.assetClass);
 
-  if (!provider && !providerSymbolId && !exchange && !currency && !assetClass) {
+  if (!provider && !providerSymbolId && ibkrConid === null && !exchange && !currency && !assetClass) {
     return null;
   }
 
@@ -101,6 +102,7 @@ export function createTerminalRouteIdentity(
     symbol,
     provider,
     providerSymbolId,
+    ibkrConid,
     exchange,
     currency,
     assetClass,
@@ -151,4 +153,13 @@ export function firstTerminalQueryValue(value: string | string[] | undefined): s
   }
 
   return value ?? null;
+}
+
+function parseTerminalRouteNumber(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value.trim())) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

@@ -505,6 +505,169 @@ select:focus-visible,
   scrollbar-gutter: stable;
 }
 
+.terminal-chart-landing {
+  min-width: 0;
+  min-height: 0;
+}
+
+.terminal-chart-landing__panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.terminal-chart-landing__status-actions,
+.terminal-chart-landing__selector-heading,
+.terminal-chart-landing__selected-heading,
+.terminal-chart-landing__empty-actions,
+.terminal-chart-landing__route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.terminal-chart-landing__status-actions,
+.terminal-chart-landing__selected-heading {
+  justify-content: space-between;
+}
+
+.terminal-chart-landing__body {
+  display: grid;
+  grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+  gap: 0.9rem;
+  align-items: stretch;
+  min-width: 0;
+  min-height: min(42rem, 72dvh);
+}
+
+.terminal-chart-landing__selector,
+.terminal-chart-landing__chart-region {
+  min-width: 0;
+  border: 1px solid hsl(var(--terminal-border) / 0.52);
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface-inset) / 0.66);
+}
+
+.terminal-chart-landing__selector {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  max-height: min(42rem, 72dvh);
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.terminal-chart-landing__selector-heading {
+  justify-content: space-between;
+}
+
+.terminal-chart-landing__selector-heading h2,
+.terminal-chart-landing__selected-heading h2 {
+  margin: 0;
+  color: hsl(var(--terminal-text));
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+}
+
+.terminal-chart-landing__state-copy,
+.terminal-chart-landing__selected-heading p,
+.terminal-chart-landing__links p {
+  margin: 0;
+  color: var(--ui-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.terminal-chart-landing__list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.terminal-chart-landing__stock {
+  display: grid;
+  gap: 0.45rem;
+  border: 1px solid hsl(var(--terminal-border) / 0.5);
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface) / 0.82);
+  padding: 0.45rem;
+}
+
+.terminal-chart-landing__stock--selected {
+  border-color: hsl(var(--terminal-accent-amber) / 0.74);
+  background: hsl(var(--terminal-accent-amber) / 0.12);
+  box-shadow: inset 3px 0 0 hsl(var(--terminal-accent-amber));
+}
+
+.terminal-chart-landing__stock-button {
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.terminal-chart-landing__stock-button strong,
+.terminal-chart-landing__links strong {
+  display: block;
+  color: hsl(var(--terminal-text));
+}
+
+.terminal-chart-landing__stock-button small,
+.terminal-chart-landing__stock-button em {
+  color: var(--ui-muted);
+  font-size: 0.72rem;
+}
+
+.terminal-chart-landing__stock-button em {
+  color: var(--ui-accent);
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.terminal-chart-landing__stock-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.terminal-chart-landing__stock-meta code {
+  border: 1px solid hsl(var(--terminal-border) / 0.52);
+  border-radius: 2px;
+  background: hsl(var(--terminal-surface-elevated) / 0.9);
+  color: hsl(var(--terminal-text));
+  font-size: 0.68rem;
+  padding: 0.18rem 0.28rem;
+}
+
+.terminal-chart-landing__chart-region {
+  display: grid;
+  align-content: stretch;
+  min-height: 32rem;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.terminal-chart-landing__selected-chart,
+.terminal-chart-landing__links {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.terminal-chart-landing__workspace {
+  min-height: min(40rem, 68dvh);
+}
+
+.terminal-chart-landing__empty-actions {
+  margin-top: 0.75rem;
+}
+
 .terminal-indicator-grid {
   align-self: stretch;
   display: grid;
@@ -1701,8 +1864,15 @@ select:focus-visible,
   .terminal-chart-workspace__market-grid,
 
 
+  .terminal-chart-landing__body,
+
+
   .terminal-market-monitor__grid {
     grid-template-columns: 1fr;
+  }
+
+  .terminal-chart-landing__selector {
+    max-height: 22rem;
   }
 
   .terminal-chart-workspace__chart-region {
@@ -2317,6 +2487,8 @@ select:focus-visible,
   .terminal-chart-workspace,
   .terminal-chart-workspace__market-grid,
   .terminal-chart-workspace__chart-region,
+  .terminal-chart-landing__body,
+  .terminal-chart-landing__chart-region,
   .chart-shell {
     min-height: 0;
   }

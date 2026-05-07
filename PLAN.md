@@ -33,9 +33,10 @@ enabled/current workflow modules, visible-disabled future modules, purpose-match
 module rail icons with local icon-first collapse behavior, compact dense market
 monitor with visible internal vertical/horizontal table scrollbars for wide
 exact-identity and action columns, visibly sized chart/analysis/backtest
-workspaces, provider diagnostics, canonical enabled routes (`/`, `/search`,
-`/watchlist`, `/chart`, `/analysis`, `/backtest`, `/status`, `/help`), canonical
-symbol routes (`/chart/{symbol}`, `/analysis/{symbol}`, `/backtest/{symbol}`),
+workspaces, provider diagnostics, a `/chart` Stored stocks selector that defaults
+to the first backend watchlist instrument when available, canonical enabled routes
+(`/`, `/search`, `/watchlist`, `/chart`, `/analysis`, `/backtest`, `/status`,
+`/help`), canonical symbol routes (`/chart/{symbol}`, `/analysis/{symbol}`, `/backtest/{symbol}`),
 visible-disabled routes (`/news`, `/portfolio`, `/research`, `/screener`,
 `/econ`, `/ai`, `/node`, `/orders`), a rail-first full-bleed single-primary
 workspace layout with no app-level brand header, visible global safety strip,
@@ -116,11 +117,13 @@ persisted strategy/buy-and-hold equity overlays, and comparison validation.
 in agent/context/UI docs. `TP-065` added canonical terminal route architecture
 for enabled/disabled modules, exact chart/analysis/backtest symbol routes, route
 architecture validation, and removal of the old `/symbols/{symbol}` route without
-a redirect or alias.
+a redirect or alias. `TP-066` added `/chart` Stored stocks selector/list behavior,
+first-backend-watchlist-instrument default chart rendering, exact identity
+handoff including optional `ibkrConid`, explicit empty/unavailable Search and
+Watchlist links, and chart-default validation without fake default symbols.
 
 Remaining ready implementation tasks are queued for the frontend route/visibility UX batch:
 
-- `TP-066` — `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
 - `TP-067` — purpose-built Home, Search, and Watchlist modules with distinct user intent
 - `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
 
@@ -132,7 +135,8 @@ use `TP-069`.
 
 Future frontend work should build on the direct module/workflow frame,
 canonical enabled/disabled/symbol routes, rail-first full-viewport workspace,
-compact market-monitor filters, visible market-monitor table scrollbars, desktop
+compact market-monitor filters, visible market-monitor table scrollbars, `/chart`
+Stored stocks default selector behavior, desktop
 Safari/Firefox/Chrome/Edge visibility and scroll-ownership guardrail,
 non-collapsing chart visibility contract, original black/graphite/amber terminal
 palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
