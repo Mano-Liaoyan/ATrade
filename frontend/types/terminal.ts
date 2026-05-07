@@ -1,4 +1,5 @@
-import type { ChartRange, MarketDataSymbolIdentity } from "./marketData";
+import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
+import type { ChartRange } from "./marketData";
 
 export const ENABLED_TERMINAL_MODULE_IDS = [
   "HOME",
@@ -94,7 +95,7 @@ export type TerminalNavigationIntent = {
   focusTargetId?: string;
   searchQuery?: string;
   symbol?: string;
-  identity?: MarketDataSymbolIdentity | null;
+  identity?: InstrumentIdentityInput | null;
   chartRange?: ChartRange;
 };
 

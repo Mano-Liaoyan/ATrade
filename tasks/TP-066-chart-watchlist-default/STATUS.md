@@ -1,6 +1,6 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
-**Current Step:** Step 3: Preserve symbol-specific chart behavior
+**Current Step:** Step 4: Add chart landing validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -43,16 +43,16 @@
 ---
 
 ### Step 3: Preserve symbol-specific chart behavior
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Keep `/chart/[symbol]` direct chart rendering with exact identity/range parsing
-- [ ] Ensure stored-stock selection updates chart and/or route without losing identity metadata
-- [ ] Ensure chart-to-analysis/backtest handoff routes remain canonical
+- [x] Keep `/chart/[symbol]` direct chart rendering with exact identity/range parsing
+- [x] Ensure stored-stock selection updates chart and/or route without losing identity metadata
+- [x] Ensure chart-to-analysis/backtest handoff routes remain canonical
 
 ---
 
 ### Step 4: Add chart landing validation
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-chart-watchlist-default-tests.sh`
 - [ ] Update existing route/chart tests only where shared paths or strings changed
@@ -108,6 +108,7 @@
 | 2026-05-07 04:00 | Step 0 completed | Required paths verified; TP-065 canonical chart routes present and `/symbols` route absent |
 | 2026-05-07 04:15 | Step 1 completed | Added chart landing workflow using backend watchlist workflow, first stored-stock default selection, canonical handoffs, explicit fallback/empty/unavailable states; `cd frontend && npm run build` passed |
 | 2026-05-07 04:25 | Step 2 completed | `/chart` now renders Stored stocks selector/list plus default chart region with explicit empty/unavailable links and internal scroll CSS; `cd frontend && npm run build` passed |
+| 2026-05-07 04:35 | Step 3 completed | Preserved direct `/chart/[symbol]` path, added `ibkrConid` route parsing/handoff, and kept chart/analysis/backtest canonical symbol routes; `cd frontend && npm run build` passed |
 
 ---
 

@@ -13,7 +13,7 @@ import { createTerminalModuleRoute, createTerminalSymbolRoute } from '@/lib/term
 import { useTerminalChartWorkspaceWorkflow } from '@/lib/terminalChartWorkspaceWorkflow';
 import { getWatchlistPinKey, type WatchlistSymbol } from '@/lib/watchlistClient';
 import { useWatchlistWorkflow } from '@/lib/watchlistWorkflow';
-import type { ChartRange, MarketDataSymbolIdentity } from '@/types/marketData';
+import type { ChartRange } from '@/types/marketData';
 import type { EnabledTerminalModuleId, TerminalNavigationIntent } from '@/types/terminal';
 import { TerminalChartWorkspace } from './TerminalChartWorkspace';
 import { TerminalPanel } from './TerminalPanel';
@@ -32,7 +32,7 @@ type StoredStockCandidate = {
   name: string | null;
   sourceLabel: string;
   identity: NormalizedInstrumentIdentity;
-  routeIdentity: MarketDataSymbolIdentity;
+  routeIdentity: InstrumentIdentityInput;
   chartHref: string;
   analysisHref: string;
   backtestHref: string;
@@ -377,13 +377,14 @@ function createStoredStockCandidate(symbol: WatchlistSymbol, index: number, sour
   };
 }
 
-function toRouteIdentity(identity: NormalizedInstrumentIdentity): MarketDataSymbolIdentity {
+function toRouteIdentity(identity: NormalizedInstrumentIdentity): InstrumentIdentityInput {
   return {
     symbol: identity.symbol,
     provider: identity.provider,
     providerSymbolId: identity.providerSymbolId,
+    ibkrConid: identity.ibkrConid,
     assetClass: identity.assetClass,
-    exchange: identity.exchange ?? '',
+    exchange: identity.exchange,
     currency: identity.currency,
   };
 }

@@ -77,7 +77,7 @@ type TerminalMarketMonitorBaseRow = {
   currency: string;
   assetClass: string;
   identity: NormalizedInstrumentIdentity;
-  exactIdentity: MarketDataSymbolIdentity;
+  exactIdentity: InstrumentIdentityInput;
   chartHref: string;
   analysisHref: string;
   backtestHref: string;
@@ -628,7 +628,7 @@ function createBaseMonitorRow({
   reasons: string[];
   instrumentKey?: string;
 }): TerminalMarketMonitorBaseRow {
-  const exactIdentity = toMarketDataSymbolIdentity(identity);
+  const exactIdentity = toNavigationInstrumentIdentity(identity);
   const chartHref = createTerminalSymbolRoute('CHART', identity);
   const analysisHref = createModuleHref(identity, 'ANALYSIS');
   const backtestHref = createModuleHref(identity, 'BACKTEST');
@@ -695,13 +695,14 @@ function createModuleHref(identity: InstrumentIdentityInput, moduleId: Extract<E
   return createTerminalSymbolRoute(moduleId, identity);
 }
 
-function toMarketDataSymbolIdentity(identity: NormalizedInstrumentIdentity): MarketDataSymbolIdentity {
+function toNavigationInstrumentIdentity(identity: NormalizedInstrumentIdentity): InstrumentIdentityInput {
   return {
     symbol: identity.symbol,
     provider: identity.provider,
     providerSymbolId: identity.providerSymbolId,
+    ibkrConid: identity.ibkrConid,
     assetClass: identity.assetClass,
-    exchange: identity.exchange ?? '',
+    exchange: identity.exchange,
     currency: identity.currency,
   };
 }
