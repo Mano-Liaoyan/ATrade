@@ -1,11 +1,11 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
+**Current Step:** Step 1: Store the desktop browser visibility rule in project memory
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,15 +15,15 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Store the desktop browser visibility rule in project memory
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add durable desktop browser/no-clipping/visible-scrollbar guardrail to `AGENTS.md` and `tasks/CONTEXT.md`
 - [ ] Update `docs/design/atrade-terminal-ui.md` with Safari/Firefox/Chrome/Edge visibility and scroll ownership contract
@@ -103,6 +103,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-07 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-07 01:10 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-07 01:10 | Step 0 started | Preflight |
+| 2026-05-07 01:11 | Step 0 completed | Required files verified; frontend dependencies installed with npm ci; toolchain available |
+| 2026-05-07 01:11 | Step 1 started | Project memory and UI documentation guardrail |
 
 ---
 
