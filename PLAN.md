@@ -36,8 +36,10 @@ exact-identity and action columns, visibly sized chart/analysis/backtest
 workspaces, provider diagnostics, a rail-first full-bleed single-primary
 workspace layout
 with no app-level brand header, visible global safety strip,
-shell context/monitor/footer chrome, or page-level vertical scrolling, an
-original black/graphite/amber institutional terminal
+shell context/monitor/footer chrome, or page-level vertical scrolling, a desktop
+Safari/Firefox/Chrome/Edge no-clipping contract with visible internal/custom
+rail, workspace, panel, table, and module scroll affordances, an original
+black/graphite/amber institutional terminal
 palette with red/green market states, and final cutover/no-command/simplified-layout/top-chrome
 filter-density/chart-visibility/theme-refactor guardrails for clean-room,
 no-order, truthful provider-state, and `ATrade.Api` browser boundaries. The
@@ -124,7 +126,8 @@ use `TP-069`.
 
 Future frontend work should build on the direct module/workflow frame,
 rail-first full-viewport workspace, compact market-monitor filters, visible
-market-monitor table scrollbars, non-collapsing chart visibility contract,
+market-monitor table scrollbars, desktop Safari/Firefox/Chrome/Edge visibility
+and scroll-ownership guardrail, non-collapsing chart visibility contract,
 original black/graphite/amber terminal palette, and accessible icon-first rail collapse behavior established by `ATradeTerminalApp`,
 `frontend/types/terminal.ts`,
 `TerminalWorkspaceLayout`, `terminalModuleRegistry`,

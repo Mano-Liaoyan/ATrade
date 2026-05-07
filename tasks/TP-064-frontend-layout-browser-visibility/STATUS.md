@@ -1,6 +1,6 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
-**Current Step:** Step 1: Store the desktop browser visibility rule in project memory
+**Current Step:** Step 2: Fix terminal shell, rail, and workspace scroll ownership
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -23,16 +23,16 @@
 ---
 
 ### Step 1: Store the desktop browser visibility rule in project memory
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Add durable desktop browser/no-clipping/visible-scrollbar guardrail to `AGENTS.md` and `tasks/CONTEXT.md`
-- [ ] Update `docs/design/atrade-terminal-ui.md` with Safari/Firefox/Chrome/Edge visibility and scroll ownership contract
-- [ ] Check README/PLAN/paper workspace docs for stale wording and update only if affected
+- [x] Add durable desktop browser/no-clipping/visible-scrollbar guardrail to `AGENTS.md` and `tasks/CONTEXT.md`
+- [x] Update `docs/design/atrade-terminal-ui.md` with Safari/Firefox/Chrome/Edge visibility and scroll ownership contract
+- [x] Check README/PLAN/paper workspace docs for stale wording and update only if affected
 
 ---
 
 ### Step 2: Fix terminal shell, rail, and workspace scroll ownership
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Make the module rail fully reachable without clipping enabled or visible-disabled module buttons
 - [ ] Make the primary workspace own visible internal scrolling while preserving page-level `overflow: hidden`
@@ -107,6 +107,8 @@
 | 2026-05-07 01:10 | Step 0 started | Preflight |
 | 2026-05-07 01:11 | Step 0 completed | Required files verified; frontend dependencies installed with npm ci; toolchain available |
 | 2026-05-07 01:11 | Step 1 started | Project memory and UI documentation guardrail |
+| 2026-05-07 01:13 | Step 1 completed | Browser visibility guardrail stored in agent/context/design/current docs |
+| 2026-05-07 01:13 | Step 2 started | Terminal shell, rail, and primary workspace scroll ownership |
 
 ---
 

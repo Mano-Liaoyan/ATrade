@@ -199,15 +199,22 @@ implementation while leaving room for a desktop wrapper later.
   brand header and no persistent paper-only safety strip. It does not render
   shell-only context aside, monitor strip, footer/status strip, context/monitor
   splitters, or a layout reset control.
-- The main page and body should not vertically scroll. The application frame is
-  viewport-height with page-level `overflow: hidden`; long market-monitor,
-  chart, analysis, status, help, and disabled-module content scrolls inside the
-  primary workspace or module-owned scroll regions. Backtest run forms, status,
-  history, completed-run comparison tables/overlays, and detail content use module-owned scroll space and must not force
-  page-level scrolling. The market monitor table is its own module-owned scroll
-  region: row overflow stays inside the table
-  viewport with sticky headers, and horizontal overflow remains visible through a
-  dedicated table scrollbar rather than clipping identity/action columns.
+- The main page and body should not vertically scroll on latest stable desktop
+  Safari, Firefox, Chrome, or Edge. The application frame is viewport-height with
+  page-level `overflow: hidden`; long market-monitor, chart, analysis, backtest,
+  status, help, and disabled-module content scrolls inside the primary workspace
+  or module-owned scroll regions. Backtest run forms, status, history,
+  completed-run comparison tables/overlays, and detail content use module-owned
+  scroll space and must not force page-level scrolling. Scroll-owned regions must
+  expose visible app-owned or explicitly styled scroll affordances. Safari may
+  overlay or hide native OS scrollbars, so ATrade-owned custom tracks/thumbs are
+  acceptable for critical regions; Firefox should receive explicit
+  `scrollbar-color`/`scrollbar-width` treatment and Chromium/WebKit browsers
+  should receive visible `::-webkit-scrollbar` tracks/thumbs. The market monitor
+  table is its own module-owned scroll region: row overflow stays inside the
+  table viewport with sticky headers, and horizontal overflow remains visible
+  through a dedicated table scrollbar rather than clipping identity/action
+  columns.
 - Panel content must remain honest about backend state: loading, provider
   not-configured, provider unavailable, authentication required, no analysis
   engine configured, no watchlist pins, and disabled module states each get
@@ -241,7 +248,9 @@ implementation while leaving room for a desktop wrapper later.
   label.
 - Visible-disabled future modules may appear below a separator with disabled
   styling, purpose-matched icons, explanatory title/tooltip copy, and no active
-  workspace route.
+  workspace route. The rail owns its own overflow on desktop so late-list items
+  such as NODE and ORDERS remain fully reachable and no module button is clipped
+  half-visible at the viewport edge.
 - Rail labels should use ATrade module names, not third-party product branding.
 - The rail may collapse to an icon-first compact state on laptop/desktop
   screens. Collapse/expand must be a visible button with accessible state

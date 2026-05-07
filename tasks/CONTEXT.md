@@ -92,12 +92,14 @@ current frontend UX batch, beyond preserving existing responsive fallbacks.
 
 The accepted shell contract is: keep the terminal as a full-viewport app with
 page-level scrolling disabled, but make every overflowing region internally
-reachable with visible/custom scroll affordances. Rail items, market-monitor
-tables/detail panels, chart, analysis, backtest, status, help, and disabled
-module content must not be clipped or unreachable; use module-owned scroll
-regions rather than hiding overflow. Safari's native scrollbar behavior may hide
-OS scrollbars, so key scroll-owned terminal regions should render app-owned or
-explicitly styled visible scrollbar tracks/thumbs.
+reachable with visible/custom scroll affordances. Rail items, including late-list
+visible-disabled entries such as NODE and ORDERS; the primary workspace;
+market-monitor tables/detail panels; chart, analysis, backtest, status, help,
+and disabled module content must not be clipped or unreachable. Use
+module-owned scroll regions rather than hiding overflow. Safari's native
+scrollbar behavior may hide OS scrollbars, so key scroll-owned terminal regions
+must render app-owned or explicitly styled visible scrollbar tracks/thumbs that
+remain apparent in Safari, Firefox, Chrome, and Edge.
 
 ## Runtime Contract
 
