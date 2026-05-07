@@ -1,7 +1,7 @@
 # TP-065: Terminal route architecture and old symbol route removal — Status
 
-**Current Step:** Step 5: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 6: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-07
 **Review Level:** 1
 **Review Counter:** 0
@@ -75,12 +75,12 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Canonical route docs updated
-- [ ] README/PLAN verification/current-surface text updated if affected
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] Canonical route docs updated
+- [x] README/PLAN verification/current-surface text updated if affected
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -95,6 +95,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Disabled rail entries need canonical routes while still announcing disabled state. | Implemented focusable `aria-disabled` rail buttons with `aria-current` for selected disabled routes and app-owned route pushes. | `frontend/components/terminal/TerminalModuleRail.tsx`, `frontend/components/terminal/ATradeTerminalApp.tsx` |
+| Existing cutover validation globally rejected `height: auto;`, which conflicted with the backtest comparison SVG rather than route architecture. | Narrowed the assertion to the terminal workspace layout owning `height: 100%` while preserving the no-splitter/no-context guardrail. | `tests/apphost/frontend-terminal-cutover-tests.sh` |
+| `next build` rewrites generated `frontend/next-env.d.ts` references between dev/build route type outputs. | Reverted generated `next-env.d.ts` after validation runs; no source contract change required. | `frontend/next-env.d.ts` |
 
 ---
 
@@ -121,6 +124,9 @@
 | 2026-05-07 03:10 | Step 5 started | Full task verification gate |
 | 2026-05-07 03:10 | Step 5 verification | Route architecture, chart/analysis, trading workspace, Next.js bootstrap, frontend build, `dotnet test ATrade.slnx`, and `dotnet build ATrade.slnx` passed |
 | 2026-05-07 03:10 | Step 5 completed | All required verification commands passed after updating bootstrap route-wrapper assertion |
+| 2026-05-07 03:10 | Step 6 started | Documentation and delivery updates |
+| 2026-05-07 03:10 | Step 6 completed | Active route docs, README/PLAN verification inventory/current surface, check-if-affected docs, and discoveries updated |
+| 2026-05-07 03:10 | Task completed | All TP-065 steps and verification gates complete |
 
 ---
 

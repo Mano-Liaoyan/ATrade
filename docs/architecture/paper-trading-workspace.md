@@ -120,15 +120,16 @@ frame remains non-scrolling. Latest stable desktop Safari, Firefox, Chrome, and
 Edge are supported targets for this no-clipping contract; rail, workspace,
 panel, table, chart, analysis, backtest, status, help, and disabled-module
 overflow must stay reachable through module-owned visible/custom scroll
-affordances rather than page scroll. The home and symbol routes now render
-directly through `ATradeTerminalApp`, which provides the direct module/workflow
-frame, module rail, single primary workspace region, module-owned scrolling,
-STATUS/HELP modules, and honest disabled-module surfaces for future modules
-(`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`, `ECON`, `AI`, `NODE`, and
-`ORDERS`). Users open modules through the
-rail, market-monitor chart/analysis/backtest actions, and symbol route state; no
-command input, command parser, or backend command route is part of the active
-frontend.
+affordances rather than page scroll. Canonical enabled, symbol, and
+disabled-module routes now render directly through `ATradeTerminalApp`, which
+provides the direct module/workflow frame, module rail, single primary workspace
+region, module-owned scrolling, STATUS/HELP modules, and honest disabled-module
+surfaces for future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`,
+`ECON`, `AI`, `NODE`, and `ORDERS`). Users open modules through the rail,
+market-monitor chart/analysis/backtest actions, and `/chart/{symbol}`,
+`/analysis/{symbol}`, or `/backtest/{symbol}` route state; no command input,
+command parser, old `/symbols/{symbol}` compatibility route, or backend command
+route is part of the active frontend.
 The visual direction is inspired only by broad finance-workstation information
 architecture and is implemented with original ATrade black/graphite/amber tokens,
 red/green market-state colors, warm gray dividers, and restrained information
