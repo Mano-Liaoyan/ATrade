@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-06
+updated: 2026-05-07
 summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
 see_also:
   - PLAN.md
@@ -214,11 +214,18 @@ module rail navigation plus explicit workflow actions rather than the retired ol
 shell/list route wrappers, a command system, cyan/blue-gradient-dominant styling,
 or the removed app-level, context, monitor, footer, and top-safety chrome.
 
-No ready implementation tasks are currently queued. The next new Taskplane
-packet should use `TP-064`. Completed Taskplane packets through `TP-063` are
-present in `tasks/`; completed packets should be archived when convenient.
-During orchestrated runs the runtime handles post-merge archival for active task
-folders.
+Ready implementation tasks are queued for the frontend route/visibility UX batch:
+
+- `TP-064` — frontend layout and browser visibility guardrails plus durable memory in agent/context/UI docs
+- `TP-065` — canonical terminal route architecture for enabled/disabled modules and removal of `/symbols/[symbol]`
+- `TP-066` — `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
+- `TP-067` — purpose-built Home, Search, and Watchlist modules with distinct user intent
+- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+
+The next new Taskplane packet should use `TP-069`. Completed Taskplane packets
+through `TP-063` are present in `tasks/`; completed packets should be archived
+when convenient. During orchestrated runs the runtime handles post-merge
+archival for active task folders.
 
 ## Repository Map
 
@@ -245,6 +252,7 @@ agents used by the orchestrator.
 - `docs/design/atrade-terminal-ui.md` defines the active clean-room ATrade paper workspace UI target for the frontend reconstruction queue.
 - `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md`, and `docs/architecture/paper-trading-workspace.md` define the provider seams, analysis engine contract, and paper-trading workspace contract.
 - Durable code or runtime changes must update the relevant active docs in the same change.
+- Frontend desktop behavior must stay consistent across latest stable Safari, Firefox, Chrome, and Edge: if page-level scrolling is disabled, all rail/workspace/panel/table/module overflow must remain reachable through visible internal/custom scroll affordances. Mobile optimization is not in scope for the current frontend UX batch beyond preserving existing fallbacks.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
 - No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
 

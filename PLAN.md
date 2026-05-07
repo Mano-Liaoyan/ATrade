@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-06
+updated: 2026-05-07
 summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, paper-capital source, saved backtesting API seams, and terminal comparison surface.
 see_also:
   - README.md
@@ -13,7 +13,7 @@ see_also:
 
 # ATrade Current Plan
 
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-07
 
 ## Current Focus
 
@@ -69,6 +69,7 @@ Current repository contracts remain:
 - keep paper-capital and saved backtest initialization/history behind `ATrade.Api`, with IBKR account ids used only internally and local fallback capital/backtest rows persisted in Postgres without secrets, gateway URLs, direct bars, custom code, or order-routing fields
 - keep credentials, account identifiers, tokens, cookies, and live-trading behavior out of committed files and active defaults
 - keep frontend/browser data access behind `ATrade.Api`; the frontend must not connect directly to Postgres or TimescaleDB
+- keep frontend desktop behavior consistent across latest stable Safari, Firefox, Chrome, and Edge: page-level scrolling may stay disabled only when rail/workspace/panel/table/module overflow remains reachable through visible internal/custom scroll affordances; mobile optimization is out of scope for the current frontend UX batch beyond preserving existing fallbacks
 - keep durable runtime/code changes paired with active documentation updates
 
 ## Active Task Queue
@@ -107,9 +108,17 @@ history/detail, cancel, retry, and frontend backtest workspace validation.
 `TP-063` added completed-run-only saved-run comparison, metrics table/cards,
 persisted strategy/buy-and-hold equity overlays, and comparison validation.
 
-No ready implementation tasks are currently queued. Completed task packets
-through `TP-063` are present in `tasks/`; completed packets should be archived
-when convenient. The next new Taskplane packet should use `TP-064`.
+Ready implementation tasks are queued for the frontend route/visibility UX batch:
+
+- `TP-064` — frontend layout and browser visibility guardrails plus durable memory in agent/context/UI docs
+- `TP-065` — canonical terminal route architecture for enabled/disabled modules and removal of `/symbols/[symbol]`
+- `TP-066` — `/chart` Stored stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
+- `TP-067` — purpose-built Home, Search, and Watchlist modules with distinct user intent
+- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+
+Completed task packets through `TP-063` are present in `tasks/`; completed
+packets should be archived when convenient. The next new Taskplane packet should
+use `TP-069`.
 
 ## Follow-Up Direction
 
@@ -140,4 +149,4 @@ provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-064`
+`TP-069`

@@ -1,8 +1,8 @@
 # General — Context
 
-**Last Updated:** 2026-05-06
+**Last Updated:** 2026-05-07
 **Status:** Active
-**Next Task ID:** TP-064
+**Next Task ID:** TP-069
 
 ---
 
@@ -48,8 +48,13 @@ implementation queue.
 
 ## Active Task Queue
 
-No ready implementation tasks are currently queued after the completed frontend
-polish wave and backtesting MVP wave.
+Ready implementation tasks are queued for the frontend route/visibility UX batch:
+
+- `TP-064` — frontend layout and browser visibility guardrails, including durable memory in `AGENTS.md`, `tasks/CONTEXT.md`, and the active UI design doc
+- `TP-065` — canonical terminal route architecture for enabled/disabled modules and removal of the old `/symbols/[symbol]` route
+- `TP-066` — `/chart` stored-stocks selector and first-watchlist-instrument default chart behavior without fake default symbols
+- `TP-067` — purpose-built Home, Search, and Watchlist modules so the three pages no longer look like identical market-monitor clones
+- `TP-068` — consolidated frontend route, visibility, chart-default, and page-purpose regression validation
 
 The most recent completed work includes:
 
@@ -63,7 +68,7 @@ The most recent completed work includes:
 - `TP-062` — added the BACKTEST terminal module with run form, capital settings, SignalR status, history, cancel, and retry
 - `TP-063` — added saved-run comparison and equity/benchmark overlays in the BACKTEST module
 
-The next new Taskplane packet should use `TP-064`.
+The next new Taskplane packet should use `TP-069`.
 
 Completed task packets through `TP-063` are present in `tasks/`; completed
 packets should be archived when convenient.
@@ -74,10 +79,25 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-064`
+- New tasks should use the next ID: `TP-069`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
+
+## Frontend Desktop Browser Visibility Guardrail
+
+Frontend work must preserve consistent behavior across latest stable desktop
+Safari, Firefox, Chrome, and Edge. Mobile optimization is not in scope for the
+current frontend UX batch, beyond preserving existing responsive fallbacks.
+
+The accepted shell contract is: keep the terminal as a full-viewport app with
+page-level scrolling disabled, but make every overflowing region internally
+reachable with visible/custom scroll affordances. Rail items, market-monitor
+tables/detail panels, chart, analysis, backtest, status, help, and disabled
+module content must not be clipped or unreachable; use module-owned scroll
+regions rather than hiding overflow. Safari's native scrollbar behavior may hide
+OS scrollbars, so key scroll-owned terminal regions should render app-owned or
+explicitly styled visible scrollbar tracks/thumbs.
 
 ## Runtime Contract
 
@@ -102,7 +122,7 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | None currently queued; next packet is `TP-064`            |
+| Active tasks        | `TP-064` through `TP-068` frontend route/visibility UX batch |
 | Completed tasks     | `tasks/TP-042-*` through `tasks/TP-063-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |

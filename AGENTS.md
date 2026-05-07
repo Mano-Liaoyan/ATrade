@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-05
+updated: 2026-05-07
 summary: Repository guidance and introduction of repo-local Pi skills.
 see_also:
   - README.md
@@ -18,7 +18,8 @@ orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
 ## Current Coordination Model
 
 - Implementation work is tracked as Taskplane packets under `tasks/`.
-- No ready implementation tasks are currently queued after the completed frontend polish wave (`TP-055` through `TP-057`) and backtesting MVP wave (`TP-058` through `TP-063`).
+- Ready frontend route/visibility UX tasks are queued as `TP-064` through `TP-068`.
+- `TP-064` captures the durable desktop browser visibility guardrail; `TP-065` adds canonical routes and removes `/symbols/[symbol]`; `TP-066` adds `/chart` stored-stock/default-watchlist behavior; `TP-067` makes Home/Search/Watchlist purpose-built; `TP-068` adds consolidated regression validation.
 - Completed task packets through `TP-063` are present in `tasks/`; completed packets should be archived when convenient.
 - `TP-055` through `TP-057` finalized the terminal palette, rail icon/collapse behavior, and visible market-monitor table scrollbars; `TP-058` through `TP-063` added the paper-capital/backtesting MVP and terminal BACKTEST comparison surface.
 - The next task ID is recorded in `tasks/CONTEXT.md`.
@@ -46,6 +47,9 @@ Current installed skills include:
 - `to-prd`, `to-issues`, and `triage` — PRD, issue, and triage workflow helpers.
 - `caveman`, `grill-me`, and `write-a-skill` — productivity and skill-authoring
   helpers.
+- `ask-and-plan` — clarify rough requirements one question at a time with
+  recommendations, then stage small Taskplane task packets with dependencies,
+  verification, and durable memory updates when requested.
 
 ## Startup Order For Coding Sessions
 
@@ -61,5 +65,6 @@ Current installed skills include:
 - Keep secrets, IBKR credentials, account identifiers, tokens, and session cookies out of git.
 - Real IBKR/iBeam and LEAN verification must use ignored local `.env` values and cleanly skip when the required local runtime is unavailable.
 - Do not add real order placement or live-trading behavior in the current queued work.
+- Frontend desktop browser behavior is a major product guardrail: latest stable Safari, Firefox, Chrome, and Edge must behave consistently; page-level scrolling can remain disabled only if every overflowing rail/workspace/panel/table/module region owns visible internal/custom scroll affordances and no content is clipped or unreachable. Mobile optimization is not in scope for the current frontend UX batch beyond preserving existing fallbacks.
 - Durable code/runtime changes must update active documentation in the same change.
 - Use `docs/INDEX.md` as the documentation discovery layer; only `active` docs are implementation authority.
