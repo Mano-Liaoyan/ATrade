@@ -1,6 +1,6 @@
 # TP-066: Chart landing watchlist default and stored-stock selector — Status
 
-**Current Step:** Step 5: Testing & Verification
+**Current Step:** Step 6: Documentation & Delivery
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -61,21 +61,21 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Chart landing validation passing
-- [ ] Stock chart visibility validation passing
-- [ ] Chart range preset validation passing
-- [ ] Route architecture validation passing
-- [ ] Frontend build passes
-- [ ] FULL test suite passing
-- [ ] All failures fixed
-- [ ] Build passes
+- [x] Chart landing validation passing
+- [x] Stock chart visibility validation passing
+- [x] Chart range preset validation passing
+- [x] Route architecture validation passing
+- [x] Frontend build passes
+- [x] FULL test suite passing
+- [x] All failures fixed
+- [x] Build passes
 
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Chart landing/default stored-stock docs updated
 - [ ] README/PLAN verification/current-surface text updated if affected
@@ -110,6 +110,7 @@
 | 2026-05-07 04:25 | Step 2 completed | `/chart` now renders Stored stocks selector/list plus default chart region with explicit empty/unavailable links and internal scroll CSS; `cd frontend && npm run build` passed |
 | 2026-05-07 04:35 | Step 3 completed | Preserved direct `/chart/[symbol]` path, added `ibkrConid` route parsing/handoff, and kept chart/analysis/backtest canonical symbol routes; `cd frontend && npm run build` passed |
 | 2026-05-07 04:45 | Step 4 completed | Added provider-independent chart watchlist default validation and updated shared route/identity test expectations; targeted apphost validations passed |
+| 2026-05-07 05:00 | Step 5 completed | Chart landing, stock chart, chart range, route architecture validations, frontend build, full `dotnet test ATrade.slnx`, and `dotnet build ATrade.slnx` passed with zero failures |
 
 ---
 
