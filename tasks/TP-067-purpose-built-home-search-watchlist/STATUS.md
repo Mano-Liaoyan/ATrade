@@ -1,6 +1,6 @@
 # TP-067: Purpose-built Home, Search, and Watchlist modules — Status
 
-**Current Step:** Step 1: Split page composition by purpose
+**Current Step:** Step 2: Implement a dashboard-focused Home module
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -32,11 +32,11 @@
 ---
 
 ### Step 2: Implement a dashboard-focused Home module
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Render Home as provider/API status, paper safety, quick actions, and compact market/watchlist context
-- [ ] Use compact truthful previews instead of a full generic market monitor clone
-- [ ] Keep Home copy/headings distinct from Search and Watchlist
+- [x] Render Home as provider/API status, paper safety, quick actions, and compact market/watchlist context
+- [x] Use compact truthful previews instead of a full generic market monitor clone
+- [x] Keep Home copy/headings distinct from Search and Watchlist
 
 ---
 
