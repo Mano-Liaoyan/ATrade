@@ -1,6 +1,6 @@
 # TP-064: Frontend layout and browser visibility guardrails — Status
 
-**Current Step:** Step 3: Fix module-owned panel visibility
+**Current Step:** Step 4: Add layout/browser visibility validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-07
 **Review Level:** 1
@@ -42,17 +42,17 @@
 ---
 
 ### Step 3: Fix module-owned panel visibility
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] Make `MarketMonitorDetailPanel` content fully reachable without viewport-edge clipping
-- [ ] Ensure Analysis, Backtest, Status, Help, Chart, and disabled-module surfaces remain reachable through module-owned overflow/reflow
-- [ ] Preserve visible market-monitor table vertical/horizontal scrollbars, sticky headers, identity columns, and action columns
-- [ ] Avoid mobile-specific optimization beyond existing responsive fallbacks
+- [x] Make `MarketMonitorDetailPanel` content fully reachable without viewport-edge clipping
+- [x] Ensure Analysis, Backtest, Status, Help, Chart, and disabled-module surfaces remain reachable through module-owned overflow/reflow
+- [x] Preserve visible market-monitor table vertical/horizontal scrollbars, sticky headers, identity columns, and action columns
+- [x] Avoid mobile-specific optimization beyond existing responsive fallbacks
 
 ---
 
 ### Step 4: Add layout/browser visibility validation
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create `tests/apphost/frontend-terminal-layout-visibility-tests.sh`
 - [ ] Update existing shell/scrollbar/rail tests only where shared layout changes require it
@@ -111,6 +111,8 @@
 | 2026-05-07 01:13 | Step 2 started | Terminal shell, rail, and primary workspace scroll ownership |
 | 2026-05-07 01:20 | Step 2 completed | Rail and primary workspace own native/custom styled scrolling; no-command guardrail tests pass |
 | 2026-05-07 01:20 | Step 3 started | Module-owned panel visibility and overflow reachability |
+| 2026-05-07 01:28 | Step 3 completed | Detail, chart, analysis, backtest, status, help, and disabled module surfaces expose reachable module-owned overflow/reflow |
+| 2026-05-07 01:28 | Step 4 started | Layout/browser visibility validation script and impacted test updates |
 
 ---
 

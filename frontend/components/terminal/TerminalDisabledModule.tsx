@@ -28,7 +28,8 @@ export function TerminalDisabledModule({ className, module, moduleId }: Terminal
 
   return (
     <TerminalPanel
-      className={cn("terminal-disabled-module", className)}
+      className={cn("terminal-disabled-module terminal-module-scroll-surface", className)}
+      data-scroll-owner="disabled-module"
       data-testid={`terminal-disabled-module-${unavailable.module.id.toLowerCase()}`}
       description={unavailable.message}
       eyebrow="Visible-disabled module"

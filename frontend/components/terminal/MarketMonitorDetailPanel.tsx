@@ -32,7 +32,8 @@ export function MarketMonitorDetailPanel({
   if (!row) {
     return (
       <TerminalPanel
-        className={cn('market-monitor-detail', compact && 'market-monitor-detail--compact', className)}
+        className={cn('market-monitor-detail terminal-scroll-owned', compact && 'market-monitor-detail--compact', className)}
+        data-scroll-owner="market-monitor-detail"
         data-testid="market-monitor-detail-panel"
         density="compact"
         eyebrow="Selection"
@@ -50,7 +51,8 @@ export function MarketMonitorDetailPanel({
 
   return (
     <TerminalPanel
-      className={cn('market-monitor-detail', compact && 'market-monitor-detail--compact', className)}
+      className={cn('market-monitor-detail terminal-scroll-owned', compact && 'market-monitor-detail--compact', className)}
+      data-scroll-owner="market-monitor-detail"
       data-testid="market-monitor-detail-panel"
       density="compact"
       eyebrow="Selected instrument"

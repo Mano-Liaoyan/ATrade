@@ -4,7 +4,7 @@ import { TerminalProviderDiagnostics } from "./TerminalProviderDiagnostics";
 
 export function TerminalStatusModule() {
   return (
-    <section className="terminal-status-module workspace-stack" data-testid="terminal-status-module" id="terminal-status" tabIndex={-1}>
+    <section className="terminal-status-module terminal-module-scroll-surface workspace-stack" data-scroll-owner="status-module" data-testid="terminal-status-module" id="terminal-status" tabIndex={-1}>
       <TerminalPanel
         eyebrow="Operational status"
         title="ATrade.Api, provider, and paper-mode boundary"

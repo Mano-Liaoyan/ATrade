@@ -502,6 +502,7 @@ select:focus-visible,
   min-height: 30rem;
   resize: vertical;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .terminal-indicator-grid {
@@ -796,6 +797,13 @@ select:focus-visible,
 
 .terminal-scroll-owned::-webkit-scrollbar-corner {
   background: hsl(var(--terminal-surface-elevated));
+}
+
+.terminal-module-scroll-surface {
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-wrap: anywhere;
 }
 
 .terminal-module-rail__navigation {
@@ -1571,6 +1579,11 @@ select:focus-visible,
 .market-monitor-detail {
   position: sticky;
   top: 0;
+  align-self: start;
+  max-block-size: min(34rem, calc(100dvh - 4rem));
+  min-width: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .market-monitor-detail__body,
@@ -1650,9 +1663,10 @@ select:focus-visible,
 }
 
 .market-monitor-detail__identity dd {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .market-monitor-detail__reasons ul {
@@ -1912,6 +1926,20 @@ select:focus-visible,
   font-size: 0.8rem;
 }
 
+.terminal-backtest-history__list {
+  max-block-size: min(24rem, 48dvh);
+  overflow: auto;
+  padding-inline-end: 0.16rem;
+  scrollbar-gutter: stable;
+}
+
+.terminal-backtest-detail__scroll-list {
+  max-block-size: min(16rem, 36dvh);
+  overflow: auto;
+  padding-inline-end: 0.16rem;
+  scrollbar-gutter: stable;
+}
+
 .terminal-backtest-history__item {
   display: grid;
   gap: 0.25rem;
@@ -2112,7 +2140,8 @@ select:focus-visible,
 }
 
 .terminal-backtest-comparison__table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .terminal-backtest-comparison__table {
