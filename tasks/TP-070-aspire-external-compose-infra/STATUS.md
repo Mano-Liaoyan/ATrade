@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 4
+**Review Counter:** 5
 **Iteration:** 1
 **Size:** M
 
@@ -46,10 +46,10 @@
 ### Step 3: Add opt-in manifest and wiring tests
 **Status:** 🟨 In Progress
 
-- [ ] Add/update Compose-mode manifest tests asserting infra resources are absent
-- [ ] Assert app resources and external connection string env are present
-- [ ] Assert manifests do not expose raw database/broker secrets
-- [ ] Keep current default AppHost manifest expectations passing until cutover
+- [x] Add/update Compose-mode manifest tests asserting infra resources are absent
+- [x] Assert app resources and external connection string env are present
+- [x] Assert manifests do not expose raw database/broker secrets
+- [x] Keep current default AppHost manifest expectations passing until cutover
 
 ---
 
@@ -112,3 +112,4 @@
 | 2026-05-10 05:18 | Review R002 | code Step 1: APPROVE |
 | 2026-05-10 05:24 | Review R003 | plan Step 2: APPROVE |
 | 2026-05-10 05:33 | Review R004 | code Step 2: APPROVE |
+| 2026-05-10 05:38 | Review R005 | plan Step 3: APPROVE |
