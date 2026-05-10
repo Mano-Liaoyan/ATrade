@@ -1,10 +1,10 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
-**Current Step:** Step 4: Update frontend identity handoff
+**Current Step:** Step 5: Documentation and durable memory update
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 9
+**Review Counter:** 10
 **Iteration:** 1
 **Size:** M
 
@@ -67,12 +67,12 @@
 ---
 
 ### Step 5: Documentation and durable memory update
-**Status:** Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Active architecture docs updated
-- [ ] Saved backtest identity docs updated
-- [ ] Watchlist identity/key docs updated
-- [ ] `tasks/CONTEXT.md` updated with discoveries and next task state
+- [x] Active architecture docs updated
+- [x] Saved backtest identity docs updated
+- [x] Watchlist identity/key docs updated
+- [x] `tasks/CONTEXT.md` updated with discoveries and next task state
 
 ---
 
@@ -141,3 +141,4 @@
 | 2026-05-10 21:30 | Review R006 | plan Step 3: APPROVE |
 | 2026-05-10 21:48 | Review R008 | plan Step 4: APPROVE |
 | 2026-05-10 22:00 | Review R009 | code Step 4: APPROVE |
+| 2026-05-10 22:05 | Review R010 | plan Step 5: APPROVE |

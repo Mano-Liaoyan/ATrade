@@ -193,8 +193,9 @@ without a command system.
   Search and Watchlist instead of inventing a demo/default symbol.
 - Symbol routes initialize `CHART`, `ANALYSIS`, or `BACKTEST` directly from
   `/chart/{symbol}`, `/analysis/{symbol}`, and `/backtest/{symbol}` route/query
-  state, including chart range and exact identity metadata (`provider`,
-  `providerSymbolId`, `ibkrConid`, `exchange`, `currency`, and `assetClass`). The retired
+  state, including chart range and provider-neutral exact identity metadata
+  (`provider`, `providerSymbolId`, `exchange`, `currency`, and `assetClass`).
+  IBKR `conid` is adapter metadata only, not route/query identity. The retired
   `/symbols/{symbol}` route is removed instead of redirected or aliased.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
   provider-state meanings, and paper-only safety constraints.

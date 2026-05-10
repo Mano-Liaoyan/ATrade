@@ -59,8 +59,9 @@ see_also:
 > cancellation, `/hubs/backtests` SignalR updates, and secret/direct-bar/runtime
 > detail redaction. `ATrade.Workspaces` owns the first
 > backend-persisted workspace preference: Postgres-backed exact instrument
-> watchlists with stable `instrumentKey`/`pinKey` payloads derived from provider,
-> provider id / IBKR `conid`, symbol, exchange, currency, and asset class, plus a
+> watchlists with stable provider-neutral `instrumentKey`/`pinKey` payloads
+> derived from provider, provider symbol id, symbol, exchange, currency, and
+> asset class; IBKR `conid` is provider metadata/alias data only, plus a
 > temporary local
 > user / workspace identity seam. The remaining modules and workers listed below stay
 > aspirational and will land in later milestones tracked by `PLAN.md`. The
@@ -242,8 +243,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `IWorkspaceWatchlistIntake`, so `ATrade.Workspaces` owns the temporary local
   workspace identity, idempotent schema initialization ordering, exact
   provider/market pin normalization, exact unpin validation, Postgres
-  persistence, stable `instrumentKey`/`pinKey` metadata payloads, and stable
-  validation/storage error shapes while the API only binds HTTP requests and
+  persistence, stable provider-neutral `instrumentKey`/`pinKey` metadata
+  payloads that exclude `ibkrConid`, and stable validation/storage error shapes
+  while the API only binds HTTP requests and
   projects HTTP responses. The backtest REST handlers resolve
   `IBacktestRunFactory`, `IBacktestRunRepository`, the backtesting schema
   initializer, and `IBacktestRunCancellationRegistry`, while the mapped
@@ -515,8 +517,9 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   `ATrade.MarketData.ExactInstrumentIdentity`, exact instrument-key validation,
   idempotent Postgres schema initialization ordering, stable watchlist error
   shapes, and repository operations for pinned watchlist instruments. The current schema
-  stores `user_id`, `workspace_id`, durable `instrument_key`, normalized symbol,
-  provider, optional provider symbol id / IBKR `conid`, display name, exchange,
+  stores `user_id`, `workspace_id`, durable provider-neutral `instrument_key`,
+  normalized symbol, provider, optional provider symbol id plus IBKR `conid`
+  provider metadata, display name, exchange,
   currency, asset class, sort order, and timestamps. It deduplicates only exact
   provider/market instrument keys, allowing the same symbol or company name to
   be pinned for multiple exchanges/currencies, and rejects legacy symbol deletes

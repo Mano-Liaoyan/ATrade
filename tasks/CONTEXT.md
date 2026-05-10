@@ -1,8 +1,8 @@
 # General — Context
 
-**Last Updated:** 2026-05-07
+**Last Updated:** 2026-05-10
 **Status:** Active
-**Next Task ID:** TP-072
+**Next Task ID:** TP-073
 
 ---
 
@@ -40,16 +40,19 @@ implementation queue.
   tuple for a tradable or chartable instrument: provider, provider symbol id,
   symbol, exchange, currency, and asset class, normalized by
   `ATrade.MarketData.ExactInstrumentIdentity`. Provider-backed market-data
-  search, trending, candle, indicator, latest-update, Timescale cache, and
-  watchlist flows carry this identity where available. Backend-owned persisted
-  keys derive from the normalized tuple and retain the legacy
-  `instrumentKey` / `pinKey` segment shape; frontend code may compute
-  provisional keys only for optimistic UI state until the backend returns
-  authoritative `instrumentKey` / `pinKey` values.
+  search, trending, candle, indicator, latest-update, Timescale cache,
+  watchlist, and saved backtest flows carry this identity where available.
+  Backend-owned persisted keys derive only from the normalized tuple and retain
+  the legacy `instrumentKey` / `pinKey` segment names while excluding an
+  `ibkrConid` segment. IBKR `conid` is provider-specific metadata and an alias
+  for the IBKR provider symbol id, not a separate provider-neutral identity
+  dimension. Frontend code may compute provider-neutral provisional keys only for
+  optimistic UI state until the backend returns authoritative `instrumentKey` /
+  `pinKey` values.
 
 ## Active Task Queue
 
-No ready implementation tasks are currently queued after completion of the frontend route/visibility UX batch through `TP-068`. The next new Taskplane packet should use `TP-069`.
+No ready implementation tasks are currently queued after completion of TP-072 Exact Instrument Identity provider-neutral key deepening. The next new Taskplane packet should use `TP-073`.
 
 The most recent completed work includes:
 
@@ -80,7 +83,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-072`
+- New tasks should use the next ID: `TP-073`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -125,7 +128,7 @@ All variants start Compose infrastructure first and then delegate to the Aspire 
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | None currently queued; next packet should use `TP-072`    |
+| Active tasks        | None currently queued; next packet should use `TP-073`    |
 | Completed tasks     | `tasks/TP-042-*` through `tasks/TP-068-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |

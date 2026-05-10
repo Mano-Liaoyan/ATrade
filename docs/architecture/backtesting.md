@@ -49,9 +49,11 @@ A saved run envelope contains:
 - `id` — server-generated `bt_...` run id.
 - `status` — one of `queued`, `running`, `completed`, `failed`, or `cancelled`.
 - `sourceRunId` — populated only for retry-created runs.
-- `request` — normalized request snapshot with symbol identity, built-in strategy
-  id, optional analysis engine id, JSON parameter bag, chart range, cost model,
-  slippage bps, and benchmark mode.
+- `request` — normalized request snapshot with the full provider-neutral Exact
+  Instrument Identity tuple (`provider`, `providerSymbolId`, `symbol`,
+  `exchange`, `currency`, and `assetClass`), built-in strategy id, optional
+  analysis engine id, JSON parameter bag, chart range, cost model, slippage bps,
+  and benchmark mode.
 - `capital` — `initialCapital`, `currency`, and `capitalSource` captured at
   creation time.
 - timestamps for creation/update/start/completion.
@@ -68,7 +70,8 @@ interrupted rows left in `running` are marked `failed` with
 requests best-effort cancellation for running rows through runner-owned
 cancellation tokens before marking the row `cancelled`. `POST /api/backtests/{id}/retry`
 is allowed only for `failed` or `cancelled` runs and creates a new queued run
-from the saved source request snapshot instead of mutating the source run.
+from the saved source request snapshot instead of mutating the source run, so
+provider-neutral symbol identity is retried exactly as originally saved.
 
 ## Capital Snapshot
 
@@ -245,9 +248,10 @@ Request validation and persistence safety checks reject:
   broker/order-routing fields;
 - multi-symbol or portfolio payloads.
 
-Backtests load market-data bars on the server. The browser must submit only
-provider-neutral identity, built-in strategy id, optional engine id, bounded JSON
-parameters, chart range, cost/slippage settings, and benchmark mode.
+Backtests load market-data bars on the server. The browser must submit only the
+provider-neutral Exact Instrument Identity tuple, built-in strategy id, optional
+engine id, bounded JSON parameters, chart range, cost/slippage settings, and
+benchmark mode; IBKR `conid` is not a saved backtest identity dimension.
 
 ## Verification
 
