@@ -1,7 +1,7 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
-**Current Step:** Step 6: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 7: Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-10
 **Review Level:** 2
 **Review Counter:** 14
@@ -92,11 +92,11 @@
 ---
 
 ### Step 7: Delivery
-**Status:** Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -113,6 +113,9 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Canonical Exact Instrument Identity keys now exclude `ibkrConid`; legacy `ibkrConid` key segments normalize forward through the backend helper. | Implemented and documented. | `src/ATrade.MarketData/ExactInstrumentIdentity.cs`, `docs/architecture/provider-abstractions.md` |
+| Frontend routes/query strings and provisional keys use provider-neutral identity fields only; `ibkrConid` remains only provider metadata in DTO/display paths. | Implemented and apphost source checks updated. | `frontend/lib/instrumentIdentity.ts`, `frontend/lib/terminalRoutes.ts`, `tests/apphost/*` |
+| Plain `npm run build` fails under orchestrator `NODE_ENV=development`, but `NODE_ENV=production npm run build` passes; reviewer confirmed the plain-build failure exists at baseline. | Logged as pre-existing environment/build issue, not TP-072 regression. | `STATUS.md` Notes |
 
 ---
 
