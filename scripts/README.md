@@ -26,15 +26,15 @@ Windows documentation must use an explicit relative path when invoking the repo-
 
 ## Required Behavior
 
-The long-term `start run` contract is to bring up:
+The `start run` contract now brings up Compose-managed infrastructure first and then Aspire AppHost for application services:
 
+- Compose infrastructure (`Postgres`, `TimescaleDB`, `Redis`, `NATS`, and optional profile services)
 - Aspire AppHost
 - backend services
 - long-running workers
 - Next.js frontend
-- infrastructure resources managed by Aspire
 
-There must not be separate mandatory commands for the frontend, workers, or infra in the normal local startup path.
+There must not be separate mandatory commands for the frontend or workers in the normal local startup path; infrastructure stays warm in Compose until the developer explicitly stops it.
 
 The current bootstrap slice now implements the first infrastructure-aware runnable subset of that graph:
 
@@ -42,11 +42,11 @@ The current bootstrap slice now implements the first infrastructure-aware runnab
 - a minimal `ATrade.Api` backend service managed by Aspire, with stable `GET /health` and `GET /api/accounts/overview` endpoints
 - an AppHost-managed `ATrade.Ibkr.Worker` shell process managed by Aspire
 - the first real Next.js frontend slice managed by Aspire
-- Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources declared in the AppHost graph
-- an optional AppHost-managed `ibkr-gateway` iBeam container using `voyz/ibeam:latest` when broker integration is enabled locally with real ignored `.env` credentials
-- provider-neutral analysis endpoints with an optional LEAN analysis provider selected by ignored `.env` runtime settings, plus an Aspire-visible `lean-engine` runtime container when LEAN Docker mode is selected
-- explicit AppHost resource references from `api` to `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, plus matching worker references from `ibkr-worker` to `Postgres`, `Redis`, and `NATS`
-- explicit container-runtime `--pids-limit 2048` settings for the AppHost-managed `postgres`, `timescaledb`, `redis`, and `nats` resources so Podman-backed Docker API runs do not collapse to an effective `pids.max=1`
+- Compose-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` services started before AppHost
+- an optional Compose `ibkr` profile for the `voyz/ibeam:latest` `ibkr-gateway` service when broker integration is enabled locally with real ignored `.env` credentials
+- provider-neutral analysis endpoints with an optional LEAN analysis provider selected by ignored `.env` runtime settings, plus a Compose `lean` profile for the `lean-engine` runtime service when LEAN Docker mode is selected
+- direct localhost infrastructure connection strings injected from AppHost into `api` and `ibkr-worker`; infrastructure containers do not appear in the default Aspire dashboard
+- explicit container-runtime `pids_limit: 2048` settings for Compose `postgres`, `timescaledb`, `redis`, and `nats` services so Podman-backed Docker API runs do not collapse to an effective `pids.max=1`
 - deterministic `TS_TUNE_MEMORY=512MB` and `TS_TUNE_NUM_CPUS=2` inputs for the `timescaledb` resource so its init-time tuning script does not crash in the rootless Podman environment used here
 
 Later slices extend that graph with additional backend services, workers, and richer frontend routes.
@@ -79,7 +79,7 @@ Target AppHost responsibilities:
 - run the main .NET API host
 - run worker services
 - run the Next.js app as an Aspire-managed node resource
-- start Postgres, TimescaleDB, Redis, and NATS as Aspire-managed resources
+- reference Compose-published Postgres, TimescaleDB, Redis, and NATS ports without declaring them in the default Aspire graph
 
 ## Next.js Orchestration Requirement
 
@@ -129,23 +129,23 @@ Aspire dashboard UI port is part of the `.env` contract.
 
 ### Compose-managed infrastructure foundation variables
 
-This task stages a repo-owned `compose.yaml`, reusable helper scripts, and an
-opt-in AppHost external-infrastructure mode without cutting over the default
-`start run` path. `ATRADE_INFRASTRUCTURE_MODE=apphost` remains the committed
-and default behavior, so plain `./start run` still declares AppHost-managed
-Postgres, TimescaleDB, Redis, NATS, optional iBeam, and optional LEAN resources
-until a later cutover task.
+The repo-owned `compose.yaml` and reusable helper scripts are now the default
+infrastructure owner for `start run`. The Unix and PowerShell `start run`
+implementations load `.env.template`, ignored `.env`, then process environment
+values, invoke `scripts/compose-infra.* up`, and then launch AppHost. Compose is
+not stopped automatically when AppHost exits.
 
-Set `ATRADE_INFRASTRUCTURE_MODE=compose` only after starting the Compose graph
-(or otherwise providing the same localhost ports). In that mode Aspire still
-launches `api`, `ibkr-worker`, and the Next.js `frontend`, but omits the
-infrastructure containers from the AppHost graph/dashboard and injects direct
+`ATRADE_INFRASTRUCTURE_MODE=compose` is the committed/default behavior. In this
+mode Aspire launches `api`, `ibkr-worker`, and the Next.js `frontend`, omits the
+infrastructure containers from the AppHost graph/dashboard, and injects direct
 localhost connection strings for API/worker resources. Database passwords remain
-Aspire secret parameter references in generated manifests.
+Aspire secret parameter references in generated manifests. Set
+`ATRADE_INFRASTRUCTURE_MODE=apphost` only for temporary diagnostic fallback runs
+where Aspire should create infrastructure containers itself.
 
 - `ATRADE_COMPOSE_COMMAND` — optional exact Compose command override; committed default is blank so helper scripts auto-select Podman Compose before Docker Compose
 - `ATRADE_COMPOSE_PROJECT_NAME` — Compose project name; committed default `atrade`
-- `ATRADE_INFRASTRUCTURE_MODE` — AppHost infrastructure graph mode; committed/default `apphost`, optional `compose` for Compose-owned infrastructure while Aspire still launches app resources
+- `ATRADE_INFRASTRUCTURE_MODE` — AppHost infrastructure graph mode; committed/default `compose`; `apphost` is a temporary diagnostic fallback for Aspire-owned infrastructure containers
 - `ATRADE_POSTGRES_PORT` — Compose-managed Postgres localhost bind port; committed default `5432`
 - `ATRADE_TIMESCALEDB_PORT` — Compose-managed TimescaleDB localhost bind port; committed default `5433`
 - `ATRADE_REDIS_PORT` — Compose-managed Redis localhost bind port; committed default `6379`

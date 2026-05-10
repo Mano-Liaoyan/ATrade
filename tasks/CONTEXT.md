@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-07
 **Status:** Active
-**Next Task ID:** TP-069
+**Next Task ID:** TP-072
 
 ---
 
@@ -22,12 +22,12 @@ implementation queue.
   workspace watchlist endpoints, and a market-data SignalR hub.
 - `workers/ATrade.Ibkr.Worker` provides the current safe IBKR worker shell.
 - `frontend/` contains the Next.js paper-trading workspace.
-- AppHost-managed local infrastructure includes Postgres, TimescaleDB, Redis,
-  and NATS.
+- Compose-managed local infrastructure includes Postgres, TimescaleDB, Redis,
+  and NATS; Aspire AppHost launches API, worker, and frontend by default.
 - Provider-backed IBKR/iBeam market data, symbol search, backend watchlists,
   provider-neutral analysis/LEAN seams, the `ATrade.slnx` solution-file
   contract, the HTTPS local iBeam Client Portal transport contract,
-  AppHost-managed LEAN Docker runtime wiring, durable AppHost Postgres
+  Compose-managed LEAN Docker runtime wiring, durable Compose Postgres
   watchlists, durable TimescaleDB cache rows, frontend workflow module seams,
   the completed `TP-045` through `TP-057` frontend reconstruction/polish wave,
   the completed `TP-058` through `TP-063` paper-capital/backtesting MVP wave,
@@ -80,7 +80,7 @@ This repository uses Taskplane task packets for implementation work.
 
 - Run all ready tasks: `/orch all`
 - Run one task: `/orch tasks/<TASK-ID>-<slug>/PROMPT.md`
-- New tasks should use the next ID: `TP-069`
+- New tasks should use the next ID: `TP-072`
 - New task prompts and verification commands should use `ATrade.slnx` for repo-level .NET build/test/list operations.
 - Task packets must include `PROMPT.md` and `STATUS.md`
 - Finished task directories should be moved to `tasks/archive/`
@@ -115,7 +115,7 @@ The repo-local `start` shim is the single startup contract across platforms:
 - Windows PowerShell: `./start.ps1 run`
 - Windows Command Prompt: `./start.cmd run`
 
-All variants delegate to the Aspire AppHost.
+All variants start Compose infrastructure first and then delegate to the Aspire AppHost for API, worker, and frontend. Infrastructure containers do not appear in the default Aspire dashboard and remain running after AppHost exits.
 
 ## Key Files
 
@@ -125,7 +125,7 @@ All variants delegate to the Aspire AppHost.
 | Current plan        | `PLAN.md`                                                 |
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
-| Active tasks        | None currently queued; next packet should use `TP-069`    |
+| Active tasks        | None currently queued; next packet should use `TP-072`    |
 | Completed tasks     | `tasks/TP-042-*` through `tasks/TP-068-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |

@@ -46,7 +46,7 @@ see_also:
 > metadata, rich backtest detail contracts, and no-configured-engine fallback.
 > `ATrade.Analysis.Lean` now implements LEAN as the first analysis engine
 > provider behind that seam using a generated analysis-only LEAN workspace,
-> AppHost-managed Docker metadata when Docker mode is selected, parameterized
+> Compose-managed Docker metadata when Docker mode is selected, parameterized
 > built-in strategy simulation, and safe runtime-unavailable states.
 > `ATrade.Accounts` now also owns the provider-neutral paper-capital contract,
 > Postgres-backed local paper-capital fallback ledger, and `IPaperCapitalService`
@@ -101,8 +101,8 @@ see_also:
 >
 > **Current runnable slice:** today the AppHost launches `ATrade.Api`,
 > `ATrade.Ibkr.Worker`, and the Next.js frontend home page; declares
-> `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as managed infrastructure
-> resources; forwards the safe IBKR/iBeam paper-trading environment contract into
+> `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as Compose-managed infrastructure
+> services; forwards the safe IBKR/iBeam paper-trading environment contract into
 > `api` / `ibkr-worker`; can add the optional `ibkr-gateway` `voyz/ibeam:latest`
 > container only when ignored `.env` credentials enable integration; and keeps the browser-facing backend slice focused on
 > `GET /health`, `GET /api/accounts/overview`, `GET /api/accounts/paper-capital`,
@@ -156,8 +156,8 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Responsibilities:** Declare Aspire resources; wire connection strings;
   expose HTTP endpoints for the frontend and API; emit unified telemetry.
 - **Expected dependencies:** Every other runtime module as declared
-  resources; `Postgres`, `TimescaleDB`, `Redis`, `NATS` as Aspire-managed
-  infrastructure resources. In the current runnable slice, the AppHost wires
+  resources; `Postgres`, `TimescaleDB`, `Redis`, `NATS` as Compose-managed
+  infrastructure services. In the current runnable slice, the AppHost wires
   `ATrade.Api`, `ATrade.Ibkr.Worker`, and the bootstrap Next.js frontend home
   page; declares the four shared infrastructure resources; sends `api` the
   full backend infrastructure set; sends `ibkr-worker` its current
@@ -462,7 +462,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
   live-mode, order-placement, and ATrade order-endpoint calls.
 - **Expected dependencies:** `ATrade.Analysis`, `ATrade.MarketData`, .NET
   hosting/configuration abstractions, and either an optional local official LEAN
-  CLI or the AppHost-managed `lean-engine` container selected through ignored
+  CLI or the Compose-managed `lean-engine` service selected through ignored
   `.env` values.
 - **First-phase focus:** Provide SMA crossover, RSI mean-reversion, and breakout
   analysis/backtest output over the same market-data-provider bars the API and
@@ -525,7 +525,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Expected dependencies:** `ATrade.MarketData` for backend-owned exact
   identity normalization/key construction, `Postgres` via the AppHost-provided
   `ConnectionStrings:postgres`, `Microsoft.Extensions.Configuration`,
-  `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. The AppHost-managed
+  `Microsoft.Extensions.DependencyInjection`, and `Npgsql`. The Compose-managed
   Postgres data directory is volume-backed so these preferences survive full
   local `start run` / AppHost restarts when the same volume and stable password
   are reused. `ATrade.Workspaces` is composed by `ATrade.Api`; it does not call

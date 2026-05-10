@@ -22,7 +22,7 @@ market data, TimescaleDB cache-aside, durable Postgres watchlists, durable
 Postgres local paper-capital fallback storage, durable Postgres saved backtest
 run history, an API-hosted async backtest runner with SignalR job updates,
 exact provider/market pins, configurable local AppHost ports,
-optional AppHost-managed LEAN Docker runtime wiring, and the completed `TP-045`
+optional Compose-managed LEAN Docker runtime wiring, and the completed `TP-045`
 through `TP-057` frontend reconstruction,
 no-command cutover, layout simplification,
 top-chrome/filter-density cleanup, stock chart visibility restoration, original
@@ -172,4 +172,4 @@ data, direct provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-069`
+`TP-072`

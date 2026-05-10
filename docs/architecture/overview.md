@@ -16,8 +16,8 @@ see_also:
 
 > **Status note:** This document describes the target architecture and the
 > current runnable slice. The repository now has an Aspire AppHost graph that
-> launches `ATrade.Api`, `ATrade.Ibkr.Worker`, the Next.js frontend, and
-> Aspire-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS` resources.
+> starts Compose-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, then
+> launches `ATrade.Api`, `ATrade.Ibkr.Worker`, and the Next.js frontend through Aspire.
 > Active implementation work is tracked in `PLAN.md` and Taskplane packets
 > under `tasks/`.
 >
@@ -69,10 +69,10 @@ All three surfaces are wired together by **Aspire 13.2** acting as the local
 orchestrator. There is no independent `npm run dev` or hand-run worker command
 in the normal local startup path. `start run` delegates to the Aspire AppHost
 and, by default, the AppHost brings up every process and every infrastructure
-resource. A staged opt-in `ATRADE_INFRASTRUCTURE_MODE=compose` path can instead
-keep API, worker, and frontend under Aspire while referencing Compose-published
-localhost infrastructure; the default remains AppHost-managed until the cutover
-task.
+resource. The default `ATRADE_INFRASTRUCTURE_MODE=compose` path keeps API, worker, and
+frontend under Aspire while referencing Compose-published localhost
+infrastructure. `ATRADE_INFRASTRUCTURE_MODE=apphost` remains only as a temporary
+diagnostic fallback.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -210,7 +210,7 @@ currency, and asset class where available. API cache-aside reads decide whether
 rows are fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, return
 cache hits with `timescale-cache:{originalSource}` source metadata and identity
 metadata, optionally filter exact chart reads by provider/market query metadata,
-and refresh from the provider when rows are missing or stale. The AppHost-managed `timescaledb`
+and refresh from the provider when rows are missing or stale. The Compose-managed `timescaledb`
 data directory is volume-backed with `ATRADE_TIMESCALEDB_DATA_VOLUME` (default
 `atrade-timescaledb-data`) and a stable `ATRADE_TIMESCALEDB_PASSWORD`, so fresh
 market-data cache rows survive a full local `start run` stop/start cycle when
@@ -255,7 +255,7 @@ started: safe IBKR/iBeam session status, credentials-missing/configured-iBeam
 states, deterministic paper-order simulation, provider-backed market-data
 surfaces, SignalR chart updates, exact Postgres-backed watchlist preferences,
 and the optional LEAN analysis provider already route through `ATrade.Api`; in
-Docker mode LEAN uses the AppHost-managed `lean-engine` resource rather than a
+Docker mode LEAN uses the Compose-managed `lean-engine` resource rather than a
 hidden ad-hoc container. The slice keeps the current modular-monolith and Aspire
 contracts intact by routing browser traffic through `ATrade.Api`, using SignalR for browser-facing real-time
 updates, using NATS for internal fan-out, keeping orders simulated rather than
