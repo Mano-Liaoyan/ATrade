@@ -1,7 +1,7 @@
 # TP-070: Aspire external Compose infrastructure mode — Status
 
-**Current Step:** Step 4: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-10
 **Review Level:** 2
 **Review Counter:** 8
@@ -67,11 +67,11 @@
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Git Bash on this Windows lane exposes Microsoft Store `python3` stubs ahead of a real MSYS Python and converts `/workspace` env assignments when launching Windows `dotnet`; verification used `/c/msys64/mingw64/bin` first and the LEAN script now passes `//workspace`/normalizes paths for manifest assertions. | Addressed in `tests/apphost/lean-aspire-runtime-tests.sh`; no broader runtime change needed. | Step 4 verification |
 
 ---
 
