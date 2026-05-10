@@ -128,6 +128,8 @@
 | 2026-05-10 06:13 | Step 0 started | Preflight |
 | 2026-05-10 08:13 | Worker iter 1 | killed (wall-clock timeout) in 7200s, tools: 230 |
 | 2026-05-10 08:13 | Step 6 started | Testing & Verification |
+| 2026-05-10 08:29 | Worker iter 2 | done in 968s, tools: 72 |
+| 2026-05-10 08:29 | Task complete | .DONE created |
 
 ---
 
