@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 3
+**Review Counter:** 4
 **Iteration:** 1
 **Size:** M
 
@@ -33,7 +33,7 @@
 ---
 
 ### Step 2: Add external-infra AppHost graph behavior
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] In Compose mode, omit AppHost infra container resources
 - [x] In Compose mode, keep API, IBKR worker, and frontend as Aspire resources
@@ -111,3 +111,4 @@
 | 2026-05-10 05:09 | Review R001 | plan Step 1: APPROVE |
 | 2026-05-10 05:18 | Review R002 | code Step 1: APPROVE |
 | 2026-05-10 05:24 | Review R003 | plan Step 2: APPROVE |
+| 2026-05-10 05:33 | Review R004 | code Step 2: APPROVE |
