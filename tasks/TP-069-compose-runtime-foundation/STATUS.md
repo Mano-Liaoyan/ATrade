@@ -29,8 +29,8 @@
 - [x] Preserve `.env.template` → `.env` → process env precedence
 - [x] Extend `LocalRuntimeContract` defaults/known variables/tests
 - [x] Keep secret-bearing variables classified and out of committed values
-- [ ] R002: Reword `.env.template` exclusions so Compose host ports are not contradicted
-- [ ] R002: Add matching `scripts/README.md` Compose variable documentation asserted by shell tests
+- [x] R002: Reword `.env.template` exclusions so Compose host ports are not contradicted
+- [x] R002: Add matching `scripts/README.md` Compose variable documentation asserted by shell tests
 
 ---
 

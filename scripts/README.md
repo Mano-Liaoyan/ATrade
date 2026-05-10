@@ -127,6 +127,19 @@ The dashboard OTLP endpoint remains intentionally ephemeral on
 `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`; only the human-facing
 Aspire dashboard UI port is part of the `.env` contract.
 
+### Compose-managed infrastructure foundation variables
+
+This task stages a repo-owned `compose.yaml` and reusable helper scripts without
+cutting over the default `start run` path. Aspire/AppHost remains the default
+local startup contract until a later cutover task.
+
+- `ATRADE_COMPOSE_COMMAND` — optional exact Compose command override; committed default is blank so helper scripts auto-select Podman Compose before Docker Compose
+- `ATRADE_COMPOSE_PROJECT_NAME` — Compose project name; committed default `atrade`
+- `ATRADE_POSTGRES_PORT` — Compose-managed Postgres localhost bind port; committed default `5432`
+- `ATRADE_TIMESCALEDB_PORT` — Compose-managed TimescaleDB localhost bind port; committed default `5433`
+- `ATRADE_REDIS_PORT` — Compose-managed Redis localhost bind port; committed default `6379`
+- `ATRADE_NATS_PORT` — Compose-managed NATS localhost bind port; committed default `4222`
+
 ### AppHost database persistence variables
 
 The AppHost-managed `postgres` and `timescaledb` resources are volume-backed so
