@@ -30,6 +30,15 @@ public sealed record LocalRuntimeComposeSettings(
     string Command,
     string ProjectName);
 
+public sealed record LocalRuntimeInfrastructureSettings(
+    string Mode)
+{
+    public const string AppHostMode = "apphost";
+    public const string ComposeMode = "compose";
+
+    public bool IsComposeManaged => string.Equals(Mode, ComposeMode, StringComparison.OrdinalIgnoreCase);
+}
+
 public sealed record LocalRuntimeStorageSettings(
     string PostgresDataVolumeName,
     string PostgresPassword,
@@ -72,6 +81,7 @@ public sealed record LocalRuntimeContract(
     string LoadedFromPath,
     LocalRuntimePortSettings Ports,
     LocalRuntimeComposeSettings Compose,
+    LocalRuntimeInfrastructureSettings Infrastructure,
     LocalRuntimeStorageSettings Storage,
     LocalRuntimePaperTradingSettings PaperTrading,
     LocalRuntimeFrontendSettings Frontend,
@@ -109,6 +119,7 @@ public static class LocalRuntimeEnvironmentVariables
     public const string AspireDashboardHttpPort = "ATRADE_ASPIRE_DASHBOARD_HTTP_PORT";
     public const string ComposeCommand = "ATRADE_COMPOSE_COMMAND";
     public const string ComposeProjectName = "ATRADE_COMPOSE_PROJECT_NAME";
+    public const string InfrastructureMode = "ATRADE_INFRASTRUCTURE_MODE";
     public const string PostgresPort = "ATRADE_POSTGRES_PORT";
     public const string TimescaleDbPort = "ATRADE_TIMESCALEDB_PORT";
     public const string RedisPort = "ATRADE_REDIS_PORT";
@@ -149,6 +160,7 @@ public static class LocalRuntimeContractDefaults
     public const int AspireDashboardHttpPort = 0;
     public const string ComposeCommand = "";
     public const string ComposeProjectName = "atrade";
+    public const string InfrastructureMode = LocalRuntimeInfrastructureSettings.AppHostMode;
     public const int PostgresPort = 5432;
     public const int TimescaleDbPort = 5433;
     public const int RedisPort = 6379;
@@ -193,6 +205,7 @@ public static class LocalRuntimeContractLoader
         LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort,
         LocalRuntimeEnvironmentVariables.ComposeCommand,
         LocalRuntimeEnvironmentVariables.ComposeProjectName,
+        LocalRuntimeEnvironmentVariables.InfrastructureMode,
         LocalRuntimeEnvironmentVariables.PostgresPort,
         LocalRuntimeEnvironmentVariables.TimescaleDbPort,
         LocalRuntimeEnvironmentVariables.RedisPort,
@@ -260,6 +273,7 @@ public static class LocalRuntimeContractLoader
         var aspireDashboardHttpPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort, LocalRuntimeContractDefaults.AspireDashboardHttpPort, allowZero: true);
         var composeCommand = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.ComposeCommand, LocalRuntimeContractDefaults.ComposeCommand);
         var composeProjectName = ResolveComposeProjectName(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.ComposeProjectName, LocalRuntimeContractDefaults.ComposeProjectName);
+        var infrastructureMode = ResolveInfrastructureMode(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.InfrastructureMode, LocalRuntimeContractDefaults.InfrastructureMode);
         var postgresPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.PostgresPort, LocalRuntimeContractDefaults.PostgresPort, allowZero: false);
         var timescaleDbPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.TimescaleDbPort, LocalRuntimeContractDefaults.TimescaleDbPort, allowZero: false);
         var redisPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.RedisPort, LocalRuntimeContractDefaults.RedisPort, allowZero: false);
@@ -324,6 +338,7 @@ public static class LocalRuntimeContractLoader
                 redisPort,
                 natsPort),
             new LocalRuntimeComposeSettings(composeCommand, composeProjectName),
+            new LocalRuntimeInfrastructureSettings(infrastructureMode),
             new LocalRuntimeStorageSettings(postgresDataVolume, postgresPassword, timescaleDataVolume, timescalePassword),
             new LocalRuntimePaperTradingSettings(
                 brokerIntegrationEnabled,
@@ -466,6 +481,24 @@ public static class LocalRuntimeContractLoader
     {
         var value = ResolveRawString(configuredValues, variableName, defaultValue);
         var normalized = NormalizeComposeProjectName(value, variableName, defaultValue);
+        SetResolvedValue(resolvedValues, variableName, normalized);
+        return normalized;
+    }
+
+    private static string ResolveInfrastructureMode(
+        IReadOnlyDictionary<string, string> configuredValues,
+        IDictionary<string, LocalRuntimeContractValue> resolvedValues,
+        string variableName,
+        string defaultValue)
+    {
+        var value = ResolveRawString(configuredValues, variableName, defaultValue).Trim();
+        var normalized = value.ToLowerInvariant();
+        if (normalized is not LocalRuntimeInfrastructureSettings.AppHostMode and not LocalRuntimeInfrastructureSettings.ComposeMode)
+        {
+            throw new InvalidOperationException(
+                $"{variableName} must be either '{LocalRuntimeInfrastructureSettings.AppHostMode}' or '{LocalRuntimeInfrastructureSettings.ComposeMode}', but was '{value}'.");
+        }
+
         SetResolvedValue(resolvedValues, variableName, normalized);
         return normalized;
     }

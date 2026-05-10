@@ -1,11 +1,11 @@
 # TP-070: Aspire external Compose infrastructure mode — Status
 
-**Current Step:** Not Started
-**Status:** 🔵 Ready for Execution
-**Last Updated:** 2026-05-09
+**Current Step:** Step 5: Documentation & Delivery
+**Status:** ✅ Complete
+**Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 0
-**Iteration:** 0
+**Review Counter:** 8
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,63 +15,63 @@
 ---
 
 ### Step 0: Preflight
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
 
 ---
 
 ### Step 1: Model opt-in Compose infrastructure mode
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Add/finalize infrastructure mode setting while preserving current default
-- [ ] Build localhost Postgres, TimescaleDB, Redis, and NATS connection strings from shared runtime values
-- [ ] Keep database passwords secret in manifests through parameter/reference-expression plumbing
-- [ ] Validate/normalize ports and mode values consistently
+- [x] Add/finalize infrastructure mode setting while preserving current default
+- [x] Build localhost Postgres, TimescaleDB, Redis, and NATS connection strings from shared runtime values
+- [x] Keep database passwords secret in manifests through parameter/reference-expression plumbing
+- [x] Validate/normalize ports and mode values consistently
 
 ---
 
 ### Step 2: Add external-infra AppHost graph behavior
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] In Compose mode, omit AppHost infra container resources
-- [ ] In Compose mode, keep API, IBKR worker, and frontend as Aspire resources
-- [ ] Inject external connection strings into API/worker resources
-- [ ] Preserve paper-trading and LEAN environment handoff
-- [ ] Preserve existing AppHost-managed infrastructure behavior outside Compose mode
+- [x] In Compose mode, omit AppHost infra container resources
+- [x] In Compose mode, keep API, IBKR worker, and frontend as Aspire resources
+- [x] Inject external connection strings into API/worker resources
+- [x] Preserve paper-trading and LEAN environment handoff
+- [x] Preserve existing AppHost-managed infrastructure behavior outside Compose mode
 
 ---
 
 ### Step 3: Add opt-in manifest and wiring tests
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] Add/update Compose-mode manifest tests asserting infra resources are absent
-- [ ] Assert app resources and external connection string env are present
-- [ ] Assert manifests do not expose raw database/broker secrets
-- [ ] Keep current default AppHost manifest expectations passing until cutover
+- [x] Add/update Compose-mode manifest tests asserting infra resources are absent
+- [x] Assert app resources and external connection string env are present
+- [x] Assert manifests do not expose raw database/broker secrets
+- [x] Keep current default AppHost manifest expectations passing until cutover
 
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] AppHost manifest validation passing
-- [ ] AppHost worker/resource wiring validation passing
-- [ ] iBeam runtime validation passing if affected
-- [ ] LEAN runtime validation passing if affected
-- [ ] Local runtime contract tests passing if affected
-- [ ] FULL test suite passing
-- [ ] Build passes
+- [x] AppHost manifest validation passing
+- [x] AppHost worker/resource wiring validation passing
+- [x] iBeam runtime validation passing if affected
+- [x] LEAN runtime validation passing if affected
+- [x] Local runtime contract tests passing if affected
+- [x] FULL test suite passing
+- [x] Build passes
 
 ---
 
 ### Step 5: Documentation & Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -86,6 +86,7 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Git Bash on this Windows lane exposes Microsoft Store `python3` stubs ahead of a real MSYS Python and converts `/workspace` env assignments when launching Windows `dotnet`; verification used `/c/msys64/mingw64/bin` first and the LEAN script now passes `//workspace`/normalizes paths for manifest assertions. | Addressed in `tests/apphost/lean-aspire-runtime-tests.sh`; no broader runtime change needed. | Step 4 verification |
 
 ---
 
@@ -94,6 +95,10 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-09 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-10 05:04 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-10 05:04 | Step 0 started | Preflight |
+| 2026-05-10 06:11 | Worker iter 1 | done in 4059s, tools: 166 |
+| 2026-05-10 06:11 | Task complete | .DONE created |
 
 ---
 
@@ -106,3 +111,10 @@
 ## Notes
 
 *Reserved for execution notes*
+| 2026-05-10 05:09 | Review R001 | plan Step 1: APPROVE |
+| 2026-05-10 05:18 | Review R002 | code Step 1: APPROVE |
+| 2026-05-10 05:24 | Review R003 | plan Step 2: APPROVE |
+| 2026-05-10 05:33 | Review R004 | code Step 2: APPROVE |
+| 2026-05-10 05:38 | Review R005 | plan Step 3: APPROVE |
+| 2026-05-10 05:48 | Review R006 | code Step 3: APPROVE |
+| 2026-05-10 05:54 | Review R007 | plan Step 4: APPROVE |

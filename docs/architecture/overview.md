@@ -66,10 +66,13 @@ runtime surfaces:
    handling.
 
 All three surfaces are wired together by **Aspire 13.2** acting as the local
-orchestrator. There is no separate `docker compose`, no independent
-`npm run dev`, and no hand-run worker command in the normal local startup
-path. `start run` delegates to the Aspire AppHost and the AppHost brings up
-every process and every infrastructure resource.
+orchestrator. There is no independent `npm run dev` or hand-run worker command
+in the normal local startup path. `start run` delegates to the Aspire AppHost
+and, by default, the AppHost brings up every process and every infrastructure
+resource. A staged opt-in `ATRADE_INFRASTRUCTURE_MODE=compose` path can instead
+keep API, worker, and frontend under Aspire while referencing Compose-published
+localhost infrastructure; the default remains AppHost-managed until the cutover
+task.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
@@ -137,9 +140,11 @@ architecture the AppHost is responsible for:
   pattern already exercised by the bootstrap home page in
   `src/ATrade.AppHost/Program.cs`)
 - Declaring `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as Aspire-managed
-  infrastructure resources and wiring their connection strings into the
-  services that need them. The current runnable slice already declares those
-  resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
+  infrastructure resources by default, or — only when
+  `ATRADE_INFRASTRUCTURE_MODE=compose` is explicitly selected — omitting those
+  infrastructure resources and injecting direct localhost connection strings for
+  Compose-owned infrastructure. The current default runnable slice declares
+  those resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
   four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`, backs
   the primary `postgres` data directory with the named
   `ATRADE_POSTGRES_DATA_VOLUME` volume plus a stable `ATRADE_POSTGRES_PASSWORD`

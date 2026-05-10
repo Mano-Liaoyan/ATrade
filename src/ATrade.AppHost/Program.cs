@@ -15,6 +15,7 @@ var localPortContract = LocalDevelopmentPortContractLoader.FromRuntimeContract(l
 var paperTradingContract = PaperTradingEnvironmentContract.Load(localRuntimeContract);
 var leanRuntimeContract = LeanAnalysisRuntimeContract.Load(localRuntimeContract);
 var storageContract = AppHostStorageContract.Load(localRuntimeContract);
+var composeInfrastructureContract = ComposeInfrastructureContract.Load(localRuntimeContract);
 var builder = DistributedApplication.CreateBuilder(args);
 var ibkrUsername = builder.AddParameter("ibkr-username", () => paperTradingContract.IbkrUsername, secret: true);
 var ibkrPassword = builder.AddParameter("ibkr-password", () => paperTradingContract.IbkrPassword, secret: true);
@@ -22,59 +23,7 @@ var ibkrPaperAccountId = builder.AddParameter("ibkr-paper-account-id", () => pap
 var postgresPassword = builder.AddParameter("postgres-password", () => storageContract.PostgresPassword, secret: true);
 var timescalePassword = builder.AddParameter("timescaledb-password", () => storageContract.TimescalePassword, secret: true);
 
-var postgres = builder.AddPostgres("postgres", password: postgresPassword)
-    .WithDataVolume(storageContract.PostgresDataVolumeName, isReadOnly: false)
-    .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
-
-// TimescaleDB runs the Postgres protocol, so model it as a dedicated Postgres server
-// resource that uses the TimescaleDB container image in the local Aspire graph.
-var timescaledb = builder.AddPostgres("timescaledb", password: timescalePassword)
-    .WithImage("timescale/timescaledb", "latest-pg17")
-    .WithDataVolume(storageContract.TimescaleDataVolumeName, isReadOnly: false)
-    .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
-    .WithEnvironment("TS_TUNE_MEMORY", timescaleTuneMemory)
-    .WithEnvironment("TS_TUNE_NUM_CPUS", timescaleTuneCpuCount);
-
-var redis = builder.AddRedis("redis")
-    .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
-var nats = builder.AddNats("nats")
-    .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
-
-if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out var gatewayTag))
-{
-    var gatewayHostPort = paperTradingContract.GetGatewayPort();
-
-    builder.AddContainer("ibkr-gateway", gatewayImage, gatewayTag)
-        .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
-        .WithBindMount(ibeamInputsMountSource, ibeamInputsMountTarget, isReadOnly: true)
-        .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamAccount, ibkrUsername)
-        .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamPassword, ibkrPassword)
-        .WithEndpoint(
-            name: "https",
-            scheme: "https",
-            targetPort: IbkrGatewayContainerOptions.DefaultIbeamClientPortalPort,
-            port: gatewayHostPort,
-            isProxied: false);
-}
-
-if (leanRuntimeContract.TryGetDockerImageReference(out var leanImage, out var leanTag))
-{
-    Directory.CreateDirectory(leanRuntimeContract.WorkspaceRoot);
-
-    builder.AddContainer("lean-engine", leanImage, leanTag)
-        .WithContainerName(leanRuntimeContract.ManagedContainerName)
-        .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
-        .WithEnvironment("PYTHONDONTWRITEBYTECODE", "1")
-        .WithBindMount(leanRuntimeContract.WorkspaceRoot, leanRuntimeContract.ContainerWorkspaceRoot, isReadOnly: false)
-        .WithEntrypoint("tail")
-        .WithArgs("-f", "/dev/null");
-}
-
 var api = builder.AddProject<Projects.ATrade_Api>("api")
-    .WithReference(postgres)
-    .WithReference(timescaledb)
-    .WithReference(redis)
-    .WithReference(nats)
     .WithExternalHttpEndpoints()
     .WithEnvironment(LocalRuntimeEnvironmentVariables.ApiHttpPort, localPortContract.ApiHttpPort.ToString())
     .WithEnvironment(LocalRuntimeEnvironmentVariables.MarketDataCacheFreshnessMinutes, localRuntimeContract.MarketData.CacheFreshnessMinutes)
@@ -93,9 +42,6 @@ foreach (var pair in leanRuntimeContract.ToApiEnvironment())
 }
 
 var ibkrWorker = builder.AddProject<Projects.ATrade_Ibkr_Worker>("ibkr-worker")
-    .WithReference(postgres)
-    .WithReference(redis)
-    .WithReference(nats)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.IntegrationEnabled, paperTradingContract.BrokerIntegrationEnabled)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.AccountMode, paperTradingContract.BrokerAccountMode)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.GatewayUrl, paperTradingContract.GatewayUrl)
@@ -104,6 +50,77 @@ var ibkrWorker = builder.AddProject<Projects.ATrade_Ibkr_Worker>("ibkr-worker")
     .WithEnvironment(IbkrGatewayEnvironmentVariables.PaperAccountId, ibkrPaperAccountId)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.Username, ibkrUsername)
     .WithEnvironment(IbkrGatewayEnvironmentVariables.Password, ibkrPassword);
+
+if (composeInfrastructureContract.IsEnabled)
+{
+    api.WithEnvironment("ConnectionStrings__postgres", composeInfrastructureContract.BuildPostgresConnectionString(postgresPassword))
+        .WithEnvironment("ConnectionStrings__timescaledb", composeInfrastructureContract.BuildTimescaleConnectionString(timescalePassword))
+        .WithEnvironment("ConnectionStrings__redis", composeInfrastructureContract.BuildRedisConnectionString())
+        .WithEnvironment("ConnectionStrings__nats", composeInfrastructureContract.BuildNatsConnectionString());
+
+    ibkrWorker.WithEnvironment("ConnectionStrings__postgres", composeInfrastructureContract.BuildPostgresConnectionString(postgresPassword))
+        .WithEnvironment("ConnectionStrings__redis", composeInfrastructureContract.BuildRedisConnectionString())
+        .WithEnvironment("ConnectionStrings__nats", composeInfrastructureContract.BuildNatsConnectionString());
+}
+else
+{
+    var postgres = builder.AddPostgres("postgres", password: postgresPassword)
+        .WithDataVolume(storageContract.PostgresDataVolumeName, isReadOnly: false)
+        .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
+
+    // TimescaleDB runs the Postgres protocol, so model it as a dedicated Postgres server
+    // resource that uses the TimescaleDB container image in the local Aspire graph.
+    var timescaledb = builder.AddPostgres("timescaledb", password: timescalePassword)
+        .WithImage("timescale/timescaledb", "latest-pg17")
+        .WithDataVolume(storageContract.TimescaleDataVolumeName, isReadOnly: false)
+        .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
+        .WithEnvironment("TS_TUNE_MEMORY", timescaleTuneMemory)
+        .WithEnvironment("TS_TUNE_NUM_CPUS", timescaleTuneCpuCount);
+
+    var redis = builder.AddRedis("redis")
+        .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
+    var nats = builder.AddNats("nats")
+        .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);
+
+    api.WithReference(postgres)
+        .WithReference(timescaledb)
+        .WithReference(redis)
+        .WithReference(nats);
+
+    ibkrWorker.WithReference(postgres)
+        .WithReference(redis)
+        .WithReference(nats);
+
+    if (paperTradingContract.TryGetGatewayImageReference(out var gatewayImage, out var gatewayTag))
+    {
+        var gatewayHostPort = paperTradingContract.GetGatewayPort();
+
+        builder.AddContainer("ibkr-gateway", gatewayImage, gatewayTag)
+            .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
+            .WithBindMount(ibeamInputsMountSource, ibeamInputsMountTarget, isReadOnly: true)
+            .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamAccount, ibkrUsername)
+            .WithEnvironment(IbkrGatewayEnvironmentVariables.IbeamPassword, ibkrPassword)
+            .WithEndpoint(
+                name: "https",
+                scheme: "https",
+                targetPort: IbkrGatewayContainerOptions.DefaultIbeamClientPortalPort,
+                port: gatewayHostPort,
+                isProxied: false);
+    }
+
+    if (leanRuntimeContract.TryGetDockerImageReference(out var leanImage, out var leanTag))
+    {
+        Directory.CreateDirectory(leanRuntimeContract.WorkspaceRoot);
+
+        builder.AddContainer("lean-engine", leanImage, leanTag)
+            .WithContainerName(leanRuntimeContract.ManagedContainerName)
+            .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit)
+            .WithEnvironment("PYTHONDONTWRITEBYTECODE", "1")
+            .WithBindMount(leanRuntimeContract.WorkspaceRoot, leanRuntimeContract.ContainerWorkspaceRoot, isReadOnly: false)
+            .WithEntrypoint("tail")
+            .WithArgs("-f", "/dev/null");
+    }
+}
 
 if (!string.IsNullOrWhiteSpace(paperTradingContract.GatewayTimeoutSeconds))
 {

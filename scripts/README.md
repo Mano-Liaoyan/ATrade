@@ -129,12 +129,23 @@ Aspire dashboard UI port is part of the `.env` contract.
 
 ### Compose-managed infrastructure foundation variables
 
-This task stages a repo-owned `compose.yaml` and reusable helper scripts without
-cutting over the default `start run` path. Aspire/AppHost remains the default
-local startup contract until a later cutover task.
+This task stages a repo-owned `compose.yaml`, reusable helper scripts, and an
+opt-in AppHost external-infrastructure mode without cutting over the default
+`start run` path. `ATRADE_INFRASTRUCTURE_MODE=apphost` remains the committed
+and default behavior, so plain `./start run` still declares AppHost-managed
+Postgres, TimescaleDB, Redis, NATS, optional iBeam, and optional LEAN resources
+until a later cutover task.
+
+Set `ATRADE_INFRASTRUCTURE_MODE=compose` only after starting the Compose graph
+(or otherwise providing the same localhost ports). In that mode Aspire still
+launches `api`, `ibkr-worker`, and the Next.js `frontend`, but omits the
+infrastructure containers from the AppHost graph/dashboard and injects direct
+localhost connection strings for API/worker resources. Database passwords remain
+Aspire secret parameter references in generated manifests.
 
 - `ATRADE_COMPOSE_COMMAND` — optional exact Compose command override; committed default is blank so helper scripts auto-select Podman Compose before Docker Compose
 - `ATRADE_COMPOSE_PROJECT_NAME` — Compose project name; committed default `atrade`
+- `ATRADE_INFRASTRUCTURE_MODE` — AppHost infrastructure graph mode; committed/default `apphost`, optional `compose` for Compose-owned infrastructure while Aspire still launches app resources
 - `ATRADE_POSTGRES_PORT` — Compose-managed Postgres localhost bind port; committed default `5432`
 - `ATRADE_TIMESCALEDB_PORT` — Compose-managed TimescaleDB localhost bind port; committed default `5433`
 - `ATRADE_REDIS_PORT` — Compose-managed Redis localhost bind port; committed default `6379`
