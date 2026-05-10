@@ -1,6 +1,6 @@
 # TP-070: Aspire external Compose infrastructure mode — Status
 
-**Current Step:** Step 1: Model opt-in Compose infrastructure mode
+**Current Step:** Step 2: Add external-infra AppHost graph behavior
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
@@ -33,7 +33,7 @@
 ---
 
 ### Step 2: Add external-infra AppHost graph behavior
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] In Compose mode, omit AppHost infra container resources
 - [ ] In Compose mode, keep API, IBKR worker, and frontend as Aspire resources
