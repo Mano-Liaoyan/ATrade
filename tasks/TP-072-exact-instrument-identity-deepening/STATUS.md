@@ -1,10 +1,10 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
-**Current Step:** Step 1: Pin provider-neutral identity/key contract tests first
+**Current Step:** Step 2: Deepen backend Exact Instrument Identity implementation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 2
+**Review Counter:** 3
 **Iteration:** 1
 **Size:** M
 
@@ -34,12 +34,12 @@
 ---
 
 ### Step 2: Deepen backend Exact Instrument Identity implementation
-**Status:** Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Canonical backend key emission excludes `ibkrConid`
-- [ ] IBKR `conid` alias handling is provider-specific
-- [ ] Runtime key construction has one implementation path
-- [ ] Legacy `ibkrConid`-bearing inputs normalize forward
+- [x] Canonical backend key emission excludes `ibkrConid`
+- [x] IBKR `conid` alias handling is provider-specific
+- [x] Runtime key construction has one implementation path
+- [x] Legacy `ibkrConid`-bearing inputs normalize forward
 
 ---
 
@@ -130,3 +130,4 @@
 *Reserved for execution notes*
 | 2026-05-10 20:51 | Review R001 | plan Step 1: APPROVE |
 | 2026-05-10 21:00 | Review R002 | code Step 1: APPROVE |
+| 2026-05-10 21:07 | Review R003 | plan Step 2: APPROVE |
