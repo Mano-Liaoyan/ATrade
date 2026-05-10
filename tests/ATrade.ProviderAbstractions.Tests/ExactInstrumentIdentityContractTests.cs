@@ -24,8 +24,9 @@ public sealed class ExactInstrumentIdentityContractTests
         Assert.Equal("USD", identity.Currency);
         Assert.Equal(MarketDataAssetClasses.Stock, identity.AssetClass);
         Assert.Equal(
-            "provider=ibkr|providerSymbolId=265598|ibkrConid=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK",
+            "provider=ibkr|providerSymbolId=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK",
             identity.InstrumentKey);
+        Assert.DoesNotContain("ibkrConid", identity.InstrumentKey, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -54,8 +55,33 @@ public sealed class ExactInstrumentIdentityContractTests
         Assert.Equal(ExactInstrumentIdentityDefaults.DefaultCurrency, manual.Currency);
         Assert.Equal(ExactInstrumentIdentityDefaults.DefaultAssetClass, manual.AssetClass);
         Assert.Equal(
-            "provider=manual|providerSymbolId=|ibkrConid=|symbol=NVDA|exchange=|currency=USD|assetClass=STK",
+            "provider=manual|providerSymbolId=|symbol=NVDA|exchange=|currency=USD|assetClass=STK",
             manual.InstrumentKey);
+        Assert.DoesNotContain("ibkrConid", manual.InstrumentKey, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NormalizeExistingInstrumentKey_AcceptsLegacyIbkrConidSegmentAndNormalizesForward()
+    {
+        var normalized = ExactInstrumentIdentity.NormalizeExistingInstrumentKey(
+            " provider=ibkr|providerSymbolId=265598|ibkrConid=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK ");
+
+        Assert.Equal(
+            "provider=ibkr|providerSymbolId=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK",
+            normalized);
+        Assert.DoesNotContain("ibkrConid", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void NormalizeExistingInstrumentKey_UsesLegacyIbkrConidAsIbkrProviderSymbolAliasOnly()
+    {
+        var normalized = ExactInstrumentIdentity.NormalizeExistingInstrumentKey(
+            "provider=ibkr|providerSymbolId=|ibkrConid=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK");
+
+        Assert.Equal(
+            "provider=ibkr|providerSymbolId=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK",
+            normalized);
+        Assert.DoesNotContain("ibkrConid", normalized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -79,7 +105,8 @@ public sealed class ExactInstrumentIdentityContractTests
         Assert.Equal("USD", projected.Currency);
         Assert.Equal(exact.ToMarketDataSymbolIdentity(), projected);
         Assert.Equal(
-            "provider=ibkr|providerSymbolId=272093|ibkrConid=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK",
+            "provider=ibkr|providerSymbolId=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK",
             exact.InstrumentKey);
+        Assert.DoesNotContain("ibkrConid", exact.InstrumentKey, StringComparison.OrdinalIgnoreCase);
     }
 }

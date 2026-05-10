@@ -66,6 +66,12 @@ public sealed class PostgresBacktestRunRepositoryTests
 
         Assert.Contains("\"strategyId\":\"sma-crossover\"", json, StringComparison.Ordinal);
         Assert.Contains("\"chartRange\":\"1y\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"symbol\":\"AAPL\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"provider\":\"ibkr\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"providerSymbolId\":\"265598\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"exchange\":\"NASDAQ\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"currency\":\"USD\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"assetClass\":\"STK\"", json, StringComparison.Ordinal);
         Assert.Contains("\"parameters\"", json, StringComparison.Ordinal);
         Assert.DoesNotContain("symbolCode", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("bars", json, StringComparison.OrdinalIgnoreCase);

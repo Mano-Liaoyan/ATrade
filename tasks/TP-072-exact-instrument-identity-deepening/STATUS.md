@@ -1,10 +1,10 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Pin provider-neutral identity/key contract tests first
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 0
+**Review Counter:** 1
 **Iteration:** 1
 **Size:** M
 
@@ -24,12 +24,12 @@
 ---
 
 ### Step 1: Pin provider-neutral identity/key contract tests first
-**Status:** Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Backend canonical key tests added/updated
-- [ ] Legacy `ibkrConid` key normalization tests added/updated
-- [ ] Frontend provisional provider-neutral key tests/source checks added/updated
-- [ ] Saved backtest full identity tuple tests added/updated
+- [x] Backend canonical key tests added/updated
+- [x] Legacy `ibkrConid` key normalization tests added/updated
+- [x] Frontend provisional provider-neutral key tests/source checks added/updated
+- [x] Saved backtest full identity tuple tests added/updated
 
 ---
 
@@ -128,3 +128,4 @@
 ## Notes
 
 *Reserved for execution notes*
+| 2026-05-10 20:51 | Review R001 | plan Step 1: APPROVE |

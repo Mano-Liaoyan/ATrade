@@ -161,14 +161,15 @@ assert_exact_identity_query_preservation() {
   assert_file_contains "$routes" '${TERMINAL_SYMBOL_MODULE_ROUTES[moduleId]}/${encodeURIComponent(normalized.symbol)}${query ? `?${query}` : ""}'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.provider)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.providerSymbolId)'
-  assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.ibkrConid)'
+  assert_file_not_contains "$routes" 'firstTerminalQueryValue(searchParams.ibkrConid)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.exchange)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.currency)'
   assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.assetClass)'
 
   assert_file_contains "$identity" "params.set('provider', identity.provider);"
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
-  assert_file_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
+  assert_file_not_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
+  assert_file_not_contains "$identity" "\`ibkrConid="
   assert_file_contains "$identity" "params.set('exchange', identity.exchange);"
   assert_file_contains "$identity" "params.set('currency', identity.currency);"
   assert_file_contains "$identity" "params.set('assetClass', identity.assetClass);"
