@@ -160,7 +160,9 @@ public static class LocalRuntimeContractDefaults
     public const int AspireDashboardHttpPort = 0;
     public const string ComposeCommand = "";
     public const string ComposeProjectName = "atrade";
-    public const string InfrastructureMode = LocalRuntimeInfrastructureSettings.AppHostMode;
+    // Compose-managed infrastructure is the canonical default. Use
+    // ATRADE_INFRASTRUCTURE_MODE=apphost for diagnostic fallback only.
+    public const string InfrastructureMode = LocalRuntimeInfrastructureSettings.ComposeMode;
     public const int PostgresPort = 5432;
     public const int TimescaleDbPort = 5433;
     public const int RedisPort = 6379;

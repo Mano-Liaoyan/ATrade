@@ -2,7 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-docker_label_filter='label=com.microsoft.developer.usvc-dev.group-version=usvc-dev.developer.microsoft.com/v1'
+compose_project_name="atrade-timescale-volume-test-7218-"
+docker_label_filter="label=com.docker.compose.project="
 
 apphost_pid=''
 apphost_log=''
@@ -24,6 +25,7 @@ cleanup() {
 
   if command -v docker >/dev/null 2>&1; then
     if [[ -n "$postgres_data_volume" ]]; then
+      ATRADE_COMPOSE_PROJECT_NAME="$compose_project_name" "$repo_root/scripts/compose-infra.sh" down --remove-orphans >/dev/null 2>&1 || true
       docker volume rm "$postgres_data_volume" >/dev/null 2>&1 || true
     fi
     if [[ -n "$timescale_data_volume" ]]; then
@@ -40,12 +42,12 @@ trap cleanup EXIT
 
 skip_without_container_engine() {
   if ! command -v docker >/dev/null 2>&1; then
-    printf 'SKIP: docker CLI is not available; skipping AppHost Timescale cache volume verification.\n'
+    printf 'SKIP: docker CLI is not available; skipping Compose Timescale cache volume verification.\n'
     exit 0
   fi
 
   if ! docker version >/dev/null 2>&1; then
-    printf 'SKIP: no healthy Docker-compatible engine is available; skipping AppHost Timescale cache volume verification.\n'
+    printf 'SKIP: no healthy Docker-compatible engine is available; skipping Compose Timescale cache volume verification.\n'
     exit 0
   fi
 }
@@ -137,7 +139,7 @@ wait_for_new_infra_containers() {
     fi
   done
 
-  fail_with_debug 'Timed out waiting for AppHost-managed infrastructure containers.'
+  fail_with_debug 'Timed out waiting for Compose-managed infrastructure containers.'
 }
 
 find_created_container_by_image() {
@@ -161,7 +163,7 @@ assert_database_uses_test_volume() {
   local container_id
   local matching_mount
 
-  container_id="$(find_created_container_by_image "$image")" || fail_with_debug "Failed to find the AppHost-managed $resource_name container."
+  container_id="$(find_created_container_by_image "$image")" || fail_with_debug "Failed to find the Compose-managed $resource_name container."
   matching_mount="$(docker inspect "$container_id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}} {{.RW}}{{end}}{{end}}')"
 
   if [[ "$matching_mount" != "$expected_volume true" ]]; then
@@ -170,7 +172,7 @@ assert_database_uses_test_volume() {
 }
 
 get_timescaledb_container_id() {
-  find_created_container_by_image 'docker.io/timescale/timescaledb:latest-pg17' || fail_with_debug 'Failed to find the AppHost-managed timescaledb container.'
+  find_created_container_by_image 'docker.io/timescale/timescaledb:latest-pg17' || fail_with_debug 'Failed to find the Compose-managed timescaledb container.'
 }
 
 wait_for_timescaledb_ready() {
@@ -189,7 +191,7 @@ wait_for_timescaledb_ready() {
     sleep 1
   done
 
-  fail_with_debug 'Timed out waiting for AppHost-managed TimescaleDB to accept connections.'
+  fail_with_debug 'Timed out waiting for Compose-managed TimescaleDB to accept connections.'
 }
 
 wait_for_http_200() {
@@ -227,6 +229,8 @@ start_apphost_session() {
 
   (
     cd "$repo_root"
+    ATRADE_COMPOSE_PROJECT_NAME="$compose_project_name" \
+    ATRADE_INFRASTRUCTURE_MODE=compose \
     ATRADE_API_HTTP_PORT="$api_port" \
       ATRADE_FRONTEND_DIRECT_HTTP_PORT="$frontend_direct_port" \
       ATRADE_APPHOST_FRONTEND_HTTP_PORT="$apphost_frontend_port" \
@@ -246,14 +250,14 @@ start_apphost_session() {
   apphost_pid=$!
 
   wait_for_new_infra_containers "$before_ids"
-  assert_database_uses_test_volume 'docker.io/library/postgres:17.6' postgres "$postgres_data_volume"
+  assert_database_uses_test_volume 'postgres:17' postgres "$postgres_data_volume"
   assert_database_uses_test_volume 'docker.io/timescale/timescaledb:latest-pg17' timescaledb "$timescale_data_volume"
   wait_for_timescaledb_ready
 
   health_response="$(mktemp "$temp_dir/health-${session_name}-XXXXXX.response")"
   wait_for_http_200 "$api_url/health" "$health_response"
   if [[ "$(cat "$health_response")" != 'ok' ]]; then
-    fail_with_debug 'Expected AppHost-managed ATrade.Api health endpoint to return ok.'
+    fail_with_debug 'Expected Compose-managed ATrade.Api health endpoint to return ok.'
   fi
 }
 
@@ -286,7 +290,7 @@ request_json() {
     printf 'expected %s %s to return HTTP %s, got %s\n' "$method" "$path" "$expected_code" "$code" >&2
     cat "$output_file" >&2 || true
     printf '\n' >&2
-    fail_with_debug 'Unexpected AppHost-managed API response.'
+    fail_with_debug 'Unexpected Compose-managed API response.'
   fi
 }
 

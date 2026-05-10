@@ -25,5 +25,13 @@ if (-not (Test-Path $ProjectPath)) {
     exit 1
 }
 
+$InfraMode = if ([string]::IsNullOrWhiteSpace($env:ATRADE_INFRASTRUCTURE_MODE)) { 'compose' } else { $env:ATRADE_INFRASTRUCTURE_MODE }
+if ($InfraMode -ieq 'compose') {
+    & (Join-Path $RepoRoot 'scripts/compose-infra.ps1') up
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
 & dotnet run --project $ProjectPath --no-launch-profile -- @args
 exit $LASTEXITCODE

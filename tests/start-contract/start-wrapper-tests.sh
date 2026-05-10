@@ -66,6 +66,20 @@ assert_file_not_exists() {
   fi
 }
 
+assert_line_order() {
+  local haystack="$1"
+  local first="$2"
+  local second="$3"
+
+  local before_first="${haystack%%"$first"*}"
+  local before_second="${haystack%%"$second"*}"
+
+  if [[ "$before_first" == "$haystack" || "$before_second" == "$haystack" || ${#before_first} -gt ${#before_second} ]]; then
+    printf 'expected %s to appear before %s in output:\n%s\n' "$first" "$second" "$haystack" >&2
+    return 1
+  fi
+}
+
 assert_executable_exists() {
   local file_path="$1"
 
@@ -149,13 +163,14 @@ EOF
 }
 
 free_port() {
-  python3 - <<'PY'
-import socket
-
-with socket.socket() as sock:
-    sock.bind(("127.0.0.1", 0))
-    print(sock.getsockname()[1])
-PY
+  node - <<'NODE'
+const net = require('node:net');
+const server = net.createServer();
+server.listen(0, '127.0.0.1', () => {
+  console.log(server.address().port);
+  server.close();
+});
+NODE
 }
 
 run_with_local_contract_environment() {
@@ -184,6 +199,7 @@ EOF
       -u ATRADE_FRONTEND_DIRECT_HTTP_PORT \
       -u ATRADE_APPHOST_FRONTEND_HTTP_PORT \
       -u ATRADE_ASPIRE_DASHBOARD_HTTP_PORT \
+      -u ATRADE_BROKER_INTEGRATION_ENABLED \
       ATRADE_API_HTTP_PORT=7198 \
       "$bash_exe" -c '
         set -euo pipefail
@@ -267,7 +283,7 @@ assert_start_run_script_failure_paths() {
   ln -s "$(command -v dirname)" "$fake_bin/dirname"
 
   local missing_dotnet_output
-  missing_dotnet_output="$(PATH="$fake_bin" run_and_capture "$bash_exe" "$repo_root/scripts/start.run.sh")"
+  missing_dotnet_output="$(PATH="$fake_bin:/usr/bin:/bin" run_and_capture "$bash_exe" "$repo_root/scripts/start.run.sh")"
   rm -rf "$fake_bin"
 
   assert_contains "$missing_dotnet_output" 'dotnet is required to run the ATrade AppHost.'
@@ -306,10 +322,12 @@ EOF
   write_local_port_contract 5198 3118 3018 5018
 
   local run_output
-  run_output="$(PATH="$fake_bin:$PATH" run_and_capture run_with_local_contract_environment "$bash_exe" "$repo_root/scripts/start.run.sh" alpha beta)"
+  run_output="$(PATH="$fake_bin:$PATH" ATRADE_COMPOSE_DRY_RUN=true ATRADE_COMPOSE_COMMAND='printf __FAKE_COMPOSE__' run_and_capture run_with_local_contract_environment "$bash_exe" "$repo_root/scripts/start.run.sh" alpha beta)"
 
   rm -rf "$fake_bin"
 
+  assert_contains "$run_output" 'printf __FAKE_COMPOSE__'
+  assert_line_order "$run_output" 'printf __FAKE_COMPOSE__' '__FAKE_DOTNET__'
   assert_contains "$run_output" '__FAKE_DOTNET__'
   assert_contains "$run_output" '__ASPNETCORE_URLS__=http://127.0.0.1:5018'
   assert_contains "$run_output" '__ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL__=http://127.0.0.1:0'
@@ -327,31 +345,38 @@ EOF
 dashboard_port_is_open() {
   local dashboard_port="$1"
 
-  python3 - "$dashboard_port" <<'PY'
-import socket
-import sys
-
-port = int(sys.argv[1])
-with socket.socket() as sock:
-    sock.settimeout(0.25)
-    raise SystemExit(0 if sock.connect_ex(("127.0.0.1", port)) == 0 else 1)
-PY
+  node - "$dashboard_port" <<'NODE'
+const net = require('node:net');
+const port = Number(process.argv[2]);
+const socket = net.createConnection({ host: '127.0.0.1', port });
+const done = (code) => { socket.destroy(); process.exit(code); };
+socket.setTimeout(250);
+socket.on('connect', () => done(0));
+socket.on('timeout', () => done(1));
+socket.on('error', () => done(1));
+NODE
 }
 
 assert_start_run_dashboard_port_smoke() {
   local ports
-  ports="$(python3 - <<'PY'
-import socket
-
-sockets = [socket.socket() for _ in range(4)]
-try:
-    for sock in sockets:
-        sock.bind(("127.0.0.1", 0))
-    print(" ".join(str(sock.getsockname()[1]) for sock in sockets))
-finally:
-    for sock in sockets:
-        sock.close()
-PY
+  ports="$(node - <<'NODE'
+const net = require('node:net');
+const servers = [];
+const ports = [];
+let pending = 4;
+for (let index = 0; index < 4; index += 1) {
+  const server = net.createServer();
+  servers.push(server);
+  server.listen(0, '127.0.0.1', () => {
+    ports[index] = server.address().port;
+    pending -= 1;
+    if (pending === 0) {
+      console.log(ports.join(' '));
+      for (const openServer of servers) openServer.close();
+    }
+  });
+}
+NODE
 )"
 
   local api_port frontend_direct_port apphost_frontend_port dashboard_port
@@ -361,7 +386,7 @@ PY
   dashboard_smoke_log="$(mktemp)"
   (
     cd "$repo_root"
-    run_with_local_contract_environment "$repo_root/scripts/start.run.sh"
+    ATRADE_INFRASTRUCTURE_MODE=apphost run_with_local_contract_environment "$repo_root/scripts/start.run.sh"
   ) >"$dashboard_smoke_log" 2>&1 &
   dashboard_smoke_pid=$!
 
@@ -452,6 +477,8 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.sh" 'atrade_load_local_port_contract'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'ASPNETCORE_URLS="http://127.0.0.1:$aspire_dashboard_http_port"'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL:-http://127.0.0.1:0'
+  assert_file_contains "$repo_root/scripts/start.run.sh" 'scripts/compose-infra.sh" up'
+  assert_file_contains "$repo_root/scripts/start.run.sh" 'ATRADE_INFRASTRUCTURE_MODE:-compose'
   assert_file_contains "$repo_root/scripts/start.run.sh" '--no-launch-profile -- "$@"'
   assert_file_contains "$repo_root/scripts/local-env.sh" 'ATRADE_PORT_CONTRACT_PATH'
   assert_file_not_contains "$repo_root/scripts/local-env.sh" 'local -A'
@@ -467,13 +494,16 @@ main() {
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'Import-ATradeLocalPortContract -RepoRoot $RepoRoot'
   assert_file_contains "$repo_root/scripts/start.run.ps1" '$env:ASPNETCORE_URLS = "http://127.0.0.1:$AspireDashboardHttpPort"'
   assert_file_contains "$repo_root/scripts/start.run.ps1" '$env:ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL = '\''http://127.0.0.1:0'\'''
+  assert_file_contains "$repo_root/scripts/start.run.ps1" 'scripts/compose-infra.ps1'
+  assert_file_contains "$repo_root/scripts/start.run.ps1" 'ATRADE_INFRASTRUCTURE_MODE'
   assert_file_contains "$repo_root/scripts/start.run.ps1" '--no-launch-profile -- @args'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.sh" 'Missing AppHost project at %s'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'dotnet is required to run the ATrade AppHost.'
   assert_file_contains "$repo_root/scripts/start.run.ps1" 'Missing AppHost project at $ProjectPath'
-  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-ps1' -CommandText './start.ps1 run'"
-  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-cmd' -CommandText './start.cmd run'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-ps1'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" "Invoke-WrapperSmoke -Name 'start-cmd'"
+  assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" 'ATRADE_INFRASTRUCTURE_MODE="apphost"'
   assert_file_contains "$repo_root/tests/start-contract/start-wrapper-windows.ps1" '$SuccessMarker = '
   assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'runs-on: windows-latest'
   assert_file_contains "$repo_root/.github/workflows/windows-start-run.yml" 'actions/setup-dotnet@v4'
@@ -501,9 +531,9 @@ main() {
   assert_file_contains "$repo_root/frontend/package.json" '"build": "next build"'
   assert_file_contains "$repo_root/frontend/package.json" '"start": "next start"'
   assert_file_contains "$repo_root/frontend/app/layout.tsx" "import './globals.css';"
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'ATrade Frontend Home'
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'Next.js Bootstrap Slice'
-  assert_file_contains "$repo_root/frontend/app/page.tsx" 'Aspire AppHost Frontend Contract'
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'TerminalRoutePage'
+  assert_file_contains "$repo_root/frontend/app/page.tsx" 'moduleId="HOME"'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalRoutePage.tsx" 'ATradeTerminalApp'
   assert_file_contains "$repo_root/frontend/next-env.d.ts" '/// <reference types="next" />'
   assert_file_contains "$repo_root/frontend/tsconfig.json" '"name": "next"'
   assert_file_not_exists "$repo_root/frontend/server.js"

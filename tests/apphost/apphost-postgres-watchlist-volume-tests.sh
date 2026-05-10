@@ -2,7 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-docker_label_filter='label=com.microsoft.developer.usvc-dev.group-version=usvc-dev.developer.microsoft.com/v1'
+compose_project_name="atrade-watchlist-volume-test-7221-"
+docker_label_filter="label=com.docker.compose.project="
 
 apphost_pid=''
 apphost_log=''
@@ -20,6 +21,7 @@ cleanup() {
   stop_apphost_session || true
 
   if [[ -n "$postgres_data_volume" ]]; then
+    ATRADE_COMPOSE_PROJECT_NAME="$compose_project_name" "$repo_root/scripts/compose-infra.sh" down --remove-orphans >/dev/null 2>&1 || true
     docker volume rm "$postgres_data_volume" >/dev/null 2>&1 || true
   fi
 
@@ -32,12 +34,12 @@ trap cleanup EXIT
 
 skip_without_container_engine() {
   if ! command -v docker >/dev/null 2>&1; then
-    printf 'SKIP: docker CLI is not available; skipping AppHost Postgres watchlist volume verification.\n'
+    printf 'SKIP: docker CLI is not available; skipping Compose Postgres watchlist volume verification.\n'
     exit 0
   fi
 
   if ! docker version >/dev/null 2>&1; then
-    printf 'SKIP: no healthy Docker-compatible engine is available; skipping AppHost Postgres watchlist volume verification.\n'
+    printf 'SKIP: no healthy Docker-compatible engine is available; skipping Compose Postgres watchlist volume verification.\n'
     exit 0
   fi
 }
@@ -128,7 +130,7 @@ wait_for_new_infra_containers() {
     fi
   done
 
-  fail_with_debug 'Timed out waiting for AppHost-managed infrastructure containers.'
+  fail_with_debug 'Timed out waiting for Compose-managed infrastructure containers.'
 }
 
 find_created_container_by_image() {
@@ -149,7 +151,7 @@ assert_postgres_uses_test_volume() {
   local postgres_id
   local matching_mount
 
-  postgres_id="$(find_created_container_by_image 'docker.io/library/postgres:17.6')" || fail_with_debug 'Failed to find the AppHost-managed postgres container.'
+  postgres_id="$(find_created_container_by_image 'postgres:17')" || fail_with_debug 'Failed to find the Compose-managed postgres container.'
   matching_mount="$(docker inspect "$postgres_id" --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}} {{.RW}}{{end}}{{end}}')"
 
   if [[ "$matching_mount" != "$postgres_data_volume true" ]]; then
@@ -200,7 +202,7 @@ wait_for_watchlist_available() {
   printf 'expected GET /api/workspace/watchlist to become available, got HTTP %s\n' "$code" >&2
   cat "$output_file" >&2 || true
   printf '\n' >&2
-  fail_with_debug 'Timed out waiting for AppHost-managed watchlist API storage readiness.'
+  fail_with_debug 'Timed out waiting for Compose-managed watchlist API storage readiness.'
 }
 
 start_apphost_session() {
@@ -217,6 +219,8 @@ start_apphost_session() {
 
   (
     cd "$repo_root"
+    ATRADE_COMPOSE_PROJECT_NAME="$compose_project_name" \
+    ATRADE_INFRASTRUCTURE_MODE=compose \
     ATRADE_API_HTTP_PORT="$api_port" \
       ATRADE_FRONTEND_DIRECT_HTTP_PORT="$frontend_direct_port" \
       ATRADE_APPHOST_FRONTEND_HTTP_PORT="$apphost_frontend_port" \
@@ -238,7 +242,7 @@ start_apphost_session() {
   health_response="$(mktemp "$temp_dir/health-${session_name}-XXXXXX.response")"
   wait_for_http_200 "$api_url/health" "$health_response"
   if [[ "$(cat "$health_response")" != 'ok' ]]; then
-    fail_with_debug 'Expected AppHost-managed ATrade.Api health endpoint to return ok.'
+    fail_with_debug 'Expected Compose-managed ATrade.Api health endpoint to return ok.'
   fi
 
   wait_for_watchlist_available "$(mktemp "$temp_dir/watchlist-ready-${session_name}-XXXXXX.json")"
@@ -283,7 +287,7 @@ request_json() {
     printf 'expected %s %s to return HTTP %s, got %s\n' "$method" "$path" "$expected_code" "$code" >&2
     cat "$output_file" >&2 || true
     printf '\n' >&2
-    fail_with_debug 'Unexpected AppHost-managed API response.'
+    fail_with_debug 'Unexpected Compose-managed API response.'
   fi
 }
 

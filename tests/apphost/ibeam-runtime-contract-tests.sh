@@ -24,13 +24,14 @@ cleanup() {
 trap cleanup EXIT
 
 allocate_port() {
-  python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
+  node - <<'NODE'
+const net = require('node:net');
+const server = net.createServer();
+server.listen(0, '127.0.0.1', () => {
+  console.log(server.address().port);
+  server.close();
+});
+NODE
 }
 
 publish_manifest() {
@@ -40,6 +41,7 @@ publish_manifest() {
   local password="$4"
   local account_id="$5"
 
+  ATRADE_INFRASTRUCTURE_MODE=compose \
   ATRADE_BROKER_INTEGRATION_ENABLED="$integration_enabled" \
   ATRADE_BROKER_ACCOUNT_MODE=Paper \
   ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:5000 \
@@ -108,61 +110,41 @@ stop_api() {
 }
 
 assert_template_is_safe() {
-  python3 - <<'PY' "$repo_root/.env.template"
-from pathlib import Path
-import re
-import sys
-
-template_path = Path(sys.argv[1])
-
-def parse(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for raw_line in path.read_text(encoding='utf-8').splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if '=' not in line:
-            raise SystemExit(f'invalid env line in {path}: {raw_line}')
-        key, value = line.split('=', 1)
-        values[key] = value
-    return values
-
-values = parse(template_path)
-
-required = {
-    'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
-    'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
-    'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000',
-    'ATRADE_IBKR_GATEWAY_PORT': '5000',
-    'ATRADE_IBKR_GATEWAY_IMAGE': 'voyz/ibeam:latest',
-    'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS': '15',
-    'ATRADE_IBKR_USERNAME': 'IBKR_USERNAME',
-    'ATRADE_IBKR_PASSWORD': 'IBKR_PASSWORD',
-    'ATRADE_IBKR_PAPER_ACCOUNT_ID': 'IBKR_ACCOUNT_ID',
+  node - "$repo_root/.env.template" <<'NODE'
+const fs = require('node:fs');
+const templatePath = process.argv[2];
+const values = {};
+for (const rawLine of fs.readFileSync(templatePath, 'utf8').split(/\r?\n/)) {
+  const line = rawLine.trim();
+  if (!line || line.startsWith('#')) continue;
+  const separator = line.indexOf('=');
+  if (separator <= 0) throw new Error(`invalid env line in ${templatePath}: ${rawLine}`);
+  values[line.slice(0, separator)] = line.slice(separator + 1);
 }
-for key, expected in required.items():
-    actual = values.get(key)
-    if actual != expected:
-        raise SystemExit(f'{key} expected {expected!r}, found {actual!r}')
-
-safe_password_placeholders = {'ATRADE_POSTGRES_PASSWORD', 'ATRADE_TIMESCALEDB_PASSWORD'}
-for key, value in values.items():
-    upper_key = key.upper()
-    upper_value = value.upper()
-    if any(token in upper_key for token in ('TOKEN', 'SESSION', 'COOKIE', 'SECRET')):
-        raise SystemExit(f'committed env template must not introduce token/session/cookie/secret key: {key}')
-    if key in {'ATRADE_IBKR_USERNAME', 'ATRADE_IBKR_PASSWORD', 'ATRADE_IBKR_PAPER_ACCOUNT_ID'} | safe_password_placeholders:
-        continue
-    if any(token in upper_value for token in ('PASSWORD', 'TOKEN', 'SESSION', 'COOKIE', 'SECRET')):
-        raise SystemExit(f'committed env template contains suspicious credential-like value for {key}')
-
-if re.fullmatch(r'(DU|U)\d+', values['ATRADE_IBKR_PAPER_ACCOUNT_ID']):
-    raise SystemExit('committed paper account id must remain an obvious placeholder')
-if values['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
-    raise SystemExit('broker integration must stay disabled by default')
-if any(value.lower() == 'live' for key, value in values.items() if key != 'ATRADE_BROKER_ACCOUNT_MODE'):
-    raise SystemExit('committed defaults must not enable live behavior')
-PY
+const required = {
+  ATRADE_BROKER_INTEGRATION_ENABLED: 'false',
+  ATRADE_BROKER_ACCOUNT_MODE: 'Paper',
+  ATRADE_IBKR_GATEWAY_URL: 'https://127.0.0.1:5000',
+  ATRADE_IBKR_GATEWAY_PORT: '5000',
+  ATRADE_IBKR_GATEWAY_IMAGE: 'voyz/ibeam:latest',
+  ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS: '15',
+  ATRADE_IBKR_USERNAME: 'IBKR_USERNAME',
+  ATRADE_IBKR_PASSWORD: 'IBKR_PASSWORD',
+  ATRADE_IBKR_PAPER_ACCOUNT_ID: 'IBKR_ACCOUNT_ID',
+};
+for (const [key, expected] of Object.entries(required)) if (values[key] !== expected) throw new Error(`${key} expected ${expected}, found ${values[key]}`);
+const safe = new Set(['ATRADE_POSTGRES_PASSWORD', 'ATRADE_TIMESCALEDB_PASSWORD']);
+for (const [key, value] of Object.entries(values)) {
+  const upperKey = key.toUpperCase();
+  const upperValue = value.toUpperCase();
+  if (['TOKEN', 'SESSION', 'COOKIE', 'SECRET'].some((token) => upperKey.includes(token))) throw new Error(`committed env template must not introduce unsafe key: ${key}`);
+  if (['ATRADE_IBKR_USERNAME', 'ATRADE_IBKR_PASSWORD', 'ATRADE_IBKR_PAPER_ACCOUNT_ID'].includes(key) || safe.has(key)) continue;
+  if (['PASSWORD', 'TOKEN', 'SESSION', 'COOKIE', 'SECRET'].some((token) => upperValue.includes(token))) throw new Error(`suspicious credential-like value for ${key}`);
+}
+if (/^(DU|U)\d+$/.test(values.ATRADE_IBKR_PAPER_ACCOUNT_ID)) throw new Error('committed paper account id must remain an obvious placeholder');
+if (values.ATRADE_BROKER_INTEGRATION_ENABLED.toLowerCase() !== 'false') throw new Error('broker integration must stay disabled by default');
+for (const [key, value] of Object.entries(values)) if (key !== 'ATRADE_BROKER_ACCOUNT_MODE' && value.toLowerCase() === 'live') throw new Error('committed defaults must not enable live behavior');
+NODE
 }
 
 assert_apphost_ibeam_manifest_contract() {
@@ -172,60 +154,32 @@ assert_apphost_ibeam_manifest_contract() {
   publish_manifest "$manifest_path" false IBKR_USERNAME IBKR_PASSWORD IBKR_ACCOUNT_ID
   publish_manifest "$enabled_manifest_path" true REAL_USERNAME_SHOULD_NOT_SURFACE REAL_PASSWORD_SHOULD_NOT_SURFACE DU1234567
 
-  python3 - <<'PY' "$manifest_path" "$enabled_manifest_path" "$repo_root/src/ATrade.AppHost/Program.cs" "$repo_root/src/ATrade.AppHost/ibeam-inputs/conf.yaml"
-from pathlib import Path
-import json
-import sys
-
-disabled_manifest = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-enabled_manifest_path = Path(sys.argv[2])
-enabled_text = enabled_manifest_path.read_text(encoding='utf-8')
-enabled_manifest = json.loads(enabled_text)
-program_text = Path(sys.argv[3]).read_text(encoding='utf-8')
-ibeam_conf_text = Path(sys.argv[4]).read_text(encoding='utf-8')
-
-if 'AddContainer("ibkr-gateway"' not in program_text:
-    raise SystemExit('AppHost must declare the ibkr-gateway container resource')
-if 'IBEAM_ACCOUNT' not in program_text and 'IbeamAccount' not in program_text:
-    raise SystemExit('AppHost must map the verified IBEAM_ACCOUNT variable')
-if 'IBEAM_PASSWORD' not in program_text and 'IbeamPassword' not in program_text:
-    raise SystemExit('AppHost must map the verified IBEAM_PASSWORD variable')
-
-if 'ibkr-gateway' in disabled_manifest.get('resources', {}):
-    raise SystemExit('default disabled AppHost manifest must not start ibkr-gateway')
-
-enabled_resources = enabled_manifest.get('resources', {})
-container = enabled_resources.get('ibkr-gateway')
-if container is None:
-    raise SystemExit('enabled AppHost manifest must include ibkr-gateway')
-if container.get('image') != 'voyz/ibeam:latest':
-    raise SystemExit(f'ibkr-gateway image must be voyz/ibeam:latest: {container!r}')
-if container.get('env') != {'IBEAM_ACCOUNT': '{ibkr-username.value}', 'IBEAM_PASSWORD': '{ibkr-password.value}'}:
-    raise SystemExit(f'ibkr-gateway must receive only required redacted iBeam env vars: {container.get("env")!r}')
-bind_mounts = container.get('bindMounts', [])
-if not any(mount.get('target') == '/srv/inputs' and mount.get('readOnly') is True and 'ibeam-inputs' in mount.get('source', '') for mount in bind_mounts):
-    raise SystemExit(f'ibkr-gateway must mount the repo-local iBeam inputs directory read-only: {bind_mounts!r}')
-for required in ('172.16.*', '172.31.*', '192.168.*', '10.*', '127.0.0.1'):
-    if required not in ibeam_conf_text:
-        raise SystemExit(f'iBeam custom conf.yaml must allow local/private Docker caller range {required}')
-for forbidden in ('IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'REAL_USERNAME', 'REAL_PASSWORD', 'DU1234567'):
-    if forbidden in ibeam_conf_text:
-        raise SystemExit(f'iBeam custom conf.yaml must not contain credential/account placeholders: {forbidden}')
-https_binding = container.get('bindings', {}).get('https')
-if https_binding is None:
-    raise SystemExit(f'ibkr-gateway must expose an HTTPS binding, found {container.get("bindings")!r}')
-if https_binding.get('scheme') != 'https' or https_binding.get('targetPort') != 5000:
-    raise SystemExit(f'ibkr-gateway HTTPS binding must target Client Portal port 5000: {https_binding!r}')
-for resource_name in ('ibkr-username', 'ibkr-password', 'ibkr-paper-account-id'):
-    resource = enabled_resources.get(resource_name)
-    if resource is None or resource.get('type') != 'parameter.v0':
-        raise SystemExit(f'missing secret parameter resource {resource_name}')
-    if resource.get('inputs', {}).get('value', {}).get('secret') is not True:
-        raise SystemExit(f'{resource_name} must be marked secret')
-for forbidden in ('REAL_USERNAME_SHOULD_NOT_SURFACE', 'REAL_PASSWORD_SHOULD_NOT_SURFACE', 'DU1234567'):
-    if forbidden in enabled_text:
-        raise SystemExit(f'AppHost manifest leaked raw credential/account value: {forbidden}')
-PY
+  node - "$manifest_path" "$enabled_manifest_path" "$repo_root/compose.yaml" "$repo_root/src/ATrade.AppHost/ibeam-inputs/conf.yaml" <<'NODE'
+const fs = require('node:fs');
+const disabledManifest = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const enabledText = fs.readFileSync(process.argv[3], 'utf8');
+const enabledManifest = JSON.parse(enabledText);
+const composeText = fs.readFileSync(process.argv[4], 'utf8');
+const ibeamConfText = fs.readFileSync(process.argv[5], 'utf8');
+if (!composeText.includes('ibkr-gateway:') || !composeText.includes('- ibkr')) throw new Error('Compose file must own ibkr-gateway behind the ibkr profile');
+if (!composeText.includes('IBEAM_ACCOUNT:') || !composeText.includes('IBEAM_PASSWORD:')) throw new Error('Compose iBeam service must map verified credential inputs');
+if ((disabledManifest.resources || {})['ibkr-gateway']) throw new Error('default disabled AppHost manifest must not start ibkr-gateway');
+const enabledResources = enabledManifest.resources || {};
+if (enabledResources['ibkr-gateway']) throw new Error('Compose-owned ibkr-gateway must not appear in the default AppHost manifest');
+for (const resourceName of ['api', 'ibkr-worker']) {
+  const env = enabledResources[resourceName]?.env || {};
+  if (env.ATRADE_BROKER_INTEGRATION_ENABLED !== 'true') throw new Error(`${resourceName} must receive broker integration flag`);
+  if (env.ATRADE_IBKR_USERNAME !== '{ibkr-username.value}' || env.ATRADE_IBKR_PASSWORD !== '{ibkr-password.value}') throw new Error(`${resourceName} must receive redacted iBeam credential parameter references`);
+}
+for (const required of ['172.16.*', '172.31.*', '192.168.*', '10.*', '127.0.0.1']) if (!ibeamConfText.includes(required)) throw new Error(`iBeam custom conf.yaml must allow ${required}`);
+for (const forbidden of ['IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'REAL_USERNAME', 'REAL_PASSWORD', 'DU1234567']) if (ibeamConfText.includes(forbidden)) throw new Error(`iBeam custom conf.yaml contains forbidden ${forbidden}`);
+for (const resourceName of ['ibkr-username', 'ibkr-password', 'ibkr-paper-account-id']) {
+  const resource = enabledResources[resourceName];
+  if (!resource || resource.type !== 'parameter.v0') throw new Error(`missing secret parameter resource ${resourceName}`);
+  if (resource.inputs?.value?.secret !== true) throw new Error(`${resourceName} must be marked secret`);
+}
+for (const forbidden of ['REAL_USERNAME_SHOULD_NOT_SURFACE', 'REAL_PASSWORD_SHOULD_NOT_SURFACE', 'DU1234567']) if (enabledText.includes(forbidden)) throw new Error(`AppHost manifest leaked raw value ${forbidden}`);
+NODE
 }
 
 assert_status_payloads_are_redacted() {
@@ -247,34 +201,20 @@ assert_status_payloads_are_redacted() {
   curl --silent --fail --output "$configured_status_file" "http://127.0.0.1:${configured_port}/api/broker/ibkr/status" >/dev/null
   stop_api
 
-  python3 - <<'PY' "$status_file" "$configured_status_file"
-from pathlib import Path
-import json
-import sys
-
-missing = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-configured = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
-if missing.get('state') != 'credentials-missing':
-    raise SystemExit(f'placeholder credentials must produce credentials-missing status: {missing!r}')
-if configured.get('state') != 'ibeam-container-configured':
-    raise SystemExit(f'configured but unreachable iBeam must produce safe configured status: {configured!r}')
-for payload in (missing, configured):
-    serialized = json.dumps(payload)
-    for forbidden in (
-        'IBKR_USERNAME',
-        'IBKR_PASSWORD',
-        'IBKR_ACCOUNT_ID',
-        'REAL_USERNAME_SHOULD_NOT_LEAK',
-        'REAL_PASSWORD_SHOULD_NOT_LEAK',
-        'DU1234567',
-        'sessionCookie',
-        'token',
-    ):
-        if forbidden in serialized:
-            raise SystemExit(f'status payload leaked forbidden value: {forbidden}')
-    if 'paperAccountId' in payload or 'gatewayUrl' in payload or 'username' in payload or 'password' in payload:
-        raise SystemExit(f'status payload exposed unsafe fields: {payload!r}')
-PY
+  node - "$status_file" "$configured_status_file" <<'NODE'
+const fs = require('node:fs');
+const missing = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const configured = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+if (missing.state !== 'credentials-missing') throw new Error(`placeholder credentials must produce credentials-missing status: ${JSON.stringify(missing)}`);
+if (configured.state !== 'ibeam-container-configured') throw new Error(`configured but unreachable iBeam must produce safe configured status: ${JSON.stringify(configured)}`);
+for (const payload of [missing, configured]) {
+  const serialized = JSON.stringify(payload);
+  for (const forbidden of ['IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'REAL_USERNAME_SHOULD_NOT_LEAK', 'REAL_PASSWORD_SHOULD_NOT_LEAK', 'DU1234567', 'sessionCookie', 'token']) {
+    if (serialized.includes(forbidden)) throw new Error(`status payload leaked forbidden value: ${forbidden}`);
+  }
+  for (const unsafe of ['paperAccountId', 'gatewayUrl', 'username', 'password']) if (Object.hasOwn(payload, unsafe)) throw new Error(`status payload exposed unsafe field: ${unsafe}`);
+}
+NODE
 }
 
 assert_optional_real_ibeam_https_smoke() {
@@ -300,19 +240,13 @@ assert_optional_real_ibeam_https_smoke() {
     return 0
   fi
 
-  python3 - <<'PY' "$smoke_file"
-from pathlib import Path
-import json
-import sys
-
-payload = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-if not isinstance(payload.get('authenticated'), bool) or not isinstance(payload.get('connected'), bool):
-    raise SystemExit('real iBeam auth-status smoke response must include boolean authenticated and connected fields')
-serialized = json.dumps(payload)
-for forbidden in ('IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'sessionCookie', 'cookie', 'token'):
-    if forbidden in serialized:
-        raise SystemExit(f'real iBeam smoke response included forbidden value marker: {forbidden}')
-PY
+  node - "$smoke_file" <<'NODE'
+const fs = require('node:fs');
+const payload = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (typeof payload.authenticated !== 'boolean' || typeof payload.connected !== 'boolean') throw new Error('real iBeam auth-status smoke response must include boolean authenticated and connected fields');
+const serialized = JSON.stringify(payload);
+for (const forbidden of ['IBKR_USERNAME', 'IBKR_PASSWORD', 'IBKR_ACCOUNT_ID', 'sessionCookie', 'cookie', 'token']) if (serialized.includes(forbidden)) throw new Error(`real iBeam smoke response included forbidden marker: ${forbidden}`);
+NODE
   rm -f "$smoke_file"
 }
 

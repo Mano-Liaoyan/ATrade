@@ -41,7 +41,7 @@ see_also:
 > symbol `DELETE`
 > `/api/workspace/watchlist` endpoints plus exact
 > `DELETE /api/workspace/watchlist/pins/{instrumentKey}` backed by the
-> AppHost-managed Postgres resource, a TimescaleDB-backed market-data
+> Compose-managed Postgres service, a TimescaleDB-backed market-data
 > cache-aside path in `ATrade.MarketData.Timescale`, AppHost-driven paper-safe
 > broker/iBeam configuration wiring, and a Next.js ATrade paper workspace
 > with direct module/workflow navigation, enabled/disabled module registry and
@@ -291,8 +291,8 @@ invalid-request / market-data error propagation, and engine handoff. With no
 engine selected the
 HTTP projection still returns explicit `analysis-engine-not-configured` metadata,
 and when `ATRADE_ANALYSIS_ENGINE=Lean` the configured LEAN provider analyzes the
-normalized bars; in Docker mode that provider uses the AppHost-managed
-`lean-engine` runtime and returns explicit `analysis-engine-unavailable` errors
+normalized bars; in Docker mode that provider uses the Compose-managed
+`lean-engine` profile service and returns explicit `analysis-engine-unavailable` errors
 when the managed runtime is absent or unreachable. Watchlist endpoints use
 `IWorkspaceWatchlistIntake`; Workspaces owns local identity use, schema
 initialization ordering, pin/replace/unpin normalization, exact instrument-key
@@ -396,7 +396,7 @@ The paper-trading slice extends existing planned responsibilities as follows:
 - `ATrade.Analysis.Lean` owns the first concrete analysis provider. It builds a
   temporary official-LEAN workspace from ATrade OHLCV bars, runs analysis-only
   SMA crossover, RSI mean-reversion, or breakout simulations through the
-  configured LEAN CLI or AppHost-managed Docker runtime (`lean-engine`), parses
+  configured LEAN CLI or Compose-managed Docker runtime (`lean-engine`), parses
   provider-neutral signals/metrics/backtest details, and rejects brokerage,
   live-mode, order-placement, and ATrade order-endpoint source tokens.
 - `ATrade.Backtesting` owns provider-neutral saved backtest contracts,
@@ -428,16 +428,16 @@ official IBKR Gateway APIs, but the browser never binds to the worker directly.
 ## 4. IBKR Gateway / iBeam Session And Connectivity Model
 
 IBKR integration for this slice is **session-aware and paper-only**. The approved
-local runtime for user-driven IBKR API login is the AppHost-managed
+local runtime for user-driven IBKR API login is the Compose-managed
 iBeam/Gateway container image `voyz/ibeam:latest`, which is disabled by default
 and only starts when ignored local `.env` values enable broker integration and
 replace the fake credential placeholders. The Client Portal API uses HTTPS on
-iBeam's internal container port `5000`; AppHost publishes that internal port on
+iBeam's internal container port `5000`; Compose publishes that internal port on
 the configured local host port from `ATRADE_IBKR_GATEWAY_PORT` and mounts the
 repo-local non-secret `src/ATrade.AppHost/ibeam-inputs/conf.yaml` into
 `/srv/inputs` read-only. That inputs file keeps Client Portal locked to
 loopback/private local-development callers while allowing the Docker bridge
-source addresses that Aspire published-port requests use. The committed gateway
+source addresses that local published-port requests use. The committed gateway
 URL default is `https://127.0.0.1:5000`, and custom local ports must keep
 `ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:<ATRADE_IBKR_GATEWAY_PORT>` while
 still mapping to container target port `5000`. AppHost resolves those values
@@ -453,7 +453,7 @@ application logic sees an auth response.
 responsibilities are:
 
 - read paper-mode broker configuration from the ignored local `.env`
-- rely on AppHost to map `ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` to
+- rely on the Compose helper to map `ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` to
   the iBeam container variables `IBEAM_ACCOUNT` and `IBEAM_PASSWORD`
 - establish or verify a session against the official IBKR Gateway/iBeam APIs
 - publish normalized session state changes onto NATS
@@ -691,9 +691,9 @@ paper-capital fallback values are also stored in Postgres as workspace-scoped
 settings owned by `ATrade.Accounts`; they are API-only state for backtesting
 capital selection, not browser-local preferences, and are superseded whenever a
 safe authenticated IBKR paper balance is available. Because
-the AppHost-managed Postgres data directory is backed by the named
+the Compose-managed Postgres data directory is backed by the named
 `ATRADE_POSTGRES_DATA_VOLUME` volume, pins survive full local application
-reboots that recreate the AppHost/Postgres container when the same volume and
+reboots that recreate the Compose Postgres container when the same volume and
 stable `ATRADE_POSTGRES_PASSWORD` value are reused. The frontend loads, pins,
 and unpins through the backend watchlist API, then updates its browser cache
 from the backend response. Search-result pins send the provider-neutral metadata

@@ -64,6 +64,8 @@ if (composeInfrastructureContract.IsEnabled)
 }
 else
 {
+    // Diagnostic fallback only: the default local startup path uses Compose-owned
+    // infrastructure and keeps these containers out of the Aspire dashboard.
     var postgres = builder.AddPostgres("postgres", password: postgresPassword)
         .WithDataVolume(storageContract.PostgresDataVolumeName, isReadOnly: false)
         .WithContainerRuntimeArgs("--pids-limit", safeInfraContainerPidsLimit);

@@ -23,4 +23,9 @@ if [[ ! -f "$project_path" ]]; then
   exit 1
 fi
 
+infra_mode="${ATRADE_INFRASTRUCTURE_MODE:-compose}"
+if [[ "${infra_mode,,}" == 'compose' ]]; then
+  "$repo_root/scripts/compose-infra.sh" up
+fi
+
 exec dotnet run --project "$project_path" --no-launch-profile -- "$@"

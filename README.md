@@ -41,8 +41,9 @@ The repository-wide startup contract is the repo-local `start` shim:
 - Windows PowerShell: `./start.ps1 run`
 - Windows Command Prompt: `./start.cmd run`
 
-All variants delegate to the Aspire AppHost so one command can bring up the
-API, worker, frontend, and local infrastructure. Local bind-port overrides,
+All variants start Compose infrastructure first, then delegate to the Aspire
+AppHost for the API, worker, and frontend. Infrastructure containers stay out of
+the default Aspire dashboard and remain running after AppHost exits. Local bind-port overrides,
 including the optional fixed Aspire dashboard UI port
 (`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback) and
 AppHost Postgres/TimescaleDB data-volume/password overrides, are kept in ignored
@@ -133,7 +134,7 @@ and return the provider response. When iBeam is disabled, missing credentials,
 unauthenticated, timed out, or unreachable, a fresh persisted response can still serve the request; otherwise
 the API and frontend surface safe provider-not-configured/provider-unavailable
 states projected from the shared IBKR/iBeam readiness module instead of falling back to production mocks. Pinned instruments are backend-owned
-workspace preferences persisted in the volume-backed AppHost-managed Postgres
+workspace preferences persisted in the volume-backed Compose-managed Postgres
 database through `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity; they
 survive full local AppHost stop/start cycles when the same Postgres data volume
@@ -158,10 +159,10 @@ when ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers
 `ATrade.Analysis.Lean`, runs LEAN over market-data-provider candles, and returns
 provider-neutral signals/metrics/backtest summaries and rich backtest details.
 With
-`ATRADE_LEAN_RUNTIME_MODE=docker`, AppHost exposes a dashboard-visible
-`lean-engine` resource, bind-mounts the generated workspace root, and passes the
-managed container metadata to the API so execution uses `docker exec` against
-that resource. Missing LEAN runtime, missing managed container metadata,
+`ATRADE_LEAN_RUNTIME_MODE=docker`, Compose starts the `lean-engine` profile
+service, bind-mounts the generated workspace root, and AppHost passes the safe
+managed-container metadata to the API so execution uses `docker exec` against
+that service. Missing LEAN runtime, missing managed container metadata,
 unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
 `analysis-engine-unavailable` responses without fake signals.
 
