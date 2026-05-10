@@ -1,0 +1,84 @@
+name: "${ATRADE_COMPOSE_PROJECT_NAME:-atrade}"
+
+services:
+  postgres:
+    image: postgres:17
+    pids_limit: 2048
+    environment:
+      POSTGRES_DB: atrade
+      POSTGRES_USER: atrade
+      POSTGRES_PASSWORD: "${ATRADE_POSTGRES_PASSWORD:-ATRADE_POSTGRES_PASSWORD}"
+    ports:
+      - "127.0.0.1:${ATRADE_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - type: volume
+        source: postgres-data
+        target: /var/lib/postgresql/data
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    pids_limit: 2048
+    environment:
+      POSTGRES_DB: atrade_marketdata
+      POSTGRES_USER: atrade
+      POSTGRES_PASSWORD: "${ATRADE_TIMESCALEDB_PASSWORD:-ATRADE_TIMESCALEDB_PASSWORD}"
+      TS_TUNE_MEMORY: 512MB
+      TS_TUNE_NUM_CPUS: "2"
+    ports:
+      - "127.0.0.1:${ATRADE_TIMESCALEDB_PORT:-5433}:5432"
+    volumes:
+      - type: volume
+        source: timescaledb-data
+        target: /var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    pids_limit: 2048
+    ports:
+      - "127.0.0.1:${ATRADE_REDIS_PORT:-6379}:6379"
+
+  nats:
+    image: nats:2
+    pids_limit: 2048
+    ports:
+      - "127.0.0.1:${ATRADE_NATS_PORT:-4222}:4222"
+
+  ibkr-gateway:
+    profiles:
+      - ibkr
+    image: "${ATRADE_IBKR_GATEWAY_IMAGE:-voyz/ibeam:latest}"
+    pids_limit: 2048
+    environment:
+      IBEAM_ACCOUNT: "${ATRADE_IBKR_USERNAME:-IBKR_USERNAME}"
+      IBEAM_PASSWORD: "${ATRADE_IBKR_PASSWORD:-IBKR_PASSWORD}"
+    ports:
+      - "127.0.0.1:${ATRADE_IBKR_GATEWAY_PORT:-5000}:5000"
+    volumes:
+      - type: bind
+        source: ./src/ATrade.AppHost/ibeam-inputs
+        target: /srv/inputs
+        read_only: true
+
+  lean-engine:
+    profiles:
+      - lean
+    image: "${ATRADE_LEAN_DOCKER_IMAGE:-quantconnect/lean:latest}"
+    container_name: "${ATRADE_LEAN_MANAGED_CONTAINER_NAME:-atrade-lean-engine}"
+    pids_limit: 2048
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    entrypoint:
+      - tail
+    command:
+      - -f
+      - /dev/null
+    volumes:
+      - type: bind
+        source: "${ATRADE_LEAN_WORKSPACE_ROOT:-./artifacts/lean-workspaces}"
+        target: "${ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT:-/workspace}"
+
+volumes:
+  postgres-data:
+    name: "${ATRADE_POSTGRES_DATA_VOLUME:-atrade-postgres-data}"
+  timescaledb-data:
+    name: "${ATRADE_TIMESCALEDB_DATA_VOLUME:-atrade-timescaledb-data}"
