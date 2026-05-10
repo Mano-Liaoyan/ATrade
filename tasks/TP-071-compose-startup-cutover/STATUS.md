@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 1
+**Review Counter:** 2
 **Iteration:** 1
 **Size:** M
 
@@ -23,13 +23,15 @@
 ---
 
 ### Step 1: Flip the default startup contract to Compose-managed infrastructure
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [x] Update defaults for Compose-managed infrastructure with Aspire-launched app services
 - [x] Invoke Compose helper `up` before AppHost in Unix and PowerShell start scripts
 - [x] Preserve Podman-first, Docker-fallback, and exact `ATRADE_COMPOSE_COMMAND` behavior
 - [x] Leave Compose running when AppHost exits
 - [x] Preserve cross-platform wrapper semantics
+- [ ] R002: Gate Compose startup on `ATRADE_INFRASTRUCTURE_MODE=compose` in Unix and PowerShell scripts
+- [ ] R002: Revert unrelated `frontend/next-env.d.ts` generated change
 
 ---
 
@@ -134,3 +136,4 @@
 
 *Reserved for execution notes*
 | 2026-05-10 06:23 | Review R001 | plan Step 1: APPROVE |
+| 2026-05-10 06:35 | Review R002 | code Step 1: REVISE |
