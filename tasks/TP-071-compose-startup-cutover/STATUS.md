@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 3
+**Review Counter:** 4
 **Iteration:** 1
 **Size:** M
 
@@ -36,12 +36,12 @@
 ---
 
 ### Step 2: Make the default AppHost graph dashboard-honest
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Make Compose infrastructure mode the default AppHost path
-- [ ] Ensure default Aspire manifest/dashboard omits infra container resources
-- [ ] Preserve secret-safe connection string and paper/LEAN handoff
-- [ ] Document any explicit legacy/fallback AppHost-managed infra mode as non-default
+- [x] Make Compose infrastructure mode the default AppHost path
+- [x] Ensure default Aspire manifest/dashboard omits infra container resources
+- [x] Preserve secret-safe connection string and paper/LEAN handoff
+- [x] Document any explicit legacy/fallback AppHost-managed infra mode as non-default
 
 ---
 
@@ -138,3 +138,4 @@
 | 2026-05-10 06:23 | Review R001 | plan Step 1: APPROVE |
 | 2026-05-10 06:35 | Review R002 | code Step 1: REVISE |
 | 2026-05-10 06:43 | Review R003 | code Step 1: APPROVE |
+| 2026-05-10 06:52 | Review R004 | plan Step 2: APPROVE |
