@@ -1,3 +1,4 @@
+using System.Globalization;
 using ATrade.Accounts;
 using ATrade.Analysis;
 using ATrade.Analysis.Lean;
@@ -63,16 +64,16 @@ app.MapGet(
         ToMarketDataResult(await marketDataService.SearchSymbolsAsync(query, assetClass, limit, cancellationToken)));
 app.MapGet(
     "/api/market-data/{symbol}/candles",
-    async (string symbol, string? range, string? chartRange, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+    async (string symbol, string? range, string? chartRange, string? timeframe, string? provider, string? providerSymbolId, long? ibkrConid, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
-        var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
+        var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, ibkrConid, exchange, currency, assetClass);
         return ToMarketDataResult(await marketDataService.GetCandlesAsync(symbol, SelectChartRange(range, chartRange, timeframe), identity, cancellationToken));
     });
 app.MapGet(
     "/api/market-data/{symbol}/indicators",
-    async (string symbol, string? range, string? chartRange, string? timeframe, string? provider, string? providerSymbolId, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
+    async (string symbol, string? range, string? chartRange, string? timeframe, string? provider, string? providerSymbolId, long? ibkrConid, string? exchange, string? currency, string? assetClass, IMarketDataService marketDataService, CancellationToken cancellationToken) =>
     {
-        var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, exchange, currency, assetClass);
+        var identity = CreateOptionalSymbolIdentity(symbol, provider, providerSymbolId, ibkrConid, exchange, currency, assetClass);
         return ToMarketDataResult(await marketDataService.GetIndicatorsAsync(symbol, SelectChartRange(range, chartRange, timeframe), identity, cancellationToken));
     });
 app.MapGet(
@@ -421,12 +422,14 @@ static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
     string symbol,
     string? provider,
     string? providerSymbolId,
+    long? ibkrConid,
     string? exchange,
     string? currency,
     string? assetClass)
 {
     if (string.IsNullOrWhiteSpace(provider)
         && string.IsNullOrWhiteSpace(providerSymbolId)
+        && !ibkrConid.HasValue
         && string.IsNullOrWhiteSpace(exchange)
         && string.IsNullOrWhiteSpace(currency)
         && string.IsNullOrWhiteSpace(assetClass))
@@ -434,10 +437,19 @@ static MarketDataSymbolIdentity? CreateOptionalSymbolIdentity(
         return null;
     }
 
+    // HTTP query parsing is an adapter concern: legacy ibkrConid is accepted only
+    // as an IBKR provider-symbol alias before crossing the market-data seam.
+    var normalizedProvider = string.IsNullOrWhiteSpace(provider)
+        ? (ibkrConid.HasValue ? ExactInstrumentIdentityProviders.Ibkr : "market-data-provider")
+        : provider;
+    var providerNeutralSymbolId = string.IsNullOrWhiteSpace(providerSymbolId) && ibkrConid.HasValue
+        ? ibkrConid.Value.ToString(CultureInfo.InvariantCulture)
+        : providerSymbolId;
+
     return MarketDataSymbolIdentity.Create(
         symbol,
-        string.IsNullOrWhiteSpace(provider) ? "market-data-provider" : provider,
-        providerSymbolId,
+        normalizedProvider,
+        providerNeutralSymbolId,
         assetClass,
         exchange,
         currency);

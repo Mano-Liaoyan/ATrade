@@ -1,10 +1,10 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
-**Current Step:** Step 2: Deepen backend Exact Instrument Identity implementation
+**Current Step:** Step 3: Update adapters and persistence consumers
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 5
+**Review Counter:** 6
 **Iteration:** 1
 **Size:** M
 
@@ -47,12 +47,12 @@
 ---
 
 ### Step 3: Update adapters and persistence consumers
-**Status:** Not Started
+**Status:** 🟨 In Progress
 
-- [ ] API route/query adapters translate into provider-neutral identity tuple
-- [ ] Watchlist runtime persistence uses Exact Instrument Identity key construction
-- [ ] Saved backtest request/history/retry carries full provider-neutral tuple
-- [ ] Legacy repair/backfill behavior documented in code/tests where unavoidable
+- [x] API route/query adapters translate into provider-neutral identity tuple
+- [x] Watchlist runtime persistence uses Exact Instrument Identity key construction
+- [x] Saved backtest request/history/retry carries full provider-neutral tuple
+- [x] Legacy repair/backfill behavior documented in code/tests where unavoidable
 
 ---
 
@@ -138,3 +138,4 @@
 | 2026-05-10 21:07 | Review R003 | plan Step 2: APPROVE |
 | 2026-05-10 21:14 | Review R004 | code Step 2: REVISE |
 | 2026-05-10 21:22 | Review R005 | code Step 2: APPROVE |
+| 2026-05-10 21:30 | Review R006 | plan Step 3: APPROVE |
