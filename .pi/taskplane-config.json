@@ -20,7 +20,7 @@
       "thinking": "medium"
     },
     "reviewer": {
-      "model": "deepseek/deepseek-v4-pro",
+      "model": "openai-codex/gpt-5.5",
       "thinking": "xhigh"
     }
   },

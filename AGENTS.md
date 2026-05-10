@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-07
+updated: 2026-05-10
 summary: Repository guidance and introduction of repo-local Pi skills.
 see_also:
   - README.md
@@ -18,10 +18,9 @@ orchestrator (`task-worker`, `task-reviewer`, `task-merger`, and `supervisor`).
 ## Current Coordination Model
 
 - Implementation work is tracked as Taskplane packets under `tasks/`.
-- Ready frontend route/visibility UX tasks are queued as `TP-064` through `TP-068`.
-- `TP-064` captures the durable desktop browser visibility guardrail; `TP-065` adds canonical routes and removes `/symbols/[symbol]`; `TP-066` adds `/chart` stored-stock/default-watchlist behavior; `TP-067` makes Home/Search/Watchlist purpose-built; `TP-068` adds consolidated regression validation.
-- Completed task packets through `TP-063` are present in `tasks/`; completed packets should be archived when convenient.
-- `TP-055` through `TP-057` finalized the terminal palette, rail icon/collapse behavior, and visible market-monitor table scrollbars; `TP-058` through `TP-063` added the paper-capital/backtesting MVP and terminal BACKTEST comparison surface.
+- No ready implementation tasks are currently queued after completion of `TP-072` Exact Instrument Identity provider-neutral key deepening.
+- `TP-064` through `TP-068` completed the frontend route/visibility UX batch; `TP-069` through `TP-071` completed the Compose-managed infrastructure startup cutover; `TP-072` deepened provider-neutral Exact Instrument Identity keys and saved backtest identity.
+- Completed task packets through `TP-072` are present in `tasks/`; completed packets should be archived when convenient.
 - The next task ID is recorded in `tasks/CONTEXT.md`.
 
 ## Repo-local Pi Skills
@@ -50,6 +49,20 @@ Current installed skills include:
 - `ask-and-plan` — clarify rough requirements one question at a time with
   recommendations, then stage small Taskplane task packets with dependencies,
   verification, and durable memory updates when requested.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `Mano-Liaoyan/ATrade`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default engineering-skill triage labels are used. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: `tasks/CONTEXT.md` is the repo domain context, with active docs discovered through `docs/INDEX.md`; ADRs live under `docs/adr/` when added. See `docs/agents/domain.md`.
 
 ## Startup Order For Coding Sessions
 

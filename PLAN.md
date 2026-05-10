@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-07
+updated: 2026-05-10
 summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, paper-capital source, saved backtesting API seams, and terminal comparison surface.
 see_also:
   - README.md
@@ -13,7 +13,7 @@ see_also:
 
 # ATrade Current Plan
 
-**Last updated:** 2026-05-07
+**Last updated:** 2026-05-10
 
 ## Current Focus
 
@@ -134,9 +134,15 @@ frontend regression suite covering accepted enabled and visible-disabled routes,
 visibility/scroll-ownership guardrails, `/chart` Stored stocks defaults, and
 distinct Home/Search/Watchlist page purposes.
 
-The frontend route/visibility UX batch through `TP-068` is complete.
+The frontend route/visibility UX batch through `TP-068` is complete. `TP-069`
+through `TP-071` completed the Compose-managed infrastructure startup cutover.
+`TP-072` completed Exact Instrument Identity deepening so canonical route/query
+handoff, frontend provisional keys, backend `instrumentKey` / `pinKey` values,
+watchlist persistence, and saved backtest run identity use the provider-neutral
+tuple only while accepting legacy `ibkrConid`-bearing inputs solely to normalize
+forward.
 
-Completed task packets through `TP-063` are present in `tasks/`; completed
+Completed task packets through `TP-072` are present in `tasks`; completed
 packets should be archived when convenient. The next new Taskplane packet should
 use `TP-073`.
 
@@ -167,7 +173,7 @@ data, direct provider/database access, or order-entry UI paths.
 - Keep secrets, IBKR credentials, account identifiers, tokens, and session cookies out of git.
 - Real IBKR/iBeam and LEAN checks must use ignored `.env` values and cleanly skip when local runtimes or credentials are unavailable.
 - Local `voyz/ibeam:latest` Client Portal traffic uses HTTPS on the configured gateway port; self-signed certificate trust must stay scoped to loopback iBeam development traffic.
-- Do not add real order placement or live-trading behavior in this queued batch.
+- Do not add real order placement or live-trading behavior in the current task queue.
 - Update active docs in the same change as durable code/runtime changes.
 
 ## Next Task ID

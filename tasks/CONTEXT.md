@@ -31,7 +31,9 @@ implementation queue.
   watchlists, durable TimescaleDB cache rows, frontend workflow module seams,
   the completed `TP-045` through `TP-057` frontend reconstruction/polish wave,
   the completed `TP-058` through `TP-063` paper-capital/backtesting MVP wave,
-  and the completed `TP-064` through `TP-068` frontend route/visibility UX wave
+  the completed `TP-064` through `TP-068` frontend route/visibility UX wave,
+  the completed `TP-069` through `TP-071` Compose startup cutover wave, and the
+  completed `TP-072` Exact Instrument Identity provider-neutral key deepening
   are present.
 
 ## Domain Vocabulary
@@ -40,19 +42,35 @@ implementation queue.
   tuple for a tradable or chartable instrument: provider, provider symbol id,
   symbol, exchange, currency, and asset class, normalized by
   `ATrade.MarketData.ExactInstrumentIdentity`. Provider-backed market-data
-  search, trending, candle, indicator, latest-update, Timescale cache,
-  watchlist, and saved backtest flows carry this identity where available.
-  Backend-owned persisted keys derive only from the normalized tuple and retain
-  the legacy `instrumentKey` / `pinKey` segment names while excluding an
-  `ibkrConid` segment. IBKR `conid` is provider-specific metadata and an alias
-  for the IBKR provider symbol id, not a separate provider-neutral identity
-  dimension. Frontend code may compute provider-neutral provisional keys only for
-  optimistic UI state until the backend returns authoritative `instrumentKey` /
-  `pinKey` values.
+  search, trending, candle, indicator, latest-update, Timescale cache, and
+  watchlist flows carry this identity where available. Backend-owned persisted
+  keys derive from the normalized tuple and retain the legacy
+  `instrumentKey` / `pinKey` segment shape; frontend code may compute
+  provisional keys only for optimistic UI state until the backend returns
+  authoritative `instrumentKey` / `pinKey` values. Canonical ATrade route and
+  frontend query handoff should use the provider-neutral identity tuple
+  (`provider`, `providerSymbolId`, `symbol`, `exchange`, `currency`, and
+  `assetClass`). Backend-owned `instrumentKey` / `pinKey` values should also
+  derive from that provider-neutral tuple only. IBKR `conid` values are
+  IBKR-specific provider metadata and aliases for the IBKR provider symbol id,
+  not a separate provider-neutral identity dimension. Existing `ibkrConid`-
+  bearing keys are legacy inputs only; compatibility code may accept them in
+  order to normalize to the provider-neutral key shape, but new canonical keys
+  should not emit an `ibkrConid` segment. Frontend optimistic UI may compute
+  provisional keys from the same provider-neutral tuple, but backend-returned
+  `instrumentKey` / `pinKey` values remain authoritative. Route/query parsing
+  remains an API/frontend adapter concern; those adapters should translate
+  request shape into the provider-neutral tuple before crossing the Exact
+  Instrument Identity module seam. Saved backtest runs should persist and
+  display the full provider-neutral Exact Instrument Identity tuple rather than
+  symbol-only history with optional provider metadata. Runtime `instrumentKey`
+  construction must go through the Exact Instrument Identity implementation;
+  SQL migrations/repositories should not manually reconstruct canonical key
+  strings except for unavoidable one-off legacy repair.
 
 ## Active Task Queue
 
-No ready implementation tasks are currently queued after completion of TP-072 Exact Instrument Identity provider-neutral key deepening. The next new Taskplane packet should use `TP-073`.
+No ready implementation tasks are currently queued after completion of `TP-072` Exact Instrument Identity provider-neutral key deepening. The next new Taskplane packet should use `TP-073`.
 
 The most recent completed work includes:
 
@@ -70,10 +88,14 @@ The most recent completed work includes:
 - `TP-066` — added `/chart` Stored stocks defaults without fake demo symbols
 - `TP-067` — made Home, Search, and Watchlist purpose-built instead of identical market-monitor wrappers
 - `TP-068` — added consolidated frontend route, visibility, chart-default, and page-purpose regression validation
+- `TP-069` — added the Compose runtime foundation with stable local infra ports and helper scripts
+- `TP-070` — added opt-in AppHost external Compose infrastructure mode
+- `TP-071` — cut over default startup to Compose-managed infrastructure with Aspire-launched app services
+- `TP-072` — deepened Exact Instrument Identity so canonical keys and saved backtest identity use provider-neutral fields and legacy `ibkrConid` inputs normalize forward
 
-The next new Taskplane packet should use `TP-069`.
+The next new Taskplane packet should use `TP-073`.
 
-Completed task packets through `TP-068` are present in `tasks/`; completed
+Completed task packets through `TP-072` are present in `tasks/`; completed
 packets should be archived when convenient. During orchestrated runs the runtime
 handles post-merge archival for active task folders.
 
@@ -129,7 +151,7 @@ All variants start Compose infrastructure first and then delegate to the Aspire 
 | Documentation index | `docs/INDEX.md`                                           |
 | Startup contract    | `scripts/README.md`                                       |
 | Active tasks        | None currently queued; next packet should use `TP-073`    |
-| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-068-*`                 |
+| Completed tasks     | `tasks/TP-042-*` through `tasks/TP-072-*`                 |
 | Archived tasks      | `tasks/archive/TP-002-*` through `tasks/archive/TP-041-*` |
 | Taskplane config    | `.pi/taskplane-config.json`                               |
 | AppHost             | `src/ATrade.AppHost/Program.cs`                           |
@@ -149,6 +171,6 @@ All variants start Compose infrastructure first and then delegate to the Aspire 
 - [ ] Review the frontend dependency audit from TP-018 (`lightweight-charts` and `@microsoft/signalr` reported moderate npm advisories) without forcing breaking upgrades.
 - [ ] Review TP-046 frontend npm audit advisories for `next` and `postcss` after the terminal UI stack bootstrap; do not force breaking upgrades inside the reconstruction queue.
 - [x] Archive completed `TP-019` through `TP-041` task packets before starting the previous queued run.
-- [ ] Archive completed `TP-042` through `TP-068` task packets when convenient.
+- [ ] Archive completed `TP-042` through `TP-072` task packets when convenient.
 - [ ] Verify real IBKR/iBeam and LEAN behavior only through ignored `.env` values and documented optional runtime checks.
 - [ ] Keep local iBeam Client Portal transport on HTTPS (`https://127.0.0.1:<gateway-port>`) and restrict self-signed certificate handling to loopback iBeam development traffic.
