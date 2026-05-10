@@ -103,7 +103,7 @@ assert_exact_identity_chart_and_analysis_handoff() {
 
   assert_file_contains "$identity" 'providerSymbolId=${encodeSegment(normalized.providerSymbolId)}'
   assert_file_contains "$identity" "params.set('providerSymbolId', identity.providerSymbolId);"
-  assert_file_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
+  assert_file_not_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
   assert_file_contains "$monitor_workflow" "createTerminalSymbolRoute('CHART', identity)"
   assert_file_contains "$monitor_workflow" 'return createTerminalSymbolRoute(moduleId, identity);'
   assert_file_contains "$monitor_workflow" 'identity: row.exactIdentity'

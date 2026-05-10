@@ -129,9 +129,9 @@ assert_exact_identity_and_canonical_handoff() {
   assert_file_contains "$landing" 'data-chart-href={candidate.chartHref}'
   assert_file_contains "$landing" 'data-analysis-href={candidate.analysisHref}'
   assert_file_contains "$landing" 'data-backtest-href={candidate.backtestHref}'
-  assert_file_contains "$routes" 'firstTerminalQueryValue(searchParams.ibkrConid)'
-  assert_file_contains "$routes" 'ibkrConid,'
-  assert_file_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
+  assert_file_not_contains "$routes" 'firstTerminalQueryValue(searchParams.ibkrConid)'
+  assert_file_not_contains "$routes" 'ibkrConid,'
+  assert_file_not_contains "$identity" "params.set('ibkrConid', String(identity.ibkrConid));"
   assert_file_contains "$terminal_types" 'identity?: InstrumentIdentityInput | null'
 }
 

@@ -82,12 +82,12 @@
 - [x] Exact Instrument Identity contract tests passing
 - [x] Workspaces watchlist tests passing
 - [x] Backtesting tests passing
-- [ ] Affected frontend/apphost identity contract tests passing
+- [x] Affected frontend/apphost identity contract tests passing
 - [x] Frontend build passing if frontend identity code changes
 - [x] FULL test suite passing
 - [x] Build passes
-- [ ] R013 stale Category A apphost `ibkrConid` assertions migrated
-- [ ] R013 affected apphost identity scripts rerun and passing
+- [x] R013 stale Category A apphost `ibkrConid` assertions migrated
+- [x] R013 affected apphost identity scripts rerun and passing
 
 ---
 
