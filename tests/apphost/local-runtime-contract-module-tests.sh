@@ -42,94 +42,81 @@ assert_file_not_contains() {
 }
 
 assert_env_template_defaults() {
-  python3 - <<'PY' "$env_template_path"
-from pathlib import Path
-import re
-import sys
+  node - <<'JS' "$env_template_path"
+const fs = require('fs');
+const envPath = process.argv[2];
+const values = new Map();
 
-path = Path(sys.argv[1])
-values: dict[str, str] = {}
-
-for raw_line in path.read_text(encoding='utf-8').splitlines():
-    line = raw_line.strip()
-    if not line or line.startswith('#'):
-        continue
-    if '=' not in line:
-        raise SystemExit(f'invalid .env.template line: {raw_line}')
-    key, value = line.split('=', 1)
-    key = key.strip()
-    value = value.strip().strip('"\'')
-    if not key:
-        raise SystemExit(f'invalid empty .env.template key in line: {raw_line}')
-    if key in values:
-        raise SystemExit(f'duplicate .env.template key: {key}')
-    values[key] = value
-
-expected = {
-    'ATRADE_API_HTTP_PORT': '5181',
-    'ATRADE_FRONTEND_DIRECT_HTTP_PORT': '3111',
-    'ATRADE_APPHOST_FRONTEND_HTTP_PORT': '3000',
-    'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT': '0',
-    'ATRADE_COMPOSE_COMMAND': '',
-    'ATRADE_COMPOSE_PROJECT_NAME': 'atrade',
-    'ATRADE_POSTGRES_PORT': '5432',
-    'ATRADE_TIMESCALEDB_PORT': '5433',
-    'ATRADE_REDIS_PORT': '6379',
-    'ATRADE_NATS_PORT': '4222',
-    'ATRADE_POSTGRES_DATA_VOLUME': 'atrade-postgres-data',
-    'ATRADE_POSTGRES_PASSWORD': 'ATRADE_POSTGRES_PASSWORD',
-    'ATRADE_TIMESCALEDB_DATA_VOLUME': 'atrade-timescaledb-data',
-    'ATRADE_TIMESCALEDB_PASSWORD': 'ATRADE_TIMESCALEDB_PASSWORD',
-    'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
-    'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
-    'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000',
-    'ATRADE_IBKR_GATEWAY_PORT': '5000',
-    'ATRADE_IBKR_GATEWAY_IMAGE': 'voyz/ibeam:latest',
-    'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS': '15',
-    'ATRADE_IBKR_USERNAME': 'IBKR_USERNAME',
-    'ATRADE_IBKR_PASSWORD': 'IBKR_PASSWORD',
-    'ATRADE_IBKR_PAPER_ACCOUNT_ID': 'IBKR_ACCOUNT_ID',
-    'ATRADE_FRONTEND_API_BASE_URL': 'http://127.0.0.1:5181',
-    'NEXT_PUBLIC_ATRADE_API_BASE_URL': 'http://127.0.0.1:5181',
-    'ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES': '30',
-    'ATRADE_ANALYSIS_ENGINE': 'none',
-    'ATRADE_LEAN_RUNTIME_MODE': 'cli',
-    'ATRADE_LEAN_CLI_COMMAND': 'lean',
-    'ATRADE_LEAN_DOCKER_COMMAND': 'docker',
-    'ATRADE_LEAN_DOCKER_IMAGE': 'quantconnect/lean:latest',
-    'ATRADE_LEAN_WORKSPACE_ROOT': 'artifacts/lean-workspaces',
-    'ATRADE_LEAN_TIMEOUT_SECONDS': '45',
-    'ATRADE_LEAN_KEEP_WORKSPACE': 'false',
-    'ATRADE_LEAN_MANAGED_CONTAINER_NAME': 'atrade-lean-engine',
-    'ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT': '/workspace',
+for (const rawLine of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+  const line = rawLine.trim();
+  if (!line || line.startsWith('#')) continue;
+  const separatorIndex = line.indexOf('=');
+  if (separatorIndex <= 0) throw new Error(`invalid .env.template line: ${rawLine}`);
+  const key = line.slice(0, separatorIndex).trim();
+  const value = line.slice(separatorIndex + 1).trim().replace(/^["']|["']$/g, '');
+  if (!key) throw new Error(`invalid empty .env.template key in line: ${rawLine}`);
+  if (values.has(key)) throw new Error(`duplicate .env.template key: ${key}`);
+  values.set(key, value);
 }
 
-missing = sorted(set(expected) - set(values))
-if missing:
-    raise SystemExit(f'.env.template missing expected keys: {missing}')
+const expected = {
+  ATRADE_API_HTTP_PORT: '5181',
+  ATRADE_FRONTEND_DIRECT_HTTP_PORT: '3111',
+  ATRADE_APPHOST_FRONTEND_HTTP_PORT: '3000',
+  ATRADE_ASPIRE_DASHBOARD_HTTP_PORT: '0',
+  ATRADE_COMPOSE_COMMAND: '',
+  ATRADE_COMPOSE_PROJECT_NAME: 'atrade',
+  ATRADE_POSTGRES_PORT: '5432',
+  ATRADE_TIMESCALEDB_PORT: '5433',
+  ATRADE_REDIS_PORT: '6379',
+  ATRADE_NATS_PORT: '4222',
+  ATRADE_POSTGRES_DATA_VOLUME: 'atrade-postgres-data',
+  ATRADE_POSTGRES_PASSWORD: 'ATRADE_POSTGRES_PASSWORD',
+  ATRADE_TIMESCALEDB_DATA_VOLUME: 'atrade-timescaledb-data',
+  ATRADE_TIMESCALEDB_PASSWORD: 'ATRADE_TIMESCALEDB_PASSWORD',
+  ATRADE_BROKER_INTEGRATION_ENABLED: 'false',
+  ATRADE_BROKER_ACCOUNT_MODE: 'Paper',
+  ATRADE_IBKR_GATEWAY_URL: 'https://127.0.0.1:5000',
+  ATRADE_IBKR_GATEWAY_PORT: '5000',
+  ATRADE_IBKR_GATEWAY_IMAGE: 'voyz/ibeam:latest',
+  ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS: '15',
+  ATRADE_IBKR_USERNAME: 'IBKR_USERNAME',
+  ATRADE_IBKR_PASSWORD: 'IBKR_PASSWORD',
+  ATRADE_IBKR_PAPER_ACCOUNT_ID: 'IBKR_ACCOUNT_ID',
+  ATRADE_FRONTEND_API_BASE_URL: 'http://127.0.0.1:5181',
+  NEXT_PUBLIC_ATRADE_API_BASE_URL: 'http://127.0.0.1:5181',
+  ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES: '30',
+  ATRADE_ANALYSIS_ENGINE: 'none',
+  ATRADE_LEAN_RUNTIME_MODE: 'cli',
+  ATRADE_LEAN_CLI_COMMAND: 'lean',
+  ATRADE_LEAN_DOCKER_COMMAND: 'docker',
+  ATRADE_LEAN_DOCKER_IMAGE: 'quantconnect/lean:latest',
+  ATRADE_LEAN_WORKSPACE_ROOT: 'artifacts/lean-workspaces',
+  ATRADE_LEAN_TIMEOUT_SECONDS: '45',
+  ATRADE_LEAN_KEEP_WORKSPACE: 'false',
+  ATRADE_LEAN_MANAGED_CONTAINER_NAME: 'atrade-lean-engine',
+  ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT: '/workspace',
+};
 
-for key, expected_value in expected.items():
-    actual_value = values[key]
-    if actual_value != expected_value:
-        raise SystemExit(f'{key} expected {expected_value!r}, found {actual_value!r}')
+const missing = Object.keys(expected).filter((key) => !values.has(key)).sort();
+if (missing.length > 0) throw new Error(`.env.template missing expected keys: ${missing.join(', ')}`);
 
-for key, value in values.items():
-    if value.lower() == 'live':
-        raise SystemExit(f'{key} must not default to live mode')
-    if re.search(r'(TOKEN|COOKIE|SESSION)', key, re.IGNORECASE):
-        raise SystemExit(f'session/token/cookie-bearing key must not be committed to .env.template: {key}')
-    if key in {'ATRADE_IBKR_USERNAME', 'ATRADE_IBKR_PASSWORD', 'ATRADE_IBKR_PAPER_ACCOUNT_ID'}:
-        continue
-    if re.fullmatch(r'(DU|U)\d+', value, re.IGNORECASE):
-        raise SystemExit(f'{key} must not contain a real-looking broker account id')
+for (const [key, expectedValue] of Object.entries(expected)) {
+  const actualValue = values.get(key);
+  if (actualValue !== expectedValue) throw new Error(`${key} expected ${JSON.stringify(expectedValue)}, found ${JSON.stringify(actualValue)}`);
+}
 
-if values['ATRADE_IBKR_USERNAME'] != 'IBKR_USERNAME':
-    raise SystemExit('ATRADE_IBKR_USERNAME must stay an obvious fake placeholder')
-if values['ATRADE_IBKR_PASSWORD'] != 'IBKR_PASSWORD':
-    raise SystemExit('ATRADE_IBKR_PASSWORD must stay an obvious fake placeholder')
-if values['ATRADE_IBKR_PAPER_ACCOUNT_ID'] != 'IBKR_ACCOUNT_ID':
-    raise SystemExit('ATRADE_IBKR_PAPER_ACCOUNT_ID must stay an obvious fake placeholder')
-PY
+for (const [key, value] of values) {
+  if (value.toLowerCase() === 'live') throw new Error(`${key} must not default to live mode`);
+  if (/(TOKEN|COOKIE|SESSION)/i.test(key)) throw new Error(`session/token/cookie-bearing key must not be committed to .env.template: ${key}`);
+  if (['ATRADE_IBKR_USERNAME', 'ATRADE_IBKR_PASSWORD', 'ATRADE_IBKR_PAPER_ACCOUNT_ID'].includes(key)) continue;
+  if (/^(DU|U)\d+$/i.test(value)) throw new Error(`${key} must not contain a real-looking broker account id`);
+}
+
+if (values.get('ATRADE_IBKR_USERNAME') !== 'IBKR_USERNAME') throw new Error('ATRADE_IBKR_USERNAME must stay an obvious fake placeholder');
+if (values.get('ATRADE_IBKR_PASSWORD') !== 'IBKR_PASSWORD') throw new Error('ATRADE_IBKR_PASSWORD must stay an obvious fake placeholder');
+if (values.get('ATRADE_IBKR_PAPER_ACCOUNT_ID') !== 'IBKR_ACCOUNT_ID') throw new Error('ATRADE_IBKR_PAPER_ACCOUNT_ID must stay an obvious fake placeholder');
+JS
 }
 
 assert_docs_and_existing_tests_share_defaults() {
@@ -161,9 +148,9 @@ assert_docs_and_existing_tests_share_defaults() {
 
   assert_file_contains "$start_wrapper_test_path" "assert_file_contains \"\$repo_root/.env.template\" 'ATRADE_APPHOST_FRONTEND_HTTP_PORT=3000'"
   assert_file_contains "$start_wrapper_test_path" "assert_file_contains \"\$repo_root/.env.template\" 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=0'"
-  assert_file_contains "$paper_config_test_path" "'ATRADE_BROKER_INTEGRATION_ENABLED': 'false'"
-  assert_file_contains "$paper_config_test_path" "'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000'"
-  assert_file_contains "$paper_config_test_path" "'ATRADE_IBKR_GATEWAY_PORT': '5000'"
+  assert_file_contains "$paper_config_test_path" "ATRADE_BROKER_INTEGRATION_ENABLED: 'false'"
+  assert_file_contains "$paper_config_test_path" "ATRADE_IBKR_GATEWAY_URL: 'https://127.0.0.1:5000'"
+  assert_file_contains "$paper_config_test_path" "ATRADE_IBKR_GATEWAY_PORT: '5000'"
 }
 
 assert_removed_lane_specific_defaults() {

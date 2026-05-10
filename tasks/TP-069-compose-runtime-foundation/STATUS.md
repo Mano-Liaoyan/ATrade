@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 7
+**Review Counter:** 8
 **Iteration:** 1
 **Size:** M
 
@@ -57,9 +57,9 @@
 ### Step 4: Add contract validation
 **Status:** 🟨 In Progress
 
-- [ ] Add Compose contract tests for command selection, profiles, ports, volumes, and safety
-- [ ] Keep live Compose checks optional/skippable when no engine is installed
-- [ ] Update existing runtime contract tests for intentional new variables
+- [x] Add Compose contract tests for command selection, profiles, ports, volumes, and safety
+- [x] Keep live Compose checks optional/skippable when no engine is installed
+- [x] Update existing runtime contract tests for intentional new variables
 
 ---
 
@@ -95,6 +95,7 @@
 | R005 | Code | Step 2 | APPROVE | .reviews/R005-code-step2.md |
 | R006 | Plan | Step 3 | APPROVE | .reviews/R006-plan-step3.md |
 | R007 | Code | Step 3 | APPROVE | .reviews/R007-code-step3.md |
+| R008 | Plan | Step 4 | APPROVE | .reviews/R008-plan-step4.md |
 
 ---
 
@@ -128,6 +129,7 @@
 | 2026-05-10 04:23 | Step 3 code review | R007 APPROVE |
 | 2026-05-10 04:23 | Step 3 completed | Compose helper scripts approved |
 | 2026-05-10 04:23 | Step 4 started | Compose contract validation |
+| 2026-05-10 04:24 | Step 4 plan review | R008 APPROVE |
 
 ---
 
@@ -146,4 +148,6 @@
 - 2026-05-10 04:06 — Review R005 code Step 2: APPROVE
 - 2026-05-10 04:07 — Review R006 plan Step 3: APPROVE
 - 2026-05-10 04:23 — Review R007 code Step 3: APPROVE
+- 2026-05-10 04:24 — Review R008 plan Step 4: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
+| 2026-05-10 04:28 | Review R008 | plan Step 4: APPROVE |

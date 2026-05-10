@@ -25,134 +25,104 @@ assert_file_contains() {
 }
 
 assert_architecture_doc_frontmatter() {
-  python3 - <<'PY' "$doc_path"
-from pathlib import Path
-import sys
+  node - <<'JS' "$doc_path"
+const fs = require('fs');
+const docPath = process.argv[2];
+const text = fs.readFileSync(docPath, 'utf8');
 
-path = Path(sys.argv[1])
-text = path.read_text(encoding='utf-8')
-
-if not text.startswith('---\n'):
-    raise SystemExit(f'{path} is missing a frontmatter block')
-
-parts = text.split('---\n', 2)
-if len(parts) < 3:
-    raise SystemExit(f'{path} does not contain a complete frontmatter block')
-
-frontmatter = parts[1]
-required_fields = ['status:', 'owner:', 'updated:', 'summary:', 'see_also:']
-for field in required_fields:
-    if field not in frontmatter:
-        raise SystemExit(f'{path} frontmatter missing {field}')
-
-if 'status: active' not in frontmatter:
-    raise SystemExit(f'{path} frontmatter must declare status: active')
-PY
+if (!text.startsWith('---\n') && !text.startsWith('---\r\n')) throw new Error(`${docPath} is missing a frontmatter block`);
+const parts = text.split(/---\r?\n/);
+if (parts.length < 3) throw new Error(`${docPath} does not contain a complete frontmatter block`);
+const frontmatter = parts[1];
+for (const field of ['status:', 'owner:', 'updated:', 'summary:', 'see_also:']) {
+  if (!frontmatter.includes(field)) throw new Error(`${docPath} frontmatter missing ${field}`);
+}
+if (!frontmatter.includes('status: active')) throw new Error(`${docPath} frontmatter must declare status: active`);
+JS
 }
 
 assert_env_contract_is_paper_safe() {
-  python3 - <<'PY' "$env_path"
-from pathlib import Path
-import re
-import sys
+  node - <<'JS' "$env_path"
+const fs = require('fs');
+const envPath = process.argv[2];
+const values = new Map();
 
-path = Path(sys.argv[1])
-values = {}
-for raw_line in path.read_text(encoding='utf-8').splitlines():
-    line = raw_line.strip()
-    if not line or line.startswith('#'):
-        continue
-    if '=' not in line:
-        raise SystemExit(f'invalid env contract line: {raw_line}')
-    key, value = line.split('=', 1)
-    values[key] = value
-
-required = {
-    'ATRADE_API_HTTP_PORT': '5181',
-    'ATRADE_FRONTEND_DIRECT_HTTP_PORT': '3111',
-    'ATRADE_APPHOST_FRONTEND_HTTP_PORT': '3000',
-    'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT': '0',
-    'ATRADE_COMPOSE_COMMAND': '',
-    'ATRADE_COMPOSE_PROJECT_NAME': 'atrade',
-    'ATRADE_POSTGRES_PORT': '5432',
-    'ATRADE_TIMESCALEDB_PORT': '5433',
-    'ATRADE_REDIS_PORT': '6379',
-    'ATRADE_NATS_PORT': '4222',
-    'ATRADE_POSTGRES_DATA_VOLUME': 'atrade-postgres-data',
-    'ATRADE_POSTGRES_PASSWORD': 'ATRADE_POSTGRES_PASSWORD',
-    'ATRADE_TIMESCALEDB_DATA_VOLUME': 'atrade-timescaledb-data',
-    'ATRADE_TIMESCALEDB_PASSWORD': 'ATRADE_TIMESCALEDB_PASSWORD',
-    'ATRADE_BROKER_INTEGRATION_ENABLED': 'false',
-    'ATRADE_BROKER_ACCOUNT_MODE': 'Paper',
-    'ATRADE_IBKR_GATEWAY_URL': 'https://127.0.0.1:5000',
-    'ATRADE_IBKR_GATEWAY_PORT': '5000',
-    'ATRADE_IBKR_GATEWAY_IMAGE': 'voyz/ibeam:latest',
-    'ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS': '15',
-    'ATRADE_IBKR_USERNAME': 'IBKR_USERNAME',
-    'ATRADE_IBKR_PASSWORD': 'IBKR_PASSWORD',
-    'ATRADE_IBKR_PAPER_ACCOUNT_ID': 'IBKR_ACCOUNT_ID',
-    'ATRADE_FRONTEND_API_BASE_URL': 'http://127.0.0.1:5181',
-    'NEXT_PUBLIC_ATRADE_API_BASE_URL': 'http://127.0.0.1:5181',
+for (const rawLine of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+  const line = rawLine.trim();
+  if (!line || line.startsWith('#')) continue;
+  const separatorIndex = line.indexOf('=');
+  if (separatorIndex <= 0) throw new Error(`invalid env contract line: ${rawLine}`);
+  values.set(line.slice(0, separatorIndex), line.slice(separatorIndex + 1));
 }
 
-for key, expected in required.items():
-    actual = values.get(key)
-    if actual != expected:
-        raise SystemExit(f'{key} expected {expected!r}, found {actual!r}')
+const required = {
+  ATRADE_API_HTTP_PORT: '5181',
+  ATRADE_FRONTEND_DIRECT_HTTP_PORT: '3111',
+  ATRADE_APPHOST_FRONTEND_HTTP_PORT: '3000',
+  ATRADE_ASPIRE_DASHBOARD_HTTP_PORT: '0',
+  ATRADE_COMPOSE_COMMAND: '',
+  ATRADE_COMPOSE_PROJECT_NAME: 'atrade',
+  ATRADE_POSTGRES_PORT: '5432',
+  ATRADE_TIMESCALEDB_PORT: '5433',
+  ATRADE_REDIS_PORT: '6379',
+  ATRADE_NATS_PORT: '4222',
+  ATRADE_POSTGRES_DATA_VOLUME: 'atrade-postgres-data',
+  ATRADE_POSTGRES_PASSWORD: 'ATRADE_POSTGRES_PASSWORD',
+  ATRADE_TIMESCALEDB_DATA_VOLUME: 'atrade-timescaledb-data',
+  ATRADE_TIMESCALEDB_PASSWORD: 'ATRADE_TIMESCALEDB_PASSWORD',
+  ATRADE_BROKER_INTEGRATION_ENABLED: 'false',
+  ATRADE_BROKER_ACCOUNT_MODE: 'Paper',
+  ATRADE_IBKR_GATEWAY_URL: 'https://127.0.0.1:5000',
+  ATRADE_IBKR_GATEWAY_PORT: '5000',
+  ATRADE_IBKR_GATEWAY_IMAGE: 'voyz/ibeam:latest',
+  ATRADE_IBKR_GATEWAY_TIMEOUT_SECONDS: '15',
+  ATRADE_IBKR_USERNAME: 'IBKR_USERNAME',
+  ATRADE_IBKR_PASSWORD: 'IBKR_PASSWORD',
+  ATRADE_IBKR_PAPER_ACCOUNT_ID: 'IBKR_ACCOUNT_ID',
+  ATRADE_FRONTEND_API_BASE_URL: 'http://127.0.0.1:5181',
+  NEXT_PUBLIC_ATRADE_API_BASE_URL: 'http://127.0.0.1:5181',
+};
 
-if values['ATRADE_IBKR_USERNAME'] != 'IBKR_USERNAME':
-    raise SystemExit('ATRADE_IBKR_USERNAME must stay an obvious fake placeholder')
+for (const [key, expected] of Object.entries(required)) {
+  const actual = values.get(key);
+  if (actual !== expected) throw new Error(`${key} expected ${JSON.stringify(expected)}, found ${JSON.stringify(actual)}`);
+}
 
-if values['ATRADE_IBKR_PASSWORD'] != 'IBKR_PASSWORD':
-    raise SystemExit('ATRADE_IBKR_PASSWORD must stay an obvious fake placeholder')
+if (values.get('ATRADE_IBKR_USERNAME') !== 'IBKR_USERNAME') throw new Error('ATRADE_IBKR_USERNAME must stay an obvious fake placeholder');
+if (values.get('ATRADE_IBKR_PASSWORD') !== 'IBKR_PASSWORD') throw new Error('ATRADE_IBKR_PASSWORD must stay an obvious fake placeholder');
 
-for key in values:
-    if re.search(r'(TOKEN|SECRET|COOKIE|SESSION)', key):
-        raise SystemExit(f'unexpected token/session/secret-bearing key committed to .env.template: {key}')
+for (const key of values.keys()) {
+  if (/(TOKEN|SECRET|COOKIE|SESSION)/.test(key)) throw new Error(`unexpected token/session/secret-bearing key committed to .env.template: ${key}`);
+}
 
-if values['ATRADE_BROKER_ACCOUNT_MODE'] != 'Paper':
-    raise SystemExit('ATRADE_BROKER_ACCOUNT_MODE must remain Paper in committed defaults')
+if (values.get('ATRADE_BROKER_ACCOUNT_MODE') !== 'Paper') throw new Error('ATRADE_BROKER_ACCOUNT_MODE must remain Paper in committed defaults');
+if (values.get('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT') !== '0') throw new Error('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must preserve the ephemeral dashboard default');
+if (values.get('ATRADE_POSTGRES_DATA_VOLUME') !== 'atrade-postgres-data') throw new Error('ATRADE_POSTGRES_DATA_VOLUME must preserve the shared non-secret default Postgres volume name');
+if (values.get('ATRADE_POSTGRES_PASSWORD') !== 'ATRADE_POSTGRES_PASSWORD') throw new Error('ATRADE_POSTGRES_PASSWORD must stay an obvious fake local-dev placeholder');
+if (values.get('ATRADE_TIMESCALEDB_DATA_VOLUME') !== 'atrade-timescaledb-data') throw new Error('ATRADE_TIMESCALEDB_DATA_VOLUME must preserve the shared non-secret default TimescaleDB volume name');
+if (values.get('ATRADE_TIMESCALEDB_PASSWORD') !== 'ATRADE_TIMESCALEDB_PASSWORD') throw new Error('ATRADE_TIMESCALEDB_PASSWORD must stay an obvious fake local-dev placeholder');
 
-if values['ATRADE_ASPIRE_DASHBOARD_HTTP_PORT'] != '0':
-    raise SystemExit('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must preserve the ephemeral dashboard default')
+if ([...values.keys()].some((key) => ['TOKEN', 'SECRET', 'COOKIE', 'SESSION'].some((token) => 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT'.includes(token)))) {
+  throw new Error('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must remain a non-secret local port key');
+}
+if (['TOKEN', 'SECRET', 'COOKIE', 'SESSION'].some((token) => 'ATRADE_POSTGRES_DATA_VOLUME'.includes(token))) {
+  throw new Error('ATRADE_POSTGRES_DATA_VOLUME must remain a non-secret local Docker volume key');
+}
+if (['TOKEN', 'SECRET', 'COOKIE', 'SESSION'].some((token) => 'ATRADE_TIMESCALEDB_DATA_VOLUME'.includes(token))) {
+  throw new Error('ATRADE_TIMESCALEDB_DATA_VOLUME must remain a non-secret local Docker volume key');
+}
 
-if values['ATRADE_POSTGRES_DATA_VOLUME'] != 'atrade-postgres-data':
-    raise SystemExit('ATRADE_POSTGRES_DATA_VOLUME must preserve the shared non-secret default Postgres volume name')
+if (/^(DU|U)\d+$/i.test(values.get('ATRADE_POSTGRES_PASSWORD'))) throw new Error('ATRADE_POSTGRES_PASSWORD must not look like a broker account id');
+if (/^(DU|U)\d+$/i.test(values.get('ATRADE_TIMESCALEDB_PASSWORD'))) throw new Error('ATRADE_TIMESCALEDB_PASSWORD must not look like a broker account id');
+if (values.get('ATRADE_BROKER_INTEGRATION_ENABLED').toLowerCase() !== 'false') throw new Error('ATRADE_BROKER_INTEGRATION_ENABLED must remain false in committed defaults');
+if (values.get('ATRADE_IBKR_PAPER_ACCOUNT_ID') !== 'IBKR_ACCOUNT_ID' || /^(DU|U)\d+$/i.test(values.get('ATRADE_IBKR_PAPER_ACCOUNT_ID'))) {
+  throw new Error('ATRADE_IBKR_PAPER_ACCOUNT_ID must stay a placeholder, not a real-looking account id');
+}
 
-if values['ATRADE_POSTGRES_PASSWORD'] != 'ATRADE_POSTGRES_PASSWORD':
-    raise SystemExit('ATRADE_POSTGRES_PASSWORD must stay an obvious fake local-dev placeholder')
-
-if values['ATRADE_TIMESCALEDB_DATA_VOLUME'] != 'atrade-timescaledb-data':
-    raise SystemExit('ATRADE_TIMESCALEDB_DATA_VOLUME must preserve the shared non-secret default TimescaleDB volume name')
-
-if values['ATRADE_TIMESCALEDB_PASSWORD'] != 'ATRADE_TIMESCALEDB_PASSWORD':
-    raise SystemExit('ATRADE_TIMESCALEDB_PASSWORD must stay an obvious fake local-dev placeholder')
-
-if any(token in 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
-    raise SystemExit('ATRADE_ASPIRE_DASHBOARD_HTTP_PORT must remain a non-secret local port key')
-
-if any(token in 'ATRADE_POSTGRES_DATA_VOLUME' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
-    raise SystemExit('ATRADE_POSTGRES_DATA_VOLUME must remain a non-secret local Docker volume key')
-
-if any(token in 'ATRADE_TIMESCALEDB_DATA_VOLUME' for token in ('TOKEN', 'SECRET', 'COOKIE', 'SESSION')):
-    raise SystemExit('ATRADE_TIMESCALEDB_DATA_VOLUME must remain a non-secret local Docker volume key')
-
-if re.fullmatch(r'(DU|U)\d+', values['ATRADE_POSTGRES_PASSWORD']):
-    raise SystemExit('ATRADE_POSTGRES_PASSWORD must not look like a broker account id')
-
-if re.fullmatch(r'(DU|U)\d+', values['ATRADE_TIMESCALEDB_PASSWORD']):
-    raise SystemExit('ATRADE_TIMESCALEDB_PASSWORD must not look like a broker account id')
-
-if values['ATRADE_BROKER_INTEGRATION_ENABLED'].lower() != 'false':
-    raise SystemExit('ATRADE_BROKER_INTEGRATION_ENABLED must remain false in committed defaults')
-
-if values['ATRADE_IBKR_PAPER_ACCOUNT_ID'] != 'IBKR_ACCOUNT_ID' or re.fullmatch(r'(DU|U)\d+', values['ATRADE_IBKR_PAPER_ACCOUNT_ID']):
-    raise SystemExit('ATRADE_IBKR_PAPER_ACCOUNT_ID must stay a placeholder, not a real-looking account id')
-
-for key, value in values.items():
-    if key != 'ATRADE_BROKER_ACCOUNT_MODE' and value.lower() == 'live':
-        raise SystemExit(f'{key} must not default to live mode')
-PY
+for (const [key, value] of values) {
+  if (key !== 'ATRADE_BROKER_ACCOUNT_MODE' && value.toLowerCase() === 'live') throw new Error(`${key} must not default to live mode`);
+}
+JS
 }
 
 assert_docs_capture_paper_trading_contract() {
