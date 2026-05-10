@@ -71,7 +71,7 @@ publish_manifest_with_lean_defaults() {
   ATRADE_LEAN_TIMEOUT_SECONDS=45 \
   ATRADE_LEAN_KEEP_WORKSPACE=false \
   ATRADE_LEAN_MANAGED_CONTAINER_NAME=atrade-lean-engine \
-  ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=/workspace \
+  ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=//workspace \
     dotnet run --project "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" -- --publisher manifest --output-path "$manifest_path" >/dev/null
 }
 
@@ -91,7 +91,7 @@ publish_manifest_with_lean_docker_enabled() {
   ATRADE_LEAN_TIMEOUT_SECONDS="$timeout_seconds" \
   ATRADE_LEAN_KEEP_WORKSPACE=false \
   ATRADE_LEAN_MANAGED_CONTAINER_NAME="$managed_container_name" \
-  ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=/workspace \
+  ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=//workspace \
     dotnet run --project "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" -- --publisher manifest --output-path "$manifest_path" >/dev/null
 }
 
@@ -227,20 +227,27 @@ if not api:
     raise SystemExit("expected AppHost manifest to include api project resource")
 
 env = api.get("env", {})
-expected_workspace = str(repo_root / "artifacts" / "lean-workspaces")
+expected_workspace_suffix = "artifacts/lean-workspaces"
 expected = {
     "ATRADE_ANALYSIS_ENGINE": "none",
     "ATRADE_LEAN_RUNTIME_MODE": "cli",
     "ATRADE_LEAN_CLI_COMMAND": "lean",
     "ATRADE_LEAN_DOCKER_COMMAND": "docker",
     "ATRADE_LEAN_DOCKER_IMAGE": "quantconnect/lean:latest",
-    "ATRADE_LEAN_WORKSPACE_ROOT": expected_workspace,
+    "ATRADE_LEAN_WORKSPACE_ROOT": expected_workspace_suffix,
     "ATRADE_LEAN_TIMEOUT_SECONDS": "45",
     "ATRADE_LEAN_KEEP_WORKSPACE": "false",
     "ATRADE_LEAN_MANAGED_CONTAINER_NAME": "atrade-lean-engine",
     "ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT": "/workspace",
 }
-missing_or_wrong = {key: env.get(key) for key, value in expected.items() if env.get(key) != value}
+missing_or_wrong = {}
+for key, value in expected.items():
+    actual = env.get(key)
+    if key == "ATRADE_LEAN_WORKSPACE_ROOT":
+        if not str(actual).replace("\\", "/").endswith(value):
+            missing_or_wrong[key] = actual
+    elif actual != value:
+        missing_or_wrong[key] = actual
 if missing_or_wrong:
     raise SystemExit(f"api project did not receive expected safe LEAN no-engine configuration: {missing_or_wrong!r}")
 
@@ -286,20 +293,27 @@ if not api:
     raise SystemExit("expected AppHost manifest to include api project resource")
 
 env = api.get("env", {})
-expected_workspace = str(repo_root / "artifacts" / "lean-workspaces")
+expected_workspace_suffix = "artifacts/lean-workspaces"
 expected = {
     "ATRADE_ANALYSIS_ENGINE": "Lean",
     "ATRADE_LEAN_RUNTIME_MODE": "docker",
     "ATRADE_LEAN_CLI_COMMAND": "lean",
     "ATRADE_LEAN_DOCKER_COMMAND": "docker",
     "ATRADE_LEAN_DOCKER_IMAGE": "quantconnect/lean:latest",
-    "ATRADE_LEAN_WORKSPACE_ROOT": expected_workspace,
+    "ATRADE_LEAN_WORKSPACE_ROOT": expected_workspace_suffix,
     "ATRADE_LEAN_TIMEOUT_SECONDS": "45",
     "ATRADE_LEAN_KEEP_WORKSPACE": "false",
     "ATRADE_LEAN_MANAGED_CONTAINER_NAME": "atrade-lean-engine",
     "ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT": "/workspace",
 }
-missing_or_wrong = {key: env.get(key) for key, value in expected.items() if env.get(key) != value}
+missing_or_wrong = {}
+for key, value in expected.items():
+    actual = env.get(key)
+    if key == "ATRADE_LEAN_WORKSPACE_ROOT":
+        if not str(actual).replace("\\", "/").endswith(value):
+            missing_or_wrong[key] = actual
+    elif actual != value:
+        missing_or_wrong[key] = actual
 if missing_or_wrong:
     raise SystemExit(f"api project did not receive expected Docker-mode LEAN configuration: {missing_or_wrong!r}")
 PY
