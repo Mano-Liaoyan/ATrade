@@ -1,7 +1,7 @@
 # TP-071: Compose startup cutover for Aspire-launched app services — Status
 
-**Current Step:** Step 6: Testing & Verification
-**Status:** 🟡 In Progress
+**Current Step:** Step 7: Delivery
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-10
 **Review Level:** 2
 **Review Counter:** 12
@@ -95,11 +95,11 @@
 ---
 
 ### Step 7: Delivery
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -114,6 +114,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Some check-if-affected architecture docs still described AppHost-managed iBeam/LEAN/Postgres after the Compose cutover. | Updated to Compose-managed wording during delivery review. | `docs/architecture/analysis-engines.md`, `docs/architecture/paper-trading-workspace.md`, `docs/architecture/modules.md` |
+| Runtime Compose/volume validations skipped clearly in this environment because no compatible Docker/Podman Compose engine was available. | Static/source validations and full .NET suite passed; runtime scripts reported explicit skips. | Step 6 test output |
 
 ---
 

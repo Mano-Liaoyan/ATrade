@@ -184,15 +184,15 @@ ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT=/workspace
 ```
 
 To enable LEAN locally, copy `.env.template` to ignored `.env` and set
-`ATRADE_ANALYSIS_ENGINE=Lean`. For the no-paid-account local path, use AppHost-managed Docker mode: set
+`ATRADE_ANALYSIS_ENGINE=Lean`. For the no-paid-account local path, use Compose-managed Docker mode: set
 `ATRADE_ANALYSIS_ENGINE=Lean`, set `ATRADE_LEAN_RUNTIME_MODE=docker`, keep or
 override `ATRADE_LEAN_DOCKER_IMAGE` with a LEAN engine image such as
-`quantconnect/lean:latest`, and start through `./start run`; the Aspire graph
-then shows a `lean-engine` resource and mounts `ATRADE_LEAN_WORKSPACE_ROOT` into
+`quantconnect/lean:latest`, and start through `./start run`; the Compose stack
+then owns the `lean-engine` profile service and mounts `ATRADE_LEAN_WORKSPACE_ROOT` into
 that container at `ATRADE_LEAN_CONTAINER_WORKSPACE_ROOT`. AppHost resolves these
 settings through the shared local runtime contract loader; the API receives only
 these non-secret LEAN settings and invokes the engine launcher directly inside
-the managed container. CLI mode remains available for users who already have a
+the Compose-managed container. CLI mode remains available for users who already have a
 usable LEAN CLI workspace by keeping `ATRADE_LEAN_RUNTIME_MODE=cli`, installing
 or configuring the official `lean` command, and ensuring
 `ATRADE_LEAN_WORKSPACE_ROOT` is at or under an initialized LEAN workspace

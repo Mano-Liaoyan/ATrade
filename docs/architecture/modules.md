@@ -451,7 +451,7 @@ hosting defaults (telemetry, health checks, resilience, configuration).
 - **Purpose:** LEAN adapter behind the provider-neutral analysis engine seam.
 - **Responsibilities:** Bind safe LEAN runtime options, generate temporary LEAN
   project workspaces from ATrade-normalized OHLCV bars, execute the configured
-  official LEAN CLI or the AppHost-managed Docker runtime (`lean-engine` via
+  official LEAN CLI or the Compose-managed Docker runtime (`lean-engine` via
   `docker exec` with a shared workspace mount), parse the emitted analysis result
   marker, and return provider-neutral signals, metrics, backtest summaries,
   equity curves, simulated trades, benchmarks, and accounting details.
