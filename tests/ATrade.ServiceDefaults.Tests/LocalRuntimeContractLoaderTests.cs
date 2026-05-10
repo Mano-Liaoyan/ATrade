@@ -10,6 +10,12 @@ public sealed class LocalRuntimeContractLoaderTests
         using var repository = TemporaryRepository.Create();
         repository.WriteTemplate($$"""
 {{LocalRuntimeEnvironmentVariables.ApiHttpPort}}=5181
+{{LocalRuntimeEnvironmentVariables.ComposeCommand}}=podman compose
+{{LocalRuntimeEnvironmentVariables.ComposeProjectName}}=templateproject
+{{LocalRuntimeEnvironmentVariables.PostgresPort}}=15432
+{{LocalRuntimeEnvironmentVariables.TimescaleDbPort}}=15433
+{{LocalRuntimeEnvironmentVariables.RedisPort}}=16379
+{{LocalRuntimeEnvironmentVariables.NatsPort}}=14222
 {{LocalRuntimeEnvironmentVariables.PostgresDataVolume}}=template-postgres-volume
 {{LocalRuntimeEnvironmentVariables.PostgresPassword}}=template-postgres-password
 {{LocalRuntimeEnvironmentVariables.BrokerIntegrationEnabled}}=false
@@ -22,6 +28,8 @@ public sealed class LocalRuntimeContractLoaderTests
 """);
         repository.WriteEnv($$"""
 {{LocalRuntimeEnvironmentVariables.ApiHttpPort}}=6001
+{{LocalRuntimeEnvironmentVariables.ComposeProjectName}}=envproject
+{{LocalRuntimeEnvironmentVariables.PostgresPort}}=25432
 {{LocalRuntimeEnvironmentVariables.PostgresDataVolume}}=env-postgres-volume
 {{LocalRuntimeEnvironmentVariables.IbkrUsername}}=env-paper-user
 {{LocalRuntimeEnvironmentVariables.LeanWorkspaceRoot}}=env-lean-workspace
@@ -35,6 +43,8 @@ public sealed class LocalRuntimeContractLoaderTests
             {
                 [LocalRuntimeEnvironmentVariables.ApiHttpPort] = "7001",
                 [LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort] = "7002",
+                [LocalRuntimeEnvironmentVariables.ComposeCommand] = "docker compose",
+                [LocalRuntimeEnvironmentVariables.PostgresPort] = "35432",
                 [LocalRuntimeEnvironmentVariables.PostgresPassword] = "process-postgres-password",
                 [LocalRuntimeEnvironmentVariables.IbkrPassword] = "process-paper-password",
                 [LocalRuntimeEnvironmentVariables.LeanWorkspaceRoot] = "process-lean-workspace",
@@ -45,6 +55,12 @@ public sealed class LocalRuntimeContractLoaderTests
         Assert.Equal(7001, contract.Ports.ApiHttpPort);
         Assert.Equal(7002, contract.Ports.AspireDashboardHttpPort);
         Assert.Equal(LocalRuntimeContractDefaults.FrontendDirectHttpPort, contract.Ports.FrontendDirectHttpPort);
+        Assert.Equal("docker compose", contract.Compose.Command);
+        Assert.Equal("envproject", contract.Compose.ProjectName);
+        Assert.Equal(35432, contract.Ports.PostgresPort);
+        Assert.Equal(15433, contract.Ports.TimescaleDbPort);
+        Assert.Equal(16379, contract.Ports.RedisPort);
+        Assert.Equal(14222, contract.Ports.NatsPort);
         Assert.Equal("env-postgres-volume", contract.Storage.PostgresDataVolumeName);
         Assert.Equal("process-postgres-password", contract.Storage.PostgresPassword);
         Assert.Equal("false", contract.PaperTrading.BrokerIntegrationEnabled);
@@ -71,6 +87,12 @@ public sealed class LocalRuntimeContractLoaderTests
         Assert.Equal(LocalRuntimeContractDefaults.FrontendDirectHttpPort, contract.Ports.FrontendDirectHttpPort);
         Assert.Equal(LocalRuntimeContractDefaults.AppHostFrontendHttpPort, contract.Ports.AppHostFrontendHttpPort);
         Assert.Equal(LocalRuntimeContractDefaults.AspireDashboardHttpPort, contract.Ports.AspireDashboardHttpPort);
+        Assert.Equal(LocalRuntimeContractDefaults.ComposeCommand, contract.Compose.Command);
+        Assert.Equal(LocalRuntimeContractDefaults.ComposeProjectName, contract.Compose.ProjectName);
+        Assert.Equal(LocalRuntimeContractDefaults.PostgresPort, contract.Ports.PostgresPort);
+        Assert.Equal(LocalRuntimeContractDefaults.TimescaleDbPort, contract.Ports.TimescaleDbPort);
+        Assert.Equal(LocalRuntimeContractDefaults.RedisPort, contract.Ports.RedisPort);
+        Assert.Equal(LocalRuntimeContractDefaults.NatsPort, contract.Ports.NatsPort);
         Assert.Equal(LocalRuntimeContractDefaults.PostgresDataVolume, contract.Storage.PostgresDataVolumeName);
         Assert.Equal(LocalRuntimeContractDefaults.PostgresPassword, contract.Storage.PostgresPassword);
         Assert.Equal(LocalRuntimeContractDefaults.TimescaleDataVolume, contract.Storage.TimescaleDataVolumeName);
@@ -85,7 +107,7 @@ public sealed class LocalRuntimeContractLoaderTests
         Assert.Equal(LocalRuntimeContractDefaults.MarketDataCacheFreshnessMinutes, contract.MarketData.CacheFreshnessMinutes);
         Assert.Equal(LocalRuntimeContractDefaults.AnalysisEngine, contract.Lean.AnalysisEngine);
         Assert.Equal(LocalRuntimeContractDefaults.LeanRuntimeMode, contract.Lean.RuntimeMode);
-        Assert.Equal(Path.Combine(repository.Root, LocalRuntimeContractDefaults.LeanWorkspaceRoot), contract.Lean.WorkspaceRoot);
+        Assert.Equal(Path.GetFullPath(Path.Combine(repository.Root, LocalRuntimeContractDefaults.LeanWorkspaceRoot)), contract.Lean.WorkspaceRoot);
         Assert.Equal(LocalRuntimeContractDefaults.LeanContainerWorkspaceRoot, contract.Lean.ContainerWorkspaceRoot);
     }
 
@@ -107,6 +129,12 @@ public sealed class LocalRuntimeContractLoaderTests
         AssertSecret(contract, LocalRuntimeEnvironmentVariables.IbkrPaperAccountId);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.ApiHttpPort);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.ComposeCommand);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.ComposeProjectName);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.PostgresPort);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.TimescaleDbPort);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.RedisPort);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.NatsPort);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.PostgresDataVolume);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.IbkrGatewayUrl);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.IbkrGatewayImage);
@@ -120,6 +148,10 @@ public sealed class LocalRuntimeContractLoaderTests
     [InlineData(LocalRuntimeEnvironmentVariables.FrontendDirectHttpPort, "70000")]
     [InlineData(LocalRuntimeEnvironmentVariables.AppHostFrontendHttpPort, "not-a-port")]
     [InlineData(LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort, "70000")]
+    [InlineData(LocalRuntimeEnvironmentVariables.PostgresPort, "0")]
+    [InlineData(LocalRuntimeEnvironmentVariables.TimescaleDbPort, "70000")]
+    [InlineData(LocalRuntimeEnvironmentVariables.RedisPort, "not-a-port")]
+    [InlineData(LocalRuntimeEnvironmentVariables.NatsPort, "-1")]
     public void Load_rejects_invalid_port_values(string variableName, string value)
     {
         using var repository = TemporaryRepository.Create();
@@ -136,6 +168,25 @@ public sealed class LocalRuntimeContractLoaderTests
 
         Assert.Contains(variableName, exception.Message, StringComparison.Ordinal);
         Assert.Contains(value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_rejects_invalid_compose_project_names()
+    {
+        using var repository = TemporaryRepository.Create();
+        repository.WriteTemplate("# intentionally empty\n");
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            LocalRuntimeContractLoader.Load(new LocalRuntimeContractLoadOptions(
+                RepositoryRoot: repository.Root,
+                ContractPath: repository.TemplatePath,
+                EnvironmentVariables: new Dictionary<string, string?>
+                {
+                    [LocalRuntimeEnvironmentVariables.ComposeProjectName] = "Bad.Project",
+                })));
+
+        Assert.Contains(LocalRuntimeEnvironmentVariables.ComposeProjectName, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Bad.Project", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

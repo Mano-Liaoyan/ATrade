@@ -70,6 +70,12 @@ expected = {
     'ATRADE_FRONTEND_DIRECT_HTTP_PORT': '3111',
     'ATRADE_APPHOST_FRONTEND_HTTP_PORT': '3000',
     'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT': '0',
+    'ATRADE_COMPOSE_COMMAND': '',
+    'ATRADE_COMPOSE_PROJECT_NAME': 'atrade',
+    'ATRADE_POSTGRES_PORT': '5432',
+    'ATRADE_TIMESCALEDB_PORT': '5433',
+    'ATRADE_REDIS_PORT': '6379',
+    'ATRADE_NATS_PORT': '4222',
     'ATRADE_POSTGRES_DATA_VOLUME': 'atrade-postgres-data',
     'ATRADE_POSTGRES_PASSWORD': 'ATRADE_POSTGRES_PASSWORD',
     'ATRADE_TIMESCALEDB_DATA_VOLUME': 'atrade-timescaledb-data',
@@ -131,6 +137,12 @@ assert_docs_and_existing_tests_share_defaults() {
   assert_file_contains "$scripts_readme_path" '`ATRADE_FRONTEND_DIRECT_HTTP_PORT` — direct `frontend/` `npm run dev` verification path; committed default `3111`'
   assert_file_contains "$scripts_readme_path" '`ATRADE_APPHOST_FRONTEND_HTTP_PORT` — AppHost-managed Next.js frontend port; committed default `3000`'
   assert_file_contains "$scripts_readme_path" '`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT` — Aspire dashboard UI bind port used by `./start run`, `./start.ps1 run`, and `./start.cmd run`; the committed default `0`'
+  assert_file_contains "$scripts_readme_path" '`ATRADE_COMPOSE_COMMAND` — optional exact Compose command override; committed default is blank so helper scripts auto-select Podman Compose before Docker Compose'
+  assert_file_contains "$scripts_readme_path" '`ATRADE_COMPOSE_PROJECT_NAME` — Compose project name; committed default `atrade`'
+  assert_file_contains "$scripts_readme_path" '`ATRADE_POSTGRES_PORT` — Compose-managed Postgres localhost bind port; committed default `5432`'
+  assert_file_contains "$scripts_readme_path" '`ATRADE_TIMESCALEDB_PORT` — Compose-managed TimescaleDB localhost bind port; committed default `5433`'
+  assert_file_contains "$scripts_readme_path" '`ATRADE_REDIS_PORT` — Compose-managed Redis localhost bind port; committed default `6379`'
+  assert_file_contains "$scripts_readme_path" '`ATRADE_NATS_PORT` — Compose-managed NATS localhost bind port; committed default `4222`'
   assert_file_contains "$scripts_readme_path" '`ATRADE_BROKER_INTEGRATION_ENABLED` — feature flag for local broker/iBeam wiring; committed default stays `false`'
   assert_file_contains "$scripts_readme_path" '`ATRADE_IBKR_GATEWAY_URL` — local iBeam/IBKR Gateway Client Portal API base URL; committed default is `https://127.0.0.1:5000`'
   assert_file_contains "$scripts_readme_path" '`ATRADE_IBKR_GATEWAY_PORT` — local host bind port for the iBeam Client Portal API; committed default is `5000`'
@@ -159,6 +171,10 @@ assert_removed_lane_specific_defaults() {
   assert_file_not_contains "$env_template_path" 'ATRADE_FRONTEND_DIRECT_HTTP_PORT=13111'
   assert_file_not_contains "$env_template_path" 'ATRADE_APPHOST_FRONTEND_HTTP_PORT=13000'
   assert_file_not_contains "$env_template_path" 'ATRADE_ASPIRE_DASHBOARD_HTTP_PORT=10001'
+  assert_file_not_contains "$env_template_path" 'ATRADE_POSTGRES_PORT=15432'
+  assert_file_not_contains "$env_template_path" 'ATRADE_TIMESCALEDB_PORT=15433'
+  assert_file_not_contains "$env_template_path" 'ATRADE_REDIS_PORT=16379'
+  assert_file_not_contains "$env_template_path" 'ATRADE_NATS_PORT=14222'
   assert_file_not_contains "$env_template_path" 'ATRADE_IBKR_GATEWAY_URL=https://127.0.0.1:15000'
   assert_file_not_contains "$env_template_path" 'ATRADE_IBKR_GATEWAY_PORT=15000'
   assert_file_not_contains "$env_template_path" 'ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES=10'
