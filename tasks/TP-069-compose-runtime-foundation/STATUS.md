@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 5
+**Review Counter:** 6
 **Iteration:** 1
 **Size:** M
 
@@ -47,10 +47,10 @@
 ### Step 3: Add reusable Compose helper scripts
 **Status:** 🟨 In Progress
 
-- [ ] Add Unix helper with local runtime env loading and Compose actions
-- [ ] Add PowerShell helper with equivalent Windows behavior
-- [ ] Implement `ATRADE_COMPOSE_COMMAND`, Podman-default, Docker-fallback command selection
-- [ ] Implement automatic `ibkr` and `lean` profile selection without leaking secrets
+- [x] Add Unix helper with local runtime env loading and Compose actions
+- [x] Add PowerShell helper with equivalent Windows behavior
+- [x] Implement `ATRADE_COMPOSE_COMMAND`, Podman-default, Docker-fallback command selection
+- [x] Implement automatic `ibkr` and `lean` profile selection without leaking secrets
 
 ---
 
@@ -93,6 +93,7 @@
 | R003 | Code | Step 1 | APPROVE | .reviews/R003-code-step1.md |
 | R004 | Plan | Step 2 | APPROVE | .reviews/R004-plan-step2.md |
 | R005 | Code | Step 2 | APPROVE | .reviews/R005-code-step2.md |
+| R006 | Plan | Step 3 | APPROVE | .reviews/R006-plan-step3.md |
 
 ---
 
@@ -122,6 +123,7 @@
 | 2026-05-10 04:06 | Step 2 code review | R005 APPROVE |
 | 2026-05-10 04:06 | Step 2 completed | Compose infrastructure definition approved |
 | 2026-05-10 04:06 | Step 3 started | Compose helper scripts |
+| 2026-05-10 04:07 | Step 3 plan review | R006 APPROVE |
 
 ---
 
@@ -138,4 +140,6 @@
 - 2026-05-10 03:53 — Review R003 code Step 1: APPROVE
 - 2026-05-10 03:55 — Review R004 plan Step 2: APPROVE
 - 2026-05-10 04:06 — Review R005 code Step 2: APPROVE
+- 2026-05-10 04:07 — Review R006 plan Step 3: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
+| 2026-05-10 04:12 | Review R006 | plan Step 3: APPROVE |
