@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 9
+**Review Counter:** 10
 **Iteration:** 1
 **Size:** M
 
@@ -66,12 +66,12 @@
 ### Step 5: Testing & Verification
 **Status:** 🟨 In Progress
 
-- [ ] Compose contract tests passing
-- [ ] Local runtime contract tests passing
-- [ ] Apphost local runtime shell contract tests passing if affected
-- [ ] Paper-trading config contract tests passing if affected
-- [ ] FULL test suite passing
-- [ ] Build passes
+- [x] Compose contract tests passing
+- [x] Local runtime contract tests passing
+- [x] Apphost local runtime shell contract tests passing if affected
+- [x] Paper-trading config contract tests passing if affected
+- [x] FULL test suite passing
+- [x] Build passes
 
 ---
 
@@ -97,6 +97,7 @@
 | R007 | Code | Step 3 | APPROVE | .reviews/R007-code-step3.md |
 | R008 | Plan | Step 4 | APPROVE | .reviews/R008-plan-step4.md |
 | R009 | Code | Step 4 | UNAVAILABLE | *(reviewer exited without output)* |
+| R010 | Plan | Step 5 | APPROVE | .reviews/R010-plan-step5.md |
 
 ---
 
@@ -135,6 +136,14 @@
 | 2026-05-10 04:36 | Step 4 code review | R009 UNAVAILABLE; proceeded per review protocol |
 | 2026-05-10 04:36 | Step 4 completed | Contract validation added with unavailable reviewer noted |
 | 2026-05-10 04:36 | Step 5 started | Testing and verification |
+| 2026-05-10 04:37 | Step 5 plan review | R010 APPROVE |
+| 2026-05-10 04:39 | Step 5 compose tests | `bash tests/compose/compose-infra-contract-tests.sh` passed; live engine check skipped cleanly |
+| 2026-05-10 04:40 | Step 5 ServiceDefaults tests | `dotnet test tests/ATrade.ServiceDefaults.Tests/ATrade.ServiceDefaults.Tests.csproj --nologo --verbosity minimal` passed |
+| 2026-05-10 04:40 | Step 5 apphost shell tests | `bash tests/apphost/local-runtime-contract-module-tests.sh` passed |
+| 2026-05-10 04:40 | Step 5 paper config tests | `bash tests/apphost/paper-trading-config-contract-tests.sh` passed |
+| 2026-05-10 04:44 | Step 5 full suite | First run exposed Windows LEAN fake-runtime test incompatibility; fixed and reran successfully |
+| 2026-05-10 04:47 | Step 5 full suite | `dotnet test ATrade.slnx --nologo --verbosity minimal` passed |
+| 2026-05-10 04:48 | Step 5 build | `dotnet build ATrade.slnx --nologo --verbosity minimal` passed |
 
 ---
 
@@ -155,4 +164,6 @@
 - 2026-05-10 04:23 — Review R007 code Step 3: APPROVE
 - 2026-05-10 04:24 — Review R008 plan Step 4: APPROVE
 - 2026-05-10 04:36 — Review R009 code Step 4: UNAVAILABLE (reviewer exited without output); proceeding with caution per protocol.
+- 2026-05-10 04:37 — Review R010 plan Step 5: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
+| 2026-05-10 04:48 | Review R010 | plan Step 5: APPROVE |

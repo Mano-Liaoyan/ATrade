@@ -184,9 +184,10 @@ public sealed class LeanAnalysisEngineTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.False(result.TimedOut);
-        Assert.Equal(
-            "exec\n-e\nPYTHONDONTWRITEBYTECODE=1\n-w\n/Lean/Launcher/bin/Debug\natrade-lean-engine\ndotnet\nQuantConnect.Lean.Launcher.dll\n--config\n/workspace/run-1/lean-engine-config.json\n",
-            result.StandardOutput.ReplaceLineEndings("\n"));
+        var expectedDockerCommandOutput = OperatingSystem.IsWindows()
+            ? "exec\n-e\nPYTHONDONTWRITEBYTECODE\n1\n-w\n/Lean/Launcher/bin/Debug\natrade-lean-engine\ndotnet\nQuantConnect.Lean.Launcher.dll\n--config\n/workspace/run-1/lean-engine-config.json\n"
+            : "exec\n-e\nPYTHONDONTWRITEBYTECODE=1\n-w\n/Lean/Launcher/bin/Debug\natrade-lean-engine\ndotnet\nQuantConnect.Lean.Launcher.dll\n--config\n/workspace/run-1/lean-engine-config.json\n";
+        Assert.Equal(expectedDockerCommandOutput, result.StandardOutput.ReplaceLineEndings("\n"));
 
         var engineConfig = File.ReadAllText(Path.Combine(workspace, "lean-engine-config.json"));
         Assert.Contains("\"algorithm-location\": \"/workspace/run-1/ATradeLeanAnalysis/main.py\"", engineConfig, StringComparison.Ordinal);
@@ -439,12 +440,15 @@ public sealed class LeanAnalysisEngineTests
 
     private static string CreateExecutableScript(string body)
     {
+        var directory = Directory.CreateTempSubdirectory("atrade-lean-runtime-command-");
+
         if (OperatingSystem.IsWindows())
         {
-            throw new PlatformNotSupportedException("LEAN runtime executor command-construction tests require a Unix-like shell.");
+            var cmdPath = Path.Combine(directory.FullName, "fake-runtime.cmd");
+            File.WriteAllText(cmdPath, CreateWindowsCommandScript(body));
+            return cmdPath;
         }
 
-        var directory = Directory.CreateTempSubdirectory("atrade-lean-runtime-command-");
         var path = Path.Combine(directory.FullName, "fake-runtime.sh");
         File.WriteAllText(path, $"#!/usr/bin/env bash\nset -euo pipefail\n{body}");
 
@@ -465,6 +469,41 @@ public sealed class LeanAnalysisEngineTests
         }
 
         return path;
+    }
+
+    private static string CreateWindowsCommandScript(string body)
+    {
+        if (body.Contains("printf '%s\\n' \"$@\"", StringComparison.Ordinal))
+        {
+            return """
+                @echo off
+                :print_args
+                if "%~1"=="" exit /b 0
+                echo %~1
+                shift
+                goto print_args
+                """;
+        }
+
+        if (body.Contains("No such container: atrade-lean-engine", StringComparison.Ordinal))
+        {
+            return """
+                @echo off
+                echo No such container: atrade-lean-engine 1>&2
+                exit /b 1
+                """;
+        }
+
+        if (body.Contains("runtime should not be called", StringComparison.Ordinal))
+        {
+            return """
+                @echo off
+                echo runtime should not be called
+                exit /b 0
+                """;
+        }
+
+        throw new NotSupportedException($"Unsupported fake runtime command body for Windows test execution: {body}");
     }
 
     private static AnalysisRequest CreateRequest(
