@@ -111,6 +111,9 @@ assert_manifest_declares_infrastructure_graph() {
 assert_default_compose_mode_omits_infrastructure_graph() {
   compose_manifest_path="$(mktemp --suffix=.json)"
 
+  assert_file_contains "$repo_root/src/ATrade.AppHost/ComposeInfrastructureContract.cs" 'ReferenceExpression.Create'
+  assert_file_not_contains "$repo_root/src/ATrade.AppHost/ComposeInfrastructureContract.cs" 'Password={{{password.Resource.Name}.value}}'
+
   ATRADE_POSTGRES_PORT=15432 \
     ATRADE_TIMESCALEDB_PORT=15433 \
     ATRADE_REDIS_PORT=16379 \
@@ -139,8 +142,8 @@ if (resources.frontend.type !== 'container.v1') throw new Error(`frontend should
 const apiEnv = resources.api.env ?? {};
 const workerEnv = resources['ibkr-worker'].env ?? {};
 const expectedApi = {
-  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=postgres;Password={postgres-password.value};Database=postgres',
-  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=postgres;Password={timescaledb-password.value};Database=postgres',
+  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=atrade;Password={postgres-password.value};Database=atrade',
+  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=atrade;Password={timescaledb-password.value};Database=atrade_marketdata',
   ConnectionStrings__redis: '127.0.0.1:16379',
   ConnectionStrings__nats: 'nats://127.0.0.1:14222',
 };

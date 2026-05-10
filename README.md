@@ -56,17 +56,17 @@ credential-bearing values classified for Aspire secret-parameter handoff.
 
 The current runnable slice includes:
 
-- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, Next.js
-  frontend, volume-backed Postgres, volume-backed TimescaleDB, Redis, NATS, the
-  optional `voyz/ibeam:latest` `ibkr-gateway` container when ignored local `.env`
-  credentials enable broker integration, and the optional `lean-engine` LEAN
-  runtime container when ignored local `.env` selects LEAN Docker mode; the
-  primary `postgres` data directory uses `ATRADE_POSTGRES_DATA_VOLUME` (default
-  `atrade-postgres-data`) plus a stable local-dev `ATRADE_POSTGRES_PASSWORD`
-  secret parameter so workspace preferences and local paper-capital fallback
-  values survive full local AppHost reboots;
-  the `timescaledb` data directory uses `ATRADE_TIMESCALEDB_DATA_VOLUME`
-  (default `atrade-timescaledb-data`) plus a stable local-dev
+- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, and Next.js
+  frontend while default infrastructure is Compose-managed Postgres,
+  TimescaleDB, Redis, and NATS. In Compose mode, AppHost injects localhost
+  connection strings that target the Compose-created `atrade` role, primary
+  Postgres database `atrade`, and TimescaleDB database `atrade_marketdata`.
+  Compose keeps the primary `postgres` data directory in
+  `ATRADE_POSTGRES_DATA_VOLUME` (default `atrade-postgres-data`) plus a stable
+  local-dev `ATRADE_POSTGRES_PASSWORD` secret parameter so workspace preferences
+  and local paper-capital fallback values survive full local AppHost reboots;
+  the `timescaledb` data directory uses `ATRADE_TIMESCALEDB_DATA_VOLUME` (default
+  `atrade-timescaledb-data`) plus a stable local-dev
   `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data cache rows
   survive full local AppHost reboots; the local iBeam Client Portal URL is HTTPS on the configured host gateway port,
   mapped to the container's internal Client Portal port `5000`, and the

@@ -85,8 +85,8 @@ for (const [resourceName, expectedType] of Object.entries(requiredResourceTypes)
 const apiEnv = resources.api.env ?? {};
 const workerEnv = resources['ibkr-worker'].env ?? {};
 const expectedApiEnv = {
-  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=postgres;Password={postgres-password.value};Database=postgres',
-  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=postgres;Password={timescaledb-password.value};Database=postgres',
+  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=atrade;Password={postgres-password.value};Database=atrade',
+  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=atrade;Password={timescaledb-password.value};Database=atrade_marketdata',
   ConnectionStrings__redis: '127.0.0.1:16379',
   ConnectionStrings__nats: 'nats://127.0.0.1:14222',
   ATRADE_API_HTTP_PORT: '5181',
@@ -152,8 +152,8 @@ for (const resourceName of ['api', 'ibkr-worker', 'frontend']) {
 const apiEnv = resources.api.env ?? {};
 const workerEnv = resources['ibkr-worker'].env ?? {};
 const expectedApi = {
-  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=postgres;Password={postgres-password.value};Database=postgres',
-  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=postgres;Password={timescaledb-password.value};Database=postgres',
+  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=atrade;Password={postgres-password.value};Database=atrade',
+  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=atrade;Password={timescaledb-password.value};Database=atrade_marketdata',
   ConnectionStrings__redis: '127.0.0.1:16379',
   ConnectionStrings__nats: 'nats://127.0.0.1:14222',
   ATRADE_BROKER_INTEGRATION_ENABLED: 'false',

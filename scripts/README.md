@@ -175,40 +175,47 @@ trap, and therefore does not run `down` automatically when the helper exits.
 
 The default Compose graph publishes Postgres, TimescaleDB, Redis, and NATS only
 on `127.0.0.1` using the stable `ATRADE_*_PORT` values above. Postgres and
-TimescaleDB keep the same durable named volume variables as AppHost. Optional
-profiles stay disabled unless local ignored/process settings make them safe:
+TimescaleDB keep the same durable named volume variables as the local runtime
+contract. Compose initializes both database services with the `atrade` role;
+the primary Postgres database is `atrade`, and the TimescaleDB market-data
+database is `atrade_marketdata`. AppHost Compose mode injects matching
+localhost connection strings into the API and worker. Those connection strings
+are assembled as Aspire reference expressions so database passwords remain
+secret references in generated manifests and resolve only in the launched
+application process environments. Optional profiles stay disabled unless local
+ignored/process settings make them safe:
 `ibkr` is enabled for `up` only when broker integration is true and the IBKR
 username/password are non-placeholder values, while `lean` is enabled only when
 `ATRADE_ANALYSIS_ENGINE=Lean` and `ATRADE_LEAN_RUNTIME_MODE=docker`. The helper
 command output never prints raw IBKR username/password values.
 
-### AppHost database persistence variables
+### Database persistence variables
 
-The AppHost-managed `postgres` and `timescaledb` resources are volume-backed so
+The Compose-managed `postgres` and `timescaledb` resources are volume-backed so
 backend-owned workspace preferences and provider-backed market-data cache rows
-survive a full `start run` stop/start cycle rather than only an API process
-restart.
+survive a full `start run` AppHost stop/start cycle rather than only an API
+process restart.
 
 - `ATRADE_POSTGRES_DATA_VOLUME` — Docker-compatible named volume used for the
-  AppHost `postgres` data directory; committed default is
-  `atrade-postgres-data`. Override in ignored `.env` when multiple worktrees
-  need isolated local databases.
+  Compose `postgres` data directory; committed default is `atrade-postgres-data`.
+  Override in ignored `.env` when multiple worktrees need isolated local
+  databases.
 - `ATRADE_POSTGRES_PASSWORD` — fake local-dev placeholder passed as a secret
-  Aspire parameter to `postgres` and dependent services. The value must stay
-  stable for the lifetime of a named data volume; if an existing local volume was
-  initialized with a different password, either set that same value in ignored
-  `.env` or intentionally remove/recreate the volume after confirming no local
-  data is needed.
+  parameter to Compose `postgres` and as an AppHost parameter reference to
+  dependent services. The value must stay stable for the lifetime of a named data
+  volume; if an existing local volume was initialized with a different password,
+  either set that same value in ignored `.env` or intentionally remove/recreate
+  the volume after confirming no local data is needed.
 - `ATRADE_TIMESCALEDB_DATA_VOLUME` — Docker-compatible named volume used for the
-  AppHost `timescaledb` data directory; committed default is
+  Compose `timescaledb` data directory; committed default is
   `atrade-timescaledb-data`. Override in ignored `.env` when multiple worktrees
   need isolated market-data cache databases.
 - `ATRADE_TIMESCALEDB_PASSWORD` — fake local-dev placeholder passed as a secret
-  Aspire parameter to `timescaledb` and `api`. Like Postgres, the value must stay
-  stable for the lifetime of a named TimescaleDB data volume; if an existing
-  local volume was initialized with a different password, either set that value
-  in ignored `.env` or intentionally remove/recreate the volume after confirming
-  no local cache data is needed.
+  parameter to Compose `timescaledb` and as an AppHost parameter reference to
+  `api`. Like Postgres, the value must stay stable for the lifetime of a named
+  TimescaleDB data volume; if an existing local volume was initialized with a
+  different password, either set that value in ignored `.env` or intentionally
+  remove/recreate the volume after confirming no local cache data is needed.
 
 Do not remove the shared default volumes from automated tests. The AppHost
 watchlist, Timescale cache reboot, manifest, and runtime infrastructure tests

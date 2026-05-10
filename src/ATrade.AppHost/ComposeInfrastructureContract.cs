@@ -1,3 +1,4 @@
+using System.Globalization;
 using ATrade.ServiceDefaults;
 using Aspire.Hosting.ApplicationModel;
 
@@ -10,6 +11,10 @@ public sealed record ComposeInfrastructureContract(
     int RedisPort,
     int NatsPort)
 {
+    private const string ComposeDatabaseUsername = "atrade";
+    private const string ComposePostgresDatabase = "atrade";
+    private const string ComposeTimescaleDatabase = "atrade_marketdata";
+
     public bool IsEnabled => string.Equals(Mode, LocalRuntimeInfrastructureSettings.ComposeMode, StringComparison.OrdinalIgnoreCase);
 
     public static ComposeInfrastructureContract Load(LocalRuntimeContract runtimeContract)
@@ -24,22 +29,28 @@ public sealed record ComposeInfrastructureContract(
             runtimeContract.Ports.NatsPort);
     }
 
-    public string BuildPostgresConnectionString(IResourceBuilder<ParameterResource> password) =>
-        BuildPostgresProtocolConnectionString(PostgresPort, password);
+    public ReferenceExpression BuildPostgresConnectionString(IResourceBuilder<ParameterResource> password) =>
+        BuildPostgresProtocolConnectionString(PostgresPort, ComposePostgresDatabase, password);
 
-    public string BuildTimescaleConnectionString(IResourceBuilder<ParameterResource> password) =>
-        BuildPostgresProtocolConnectionString(TimescaleDbPort, password);
+    public ReferenceExpression BuildTimescaleConnectionString(IResourceBuilder<ParameterResource> password) =>
+        BuildPostgresProtocolConnectionString(TimescaleDbPort, ComposeTimescaleDatabase, password);
 
     public string BuildRedisConnectionString() => $"127.0.0.1:{RedisPort}";
 
     public string BuildNatsConnectionString() => $"nats://127.0.0.1:{NatsPort}";
 
-    private static string BuildPostgresProtocolConnectionString(
+    private static ReferenceExpression BuildPostgresProtocolConnectionString(
         int port,
+        string database,
         IResourceBuilder<ParameterResource> password)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(database);
         ArgumentNullException.ThrowIfNull(password);
 
-        return $"Host=127.0.0.1;Port={port};Username=postgres;Password={{{password.Resource.Name}.value}};Database=postgres";
+        var portText = port.ToString(CultureInfo.InvariantCulture);
+        var prefix = $"Host=127.0.0.1;Port={portText};Username={ComposeDatabaseUsername};Password=";
+        var suffix = $";Database={database}";
+
+        return ReferenceExpression.Create($"{prefix}{password}{suffix}");
     }
 }

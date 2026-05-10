@@ -131,7 +131,8 @@ Windows documentation must use the explicit relative path form.
 
 ## 3. Aspire 13.2 As The Orchestrator
 
-Aspire 13.2 is the **single local orchestrator** for ATrade. In the target
+The repo-local `start run` contract starts Compose-managed infrastructure first,
+then uses Aspire 13.2 to orchestrate ATrade app services. In the target
 architecture the AppHost is responsible for:
 
 - Starting the main .NET API host built on `ATrade.ServiceDefaults`
@@ -139,22 +140,24 @@ architecture the AppHost is responsible for:
 - Starting the Next.js app as an Aspire-managed JavaScript resource (the
   pattern already exercised by the bootstrap home page in
   `src/ATrade.AppHost/Program.cs`)
-- Declaring `Postgres`, `TimescaleDB`, `Redis`, and `NATS` as Aspire-managed
-  infrastructure resources by default, or — only when
-  `ATRADE_INFRASTRUCTURE_MODE=compose` is explicitly selected — omitting those
-  infrastructure resources and injecting direct localhost connection strings for
-  Compose-owned infrastructure. The current default runnable slice declares
-  those resources in `src/ATrade.AppHost/Program.cs`, wires `ATrade.Api` to all
-  four, wires `ATrade.Ibkr.Worker` to `Postgres`, `Redis`, and `NATS`, backs
-  the primary `postgres` data directory with the named
-  `ATRADE_POSTGRES_DATA_VOLUME` volume plus a stable `ATRADE_POSTGRES_PASSWORD`
-  secret parameter so local workspace preferences survive AppHost reboots, backs
-  the `timescaledb` data directory with `ATRADE_TIMESCALEDB_DATA_VOLUME` plus a
-  stable `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data
-  cache rows survive AppHost reboots, forwards the safe paper-trading IBKR/iBeam
-  environment contract plus market-data cache freshness/API port values into the
-  API and worker from the shared local runtime contract, uses redacted Aspire
-  parameters for credential-bearing values, and only declares an optional
+- Omitting `Postgres`, `TimescaleDB`, `Redis`, and `NATS` from the default
+  Aspire graph and injecting direct localhost connection strings for
+  Compose-owned infrastructure. Those connection strings target the Compose
+  `atrade` database role, the primary Postgres database `atrade`, and the
+  TimescaleDB market-data database `atrade_marketdata`. The diagnostic
+  `ATRADE_INFRASTRUCTURE_MODE=apphost` fallback can still declare Aspire-managed
+  infrastructure resources. The current default runnable slice wires
+  `ATrade.Api` to all four Compose services, wires `ATrade.Ibkr.Worker` to
+  Postgres, Redis, and NATS, backs the primary `postgres` data directory with
+  the named `ATRADE_POSTGRES_DATA_VOLUME` volume plus a stable
+  `ATRADE_POSTGRES_PASSWORD` secret parameter so local workspace preferences
+  survive AppHost reboots, backs the `timescaledb` data directory with
+  `ATRADE_TIMESCALEDB_DATA_VOLUME` plus a stable `ATRADE_TIMESCALEDB_PASSWORD`
+  secret parameter so fresh market-data cache rows survive AppHost reboots,
+  forwards the safe paper-trading IBKR/iBeam environment contract plus
+  market-data cache freshness/API port values into the API and worker from the
+  shared local runtime contract, uses redacted Aspire parameters for
+  credential-bearing values, and only declares an optional
   `ibkr-gateway` `voyz/ibeam:latest` container when broker integration is
   enabled and fake credential placeholders have been replaced in ignored `.env`.
   The optional iBeam container also receives a
