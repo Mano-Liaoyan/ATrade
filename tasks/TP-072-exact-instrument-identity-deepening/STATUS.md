@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 1
+**Review Counter:** 2
 **Iteration:** 1
 **Size:** M
 
@@ -24,7 +24,7 @@
 ---
 
 ### Step 1: Pin provider-neutral identity/key contract tests first
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Backend canonical key tests added/updated
 - [x] Legacy `ibkrConid` key normalization tests added/updated
@@ -129,3 +129,4 @@
 
 *Reserved for execution notes*
 | 2026-05-10 20:51 | Review R001 | plan Step 1: APPROVE |
+| 2026-05-10 21:00 | Review R002 | code Step 1: APPROVE |
