@@ -12,6 +12,7 @@ public sealed class LocalRuntimeContractLoaderTests
 {{LocalRuntimeEnvironmentVariables.ApiHttpPort}}=5181
 {{LocalRuntimeEnvironmentVariables.ComposeCommand}}=podman compose
 {{LocalRuntimeEnvironmentVariables.ComposeProjectName}}=templateproject
+{{LocalRuntimeEnvironmentVariables.InfrastructureMode}}=compose
 {{LocalRuntimeEnvironmentVariables.PostgresPort}}=15432
 {{LocalRuntimeEnvironmentVariables.TimescaleDbPort}}=15433
 {{LocalRuntimeEnvironmentVariables.RedisPort}}=16379
@@ -29,6 +30,7 @@ public sealed class LocalRuntimeContractLoaderTests
         repository.WriteEnv($$"""
 {{LocalRuntimeEnvironmentVariables.ApiHttpPort}}=6001
 {{LocalRuntimeEnvironmentVariables.ComposeProjectName}}=envproject
+{{LocalRuntimeEnvironmentVariables.InfrastructureMode}}=apphost
 {{LocalRuntimeEnvironmentVariables.PostgresPort}}=25432
 {{LocalRuntimeEnvironmentVariables.PostgresDataVolume}}=env-postgres-volume
 {{LocalRuntimeEnvironmentVariables.IbkrUsername}}=env-paper-user
@@ -57,6 +59,8 @@ public sealed class LocalRuntimeContractLoaderTests
         Assert.Equal(LocalRuntimeContractDefaults.FrontendDirectHttpPort, contract.Ports.FrontendDirectHttpPort);
         Assert.Equal("docker compose", contract.Compose.Command);
         Assert.Equal("envproject", contract.Compose.ProjectName);
+        Assert.Equal(LocalRuntimeInfrastructureSettings.AppHostMode, contract.Infrastructure.Mode);
+        Assert.False(contract.Infrastructure.IsComposeManaged);
         Assert.Equal(35432, contract.Ports.PostgresPort);
         Assert.Equal(15433, contract.Ports.TimescaleDbPort);
         Assert.Equal(16379, contract.Ports.RedisPort);
@@ -89,6 +93,7 @@ public sealed class LocalRuntimeContractLoaderTests
         Assert.Equal(LocalRuntimeContractDefaults.AspireDashboardHttpPort, contract.Ports.AspireDashboardHttpPort);
         Assert.Equal(LocalRuntimeContractDefaults.ComposeCommand, contract.Compose.Command);
         Assert.Equal(LocalRuntimeContractDefaults.ComposeProjectName, contract.Compose.ProjectName);
+        Assert.Equal(LocalRuntimeContractDefaults.InfrastructureMode, contract.Infrastructure.Mode);
         Assert.Equal(LocalRuntimeContractDefaults.PostgresPort, contract.Ports.PostgresPort);
         Assert.Equal(LocalRuntimeContractDefaults.TimescaleDbPort, contract.Ports.TimescaleDbPort);
         Assert.Equal(LocalRuntimeContractDefaults.RedisPort, contract.Ports.RedisPort);
@@ -131,6 +136,7 @@ public sealed class LocalRuntimeContractLoaderTests
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.ComposeCommand);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.ComposeProjectName);
+        AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.InfrastructureMode);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.PostgresPort);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.TimescaleDbPort);
         AssertNonSecret(contract, LocalRuntimeEnvironmentVariables.RedisPort);
@@ -187,6 +193,25 @@ public sealed class LocalRuntimeContractLoaderTests
 
         Assert.Contains(LocalRuntimeEnvironmentVariables.ComposeProjectName, exception.Message, StringComparison.Ordinal);
         Assert.Contains("Bad.Project", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_rejects_invalid_infrastructure_modes()
+    {
+        using var repository = TemporaryRepository.Create();
+        repository.WriteTemplate("# intentionally empty\n");
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            LocalRuntimeContractLoader.Load(new LocalRuntimeContractLoadOptions(
+                RepositoryRoot: repository.Root,
+                ContractPath: repository.TemplatePath,
+                EnvironmentVariables: new Dictionary<string, string?>
+                {
+                    [LocalRuntimeEnvironmentVariables.InfrastructureMode] = "external",
+                })));
+
+        Assert.Contains(LocalRuntimeEnvironmentVariables.InfrastructureMode, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("external", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

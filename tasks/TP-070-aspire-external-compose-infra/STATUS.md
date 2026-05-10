@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 0
+**Review Counter:** 1
 **Iteration:** 1
 **Size:** M
 
@@ -25,10 +25,10 @@
 ### Step 1: Model opt-in Compose infrastructure mode
 **Status:** 🟨 In Progress
 
-- [ ] Add/finalize infrastructure mode setting while preserving current default
-- [ ] Build localhost Postgres, TimescaleDB, Redis, and NATS connection strings from shared runtime values
-- [ ] Keep database passwords secret in manifests through parameter/reference-expression plumbing
-- [ ] Validate/normalize ports and mode values consistently
+- [x] Add/finalize infrastructure mode setting while preserving current default
+- [x] Build localhost Postgres, TimescaleDB, Redis, and NATS connection strings from shared runtime values
+- [x] Keep database passwords secret in manifests through parameter/reference-expression plumbing
+- [x] Validate/normalize ports and mode values consistently
 
 ---
 
@@ -108,3 +108,4 @@
 ## Notes
 
 *Reserved for execution notes*
+| 2026-05-10 05:09 | Review R001 | plan Step 1: APPROVE |
