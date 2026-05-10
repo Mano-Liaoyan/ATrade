@@ -71,7 +71,8 @@ trap cleanup EXIT
 assert_manifest_declares_infrastructure_graph() {
   manifest_path="$(mktemp --suffix=.json)"
 
-  ATRADE_POSTGRES_DATA_VOLUME="$manifest_postgres_data_volume" \
+  ATRADE_INFRASTRUCTURE_MODE=apphost \
+    ATRADE_POSTGRES_DATA_VOLUME="$manifest_postgres_data_volume" \
     ATRADE_TIMESCALEDB_DATA_VOLUME="$manifest_timescale_data_volume" \
     dotnet run --project "$repo_root/src/ATrade.AppHost/ATrade.AppHost.csproj" -- --publisher manifest --output-path "$manifest_path" >/dev/null
 
