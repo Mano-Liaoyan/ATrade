@@ -1,11 +1,11 @@
 # TP-071: Compose startup cutover for Aspire-launched app services — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 6: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
 **Review Counter:** 11
-**Iteration:** 1
+**Iteration:** 2
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -67,7 +67,7 @@
 ---
 
 ### Step 5: Documentation and durable memory update
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Update README, PLAN, scripts README, and architecture overview
 - [x] Update architecture modules doc if affected
@@ -78,19 +78,19 @@
 ---
 
 ### Step 6: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Compose contract tests passing
-- [ ] Start wrapper tests passing
-- [ ] AppHost manifest validation passing
-- [ ] AppHost worker/resource wiring validation passing
-- [ ] iBeam runtime contract validation passing
-- [ ] LEAN runtime validation passing
-- [ ] Compose/AppHost infra runtime validation passing or clearly skipped
-- [ ] Postgres watchlist volume validation passing or clearly skipped
-- [ ] Timescale cache volume validation passing or clearly skipped
-- [ ] FULL test suite passing
-- [ ] Build passes
+- [x] Compose contract tests passing
+- [x] Start wrapper tests passing
+- [x] AppHost manifest validation passing
+- [x] AppHost worker/resource wiring validation passing
+- [x] iBeam runtime contract validation passing
+- [x] LEAN runtime validation passing
+- [x] Compose/AppHost infra runtime validation passing or clearly skipped
+- [x] Postgres watchlist volume validation passing or clearly skipped
+- [x] Timescale cache volume validation passing or clearly skipped
+- [x] FULL test suite passing
+- [x] Build passes
 
 ---
 
@@ -124,6 +124,8 @@
 | 2026-05-09 | Task staged | PROMPT.md and STATUS.md created |
 | 2026-05-10 06:13 | Task started | Runtime V2 lane-runner execution |
 | 2026-05-10 06:13 | Step 0 started | Preflight |
+| 2026-05-10 08:13 | Worker iter 1 | killed (wall-clock timeout) in 7200s, tools: 230 |
+| 2026-05-10 08:13 | Step 6 started | Testing & Verification |
 
 ---
 
