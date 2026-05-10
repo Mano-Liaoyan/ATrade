@@ -108,11 +108,10 @@ assert_manifest_declares_infrastructure_graph() {
   assert_file_contains "$manifest_path" '"external": true'
 }
 
-assert_compose_mode_omits_infrastructure_graph() {
+assert_default_compose_mode_omits_infrastructure_graph() {
   compose_manifest_path="$(mktemp --suffix=.json)"
 
-  ATRADE_INFRASTRUCTURE_MODE=compose \
-    ATRADE_POSTGRES_PORT=15432 \
+  ATRADE_POSTGRES_PORT=15432 \
     ATRADE_TIMESCALEDB_PORT=15433 \
     ATRADE_REDIS_PORT=16379 \
     ATRADE_NATS_PORT=14222 \
@@ -126,12 +125,12 @@ const manifest = JSON.parse(text);
 const resources = manifest.resources ?? {};
 for (const resourceName of ['postgres', 'timescaledb', 'redis', 'nats', 'ibkr-gateway', 'lean-engine']) {
   if (Object.prototype.hasOwnProperty.call(resources, resourceName)) {
-    throw new Error(`Compose infrastructure mode must not declare ${resourceName}`);
+    throw new Error(`Default Compose infrastructure mode must not declare ${resourceName}`);
   }
 }
 for (const resourceName of ['api', 'ibkr-worker', 'frontend']) {
   if (!resources[resourceName]) {
-    throw new Error(`Compose infrastructure mode must keep ${resourceName}`);
+    throw new Error(`Default Compose infrastructure mode must keep ${resourceName}`);
   }
 }
 if (resources.api.type !== 'project.v0') throw new Error(`api should stay project.v0, found ${resources.api.type}`);
@@ -169,7 +168,7 @@ NODE
 
 main() {
   assert_manifest_declares_infrastructure_graph
-  assert_compose_mode_omits_infrastructure_graph
+  assert_default_compose_mode_omits_infrastructure_graph
 }
 
 main "$@"

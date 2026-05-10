@@ -62,6 +62,8 @@ function Assert-WrapperContractFiles {
     $templatePath = Join-Path $RepoRoot '.env.template'
 
     Assert-FileContains -Path $runScriptPath -Needle 'Import-ATradeLocalPortContract -RepoRoot $RepoRoot'
+    Assert-FileContains -Path $runScriptPath -Needle 'scripts/compose-infra.ps1'
+    Assert-FileContains -Path $runScriptPath -Needle 'ATRADE_INFRASTRUCTURE_MODE'
     Assert-FileContains -Path $runScriptPath -Needle '$env:ASPNETCORE_URLS = "http://127.0.0.1:$AspireDashboardHttpPort"'
     Assert-FileContains -Path $runScriptPath -Needle '--no-launch-profile -- @args'
     Assert-FileContains -Path $envLoaderPath -Needle 'ATRADE_PORT_CONTRACT_PATH'
@@ -141,8 +143,8 @@ function Invoke-WrapperSmoke {
 Push-Location $RepoRoot
 try {
     Assert-WrapperContractFiles
-    Invoke-WrapperSmoke -Name 'start-ps1' -CommandText './start.ps1 run'
-    Invoke-WrapperSmoke -Name 'start-cmd' -CommandText './start.cmd run'
+    Invoke-WrapperSmoke -Name 'start-ps1' -CommandText '$env:ATRADE_INFRASTRUCTURE_MODE="apphost"; ./start.ps1 run'
+    Invoke-WrapperSmoke -Name 'start-cmd' -CommandText '$env:ATRADE_INFRASTRUCTURE_MODE="apphost"; ./start.cmd run'
 
     Write-Host 'Windows wrapper smoke verification completed successfully.'
 }

@@ -24,7 +24,7 @@ publish_apphost_manifest() {
   local password="$4"
   local gateway_url="${5:-https://127.0.0.1:5000}"
   local gateway_port="${6:-5000}"
-  local infrastructure_mode="${7:-apphost}"
+  local infrastructure_mode="${7:-compose}"
 
   ATRADE_INFRASTRUCTURE_MODE="$infrastructure_mode" \
   ATRADE_API_HTTP_PORT=5181 \
@@ -73,12 +73,10 @@ const requiredResourceTypes = {
   api: 'project.v0',
   'ibkr-worker': 'project.v0',
   frontend: 'container.v1',
-  postgres: 'container.v0',
-  timescaledb: 'container.v0',
-  redis: 'container.v0',
-  nats: 'container.v0',
 };
-if (resources['ibkr-gateway']) throw new Error('ibkr-gateway should stay optional and must not appear while broker integration is disabled');
+for (const resourceName of ['postgres', 'timescaledb', 'redis', 'nats', 'ibkr-gateway', 'lean-engine']) {
+  if (resources[resourceName]) throw new Error(`default Compose mode must not declare ${resourceName}`);
+}
 for (const [resourceName, expectedType] of Object.entries(requiredResourceTypes)) {
   const resource = resources[resourceName];
   if (!resource) throw new Error(`missing resource: ${resourceName}`);
@@ -87,14 +85,10 @@ for (const [resourceName, expectedType] of Object.entries(requiredResourceTypes)
 const apiEnv = resources.api.env ?? {};
 const workerEnv = resources['ibkr-worker'].env ?? {};
 const expectedApiEnv = {
-  ConnectionStrings__postgres: '{postgres.connectionString}',
-  ConnectionStrings__timescaledb: '{timescaledb.connectionString}',
-  ConnectionStrings__redis: '{redis.connectionString}',
-  ConnectionStrings__nats: '{nats.connectionString}',
-  POSTGRES_HOST: '{postgres.bindings.tcp.host}',
-  TIMESCALEDB_HOST: '{timescaledb.bindings.tcp.host}',
-  REDIS_HOST: '{redis.bindings.tcp.host}',
-  NATS_HOST: '{nats.bindings.tcp.host}',
+  ConnectionStrings__postgres: 'Host=127.0.0.1;Port=15432;Username=postgres;Password={postgres-password.value};Database=postgres',
+  ConnectionStrings__timescaledb: 'Host=127.0.0.1;Port=15433;Username=postgres;Password={timescaledb-password.value};Database=postgres',
+  ConnectionStrings__redis: '127.0.0.1:16379',
+  ConnectionStrings__nats: 'nats://127.0.0.1:14222',
   ATRADE_API_HTTP_PORT: '5181',
   ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES: '30',
   ATRADE_BROKER_INTEGRATION_ENABLED: 'false',
@@ -108,12 +102,9 @@ const expectedApiEnv = {
   ATRADE_IBKR_PASSWORD: '{ibkr-password.value}',
 };
 const expectedWorkerEnv = {
-  ConnectionStrings__postgres: '{postgres.connectionString}',
-  ConnectionStrings__redis: '{redis.connectionString}',
-  ConnectionStrings__nats: '{nats.connectionString}',
-  POSTGRES_HOST: '{postgres.bindings.tcp.host}',
-  REDIS_HOST: '{redis.bindings.tcp.host}',
-  NATS_HOST: '{nats.bindings.tcp.host}',
+  ConnectionStrings__postgres: expectedApiEnv.ConnectionStrings__postgres,
+  ConnectionStrings__redis: expectedApiEnv.ConnectionStrings__redis,
+  ConnectionStrings__nats: expectedApiEnv.ConnectionStrings__nats,
   ATRADE_BROKER_INTEGRATION_ENABLED: 'false',
   ATRADE_BROKER_ACCOUNT_MODE: 'Paper',
   ATRADE_IBKR_GATEWAY_URL: 'https://127.0.0.1:5000',
@@ -213,7 +204,7 @@ NODE
 
 assert_manifest_wires_ibeam_container_when_enabled() {
   enabled_manifest_path="$(mktemp --suffix=.json)"
-  publish_apphost_manifest "$enabled_manifest_path" true REAL_IBKR_USERNAME_SHOULD_NOT_SURFACE REAL_IBKR_PASSWORD_SHOULD_NOT_SURFACE
+  publish_apphost_manifest "$enabled_manifest_path" true REAL_IBKR_USERNAME_SHOULD_NOT_SURFACE REAL_IBKR_PASSWORD_SHOULD_NOT_SURFACE https://127.0.0.1:5000 5000 apphost
   assert_secret_parameters_are_redacted "$enabled_manifest_path"
 
   node - <<'NODE' "$enabled_manifest_path"
@@ -250,7 +241,7 @@ NODE
 
 assert_manifest_maps_custom_ibeam_host_port_to_client_port() {
   enabled_manifest_path="$(mktemp --suffix=.json)"
-  publish_apphost_manifest "$enabled_manifest_path" true REAL_IBKR_USERNAME_SHOULD_NOT_SURFACE REAL_IBKR_PASSWORD_SHOULD_NOT_SURFACE https://127.0.0.1:15000 15000
+  publish_apphost_manifest "$enabled_manifest_path" true REAL_IBKR_USERNAME_SHOULD_NOT_SURFACE REAL_IBKR_PASSWORD_SHOULD_NOT_SURFACE https://127.0.0.1:15000 15000 apphost
   assert_secret_parameters_are_redacted "$enabled_manifest_path"
 
   node - <<'NODE' "$enabled_manifest_path"

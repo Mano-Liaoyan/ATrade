@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 6
+**Review Counter:** 7
 **Iteration:** 1
 **Size:** M
 
@@ -47,12 +47,12 @@
 ---
 
 ### Step 3: Migrate startup and AppHost validation
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Update start-wrapper tests for Compose-before-AppHost behavior
-- [ ] Update AppHost manifest/resource tests for no default infra resources
-- [ ] Update iBeam and LEAN tests for Compose profile ownership
-- [ ] Keep Windows wrapper validation aligned with Unix behavior
+- [x] Update start-wrapper tests for Compose-before-AppHost behavior
+- [x] Update AppHost manifest/resource tests for no default infra resources
+- [x] Update iBeam and LEAN tests for Compose profile ownership
+- [x] Keep Windows wrapper validation aligned with Unix behavior
 
 ---
 
@@ -142,3 +142,4 @@
 | 2026-05-10 06:52 | Review R004 | plan Step 2: APPROVE |
 | 2026-05-10 07:02 | Review R005 | code Step 2: REVISE |
 | 2026-05-10 07:07 | Review R006 | code Step 2: APPROVE |
+| 2026-05-10 07:17 | Review R007 | plan Step 3: APPROVE |
