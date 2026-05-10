@@ -1,10 +1,10 @@
 # TP-069: Compose runtime foundation — Status
 
-**Current Step:** Step 3: Add reusable Compose helper scripts
+**Current Step:** Step 4: Add contract validation
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 6
+**Review Counter:** 7
 **Iteration:** 1
 **Size:** M
 
@@ -45,7 +45,7 @@
 ---
 
 ### Step 3: Add reusable Compose helper scripts
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Add Unix helper with local runtime env loading and Compose actions
 - [x] Add PowerShell helper with equivalent Windows behavior
@@ -55,7 +55,7 @@
 ---
 
 ### Step 4: Add contract validation
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add Compose contract tests for command selection, profiles, ports, volumes, and safety
 - [ ] Keep live Compose checks optional/skippable when no engine is installed
@@ -94,6 +94,7 @@
 | R004 | Plan | Step 2 | APPROVE | .reviews/R004-plan-step2.md |
 | R005 | Code | Step 2 | APPROVE | .reviews/R005-code-step2.md |
 | R006 | Plan | Step 3 | APPROVE | .reviews/R006-plan-step3.md |
+| R007 | Code | Step 3 | APPROVE | .reviews/R007-code-step3.md |
 
 ---
 
@@ -124,6 +125,9 @@
 | 2026-05-10 04:06 | Step 2 completed | Compose infrastructure definition approved |
 | 2026-05-10 04:06 | Step 3 started | Compose helper scripts |
 | 2026-05-10 04:07 | Step 3 plan review | R006 APPROVE |
+| 2026-05-10 04:23 | Step 3 code review | R007 APPROVE |
+| 2026-05-10 04:23 | Step 3 completed | Compose helper scripts approved |
+| 2026-05-10 04:23 | Step 4 started | Compose contract validation |
 
 ---
 
@@ -141,5 +145,5 @@
 - 2026-05-10 03:55 — Review R004 plan Step 2: APPROVE
 - 2026-05-10 04:06 — Review R005 code Step 2: APPROVE
 - 2026-05-10 04:07 — Review R006 plan Step 3: APPROVE
+- 2026-05-10 04:23 — Review R007 code Step 3: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
-| 2026-05-10 04:12 | Review R006 | plan Step 3: APPROVE |
