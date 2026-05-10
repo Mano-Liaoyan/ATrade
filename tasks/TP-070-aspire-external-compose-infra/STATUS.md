@@ -1,6 +1,6 @@
 # TP-070: Aspire external Compose infrastructure mode — Status
 
-**Current Step:** Step 0: Preflight
+**Current Step:** Step 1: Model opt-in Compose infrastructure mode
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
@@ -23,7 +23,7 @@
 ---
 
 ### Step 1: Model opt-in Compose infrastructure mode
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add/finalize infrastructure mode setting while preserving current default
 - [ ] Build localhost Postgres, TimescaleDB, Redis, and NATS connection strings from shared runtime values
