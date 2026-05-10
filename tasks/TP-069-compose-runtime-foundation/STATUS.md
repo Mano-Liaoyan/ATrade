@@ -1,10 +1,10 @@
 # TP-069: Compose runtime foundation — Status
 
-**Current Step:** Step 1: Extend the local runtime contract for Compose-managed infrastructure
+**Current Step:** Step 2: Add the Compose infrastructure definition
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 2
+**Review Counter:** 3
 **Iteration:** 1
 **Size:** M
 
@@ -23,7 +23,7 @@
 ---
 
 ### Step 1: Extend the local runtime contract for Compose-managed infrastructure
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Add committed Compose command/project and stable infra port variables
 - [x] Preserve `.env.template` → `.env` → process env precedence
@@ -35,7 +35,7 @@
 ---
 
 ### Step 2: Add the Compose infrastructure definition
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Create default Postgres, TimescaleDB, Redis, and NATS Compose services
 - [ ] Preserve durable named volume contract for Postgres and TimescaleDB
@@ -90,6 +90,7 @@
 |---|------|------|---------|------|
 | R001 | Plan | Step 1 | APPROVE | .reviews/R001-plan-step1.md |
 | R002 | Code | Step 1 | REVISE | .reviews/R002-code-step1.md |
+| R003 | Code | Step 1 | APPROVE | .reviews/R003-code-step1.md |
 
 ---
 
@@ -112,6 +113,9 @@
 | 2026-05-10 03:31 | Step 1 plan review | APPROVE |
 | 2026-05-10 03:35 | Step 1 targeted test | `dotnet test tests/ATrade.ServiceDefaults.Tests/ATrade.ServiceDefaults.Tests.csproj --nologo --verbosity minimal` passed |
 | 2026-05-10 03:46 | Step 1 code review | R002 REVISE; revision checkboxes added |
+| 2026-05-10 03:53 | Step 1 code review | R003 APPROVE |
+| 2026-05-10 03:54 | Step 1 completed | Runtime contract Compose variables approved |
+| 2026-05-10 03:54 | Step 2 started | Compose infrastructure definition |
 
 ---
 
@@ -125,4 +129,5 @@
 
 - 2026-05-10 03:35 — Review R001 plan Step 1: APPROVE
 - 2026-05-10 03:46 — Review R002 code Step 1: REVISE
+- 2026-05-10 03:53 — Review R003 code Step 1: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
