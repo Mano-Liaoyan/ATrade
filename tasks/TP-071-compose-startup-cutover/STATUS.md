@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 0
+**Review Counter:** 1
 **Iteration:** 1
 **Size:** M
 
@@ -25,11 +25,11 @@
 ### Step 1: Flip the default startup contract to Compose-managed infrastructure
 **Status:** ⬜ Not Started
 
-- [ ] Update defaults for Compose-managed infrastructure with Aspire-launched app services
-- [ ] Invoke Compose helper `up` before AppHost in Unix and PowerShell start scripts
-- [ ] Preserve Podman-first, Docker-fallback, and exact `ATRADE_COMPOSE_COMMAND` behavior
-- [ ] Leave Compose running when AppHost exits
-- [ ] Preserve cross-platform wrapper semantics
+- [x] Update defaults for Compose-managed infrastructure with Aspire-launched app services
+- [x] Invoke Compose helper `up` before AppHost in Unix and PowerShell start scripts
+- [x] Preserve Podman-first, Docker-fallback, and exact `ATRADE_COMPOSE_COMMAND` behavior
+- [x] Leave Compose running when AppHost exits
+- [x] Preserve cross-platform wrapper semantics
 
 ---
 
@@ -133,3 +133,4 @@
 ## Notes
 
 *Reserved for execution notes*
+| 2026-05-10 06:23 | Review R001 | plan Step 1: APPROVE |

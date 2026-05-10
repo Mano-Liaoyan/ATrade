@@ -25,5 +25,10 @@ if (-not (Test-Path $ProjectPath)) {
     exit 1
 }
 
+& (Join-Path $RepoRoot 'scripts/compose-infra.ps1') up
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
 & dotnet run --project $ProjectPath --no-launch-profile -- @args
 exit $LASTEXITCODE

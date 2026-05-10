@@ -23,4 +23,6 @@ if [[ ! -f "$project_path" ]]; then
   exit 1
 fi
 
+"$repo_root/scripts/compose-infra.sh" up
+
 exec dotnet run --project "$project_path" --no-launch-profile -- "$@"
