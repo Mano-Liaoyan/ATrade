@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 8
+**Review Counter:** 9
 **Iteration:** 1
 **Size:** M
 
@@ -57,12 +57,12 @@
 ---
 
 ### Step 4: Migrate runtime persistence and infrastructure tests
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Update infrastructure runtime validation for Compose-managed containers
-- [ ] Update Postgres watchlist persistence validation for Compose volumes
-- [ ] Update Timescale cache persistence validation for Compose volumes
-- [ ] Ensure live runtime tests clean up only isolated test resources and skip when needed
+- [x] Update infrastructure runtime validation for Compose-managed containers
+- [x] Update Postgres watchlist persistence validation for Compose volumes
+- [x] Update Timescale cache persistence validation for Compose volumes
+- [x] Ensure live runtime tests clean up only isolated test resources and skip when needed
 
 ---
 
@@ -144,3 +144,4 @@
 | 2026-05-10 07:07 | Review R006 | code Step 2: APPROVE |
 | 2026-05-10 07:17 | Review R007 | plan Step 3: APPROVE |
 | 2026-05-10 07:41 | Review R008 | code Step 3: APPROVE |
+| 2026-05-10 07:48 | Review R009 | plan Step 4: APPROVE |

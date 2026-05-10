@@ -10,7 +10,8 @@ timescale_data_volume="atrade-timescaledb-runtime-test-$$-$RANDOM"
 timescale_password="ATradeTimescaleRuntimeTestPassword$RANDOM$RANDOM"
 declare -a created_container_ids=()
 
-docker_label_filter='label=com.microsoft.developer.usvc-dev.group-version=usvc-dev.developer.microsoft.com/v1'
+compose_project_name="atrade-runtime-test-7220-"
+docker_label_filter="label=com.docker.compose.project="
 
 cleanup() {
   if [[ -n "$apphost_pid" ]] && kill -0 "$apphost_pid" 2>/dev/null; then
@@ -27,6 +28,7 @@ cleanup() {
   fi
 
   if command -v docker >/dev/null 2>&1; then
+    ATRADE_COMPOSE_PROJECT_NAME="$compose_project_name" "$repo_root/scripts/compose-infra.sh" down --remove-orphans >/dev/null 2>&1 || true
     docker volume rm "$postgres_data_volume" >/dev/null 2>&1 || true
     docker volume rm "$timescale_data_volume" >/dev/null 2>&1 || true
   fi
@@ -36,12 +38,12 @@ trap cleanup EXIT
 
 require_container_engine() {
   if ! command -v docker >/dev/null 2>&1; then
-    printf 'SKIP: docker CLI is not available; skipping AppHost runtime infrastructure verification.\n'
+    printf 'SKIP: docker CLI is not available; skipping Compose/AppHost runtime infrastructure verification.\n'
     exit 0
   fi
 
   if ! docker version >/dev/null 2>&1; then
-    printf 'SKIP: no healthy Docker-compatible engine is available; skipping AppHost runtime infrastructure verification.\n'
+    printf 'SKIP: no healthy Docker-compatible engine is available; skipping Compose/AppHost runtime infrastructure verification.\n'
     exit 0
   fi
 }
@@ -72,6 +74,8 @@ start_apphost() {
   apphost_log="$(mktemp)"
   (
     cd "$repo_root"
+    ATRADE_COMPOSE_PROJECT_NAME="$compose_project_name" \
+    ATRADE_INFRASTRUCTURE_MODE=compose \
     ATRADE_POSTGRES_DATA_VOLUME="$postgres_data_volume" \
       ATRADE_POSTGRES_PASSWORD="$postgres_password" \
       ATRADE_TIMESCALEDB_DATA_VOLUME="$timescale_data_volume" \
@@ -112,7 +116,7 @@ wait_for_new_infra_containers() {
     fi
   done
 
-  fail_with_debug 'Timed out waiting for AppHost-managed infra containers to be created.'
+  fail_with_debug 'Timed out waiting for Compose-managed infra containers to be created.'
 }
 
 find_created_container_by_image() {
@@ -243,10 +247,10 @@ main() {
   local redis_id
   local nats_id
 
-  postgres_id="$(find_created_container_by_image 'docker.io/library/postgres:17.6')"
+  postgres_id="$(find_created_container_by_image 'postgres:17')"
   timescaledb_id="$(find_created_container_by_image 'docker.io/timescale/timescaledb:latest-pg17')"
-  redis_id="$(find_created_container_by_image 'docker.io/library/redis:8.6')"
-  nats_id="$(find_created_container_by_image 'docker.io/library/nats:2.12')"
+  redis_id="$(find_created_container_by_image 'redis:7')"
+  nats_id="$(find_created_container_by_image 'nats:2')"
 
   assert_database_uses_isolated_volume "$postgres_id" 'postgres' "$postgres_data_volume"
   assert_database_uses_isolated_volume "$timescaledb_id" 'timescaledb' "$timescale_data_volume"
