@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 4
+**Review Counter:** 5
 **Iteration:** 1
 **Size:** M
 
@@ -42,6 +42,7 @@
 - [x] Ensure default Aspire manifest/dashboard omits infra container resources
 - [x] Preserve secret-safe connection string and paper/LEAN handoff
 - [x] Document any explicit legacy/fallback AppHost-managed infra mode as non-default
+- [ ] R005: Explicitly set `ATRADE_INFRASTRUCTURE_MODE=apphost` for legacy manifest validation
 
 ---
 
@@ -139,3 +140,4 @@
 | 2026-05-10 06:35 | Review R002 | code Step 1: REVISE |
 | 2026-05-10 06:43 | Review R003 | code Step 1: APPROVE |
 | 2026-05-10 06:52 | Review R004 | plan Step 2: APPROVE |
+| 2026-05-10 07:02 | Review R005 | code Step 2: REVISE |
