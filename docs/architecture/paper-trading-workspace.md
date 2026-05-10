@@ -259,8 +259,9 @@ accepting `range` / `chartRange` query values and still accepting legacy
 `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`, `1y`, `5y`, and `all`; they mean
 lookbacks from the current time, so `1D` means the past day, `1m` means the past
 month, and `6m` means the past six months. Optional `provider`,
-`providerSymbolId`, `ibkrConid`, `exchange`, `currency`, and `assetClass` query metadata is
-accepted for exact cache filtering/chart handoff. The AppHost `timescaledb`
+`providerSymbolId`, `exchange`, `currency`, and `assetClass` query metadata is
+accepted for exact cache filtering/chart handoff; legacy IBKR `conid` values are
+adapter aliases for `providerSymbolId`, not canonical route/query identity. The AppHost `timescaledb`
 resource is backed by a named data volume, so those fresh rows can survive a full
 `start run` / AppHost stop-start cycle and serve the API after reboot without
 another provider call. Missing, stale, mismatched-range, or lookback-incompatible
@@ -412,9 +413,11 @@ The paper-trading slice extends existing planned responsibilities as follows:
 - `ATrade.Workspaces` owns backend workspace preferences and watchlist request
   intake, including the current Postgres schema/repository for exact pinned
   watchlist instruments. Rows store a durable `instrument_key` / API
-  `instrumentKey` and `pinKey` derived from the normalized provider, provider
-  symbol id / IBKR `conid`, symbol, exchange, currency, and asset class tuple,
-  plus display name, sort order, and timestamps. Duplicate handling merges only
+  `instrumentKey` and `pinKey` derived from the normalized provider-neutral
+  tuple (`provider`, `providerSymbolId`, `symbol`, `exchange`, `currency`, and
+  `assetClass`) and therefore exclude `ibkrConid`; rows may still store IBKR
+  `conid` as provider metadata, plus display name, sort order, and timestamps.
+  Duplicate handling merges only
   exact instrument keys so the same symbol or company name can be pinned
   separately for different markets; exact unpins validate the supplied
   `instrumentKey`, while legacy symbol unpins remain limited to unambiguous rows.
@@ -698,8 +701,9 @@ stable `ATRADE_POSTGRES_PASSWORD` value are reused. The frontend loads, pins,
 and unpins through the backend watchlist API, then updates its browser cache
 from the backend response. Search-result pins send the provider-neutral metadata
 returned by `GET /api/market-data/search`: provider, provider symbol id (IBKR
-`conid` today), optional `ibkrConid`, name, exchange, currency, and asset class.
-The Workspaces watchlist intake normalizes those fields through
+`conid` today), name, exchange, currency, and asset class; optional `ibkrConid`
+may be carried only as IBKR-specific provider metadata. The Workspaces watchlist
+intake normalizes the provider-neutral fields through
 `ATrade.MarketData.ExactInstrumentIdentity` into a stable
 `instrumentKey`/`pinKey` tuple before repository persistence and uses it as the
 Postgres identity; pinning `AAPL` on NASDAQ and `AAPL` on LSE creates two rows,
@@ -835,9 +839,9 @@ through the terminal app using canonical `/chart/{symbol}`,
 preserves exact identity metadata when available, and pin/unpin actions use the
 backend watchlist API for the selected exact provider-market instrument. The
 frontend uses the centralized `frontend/lib/instrumentIdentity.ts` adapter to
-compute provisional optimistic keys, normalize asset classes, parse an IBKR
-`conid` only when the provider is `ibkr` and the provider symbol id is numeric,
-and build exact chart/analysis/backtest handoff query strings without changing
+compute provider-neutral provisional optimistic keys, normalize asset classes,
+parse an IBKR provider id alias as adapter metadata when needed, and build exact
+chart/analysis/backtest handoff query strings without changing
 the selected chart range. The old `/symbols/{symbol}` route is not retained as a
 redirect or compatibility alias.
 Backend-owned `instrumentKey` / `pinKey` values returned by watchlist responses

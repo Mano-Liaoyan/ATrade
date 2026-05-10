@@ -125,12 +125,13 @@ Core types:
   `timeframe` remains a compatibility alias in payloads and API methods, but the
   value is normalized as a chart range; `1m` means one month and one-minute reads
   use `1min`. `ExactInstrumentIdentity` is the backend-owned
-  normalization/key/equality helper for provider, provider symbol id, optional
-  IBKR `conid`, symbol, exchange, currency, and asset class; for IBKR the
-  provider symbol id is the Client Portal `conid`. Frontend canonical
-  chart/analysis/backtest routes may carry `ibkrConid` alongside
-  `providerSymbolId` so route-local handoffs can preserve the exact tuple.
-  Search results, trending symbols, candle series,
+  normalization/key/equality helper for the provider-neutral tuple: `provider`,
+  `providerSymbolId`, `symbol`, `exchange`, `currency`, and `assetClass`. IBKR
+  `conid` is provider-specific metadata and an alias for the IBKR provider symbol
+  id, not a separate provider-neutral identity dimension; canonical
+  `instrumentKey` / `pinKey` emission excludes an `ibkrConid` segment. Frontend
+  canonical chart/analysis/backtest routes carry only provider-neutral query
+  fields for exact handoff. Search results, trending symbols, candle series,
   indicators, and latest updates carry `MarketDataSymbolIdentity` where provider
   metadata is available while preserving the existing symbol/source fields for
   callers that only know a bare symbol. A `CandleSeriesResponse` with an empty
@@ -139,8 +140,8 @@ Core types:
   must not synthesize candles to make a chart appear. Downstream watchlist pins
   must treat this provider/market tuple as the exact instrument identity rather than collapsing
   results to a bare symbol or display name; `ATrade.Workspaces` delegates key
-  construction to the backend identity helper and exposes the normalized tuple as
-  `instrumentKey` and `pinKey` when a result is persisted. Other payloads include
+  construction to the backend identity helper and exposes provider-neutral
+  `instrumentKey` and `pinKey` values when a result is persisted. Other payloads include
   source metadata such as `ibkr-ibeam-history`, `ibkr-ibeam-snapshot`, scanner
   source ids, or `timescale-cache:{originalSource}` when a fresh persisted
   Timescale row serves the API response, including after a full AppHost restart
@@ -162,10 +163,12 @@ Compatibility layer:
   browser already understands.
 - `MarketDataService` composes `IMarketDataProvider`, validates stock search
   query length/asset class/result limit before provider calls, normalizes chart
-  range values before candle/indicator/latest reads, forwards optional exact
-  identity metadata (`provider`, `providerSymbolId`, optional `ibkrConid`,
-  `exchange`, `currency`, and `assetClass`), and preserves endpoint payload/status behavior for callers
-  that only supply a symbol. HTTP callers should send `range` / `chartRange`;
+  range values before candle/indicator/latest reads, translates route/query
+  shape into provider-neutral exact identity metadata (`provider`,
+  `providerSymbolId`, `exchange`, `currency`, and `assetClass`), accepts legacy
+  IBKR `conid` only as an adapter-local alias for `providerSymbolId`, and
+  preserves endpoint payload/status behavior for callers that only supply a
+  symbol. HTTP callers should send `range` / `chartRange`;
   legacy `timeframe` query parameters are still accepted as aliases.
 - `IMarketDataStreamingService` remains the SignalR-facing compatibility
   service; `MarketDataStreamingService` composes `IMarketDataStreamingProvider`

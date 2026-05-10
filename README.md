@@ -147,11 +147,11 @@ it shows explicit Search/Watchlist links instead of substituting a demo symbol.
 Users can search IBKR/iBeam stocks through
 `/api/market-data/search`, see explicit provider/market/exchange/currency/asset
 class metadata with local market badges, open result chart pages that preserve
-exact identity in query state (including optional `ibkrConid`) when available and render a visible `CandlestickChart`
+provider-neutral exact identity in query state when available and render a visible `CandlestickChart`
 when provider candles exist (empty/provider-unavailable states remain explicit
 with no synthetic bars), and pin exact provider-market
-metadata (`provider`, provider symbol id / IBKR `conid`, name, exchange,
-currency, and asset class) into the backend watchlist without a production
+metadata (`provider`, provider symbol id, name, exchange, currency, and asset
+class, with IBKR `conid` only as provider metadata) into the backend watchlist without a production
 hard-coded symbol catalog. Analysis engine discovery/run contracts are available through
 `/api/analysis/engines` and `/api/analysis/run`. With no provider selected they
 return explicit `analysis-engine-not-configured` metadata with no fake signals;
@@ -227,7 +227,7 @@ monitor, footer, and top-safety chrome.
 
 The frontend route/visibility UX batch through `TP-068` is complete. Future frontend tasks should build on the verified route matrix, `/symbols/{symbol}` removal, desktop scroll-ownership guardrails, `/chart` Stored stocks behavior, and distinct Home/Search/Watchlist page purposes.
 
-The next new Taskplane packet should use `TP-069`. Completed Taskplane packets
+The next new Taskplane packet should use `TP-073`. Completed Taskplane packets
 through `TP-063` are present in `tasks/`; completed packets should be archived
 when convenient. During orchestrated runs the runtime handles post-merge
 archival for active task folders.

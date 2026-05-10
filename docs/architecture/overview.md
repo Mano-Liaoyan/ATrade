@@ -197,9 +197,10 @@ backed by `ATRADE_POSTGRES_DATA_VOLUME` (default `atrade-postgres-data`) and a
 stable local-dev `ATRADE_POSTGRES_PASSWORD` secret parameter, so watchlist rows
 survive a full local `start run` stop/start cycle when the same volume is reused.
 Rows use a durable `instrument_key` derived through the backend exact identity
-helper from provider, provider id / IBKR `conid`, symbol, exchange, currency,
-and asset class, plus a temporary `local-user` / `paper-trading` identity seam
-until authentication and named workspaces exist.
+helper from the provider-neutral tuple (`provider`, `providerSymbolId`, `symbol`,
+`exchange`, `currency`, and `assetClass`), while IBKR `conid` remains provider
+metadata/alias data, plus a temporary `local-user` / `paper-trading` identity
+seam until authentication and named workspaces exist.
 
 ### 4.2 TimescaleDB — time-series workloads
 

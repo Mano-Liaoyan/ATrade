@@ -61,6 +61,11 @@ public sealed class BacktestRequestValidatorTests
         var snapshot = BacktestRequestValidator.Validate(request);
 
         Assert.Equal("AAPL", snapshot.Symbol.Symbol);
+        Assert.Equal("ibkr", snapshot.Symbol.Provider);
+        Assert.Equal("265598", snapshot.Symbol.ProviderSymbolId);
+        Assert.Equal("NASDAQ", snapshot.Symbol.Exchange);
+        Assert.Equal("USD", snapshot.Symbol.Currency);
+        Assert.Equal(MarketDataAssetClasses.Stock, snapshot.Symbol.AssetClass);
         Assert.Equal(BacktestStrategyIds.SmaCrossover, snapshot.StrategyId);
         Assert.Equal(ChartRangePresets.OneYear, snapshot.ChartRange);
         Assert.Equal(2, snapshot.Parameters.Count);
@@ -117,6 +122,13 @@ public sealed class BacktestRequestValidatorTests
         var restored = BacktestPersistenceSafety.DeserializeRequestSnapshot(serialized);
 
         Assert.Equal(strategyId, restored.StrategyId);
+        Assert.Equal(snapshot.Symbol, restored.Symbol);
+        Assert.Equal("ibkr", restored.Symbol.Provider);
+        Assert.Equal("265598", restored.Symbol.ProviderSymbolId);
+        Assert.Equal("AAPL", restored.Symbol.Symbol);
+        Assert.Equal("NASDAQ", restored.Symbol.Exchange);
+        Assert.Equal("USD", restored.Symbol.Currency);
+        Assert.Equal(MarketDataAssetClasses.Stock, restored.Symbol.AssetClass);
         Assert.True(restored.Parameters.ContainsKey(expectedParameterName));
         Assert.Equal(
             snapshot.Parameters[expectedParameterName].GetRawText(),

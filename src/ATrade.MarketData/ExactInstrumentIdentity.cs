@@ -75,7 +75,6 @@ public sealed partial record ExactInstrumentIdentity(
             '|',
             $"provider={EncodeSegment(Provider)}",
             $"providerSymbolId={EncodeSegment(ProviderSymbolId)}",
-            $"ibkrConid={EncodeSegment(IbkrConid?.ToString(CultureInfo.InvariantCulture))}",
             $"symbol={EncodeSegment(Symbol)}",
             $"exchange={EncodeSegment(Exchange)}",
             $"currency={EncodeSegment(Currency)}",
@@ -104,6 +103,56 @@ public sealed partial record ExactInstrumentIdentity(
         if (normalizedInstrumentKey.Length > ExactInstrumentIdentityDefaults.MaxInstrumentKeyLength)
         {
             error = $"Instrument keys must be {ExactInstrumentIdentityDefaults.MaxInstrumentKeyLength} characters or fewer.";
+            return false;
+        }
+
+        if (!normalizedInstrumentKey.Contains("=", StringComparison.Ordinal) || !normalizedInstrumentKey.Contains("|", StringComparison.Ordinal))
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        var segments = ParseInstrumentKeySegments(normalizedInstrumentKey);
+        if (segments.Count == 0)
+        {
+            error = "Instrument keys must use key=value segments.";
+            return false;
+        }
+
+        var provider = GetSegmentValue(segments, "provider");
+        var providerSymbolId = GetSegmentValue(segments, "providerSymbolId");
+        var legacyIbkrConid = GetSegmentValue(segments, "ibkrConid");
+        var symbol = GetSegmentValue(segments, "symbol");
+        var exchange = GetSegmentValue(segments, "exchange");
+        var currency = GetSegmentValue(segments, "currency");
+        var assetClass = GetSegmentValue(segments, "assetClass");
+
+        if (string.IsNullOrWhiteSpace(symbol))
+        {
+            error = "Instrument keys must include a symbol segment.";
+            return false;
+        }
+
+        long? ibkrConid = null;
+        if (!string.IsNullOrWhiteSpace(legacyIbkrConid) && long.TryParse(legacyIbkrConid, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedConid))
+        {
+            ibkrConid = parsedConid;
+        }
+
+        try
+        {
+            normalizedInstrumentKey = Create(
+                symbol,
+                provider,
+                providerSymbolId,
+                ibkrConid,
+                exchange,
+                currency,
+                assetClass).InstrumentKey;
+        }
+        catch (ArgumentException exception)
+        {
+            error = exception.Message;
             return false;
         }
 
@@ -187,6 +236,33 @@ public sealed partial record ExactInstrumentIdentity(
     }
 
     private static string? NormalizeOptionalUpper(string? value) => NormalizeOptional(value)?.ToUpperInvariant();
+
+    private static Dictionary<string, string> ParseInstrumentKeySegments(string instrumentKey)
+    {
+        var segments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var segment in instrumentKey.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separatorIndex = segment.IndexOf('=', StringComparison.Ordinal);
+            if (separatorIndex <= 0)
+            {
+                continue;
+            }
+
+            var key = segment[..separatorIndex].Trim();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            var encodedValue = segment[(separatorIndex + 1)..].Trim();
+            segments[key] = Uri.UnescapeDataString(encodedValue);
+        }
+
+        return segments;
+    }
+
+    private static string? GetSegmentValue(IReadOnlyDictionary<string, string> segments, string key) =>
+        segments.TryGetValue(key, out var value) ? NormalizeOptional(value) : null;
 
     private static string? NormalizeOptional(string? value)
     {

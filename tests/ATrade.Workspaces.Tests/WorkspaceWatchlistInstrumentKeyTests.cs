@@ -20,8 +20,9 @@ public sealed class WorkspaceWatchlistInstrumentKeyTests
                 AssetClass: " stk "));
 
         Assert.Equal(
-            "provider=ibkr|providerSymbolId=265598|ibkrConid=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK",
+            "provider=ibkr|providerSymbolId=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK",
             normalized.InstrumentKey);
+        Assert.DoesNotContain("ibkrConid", normalized.InstrumentKey, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -41,7 +42,7 @@ public sealed class WorkspaceWatchlistInstrumentKeyTests
     [Fact]
     public void WatchlistSymbolJson_ExposesInstrumentKeyAndPinKeyAliases()
     {
-        const string key = "provider=ibkr|providerSymbolId=265598|ibkrConid=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK";
+        const string key = "provider=ibkr|providerSymbolId=265598|symbol=AAPL|exchange=NASDAQ|currency=USD|assetClass=STK";
         var symbol = new WorkspaceWatchlistSymbol(
             "AAPL",
             key,

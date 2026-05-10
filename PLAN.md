@@ -122,9 +122,9 @@ in agent/context/UI docs. `TP-065` added canonical terminal route architecture
 for enabled/disabled modules, exact chart/analysis/backtest symbol routes, route
 architecture validation, and removal of the old `/symbols/{symbol}` route without
 a redirect or alias. `TP-066` added `/chart` Stored stocks selector/list behavior,
-first-backend-watchlist-instrument default chart rendering, exact identity
-handoff including optional `ibkrConid`, explicit empty/unavailable Search and
-Watchlist links, and chart-default validation without fake default symbols.
+first-backend-watchlist-instrument default chart rendering, exact provider-neutral identity
+handoff, explicit empty/unavailable Search and Watchlist links, and chart-default
+validation without fake default symbols.
 `TP-067` made Home, Search, and Watchlist purpose-built instead of three
 identical market-monitor wrappers, while preserving shared lower-level search,
 filter, table, detail, exact identity, and backend watchlist behavior. `TP-068`
@@ -138,7 +138,7 @@ The frontend route/visibility UX batch through `TP-068` is complete.
 
 Completed task packets through `TP-063` are present in `tasks/`; completed
 packets should be archived when convenient. The next new Taskplane packet should
-use `TP-069`.
+use `TP-073`.
 
 ## Follow-Up Direction
 
@@ -172,4 +172,4 @@ data, direct provider/database access, or order-entry UI paths.
 
 ## Next Task ID
 
-`TP-072`
+`TP-073`

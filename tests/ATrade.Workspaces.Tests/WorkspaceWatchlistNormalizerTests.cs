@@ -108,7 +108,8 @@ public sealed class WorkspaceWatchlistNormalizerTests
         Assert.Equal("USD", normalized.Currency);
         Assert.Equal("STK", normalized.AssetClass);
         Assert.Equal(7, normalized.SortOrder);
-        Assert.Equal("provider=ibkr|providerSymbolId=272093|ibkrConid=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK", normalized.InstrumentKey);
+        Assert.Equal("provider=ibkr|providerSymbolId=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK", normalized.InstrumentKey);
+        Assert.DoesNotContain("ibkrConid", normalized.InstrumentKey, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -143,6 +144,7 @@ public sealed class WorkspaceWatchlistNormalizerTests
         Assert.Null(normalized.Exchange);
         Assert.Equal("USD", normalized.Currency);
         Assert.Equal("STK", normalized.AssetClass);
-        Assert.Equal("provider=manual|providerSymbolId=|ibkrConid=|symbol=NVDA|exchange=|currency=USD|assetClass=STK", normalized.InstrumentKey);
+        Assert.Equal("provider=manual|providerSymbolId=|symbol=NVDA|exchange=|currency=USD|assetClass=STK", normalized.InstrumentKey);
+        Assert.DoesNotContain("ibkrConid", normalized.InstrumentKey, StringComparison.OrdinalIgnoreCase);
     }
 }

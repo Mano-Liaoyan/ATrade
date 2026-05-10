@@ -22,6 +22,7 @@ public sealed class PostgresWorkspaceWatchlistSqlTests
         Assert.Contains("sort_order integer NOT NULL DEFAULT 0", sql, StringComparison.Ordinal);
         Assert.Contains("ADD COLUMN IF NOT EXISTS instrument_key text NULL", sql, StringComparison.Ordinal);
         Assert.Contains("SET instrument_key = concat_ws", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ibkrConid", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("DROP CONSTRAINT IF EXISTS pk_workspace_watchlist_pins", sql, StringComparison.Ordinal);
         Assert.Contains("PRIMARY KEY (user_id, workspace_id, instrument_key)", sql, StringComparison.Ordinal);
         Assert.DoesNotContain("PRIMARY KEY (user_id, workspace_id, symbol)", sql, StringComparison.Ordinal);
