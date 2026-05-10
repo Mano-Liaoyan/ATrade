@@ -20,7 +20,15 @@ public sealed record LocalRuntimePortSettings(
     int ApiHttpPort,
     int FrontendDirectHttpPort,
     int AppHostFrontendHttpPort,
-    int AspireDashboardHttpPort);
+    int AspireDashboardHttpPort,
+    int PostgresPort,
+    int TimescaleDbPort,
+    int RedisPort,
+    int NatsPort);
+
+public sealed record LocalRuntimeComposeSettings(
+    string Command,
+    string ProjectName);
 
 public sealed record LocalRuntimeStorageSettings(
     string PostgresDataVolumeName,
@@ -63,6 +71,7 @@ public sealed record LocalRuntimeContract(
     string FrontendDirectory,
     string LoadedFromPath,
     LocalRuntimePortSettings Ports,
+    LocalRuntimeComposeSettings Compose,
     LocalRuntimeStorageSettings Storage,
     LocalRuntimePaperTradingSettings PaperTrading,
     LocalRuntimeFrontendSettings Frontend,
@@ -98,6 +107,12 @@ public static class LocalRuntimeEnvironmentVariables
     public const string FrontendDirectHttpPort = "ATRADE_FRONTEND_DIRECT_HTTP_PORT";
     public const string AppHostFrontendHttpPort = "ATRADE_APPHOST_FRONTEND_HTTP_PORT";
     public const string AspireDashboardHttpPort = "ATRADE_ASPIRE_DASHBOARD_HTTP_PORT";
+    public const string ComposeCommand = "ATRADE_COMPOSE_COMMAND";
+    public const string ComposeProjectName = "ATRADE_COMPOSE_PROJECT_NAME";
+    public const string PostgresPort = "ATRADE_POSTGRES_PORT";
+    public const string TimescaleDbPort = "ATRADE_TIMESCALEDB_PORT";
+    public const string RedisPort = "ATRADE_REDIS_PORT";
+    public const string NatsPort = "ATRADE_NATS_PORT";
     public const string PostgresDataVolume = "ATRADE_POSTGRES_DATA_VOLUME";
     public const string PostgresPassword = "ATRADE_POSTGRES_PASSWORD";
     public const string TimescaleDataVolume = "ATRADE_TIMESCALEDB_DATA_VOLUME";
@@ -132,6 +147,12 @@ public static class LocalRuntimeContractDefaults
     public const int FrontendDirectHttpPort = 3111;
     public const int AppHostFrontendHttpPort = 3000;
     public const int AspireDashboardHttpPort = 0;
+    public const string ComposeCommand = "";
+    public const string ComposeProjectName = "atrade";
+    public const int PostgresPort = 5432;
+    public const int TimescaleDbPort = 5433;
+    public const int RedisPort = 6379;
+    public const int NatsPort = 4222;
     public const string PostgresDataVolume = "atrade-postgres-data";
     public const string PostgresPassword = "ATRADE_POSTGRES_PASSWORD";
     public const string TimescaleDataVolume = "atrade-timescaledb-data";
@@ -170,6 +191,12 @@ public static class LocalRuntimeContractLoader
         LocalRuntimeEnvironmentVariables.FrontendDirectHttpPort,
         LocalRuntimeEnvironmentVariables.AppHostFrontendHttpPort,
         LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort,
+        LocalRuntimeEnvironmentVariables.ComposeCommand,
+        LocalRuntimeEnvironmentVariables.ComposeProjectName,
+        LocalRuntimeEnvironmentVariables.PostgresPort,
+        LocalRuntimeEnvironmentVariables.TimescaleDbPort,
+        LocalRuntimeEnvironmentVariables.RedisPort,
+        LocalRuntimeEnvironmentVariables.NatsPort,
         LocalRuntimeEnvironmentVariables.PostgresDataVolume,
         LocalRuntimeEnvironmentVariables.PostgresPassword,
         LocalRuntimeEnvironmentVariables.TimescaleDataVolume,
@@ -231,6 +258,12 @@ public static class LocalRuntimeContractLoader
         var frontendDirectHttpPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.FrontendDirectHttpPort, LocalRuntimeContractDefaults.FrontendDirectHttpPort, allowZero: false);
         var appHostFrontendHttpPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.AppHostFrontendHttpPort, LocalRuntimeContractDefaults.AppHostFrontendHttpPort, allowZero: false);
         var aspireDashboardHttpPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.AspireDashboardHttpPort, LocalRuntimeContractDefaults.AspireDashboardHttpPort, allowZero: true);
+        var composeCommand = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.ComposeCommand, LocalRuntimeContractDefaults.ComposeCommand);
+        var composeProjectName = ResolveComposeProjectName(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.ComposeProjectName, LocalRuntimeContractDefaults.ComposeProjectName);
+        var postgresPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.PostgresPort, LocalRuntimeContractDefaults.PostgresPort, allowZero: false);
+        var timescaleDbPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.TimescaleDbPort, LocalRuntimeContractDefaults.TimescaleDbPort, allowZero: false);
+        var redisPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.RedisPort, LocalRuntimeContractDefaults.RedisPort, allowZero: false);
+        var natsPort = ResolvePort(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.NatsPort, LocalRuntimeContractDefaults.NatsPort, allowZero: false);
         var postgresDataVolume = ResolveVolumeName(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.PostgresDataVolume, LocalRuntimeContractDefaults.PostgresDataVolume);
         var postgresPassword = ResolveString(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.PostgresPassword, LocalRuntimeContractDefaults.PostgresPassword);
         var timescaleDataVolume = ResolveVolumeName(configuredValues, resolvedValues, LocalRuntimeEnvironmentVariables.TimescaleDataVolume, LocalRuntimeContractDefaults.TimescaleDataVolume);
@@ -281,7 +314,16 @@ public static class LocalRuntimeContractLoader
             repositoryRoot,
             Path.Combine(repositoryRoot, "frontend"),
             loadedFromPath,
-            new LocalRuntimePortSettings(apiHttpPort, frontendDirectHttpPort, appHostFrontendHttpPort, aspireDashboardHttpPort),
+            new LocalRuntimePortSettings(
+                apiHttpPort,
+                frontendDirectHttpPort,
+                appHostFrontendHttpPort,
+                aspireDashboardHttpPort,
+                postgresPort,
+                timescaleDbPort,
+                redisPort,
+                natsPort),
+            new LocalRuntimeComposeSettings(composeCommand, composeProjectName),
             new LocalRuntimeStorageSettings(postgresDataVolume, postgresPassword, timescaleDataVolume, timescalePassword),
             new LocalRuntimePaperTradingSettings(
                 brokerIntegrationEnabled,
@@ -415,6 +457,38 @@ public static class LocalRuntimeContractLoader
 
         return port;
     }
+
+    private static string ResolveComposeProjectName(
+        IReadOnlyDictionary<string, string> configuredValues,
+        IDictionary<string, LocalRuntimeContractValue> resolvedValues,
+        string variableName,
+        string defaultValue)
+    {
+        var value = ResolveRawString(configuredValues, variableName, defaultValue);
+        var normalized = NormalizeComposeProjectName(value, variableName, defaultValue);
+        SetResolvedValue(resolvedValues, variableName, normalized);
+        return normalized;
+    }
+
+    private static string NormalizeComposeProjectName(string value, string variableName, string defaultValue)
+    {
+        var trimmed = value.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return defaultValue;
+        }
+
+        if (trimmed.Length > 128 || !IsLowerAsciiLetterOrDigit(trimmed[0]) || trimmed.Any(character => !IsLowerAsciiLetterOrDigit(character) && character is not '_' and not '-'))
+        {
+            throw new InvalidOperationException(
+                $"{variableName} must be a Compose-compatible project name using lowercase letters, digits, '_' or '-', and must start with a lowercase letter or digit; value was '{value}'.");
+        }
+
+        return trimmed;
+    }
+
+    private static bool IsLowerAsciiLetterOrDigit(char character) =>
+        character is >= 'a' and <= 'z' or >= '0' and <= '9';
 
     private static string ResolveVolumeName(
         IReadOnlyDictionary<string, string> configuredValues,

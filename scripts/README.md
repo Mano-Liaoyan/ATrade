@@ -127,6 +127,50 @@ The dashboard OTLP endpoint remains intentionally ephemeral on
 `ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL=http://127.0.0.1:0`; only the human-facing
 Aspire dashboard UI port is part of the `.env` contract.
 
+### Compose-managed infrastructure foundation variables
+
+This task stages a repo-owned `compose.yaml` and reusable helper scripts without
+cutting over the default `start run` path. Aspire/AppHost remains the default
+local startup contract until a later cutover task.
+
+- `ATRADE_COMPOSE_COMMAND` — optional exact Compose command override; committed default is blank so helper scripts auto-select Podman Compose before Docker Compose
+- `ATRADE_COMPOSE_PROJECT_NAME` — Compose project name; committed default `atrade`
+- `ATRADE_POSTGRES_PORT` — Compose-managed Postgres localhost bind port; committed default `5432`
+- `ATRADE_TIMESCALEDB_PORT` — Compose-managed TimescaleDB localhost bind port; committed default `5433`
+- `ATRADE_REDIS_PORT` — Compose-managed Redis localhost bind port; committed default `6379`
+- `ATRADE_NATS_PORT` — Compose-managed NATS localhost bind port; committed default `4222`
+
+Reusable helpers wrap the staged Compose file without replacing `start run`:
+
+```bash
+scripts/compose-infra.sh config
+scripts/compose-infra.sh up
+scripts/compose-infra.sh down
+```
+
+```powershell
+./scripts/compose-infra.ps1 config
+./scripts/compose-infra.ps1 up
+./scripts/compose-infra.ps1 down
+```
+
+Both helpers load `.env.template`, overlay ignored `.env`, preserve process
+environment overrides, pass `--project-name $ATRADE_COMPOSE_PROJECT_NAME`, and
+run against the repo-root `compose.yaml`. When `ATRADE_COMPOSE_COMMAND` is set,
+the helpers use that exact command string. When it is blank, they prefer
+`podman compose`, fall back to `docker compose`, and otherwise fail with a clear
+install/override message. `up` runs detached (`up -d`), does not install an exit
+trap, and therefore does not run `down` automatically when the helper exits.
+
+The default Compose graph publishes Postgres, TimescaleDB, Redis, and NATS only
+on `127.0.0.1` using the stable `ATRADE_*_PORT` values above. Postgres and
+TimescaleDB keep the same durable named volume variables as AppHost. Optional
+profiles stay disabled unless local ignored/process settings make them safe:
+`ibkr` is enabled for `up` only when broker integration is true and the IBKR
+username/password are non-placeholder values, while `lean` is enabled only when
+`ATRADE_ANALYSIS_ENGINE=Lean` and `ATRADE_LEAN_RUNTIME_MODE=docker`. The helper
+command output never prints raw IBKR username/password values.
+
 ### AppHost database persistence variables
 
 The AppHost-managed `postgres` and `timescaledb` resources are volume-backed so
