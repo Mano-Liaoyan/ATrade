@@ -1,6 +1,6 @@
 # TP-070: Aspire external Compose infrastructure mode — Status
 
-**Current Step:** Step 2: Add external-infra AppHost graph behavior
+**Current Step:** Step 3: Add opt-in manifest and wiring tests
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
@@ -44,7 +44,7 @@
 ---
 
 ### Step 3: Add opt-in manifest and wiring tests
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add/update Compose-mode manifest tests asserting infra resources are absent
 - [ ] Assert app resources and external connection string env are present
