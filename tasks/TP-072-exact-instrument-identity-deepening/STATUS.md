@@ -1,10 +1,10 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
-**Current Step:** Step 3: Update adapters and persistence consumers
+**Current Step:** Step 4: Update frontend identity handoff
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 7
+**Review Counter:** 8
 **Iteration:** 1
 **Size:** M
 
@@ -57,12 +57,12 @@
 ---
 
 ### Step 4: Update frontend identity handoff
-**Status:** Not Started
+**Status:** 🟨 In Progress
 
-- [ ] Frontend provisional keys use provider-neutral tuple only
-- [ ] Chart/analysis/backtest/watchlist handoff uses canonical provider-neutral fields
-- [ ] `ibkrConid` removed or isolated from public frontend route/query/key behavior
-- [ ] Backend-returned keys remain authoritative over optimistic state
+- [x] Frontend provisional keys use provider-neutral tuple only
+- [x] Chart/analysis/backtest/watchlist handoff uses canonical provider-neutral fields
+- [x] `ibkrConid` removed or isolated from public frontend route/query/key behavior
+- [x] Backend-returned keys remain authoritative over optimistic state
 
 ---
 
@@ -139,3 +139,4 @@
 | 2026-05-10 21:14 | Review R004 | code Step 2: REVISE |
 | 2026-05-10 21:22 | Review R005 | code Step 2: APPROVE |
 | 2026-05-10 21:30 | Review R006 | plan Step 3: APPROVE |
+| 2026-05-10 21:48 | Review R008 | plan Step 4: APPROVE |

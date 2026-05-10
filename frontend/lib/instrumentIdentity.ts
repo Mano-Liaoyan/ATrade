@@ -48,7 +48,6 @@ export function createProvisionalInstrumentKey(identity: InstrumentIdentityInput
   return [
     `provider=${encodeSegment(normalized.provider)}`,
     `providerSymbolId=${encodeSegment(normalized.providerSymbolId)}`,
-    `ibkrConid=${encodeSegment(normalized.ibkrConid === null ? null : String(normalized.ibkrConid))}`,
     `symbol=${encodeSegment(normalized.symbol)}`,
     `exchange=${encodeSegment(normalized.exchange)}`,
     `currency=${encodeSegment(normalized.currency)}`,
@@ -148,10 +147,6 @@ function toExactIdentitySearchParams(identity: NormalizedInstrumentIdentity): UR
 
   if (identity.providerSymbolId) {
     params.set('providerSymbolId', identity.providerSymbolId);
-  }
-
-  if (identity.ibkrConid !== null) {
-    params.set('ibkrConid', String(identity.ibkrConid));
   }
 
   if (identity.exchange) {
