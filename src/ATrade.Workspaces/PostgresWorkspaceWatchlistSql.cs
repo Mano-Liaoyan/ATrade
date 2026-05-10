@@ -54,8 +54,7 @@ internal static class PostgresWorkspaceWatchlistSql
            SET instrument_key = concat_ws(
                    '|',
                    'provider=' || lower(COALESCE(NULLIF(btrim(provider), ''), 'manual')),
-                   'providerSymbolId=' || COALESCE(NULLIF(btrim(provider_symbol_id), ''), ''),
-                   'ibkrConid=' || COALESCE(ibkr_conid::text, ''),
+                   'providerSymbolId=' || COALESCE(NULLIF(btrim(provider_symbol_id), ''), COALESCE(ibkr_conid::text, '')),
                    'symbol=' || upper(symbol),
                    'exchange=' || upper(COALESCE(NULLIF(btrim(exchange), ''), '')),
                    'currency=' || upper(COALESCE(NULLIF(btrim(currency), ''), 'USD')),

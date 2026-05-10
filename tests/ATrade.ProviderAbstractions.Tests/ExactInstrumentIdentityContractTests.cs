@@ -85,6 +85,18 @@ public sealed class ExactInstrumentIdentityContractTests
     }
 
     [Fact]
+    public void NormalizeExistingInstrumentKey_PrefersProviderSymbolIdWhenLegacyIbkrConidDiffers()
+    {
+        var normalized = ExactInstrumentIdentity.NormalizeExistingInstrumentKey(
+            "provider=ibkr|providerSymbolId=CANONICAL-ID|ibkrConid=272093|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK");
+
+        Assert.Equal(
+            "provider=ibkr|providerSymbolId=CANONICAL-ID|symbol=MSFT|exchange=NASDAQ|currency=USD|assetClass=STK",
+            normalized);
+        Assert.DoesNotContain("ibkrConid", normalized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void MarketDataSymbolIdentity_ProjectsThroughExactInstrumentIdentity()
     {
         var projected = MarketDataSymbolIdentity.Create(

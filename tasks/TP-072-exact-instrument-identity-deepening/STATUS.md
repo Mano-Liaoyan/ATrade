@@ -40,9 +40,9 @@
 - [x] IBKR `conid` alias handling is provider-specific
 - [x] Runtime key construction has one implementation path
 - [x] Legacy `ibkrConid`-bearing inputs normalize forward
-- [ ] Workspace key expectation tests updated to provider-neutral shape
-- [ ] Workspace SQL backfill emits provider-neutral keys without `ibkrConid`
-- [ ] Workspace SQL/test guardrails reject `ibkrConid` in canonical keys
+- [x] Workspace key expectation tests updated to provider-neutral shape
+- [x] Workspace SQL backfill emits provider-neutral keys without `ibkrConid`
+- [x] Workspace SQL/test guardrails reject `ibkrConid` in canonical keys
 
 ---
 
