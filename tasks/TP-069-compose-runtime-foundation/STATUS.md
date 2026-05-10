@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 1
+**Review Counter:** 2
 **Iteration:** 1
 **Size:** M
 
@@ -29,6 +29,8 @@
 - [x] Preserve `.env.template` → `.env` → process env precedence
 - [x] Extend `LocalRuntimeContract` defaults/known variables/tests
 - [x] Keep secret-bearing variables classified and out of committed values
+- [ ] R002: Reword `.env.template` exclusions so Compose host ports are not contradicted
+- [ ] R002: Add matching `scripts/README.md` Compose variable documentation asserted by shell tests
 
 ---
 
@@ -87,6 +89,7 @@
 | # | Type | Step | Verdict | File |
 |---|------|------|---------|------|
 | R001 | Plan | Step 1 | APPROVE | .reviews/R001-plan-step1.md |
+| R002 | Code | Step 1 | REVISE | .reviews/R002-code-step1.md |
 
 ---
 
@@ -108,6 +111,7 @@
 | 2026-05-10 03:30 | Step 1 started | Runtime contract extension |
 | 2026-05-10 03:31 | Step 1 plan review | APPROVE |
 | 2026-05-10 03:35 | Step 1 targeted test | `dotnet test tests/ATrade.ServiceDefaults.Tests/ATrade.ServiceDefaults.Tests.csproj --nologo --verbosity minimal` passed |
+| 2026-05-10 03:46 | Step 1 code review | R002 REVISE; revision checkboxes added |
 
 ---
 
@@ -120,3 +124,5 @@
 ## Notes
 
 - 2026-05-10 03:35 — Review R001 plan Step 1: APPROVE
+- 2026-05-10 03:46 — Review R002 code Step 1: REVISE
+- R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
