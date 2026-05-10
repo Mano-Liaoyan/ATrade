@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 4
+**Review Counter:** 5
 **Iteration:** 1
 **Size:** M
 
@@ -34,7 +34,7 @@
 ---
 
 ### Step 2: Deepen backend Exact Instrument Identity implementation
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Canonical backend key emission excludes `ibkrConid`
 - [x] IBKR `conid` alias handling is provider-specific
@@ -137,3 +137,4 @@
 | 2026-05-10 21:00 | Review R002 | code Step 1: APPROVE |
 | 2026-05-10 21:07 | Review R003 | plan Step 2: APPROVE |
 | 2026-05-10 21:14 | Review R004 | code Step 2: REVISE |
+| 2026-05-10 21:22 | Review R005 | code Step 2: APPROVE |
