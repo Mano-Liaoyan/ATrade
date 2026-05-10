@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 12
+**Review Counter:** 13
 **Iteration:** 1
 **Size:** M
 
@@ -82,10 +82,12 @@
 - [x] Exact Instrument Identity contract tests passing
 - [x] Workspaces watchlist tests passing
 - [x] Backtesting tests passing
-- [x] Affected frontend/apphost identity contract tests passing
+- [ ] Affected frontend/apphost identity contract tests passing
 - [x] Frontend build passing if frontend identity code changes
 - [x] FULL test suite passing
 - [x] Build passes
+- [ ] R013 stale Category A apphost `ibkrConid` assertions migrated
+- [ ] R013 affected apphost identity scripts rerun and passing
 
 ---
 
@@ -103,6 +105,7 @@
 | # | Type | Step | Verdict | File |
 |---|------|------|---------|------|
 | R004 | Code | 2 | REVISE | `.reviews/R004-code-step2.md` |
+| R013 | Code | 6 | REVISE | `.reviews/R013-code-step6.md` |
 
 ---
 
@@ -132,6 +135,7 @@
 ## Notes
 
 - R004 suggestions: document `IbkrConid` as provider-specific metadata in Step 3/5; optional extra workspace normalizer defense-in-depth can be considered while fixing required workspace failures.
+- R013 notes: frontend build only passed with `NODE_ENV=production npm run build`; plain `npm run build` fails at baseline too because orchestrator environment sets `NODE_ENV=development`. Category B Docker/Postgres apphost scripts still need stale canonical-key values reviewed if infrastructure validation is expanded.
 
 | 2026-05-10 20:51 | Review R001 | plan Step 1: APPROVE |
 | 2026-05-10 21:00 | Review R002 | code Step 1: APPROVE |
@@ -144,3 +148,4 @@
 | 2026-05-10 22:05 | Review R010 | plan Step 5: APPROVE |
 | 2026-05-10 22:13 | Review R011 | code Step 5: APPROVE |
 | 2026-05-10 22:21 | Review R012 | plan Step 6: APPROVE |
+| 2026-05-10 22:33 | Review R013 | code Step 6: REVISE |
