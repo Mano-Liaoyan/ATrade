@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 5
+**Review Counter:** 6
 **Iteration:** 1
 **Size:** M
 
@@ -44,7 +44,7 @@
 ---
 
 ### Step 3: Add opt-in manifest and wiring tests
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Add/update Compose-mode manifest tests asserting infra resources are absent
 - [x] Assert app resources and external connection string env are present
@@ -113,3 +113,4 @@
 | 2026-05-10 05:24 | Review R003 | plan Step 2: APPROVE |
 | 2026-05-10 05:33 | Review R004 | code Step 2: APPROVE |
 | 2026-05-10 05:38 | Review R005 | plan Step 3: APPROVE |
+| 2026-05-10 05:48 | Review R006 | code Step 3: APPROVE |
