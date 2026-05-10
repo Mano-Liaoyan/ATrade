@@ -1,11 +1,11 @@
 # TP-072: Exact Instrument Identity provider-neutral key deepening - Status
 
 **Current Step:** Step 0: Preflight
-**Status:** Not Started
+**Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
 **Review Counter:** 0
-**Iteration:** 0
+**Iteration:** 1
 **Size:** M
 
 > **Hydration:** Checkboxes represent meaningful outcomes, not individual code
@@ -15,11 +15,11 @@
 ---
 
 ### Step 0: Preflight
-**Status:** Not Started
+**Status:** ✅ Complete
 
-- [ ] Required files and paths exist
-- [ ] Dependencies satisfied
-- [ ] Current Exact Instrument Identity decisions in `tasks/CONTEXT.md` understood
+- [x] Required files and paths exist
+- [x] Dependencies satisfied
+- [x] Current Exact Instrument Identity decisions in `tasks/CONTEXT.md` understood
 
 ---
 
@@ -114,6 +114,8 @@
 | Timestamp | Action | Outcome |
 |-----------|--------|---------|
 | 2026-05-10 | Task staged | PROMPT.md and STATUS.md created |
+| 2026-05-10 20:45 | Task started | Runtime V2 lane-runner execution |
+| 2026-05-10 20:45 | Step 0 started | Preflight |
 
 ---
 
