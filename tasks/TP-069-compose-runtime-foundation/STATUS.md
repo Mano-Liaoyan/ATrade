@@ -1,10 +1,10 @@
 # TP-069: Compose runtime foundation — Status
 
-**Current Step:** Step 4: Add contract validation
+**Current Step:** Step 5: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 8
+**Review Counter:** 9
 **Iteration:** 1
 **Size:** M
 
@@ -55,7 +55,7 @@
 ---
 
 ### Step 4: Add contract validation
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Add Compose contract tests for command selection, profiles, ports, volumes, and safety
 - [x] Keep live Compose checks optional/skippable when no engine is installed
@@ -64,7 +64,7 @@
 ---
 
 ### Step 5: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Compose contract tests passing
 - [ ] Local runtime contract tests passing
@@ -96,6 +96,7 @@
 | R006 | Plan | Step 3 | APPROVE | .reviews/R006-plan-step3.md |
 | R007 | Code | Step 3 | APPROVE | .reviews/R007-code-step3.md |
 | R008 | Plan | Step 4 | APPROVE | .reviews/R008-plan-step4.md |
+| R009 | Code | Step 4 | UNAVAILABLE | *(reviewer exited without output)* |
 
 ---
 
@@ -130,6 +131,10 @@
 | 2026-05-10 04:23 | Step 3 completed | Compose helper scripts approved |
 | 2026-05-10 04:23 | Step 4 started | Compose contract validation |
 | 2026-05-10 04:24 | Step 4 plan review | R008 APPROVE |
+| 2026-05-10 04:35 | Step 4 targeted tests | Compose/local-runtime/paper config shell tests passed |
+| 2026-05-10 04:36 | Step 4 code review | R009 UNAVAILABLE; proceeded per review protocol |
+| 2026-05-10 04:36 | Step 4 completed | Contract validation added with unavailable reviewer noted |
+| 2026-05-10 04:36 | Step 5 started | Testing and verification |
 
 ---
 
@@ -149,5 +154,5 @@
 - 2026-05-10 04:07 — Review R006 plan Step 3: APPROVE
 - 2026-05-10 04:23 — Review R007 code Step 3: APPROVE
 - 2026-05-10 04:24 — Review R008 plan Step 4: APPROVE
+- 2026-05-10 04:36 — Review R009 code Step 4: UNAVAILABLE (reviewer exited without output); proceeding with caution per protocol.
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
-| 2026-05-10 04:28 | Review R008 | plan Step 4: APPROVE |
