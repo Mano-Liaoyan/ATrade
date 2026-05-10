@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 3
+**Review Counter:** 4
 **Iteration:** 1
 **Size:** M
 
@@ -40,6 +40,9 @@
 - [x] IBKR `conid` alias handling is provider-specific
 - [x] Runtime key construction has one implementation path
 - [x] Legacy `ibkrConid`-bearing inputs normalize forward
+- [ ] Workspace key expectation tests updated to provider-neutral shape
+- [ ] Workspace SQL backfill emits provider-neutral keys without `ibkrConid`
+- [ ] Workspace SQL/test guardrails reject `ibkrConid` in canonical keys
 
 ---
 
@@ -99,6 +102,7 @@
 
 | # | Type | Step | Verdict | File |
 |---|------|------|---------|------|
+| R004 | Code | 2 | REVISE | `.reviews/R004-code-step2.md` |
 
 ---
 
@@ -127,7 +131,9 @@
 
 ## Notes
 
-*Reserved for execution notes*
+- R004 suggestions: document `IbkrConid` as provider-specific metadata in Step 3/5; optional extra workspace normalizer defense-in-depth can be considered while fixing required workspace failures.
+
 | 2026-05-10 20:51 | Review R001 | plan Step 1: APPROVE |
 | 2026-05-10 21:00 | Review R002 | code Step 1: APPROVE |
 | 2026-05-10 21:07 | Review R003 | plan Step 2: APPROVE |
+| 2026-05-10 21:14 | Review R004 | code Step 2: REVISE |
