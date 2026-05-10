@@ -30,8 +30,8 @@
 - [x] Preserve Podman-first, Docker-fallback, and exact `ATRADE_COMPOSE_COMMAND` behavior
 - [x] Leave Compose running when AppHost exits
 - [x] Preserve cross-platform wrapper semantics
-- [ ] R002: Gate Compose startup on `ATRADE_INFRASTRUCTURE_MODE=compose` in Unix and PowerShell scripts
-- [ ] R002: Revert unrelated `frontend/next-env.d.ts` generated change
+- [x] R002: Gate Compose startup on `ATRADE_INFRASTRUCTURE_MODE=compose` in Unix and PowerShell scripts
+- [x] R002: Revert unrelated `frontend/next-env.d.ts` generated change
 
 ---
 
