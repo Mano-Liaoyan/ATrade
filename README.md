@@ -279,6 +279,7 @@ and new Taskplane prompts should prefer `ATrade.slnx`.
 Common verification scripts live under `tests/`:
 
 - `tests/start-contract/start-wrapper-tests.sh`
+- `tests/compose/compose-infra-contract-tests.sh`
 - `tests/apphost/api-bootstrap-tests.sh`
 - `tests/apphost/accounts-feature-bootstrap-tests.sh`
 - `tests/apphost/ibkr-paper-safety-tests.sh`

@@ -1,7 +1,7 @@
 # TP-069: Compose runtime foundation — Status
 
 **Current Step:** Step 6: Documentation & Delivery
-**Status:** 🟡 In Progress
+**Status:** ✅ Complete
 **Last Updated:** 2026-05-10
 **Review Level:** 2
 **Review Counter:** 11
@@ -76,11 +76,11 @@
 ---
 
 ### Step 6: Documentation & Delivery
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
-- [ ] "Must Update" docs modified
-- [ ] "Check If Affected" docs reviewed
-- [ ] Discoveries logged
+- [x] "Must Update" docs modified
+- [x] "Check If Affected" docs reviewed
+- [x] Discoveries logged
 
 ---
 
@@ -106,6 +106,8 @@
 
 | Discovery | Disposition | Location |
 |-----------|-------------|----------|
+| Local Podman CLI is installed but no runnable Podman socket/machine is available in this worker environment. | Compose contract test treats live `compose config` as optional and skips after static validation. | `tests/compose/compose-infra-contract-tests.sh` |
+| Windows full-suite execution exposed LEAN fake-runtime tests that assumed Unix shell scripts. | Added Windows `.cmd` fake-runtime support so `dotnet test ATrade.slnx` passes on this worker. | `tests/ATrade.Analysis.Lean.Tests/LeanAnalysisEngineTests.cs` |
 
 ---
 
@@ -148,6 +150,10 @@
 | 2026-05-10 05:00 | Step 5 code review | R011 APPROVE |
 | 2026-05-10 05:00 | Step 5 completed | Verification approved |
 | 2026-05-10 05:00 | Step 6 started | Documentation and delivery |
+| 2026-05-10 05:03 | Step 6 docs review | README verification inventory updated; PLAN and architecture overview reviewed with no change needed because `start run` remains AppHost-owned |
+| 2026-05-10 05:05 | Step 6 doc validation | Local-runtime and Compose contract scripts reran successfully after documentation edits |
+| 2026-05-10 05:05 | Step 6 completed | Documentation and discoveries finalized |
+| 2026-05-10 05:05 | Task completed | All steps complete |
 
 ---
 
@@ -171,3 +177,4 @@
 - 2026-05-10 04:37 — Review R010 plan Step 5: APPROVE
 - 2026-05-10 05:00 — Review R011 code Step 5: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
+- Step 6 affected-doc review: `scripts/README.md` and `.env.template` are the Must Update docs; `README.md` verification inventory was affected and updated; `PLAN.md`, `docs/architecture/overview.md`, and `tasks/CONTEXT.md` were reviewed with no required content change.
