@@ -4,7 +4,7 @@
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 2
+**Review Counter:** 3
 **Iteration:** 1
 **Size:** M
 
@@ -35,11 +35,11 @@
 ### Step 2: Add external-infra AppHost graph behavior
 **Status:** 🟨 In Progress
 
-- [ ] In Compose mode, omit AppHost infra container resources
-- [ ] In Compose mode, keep API, IBKR worker, and frontend as Aspire resources
-- [ ] Inject external connection strings into API/worker resources
-- [ ] Preserve paper-trading and LEAN environment handoff
-- [ ] Preserve existing AppHost-managed infrastructure behavior outside Compose mode
+- [x] In Compose mode, omit AppHost infra container resources
+- [x] In Compose mode, keep API, IBKR worker, and frontend as Aspire resources
+- [x] Inject external connection strings into API/worker resources
+- [x] Preserve paper-trading and LEAN environment handoff
+- [x] Preserve existing AppHost-managed infrastructure behavior outside Compose mode
 
 ---
 
@@ -110,3 +110,4 @@
 *Reserved for execution notes*
 | 2026-05-10 05:09 | Review R001 | plan Step 1: APPROVE |
 | 2026-05-10 05:18 | Review R002 | code Step 1: APPROVE |
+| 2026-05-10 05:24 | Review R003 | plan Step 2: APPROVE |
