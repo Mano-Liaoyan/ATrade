@@ -1,6 +1,6 @@
 # TP-070: Aspire external Compose infrastructure mode — Status
 
-**Current Step:** Step 3: Add opt-in manifest and wiring tests
+**Current Step:** Step 4: Testing & Verification
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
@@ -54,7 +54,7 @@
 ---
 
 ### Step 4: Testing & Verification
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] AppHost manifest validation passing
 - [ ] AppHost worker/resource wiring validation passing
