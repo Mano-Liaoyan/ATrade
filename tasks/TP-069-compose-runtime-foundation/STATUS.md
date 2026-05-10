@@ -1,10 +1,10 @@
 # TP-069: Compose runtime foundation — Status
 
-**Current Step:** Step 2: Add the Compose infrastructure definition
+**Current Step:** Step 3: Add reusable Compose helper scripts
 **Status:** 🟡 In Progress
 **Last Updated:** 2026-05-10
 **Review Level:** 2
-**Review Counter:** 4
+**Review Counter:** 5
 **Iteration:** 1
 **Size:** M
 
@@ -35,7 +35,7 @@
 ---
 
 ### Step 2: Add the Compose infrastructure definition
-**Status:** 🟨 In Progress
+**Status:** ✅ Complete
 
 - [x] Create default Postgres, TimescaleDB, Redis, and NATS Compose services
 - [x] Preserve durable named volume contract for Postgres and TimescaleDB
@@ -45,7 +45,7 @@
 ---
 
 ### Step 3: Add reusable Compose helper scripts
-**Status:** ⬜ Not Started
+**Status:** 🟨 In Progress
 
 - [ ] Add Unix helper with local runtime env loading and Compose actions
 - [ ] Add PowerShell helper with equivalent Windows behavior
@@ -92,6 +92,7 @@
 | R002 | Code | Step 1 | REVISE | .reviews/R002-code-step1.md |
 | R003 | Code | Step 1 | APPROVE | .reviews/R003-code-step1.md |
 | R004 | Plan | Step 2 | APPROVE | .reviews/R004-plan-step2.md |
+| R005 | Code | Step 2 | APPROVE | .reviews/R005-code-step2.md |
 
 ---
 
@@ -118,6 +119,9 @@
 | 2026-05-10 03:54 | Step 1 completed | Runtime contract Compose variables approved |
 | 2026-05-10 03:54 | Step 2 started | Compose infrastructure definition |
 | 2026-05-10 03:55 | Step 2 plan review | R004 APPROVE |
+| 2026-05-10 04:06 | Step 2 code review | R005 APPROVE |
+| 2026-05-10 04:06 | Step 2 completed | Compose infrastructure definition approved |
+| 2026-05-10 04:06 | Step 3 started | Compose helper scripts |
 
 ---
 
@@ -133,5 +137,5 @@
 - 2026-05-10 03:46 — Review R002 code Step 1: REVISE
 - 2026-05-10 03:53 — Review R003 code Step 1: APPROVE
 - 2026-05-10 03:55 — Review R004 plan Step 2: APPROVE
+- 2026-05-10 04:06 — Review R005 code Step 2: APPROVE
 - R002 suggestions: consider additional Compose project-name edge coverage and exact scripts/README wording reuse; not blocking.
-| 2026-05-10 03:59 | Review R004 | plan Step 2: APPROVE |
