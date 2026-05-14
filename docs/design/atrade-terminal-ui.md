@@ -227,16 +227,20 @@ implementation while leaving room for a desktop wrapper later.
   status, help, and disabled-module content scrolls inside the primary workspace
   or module-owned scroll regions. Backtest run forms, status, history,
   completed-run comparison tables/overlays, and detail content use module-owned
-  scroll space and must not force page-level scrolling. Scroll-owned regions must
-  expose visible app-owned or explicitly styled scroll affordances. Safari may
-  overlay or hide native OS scrollbars, so ATrade-owned custom tracks/thumbs are
-  acceptable for critical regions; Firefox should receive explicit
+  scroll space and must not force page-level scrolling. Scroll-owned regions
+  share wheel ownership: the innermost overflowing rail, workspace, panel,
+  table, or module region consumes vertical and horizontal wheel input while it
+  can move, then the remaining delta chains to the next owning workspace region
+  at top/bottom/left/right bounds instead of trapping the user. Scroll-owned
+  regions must expose visible app-owned or explicitly styled scroll affordances.
+  Safari may overlay or hide native OS scrollbars, so ATrade-owned custom tracks/thumbs
+  are acceptable for critical regions; Firefox should receive explicit
   `scrollbar-color`/`scrollbar-width` treatment and Chromium/WebKit browsers
-  should receive visible `::-webkit-scrollbar` tracks/thumbs. The market monitor
-  table is its own module-owned scroll region: row overflow stays inside the
-  table viewport with sticky headers, and horizontal overflow remains visible
-  through a dedicated table scrollbar rather than clipping identity/action
-  columns.
+  should receive visible `::-webkit-scrollbar` tracks/thumbs. The
+  market monitor table is its own module-owned scroll region: row overflow stays
+  inside the table viewport with sticky headers, and horizontal overflow remains
+  visible through a dedicated table scrollbar rather than clipping
+  identity/action columns.
 - Panel content must remain honest about backend state: loading, provider
   not-configured, provider unavailable, authentication required, no analysis
   engine configured, no watchlist pins, and disabled module states each get

@@ -201,6 +201,10 @@ assert_purpose_built_module_guardrails() {
   run_static_validation_script "$repo_root/tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh"
 }
 
+assert_scroll_ownership_guardrails() {
+  run_static_validation_script "$repo_root/tests/apphost/frontend-scroll-ownership-tests.sh"
+}
+
 assert_global_signalr_status_guardrails() {
   run_static_validation_script "$repo_root/tests/apphost/frontend-global-signalr-status-tests.sh"
 }
@@ -212,6 +216,8 @@ assert_provider_runtime_independent_validation() {
     "$repo_root/tests/apphost/frontend-terminal-layout-visibility-tests.sh"
     "$repo_root/tests/apphost/frontend-chart-watchlist-default-tests.sh"
     "$repo_root/tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh"
+    "$repo_root/tests/apphost/frontend-scroll-ownership-tests.sh"
+    "$repo_root/tests/apphost/frontend-global-signalr-status-tests.sh"
   )
   local forbidden_tokens=(
     "NEXT_PUBLIC_ATRADE_API""_BASE""_URL"
@@ -241,6 +247,7 @@ main() {
   assert_layout_visibility_guardrails
   assert_chart_landing_default_guardrails
   assert_purpose_built_module_guardrails
+  assert_scroll_ownership_guardrails
   assert_global_signalr_status_guardrails
   assert_provider_runtime_independent_validation
 

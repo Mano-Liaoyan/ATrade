@@ -934,7 +934,7 @@ select:focus-visible,
 }
 
 .terminal-scroll-owned {
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
   scrollbar-color: hsl(var(--terminal-accent-amber) / 0.74) hsl(var(--terminal-surface-elevated) / 0.9);
   scrollbar-gutter: stable;
   scrollbar-width: thin;
