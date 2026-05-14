@@ -81,21 +81,15 @@ export function TerminalChartWorkspace({
 
 function ChartFooter({ chart }: { chart: TerminalChartWorkspaceWorkflow }) {
   return (
-    <div className="chart-footer-note">
+    <div className="chart-footer-note chart-footer-note--compact">
       <p>
-        HTTP candles/indicators are refreshed for the selected lookback range from now. {chart.view.fallbackCopy}
+        Read-only chart: selected lookback refreshes through API data only; no synthetic bars or order-entry controls are shown.
       </p>
-      {chart.candles ? <p>Current candle source: {chart.view.candleSourceLabel}.</p> : null}
-      {chart.streamState === 'unavailable' ? (
-        <p>Streaming snapshots are unavailable; polling continues against the IBKR/iBeam HTTP provider.</p>
-      ) : null}
       {chart.latestUpdate ? (
         <p>
-          Last market-data stream update: {chart.latestUpdate.symbol} {chart.latestUpdate.timeframe} range close {chart.latestUpdate.close.toFixed(2)} from {chart.view.latestUpdateSourceLabel ?? chart.view.candleSourceLabel}.
+          Latest stream close {chart.latestUpdate.close.toFixed(2)} · hover the stock ID/source chips for identity, source, range, cache, and fallback details.
         </p>
       ) : null}
-      <p>{chart.view.identitySummary}</p>
-      <p>{chart.view.noOrderCopy}</p>
     </div>
   );
 }

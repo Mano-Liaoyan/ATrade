@@ -256,7 +256,14 @@ implementation while leaving room for a desktop wrapper later.
   provider-unavailable/rate-limited/service-unavailable states, and stale
   Timescale cache responses render explicit status copy rather than a blank or
   synthetic chart; stale cache must show its `sourceStatus` warning and must not
-  be visually promoted to a fresh provider success.
+  be visually promoted to a fresh provider success. The chart header keeps
+  visible identity/source labels compact: the stock ID and source chips expose
+  hover/focus details for provider-neutral Exact Instrument Identity, original
+  provider source such as `timescale-cache:{originalSource}`, cache freshness,
+  selected range, and streaming/HTTP fallback state. Long identity/source/cache
+  paragraphs do not live in the chart footer; the footer is limited to compact
+  operational/read-only copy. IBKR `conid` remains provider-symbol-id alias
+  metadata, not an additional identity dimension.
 
 ### 6.2 Layout Persistence
 
