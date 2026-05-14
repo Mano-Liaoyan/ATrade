@@ -11,6 +11,8 @@ public static class MarketDataProviderErrorCodes
 {
     public const string ProviderNotConfigured = "provider-not-configured";
     public const string ProviderUnavailable = "provider-unavailable";
+    public const string ProviderRateLimited = "provider-rate-limited";
+    public const string ProviderServiceUnavailable = "provider-service-unavailable";
     public const string AuthenticationRequired = "authentication-required";
     public const string SearchNotSupported = "search-not-supported";
     public const string InvalidSearchQuery = "invalid-search-query";
@@ -19,6 +21,7 @@ public static class MarketDataProviderErrorCodes
     public const string UnsupportedSymbol = "unsupported-symbol";
     public const string UnsupportedChartRange = "unsupported-chart-range";
     public const string MarketDataRequestFailed = "market-data-error";
+    public const string MarketDataStorageUnavailable = "market-data-storage-unavailable";
 }
 
 public static class MarketDataAssetClasses

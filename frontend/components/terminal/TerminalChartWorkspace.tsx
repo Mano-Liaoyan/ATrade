@@ -51,6 +51,12 @@ export function TerminalChartWorkspace({
               </button>
             </div>
           ) : null}
+          {!chart.loading && !chart.error && chart.view.staleCandleSourceWarning ? (
+            <div className="warning-state" role="status" data-testid="stale-chart-source-warning">
+              <strong>Stale Timescale cache shown.</strong>
+              <p>{chart.view.staleCandleSourceWarning}</p>
+            </div>
+          ) : null}
           {!chart.loading && !chart.error && chart.candles && chart.view.hasCandleData ? <CandlestickChart candles={chart.candles} indicators={chart.indicators} /> : null}
           {!chart.loading && !chart.error && (!chart.candles || !chart.view.hasCandleData) ? (
             <div className="empty-state" role="status">

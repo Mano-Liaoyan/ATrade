@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getCandles, getIndicators } from './marketDataClient';
 import { normalizeInstrumentIdentity, type InstrumentIdentityInput, type NormalizedInstrumentIdentity } from './instrumentIdentity';
 import { connectMarketDataStream, type MarketDataStreamState, type MarketDataStreamSubscription } from './marketDataStream';
-import type { CandleSeriesResponse, ChartRange, IndicatorResponse, MarketDataUpdate, OhlcvCandle } from '../types/marketData';
+import type { CandleSeriesResponse, ChartRange, IndicatorResponse, MarketDataSourceStatus, MarketDataUpdate, OhlcvCandle } from '../types/marketData';
 
 export const ChartPollingFallbackMs = 15_000;
 
@@ -160,9 +160,34 @@ export function formatChartDataWorkflowError(caughtError: unknown): string {
   return caughtError instanceof Error ? caughtError.message : 'IBKR chart data is unavailable.';
 }
 
-export function formatMarketDataSourceLabel(source: string | null | undefined): string {
+export function formatMarketDataSourceLabel(source: string | null | undefined, sourceStatus?: MarketDataSourceStatus | null): string {
+  const providerLabel = formatMarketDataProviderSourceLabel(sourceStatus?.source ?? source);
+  if (sourceStatus?.freshness === 'stale') {
+    return `Stale ${providerLabel}`;
+  }
+
+  return providerLabel;
+}
+
+export function formatStaleMarketDataSourceWarning(sourceStatus: MarketDataSourceStatus | null | undefined): string | null {
+  if (sourceStatus?.freshness !== 'stale') {
+    return null;
+  }
+
+  const attempted = sourceStatus.refreshAttemptedAtUtc
+    ? ` Refresh attempted at ${new Date(sourceStatus.refreshAttemptedAtUtc).toLocaleString()}.`
+    : '';
+  const refreshError = sourceStatus.refreshError?.message ? ` Provider refresh did not replace the stale chart: ${sourceStatus.refreshError.message}` : '';
+  return `Showing stale Timescale cache rows generated at ${new Date(sourceStatus.generatedAtUtc).toLocaleString()}.${attempted}${refreshError}`;
+}
+
+function formatMarketDataProviderSourceLabel(source: string | null | undefined): string {
   if (!source) {
     return 'IBKR/iBeam';
+  }
+
+  if (source.startsWith('timescale-cache:')) {
+    return `Timescale cache (${formatMarketDataProviderSourceLabel(source.slice('timescale-cache:'.length))})`;
   }
 
   if (source.includes('ibkr')) {

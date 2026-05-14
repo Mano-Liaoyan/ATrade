@@ -104,6 +104,55 @@ public sealed class IbkrMarketDataProviderTests
     }
 
     [Fact]
+    public async Task Provider_ClassifiesRateLimitedAndServiceUnavailableMarketDataResponses()
+    {
+        var rateLimitedHandler = new RecordingHttpMessageHandler((request, _) => Task.FromResult(request.RequestUri?.AbsolutePath switch
+        {
+            IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+            {
+                authenticated = true,
+                connected = true,
+                competing = false,
+                message = "ready",
+            }),
+            IbkrMarketDataClient.ContractSearchPath => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+            {
+                Content = JsonContent.Create(new { error = "rate limit exceeded", token = "super-secret-token" }),
+            },
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        }));
+        var serviceUnavailableHandler = new RecordingHttpMessageHandler((request, _) => Task.FromResult(request.RequestUri?.AbsolutePath switch
+        {
+            IbkrMarketDataClient.AuthStatusPath => JsonResponse(new
+            {
+                authenticated = true,
+                connected = true,
+                competing = false,
+                message = "ready",
+            }),
+            IbkrMarketDataClient.ContractSearchPath => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+            {
+                Content = JsonContent.Create(new { error = "gateway unavailable", session = "runtime-session-id" }),
+            },
+            _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+        }));
+        var rateLimitedProvider = CreateProvider(rateLimitedHandler, CreateOptions());
+        var serviceUnavailableProvider = CreateProvider(serviceUnavailableHandler, CreateOptions());
+
+        var rateLimited = await rateLimitedProvider.SearchSymbolsAsync("AAPL", CancellationToken.None);
+        var serviceUnavailable = await serviceUnavailableProvider.SearchSymbolsAsync("AAPL", CancellationToken.None);
+
+        Assert.True(rateLimited.IsFailure);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderRateLimited, rateLimited.Error?.Code);
+        Assert.Contains("rate limit", rateLimited.Error?.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("super-secret-token", rateLimited.Error?.Message);
+        Assert.True(serviceUnavailable.IsFailure);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderServiceUnavailable, serviceUnavailable.Error?.Code);
+        Assert.Contains("temporarily unavailable", serviceUnavailable.Error?.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("runtime-session-id", serviceUnavailable.Error?.Message);
+    }
+
+    [Fact]
     public async Task Provider_ReturnsProviderUnavailableWhenMarketDataEndpointRejectsUnauthenticatedSession()
     {
         var handler = new RecordingHttpMessageHandler((request, _) =>
