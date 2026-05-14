@@ -92,7 +92,7 @@ export function TerminalChartLandingModule({
         className="terminal-chart-landing__panel"
         eyebrow="Chart"
         title="Stored stocks"
-        description="Load backend-owned watchlist pins, select a stored stock, and render the first stored instrument as the default chart without demo symbols or synthetic bars."
+        description="Select a stored stock for the default chart."
         actions={(
           <div className="terminal-chart-landing__status-actions">
             <TerminalStatusBadge tone={landingState.tone} pulse={watchlist.loading}>{landingState.badge}</TerminalStatusBadge>
@@ -202,7 +202,7 @@ function StoredStockChart({ candidate, initialChartRange }: { candidate: StoredS
         <div>
           <p className="eyebrow">Selected stored stock</p>
           <h2>{candidate.symbol} default chart</h2>
-          <p>{formatIdentitySummary(candidate.identity)}. The candlestick workspace below keeps provider-unavailable and no-candle states explicit.</p>
+          <p>{formatIdentitySummary(candidate.identity)}. Provider-unavailable and empty candles stay visible.</p>
         </div>
         <TerminalStatusBadge tone="info">{candidate.sourceLabel}</TerminalStatusBadge>
       </div>
@@ -213,7 +213,7 @@ function StoredStockChart({ candidate, initialChartRange }: { candidate: StoredS
 
 function StoredStocksEmptyState({ error, loading, source }: { error: string | null; loading: boolean; source: 'backend' | 'cache' }) {
   if (loading) {
-    return <div className="loading-state" role="status">Loading stored stocks from the backend watchlist…</div>;
+    return <div className="loading-state" role="status">Loading stored stocks…</div>;
   }
 
   const unavailable = Boolean(error);
@@ -223,8 +223,8 @@ function StoredStocksEmptyState({ error, loading, source }: { error: string | nu
       <strong>{unavailable ? 'Stored stocks unavailable.' : 'No stored stocks yet.'}</strong>
       <p>
         {unavailable
-          ? `${error} ${source === 'cache' ? 'No cached legacy pins are available for a chart fallback.' : 'No backend watchlist rows are available for a default chart.'}`
-          : 'Pin a stock from Search or manage backend watchlist pins before the Chart landing can select a default instrument.'}
+          ? `${error} ${source === 'cache' ? 'No cached pins available.' : 'No stored stocks available.'}`
+          : 'Pin a stock from Search or Watchlist.'}
       </p>
       <div className="terminal-chart-landing__empty-actions">
         <Button asChild size="sm" variant="terminal"><Link href={createTerminalModuleRoute('SEARCH')}>Open Search</Link></Button>
@@ -293,7 +293,7 @@ function createLandingState({
   if (loading) {
     return {
       badge: 'Loading stored stocks',
-      copy: 'Loading backend-owned stored stocks from ATrade.Api watchlist preferences.',
+      copy: 'Loading stored stocks.',
       error,
       hasCandidates: candidateCount > 0,
       loading,
@@ -305,7 +305,7 @@ function createLandingState({
   if (error && candidateCount > 0) {
     return {
       badge: 'Cached fallback',
-      copy: `${error} Cached legacy pins are shown as a non-authoritative fallback until the backend watchlist returns.`,
+      copy: `${error} Cached fallback shown.`,
       error,
       hasCandidates: true,
       loading,
@@ -317,7 +317,7 @@ function createLandingState({
   if (error) {
     return {
       badge: 'Stored stocks unavailable',
-      copy: `${error} No demo symbol is substituted; use Search or Watchlist when the backend is available.`,
+      copy: `${error} Stored stocks unavailable.`,
       error,
       hasCandidates: false,
       loading,
@@ -329,7 +329,7 @@ function createLandingState({
   if (candidateCount === 0) {
     return {
       badge: 'No stored stocks',
-      copy: 'The backend watchlist returned no stored stocks, so Chart cannot invent a default symbol.',
+      copy: 'No stored stocks yet.',
       error,
       hasCandidates: false,
       loading,
@@ -340,7 +340,7 @@ function createLandingState({
 
   return {
     badge: `${candidateCount} stored`,
-    copy: 'The first backend watchlist instrument is selected as the default chart candidate; choose another stored stock to update the chart.',
+    copy: 'Default chart uses the first stored stock; select another to change it.',
     error,
     hasCandidates: true,
     loading,

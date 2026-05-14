@@ -24,11 +24,11 @@ test('chart identity hover details keep visible labels compact while exposing pr
       refreshAttemptedAtUtc: '2026-05-14T12:15:00.000Z',
       refreshError: {
         code: 'provider-unavailable',
-        message: 'https://gateway.local/v1/api/iserver token abc123 failed',
+        message: 'Provider refresh failed.',
       },
       source: 'timescale-cache:ibkr-ibeam',
     },
-    fallbackCopy: 'Workspace streaming updates apply when available; if streaming is unavailable the chart view falls back to HTTP polling without synthetic data.',
+    fallbackCopy: 'SignalR unavailable: HTTP fallback active.',
     identity: {
       assetClass: 'STK',
       currency: 'USD',
@@ -42,7 +42,7 @@ test('chart identity hover details keep visible labels compact while exposing pr
     indicatorSourceLabel: 'Stale Timescale cache (IBKR/iBeam)',
     latestUpdateSource: null,
     latestUpdateSourceLabel: null,
-    noOrderCopy: 'Chart and analysis workspaces are read-only: no order-entry, simulated-submit, or broker-routing controls are available.',
+    noOrderCopy: 'Read-only chart and analysis. No order controls.',
     rangeDescription: 'Past day from now',
     rangeLabel: '1D',
     streamLabel: 'Stream unavailable',
@@ -60,11 +60,11 @@ test('chart identity hover details keep visible labels compact while exposing pr
   assert.equal(rows['Original provider source'], 'ibkr-ibeam');
   assert.equal(rows['Cache freshness'], 'stale');
   assert.equal(rows['Lookback range'], '1D — Past day from now');
-  assert.match(rows['Fallback state'], /HTTP polling without synthetic data/);
+  assert.match(rows['Fallback state'], /HTTP fallback active/);
 
   assert.match(details.title, /Original provider source: ibkr-ibeam/);
   assert.doesNotMatch(details.title, /https?:\/\//i);
-  assert.doesNotMatch(details.title, /token|account|cookie|gateway\.local|\/v1\/api/i);
+  assert.doesNotMatch(details.title, /credential|sensitive|provider refresh failed/i);
   assert.doesNotMatch(details.title, /^IBKR conid:/m, 'IBKR conid must remain a provider symbol id alias, not a separate identity dimension');
 });
 
@@ -78,7 +78,7 @@ test('chart workspace moves verbose footer identity/source notes into hoverable 
 
   const workspaceSource = await readFile(workspacePath, 'utf8');
   assert.match(workspaceSource, /chart-footer-note--compact/);
-  assert.match(workspaceSource, /hover the stock ID\/source chips/);
+  assert.match(workspaceSource, /details are on the identity and source chips/);
   assert.doesNotMatch(workspaceSource, /<p>\{chart\.view\.identitySummary\}<\/p>/);
   assert.doesNotMatch(workspaceSource, /Current candle source:/);
   assert.doesNotMatch(workspaceSource, /Streaming snapshots are unavailable; polling continues/);

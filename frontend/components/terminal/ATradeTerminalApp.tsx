@@ -252,10 +252,10 @@ function TerminalAnalysisModule({ chartRange, identity, symbol }: { chartRange: 
       <TerminalPanel
         eyebrow="Analysis"
         title={symbol ? `${symbol} analysis workspace` : "Open analysis for a symbol"}
-        description="Provider-neutral analysis lists configured engines and surfaces no-engine or runtime-unavailable states without fake signals."
+        description="Provider-neutral analysis with engine status."
         actions={<TerminalStatusBadge tone="info">ANALYSIS</TerminalStatusBadge>}
       >
-        {symbol ? <p>Running over the selected {CHART_RANGE_LABELS[chartRange]} chart range from the route or chart workspace context.</p> : <p>Open a chart or select Analyze from a market monitor row before viewing symbol analysis.</p>}
+        {symbol ? <p>Range: {CHART_RANGE_LABELS[chartRange]}.</p> : <p>Open a chart or market row first.</p>}
       </TerminalPanel>
       <TerminalAnalysisWorkspace chartRange={chartRange} identity={identity} symbol={symbol} />
     </section>

@@ -46,7 +46,7 @@ export function TerminalDisabledModule({ className, module, moduleId }: Terminal
           ))}
         </ul>
         <p className="terminal-disabled-module__footer">
-          This surface is intentionally empty: no fake data, no demo provider responses, and no order-entry controls are rendered here. Use the HELP module for enabled workspace navigation.
+          Disabled module. No data or order controls are shown.
         </p>
       </div>
     </TerminalPanel>

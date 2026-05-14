@@ -16,9 +16,9 @@ export type TerminalProviderDiagnosticsProps = {
 };
 
 export function TerminalProviderDiagnostics({
-  analysisStateLabel = 'Provider-neutral analysis discovery through ATrade.Api',
-  marketDataSourceLabel = 'Market-data source labels are surfaced on chart and monitor payloads',
-  signalRStateLabel = 'Global workspace status owns stream connectivity; modules show only local stream state when needed',
+  analysisStateLabel = 'analysis state pending',
+  marketDataSourceLabel = 'market-data source pending',
+  signalRStateLabel = 'fallback status pending',
 }: TerminalProviderDiagnosticsProps) {
   const [status, setStatus] = useState<BrokerStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,8 +77,8 @@ export function TerminalProviderDiagnostics({
       <TerminalPanel
         density="compact"
         eyebrow="Provider diagnostics"
-        title="IBKR, iBeam, data source, and analysis runtime states"
-        description="Diagnostics surface provider readiness and source labels without credential fields, account identifiers, order tickets, or broker-routing controls."
+        title="Provider diagnostics"
+        description="Readiness, source, fallback, and analysis labels."
         actions={(
           <div className="terminal-provider-diagnostics__actions">
             <TerminalStatusBadge tone={brokerTone} pulse={loading}>{loading ? 'Checking' : error ? 'Unavailable' : status?.state ?? 'Unknown'}</TerminalStatusBadge>
@@ -115,7 +115,7 @@ function getDiagnosticItems({
 }): TerminalMetadataItem[] {
   return [
     {
-      detail: status?.message ?? 'Safe broker readiness projection from ATrade.Api.',
+      detail: status?.message ?? 'Provider status pending.',
       label: 'Broker provider',
       value: status?.provider ?? 'ibkr',
     },
@@ -125,34 +125,34 @@ function getDiagnosticItems({
       value: status?.state ?? (error ? 'unavailable' : 'checking'),
     },
     {
-      detail: 'Paper-only status is shown without account identifiers or credential prompts.',
+      detail: 'Paper mode only.',
       label: 'Paper mode',
       value: status?.mode ?? 'paper',
     },
     {
-      detail: 'Chart, monitor, candles, indicators, and Timescale cache labels remain payload-owned.',
+      detail: 'Source and cache labels stay with chart and monitor data.',
       label: 'Market data source',
       value: marketDataSourceLabel,
     },
     {
-      detail: 'HTTP polling fallback remains visible when stream state is closed or unavailable.',
+      detail: 'SignalR-to-HTTP fallback status stays visible.',
       label: 'Workspace stream',
       value: signalRStateLabel,
     },
     {
-      detail: 'No-engine and runtime-unavailable states are explicit; no fake signals are generated.',
+      detail: 'analysis-engine-not-configured and analysis-engine-unavailable stay explicit.',
       label: 'Analysis provider',
       value: analysisStateLabel,
     },
     {
-      detail: 'Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes.',
+      detail: 'No order controls.',
       label: 'Order placement capability',
       value: status?.capabilities.supportsBrokerOrderPlacement ? 'provider reports enabled' : 'disabled',
     },
     {
-      detail: 'Secrets, account identifiers, tokens, cookies, gateway URLs, and session values stay out of the browser UI.',
-      label: 'Credential UI',
-      value: 'not rendered',
+      detail: 'Sensitive values are not shown.',
+      label: 'Sensitive UI',
+      value: 'not shown',
     },
   ];
 }

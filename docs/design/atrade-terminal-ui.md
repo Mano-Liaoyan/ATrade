@@ -118,10 +118,10 @@ backend cannot supply.
 | `SEARCH` | Search-first bounded/ranked stock discovery with the query input as the primary surface, ranked result count/status, source/provider/market filters, exact provider/market identity badges, and chart/pin/analysis/backtest actions. | `GET /api/market-data/search?query=...&assetClass=stock&limit=...` plus `symbolSearchWorkflow` and reusable market-monitor table/filter/detail primitives. |
 | `WATCHLIST` | Saved-stocks-first backend watchlist workspace for exact provider/market pins with source-labeled backend/cached states, add-from-Search/retry/manage affordances, pin/unpin/remove, stable `instrumentKey` / `pinKey`, and chart/analysis/backtest actions. | `GET` / `PUT` / `POST /api/workspace/watchlist`, exact `DELETE /api/workspace/watchlist/pins/{instrumentKey}`, legacy unambiguous `DELETE /api/workspace/watchlist/{symbol}`, `watchlistWorkflow`, and reusable market-monitor row primitives. |
 | `CHART` | Stored-stock chart landing plus dense chart workspace: `/chart` loads backend-owned watchlist pins, shows a Stored stocks selector, defaults to the first stored instrument when available, and `/chart/{symbol}` renders an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis/backtest handoff. | `GET /api/workspace/watchlist` through `watchlistWorkflow`, `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, `symbolChartWorkflow`, and `TerminalChartLandingModule`. |
-| `ANALYSIS` | Provider-neutral analysis workspace that lists available engines, runs analysis over market-data bars, and surfaces explicit no-engine or runtime-unavailable states without fake signals. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
+| `ANALYSIS` | Provider-neutral analysis workspace that lists engine status, runs analysis over market-data bars, and surfaces concise no-engine or runtime-unavailable labels. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
 | `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, completed-run-only comparison, metric table/cards, persisted strategy/buy-and-hold equity overlay, cancel, retry, and truthful empty/unavailable states without export or optimization controls. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
-| `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and explicit unavailable states. The global top-right workspace indicator owns browser-visible SignalR/connectivity summary so module bodies do not duplicate global stream copy. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata, and the global workspace status projection backed by ATrade.Api health plus `/hubs/backtests`. |
-| `HELP` | In-product module/workflow reference, safety reminders, provider-state explanations, and direct-navigation guidance. | Static frontend content derived from this spec and active architecture docs; no backend data required. |
+| `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and concise unavailable-state labels. The global top-right workspace indicator owns browser-visible SignalR/connectivity summary so module bodies do not duplicate global stream copy. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata, and the global workspace status projection backed by ATrade.Api health plus `/hubs/backtests`. |
+| `HELP` | Concise module/workflow reference, unavailable-state labels, and paper-only safety reminders. | Static frontend content derived from this spec and active architecture docs; no backend data required. |
 
 Enabled modules share `frontend/lib/terminalModuleRegistry.ts` so rail entries,
 module labels, icons, disabled states, and help copy stay consistent. The rail
@@ -136,8 +136,8 @@ glyph.
 Future modules may appear in the rail, their own canonical routes, and HELP
 surfaces as visible-disabled entries to communicate intended product breadth. A
 disabled module must be visually distinct from enabled modules, may be selected
-to reveal the disabled route state, and must show honest unavailable copy instead
-of mock data.
+to reveal the disabled route state, and must show concise honest unavailable
+copy instead of mock data.
 
 | Future module | Disabled-state meaning |
 | ------------- | ---------------------- |
@@ -198,9 +198,9 @@ without a command system.
   IBKR `conid` is adapter metadata only, not route/query identity. The retired
   `/symbols/{symbol}` route is removed instead of redirected or aliased.
 - HELP lists enabled modules, visible-disabled modules, workflow actions,
-  provider-state meanings, and paper-only safety constraints.
+  concise provider-state labels, and paper-only safety constraints.
 - STATUS surfaces `ATrade.Api`, broker/iBeam/provider, cache/source, and analysis
-  runtime states without hiding unavailable conditions.
+  runtime states without hiding unavailable conditions or adding tutorial copy.
 - Navigation updates focus and status text for accessibility, but it does not
   parse free-form text and it does not send navigation text to a backend AI,
   broker, or order route.
@@ -241,11 +241,11 @@ implementation while leaving room for a desktop wrapper later.
   inside the table viewport with sticky headers, and horizontal overflow remains
   visible through a dedicated table scrollbar rather than clipping
   identity/action columns.
-- Panel content must remain honest about backend state: loading, provider
-  not-configured, provider rate-limited, provider service unavailable, provider
-  unavailable, authentication required, market-data cache storage unavailable,
-  no analysis engine configured, no watchlist pins, and disabled module states
-  each get explicit copy.
+- Panel content must remain honest about backend state while staying concise:
+  loading, provider-not-configured, provider-unavailable,
+  authentication-required, rate-limited, storage failures, empty candles,
+  analysis-engine-not-configured, analysis-engine-unavailable, no watchlist pins,
+  disabled module, and fallback states each get visible labels.
 - The `CHART` workspace must reserve non-collapsing vertical space inside the
   scroll-owned workspace. `TerminalChartLandingModule` splits the Stored stocks
   selector and selected/default chart into module-owned scroll regions, and

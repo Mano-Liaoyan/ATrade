@@ -120,7 +120,7 @@ assert_truthful_provider_empty_and_no_fake_candle_states() {
   assert_file_contains "$terminal_workflow" 'isEmpty: !hasCandleData'
   assert_file_contains "$chart_workspace" 'chart.candles && chart.view.hasCandleData'
   assert_file_contains "$chart_workspace" '!chart.candles || !chart.view.hasCandleData'
-  assert_file_contains "$chart_workspace" 'no synthetic chart data is shown'
+  assert_file_contains "$chart_workspace" 'No candle rows for this lookback range.'
   assert_file_contains "$chart_workspace" 'chart.loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div>'
   assert_file_contains "$chart_workspace" '!chart.loading && chart.error'
   assert_file_contains "$chart_workspace" 'data-testid="stale-chart-source-warning"'

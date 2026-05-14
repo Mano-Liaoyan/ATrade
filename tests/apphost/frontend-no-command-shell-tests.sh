@@ -122,12 +122,12 @@ assert_safety_boundaries_preserved() {
   assert_file_contains "$detail" 'exact provider identity'
   assert_file_contains "$home" 'Orders are disabled by the paper-only safety contract.'
   assert_file_contains "$monitor" 'Backend-owned exact Postgres pins through ATrade.Api.'
-  assert_file_contains "$help" 'All browser-visible data flows through ATrade.Api'
-  assert_file_contains "$help" 'Provider-not-configured, provider-unavailable, authentication-required, and no-analysis-engine states remain explicit'
-  assert_file_contains "$help" 'no order tickets, buy/sell controls, previews, or submit actions'
-  assert_file_contains "$status" 'Browser routes through ATrade.Api only.'
-  assert_file_contains "$diagnostics" 'workspace renders no order-entry controls and does not call broker order routes.'
-  assert_file_contains "$disabled" 'no fake data, no demo provider responses, and no order-entry controls'
+  assert_file_contains "$help" 'Data is served by ATrade.Api.'
+  assert_file_contains "$help" 'Visible labels include provider-not-configured, provider-unavailable, authentication-required'
+  assert_file_contains "$help" 'No order tickets or submit actions'
+  assert_file_contains "$status" 'ATrade.Api only.'
+  assert_file_contains "$diagnostics" 'No order controls.'
+  assert_file_contains "$disabled" 'Disabled module. No data or order controls are shown.'
 
   for disabled_module in NEWS PORTFOLIO RESEARCH SCREENER ECON AI NODE ORDERS; do
     assert_file_contains "$module_registry" "id: \"$disabled_module\""
