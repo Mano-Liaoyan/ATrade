@@ -50,9 +50,10 @@ see_also:
 > visible global safety strip, shell context panel, monitor strip,
 > footer/status strip, resizable splitters, layout reset, or page-level vertical
 > scrolling, guarded for latest stable desktop Safari, Firefox, Chrome, and Edge
-> with visible internal/custom rail, workspace, panel, table, and module scroll
-> affordances, a dense market monitor table with visible internal vertical and
-> horizontal scrollbars for wide exact-identity/action columns, IBKR
+> with shared bounded wheel ownership plus visible internal/custom rail,
+> workspace, panel, table, and module scroll affordances, a dense market monitor
+> table with visible internal vertical and horizontal scrollbars for wide
+> exact-identity/action columns, IBKR
 > scanner-driven or fresh persisted trending symbols,
 > bounded/ranked/compact-filterable IBKR stock search, exact market-specific
 > Postgres-backed watchlists, a `/chart` Stored stocks selector that defaults to
@@ -121,8 +122,11 @@ frame remains non-scrolling. Latest stable desktop Safari, Firefox, Chrome, and
 Edge are supported targets for this no-clipping contract; rail, workspace,
 panel, table, chart, analysis, backtest, status, help, and disabled-module
 overflow must stay reachable through module-owned visible/custom scroll
-affordances rather than page scroll. Canonical enabled, symbol, and
-disabled-module routes now render directly through `ATradeTerminalApp`, which
+affordances rather than page scroll. Wheel input is owned by the innermost
+scrollable region until that region reaches a vertical or horizontal bound, then
+remaining wheel delta chains to the next owning workspace/global scroll region.
+Canonical enabled, symbol, and disabled-module routes now render directly
+through `ATradeTerminalApp`, which
 provides the direct module/workflow frame, module rail, single primary workspace
 region, module-owned scrolling, STATUS/HELP modules, and honest disabled-module
 surfaces for future modules (`NEWS`, `PORTFOLIO`, `RESEARCH`, `SCREENER`,

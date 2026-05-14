@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { InstrumentIdentityInput } from "@/lib/instrumentIdentity";
+import { attachTerminalWheelScrollOwnership } from "@/lib/terminalWheelScrollOwnership";
 import { createTerminalModuleRoute, createTerminalSymbolRoute, isTerminalSymbolModuleId } from "@/lib/terminalRoutes";
 import { useTerminalChartWorkspaceWorkflow } from "@/lib/terminalChartWorkspaceWorkflow";
 import { CHART_RANGE_LABELS, type ChartRange } from "@/types/marketData";
@@ -43,6 +44,7 @@ export function ATradeTerminalApp({
   initialSymbol = null,
 }: ATradeTerminalAppProps) {
   const router = useRouter();
+  const terminalFrameRef = useRef<HTMLElement | null>(null);
   const [activeModuleId, setActiveModuleId] = useState<EnabledTerminalModuleId>(initialModuleId);
   const [disabledModuleId, setDisabledModuleId] = useState<DisabledTerminalModuleId | null>(initialDisabledModuleId);
   const [navigationStatus, setNavigationStatus] = useState("Ready for module navigation.");
@@ -52,6 +54,16 @@ export function ATradeTerminalApp({
   const [activeSymbol, setActiveSymbol] = useState<string | null>(normalizedInitialSymbol);
   const [activeIdentity, setActiveIdentity] = useState<InstrumentIdentityInput | null>(initialIdentity);
   const [activeChartRange, setActiveChartRange] = useState<ChartRange>(initialChartRange);
+
+  useEffect(() => {
+    const terminalFrame = terminalFrameRef.current;
+
+    if (!terminalFrame) {
+      return;
+    }
+
+    return attachTerminalWheelScrollOwnership(terminalFrame);
+  }, []);
 
   useEffect(() => {
     setActiveModuleId(initialModuleId);
@@ -155,7 +167,7 @@ export function ATradeTerminalApp({
   );
 
   return (
-    <section className="atrade-terminal-app" data-testid="atrade-terminal-app" aria-label="ATrade paper workspace application frame">
+    <section ref={terminalFrameRef} className="atrade-terminal-app" data-testid="atrade-terminal-app" aria-label="ATrade paper workspace application frame">
       <p className="sr-only" aria-live="polite" role="status">
         {navigationStatus}
       </p>
