@@ -123,9 +123,14 @@ assert_truthful_provider_empty_and_no_fake_candle_states() {
   assert_file_contains "$chart_workspace" 'no synthetic chart data is shown'
   assert_file_contains "$chart_workspace" 'chart.loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div>'
   assert_file_contains "$chart_workspace" '!chart.loading && chart.error'
+  assert_file_contains "$chart_workspace" 'data-testid="stale-chart-source-warning"'
+  assert_file_contains "$terminal_workflow" 'staleCandleSourceWarning: formatStaleMarketDataSourceWarning(candlesSourceStatus)'
 
   assert_file_contains "$market_client" "error?.code === 'provider-not-configured'"
+  assert_file_contains "$market_client" "error?.code === 'provider-rate-limited'"
+  assert_file_contains "$market_client" "error?.code === 'provider-service-unavailable'"
   assert_file_contains "$market_client" "error?.code === 'provider-unavailable'"
+  assert_file_contains "$market_client" "error?.code === 'market-data-storage-unavailable'"
   assert_file_contains "$market_client" "error?.code === 'authentication-required'"
   assert_file_contains "$symbol_workflow" 'setCandles(candleResponse)'
   assert_file_contains "$symbol_workflow" 'setIndicators(indicatorResponse)'

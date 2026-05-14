@@ -333,8 +333,15 @@ select:focus-visible,
 .empty-state,
 
 
+.warning-state,
+
+
 .error-state {
   padding: 1.25rem;
+}
+
+.warning-state {
+  border-color: hsl(var(--terminal-accent-amber) / 0.52);
 }
 
 .error-state {

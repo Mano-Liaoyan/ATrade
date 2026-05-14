@@ -101,6 +101,21 @@ export type OhlcvCandle = {
   volume: number;
 };
 
+export type MarketDataError = {
+  code: string;
+  message: string;
+};
+
+export type MarketDataSourceFreshness = 'fresh' | 'stale' | string;
+
+export type MarketDataSourceStatus = {
+  freshness: MarketDataSourceFreshness;
+  source: string;
+  generatedAtUtc: string;
+  refreshAttemptedAtUtc?: string | null;
+  refreshError?: MarketDataError | null;
+};
+
 export type CandleSeriesResponse = {
   symbol: string;
   timeframe: Timeframe;
@@ -108,6 +123,7 @@ export type CandleSeriesResponse = {
   candles: OhlcvCandle[];
   source: string;
   identity?: MarketDataSymbolIdentity | null;
+  sourceStatus?: MarketDataSourceStatus | null;
 };
 
 export type MovingAveragePoint = {
@@ -136,6 +152,7 @@ export type IndicatorResponse = {
   macd: MacdPoint[];
   source: string;
   identity?: MarketDataSymbolIdentity | null;
+  sourceStatus?: MarketDataSourceStatus | null;
 };
 
 export type MarketDataUpdate = {

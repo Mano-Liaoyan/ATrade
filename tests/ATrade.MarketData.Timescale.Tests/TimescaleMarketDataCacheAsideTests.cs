@@ -285,7 +285,10 @@ public sealed class TimescaleMarketDataCacheAsideTests
         var result = await service.GetCandlesAsync("AAPL", ChartRangePresets.OneMonth, cancellationToken: CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Same(providerResponse, result.Value);
+        Assert.Equal(providerResponse.Symbol, result.Value?.Symbol);
+        Assert.Equal(providerResponse.Timeframe, result.Value?.Timeframe);
+        Assert.Equal(providerResponse.Source, result.Value?.Source);
+        Assert.Equal(MarketDataSourceFreshness.Fresh, result.Value?.SourceStatus?.Freshness);
         Assert.Equal(1, provider.TryGetCandlesCalls);
         var query = Assert.Single(repository.CandleQueries);
         Assert.Equal(ChartRangePresets.OneMonth, query.Timeframe);
@@ -310,7 +313,10 @@ public sealed class TimescaleMarketDataCacheAsideTests
 
         Assert.True(result.IsSuccess);
         Assert.Null(result.Error);
-        Assert.Same(providerResponse, response);
+        Assert.Equal(providerResponse.Symbol, response?.Symbol);
+        Assert.Equal(providerResponse.Timeframe, response?.Timeframe);
+        Assert.Equal(providerResponse.Source, response?.Source);
+        Assert.Equal(MarketDataSourceFreshness.Fresh, response?.SourceStatus?.Freshness);
         Assert.Equal(1, provider.TryGetCandlesCalls);
         Assert.Single(repository.CandleQueries);
         var written = Assert.Single(repository.WrittenCandleSeries);
@@ -409,7 +415,68 @@ public sealed class TimescaleMarketDataCacheAsideTests
         Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, result.Error!.Code);
         Assert.Contains("iBeam", result.Error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, provider.TryGetCandlesCalls);
-        Assert.Single(repository.CandleQueries);
+        Assert.Equal(2, repository.CandleQueries.Count);
+        Assert.Empty(repository.WrittenCandleSeries);
+    }
+
+    [Fact]
+    public async Task TryGetCandlesReturnsStorageUnavailableWhenTimescaleReadFailsAndProviderCannotRefresh()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 30, 0, TimeSpan.Zero);
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            ThrowStorageUnavailableOnCandleRead = true,
+        };
+        var provider = new RecordingMarketDataProvider
+        {
+            CandleError = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market data is unavailable; retry later."),
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var result = await service.GetCandlesAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Null(result.Value);
+        Assert.NotNull(result.Error);
+        Assert.Equal(MarketDataProviderErrorCodes.MarketDataStorageUnavailable, result.Error!.Code);
+        Assert.DoesNotContain("ConnectionStrings", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, provider.TryGetCandlesCalls);
+        Assert.Equal(2, repository.CandleQueries.Count);
+    }
+
+    [Fact]
+    public async Task TryGetCandlesReturnsLabeledStaleTimescaleSeriesWhenSafeProviderRefreshFails()
+    {
+        var now = new DateTimeOffset(2026, 4, 30, 17, 31, 0, TimeSpan.Zero);
+        var staleGeneratedAt = now.AddHours(-2);
+        var repository = new RecordingTimescaleMarketDataRepository
+        {
+            CandleSeries = CreateCandleSeries(staleGeneratedAt, source: "ibkr-history"),
+        };
+        var provider = new RecordingMarketDataProvider
+        {
+            CandleError = new MarketDataError(MarketDataProviderErrorCodes.ProviderUnavailable, "IBKR iBeam market data is unavailable; retry later."),
+        };
+        var service = CreateService(provider, repository, now, TimeSpan.FromMinutes(30));
+
+        var result = await service.GetCandlesAsync("AAPL", MarketDataTimeframes.OneDay, cancellationToken: CancellationToken.None);
+        var response = result.Value;
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Error);
+        Assert.NotNull(response);
+        Assert.Equal("timescale-cache:ibkr-history", response!.Source);
+        Assert.NotNull(response.SourceStatus);
+        Assert.Equal(MarketDataSourceFreshness.Stale, response.SourceStatus!.Freshness);
+        Assert.Equal("timescale-cache:ibkr-history", response.SourceStatus.Source);
+        Assert.Equal(staleGeneratedAt, response.GeneratedAt);
+        Assert.Equal(now, response.SourceStatus.RefreshAttemptedAtUtc);
+        Assert.NotNull(response.SourceStatus.RefreshError);
+        Assert.Equal(MarketDataProviderErrorCodes.ProviderUnavailable, response.SourceStatus.RefreshError!.Code);
+        Assert.Equal(1, provider.TryGetCandlesCalls);
+        Assert.Equal(2, repository.CandleQueries.Count);
+        Assert.Equal(now - TimeSpan.FromMinutes(30), repository.CandleQueries[0].FreshnessCutoffUtc);
+        Assert.Equal(DateTimeOffset.UnixEpoch, repository.CandleQueries[1].FreshnessCutoffUtc);
         Assert.Empty(repository.WrittenCandleSeries);
     }
 
@@ -535,6 +602,8 @@ public sealed class TimescaleMarketDataCacheAsideTests
 
         public TimescaleCandleSeries? CandleSeries { get; set; }
 
+        public bool ThrowStorageUnavailableOnCandleRead { get; set; }
+
         public List<TimescaleFreshTrendingSnapshotQuery> TrendingQueries { get; } = [];
 
         public List<TimescaleFreshCandleSeriesQuery> CandleQueries { get; } = [];
@@ -553,7 +622,14 @@ public sealed class TimescaleMarketDataCacheAsideTests
         public Task<TimescaleCandleSeries?> GetFreshCandleSeriesAsync(TimescaleFreshCandleSeriesQuery query, CancellationToken cancellationToken = default)
         {
             CandleQueries.Add(query);
-            return Task.FromResult(CandleSeries);
+            if (ThrowStorageUnavailableOnCandleRead)
+            {
+                throw new TimescaleMarketDataStorageUnavailableException("Simulated Timescale read failure.");
+            }
+
+            return Task.FromResult(CandleSeries is not null && CandleSeries.GeneratedAtUtc >= query.FreshnessCutoffUtc
+                ? CandleSeries
+                : null);
         }
 
         public Task UpsertTrendingSnapshotAsync(TimescaleTrendingSnapshot snapshot, CancellationToken cancellationToken = default)

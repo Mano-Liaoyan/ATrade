@@ -130,10 +130,17 @@ range; because the AppHost TimescaleDB data directory is volume-backed, those
 fresh rows can survive a full local
 AppHost reboot and be served without another IBKR/iBeam provider call. Missing or
 stale rows refresh from IBKR/iBeam, persist the provider response to TimescaleDB,
-and return the provider response. When iBeam is disabled, missing credentials,
-unauthenticated, timed out, or unreachable, a fresh persisted response can still serve the request; otherwise
-the API and frontend surface safe provider-not-configured/provider-unavailable
-states projected from the shared IBKR/iBeam readiness module instead of falling back to production mocks. Pinned instruments are backend-owned
+and return the provider response. If a safe refresh fails because the provider is
+rate-limited, temporarily unavailable, unavailable, not configured, or needs
+authentication, a compatible stale candle series can still render through
+`ATrade.Api`, but the payload carries `sourceStatus.freshness = "stale"`, the
+refresh error, and a visible frontend stale-cache label; stale content is never
+promoted to a fresh success. When no usable cache exists, the API and frontend
+surface distinct retry-friendly `provider-rate-limited`,
+`provider-service-unavailable`, `provider-not-configured`,
+`provider-unavailable`, `authentication-required`, and
+`market-data-storage-unavailable` states instead of falling back to production
+mocks or synthetic bars. Pinned instruments are backend-owned
 workspace preferences persisted in the volume-backed Compose-managed Postgres
 database through `ATrade.Workspaces` and surfaced to the frontend through
 `/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity; they

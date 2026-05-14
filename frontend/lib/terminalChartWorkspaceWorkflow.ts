@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import {
   ChartPollingFallbackMs,
   formatMarketDataSourceLabel,
+  formatStaleMarketDataSourceWarning,
   useSymbolChartWorkflow,
   type SymbolChartWorkflow,
   type SymbolChartWorkflowOptions,
@@ -15,6 +16,7 @@ import {
   CHART_RANGE_LABELS,
   SUPPORTED_CHART_RANGES,
   type ChartRange,
+  type MarketDataSourceStatus,
   type MarketDataSymbolIdentity,
 } from '../types/marketData';
 
@@ -40,6 +42,7 @@ export type TerminalChartWorkspaceViewModel = {
   candleSourceLabel: string;
   indicatorSourceLabel: string;
   latestUpdateSourceLabel: string | null;
+  staleCandleSourceWarning: string | null;
   streamLabel: string;
   streamTone: TerminalChartStreamTone;
   fallbackCopy: string;
@@ -73,7 +76,9 @@ export function useTerminalChartWorkspaceWorkflow(options: SymbolChartWorkflowOp
       symbol: chart.normalizedSymbol,
       chartRange: chart.chartRange,
       candlesSource: chart.candles?.source,
+      candlesSourceStatus: chart.candles?.sourceStatus,
       indicatorsSource: chart.indicators?.source,
+      indicatorsSourceStatus: chart.indicators?.sourceStatus,
       latestUpdateSource: chart.latestUpdate?.source,
       streamState: chart.streamState,
       identity: displayIdentity,
@@ -105,7 +110,9 @@ export function createTerminalChartWorkspaceViewModel({
   symbol,
   chartRange,
   candlesSource,
+  candlesSourceStatus,
   indicatorsSource,
+  indicatorsSourceStatus,
   latestUpdateSource,
   streamState,
   identity,
@@ -115,7 +122,9 @@ export function createTerminalChartWorkspaceViewModel({
   symbol: string;
   chartRange: ChartRange;
   candlesSource?: string | null;
+  candlesSourceStatus?: MarketDataSourceStatus | null;
   indicatorsSource?: string | null;
+  indicatorsSourceStatus?: MarketDataSourceStatus | null;
   latestUpdateSource?: string | null;
   streamState: SymbolChartWorkflow['streamState'];
   identity: NormalizedInstrumentIdentity | null;
@@ -129,9 +138,10 @@ export function createTerminalChartWorkspaceViewModel({
     chartRangeDescription: CHART_RANGE_DESCRIPTIONS[chartRange],
     supportedRanges: SUPPORTED_CHART_RANGES,
     rangeHelpCopy: TERMINAL_CHART_RANGE_HELP_COPY,
-    candleSourceLabel: formatMarketDataSourceLabel(candlesSource),
-    indicatorSourceLabel: formatMarketDataSourceLabel(indicatorsSource ?? candlesSource),
+    candleSourceLabel: formatMarketDataSourceLabel(candlesSource, candlesSourceStatus),
+    indicatorSourceLabel: formatMarketDataSourceLabel(indicatorsSource ?? candlesSource, indicatorsSourceStatus ?? candlesSourceStatus),
     latestUpdateSourceLabel: latestUpdateSource ? formatMarketDataSourceLabel(latestUpdateSource) : null,
+    staleCandleSourceWarning: formatStaleMarketDataSourceWarning(candlesSourceStatus),
     streamLabel: `Stream ${streamState}`,
     streamTone: getTerminalChartStreamTone(streamState),
     fallbackCopy: TERMINAL_CHART_HTTP_FALLBACK_COPY,

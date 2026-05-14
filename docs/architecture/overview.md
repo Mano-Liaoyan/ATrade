@@ -214,7 +214,10 @@ currency, and asset class where available. API cache-aside reads decide whether
 rows are fresh enough using `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`, return
 cache hits with `timescale-cache:{originalSource}` source metadata and identity
 metadata, optionally filter exact chart reads by provider/market query metadata,
-and refresh from the provider when rows are missing or stale. The Compose-managed `timescaledb`
+and refresh from the provider when rows are missing or stale. Compatible stale
+candle rows can be returned only as labeled stale cache after a safe provider
+refresh failure, with provider-neutral `sourceStatus` metadata and no synthetic
+bars. The Compose-managed `timescaledb`
 data directory is volume-backed with `ATRADE_TIMESCALEDB_DATA_VOLUME` (default
 `atrade-timescaledb-data`) and a stable `ATRADE_TIMESCALEDB_PASSWORD`, so fresh
 market-data cache rows survive a full local `start run` stop/start cycle when

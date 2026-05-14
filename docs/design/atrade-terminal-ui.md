@@ -242,18 +242,21 @@ implementation while leaving room for a desktop wrapper later.
   visible through a dedicated table scrollbar rather than clipping
   identity/action columns.
 - Panel content must remain honest about backend state: loading, provider
-  not-configured, provider unavailable, authentication required, no analysis
-  engine configured, no watchlist pins, and disabled module states each get
-  explicit copy.
+  not-configured, provider rate-limited, provider service unavailable, provider
+  unavailable, authentication required, market-data cache storage unavailable,
+  no analysis engine configured, no watchlist pins, and disabled module states
+  each get explicit copy.
 - The `CHART` workspace must reserve non-collapsing vertical space inside the
   scroll-owned workspace. `TerminalChartLandingModule` splits the Stored stocks
   selector and selected/default chart into module-owned scroll regions, and
   `TerminalChartWorkspace`, its chart region, the chart shell, and
   `.chart-container` keep explicit minimum heights; `CandlestickChart` measures
   the container, supplies `lightweight-charts` non-zero dimensions, and
-  resizes/refits after module or viewport layout changes. Empty candle responses
-  and provider-unavailable states render explicit status copy rather than a blank
-  or synthetic chart.
+  resizes/refits after module or viewport layout changes. Empty candle responses,
+  provider-unavailable/rate-limited/service-unavailable states, and stale
+  Timescale cache responses render explicit status copy rather than a blank or
+  synthetic chart; stale cache must show its `sourceStatus` warning and must not
+  be visually promoted to a fresh provider success.
 
 ### 6.2 Layout Persistence
 
@@ -315,7 +318,8 @@ implementation while leaving room for a desktop wrapper later.
   module-owned surfaces such as HOME, STATUS, HELP, chart/analysis headers, and
   market monitor rows rather than a persistent footer strip.
 - These surfaces must not show fabricated price ticks. If streaming or HTTP market
-  data is unavailable, show explicit stale/unavailable labels and retry
+  data is unavailable, rate-limited, temporarily service-unavailable, or only
+  backed by stale cache, show explicit stale/unavailable labels and retry
   affordances.
 - Paper-only/no-live-orders safety remains visible in module content when order
   or broker terms appear elsewhere on the screen; it is not a persistent

@@ -117,13 +117,27 @@ public sealed record OhlcvCandle(
     decimal Close,
     long Volume);
 
+public static class MarketDataSourceFreshness
+{
+    public const string Fresh = "fresh";
+    public const string Stale = "stale";
+}
+
+public sealed record MarketDataSourceStatus(
+    string Freshness,
+    string Source,
+    DateTimeOffset GeneratedAtUtc,
+    DateTimeOffset? RefreshAttemptedAtUtc = null,
+    MarketDataError? RefreshError = null);
+
 public sealed record CandleSeriesResponse(
     string Symbol,
     string Timeframe,
     DateTimeOffset GeneratedAt,
     IReadOnlyList<OhlcvCandle> Candles,
     string Source = "provider",
-    MarketDataSymbolIdentity? Identity = null);
+    MarketDataSymbolIdentity? Identity = null,
+    MarketDataSourceStatus? SourceStatus = null);
 
 public sealed record MovingAveragePoint(DateTimeOffset Time, decimal Sma20, decimal Sma50);
 
@@ -138,7 +152,8 @@ public sealed record IndicatorResponse(
     IReadOnlyList<RsiPoint> Rsi,
     IReadOnlyList<MacdPoint> Macd,
     string Source = "provider",
-    MarketDataSymbolIdentity? Identity = null);
+    MarketDataSymbolIdentity? Identity = null,
+    MarketDataSourceStatus? SourceStatus = null);
 
 public sealed record MarketDataUpdate(
     string Symbol,

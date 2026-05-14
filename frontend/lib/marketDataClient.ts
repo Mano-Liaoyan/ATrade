@@ -89,6 +89,18 @@ function formatMarketDataError(status: number, error: ApiErrorPayload | null): s
     return detail ? `IBKR market data is not configured. ${detail}` : 'IBKR market data is not configured.';
   }
 
+  if (error?.code === 'provider-rate-limited') {
+    return detail
+      ? `IBKR market data is rate limited. ${detail}`
+      : 'IBKR market data is rate limited; retry after the provider allows more requests.';
+  }
+
+  if (error?.code === 'provider-service-unavailable') {
+    return detail
+      ? `IBKR market data service is temporarily unavailable. ${detail}`
+      : 'IBKR market data service is temporarily unavailable; retry later.';
+  }
+
   if (error?.code === 'provider-unavailable') {
     return detail
       ? `IBKR market data is unavailable. ${detail}`
@@ -99,6 +111,12 @@ function formatMarketDataError(status: number, error: ApiErrorPayload | null): s
     return detail
       ? `IBKR authentication is required before market data can be loaded. ${detail}`
       : 'IBKR authentication is required before market data can be loaded.';
+  }
+
+  if (error?.code === 'market-data-storage-unavailable') {
+    return detail
+      ? `ATrade market-data cache is unavailable. ${detail}`
+      : 'ATrade market-data cache is unavailable; retry after storage recovers.';
   }
 
   if (error?.code === 'invalid-search-query' || error?.code === 'unsupported-asset-class' || error?.code === 'invalid-search-limit') {

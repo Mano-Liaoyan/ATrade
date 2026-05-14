@@ -344,9 +344,14 @@ static IResult ToMarketDataErrorResult(MarketDataError? error)
     return error.Code switch
     {
         MarketDataProviderErrorCodes.UnsupportedSymbol => Results.NotFound(error),
-        MarketDataProviderErrorCodes.ProviderNotConfigured or MarketDataProviderErrorCodes.ProviderUnavailable or MarketDataProviderErrorCodes.AuthenticationRequired => Results.Json(
-            error,
-            statusCode: StatusCodes.Status503ServiceUnavailable),
+        MarketDataProviderErrorCodes.ProviderRateLimited => Results.Json(error, statusCode: StatusCodes.Status429TooManyRequests),
+        MarketDataProviderErrorCodes.ProviderNotConfigured
+            or MarketDataProviderErrorCodes.ProviderUnavailable
+            or MarketDataProviderErrorCodes.ProviderServiceUnavailable
+            or MarketDataProviderErrorCodes.AuthenticationRequired
+            or MarketDataProviderErrorCodes.MarketDataStorageUnavailable => Results.Json(
+                error,
+                statusCode: StatusCodes.Status503ServiceUnavailable),
         _ => Results.BadRequest(error),
     };
 }

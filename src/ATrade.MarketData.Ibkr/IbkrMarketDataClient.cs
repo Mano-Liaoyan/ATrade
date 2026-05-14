@@ -211,10 +211,28 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
                 "IBKR iBeam rejected the market-data request because the session is not authenticated.");
         }
 
+        if (response.StatusCode is HttpStatusCode.TooManyRequests)
+        {
+            throw new IbkrMarketDataProviderException(
+                MarketDataProviderErrorCodes.ProviderRateLimited,
+                FormatProviderHttpFailure("IBKR iBeam market-data endpoint is rate limited; retry after the provider allows more requests.", redactedBody));
+        }
+
+        if (response.StatusCode is HttpStatusCode.ServiceUnavailable)
+        {
+            throw new IbkrMarketDataProviderException(
+                MarketDataProviderErrorCodes.ProviderServiceUnavailable,
+                FormatProviderHttpFailure("IBKR iBeam market-data endpoint is temporarily unavailable; retry later.", redactedBody));
+        }
+
         throw new IbkrMarketDataProviderException(
             MarketDataProviderErrorCodes.ProviderUnavailable,
             $"IBKR iBeam market-data endpoint returned {(int)response.StatusCode} {response.ReasonPhrase}: {redactedBody}".Trim());
     }
+
+    private static string FormatProviderHttpFailure(string safeMessage, string redactedBody) => string.IsNullOrWhiteSpace(redactedBody)
+        ? safeMessage
+        : $"{safeMessage} Response details: {redactedBody}";
 
     private static string SanitizeResponseBody(string body)
     {
@@ -226,8 +244,8 @@ public sealed class IbkrMarketDataClient(HttpClient httpClient) : IIbkrMarketDat
         var redacted = Regex.Replace(body, @"(?i)(set-cookie\s*:\s*)[^\r\n<]+", "$1[redacted]");
         return Regex.Replace(
             redacted,
-            @"(?i)\b(password|passwd|pwd|token|session|sessionid|cookie|authorization|api[_-]?key)\b(\s*[:=]\s*)['""']?[^'""'\s<>&;]+",
-            "$1$2[redacted]");
+            @"(?i)(['""']?\b(?:password|passwd|pwd|token|session|sessionid|cookie|authorization|api[_-]?key)\b['""']?\s*[:=]\s*)['""']?[^'""'\s<>&;,}\]]+['""']?",
+            "$1[redacted]");
     }
 
     private static IEnumerable<JsonElement> EnumerateResultItems(JsonElement root)

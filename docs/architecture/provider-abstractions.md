@@ -134,10 +134,14 @@ Core types:
   fields for exact handoff. Search results, trending symbols, candle series,
   indicators, and latest updates carry `MarketDataSymbolIdentity` where provider
   metadata is available while preserving the existing symbol/source fields for
-  callers that only know a bare symbol. A `CandleSeriesResponse` with an empty
-  `candles` array is a truthful no-data result for the requested normalized chart
-  range; frontend chart surfaces must show explicit empty/provider states and
-  must not synthesize candles to make a chart appear. Downstream watchlist pins
+  callers that only know a bare symbol. `CandleSeriesResponse` and
+  `IndicatorResponse` may include provider-neutral `sourceStatus` metadata with
+  `freshness` (`fresh` / `stale`), the displayed source, the generated timestamp,
+  and an optional safe refresh error when cache-aside serves stale content after
+  a failed provider refresh. A `CandleSeriesResponse` with an empty `candles`
+  array is a truthful no-data result for the requested normalized chart range;
+  frontend chart surfaces must show explicit empty/provider states and must not
+  synthesize candles to make a chart appear. Downstream watchlist pins
   must treat this provider/market tuple as the exact instrument identity rather than collapsing
   results to a bare symbol or display name; `ATrade.Workspaces` delegates key
   construction to the backend identity helper and exposes provider-neutral
@@ -146,7 +150,11 @@ Core types:
   source ids, or `timescale-cache:{originalSource}` when a fresh persisted
   Timescale row serves the API response, including after a full AppHost restart
   when the row remains inside the configured freshness window on the
-  volume-backed TimescaleDB data directory. The Timescale persistence layer
+  volume-backed TimescaleDB data directory. Stale-compatible candle rows may use
+  the same cache source plus `sourceStatus.freshness = "stale"` only after a safe
+  refresh attempt fails; the refresh error must use ATrade error codes and safe
+  copy, not raw gateway URLs, account identifiers, tokens, cookies, or runtime
+  internals. The Timescale persistence layer
   stores provider metadata generically as `provider`, `provider_symbol_id`,
   symbol, exchange, currency, asset class, source, and timestamps, and exact
   read filters can use that metadata without changing the legacy
@@ -180,9 +188,13 @@ Compatibility layer:
   provider. In `ATrade.Api` it wraps the concrete provider-backed
   `MarketDataService` behind `IMarketDataService`, awaits fresh Timescale rows
   before provider calls for trending/candle/indicator inputs, keys candle rows by
-  normalized chart range, rejects stale or cadence-incompatible legacy range rows,
-  persists provider responses after cache misses, and preserves provider-neutral
-  endpoint payloads.
+  normalized chart range, rejects cadence-incompatible legacy range rows, attempts
+  provider refreshes for missing/stale rows, persists successful provider
+  responses after cache misses, and preserves provider-neutral endpoint payloads.
+  If a refresh fails with a safe retryable/unavailable provider error and a
+  compatible older candle series exists, the decorator may return that series as
+  stale cache with `sourceStatus` refresh metadata; it must not label stale rows
+  as fresh or fabricate bars.
   AppHost supplies `ConnectionStrings:timescaledb` from a volume-backed
   `timescaledb` resource so fresh persisted rows can survive full local AppHost
   reboots without changing API/frontend payloads.
@@ -192,7 +204,11 @@ Unavailable handling:
 - Providers report status through `MarketDataProviderStatus`.
 - `not-configured` maps to `provider-not-configured`.
 - `unavailable` maps to `provider-unavailable`.
-- rejected Client Portal requests caused by unauthenticated iBeam sessions may
+- Provider HTTP 429 maps to `provider-rate-limited` and HTTP 503 maps to
+  `provider-service-unavailable`; the API returns HTTP 429 for the former and
+  HTTP 503 for provider unavailable/not-configured/authentication/service
+  unavailable and `market-data-storage-unavailable` states.
+- Rejected Client Portal requests caused by unauthenticated iBeam sessions may
   surface `authentication-required` while still avoiding fake data.
 - Async read services return these safe errors through `MarketDataReadResult<T>`;
   provider tasks must not silently fall back to synthetic data when iBeam is
