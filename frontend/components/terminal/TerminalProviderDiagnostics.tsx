@@ -17,7 +17,7 @@ export type TerminalProviderDiagnosticsProps = {
 export function TerminalProviderDiagnostics({
   analysisStateLabel = 'Provider-neutral analysis discovery through ATrade.Api',
   marketDataSourceLabel = 'Market-data source labels are surfaced on chart and monitor payloads',
-  signalRStateLabel = 'SignalR state is reported inside active chart workspaces',
+  signalRStateLabel = 'Global workspace status owns stream connectivity; modules show only local stream state when needed',
 }: TerminalProviderDiagnosticsProps) {
   const [status, setStatus] = useState<BrokerStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,7 +93,7 @@ export function TerminalProviderDiagnostics({
           <DiagnosticItem label="IBKR/iBeam state" value={status?.state ?? (error ? 'unavailable' : 'checking')} detail={`Connected ${formatBoolean(status?.connected)} · authenticated ${formatBoolean(status?.authenticated)} · competing ${formatBoolean(status?.competing)}`} />
           <DiagnosticItem label="Paper mode" value={status?.mode ?? 'paper'} detail="Paper-only status is shown without account identifiers or credential prompts." />
           <DiagnosticItem label="Market data source" value={marketDataSourceLabel} detail="Chart, monitor, candles, indicators, and Timescale cache labels remain payload-owned." />
-          <DiagnosticItem label="SignalR stream" value={signalRStateLabel} detail="HTTP polling fallback remains visible when stream state is closed or unavailable." />
+          <DiagnosticItem label="Workspace stream" value={signalRStateLabel} detail="HTTP polling fallback remains visible when stream state is closed or unavailable." />
           <DiagnosticItem label="Analysis provider" value={analysisStateLabel} detail="No-engine and runtime-unavailable states are explicit; no fake signals are generated." />
           <DiagnosticItem label="Order placement capability" value={status?.capabilities.supportsBrokerOrderPlacement ? 'provider reports enabled' : 'disabled'} detail="Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes." />
           <DiagnosticItem label="Credential UI" value="not rendered" detail="Secrets, account identifiers, tokens, cookies, gateway URLs, and session values stay out of the browser UI." />

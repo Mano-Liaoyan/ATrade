@@ -201,6 +201,10 @@ assert_purpose_built_module_guardrails() {
   run_static_validation_script "$repo_root/tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh"
 }
 
+assert_global_signalr_status_guardrails() {
+  run_static_validation_script "$repo_root/tests/apphost/frontend-global-signalr-status-tests.sh"
+}
+
 assert_provider_runtime_independent_validation() {
   local validation_scripts=(
     "${BASH_SOURCE[0]}"
@@ -237,6 +241,7 @@ main() {
   assert_layout_visibility_guardrails
   assert_chart_landing_default_guardrails
   assert_purpose_built_module_guardrails
+  assert_global_signalr_status_guardrails
   assert_provider_runtime_independent_validation
 
   printf 'frontend terminal consolidated regression validation passed.\n'
