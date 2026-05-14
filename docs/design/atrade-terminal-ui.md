@@ -264,6 +264,18 @@ implementation while leaving room for a desktop wrapper later.
   paragraphs do not live in the chart footer; the footer is limited to compact
   operational/read-only copy. IBKR `conid` remains provider-symbol-id alias
   metadata, not an additional identity dimension.
+- The `BACKTEST` workspace is a progressive saved-run workflow, not a compact
+  all-at-once form. Its task order is effective capital, selected instrument
+  and range, strategy setup, advanced cost/slippage/benchmark settings, create
+  saved run, live selected-run status, saved history, saved run detail, and
+  completed-run comparison. Required inputs and the primary create action should
+  be visually prominent; advanced inputs are grouped after strategy setup but
+  never hide the saved-run context. Status, history, detail, and comparison
+  render only ATrade.Api saved run envelopes; queued/running/failed/cancelled
+  runs stay visible but cannot be compared until a completed persisted result
+  and equity curve exist. Cancel/retry actions stay on the selected-run status
+  panel, and retry creates a new saved run. The module must not add order,
+  export, optimization, custom-code, or live-trading controls.
 
 ### 6.2 Layout Persistence
 

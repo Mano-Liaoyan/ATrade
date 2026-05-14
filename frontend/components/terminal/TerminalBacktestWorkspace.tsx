@@ -83,8 +83,15 @@ export function TerminalBacktestWorkspace({
         <BacktestRunForm workflow={workflow} />
         <BacktestLiveStatusPanel workflow={workflow} />
         <BacktestHistoryPanel workflow={workflow} />
-        <BacktestComparisonPanel workflow={workflow} />
         <BacktestRunDetailPanel workflow={workflow} />
+        <section className="terminal-backtest-step" data-testid="backtest-step-comparison" aria-labelledby="backtest-step-comparison-title">
+          <div className="terminal-backtest-step__header">
+            <span>Step 09</span>
+            <h2 id="backtest-step-comparison-title">Completed-run comparison</h2>
+            <p>Select only completed saved runs with persisted result envelopes; no incomplete, fake, or synthetic results are eligible.</p>
+          </div>
+          <BacktestComparisonPanel workflow={workflow} />
+        </section>
         <BacktestTruthfulStatesPanel />
       </TerminalPanel>
     </section>
@@ -97,7 +104,13 @@ function BacktestCapitalPanel({ workflow }: { workflow: TerminalBacktestWorkflow
   const sourceTone = workflow.capital?.source === 'unavailable' || workflow.capitalError ? 'warning' : 'success';
 
   return (
-    <div className="terminal-backtest-capital" data-testid="backtest-capital-panel">
+    <section className="terminal-backtest-step terminal-backtest-capital" data-testid="backtest-step-capital" aria-labelledby="backtest-step-capital-title">
+      <div className="terminal-backtest-step__header">
+        <span>Step 01</span>
+        <h2 id="backtest-step-capital-title">Effective capital</h2>
+        <p>Confirm the paper-capital snapshot that ATrade.Api will attach to any new saved backtest run.</p>
+      </div>
+      <div className="terminal-backtest-step__body" data-testid="backtest-capital-panel">
       <div className="terminal-backtest-capital__status">
         <TerminalMetadataGrid
           ariaLabel="Backtest paper-capital source metadata"
@@ -181,7 +194,8 @@ function BacktestCapitalPanel({ workflow }: { workflow: TerminalBacktestWorkflow
           ))}
         </ul>
       ) : null}
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -199,7 +213,13 @@ function BacktestRunDetailPanel({ workflow }: { workflow: TerminalBacktestWorkfl
   const result = run?.result ?? null;
 
   return (
-    <div className="terminal-backtest-detail" data-testid="backtest-run-detail">
+    <section className="terminal-backtest-step terminal-backtest-detail" data-testid="backtest-step-detail" aria-labelledby="backtest-step-detail-title">
+      <div className="terminal-backtest-step__header">
+        <span>Step 08</span>
+        <h2 id="backtest-step-detail-title">Saved run detail</h2>
+        <p>Inspect exactly one saved run envelope from ATrade.Api; result fields appear only when persisted by the backend.</p>
+      </div>
+      <div className="terminal-backtest-step__body" data-testid="backtest-run-detail">
       <div className="terminal-backtest-detail__header">
         <TerminalMetadataGrid
           ariaLabel="Selected saved backtest run metadata"
@@ -240,29 +260,30 @@ function BacktestRunDetailPanel({ workflow }: { workflow: TerminalBacktestWorkfl
             <Metric label="Win rate" value={result.backtest ? `${result.backtest.winRatePercent.toFixed(1)}%` : 'n/a'} />
           </div>
 
-          <TerminalMetadataGrid
-            ariaLabel="Saved backtest result source metadata"
-            className="terminal-backtest-detail__source"
-            columns={2}
-            items={[
-              {
-                detail: `${result.engine.provider} · ${result.engine.version} · ${result.engine.state}`,
-                label: 'Engine',
-                value: result.engine.displayName,
-              },
-              {
-                detail: `${result.source.provider} · generated ${formatDateTime(result.source.generatedAtUtc)}`,
-                label: 'Market data source',
-                value: result.source.marketDataSource,
-              },
-              {
-                detail: `${result.symbol.providerSymbolId ?? 'no provider id'} · ${result.symbol.exchange || 'market unavailable'} · ${result.symbol.currency} · ${result.symbol.assetClass}`,
-                label: 'Symbol metadata',
-                value: `${result.symbol.symbol} · ${result.symbol.provider.toUpperCase()}`,
-              },
-            ]}
-            testId="backtest-source-metadata"
-          />
+          <div data-testid="backtest-source-metadata">
+            <TerminalMetadataGrid
+              ariaLabel="Saved backtest result source metadata"
+              className="terminal-backtest-detail__source"
+              columns={2}
+              items={[
+                {
+                  detail: `${result.engine.provider} · ${result.engine.version} · ${result.engine.state}`,
+                  label: 'Engine',
+                  value: result.engine.displayName,
+                },
+                {
+                  detail: `${result.source.provider} · generated ${formatDateTime(result.source.generatedAtUtc)}`,
+                  label: 'Market data source',
+                  value: result.source.marketDataSource,
+                },
+                {
+                  detail: `${result.symbol.providerSymbolId ?? 'no provider id'} · ${result.symbol.exchange || 'market unavailable'} · ${result.symbol.currency} · ${result.symbol.assetClass}`,
+                  label: 'Symbol metadata',
+                  value: `${result.symbol.symbol} · ${result.symbol.provider.toUpperCase()}`,
+                },
+              ]}
+            />
+          </div>
 
           <div className="terminal-backtest-detail__benchmark" data-testid="backtest-benchmark-summary">
             <span>Benchmark</span>
@@ -278,7 +299,8 @@ function BacktestRunDetailPanel({ workflow }: { workflow: TerminalBacktestWorkfl
           </div>
         </div>
       ) : null}
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -333,7 +355,13 @@ function BacktestTradeList({ run }: { run: BacktestRunEnvelope }) {
 
 function BacktestHistoryPanel({ workflow }: { workflow: TerminalBacktestWorkflow }) {
   return (
-    <div className="terminal-backtest-history" data-testid="backtest-run-history">
+    <section className="terminal-backtest-step terminal-backtest-history" data-testid="backtest-step-history" aria-labelledby="backtest-step-history-title">
+      <div className="terminal-backtest-step__header">
+        <span>Step 07</span>
+        <h2 id="backtest-step-history-title">Saved history</h2>
+        <p>Choose from truthful saved run envelopes returned by GET /api/backtests; empty history stays empty.</p>
+      </div>
+      <div className="terminal-backtest-step__body" data-testid="backtest-run-history">
       <div className="terminal-backtest-history__header">
         <div>
           <span>Saved run history</span>
@@ -404,7 +432,8 @@ function BacktestHistoryPanel({ workflow }: { workflow: TerminalBacktestWorkflow
           })}
         </div>
       )}
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -415,7 +444,13 @@ function BacktestLiveStatusPanel({ workflow }: { workflow: TerminalBacktestWorkf
   const explicitUnavailable = getExplicitUnavailableMessage(run) ?? workflow.streamError ?? workflow.historyError ?? workflow.detailError;
 
   return (
-    <div className="terminal-backtest-live" data-testid="backtest-live-status-panel">
+    <section className="terminal-backtest-step terminal-backtest-live" data-testid="backtest-step-live-status" aria-labelledby="backtest-step-live-status-title">
+      <div className="terminal-backtest-step__header">
+        <span>Step 06</span>
+        <h2 id="backtest-step-live-status-title">Live selected-run status</h2>
+        <p>Keep the selected saved run visible across queued, running, completed, failed, and cancelled states while SignalR reconnects through HTTP refresh.</p>
+      </div>
+      <div className="terminal-backtest-step__body" data-testid="backtest-live-status-panel">
       <div className="terminal-backtest-live__header">
         <TerminalMetadataGrid
           ariaLabel="Live saved backtest run status metadata"
@@ -496,7 +531,8 @@ function BacktestLiveStatusPanel({ workflow }: { workflow: TerminalBacktestWorkf
         </Button>
         <span>{workflow.signalRCopy}</span>
       </div>
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -508,144 +544,175 @@ function BacktestRunForm({ workflow }: { workflow: TerminalBacktestWorkflow }) {
       className="terminal-backtest-form"
       data-testid="backtest-run-form"
     >
-      <div className="terminal-backtest-form__grid">
-        <label className="terminal-field">
-          <span>Single stock symbol</span>
-          <Input
-            aria-invalid={Boolean(workflow.validation.fieldErrors.symbol)}
-            data-testid="backtest-symbol-input"
-            maxLength={32}
-            onChange={(event) => workflow.setSymbol(event.target.value)}
-            placeholder="AAPL"
-            value={workflow.symbol}
-          />
-          <small>{workflow.validation.fieldErrors.symbol ?? 'One symbol only; exact identity is preserved when opened from chart or market monitor.'}</small>
-        </label>
-
-        <label className="terminal-field">
-          <span>Chart range</span>
-          <select
-            className="terminal-select"
-            data-testid="backtest-chart-range-select"
-            onChange={(event) => workflow.setChartRange(event.target.value as ChartRange)}
-            value={workflow.chartRange}
-          >
-            {SUPPORTED_CHART_RANGES.map((range) => (
-              <option key={range} value={range}>{range}</option>
-            ))}
-          </select>
-          <small>{workflow.chartRangeDescription}</small>
-        </label>
-
-        <label className="terminal-field">
-          <span>Strategy</span>
-          <select
-            className="terminal-select"
-            data-testid="backtest-strategy-select"
-            onChange={(event) => workflow.setStrategyId(event.target.value as typeof workflow.strategyId)}
-            value={workflow.strategyId}
-          >
-            {workflow.strategies.map((strategy) => (
-              <option key={strategy.id} value={strategy.id}>{strategy.displayName}</option>
-            ))}
-          </select>
-          <small>{workflow.strategyDefinition.description}</small>
-        </label>
-      </div>
-
-      <div className="terminal-backtest-form__parameters" data-testid="backtest-parameter-fields">
-        {workflow.strategyDefinition.parameters.map((parameter) => {
-          const fieldError = workflow.validation.fieldErrors[`parameter:${parameter.name}`];
-          return (
-            <label className="terminal-field" key={parameter.name}>
-              <span>{parameter.displayName}</span>
-              <Input
-                aria-invalid={Boolean(fieldError)}
-                data-testid={`backtest-parameter-${parameter.name}`}
-                inputMode="decimal"
-                min={parameter.minimumValue}
-                max={parameter.maximumValue}
-                onChange={(event) => workflow.setParameterValue(parameter.name, event.target.value)}
-                step={parameter.valueType === 'integer' ? 1 : 0.01}
-                type="number"
-                value={workflow.parameterValues[parameter.name] ?? ''}
-              />
-              <small>{fieldError ?? parameter.description}</small>
-            </label>
-          );
-        })}
-      </div>
-
-      <div className="terminal-backtest-form__costs" data-testid="backtest-cost-fields">
-        <label className="terminal-field">
-          <span>Commission / trade</span>
-          <Input
-            aria-invalid={Boolean(workflow.validation.fieldErrors.commissionPerTrade)}
-            data-testid="backtest-commission-per-trade-input"
-            inputMode="decimal"
-            min={0}
-            onChange={(event) => workflow.setCommissionPerTrade(event.target.value)}
-            step="0.01"
-            type="number"
-            value={workflow.commissionPerTrade}
-          />
-          <small>{workflow.validation.fieldErrors.commissionPerTrade ?? 'Flat simulated commission per completed trade.'}</small>
-        </label>
-        <label className="terminal-field">
-          <span>Commission bps</span>
-          <Input
-            aria-invalid={Boolean(workflow.validation.fieldErrors.commissionBps)}
-            data-testid="backtest-commission-bps-input"
-            inputMode="decimal"
-            min={0}
-            onChange={(event) => workflow.setCommissionBps(event.target.value)}
-            step="0.01"
-            type="number"
-            value={workflow.commissionBps}
-          />
-          <small>{workflow.validation.fieldErrors.commissionBps ?? 'Basis-point simulated commission input.'}</small>
-        </label>
-        <label className="terminal-field">
-          <span>Slippage bps</span>
-          <Input
-            aria-invalid={Boolean(workflow.validation.fieldErrors.slippageBps)}
-            data-testid="backtest-slippage-bps-input"
-            inputMode="decimal"
-            min={0}
-            onChange={(event) => workflow.setSlippageBps(event.target.value)}
-            step="0.01"
-            type="number"
-            value={workflow.slippageBps}
-          />
-          <small>{workflow.validation.fieldErrors.slippageBps ?? 'Basis-point simulated slippage input.'}</small>
-        </label>
-        <label className="terminal-field">
-          <span>Benchmark</span>
-          <select
-            className="terminal-select"
-            data-testid="backtest-benchmark-select"
-            onChange={(event) => workflow.setBenchmarkMode(event.target.value as typeof workflow.benchmarkMode)}
-            value={workflow.benchmarkMode}
-          >
-            <option value="buy-and-hold">Buy and hold</option>
-            <option value="none">None</option>
-          </select>
-          <small>Optional buy-and-hold benchmark result envelope.</small>
-        </label>
-      </div>
-
-      {firstError ? (
-        <div className="terminal-backtest-workspace__alert" data-testid="backtest-form-error" role="alert">
-          {firstError}
+      <section className="terminal-backtest-step terminal-backtest-step--form" data-testid="backtest-step-instrument" aria-labelledby="backtest-step-instrument-title">
+        <div className="terminal-backtest-step__header">
+          <span>Step 02</span>
+          <h2 id="backtest-step-instrument-title">Selected instrument</h2>
+          <p>Required inputs identify the single stock and chart range sent to ATrade.Api for a saved run.</p>
         </div>
-      ) : null}
+        <div className="terminal-backtest-form__grid" data-testid="backtest-required-inputs" aria-label="Required backtest inputs">
+          <label className="terminal-field">
+            <span>Single stock symbol</span>
+            <Input
+              aria-invalid={Boolean(workflow.validation.fieldErrors.symbol)}
+              data-testid="backtest-symbol-input"
+              maxLength={32}
+              onChange={(event) => workflow.setSymbol(event.target.value)}
+              placeholder="AAPL"
+              value={workflow.symbol}
+            />
+            <small>{workflow.validation.fieldErrors.symbol ?? 'One symbol only; exact identity is preserved when opened from chart or market monitor.'}</small>
+          </label>
 
-      <div className="terminal-backtest-form__actions">
-        <Button data-testid="backtest-create-run-button" disabled={!workflow.canCreateRun} onClick={() => void workflow.createRun()} type="button" variant="amber">
-          {workflow.creatingRun ? 'Creating run…' : 'Create backtest run'}
-        </Button>
-        <span>{workflow.signalRCopy}</span>
-      </div>
+          <label className="terminal-field">
+            <span>Chart range</span>
+            <select
+              className="terminal-select"
+              data-testid="backtest-chart-range-select"
+              onChange={(event) => workflow.setChartRange(event.target.value as ChartRange)}
+              value={workflow.chartRange}
+            >
+              {SUPPORTED_CHART_RANGES.map((range) => (
+                <option key={range} value={range}>{range}</option>
+              ))}
+            </select>
+            <small>{workflow.chartRangeDescription}</small>
+          </label>
+        </div>
+      </section>
+
+      <section className="terminal-backtest-step terminal-backtest-step--form" data-testid="backtest-step-strategy" aria-labelledby="backtest-step-strategy-title">
+        <div className="terminal-backtest-step__header">
+          <span>Step 03</span>
+          <h2 id="backtest-step-strategy-title">Strategy setup</h2>
+          <p>Choose one built-in strategy and tune only its bounded, provider-neutral parameters.</p>
+        </div>
+        <div className="terminal-backtest-form__grid" data-testid="backtest-strategy-setup" aria-label="Backtest strategy setup">
+          <label className="terminal-field">
+            <span>Strategy</span>
+            <select
+              className="terminal-select"
+              data-testid="backtest-strategy-select"
+              onChange={(event) => workflow.setStrategyId(event.target.value as typeof workflow.strategyId)}
+              value={workflow.strategyId}
+            >
+              {workflow.strategies.map((strategy) => (
+                <option key={strategy.id} value={strategy.id}>{strategy.displayName}</option>
+              ))}
+            </select>
+            <small>{workflow.strategyDefinition.description}</small>
+          </label>
+        </div>
+
+        <div className="terminal-backtest-form__parameters" data-testid="backtest-parameter-fields">
+          {workflow.strategyDefinition.parameters.map((parameter) => {
+            const fieldError = workflow.validation.fieldErrors[`parameter:${parameter.name}`];
+            return (
+              <label className="terminal-field" key={parameter.name}>
+                <span>{parameter.displayName}</span>
+                <Input
+                  aria-invalid={Boolean(fieldError)}
+                  data-testid={`backtest-parameter-${parameter.name}`}
+                  inputMode="decimal"
+                  min={parameter.minimumValue}
+                  max={parameter.maximumValue}
+                  onChange={(event) => workflow.setParameterValue(parameter.name, event.target.value)}
+                  step={parameter.valueType === 'integer' ? 1 : 0.01}
+                  type="number"
+                  value={workflow.parameterValues[parameter.name] ?? ''}
+                />
+                <small>{fieldError ?? parameter.description}</small>
+              </label>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="terminal-backtest-step terminal-backtest-step--form" data-testid="backtest-step-advanced" aria-labelledby="backtest-step-advanced-title">
+        <div className="terminal-backtest-step__header">
+          <span>Step 04</span>
+          <h2 id="backtest-step-advanced-title">Advanced settings</h2>
+          <p>Cost, slippage, and benchmark settings are grouped after required inputs so the primary saved-run path stays clear.</p>
+        </div>
+        <div className="terminal-backtest-form__costs" data-testid="backtest-advanced-settings" aria-label="Cost, slippage, and benchmark settings">
+          <label className="terminal-field">
+            <span>Commission / trade</span>
+            <Input
+              aria-invalid={Boolean(workflow.validation.fieldErrors.commissionPerTrade)}
+              data-testid="backtest-commission-per-trade-input"
+              inputMode="decimal"
+              min={0}
+              onChange={(event) => workflow.setCommissionPerTrade(event.target.value)}
+              step="0.01"
+              type="number"
+              value={workflow.commissionPerTrade}
+            />
+            <small>{workflow.validation.fieldErrors.commissionPerTrade ?? 'Flat simulated commission per completed trade.'}</small>
+          </label>
+          <label className="terminal-field">
+            <span>Commission bps</span>
+            <Input
+              aria-invalid={Boolean(workflow.validation.fieldErrors.commissionBps)}
+              data-testid="backtest-commission-bps-input"
+              inputMode="decimal"
+              min={0}
+              onChange={(event) => workflow.setCommissionBps(event.target.value)}
+              step="0.01"
+              type="number"
+              value={workflow.commissionBps}
+            />
+            <small>{workflow.validation.fieldErrors.commissionBps ?? 'Basis-point simulated commission input.'}</small>
+          </label>
+          <label className="terminal-field">
+            <span>Slippage bps</span>
+            <Input
+              aria-invalid={Boolean(workflow.validation.fieldErrors.slippageBps)}
+              data-testid="backtest-slippage-bps-input"
+              inputMode="decimal"
+              min={0}
+              onChange={(event) => workflow.setSlippageBps(event.target.value)}
+              step="0.01"
+              type="number"
+              value={workflow.slippageBps}
+            />
+            <small>{workflow.validation.fieldErrors.slippageBps ?? 'Basis-point simulated slippage input.'}</small>
+          </label>
+          <label className="terminal-field">
+            <span>Benchmark</span>
+            <select
+              className="terminal-select"
+              data-testid="backtest-benchmark-select"
+              onChange={(event) => workflow.setBenchmarkMode(event.target.value as typeof workflow.benchmarkMode)}
+              value={workflow.benchmarkMode}
+            >
+              <option value="buy-and-hold">Buy and hold</option>
+              <option value="none">None</option>
+            </select>
+            <small>Optional buy-and-hold benchmark result envelope.</small>
+          </label>
+        </div>
+      </section>
+
+      <section className="terminal-backtest-step terminal-backtest-step--create" data-testid="backtest-step-create" aria-labelledby="backtest-step-create-title">
+        <div className="terminal-backtest-step__header">
+          <span>Step 05</span>
+          <h2 id="backtest-step-create-title">Create saved run</h2>
+          <p>The primary action queues a saved backtest run through ATrade.Api; the live selected-run panel below owns status after creation.</p>
+        </div>
+
+        {firstError ? (
+          <div className="terminal-backtest-workspace__alert" data-testid="backtest-form-error" role="alert">
+            {firstError}
+          </div>
+        ) : null}
+
+        <div className="terminal-backtest-form__actions">
+          <Button data-testid="backtest-create-run-button" disabled={!workflow.canCreateRun} onClick={() => void workflow.createRun()} type="button" variant="amber">
+            {workflow.creatingRun ? 'Creating run…' : 'Create backtest run'}
+          </Button>
+          <span>{workflow.signalRCopy}</span>
+        </div>
+      </section>
     </div>
   );
 }
