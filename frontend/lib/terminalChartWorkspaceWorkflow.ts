@@ -21,7 +21,7 @@ import {
 } from '../types/marketData';
 
 export const TERMINAL_CHART_RANGE_HELP_COPY = 'Lookback from now: 1D = past day, 1m = past month, 6m = past six months.';
-export const TERMINAL_CHART_HTTP_FALLBACK_COPY = 'SignalR applies market-data updates when /hubs/market-data is reachable; if streaming is unavailable the view falls back to HTTP polling without synthetic data.';
+export const TERMINAL_CHART_HTTP_FALLBACK_COPY = 'Workspace streaming updates apply when available; if streaming is unavailable the chart view falls back to HTTP polling without synthetic data.';
 export const TERMINAL_CHART_NO_ORDER_COPY = 'Chart and analysis workspaces are read-only: no order-entry, simulated-submit, or broker-routing controls are available.';
 
 export type TerminalChartStreamTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
@@ -142,7 +142,7 @@ export function createTerminalChartWorkspaceViewModel({
     indicatorSourceLabel: formatMarketDataSourceLabel(indicatorsSource ?? candlesSource, indicatorsSourceStatus ?? candlesSourceStatus),
     latestUpdateSourceLabel: latestUpdateSource ? formatMarketDataSourceLabel(latestUpdateSource) : null,
     staleCandleSourceWarning: formatStaleMarketDataSourceWarning(candlesSourceStatus),
-    streamLabel: `SignalR ${streamState}`,
+    streamLabel: `Stream ${streamState}`,
     streamTone: getTerminalChartStreamTone(streamState),
     fallbackCopy: TERMINAL_CHART_HTTP_FALLBACK_COPY,
     noOrderCopy: TERMINAL_CHART_NO_ORDER_COPY,

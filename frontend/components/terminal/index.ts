@@ -13,3 +13,4 @@ export * from "./TerminalStatusBadge";
 export * from "./TerminalStatusModule";
 export * from "./TerminalSurface";
 export * from "./TerminalWorkspaceLayout";
+export * from "./TerminalWorkspaceStatusIndicator";

@@ -17,7 +17,7 @@ export function TerminalInstrumentHeader({ chart }: TerminalInstrumentHeaderProp
       density="compact"
       eyebrow="Instrument"
       title={`${chart.normalizedSymbol} · ${chart.view.chartRangeLabel} lookback`}
-      description="Dense chart workspace header with exact identity, source labels, SignalR state, HTTP fallback, and lookback range controls."
+      description="Dense chart workspace header with exact identity, source labels, stream state, HTTP fallback, and lookback range controls."
       actions={(
         <div className="terminal-instrument-header__actions">
           <TerminalStatusBadge tone={chart.view.streamTone}>{chart.view.streamLabel}</TerminalStatusBadge>

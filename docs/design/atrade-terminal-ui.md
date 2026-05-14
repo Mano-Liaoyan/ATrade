@@ -120,7 +120,7 @@ backend cannot supply.
 | `CHART` | Stored-stock chart landing plus dense chart workspace: `/chart` loads backend-owned watchlist pins, shows a Stored stocks selector, defaults to the first stored instrument when available, and `/chart/{symbol}` renders an exact symbol/identity with candlesticks, volume, range controls, source labels, latest updates, and chart-to-analysis/backtest handoff. | `GET /api/workspace/watchlist` through `watchlistWorkflow`, `GET /api/market-data/{symbol}/candles?range=...`, `GET /api/market-data/{symbol}/indicators?range=...`, optional exact identity query metadata, `/hubs/market-data`, `symbolChartWorkflow`, and `TerminalChartLandingModule`. |
 | `ANALYSIS` | Provider-neutral analysis workspace that lists available engines, runs analysis over market-data bars, and surfaces explicit no-engine or runtime-unavailable states without fake signals. | `GET /api/analysis/engines`, `POST /api/analysis/run`, `ATrade.Analysis` result payloads, optional LEAN provider. |
 | `BACKTEST` | Saved single-symbol backtest workspace with exact instrument handoff, effective paper-capital panel, built-in strategy form, live run status, history/detail, completed-run-only comparison, metric table/cards, persisted strategy/buy-and-hold equity overlay, cancel, retry, and truthful empty/unavailable states without export or optimization controls. | `GET /api/accounts/paper-capital`, `PUT /api/accounts/local-paper-capital`, `POST /api/backtests`, `GET /api/backtests`, `GET /api/backtests/{id}`, cancel/retry endpoints, and `/hubs/backtests`. |
-| `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and explicit unavailable states. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata. |
+| `STATUS` | Operational status module for paper-mode broker readiness, provider/cache/source metadata, frontend/API health, and explicit unavailable states. The global top-right workspace indicator owns browser-visible SignalR/connectivity summary so module bodies do not duplicate global stream copy. | `GET /health`, `GET /api/broker/ibkr/status`, source metadata on market-data responses, analysis engine metadata, and the global workspace status projection backed by ATrade.Api health plus `/hubs/backtests`. |
 | `HELP` | In-product module/workflow reference, safety reminders, provider-state explanations, and direct-navigation guidance. | Static frontend content derived from this spec and active architecture docs; no backend data required. |
 
 Enabled modules share `frontend/lib/terminalModuleRegistry.ts` so rail entries,
@@ -292,22 +292,28 @@ implementation while leaving room for a desktop wrapper later.
 
 - `ATradeTerminalApp` no longer renders a persistent top brand header, product
   subtitle, or global visible paper-safety strip. The workspace begins with the
-  module rail and active module content so dense workflows get the full viewport.
+  module rail, a compact top-right SignalR/status indicator, and active module
+  content so dense workflows keep the full viewport.
 - Browser/API boundary copy, provider/runtime unavailable explanations, and
   no-order safety reminders live inside module-owned surfaces such as HOME,
   STATUS, HELP, disabled modules, chart/analysis headers, and market monitor
   state rows.
 - Future chrome must not reintroduce a command input, command prompt, command
-  grammar, command-first product tagline, or persistent top strip that consumes
-  workspace height.
+  grammar, command-first product tagline, or persistent top strip beyond the
+  compact top-right connectivity indicator.
 
 ### 6.5 Status And Safety Surfaces
 
+- The only global browser-visible stream/status chrome is the compact top-right
+  workspace indicator. It initializes immediately from deterministic local client
+  state, then refines after ATrade.Api health and hub checks; it distinguishes
+  connected, connecting, HTTP fallback, disconnected, cache/read degraded, and
+  unavailable states without provider/runtime identifiers.
 - Provider/source labels, cache freshness/source metadata, selected symbol
-  identity, backend health, and navigation status live inside module-owned
-  surfaces such as HOME, STATUS, HELP, chart/analysis headers, and market monitor
-  rows rather than a persistent footer strip.
-- These surfaces must not show fabricated price ticks. If SignalR or HTTP market
+  identity, backend health, and navigation status otherwise live inside
+  module-owned surfaces such as HOME, STATUS, HELP, chart/analysis headers, and
+  market monitor rows rather than a persistent footer strip.
+- These surfaces must not show fabricated price ticks. If streaming or HTTP market
   data is unavailable, rate-limited, temporarily service-unavailable, or only
   backed by stale cache, show explicit stale/unavailable labels and retry
   affordances.
