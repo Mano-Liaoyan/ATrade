@@ -897,6 +897,12 @@ select:focus-visible,
 
 
 .terminal-module-rail {
+  --terminal-rail-collapsed-target: 2.75rem;
+  --terminal-rail-focus-reserve: 0.25rem;
+  --terminal-rail-scrollbar-reserve: 0.85rem;
+  --terminal-rail-collapsed-inline-size: calc(
+    var(--terminal-rail-collapsed-target) + var(--terminal-rail-scrollbar-reserve) + 1.6rem
+  );
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   align-content: stretch;
@@ -913,8 +919,8 @@ select:focus-visible,
 }
 
 .terminal-module-rail--collapsed {
-  inline-size: 4.35rem;
-  min-inline-size: 4.35rem;
+  inline-size: var(--terminal-rail-collapsed-inline-size);
+  min-inline-size: var(--terminal-rail-collapsed-inline-size);
 }
 
 .terminal-module-rail__toggle {
@@ -1051,15 +1057,36 @@ select:focus-visible,
   white-space: nowrap;
 }
 
+.terminal-module-rail--collapsed .terminal-module-rail__navigation {
+  justify-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-block: var(--terminal-rail-focus-reserve);
+  padding-inline: var(--terminal-rail-focus-reserve) calc(var(--terminal-rail-scrollbar-reserve) + var(--terminal-rail-focus-reserve));
+  scroll-padding-block: var(--terminal-rail-focus-reserve);
+}
+
 .terminal-module-rail--collapsed .terminal-module-rail__item {
-  grid-template-columns: 2.2rem;
-  justify-content: center;
-  padding-inline: 0.48rem;
+  grid-template-columns: 1fr;
+  inline-size: var(--terminal-rail-collapsed-target);
+  min-block-size: var(--terminal-rail-collapsed-target);
+  place-items: center;
+  padding: 0;
 }
 
 .terminal-module-rail--collapsed .terminal-module-rail__toggle {
   grid-template-columns: 1fr;
-  justify-items: center;
+  inline-size: var(--terminal-rail-collapsed-target);
+  min-block-size: var(--terminal-rail-collapsed-target);
+  justify-self: center;
+  place-items: center;
+  padding: 0;
+}
+
+.terminal-module-rail--collapsed .terminal-module-rail__short {
+  inline-size: 2rem;
+  block-size: 2rem;
+  min-height: 0;
 }
 
 .terminal-module-rail--collapsed .terminal-module-rail__label,

@@ -287,7 +287,11 @@ implementation while leaving room for a desktop wrapper later.
 - The rail may collapse to an icon-first compact state on laptop/desktop
   screens. Collapse/expand must be a visible button with accessible state
   semantics; collapsed module labels remain available to assistive technology
-  and pointer users through visually hidden text and/or titles.
+  and pointer users through visually hidden text and/or titles. In the collapsed
+  desktop rail, the toggle and module icons sit in stable centered square hit
+  targets; the rail reserves room for its own scrollbar/focus affordances so
+  short, normal, and tall desktop viewport heights keep focus rings visible and
+  late disabled entries reachable instead of clipping icons at the rail edge.
 - Rail collapse state is non-sensitive, local UI state. It is not persisted to
   localStorage and does not reintroduce a command system, top app chrome, global
   safety strip, layout reset, or order-entry affordance.
