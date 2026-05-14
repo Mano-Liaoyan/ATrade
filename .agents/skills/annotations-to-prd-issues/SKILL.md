@@ -11,8 +11,8 @@ Use this skill to turn annotated feedback into planning artifacts only:
 
 1. Identify the annotation source: PR review annotations, inline code comments, screenshots, issue comments, local notes, or a supplied file.
 2. The parent agent runs the grilling session using `grill-with-docs` (**MUST TO DO**).
-3. After blockers are resolved, the parent sends a compact handoff to a fresh PRD subagent running `to-prd`. You must use `caveman` to make sure your prd instructions are minimal and complete.
-4. After the PRD subagent creates the PRD and GitHub issue, the parent sends that GitHub link plus prior decisions to a fresh issue subagent running `to-issues`. You must also use `caveman` to make sure your issue instructions are minimal and complete.
+3. After all the uncertainty are resolved, the parent sends a handoff to a fresh PRD subagent running `to-prd`. You **MUST** use `caveman` to make sure your prd instructions are minimal and complete.
+4. After the PRD subagent creates the PRD and the GitHub PRD issue, the parent sends that GitHub link plus prior decisions to a fresh issue subagent running `to-issues`. Make sure that this issue was assigned as a sub-issue of the PRD issue. You **MUST** also use `caveman` to make sure your issue instructions are minimal and complete.
 5. Stop. Do **NOT** implement fixes.
 
 ## Hard rules
@@ -24,6 +24,7 @@ Use this skill to turn annotated feedback into planning artifacts only:
 - The parent agent is responsible for user interaction, compact handoffs, subagent orchestration, and final status.
 - Ask the user only for information that cannot be discovered from annotations, repo docs, issue tracker context, or code exploration.
 - Ask blocking questions one at a time. Do not dump a long questionnaire.
+- Issues created by the issue subagent should be marked as a sub-issue of the PRD issue.
 - Preserve the project language from `CONTEXT.md`, `CONTEXT-MAP.md`, and ADRs. If terminology is missing or ambiguous, let `grill-with-docs` resolve it.
 
 </what-to-do>
