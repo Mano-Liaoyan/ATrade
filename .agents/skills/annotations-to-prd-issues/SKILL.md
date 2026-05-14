@@ -5,12 +5,12 @@ description: Convert annotated issue feedback into clarified requirements, a PRD
 
 # Annotations To PRD Issues
 
-## Quick start
+<what-to-do>
 
 Use this skill to turn annotated feedback into planning artifacts only:
 
 1. Identify the annotation source: PR review annotations, inline code comments, screenshots, issue comments, local notes, or a supplied file.
-2. The parent agent runs the grilling session using `grill-with-docs`.
+2. The parent agent runs the grilling session using `grill-with-docs` (**MUST TO DO**).
 3. After blockers are resolved, the parent sends a compact handoff to a fresh PRD subagent running `to-prd`. You must use `caveman` to make sure your prd instructions are minimal and complete.
 4. After the PRD subagent creates the PRD and GitHub issue, the parent sends that GitHub link plus prior decisions to a fresh issue subagent running `to-issues`. You must also use `caveman` to make sure your issue instructions are minimal and complete.
 5. Stop. Do **NOT** implement fixes.
@@ -19,11 +19,16 @@ Use this skill to turn annotated feedback into planning artifacts only:
 
 - No implementation during this workflow. Do not edit production code, tests, schemas, UI, or generated artifacts except documentation produced by the invoked planning skills.
 - The grilling session is managed by the **parent** agent, not a subagent.
+- The grilling session is a **MUST** to do, **ALWAYS** ask questions first you have something not quite understood.
 - PRD generation and issue generation each run in their own fresh subagent.
 - The parent agent is responsible for user interaction, compact handoffs, subagent orchestration, and final status.
 - Ask the user only for information that cannot be discovered from annotations, repo docs, issue tracker context, or code exploration.
 - Ask blocking questions one at a time. Do not dump a long questionnaire.
 - Preserve the project language from `CONTEXT.md`, `CONTEXT-MAP.md`, and ADRs. If terminology is missing or ambiguous, let `grill-with-docs` resolve it.
+
+</what-to-do>
+
+<supporting-info>
 
 ## Workflow
 
@@ -85,3 +90,5 @@ Report only:
 - PRD path and issue reference.
 - Created implementation issue references.
 - Confirmation that no implementation was performed.
+
+</supporting-info>
