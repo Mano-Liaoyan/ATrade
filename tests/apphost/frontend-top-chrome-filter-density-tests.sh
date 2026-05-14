@@ -189,11 +189,11 @@ assert_preserved_boundary_surfaces_source_contract() {
   local disabled="$frontend_root/components/terminal/TerminalDisabledModule.tsx"
   local monitor="$frontend_root/components/terminal/TerminalMarketMonitor.tsx"
 
-  assert_file_contains "$help" 'All browser-visible data flows through ATrade.Api'
-  assert_file_contains "$help" 'Orders are disabled by the paper-only safety contract.'
-  assert_file_contains "$status" 'Browser routes through ATrade.Api only.'
-  assert_file_contains "$diagnostics" 'workspace renders no order-entry controls and does not call broker order routes.'
-  assert_file_contains "$disabled" 'no fake data, no demo provider responses, and no order-entry controls'
+  assert_file_contains "$help" 'Data is served by ATrade.Api.'
+  assert_file_contains "$help" 'Orders are disabled. No order tickets or submit actions.'
+  assert_file_contains "$status" 'ATrade.Api only.'
+  assert_file_contains "$diagnostics" 'No order controls.'
+  assert_file_contains "$disabled" 'Disabled module. No data or order controls are shown.'
   assert_file_contains "$monitor" 'Backend-owned exact Postgres pins through ATrade.Api.'
   assert_file_contains "$monitor" 'Debounced, minimum-query, capped stock search through ATrade.Api.'
 }
@@ -279,14 +279,14 @@ PY
 
   wait_for_http_200 "$frontend_url/help" "$help_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$help_response" 'data-testid="terminal-help-module"'
-  assert_file_contains "$help_response" 'All browser-visible data flows through ATrade.Api'
-  assert_file_contains "$help_response" 'Orders are disabled by the paper-only safety contract.'
+  assert_file_contains "$help_response" 'Data is served by ATrade.Api.'
+  assert_file_contains "$help_response" 'Orders are disabled. No order tickets or submit actions.'
   assert_file_not_contains "$help_response" 'terminal-safety-strip'
 
   wait_for_http_200 "$frontend_url/status" "$status_response" "$frontend_pid" "$frontend_log"
   assert_file_contains "$status_response" 'data-testid="terminal-status-module"'
   assert_file_contains "$status_response" 'data-testid="terminal-provider-diagnostics"'
-  assert_file_contains "$status_response" 'Browser routes through ATrade.Api only.'
+  assert_file_contains "$status_response" 'ATrade.Api only.'
   assert_file_contains "$status_response" 'Order placement capability'
   assert_file_not_contains "$status_response" 'terminal-safety-strip'
 }

@@ -138,16 +138,15 @@ assert_exact_identity_and_canonical_handoff() {
 assert_empty_unavailable_and_cached_fallback_states() {
   local landing="$frontend_root/components/terminal/TerminalChartLandingModule.tsx"
 
-  assert_file_contains "$landing" 'Loading backend-owned stored stocks from ATrade.Api watchlist preferences.'
-  assert_file_contains "$landing" 'Cached legacy pins are shown as a non-authoritative fallback until the backend watchlist returns.'
+  assert_file_contains "$landing" 'Loading stored stocks.'
+  assert_file_contains "$landing" 'Cached fallback shown.'
   assert_file_contains "$landing" 'Stored stocks unavailable'
   assert_file_contains "$landing" 'No stored stocks'
   assert_file_contains "$landing" 'data-testid={unavailable ? '\''stored-stocks-unavailable-state'\'' : '\''stored-stocks-empty-state'\''}'
   assert_file_contains "$landing" "createTerminalModuleRoute('SEARCH')"
   assert_file_contains "$landing" "createTerminalModuleRoute('WATCHLIST')"
-  assert_file_contains "$landing" 'No demo symbol is substituted'
-  assert_file_contains "$landing" 'no-candle states explicit'
-  assert_file_contains "$landing" 'synthetic bars.'
+  assert_file_contains "$landing" 'Stored stocks unavailable.'
+  assert_file_contains "$landing" 'empty candles stay visible'
 }
 
 assert_scroll_and_no_clipping_contract() {

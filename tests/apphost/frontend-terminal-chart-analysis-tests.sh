@@ -72,14 +72,14 @@ assert_terminal_chart_workflow_contract() {
   assert_file_contains "$terminal_app" 'useTerminalChartWorkspaceWorkflow({ symbol, identity, initialChartRange })'
   assert_file_contains "$terminal_app" '<TerminalChartWorkspace chart={chart} identity={identity} />'
   assert_file_contains "$terminal_workspace" 'chart-footer-note--compact'
-  assert_file_contains "$terminal_workspace" 'hover the stock ID/source chips'
+  assert_file_contains "$terminal_workspace" 'details are on the identity and source chips'
   assert_file_contains "$instrument_header" 'chart.view.hoverDetailsTitle'
   assert_file_contains "$instrument_header" 'chart.view.compactIdentityLabel'
   assert_file_contains "$instrument_header" 'chart.view.compactSourceLabel'
   assert_file_contains "$terminal_workspace" 'chart.candles && chart.view.hasCandleData'
   assert_file_contains "$terminal_workspace" '!chart.candles || !chart.view.hasCandleData'
   assert_file_contains "$terminal_workspace" '<CandlestickChart candles={chart.candles} indicators={chart.indicators} />'
-  assert_file_contains "$terminal_workspace" 'no synthetic chart data is shown'
+  assert_file_contains "$terminal_workspace" 'No candle rows for this lookback range.'
   assert_file_contains "$candlestick_chart" 'autoSize: false'
   assert_file_contains "$candlestick_chart" 'measureChartContainer(container)'
   assert_file_contains "$candlestick_chart" 'ResizeObserver'
@@ -177,12 +177,12 @@ assert_disabled_portfolio_orders_and_no_order_entry_ui() {
   local help_component="$repo_root/frontend/components/terminal/TerminalHelpModule.tsx"
 
   assert_file_contains "$module_registry" 'id: "PORTFOLIO"'
-  assert_file_contains "$module_registry" 'No durable positions or portfolio P/L workspace exists beyond current paper account status contracts.'
+  assert_file_contains "$module_registry" 'Portfolio workspace not available.'
   assert_file_contains "$module_registry" 'id: "ORDERS"'
-  assert_file_contains "$module_registry" 'Orders are disabled by the paper-only safety contract.'
-  assert_file_contains "$module_registry" 'does not provide order tickets, buy/sell buttons, staged submissions, previews, or confirmations'
-  assert_file_contains "$disabled_component" 'no fake data, no demo provider responses, and no order-entry controls'
-  assert_file_contains "$help_component" 'no order tickets, buy/sell controls, previews, or submit actions'
+  assert_file_contains "$module_registry" 'Orders disabled in this paper workspace.'
+  assert_file_contains "$module_registry" 'No order tickets or submit actions'
+  assert_file_contains "$disabled_component" 'Disabled module. No data or order controls are shown.'
+  assert_file_contains "$help_component" 'No order tickets or submit actions'
 
   if grep -RInE --exclude-dir=.next --exclude-dir=node_modules 'Place order|Submit order|/api/orders|orders/simulate|MarketOrder|SetBrokerageModel|SetLiveMode' "$repo_root/frontend/components" "$repo_root/frontend/lib"; then
     printf 'frontend workspace must not include order-entry UI, order API calls, or live-trading runtime tokens.\n' >&2

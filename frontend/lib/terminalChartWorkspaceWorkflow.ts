@@ -21,9 +21,9 @@ import {
   type MarketDataSymbolIdentity,
 } from '../types/marketData';
 
-export const TERMINAL_CHART_RANGE_HELP_COPY = 'Lookback from now: 1D = past day, 1m = past month, 6m = past six months.';
-export const TERMINAL_CHART_HTTP_FALLBACK_COPY = 'Workspace streaming updates apply when available; if streaming is unavailable the chart view falls back to HTTP polling without synthetic data.';
-export const TERMINAL_CHART_NO_ORDER_COPY = 'Chart and analysis workspaces are read-only: no order-entry, simulated-submit, or broker-routing controls are available.';
+export const TERMINAL_CHART_RANGE_HELP_COPY = 'Lookback: 1D, 1m, 6m.';
+export const TERMINAL_CHART_HTTP_FALLBACK_COPY = 'SignalR unavailable: HTTP fallback active.';
+export const TERMINAL_CHART_NO_ORDER_COPY = 'Read-only chart and analysis. No order controls.';
 
 export type TerminalChartStreamTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
@@ -195,14 +195,14 @@ export function getTerminalChartStreamTone(streamState: SymbolChartWorkflow['str
 
 export function formatTerminalChartIdentitySummary(symbol: string, identity: NormalizedInstrumentIdentity | null): string {
   if (!identity) {
-    return `${symbol} uses the default manual symbol identity until provider metadata is supplied by search, trending, watchlist, or market-data payloads.`;
+    return `${symbol} identity pending.`;
   }
 
   const provider = identity.provider.toUpperCase();
   const providerId = identity.providerSymbolId ? ` · provider id ${identity.providerSymbolId}` : '';
   const exchange = identity.exchange ? ` · market ${identity.exchange}` : '';
 
-  return `${identity.symbol} exact instrument identity: provider ${provider}${providerId}${exchange} · ${identity.currency} · ${identity.assetClass}.`;
+  return `${identity.symbol} Exact Instrument Identity: ${provider}${providerId}${exchange} · ${identity.currency} · ${identity.assetClass}.`;
 }
 
 function getFirstMarketDataIdentity(
@@ -224,7 +224,7 @@ function createTerminalChartIdentityRows(symbol: string, identity: NormalizedIns
     return [
       { label: 'Symbol', value: symbol, code: true },
       { label: 'Provider', value: 'Manual / unavailable' },
-      { label: 'Identity handoff', value: 'Awaiting exact provider-market metadata from search, trending, watchlist, or market-data payloads.' },
+      { label: 'Identity handoff', value: 'Provider-market metadata pending.' },
     ];
   }
 

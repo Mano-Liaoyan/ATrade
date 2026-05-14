@@ -186,11 +186,11 @@ assert_simplified_workspace_source_contract() {
   assert_file_contains "$app" '<TerminalDisabledModule moduleId={disabledModuleId} />'
   assert_file_contains "$rail" 'data-testid="terminal-module-rail"'
   assert_file_contains "$rail" 'getDisabledTerminalModules'
-  assert_file_contains "$help" 'All browser-visible data flows through ATrade.Api'
+  assert_file_contains "$help" 'Data is served by ATrade.Api.'
   assert_file_contains "$status" '<TerminalProviderDiagnostics />'
   assert_file_contains "$diagnostics" 'data-testid="terminal-provider-diagnostics"'
   assert_file_contains "$disabled" 'data-testid={`terminal-disabled-module-${unavailable.module.id.toLowerCase()}`}'
-  assert_file_contains "$disabled" 'no fake data, no demo provider responses, and no order-entry controls'
+  assert_file_contains "$disabled" 'Disabled module. No data or order controls are shown.'
 
   assert_file_contains "$layout" 'data-testid="terminal-workspace-layout"'
   assert_file_contains "$layout" 'data-layout-region="primary"'

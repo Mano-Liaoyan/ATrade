@@ -7,9 +7,9 @@ import { normalizeInstrumentIdentity, type InstrumentIdentityInput, type Normali
 import { CHART_RANGE_DESCRIPTIONS, CHART_RANGE_LABELS, type ChartRange, type MarketDataSymbolIdentity } from '../types/marketData';
 import type { AnalysisEngineDescriptor, AnalysisResult, RunAnalysisRequest } from '../types/analysis';
 
-export const TERMINAL_ANALYSIS_NO_ORDER_COPY = 'Analysis only — no brokerage routing or automatic order placement.';
-export const TERMINAL_ANALYSIS_PROVIDER_NEUTRAL_COPY = 'Provider-neutral analysis uses ATrade.Api /api/analysis/engines and /api/analysis/run; LEAN and future engines stay behind the backend analysis provider seam.';
-export const TERMINAL_ANALYSIS_NO_ENGINE_HINT = 'No analysis engine is configured. Set ATRADE_ANALYSIS_ENGINE=Lean in ignored .env to enable analysis.';
+export const TERMINAL_ANALYSIS_NO_ORDER_COPY = 'Analysis only. No order controls.';
+export const TERMINAL_ANALYSIS_PROVIDER_NEUTRAL_COPY = 'Provider-neutral analysis with engine status.';
+export const TERMINAL_ANALYSIS_NO_ENGINE_HINT = 'analysis-engine-not-configured.';
 
 export type TerminalAnalysisState = 'checking' | 'ready' | 'not-configured' | 'unavailable' | 'running' | 'failed';
 

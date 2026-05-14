@@ -8,8 +8,8 @@ export function TerminalStatusModule() {
     <section className="terminal-status-module terminal-module-scroll-surface workspace-stack" data-scroll-owner="status-module" data-testid="terminal-status-module" id="terminal-status" tabIndex={-1}>
       <TerminalPanel
         eyebrow="Operational status"
-        title="ATrade.Api, provider, and paper-mode boundary"
-        description="The workspace keeps runtime status visible while preserving explicit unavailable states and browser/API separation."
+        title="Provider and workspace status"
+        description="Concise operational labels for providers, cache, analysis, and fallback."
         actions={<TerminalStatusBadge tone="success">Paper only</TerminalStatusBadge>}
       >
         <TerminalMetadataGrid
@@ -19,19 +19,19 @@ export function TerminalStatusModule() {
           items={[
             {
               label: 'Frontend data boundary',
-              value: 'Browser routes through ATrade.Api only.',
+              value: 'ATrade.Api only.',
             },
             {
-              label: 'Market data truth',
-              value: 'IBKR/iBeam or Timescale cache states remain visible; no synthetic fallback data is injected.',
+              label: 'Market data states',
+              value: 'provider-not-configured, provider-unavailable, authentication-required, rate-limited, empty candles, storage failures.',
             },
             {
               label: 'Analysis runtime',
-              value: 'Provider-neutral analysis reports no-engine or runtime-unavailable states honestly.',
+              value: 'analysis-engine-not-configured, analysis-engine-unavailable.',
             },
             {
               label: 'Order controls',
-              value: 'Disabled in this paper workspace.',
+              value: 'Disabled module. No order controls.',
             },
           ]}
         />

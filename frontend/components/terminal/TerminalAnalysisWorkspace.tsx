@@ -65,8 +65,8 @@ function TerminalAnalysisWorkspaceContent({
         data-testid="analysis-panel"
         density="compact"
         eyebrow="Analysis"
-        title={`${analysis.symbol} provider-neutral analysis`}
-        description="Discovery and runs stay behind ATrade.Api analysis contracts with explicit no-engine and runtime-unavailable states."
+        title={`${analysis.symbol} analysis`}
+        description="Engine state, signals, metrics, and analysis-engine-unavailable states."
         actions={(
           <div className="terminal-analysis-workspace__badges">
             <TerminalStatusBadge tone={stateTone} pulse={analysis.engineState === 'checking' || analysis.engineState === 'running'} data-testid="terminal-analysis-engine-state">
@@ -101,7 +101,7 @@ function TerminalAnalysisWorkspaceContent({
         />
 
         <p className="terminal-analysis-workspace__copy">
-          {analysis.providerNeutralCopy} Results are signals, metrics, and optional backtest summaries only; no brokerage routing, live trading, or automated order placement is exposed.
+          {analysis.providerNeutralCopy} Results are signals, metrics, and backtest summaries only.
         </p>
 
         {analysis.unavailableMessage ? (
@@ -139,14 +139,14 @@ function TerminalAnalysisPlaceholder({ className }: { className?: string }) {
         density="compact"
         eyebrow="Analysis"
         title="Open analysis for a symbol"
-        description="Select analysis from a chart or market monitor row. Engine discovery remains provider-neutral and no fake signals are shown."
+        description="Select a symbol to view analysis engine status."
         actions={<TerminalStatusBadge tone="info">ANALYSIS</TerminalStatusBadge>}
       >
         <div className="terminal-analysis-workspace__unavailable" data-testid="analysis-unavailable" role="status">
           <strong>No symbol selected.</strong>
-          <p>Choose a chartable instrument before running provider-neutral analysis. No analysis engine or result is fabricated for the empty state.</p>
+          <p>Choose a chartable instrument before running provider-neutral analysis.</p>
         </div>
-        <p data-testid="analysis-no-automation-note">Analysis only — no brokerage routing or automatic order placement.</p>
+        <p data-testid="analysis-no-automation-note">Analysis only. No order controls.</p>
       </TerminalPanel>
     </section>
   );

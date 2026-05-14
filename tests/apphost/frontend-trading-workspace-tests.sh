@@ -221,7 +221,7 @@ assert_frontend_dependencies_and_source() {
   assert_file_contains "$repo_root/frontend/lib/symbolChartWorkflow.ts" 'connectMarketDataStream'
   assert_file_contains "$repo_root/frontend/lib/symbolChartWorkflow.ts" 'fallbackTimer = window.setInterval'
   assert_file_contains "$repo_root/frontend/lib/symbolChartWorkflow.ts" 'formatMarketDataSourceLabel'
-  assert_file_contains "$repo_root/frontend/components/terminal/TerminalProviderDiagnostics.tsx" 'Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes.'
+  assert_file_contains "$repo_root/frontend/components/terminal/TerminalProviderDiagnostics.tsx" 'No order controls.'
   assert_file_contains "$repo_root/frontend/types/analysis.ts" 'AnalysisResult'
   assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/engines'
   assert_file_contains "$repo_root/frontend/lib/analysisClient.ts" '/api/analysis/run'

@@ -31,7 +31,7 @@ export function TerminalChartWorkspace({
             <div>
               <p className="eyebrow">Lookback candlestick chart</p>
               <h2>{chart.normalizedSymbol} candles</h2>
-              <p>Current source: {chart.view.candleSourceLabel}. Chart controls request the selected lookback range from now.</p>
+              <p>Source: {chart.view.candleSourceLabel}. Range: {chart.view.chartRangeLabel}.</p>
             </div>
             <div className="chart-actions">
               <span className={chart.streamState === 'connected' ? 'stream-pill stream-pill--connected' : 'stream-pill'} data-testid="stream-state">
@@ -44,7 +44,7 @@ export function TerminalChartWorkspace({
           {chart.loading ? <div className="loading-state" role="status">Loading OHLC candlestick chart data…</div> : null}
           {!chart.loading && chart.error ? (
             <div className="error-state" role="alert">
-              <strong>IBKR chart data unavailable.</strong>
+              <strong>Chart data unavailable.</strong>
               <p>{chart.error}</p>
               <button className="primary-button" type="button" onClick={() => void chart.refreshChartData(true)}>
                 Retry chart data
@@ -60,8 +60,8 @@ export function TerminalChartWorkspace({
           {!chart.loading && !chart.error && chart.candles && chart.view.hasCandleData ? <CandlestickChart candles={chart.candles} indicators={chart.indicators} /> : null}
           {!chart.loading && !chart.error && (!chart.candles || !chart.view.hasCandleData) ? (
             <div className="empty-state" role="status">
-              <strong>No candle data returned.</strong>
-              <p>The provider returned no candle rows for this lookback range; no synthetic chart data is shown.</p>
+              <strong>Empty candles.</strong>
+              <p>No candle rows for this lookback range.</p>
             </div>
           ) : null}
           <ChartFooter chart={chart} />
@@ -83,11 +83,11 @@ function ChartFooter({ chart }: { chart: TerminalChartWorkspaceWorkflow }) {
   return (
     <div className="chart-footer-note chart-footer-note--compact">
       <p>
-        Read-only chart: selected lookback refreshes through API data only; no synthetic bars or order-entry controls are shown.
+        Read-only chart. API data only.
       </p>
       {chart.latestUpdate ? (
         <p>
-          Latest stream close {chart.latestUpdate.close.toFixed(2)} · hover the stock ID/source chips for identity, source, range, cache, and fallback details.
+          Latest stream close {chart.latestUpdate.close.toFixed(2)} · details are on the identity and source chips.
         </p>
       ) : null}
     </div>

@@ -11,10 +11,10 @@ export function TerminalHelpModule() {
       <TerminalPanel
         eyebrow="Workspace help"
         title="Module and workflow reference"
-        description="Use the module rail and market monitor actions to open API-backed workflows; navigation never invokes natural-language routing, broker order submission, or backend AI tools."
+        description="Use the module rail and workflow actions."
         actions={<TerminalStatusBadge tone="info">HELP</TerminalStatusBadge>}
       >
-        <p className="terminal-help-module__summary">HOME, SEARCH, WATCHLIST, CHART, ANALYSIS, STATUS, and HELP remain reachable from the module rail or workflow actions while browser-visible data stays behind ATrade.Api.</p>
+        <p className="terminal-help-module__summary">Enabled modules open API-backed workflows. Disabled modules show unavailable labels.</p>
         <div className="terminal-help-module__grid">
           <div>
             <h3>Enabled modules</h3>
@@ -32,15 +32,15 @@ export function TerminalHelpModule() {
             <ul className="terminal-help-module__list">
               <li>
                 <strong>Market monitor</strong>
-                <span>Search, trending, and watchlist rows can open chart or analysis workspaces while preserving exact provider identity.</span>
+                <span>Open chart, analysis, or backtest from rows.</span>
               </li>
               <li>
                 <strong>Chart and analysis</strong>
-                <span>Symbol routes hand off provider, provider symbol id, exchange, currency, asset class, and selected range where available.</span>
+                <span>Symbol routes preserve Exact Instrument Identity when available.</span>
               </li>
               <li>
                 <strong>Status</strong>
-                <span>Provider diagnostics and paper-only state stay visible without hiding unavailable runtime states behind fake data.</span>
+                <span>Provider diagnostics show concise unavailable-state labels.</span>
               </li>
             </ul>
           </div>
@@ -66,9 +66,9 @@ export function TerminalHelpModule() {
         actions={<TerminalStatusBadge tone="warning">No orders</TerminalStatusBadge>}
       >
         <ul className="terminal-help-module__list">
-          <li>All browser-visible data flows through ATrade.Api; the frontend does not connect directly to IBKR/iBeam, Postgres, TimescaleDB, Redis, NATS, or LEAN.</li>
-          <li>Provider-not-configured, provider-unavailable, authentication-required, and no-analysis-engine states remain explicit instead of falling back to fake market data.</li>
-          <li>Orders are disabled by the paper-only safety contract. This workspace contains no order tickets, buy/sell controls, previews, or submit actions.</li>
+          <li>Data is served by ATrade.Api.</li>
+          <li>Visible labels include provider-not-configured, provider-unavailable, authentication-required, rate-limited, storage failures, analysis-engine-not-configured, analysis-engine-unavailable, empty candles, disabled module, and fallback.</li>
+          <li>Orders are disabled. No order tickets or submit actions.</li>
         </ul>
       </TerminalPanel>
     </section>
