@@ -135,7 +135,8 @@ function Invoke-WrapperSmoke {
     try {
         Write-Host "==> Starting $CommandText"
 
-        $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', "& { $CommandText }") -WorkingDirectory $RepoRoot -RedirectStandardOutput $standardOutputPath -RedirectStandardError $standardErrorPath -PassThru
+        $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes("& { $CommandText }"))
+        $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encodedCommand) -WorkingDirectory $RepoRoot -RedirectStandardOutput $standardOutputPath -RedirectStandardError $standardErrorPath -PassThru
 
         $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
 
