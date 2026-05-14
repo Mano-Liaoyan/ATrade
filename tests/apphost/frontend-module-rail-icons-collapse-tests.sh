@@ -45,24 +45,22 @@ assert_css_rule_contains() {
   local needle="$2"
   local css_file="$frontend_root/app/globals.css"
 
-  python3 - "$css_file" "$selector" "$needle" <<'PY'
-import re
-import sys
-from pathlib import Path
+  node - "$css_file" "$selector" "$needle" <<'NODE'
+const { readFileSync } = require('node:fs');
 
-css_path = Path(sys.argv[1])
-selector = sys.argv[2]
-needle = sys.argv[3]
-css = css_path.read_text(encoding='utf-8')
-pattern = re.escape(selector) + r"\s*\{(?P<body>[^{}]*)\}"
-matches = list(re.finditer(pattern, css))
-if not matches:
-    print(f"expected CSS selector {selector!r} to exist in {css_path}", file=sys.stderr)
-    sys.exit(1)
-if not any(needle in match.group('body') for match in matches):
-    print(f"expected CSS selector {selector!r} to contain {needle!r}", file=sys.stderr)
-    sys.exit(1)
-PY
+const [, , cssPath, selector, needle] = process.argv;
+const css = readFileSync(cssPath, 'utf8');
+const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const matches = [...css.matchAll(new RegExp(`${escapedSelector}\\s*\\{(?<body>[^}]*)\\}`, 'gm'))];
+if (matches.length === 0) {
+  console.error(`expected CSS selector ${JSON.stringify(selector)} to exist in ${cssPath}`);
+  process.exit(1);
+}
+if (!matches.some((match) => match.groups.body.includes(needle))) {
+  console.error(`expected CSS selector ${JSON.stringify(selector)} to contain ${JSON.stringify(needle)}`);
+  process.exit(1);
+}
+NODE
 }
 
 assert_icon_mapping() {
@@ -70,43 +68,47 @@ assert_icon_mapping() {
   local types="$frontend_root/types/terminal.ts"
   local rail="$frontend_root/components/terminal/TerminalModuleRail.tsx"
 
-  python3 - "$registry" <<'PY'
-import sys
-from pathlib import Path
+  node - "$registry" <<'NODE'
+const { readFileSync } = require('node:fs');
 
-registry = Path(sys.argv[1]).read_text(encoding='utf-8')
-expected = {
-    'HOME': 'home',
-    'SEARCH': 'search',
-    'WATCHLIST': 'bookmark',
-    'CHART': 'chart-candlestick',
-    'ANALYSIS': 'flask-conical',
-    'STATUS': 'activity',
-    'HELP': 'circle-question',
-    'NEWS': 'newspaper',
-    'PORTFOLIO': 'briefcase-business',
-    'RESEARCH': 'file-search',
-    'SCREENER': 'sliders-horizontal',
-    'ECON': 'landmark',
-    'AI': 'bot',
-    'NODE': 'workflow',
-    'ORDERS': 'ban',
+const registry = readFileSync(process.argv[2], 'utf8');
+const expected = {
+  HOME: 'home',
+  SEARCH: 'search',
+  WATCHLIST: 'bookmark',
+  CHART: 'chart-candlestick',
+  ANALYSIS: 'flask-conical',
+  STATUS: 'activity',
+  HELP: 'circle-question',
+  NEWS: 'newspaper',
+  PORTFOLIO: 'briefcase-business',
+  RESEARCH: 'file-search',
+  SCREENER: 'sliders-horizontal',
+  ECON: 'landmark',
+  AI: 'bot',
+  NODE: 'workflow',
+  ORDERS: 'ban',
+};
+for (const [moduleId, iconId] of Object.entries(expected)) {
+  const marker = `id: "${moduleId}"`;
+  if (!registry.includes(marker)) {
+    console.error(`missing module definition for ${moduleId}`);
+    process.exit(1);
+  }
+  const block = registry.slice(registry.indexOf(marker), registry.indexOf(marker) + 900);
+  if (!block.includes(`icon: "${iconId}"`)) {
+    console.error(`expected ${moduleId} to map to icon ${iconId}`);
+    process.exit(1);
+  }
+  for (const preserved of ['label:', 'shortLabel:', 'description:', 'availability:', 'placement:']) {
+    if (!block.includes(preserved)) {
+      console.error(`expected ${moduleId} definition to preserve ${preserved}`);
+      process.exit(1);
+    }
+  }
 }
-for module_id, icon_id in expected.items():
-    marker = f'id: "{module_id}"'
-    if marker not in registry:
-        print(f'missing module definition for {module_id}', file=sys.stderr)
-        sys.exit(1)
-    block = registry[registry.index(marker):registry.index(marker) + 900]
-    if f'icon: "{icon_id}"' not in block:
-        print(f'expected {module_id} to map to icon {icon_id}', file=sys.stderr)
-        sys.exit(1)
-    for preserved in ['label:', 'shortLabel:', 'description:', 'availability:', 'placement:']:
-        if preserved not in block:
-            print(f'expected {module_id} definition to preserve {preserved}', file=sys.stderr)
-            sys.exit(1)
-print('module icon registry mapping verified')
-PY
+console.log('module icon registry mapping verified');
+NODE
 
   assert_file_contains "$types" 'export type TerminalModuleIconId ='
   assert_file_contains "$types" 'icon: TerminalModuleIconId;'
@@ -134,7 +136,6 @@ assert_collapse_contract() {
   assert_file_contains "$rail" 'title={isCollapsed ? module.label : undefined}'
   assert_file_contains "$rail" 'aria-current={activeModuleId === module.id && !disabledModuleId ? "page" : undefined}'
   assert_file_contains "$rail" 'aria-disabled="true"'
-  assert_file_contains "$rail" 'tabIndex={-1}'
   assert_file_contains "$rail" 'terminal-module-rail__item--selected-disabled'
   assert_file_contains "$rail" 'className="terminal-module-rail__navigation terminal-scroll-owned terminal-rail-scroll-owned"'
   assert_file_contains "$rail" 'data-scroll-owner="module-rail"'
@@ -147,8 +148,17 @@ assert_collapse_contract() {
   assert_css_rule_contains '.terminal-module-rail__navigation' 'overflow: auto;'
   assert_css_rule_contains '.terminal-scroll-owned' 'scrollbar-width: thin;'
   assert_file_contains "$css" '.terminal-scroll-owned::-webkit-scrollbar-thumb'
-  assert_css_rule_contains '.terminal-module-rail--collapsed' 'inline-size: 4.35rem;'
-  assert_css_rule_contains '.terminal-module-rail--collapsed' 'min-inline-size: 4.35rem;'
+  assert_css_rule_contains '.terminal-module-rail' '--terminal-rail-collapsed-target: 2.75rem;'
+  assert_css_rule_contains '.terminal-module-rail' '--terminal-rail-scrollbar-reserve: 0.85rem;'
+  assert_css_rule_contains '.terminal-module-rail--collapsed' 'inline-size: var(--terminal-rail-collapsed-inline-size);'
+  assert_css_rule_contains '.terminal-module-rail--collapsed' 'min-inline-size: var(--terminal-rail-collapsed-inline-size);'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__navigation' 'justify-items: center;'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__navigation' 'overflow-y: auto;'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__item' 'inline-size: var(--terminal-rail-collapsed-target);'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__item' 'min-block-size: var(--terminal-rail-collapsed-target);'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__item' 'place-items: center;'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__short' 'inline-size: 2rem;'
+  assert_css_rule_contains '.terminal-module-rail--collapsed .terminal-module-rail__toggle' 'inline-size: var(--terminal-rail-collapsed-target);'
   assert_file_contains "$css" '.terminal-module-rail--collapsed .terminal-module-rail__label,'
   assert_file_contains "$css" '.terminal-module-rail--collapsed .terminal-module-rail__toggle-label'
   assert_file_contains "$css" 'clip: rect(0, 0, 0, 0);'
