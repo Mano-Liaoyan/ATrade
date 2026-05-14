@@ -19,7 +19,32 @@ function Get-LogText {
         return ''
     }
 
-    return [System.IO.File]::ReadAllText($Path)
+    $deadline = (Get-Date).AddSeconds(5)
+    while ($true) {
+        $stream = $null
+        $reader = $null
+
+        try {
+            $stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            $reader = [System.IO.StreamReader]::new($stream)
+            return $reader.ReadToEnd()
+        }
+        catch [System.IO.IOException] {
+            if ((Get-Date) -ge $deadline) {
+                throw
+            }
+
+            Start-Sleep -Milliseconds 100
+        }
+        finally {
+            if ($null -ne $reader) {
+                $reader.Dispose()
+            }
+            elseif ($null -ne $stream) {
+                $stream.Dispose()
+            }
+        }
+    }
 }
 
 function Get-CombinedOutput {
