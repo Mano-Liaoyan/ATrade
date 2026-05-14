@@ -7,6 +7,7 @@ import { Activity, BarChart3, FlaskConical, Pin, PinOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { TerminalMarketMonitorRow } from '@/lib/terminalMarketMonitorWorkflow';
+import { TerminalMetadataGrid } from './TerminalMetadataGrid';
 import { TerminalPanel } from './TerminalPanel';
 import { TerminalStatusBadge } from './TerminalStatusBadge';
 
@@ -82,18 +83,24 @@ export function MarketMonitorDetailPanel({
           </div>
         </div>
 
-        <dl className="market-monitor-detail__identity" data-testid="market-monitor-exact-identity">
-          <IdentityItem label="Provider" value={row.provider.toUpperCase()} />
-          <IdentityItem label="Provider ID" value={row.providerSymbolId ?? 'Unavailable'} code />
-          <IdentityItem label="IBKR conid" value={row.ibkrConid === null ? 'Unavailable' : String(row.ibkrConid)} code />
-          <IdentityItem label="Symbol" value={row.symbol} code />
-          <IdentityItem label="Exchange" value={row.exchange ?? 'Unavailable'} code />
-          <IdentityItem label="Currency" value={row.currency} code />
-          <IdentityItem label="Asset class" value={row.assetClass} code />
-          <IdentityItem label="Pin key" value={row.pinKey} code />
-          <IdentityItem label="Source" value={row.sourceLabel} />
-          <IdentityItem label="Score/rank" value={row.score === null ? row.rankLabel : `${row.rankLabel} · score ${formatScore(row.score)}`} />
-        </dl>
+        <TerminalMetadataGrid
+          ariaLabel="Market monitor Exact Instrument Identity metadata"
+          className="market-monitor-detail__identity"
+          columns={2}
+          items={[
+            { label: 'Provider', value: row.provider.toUpperCase() },
+            { code: true, label: 'Provider ID', value: row.providerSymbolId ?? 'Unavailable' },
+            { code: true, label: 'IBKR conid', value: row.ibkrConid === null ? 'Unavailable' : String(row.ibkrConid) },
+            { code: true, label: 'Symbol', value: row.symbol },
+            { code: true, label: 'Exchange', value: row.exchange ?? 'Unavailable' },
+            { code: true, label: 'Currency', value: row.currency },
+            { code: true, label: 'Asset class', value: row.assetClass },
+            { code: true, label: 'Pin key', value: row.pinKey },
+            { label: 'Source', value: row.sourceLabel },
+            { label: 'Score/rank', value: row.score === null ? row.rankLabel : `${row.rankLabel} · score ${formatScore(row.score)}` },
+          ]}
+          testId="market-monitor-exact-identity"
+        />
 
         {row.reasons.length > 0 ? (
           <div className="market-monitor-detail__reasons">
@@ -130,15 +137,6 @@ export function MarketMonitorDetailPanel({
         </div>
       </div>
     </TerminalPanel>
-  );
-}
-
-function IdentityItem({ label, value, code = false }: { label: string; value: string; code?: boolean }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{code ? <code>{value}</code> : value}</dd>
-    </div>
   );
 }
 

@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { SUPPORTED_CHART_RANGES, type ChartRange } from '@/types/marketData';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { TerminalMetadataGrid } from './TerminalMetadataGrid';
 import { TerminalPanel } from './TerminalPanel';
 import type { BacktestRunEnvelope } from '@/types/backtesting';
 import { BacktestComparisonPanel } from './BacktestComparisonPanel';
@@ -54,23 +55,29 @@ export function TerminalBacktestWorkspace({
           </div>
         )}
       >
-        <div className="terminal-backtest-workspace__summary">
-          <div>
-            <span>Instrument</span>
-            <strong>{workflow.normalizedSymbol || 'None selected'}</strong>
-            <small>{workflow.identitySummary}</small>
-          </div>
-          <div>
-            <span>Capital source</span>
-            <strong>{workflow.capital ? formatBacktestCapitalSource(workflow.capital.source) : workflow.capitalLoading ? 'Loading…' : 'Unavailable'}</strong>
-            <small>{workflow.capitalCopy}</small>
-          </div>
-          <div>
-            <span>Safety</span>
-            <strong>Simulation only</strong>
-            <small data-testid="backtest-no-order-note">{workflow.noOrderCopy}</small>
-          </div>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Backtest workspace metadata"
+          className="terminal-backtest-workspace__summary"
+          columns={3}
+          items={[
+            {
+              detail: workflow.identitySummary,
+              label: 'Instrument',
+              value: workflow.normalizedSymbol || 'None selected',
+            },
+            {
+              detail: workflow.capitalCopy,
+              label: 'Capital source',
+              value: workflow.capital ? formatBacktestCapitalSource(workflow.capital.source) : workflow.capitalLoading ? 'Loading…' : 'Unavailable',
+            },
+            {
+              detail: workflow.noOrderCopy,
+              detailTestId: 'backtest-no-order-note',
+              label: 'Safety',
+              value: 'Simulation only',
+            },
+          ]}
+        />
 
         <BacktestCapitalPanel workflow={workflow} />
         <BacktestRunForm workflow={workflow} />
@@ -92,29 +99,41 @@ function BacktestCapitalPanel({ workflow }: { workflow: TerminalBacktestWorkflow
   return (
     <div className="terminal-backtest-capital" data-testid="backtest-capital-panel">
       <div className="terminal-backtest-capital__status">
-        <div>
-          <span>Effective paper capital</span>
-          <strong>{effectiveCapital === null ? 'Unavailable' : formatCurrency(effectiveCapital, workflow.capital?.currency ?? workflow.capitalCurrency)}</strong>
-          <small>{workflow.capitalLoading ? 'Loading effective capital from ATrade.Api…' : `${capitalSource} · ${workflow.capital?.currency ?? workflow.capitalCurrency}`}</small>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Backtest paper-capital source metadata"
+          columns={1}
+          items={[
+            {
+              detail: workflow.capitalLoading ? 'Loading effective capital from ATrade.Api…' : `${capitalSource} · ${workflow.capital?.currency ?? workflow.capitalCurrency}`,
+              label: 'Effective paper capital',
+              value: effectiveCapital === null ? 'Unavailable' : formatCurrency(effectiveCapital, workflow.capital?.currency ?? workflow.capitalCurrency),
+            },
+          ]}
+        />
         <TerminalStatusBadge tone={sourceTone} data-testid="backtest-capital-source">
           {capitalSource}
         </TerminalStatusBadge>
       </div>
 
       {workflow.capital?.ibkrAvailable ? (
-        <div className="terminal-backtest-capital__sources" data-testid="backtest-capital-sources">
-          <div>
-            <span>IBKR paper source</span>
-            <strong>{workflow.capital.ibkrAvailable.available ? 'Available' : workflow.capital.ibkrAvailable.state}</strong>
-            <small>{workflow.capital.ibkrAvailable.available ? formatCurrency(workflow.capital.ibkrAvailable.capital ?? 0, workflow.capital.ibkrAvailable.currency) : 'No account identifiers are shown in the browser.'}</small>
-          </div>
-          <div>
-            <span>Local paper capital</span>
-            <strong>{workflow.capital.localConfigured ? formatCurrency(workflow.capital.localCapital ?? 0, workflow.capital.currency) : 'Not configured'}</strong>
-            <small>Stored behind ATrade.Api /api/accounts/local-paper-capital.</small>
-          </div>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Backtest paper-capital source details"
+          className="terminal-backtest-capital__sources"
+          columns={2}
+          items={[
+            {
+              detail: workflow.capital.ibkrAvailable.available ? formatCurrency(workflow.capital.ibkrAvailable.capital ?? 0, workflow.capital.ibkrAvailable.currency) : 'No account identifiers are shown in the browser.',
+              label: 'IBKR paper source',
+              value: workflow.capital.ibkrAvailable.available ? 'Available' : workflow.capital.ibkrAvailable.state,
+            },
+            {
+              detail: 'Stored behind ATrade.Api /api/accounts/local-paper-capital.',
+              label: 'Local paper capital',
+              value: workflow.capital.localConfigured ? formatCurrency(workflow.capital.localCapital ?? 0, workflow.capital.currency) : 'Not configured',
+            },
+          ]}
+          testId="backtest-capital-sources"
+        />
       ) : null}
 
       <div
@@ -182,11 +201,17 @@ function BacktestRunDetailPanel({ workflow }: { workflow: TerminalBacktestWorkfl
   return (
     <div className="terminal-backtest-detail" data-testid="backtest-run-detail">
       <div className="terminal-backtest-detail__header">
-        <div>
-          <span>Selected run detail</span>
-          <strong>{run ? `${run.id}` : 'No run selected'}</strong>
-          <small>{run ? `${run.request.symbol.symbol} · ${run.request.strategyId} · ${run.request.chartRange}` : 'Select a saved run to inspect persisted backend metadata.'}</small>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Selected saved backtest run metadata"
+          columns={1}
+          items={[
+            {
+              detail: run ? `${run.request.symbol.symbol} · ${run.request.strategyId} · ${run.request.chartRange}` : 'Select a saved run to inspect persisted backend metadata.',
+              label: 'Selected run detail',
+              value: run ? `${run.id}` : 'No run selected',
+            },
+          ]}
+        />
         {run ? <TerminalStatusBadge tone={getBacktestRunTone(run)}>{formatBacktestStatusLabel(run.status)}</TerminalStatusBadge> : null}
       </div>
 
@@ -215,23 +240,29 @@ function BacktestRunDetailPanel({ workflow }: { workflow: TerminalBacktestWorkfl
             <Metric label="Win rate" value={result.backtest ? `${result.backtest.winRatePercent.toFixed(1)}%` : 'n/a'} />
           </div>
 
-          <div className="terminal-backtest-detail__source" data-testid="backtest-source-metadata">
-            <div>
-              <span>Engine</span>
-              <strong>{result.engine.displayName}</strong>
-              <small>{result.engine.provider} · {result.engine.version} · {result.engine.state}</small>
-            </div>
-            <div>
-              <span>Market data source</span>
-              <strong>{result.source.marketDataSource}</strong>
-              <small>{result.source.provider} · generated {formatDateTime(result.source.generatedAtUtc)}</small>
-            </div>
-            <div>
-              <span>Symbol metadata</span>
-              <strong>{result.symbol.symbol} · {result.symbol.provider.toUpperCase()}</strong>
-              <small>{result.symbol.providerSymbolId ?? 'no provider id'} · {result.symbol.exchange || 'market unavailable'} · {result.symbol.currency} · {result.symbol.assetClass}</small>
-            </div>
-          </div>
+          <TerminalMetadataGrid
+            ariaLabel="Saved backtest result source metadata"
+            className="terminal-backtest-detail__source"
+            columns={2}
+            items={[
+              {
+                detail: `${result.engine.provider} · ${result.engine.version} · ${result.engine.state}`,
+                label: 'Engine',
+                value: result.engine.displayName,
+              },
+              {
+                detail: `${result.source.provider} · generated ${formatDateTime(result.source.generatedAtUtc)}`,
+                label: 'Market data source',
+                value: result.source.marketDataSource,
+              },
+              {
+                detail: `${result.symbol.providerSymbolId ?? 'no provider id'} · ${result.symbol.exchange || 'market unavailable'} · ${result.symbol.currency} · ${result.symbol.assetClass}`,
+                label: 'Symbol metadata',
+                value: `${result.symbol.symbol} · ${result.symbol.provider.toUpperCase()}`,
+              },
+            ]}
+            testId="backtest-source-metadata"
+          />
 
           <div className="terminal-backtest-detail__benchmark" data-testid="backtest-benchmark-summary">
             <span>Benchmark</span>
@@ -386,34 +417,45 @@ function BacktestLiveStatusPanel({ workflow }: { workflow: TerminalBacktestWorkf
   return (
     <div className="terminal-backtest-live" data-testid="backtest-live-status-panel">
       <div className="terminal-backtest-live__header">
-        <div>
-          <span>Live run status</span>
-          <strong>{run ? `${run.request.symbol.symbol} · ${run.request.strategyId}` : 'No run selected'}</strong>
-          <small>{run ? getBacktestRunStatusCopy(run) : 'Create a run or select saved history. No demo run or placeholder result is shown.'}</small>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Live saved backtest run status metadata"
+          columns={1}
+          items={[
+            {
+              detail: run ? getBacktestRunStatusCopy(run) : 'Create a run or select saved history. No demo run or placeholder result is shown.',
+              label: 'Live run status',
+              value: run ? `${run.request.symbol.symbol} · ${run.request.strategyId}` : 'No run selected',
+            },
+          ]}
+        />
         <TerminalStatusBadge tone={statusTone} pulse={run?.status === 'queued' || run?.status === 'running'} data-testid="backtest-selected-run-status">
           {statusLabel}
         </TerminalStatusBadge>
       </div>
 
       {run ? (
-        <div className="terminal-backtest-live__grid">
-          <div>
-            <span>Created</span>
-            <strong>{formatDateTime(run.createdAtUtc)}</strong>
-            <small>{run.sourceRunId ? `Retry of ${run.sourceRunId}` : `Updated ${formatDateTime(run.updatedAtUtc)}`}</small>
-          </div>
-          <div>
-            <span>Capital</span>
-            <strong>{formatCurrency(run.capital.initialCapital, run.capital.currency)}</strong>
-            <small>{formatBacktestCapitalSource(run.capital.capitalSource)}</small>
-          </div>
-          <div>
-            <span>Result</span>
-            <strong>{run.result?.backtest ? `${run.result.backtest.totalReturnPercent.toFixed(2)}%` : 'Not available'}</strong>
-            <small>{run.result ? 'Persisted completed result envelope.' : 'No fake result is rendered before completion.'}</small>
-          </div>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Live saved backtest run metadata"
+          className="terminal-backtest-live__grid"
+          columns={2}
+          items={[
+            {
+              detail: run.sourceRunId ? `Retry of ${run.sourceRunId}` : `Updated ${formatDateTime(run.updatedAtUtc)}`,
+              label: 'Created',
+              value: formatDateTime(run.createdAtUtc),
+            },
+            {
+              detail: formatBacktestCapitalSource(run.capital.capitalSource),
+              label: 'Capital',
+              value: formatCurrency(run.capital.initialCapital, run.capital.currency),
+            },
+            {
+              detail: run.result ? 'Persisted completed result envelope.' : 'No fake result is rendered before completion.',
+              label: 'Result',
+              value: run.result?.backtest ? `${run.result.backtest.totalReturnPercent.toFixed(2)}%` : 'Not available',
+            },
+          ]}
+        />
       ) : null}
 
       {explicitUnavailable ? (

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import type { AnalysisMetric, AnalysisResult } from '@/types/analysis';
 import { type ChartRange } from '@/types/marketData';
 import { Button } from '../ui/button';
+import { TerminalMetadataGrid } from './TerminalMetadataGrid';
 import { TerminalPanel } from './TerminalPanel';
 import { TerminalStatusBadge, type TerminalStatusTone } from './TerminalStatusBadge';
 
@@ -75,23 +76,29 @@ function TerminalAnalysisWorkspaceContent({
           </div>
         )}
       >
-        <div className="terminal-analysis-workspace__summary">
-          <div>
-            <span>Lookback</span>
-            <strong>{analysis.chartRangeLabel}</strong>
-            <small>{analysis.chartRangeDescription}</small>
-          </div>
-          <div>
-            <span>Candle source</span>
-            <strong>{analysis.sourceLabel}</strong>
-            <small>{analysis.requestIdentity ? `${analysis.requestIdentity.provider.toUpperCase()} ${analysis.requestIdentity.providerSymbolId ?? analysis.requestIdentity.symbol}` : 'Symbol-only request'}</small>
-          </div>
-          <div>
-            <span>Safety</span>
-            <strong>Analysis only</strong>
-            <small data-testid="analysis-no-automation-note">{analysis.noOrderCopy}</small>
-          </div>
-        </div>
+        <TerminalMetadataGrid
+          ariaLabel="Analysis request metadata"
+          className="terminal-analysis-workspace__summary"
+          columns={3}
+          items={[
+            {
+              detail: analysis.chartRangeDescription,
+              label: 'Lookback',
+              value: analysis.chartRangeLabel,
+            },
+            {
+              detail: analysis.requestIdentity ? `${analysis.requestIdentity.provider.toUpperCase()} ${analysis.requestIdentity.providerSymbolId ?? analysis.requestIdentity.symbol}` : 'Symbol-only request',
+              label: 'Candle source',
+              value: analysis.sourceLabel,
+            },
+            {
+              detail: analysis.noOrderCopy,
+              detailTestId: 'analysis-no-automation-note',
+              label: 'Safety',
+              value: 'Analysis only',
+            },
+          ]}
+        />
 
         <p className="terminal-analysis-workspace__copy">
           {analysis.providerNeutralCopy} Results are signals, metrics, and optional backtest summaries only; no brokerage routing, live trading, or automated order placement is exposed.
@@ -148,23 +155,28 @@ function TerminalAnalysisPlaceholder({ className }: { className?: string }) {
 function TerminalAnalysisResultView({ result }: { result: AnalysisResult }) {
   return (
     <div className="terminal-analysis-result" data-testid="analysis-result">
-      <div className="analysis-result-summary">
-        <div>
-          <span className="indicator-label">Engine</span>
-          <strong>{result.engine.displayName}</strong>
-          <small>{result.source.source}</small>
-        </div>
-        <div>
-          <span className="indicator-label">Window</span>
-          <strong>{formatBacktestWindow(result)}</strong>
-          <small>{result.timeframe}</small>
-        </div>
-        <div>
-          <span className="indicator-label">Result</span>
-          <strong>{result.status}</strong>
-          <small>{new Date(result.generatedAtUtc).toLocaleString()}</small>
-        </div>
-      </div>
+      <TerminalMetadataGrid
+        ariaLabel="Analysis result metadata"
+        className="analysis-result-summary"
+        columns={3}
+        items={[
+          {
+            detail: result.source.source,
+            label: 'Engine',
+            value: result.engine.displayName,
+          },
+          {
+            detail: result.timeframe,
+            label: 'Window',
+            value: formatBacktestWindow(result),
+          },
+          {
+            detail: new Date(result.generatedAtUtc).toLocaleString(),
+            label: 'Result',
+            value: result.status,
+          },
+        ]}
+      />
 
       {result.backtest ? (
         <div className="analysis-metrics" data-testid="analysis-backtest-summary">

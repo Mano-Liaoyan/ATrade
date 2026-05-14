@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-06
+updated: 2026-05-14
 summary: Active ATrade paper workspace UI design authority for the direct module/workflow frontend.
 see_also:
   - ../INDEX.md
@@ -354,6 +354,12 @@ while staying clearly separate from proprietary product identities.
   and status diagnostics should use dense rows, sticky headings where useful,
   right-aligned numeric columns, scan-friendly separators, and explicit visible
   scrollbars when an internal table viewport owns overflow.
+- **Compact metadata grids:** repeated label/value summaries in analysis, help,
+  backtest, status, chart, market-monitor, and HOME summary surfaces should use
+  the shared compact metadata pattern so labels and long values stay separated,
+  wrap within their cell, and preserve canonical labels such as Exact Instrument
+  Identity, provider-neutral contracts, saved backtest run, and paper-capital
+  source without clipping or visual collision.
 - **Workspace accents:** use amber/orange as the primary emphasis for selected,
   active, focused, chart overlay, and paper-safety attention states; use green
   and red only for truthful positive/negative market movement and danger; use

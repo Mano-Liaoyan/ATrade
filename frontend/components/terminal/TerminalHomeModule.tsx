@@ -11,6 +11,7 @@ import {
   useTerminalMarketMonitorWorkflow,
 } from '@/lib/terminalMarketMonitorWorkflow';
 import type { EnabledTerminalModuleId, TerminalNavigationIntent } from '@/types/terminal';
+import { TerminalMetadataGrid } from './TerminalMetadataGrid';
 import { TerminalPanel } from './TerminalPanel';
 import { TerminalProviderDiagnostics } from './TerminalProviderDiagnostics';
 import { TerminalStatusBadge, type TerminalStatusTone } from './TerminalStatusBadge';
@@ -140,13 +141,18 @@ export function TerminalHomeModule({ onOpenIntent, searchQuery = '' }: TerminalH
 
 function HomeStatusTile({ badge, detail, label, tone }: { badge: string; detail: string; label: string; tone: TerminalStatusTone }) {
   return (
-    <div className="terminal-home-status-grid__item">
-      <div>
-        <span>{label}</span>
-        <TerminalStatusBadge tone={tone} pulse={badge === 'Checking' || badge === 'Loading'}>{badge}</TerminalStatusBadge>
-      </div>
-      <p>{detail}</p>
-    </div>
+    <TerminalMetadataGrid
+      ariaLabel={`${label} summary metadata`}
+      className="terminal-home-status-grid__item"
+      columns={1}
+      items={[
+        {
+          detail,
+          label,
+          value: <TerminalStatusBadge tone={tone} pulse={badge === 'Checking' || badge === 'Loading'}>{badge}</TerminalStatusBadge>,
+        },
+      ]}
+    />
   );
 }
 
