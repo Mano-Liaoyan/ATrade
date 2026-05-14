@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { getBrokerStatus } from '@/lib/brokerStatusClient';
 import type { BrokerStatus } from '@/types/brokerStatus';
 import { Button } from '../ui/button';
+import { TerminalMetadataGrid, type TerminalMetadataItem } from './TerminalMetadataGrid';
 import { TerminalPanel } from './TerminalPanel';
 import { TerminalStatusBadge, type TerminalStatusTone } from './TerminalStatusBadge';
 
@@ -88,29 +89,72 @@ export function TerminalProviderDiagnostics({
         {error ? <p className="error-text" role="alert">Broker diagnostics unavailable: {error}</p> : null}
         {!error && loading && !status ? <p role="status">Loading broker provider diagnostics…</p> : null}
 
-        <dl className="terminal-provider-diagnostics__grid">
-          <DiagnosticItem label="Broker provider" value={status?.provider ?? 'ibkr'} detail={status?.message ?? 'Safe broker readiness projection from ATrade.Api.'} />
-          <DiagnosticItem label="IBKR/iBeam state" value={status?.state ?? (error ? 'unavailable' : 'checking')} detail={`Connected ${formatBoolean(status?.connected)} · authenticated ${formatBoolean(status?.authenticated)} · competing ${formatBoolean(status?.competing)}`} />
-          <DiagnosticItem label="Paper mode" value={status?.mode ?? 'paper'} detail="Paper-only status is shown without account identifiers or credential prompts." />
-          <DiagnosticItem label="Market data source" value={marketDataSourceLabel} detail="Chart, monitor, candles, indicators, and Timescale cache labels remain payload-owned." />
-          <DiagnosticItem label="SignalR stream" value={signalRStateLabel} detail="HTTP polling fallback remains visible when stream state is closed or unavailable." />
-          <DiagnosticItem label="Analysis provider" value={analysisStateLabel} detail="No-engine and runtime-unavailable states are explicit; no fake signals are generated." />
-          <DiagnosticItem label="Order placement capability" value={status?.capabilities.supportsBrokerOrderPlacement ? 'provider reports enabled' : 'disabled'} detail="Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes." />
-          <DiagnosticItem label="Credential UI" value="not rendered" detail="Secrets, account identifiers, tokens, cookies, gateway URLs, and session values stay out of the browser UI." />
-        </dl>
+        <TerminalMetadataGrid
+          ariaLabel="Provider diagnostics metadata"
+          className="terminal-provider-diagnostics__grid"
+          columns={3}
+          items={getDiagnosticItems({ analysisStateLabel, marketDataSourceLabel, signalRStateLabel, status, error })}
+        />
       </TerminalPanel>
     </section>
   );
 }
 
-function DiagnosticItem({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-      <small>{detail}</small>
-    </div>
-  );
+function getDiagnosticItems({
+  analysisStateLabel,
+  error,
+  marketDataSourceLabel,
+  signalRStateLabel,
+  status,
+}: {
+  analysisStateLabel: string;
+  error: string | null;
+  marketDataSourceLabel: string;
+  signalRStateLabel: string;
+  status: BrokerStatus | null;
+}): TerminalMetadataItem[] {
+  return [
+    {
+      detail: status?.message ?? 'Safe broker readiness projection from ATrade.Api.',
+      label: 'Broker provider',
+      value: status?.provider ?? 'ibkr',
+    },
+    {
+      detail: `Connected ${formatBoolean(status?.connected)} · authenticated ${formatBoolean(status?.authenticated)} · competing ${formatBoolean(status?.competing)}`,
+      label: 'IBKR/iBeam state',
+      value: status?.state ?? (error ? 'unavailable' : 'checking'),
+    },
+    {
+      detail: 'Paper-only status is shown without account identifiers or credential prompts.',
+      label: 'Paper mode',
+      value: status?.mode ?? 'paper',
+    },
+    {
+      detail: 'Chart, monitor, candles, indicators, and Timescale cache labels remain payload-owned.',
+      label: 'Market data source',
+      value: marketDataSourceLabel,
+    },
+    {
+      detail: 'HTTP polling fallback remains visible when stream state is closed or unavailable.',
+      label: 'SignalR stream',
+      value: signalRStateLabel,
+    },
+    {
+      detail: 'No-engine and runtime-unavailable states are explicit; no fake signals are generated.',
+      label: 'Analysis provider',
+      value: analysisStateLabel,
+    },
+    {
+      detail: 'Diagnostics only — the workspace renders no order-entry controls and does not call broker order routes.',
+      label: 'Order placement capability',
+      value: status?.capabilities.supportsBrokerOrderPlacement ? 'provider reports enabled' : 'disabled',
+    },
+    {
+      detail: 'Secrets, account identifiers, tokens, cookies, gateway URLs, and session values stay out of the browser UI.',
+      label: 'Credential UI',
+      value: 'not rendered',
+    },
+  ];
 }
 
 function getBrokerTone(status: BrokerStatus | null, error: string | null, loading: boolean): TerminalStatusTone {

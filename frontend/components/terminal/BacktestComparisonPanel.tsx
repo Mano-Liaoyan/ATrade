@@ -6,6 +6,7 @@ import {
   type TerminalBacktestWorkflow,
 } from '@/lib/terminalBacktestWorkflow';
 import { Button } from '../ui/button';
+import { TerminalMetadataGrid } from './TerminalMetadataGrid';
 import { TerminalStatusBadge } from './TerminalStatusBadge';
 
 const CHART_WIDTH = 720;
@@ -70,16 +71,23 @@ export function BacktestComparisonPanel({ workflow }: BacktestComparisonPanelPro
         <div className="terminal-backtest-comparison__cards" data-testid="backtest-comparison-selected-cards" aria-label="Selected backtest runs">
           {selectedSummaries.map((summary) => (
             <article className="terminal-backtest-comparison__card" key={summary.runId}>
-              <div>
-                <span>{summary.symbol}</span>
-                <strong>{summary.strategyLabel}</strong>
-                <small>{summary.chartRangeLabel} · {summary.capitalSourceLabel} · {summary.statusLabel}</small>
-              </div>
-              <div>
-                <span>Return</span>
-                <strong>{formatPercent(summary.totalReturnPercent)}</strong>
-                <small>Benchmark {formatPercent(summary.benchmarkReturnPercent)}</small>
-              </div>
+              <TerminalMetadataGrid
+                ariaLabel={`${summary.symbol} selected saved backtest run comparison metadata`}
+                className="terminal-backtest-comparison__card-metadata"
+                columns={2}
+                items={[
+                  {
+                    detail: `${summary.chartRangeLabel} · ${summary.capitalSourceLabel} · ${summary.statusLabel}`,
+                    label: summary.symbol,
+                    value: summary.strategyLabel,
+                  },
+                  {
+                    detail: `Benchmark ${formatPercent(summary.benchmarkReturnPercent)}`,
+                    label: 'Return',
+                    value: formatPercent(summary.totalReturnPercent),
+                  },
+                ]}
+              />
               <Button data-testid="backtest-comparison-remove-run" onClick={() => workflow.removeComparisonRunSelection(summary.runId)} size="sm" type="button" variant="ghost">
                 Remove
               </Button>

@@ -2,6 +2,7 @@
 
 import type { TerminalChartWorkspaceWorkflow } from '@/lib/terminalChartWorkspaceWorkflow';
 import { CHART_RANGE_DESCRIPTIONS, CHART_RANGE_LABELS, type ChartRange } from '@/types/marketData';
+import { TerminalMetadataGrid } from './TerminalMetadataGrid';
 import { TerminalPanel } from './TerminalPanel';
 import { TerminalStatusBadge } from './TerminalStatusBadge';
 
@@ -35,14 +36,17 @@ export function TerminalInstrumentHeader({ chart }: TerminalInstrumentHeaderProp
           <span>{chart.view.fallbackCopy}</span>
         </div>
 
-        <dl className="terminal-instrument-header__identity" data-testid="terminal-chart-identity">
-          {chart.view.identityRows.map((row) => (
-            <div key={row.label}>
-              <dt>{row.label}</dt>
-              <dd>{row.code ? <code>{row.value}</code> : row.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <TerminalMetadataGrid
+          ariaLabel="Chart Exact Instrument Identity metadata"
+          className="terminal-instrument-header__identity"
+          columns={3}
+          items={chart.view.identityRows.map((row) => ({
+            code: row.code,
+            label: row.label,
+            value: row.value,
+          }))}
+          testId="terminal-chart-identity"
+        />
       </div>
 
       <div id="terminal-chart-range" className="terminal-chart-range-controls" aria-label="Chart range lookback controls" data-testid="chart-range-controls">
