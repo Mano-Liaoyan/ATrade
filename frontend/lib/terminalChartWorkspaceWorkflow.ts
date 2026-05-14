@@ -11,6 +11,7 @@ import {
   type SymbolChartWorkflowOptions,
 } from './symbolChartWorkflow';
 import { getMarketDataIdentity, type NormalizedInstrumentIdentity } from './instrumentIdentity';
+import { createTerminalChartHoverDetails, type TerminalChartHoverDetailRow } from './terminalChartHoverDetails';
 import {
   CHART_RANGE_DESCRIPTIONS,
   CHART_RANGE_LABELS,
@@ -43,6 +44,11 @@ export type TerminalChartWorkspaceViewModel = {
   indicatorSourceLabel: string;
   latestUpdateSourceLabel: string | null;
   staleCandleSourceWarning: string | null;
+  hoverDetailRows: TerminalChartHoverDetailRow[];
+  hoverDetailsTitle: string;
+  compactIdentityLabel: string;
+  compactSourceLabel: string;
+  compactStateLabel: string | null;
   streamLabel: string;
   streamTone: TerminalChartStreamTone;
   fallbackCopy: string;
@@ -152,6 +158,23 @@ export function createTerminalChartWorkspaceViewModel({
     hasCandleData,
     hasIndicatorData,
     isEmpty: !hasCandleData,
+    ...createTerminalChartHoverDetails({
+      candleSource: candlesSource,
+      candleSourceLabel: formatMarketDataSourceLabel(candlesSource, candlesSourceStatus),
+      candleSourceStatus: candlesSourceStatus ?? null,
+      fallbackCopy: TERMINAL_CHART_HTTP_FALLBACK_COPY,
+      identity,
+      indicatorSource: indicatorsSource ?? candlesSource,
+      indicatorSourceLabel: formatMarketDataSourceLabel(indicatorsSource ?? candlesSource, indicatorsSourceStatus ?? candlesSourceStatus),
+      latestUpdateSource,
+      latestUpdateSourceLabel: latestUpdateSource ? formatMarketDataSourceLabel(latestUpdateSource) : null,
+      noOrderCopy: TERMINAL_CHART_NO_ORDER_COPY,
+      rangeDescription: CHART_RANGE_DESCRIPTIONS[chartRange],
+      rangeLabel: CHART_RANGE_LABELS[chartRange],
+      streamLabel: `Stream ${streamState}`,
+      streamState,
+      symbol,
+    }),
   };
 }
 
@@ -208,12 +231,23 @@ function createTerminalChartIdentityRows(symbol: string, identity: NormalizedIns
   return [
     { label: 'Symbol', value: identity.symbol, code: true },
     { label: 'Provider', value: identity.provider.toUpperCase(), code: true },
-    { label: 'Provider ID', value: identity.providerSymbolId ?? 'Unavailable', code: true },
-    { label: 'IBKR conid', value: identity.ibkrConid === null ? 'Unavailable' : String(identity.ibkrConid), code: true },
+    { label: 'Provider symbol id', value: formatProviderSymbolIdRowValue(identity), code: true },
     { label: 'Exchange', value: identity.exchange ?? 'Unavailable', code: true },
     { label: 'Currency', value: identity.currency, code: true },
     { label: 'Asset class', value: identity.assetClass, code: true },
   ];
+}
+
+function formatProviderSymbolIdRowValue(identity: NormalizedInstrumentIdentity): string {
+  if (!identity.providerSymbolId) {
+    return 'Unavailable';
+  }
+
+  if (identity.provider === 'ibkr' && identity.ibkrConid !== null && String(identity.ibkrConid) === identity.providerSymbolId) {
+    return `${identity.providerSymbolId} (IBKR conid alias)`;
+  }
+
+  return identity.providerSymbolId;
 }
 
 export { ChartPollingFallbackMs };

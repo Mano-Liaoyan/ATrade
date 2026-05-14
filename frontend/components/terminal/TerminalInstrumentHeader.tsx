@@ -31,9 +31,26 @@ export function TerminalInstrumentHeader({ chart }: TerminalInstrumentHeaderProp
       <div className="terminal-instrument-header__grid">
         <div className="terminal-instrument-header__summary">
           <span className="terminal-instrument-header__symbol">{chart.normalizedSymbol}</span>
-          <span>{chart.view.candleSourceLabel}</span>
+          <span
+            aria-label={`Chart identity details. ${chart.view.hoverDetailsTitle}`}
+            className="terminal-instrument-header__hover-chip"
+            data-testid="chart-identity-hover-details"
+            tabIndex={0}
+            title={chart.view.hoverDetailsTitle}
+          >
+            {chart.view.compactIdentityLabel}
+          </span>
+          <span
+            aria-label={`Chart source details. ${chart.view.hoverDetailsTitle}`}
+            className="terminal-instrument-header__hover-chip"
+            data-testid="chart-source-hover-details"
+            tabIndex={0}
+            title={chart.view.hoverDetailsTitle}
+          >
+            {chart.view.compactSourceLabel}
+          </span>
+          {chart.view.compactStateLabel ? <span className="terminal-instrument-header__state-label">{chart.view.compactStateLabel}</span> : null}
           <span>{chart.view.chartRangeDescription}</span>
-          <span>{chart.view.fallbackCopy}</span>
         </div>
 
         <TerminalMetadataGrid

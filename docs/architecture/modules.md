@@ -726,7 +726,12 @@ references.
   volume, SMA overlays, fit-content, crosshair behavior, and cleanup, and is only
   mounted by `TerminalChartWorkspace` when actual candle rows exist. Empty candle
   arrays stay explicit no-data states instead of synthetic bars while
-  `TimeframeSelector` and `IndicatorPanel` remain retired.
+  `TimeframeSelector` and `IndicatorPanel` remain retired. Chart identity,
+  source, cache freshness, original provider source (`timescale-cache:{originalSource}`),
+  selected range, and fallback details are exposed through hover/focus chips near
+  the stock ID/source labels so visible labels stay compact and IBKR `conid`
+  remains provider-symbol-id alias metadata rather than a separate identity
+  dimension.
   `frontend/lib/terminalAnalysisWorkflow.ts` adapts `analysisClient`
   discovery/run behavior for `TerminalAnalysisWorkspace`, which
   replaces `AnalysisPanel`; `frontend/types/backtesting.ts`,

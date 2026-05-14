@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-06
+updated: 2026-05-14
 summary: Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.
 see_also:
   - ../INDEX.md
@@ -780,7 +780,12 @@ Current implementation:
   state and updates from `/hubs/market-data`, and HTTP polling fallback when
   streaming closes or is unavailable while `frontend/lib/terminalChartWorkspaceWorkflow.ts`
   adapts range/source/identity/stream state for `TerminalChartWorkspace`,
-  `TerminalInstrumentHeader`, and `TerminalIndicatorGrid`
+  `TerminalInstrumentHeader`, and `TerminalIndicatorGrid`; chart identity/source
+  notes stay out of long footers by using compact stock ID/source chips whose
+  hover/focus details expose provider-neutral Exact Instrument Identity, original
+  provider source such as `timescale-cache:{originalSource}`, cache freshness,
+  selected range, and fallback state without secrets, account IDs, provider
+  runtime URLs, raw commands, cookies, or tokens
 - `frontend/lib/terminalAnalysisWorkflow.ts` owns provider-neutral engine
   discovery/run states for `TerminalAnalysisWorkspace`, including no-engine,
   runtime-unavailable, running, and result states; `TerminalProviderDiagnostics`
