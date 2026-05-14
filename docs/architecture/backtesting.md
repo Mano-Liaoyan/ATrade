@@ -274,9 +274,14 @@ not-found responses, cancel/retry behavior, runner/SignalR source wiring,
 built-in strategy/result contract strings, no-custom-code/no-order guardrails,
 and redaction of sensitive values from API responses, SignalR payloads, and
 persisted saved-run rows. The terminal backtest workspace validation covers the
-enabled rail registration, API/hub paths, capital panel, strategy form strings,
-history/detail/cancel/retry/status UI, no fake result states, no order controls,
-and frontend-only `ATrade.Api` browser boundary. The comparison validation covers
+enabled rail registration, API/hub paths, effective-capital panel, progressive
+selected-instrument/strategy/advanced/create task sections, history/detail/
+cancel/retry/status UI, no fake result states, no order controls, and
+frontend-only `ATrade.Api` browser boundary. The comparison validation covers
 completed-run-only selection, comparison metric labels, strategy/benchmark equity
 overlay strings, no export controls, no fake/demo comparison data, and no direct
-provider/runtime/database access.
+provider/runtime/database access. Frontend node regression tests additionally
+verify the progressive saved-run layout flow, required/advanced grouping,
+truthful SignalR-to-HTTP fallback behavior without duplicate global SignalR
+state, scroll-owned backtest regions, comparison eligibility, and absence of
+out-of-scope order/export/optimization/custom-code/live-trading controls.
