@@ -154,6 +154,10 @@ The `frontend/` application owns:
   cache/migration state, optimistic UI interactions, and route-local workflow
   state; the active shell no longer persists context/monitor split sizes or
   layout reset state
+- one compact top-right workspace SignalR/status indicator that renders an
+  immediate local/client projection, then refines through ATrade.Api health and
+  hub checks; chart/backtest stream labels remain local to those workflows and
+  do not duplicate global connectivity copy
 - SignalR subscriptions for market-data stream updates plus HTTP fallback;
   browser-facing backtest status streaming uses safe `/hubs/backtests` payloads
   with HTTP/Postgres state remaining authoritative; broker status is
@@ -188,11 +192,13 @@ backend-owned stored stocks, render a Stored stocks selector/list, select the
 first available watchlist instrument as the default chart candidate, and keep
 loading, empty, cached-fallback, and backend-unavailable states explicit without
 using browser cache as authority or substituting a hard-coded symbol;
-`symbolChartWorkflow` owns the selected chart range lookback,
-candle/indicator HTTP reads, source-label formatting, SignalR subscription
-state, stream update application, and HTTP polling fallback when streaming closes
-or is unavailable; `terminalChartWorkspaceWorkflow` adapts that contract into
-workspace-ready range/source/identity/stream view models, including
+`workspaceStatusClient` owns the global browser-visible connectivity projection
+from deterministic local cache/read state, `GET /health`, and the safe
+`/hubs/backtests` hub; `symbolChartWorkflow` owns the selected chart range
+lookback, candle/indicator HTTP reads, source-label formatting, local stream
+subscription state, stream update application, and HTTP polling fallback when
+streaming closes or is unavailable; `terminalChartWorkspaceWorkflow` adapts that
+contract into workspace-ready range/source/identity/stream view models, including
 `hasCandleData` so empty candle arrays remain explicit no-data states;
 `TerminalChartWorkspace` only mounts `CandlestickChart` when real candle rows
 exist, and `CandlestickChart` measures/resizes its `lightweight-charts` canvas so
@@ -209,8 +215,8 @@ workflow/client modules through `ATradeTerminalApp`, `TerminalHomeModule`,
 `MarketMonitorDetailPanel`, `TerminalChartWorkspace`,
 `TerminalInstrumentHeader`, `TerminalIndicatorGrid`, `TerminalAnalysisWorkspace`,
 `TerminalBacktestWorkspace`, `BacktestComparisonPanel`,
-`TerminalProviderDiagnostics`, `TerminalModuleRail`, and
-`TerminalWorkspaceLayout`;
+`TerminalProviderDiagnostics`, `TerminalModuleRail`,
+`TerminalWorkspaceStatusIndicator`, and `TerminalWorkspaceLayout`;
 the old `TradingWorkspace` / `SymbolChartView` route
 wrappers, `SymbolSearch`, `TrendingList`, `Watchlist`, `MarketLogo`,
 `TimeframeSelector`, `IndicatorPanel`, `AnalysisPanel`, and `BrokerPaperStatus`

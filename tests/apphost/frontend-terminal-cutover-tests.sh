@@ -128,7 +128,7 @@ assert_terminal_workflows_reachable() {
   assert_file_contains "$frontend_root/lib/terminalMarketMonitorWorkflow.ts" 'removePin(row.watchlistSymbol)'
   assert_file_contains "$frontend_root/components/terminal/TerminalInstrumentHeader.tsx" 'data-testid="chart-range-controls"'
   assert_file_contains "$frontend_root/components/terminal/TerminalInstrumentHeader.tsx" 'chart.view.supportedRanges.map((chartRange)'
-  assert_file_contains "$frontend_root/lib/terminalChartWorkspaceWorkflow.ts" 'SignalR applies market-data updates when /hubs/market-data is reachable; if streaming is unavailable the view falls back to HTTP polling without synthetic data.'
+  assert_file_contains "$frontend_root/lib/terminalChartWorkspaceWorkflow.ts" 'Workspace streaming updates apply when available; if streaming is unavailable the chart view falls back to HTTP polling without synthetic data.'
   assert_file_contains "$frontend_root/lib/terminalAnalysisWorkflow.ts" 'getAnalysisEngines()'
   assert_file_contains "$frontend_root/lib/terminalAnalysisWorkflow.ts" 'runProviderNeutralAnalysis(createTerminalAnalysisRunRequest'
   assert_file_contains "$frontend_root/components/terminal/TerminalStatusModule.tsx" '<TerminalProviderDiagnostics />'
@@ -170,6 +170,8 @@ assert_atrade_api_client_boundaries() {
   assert_file_contains "$frontend_root/lib/marketDataClient.ts" '`/api/market-data/${encodedSymbol}/candles?${params.toString()}`'
   assert_file_contains "$frontend_root/lib/marketDataClient.ts" '`/api/market-data/${encodedSymbol}/indicators?${params.toString()}`'
   assert_file_contains "$frontend_root/lib/marketDataStream.ts" "withUrl(buildApiUrl('/hubs/market-data'))"
+  assert_file_contains "$frontend_root/lib/workspaceStatusClient.ts" "buildApiUrl(WORKSPACE_STATUS_HEALTH_PATH)"
+  assert_file_contains "$frontend_root/lib/workspaceStatusClient.ts" "withUrl(buildApiUrl(WORKSPACE_STATUS_STREAM_PATH))"
   assert_file_contains "$frontend_root/lib/watchlistClient.ts" "fetchWatchlist('/api/workspace/watchlist')"
   assert_file_contains "$frontend_root/lib/watchlistClient.ts" "fetchWatchlist('/api/workspace/watchlist', {"
   assert_file_contains "$frontend_root/lib/watchlistClient.ts" '`/api/workspace/watchlist/pins/${encodedInstrumentKey}`'
@@ -304,6 +306,8 @@ assert_terminal_markers_present() {
   assert_path_missing "$frontend_root/lib/terminalCommandRegistry.ts"
   assert_file_contains "$frontend_root/components/terminal/TerminalModuleRail.tsx" 'data-testid="terminal-module-rail"'
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-workspace-layout"'
+  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" '<TerminalWorkspaceStatusIndicator />'
+  assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceStatusIndicator.tsx" 'data-testid="terminal-global-signalr-status"'
   assert_file_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-layout-region="primary"'
   assert_file_not_contains "$frontend_root/components/terminal/TerminalWorkspaceLayout.tsx" 'data-testid="terminal-layout-reset"'
   assert_file_contains "$frontend_root/components/terminal/TerminalMarketMonitor.tsx" 'data-testid="terminal-market-monitor"'

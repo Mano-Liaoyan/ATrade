@@ -18,7 +18,7 @@ export type TerminalProviderDiagnosticsProps = {
 export function TerminalProviderDiagnostics({
   analysisStateLabel = 'Provider-neutral analysis discovery through ATrade.Api',
   marketDataSourceLabel = 'Market-data source labels are surfaced on chart and monitor payloads',
-  signalRStateLabel = 'SignalR state is reported inside active chart workspaces',
+  signalRStateLabel = 'Global workspace status owns stream connectivity; modules show only local stream state when needed',
 }: TerminalProviderDiagnosticsProps) {
   const [status, setStatus] = useState<BrokerStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,7 +136,7 @@ function getDiagnosticItems({
     },
     {
       detail: 'HTTP polling fallback remains visible when stream state is closed or unavailable.',
-      label: 'SignalR stream',
+      label: 'Workspace stream',
       value: signalRStateLabel,
     },
     {

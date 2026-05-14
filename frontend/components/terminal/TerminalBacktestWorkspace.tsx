@@ -49,7 +49,7 @@ export function TerminalBacktestWorkspace({
         actions={(
           <div className="terminal-backtest-workspace__badges">
             <TerminalStatusBadge tone={workflow.streamState === 'connected' ? 'success' : workflow.streamState === 'unavailable' ? 'warning' : 'info'} pulse={workflow.streamState === 'connecting' || workflow.streamState === 'reconnecting'} data-testid="backtest-stream-state">
-              SignalR {workflow.streamState}
+              Run stream {workflow.streamState}
             </TerminalStatusBadge>
             <TerminalStatusBadge tone="warning">No orders</TerminalStatusBadge>
           </div>
