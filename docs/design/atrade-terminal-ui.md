@@ -36,7 +36,7 @@ surfaces.
 - [`analysis-engines.md`](../architecture/analysis-engines.md) — provider-neutral
   analysis request/result contract and LEAN integration boundary.
 - [`README.md`](../../README.md) and [`PLAN.md`](../../PLAN.md) — current runtime
-  surface, verification entry points, and active Taskplane queue.
+  surface, verification entry points, and active implementation direction.
 
 ## 1. Authority And Scope
 

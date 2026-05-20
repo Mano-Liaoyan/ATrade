@@ -60,12 +60,6 @@ assert_guardrail_docs() {
   assert_file_contains "$repo_root/AGENTS.md" 'Safari may hide native OS scrollbars'
   assert_file_contains "$repo_root/AGENTS.md" 'Mobile optimization is not in scope'
 
-  assert_file_contains "$repo_root/tasks/CONTEXT.md" 'latest stable desktop'
-  assert_file_contains "$repo_root/tasks/CONTEXT.md" 'Safari, Firefox, Chrome, and Edge'
-  assert_file_contains "$repo_root/tasks/CONTEXT.md" 'page-level scrolling disabled'
-  assert_file_contains "$repo_root/tasks/CONTEXT.md" 'NODE and ORDERS'
-  assert_file_contains "$repo_root/tasks/CONTEXT.md" 'app-owned or explicitly styled visible scrollbar tracks/thumbs'
-
   assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'latest stable desktop'
   assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'Safari, Firefox, Chrome, or Edge'
   assert_file_contains "$repo_root/docs/design/atrade-terminal-ui.md" 'page-level `overflow: hidden`'

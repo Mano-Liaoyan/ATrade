@@ -1,19 +1,18 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-10
+updated: 2026-05-21
 summary: Current implementation plan after the ATrade paper workspace frontend reconstruction, paper-capital source, saved backtesting API seams, and terminal comparison surface.
 see_also:
   - README.md
   - docs/INDEX.md
   - docs/design/atrade-terminal-ui.md
   - scripts/README.md
-  - tasks/CONTEXT.md
 ---
 
 # ATrade Current Plan
 
-**Last updated:** 2026-05-10
+**Last updated:** 2026-05-21
 
 ## Current Focus
 
@@ -22,9 +21,8 @@ market data, TimescaleDB cache-aside, durable Postgres watchlists, durable
 Postgres local paper-capital fallback storage, durable Postgres saved backtest
 run history, an API-hosted async backtest runner with SignalR job updates,
 exact provider/market pins, configurable local AppHost ports,
-optional Compose-managed LEAN Docker runtime wiring, and the completed `TP-045`
-through `TP-057` frontend reconstruction,
-no-command cutover, layout simplification,
+optional Compose-managed LEAN Docker runtime wiring, and the completed frontend
+reconstruction, no-command cutover, layout simplification,
 top-chrome/filter-density cleanup, stock chart visibility restoration, original
 terminal theme foundation, module rail icon/collapse behavior, visible
 market-monitor table scrollbars, `/chart` Stored stocks default behavior, and
@@ -51,8 +49,8 @@ black/graphite/amber institutional terminal
 palette with red/green market states, and final cutover/no-command/simplified-layout/top-chrome
 filter-density/chart-visibility/theme-refactor guardrails for clean-room,
 no-order, truthful provider-state, and `ATrade.Api` browser boundaries. The
-backend/backtesting MVP seams (`TP-058` through `TP-061`) add paper-capital
-source selection, saved backtest APIs, API-hosted async execution, and built-in
+backend/backtesting MVP seams add paper-capital source selection, saved backtest
+APIs, API-hosted async execution, and built-in
 strategy/rich result expansion through `ATrade.Api`: effective capital prefers a
 safe authenticated IBKR paper balance, falls back to a user-configured local
 Postgres ledger value, reports explicit unavailable/unconfigured state when
@@ -62,12 +60,12 @@ cancelled best-effort, and broadcast over `/hubs/backtests`. Saved runs now carr
 server-validated `sma-crossover`, `rsi-mean-reversion`, and `breakout`
 parameters, cost/slippage settings, buy-and-hold benchmark mode, and
 provider-neutral summary/equity-curve/simulated-trade result envelopes without
-custom code or order routing. `TP-062` adds the first user-facing terminal
-BACKTEST module on top of those contracts: an effective/local paper-capital
+custom code or order routing. The first user-facing terminal BACKTEST module
+builds on those contracts: an effective/local paper-capital
 panel, single-symbol SMA/RSI/breakout strategy form, SignalR live status,
 Postgres-backed history/detail, cancel, retry-as-new-run behavior, and truthful
-empty/unavailable states with no order controls or fake results. `TP-063` adds
-completed-run-only saved-run comparison, side-by-side metrics, and persisted
+empty/unavailable states with no order controls or fake results. Saved-run
+comparison adds completed-run-only selection, side-by-side metrics, and persisted
 strategy/buy-and-hold benchmark equity overlays without export, optimization,
 fake demo data, direct provider access, or order-routing scope. The active
 clean-room UI design authority remains `docs/design/atrade-terminal-ui.md`.
@@ -82,69 +80,29 @@ Current repository contracts remain:
 - keep frontend desktop behavior consistent across latest stable Safari, Firefox, Chrome, and Edge: page-level scrolling may stay disabled only when rail/workspace/panel/table/module overflow remains reachable through visible internal/custom scroll affordances; mobile optimization is out of scope for the current frontend UX batch beyond preserving existing fallbacks
 - keep durable runtime/code changes paired with active documentation updates
 
-## Active Task Queue
+## Completed Work Summary
 
-The frontend reconstruction queue is complete through the rail-first
+The frontend reconstruction is complete through the rail-first
 top-chrome/filter-density cleanup, stock chart visibility restoration, original
 black/graphite/amber terminal theme foundation, module rail icon/collapse
-behavior, and market-monitor visible scrollbar work:
+behavior, market-monitor visible scrollbar work, canonical enabled/disabled and
+symbol route architecture, `/chart` Stored stocks behavior, purpose-built
+Home/Search/Watchlist pages, and the consolidated frontend route/visibility
+regression suite.
 
-- `TP-045` — defined the active UI design spec and clean-room visual guardrails
-- `TP-046` — bootstrapped the shadcn/Tailwind/Radix UI stack and original ATrade primitives
-- `TP-047` — built the module shell, module rail, and resizable layout persistence
-- `TP-048` — rebuilt search, trending, and watchlist as a dense market monitor
-- `TP-049` — rebuilt chart and analysis workspaces inside the new shell
-- `TP-050` — completed frontend cutover, cleanup, verification, and documentation updates
-- `TP-051` — removed visible terminal branding plus the command input/parser/registry and added no-command validation
-- `TP-052` — simplified the workspace to a full-bleed single-primary layout with no context/monitor/footer chrome, background grid, page-level scroll, or layout persistence
-- `TP-053` — removed the remaining top app brand header/global safety strip and compacted market-monitor filters while preserving module safety surfaces
-- `TP-054` — restored visible stock chart rendering with measured `lightweight-charts` sizing, non-collapsing chart layout, truthful empty/provider states, and chart visibility validation
-- `TP-055` — refactored the frontend into an original black/graphite/amber institutional terminal palette, reduced cyan/blue-gradient dominance, aligned chart colors, and added theme validation
-- `TP-056` — added purpose-matched icons for enabled and visible-disabled rail modules, local accessible icon-first rail collapse behavior, and rail validation
-- `TP-057` — made the market monitor table own visible vertical and horizontal scrollbars for wide exact-identity/action columns and added scrollbar validation
+The backend/backtesting MVP wave delivered paper-capital source selection,
+first-class saved backtest persistence and REST APIs, API-hosted async
+execution, restart recovery, server-side market-data/analysis execution,
+best-effort cancellation, `/hubs/backtests` SignalR updates, built-in strategy
+validation, rich provider-neutral result envelopes, buy-and-hold benchmarks, the
+enabled terminal BACKTEST workspace, completed-run comparison, persisted
+strategy/buy-and-hold equity overlays, and comparison validation.
 
-`TP-058` delivered the paper-capital source packet for the backend/backtesting
-MVP wave. `TP-059` added the first-class saved backtesting domain, Postgres
-persistence, REST API, and contract validation. `TP-060` added the API-hosted
-async runner, restart recovery, server-side market-data/analysis execution,
-best-effort cancellation, and `/hubs/backtests` SignalR updates without changing
-public REST route names. `TP-061` expanded the saved-run contract with SMA
-crossover, RSI mean-reversion, and breakout built-ins, validated
-parameters/costs/slippage, rich provider-neutral result envelopes, and
-buy-and-hold benchmarks while keeping LEAN-only/no-custom-code/no-order
-guardrails. `TP-062` added the enabled terminal BACKTEST rail module, API-only
-backtest client/workflow, paper-capital-backed run form, live status, saved
-history/detail, cancel, retry, and frontend backtest workspace validation.
-`TP-063` added completed-run-only saved-run comparison, metrics table/cards,
-persisted strategy/buy-and-hold equity overlays, and comparison validation.
-`TP-064` added frontend layout/browser visibility guardrails plus durable memory
-in agent/context/UI docs. `TP-065` added canonical terminal route architecture
-for enabled/disabled modules, exact chart/analysis/backtest symbol routes, route
-architecture validation, and removal of the old `/symbols/{symbol}` route without
-a redirect or alias. `TP-066` added `/chart` Stored stocks selector/list behavior,
-first-backend-watchlist-instrument default chart rendering, exact provider-neutral identity
-handoff, explicit empty/unavailable Search and Watchlist links, and chart-default
-validation without fake default symbols.
-`TP-067` made Home, Search, and Watchlist purpose-built instead of three
-identical market-monitor wrappers, while preserving shared lower-level search,
-filter, table, detail, exact identity, and backend watchlist behavior. `TP-068`
-added `tests/apphost/frontend-terminal-regression-suite-tests.sh`, a consolidated
-frontend regression suite covering accepted enabled and visible-disabled routes,
-`/symbols/{symbol}` removal, exact identity link preservation, desktop
-visibility/scroll-ownership guardrails, `/chart` Stored stocks defaults, and
-distinct Home/Search/Watchlist page purposes.
-
-The frontend route/visibility UX batch through `TP-068` is complete. `TP-069`
-through `TP-071` completed the Compose-managed infrastructure startup cutover.
-`TP-072` completed Exact Instrument Identity deepening so canonical route/query
-handoff, frontend provisional keys, backend `instrumentKey` / `pinKey` values,
-watchlist persistence, and saved backtest run identity use the provider-neutral
-tuple only while accepting legacy `ibkrConid`-bearing inputs solely to normalize
-forward.
-
-Completed task packets through `TP-072` are present in `tasks`; completed
-packets should be archived when convenient. The next new Taskplane packet should
-use `TP-073`.
+The Compose-managed infrastructure startup cutover is complete. Exact Instrument
+Identity deepening is complete so canonical route/query handoff, frontend
+provisional keys, backend `instrumentKey` / `pinKey` values, watchlist
+persistence, and saved backtest run identity use the provider-neutral tuple only
+while accepting legacy `ibkrConid`-bearing inputs solely to normalize forward.
 
 ## Follow-Up Direction
 
@@ -176,6 +134,3 @@ data, direct provider/database access, or order-entry UI paths.
 - Do not add real order placement or live-trading behavior in the current task queue.
 - Update active docs in the same change as durable code/runtime changes.
 
-## Next Task ID
-
-`TP-073`

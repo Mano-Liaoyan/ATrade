@@ -74,7 +74,8 @@ nunit-*.xml
 # Lean Workspace
 lean-workspaces/
 
-# Taskplane / Pi runtime artifacts (machine-specific, do not commit)
+# Retired Taskplane / Pi runtime artifacts
+.pi/agents/
 .pi/batch-state.json
 .pi/batch-history.json
 .pi/lane-state-*
@@ -86,14 +87,12 @@ lean-workspaces/
 .pi/settings.json
 .pi/dashboard-preferences.json
 .pi/taskplane.json
+.pi/taskplane-config.json
 .pi/diagnostics/
 .pi/mailbox/
 .pi/runtime/
 .pi/supervisor/
 .pi/telemetry/
 .pi/verification/
-tasks/dependencies.json
+.pi/skills/ask-and-plan
 .taskplane-tasks/
-
-# Pi project-local packages (if using pi install -l)
-.pi/npm/

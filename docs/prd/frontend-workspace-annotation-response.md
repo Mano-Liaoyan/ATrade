@@ -32,7 +32,7 @@ Build a focused frontend workspace polish and responsiveness pass that keeps all
 - chart response path optimized for cache-first, instant cached render, skeleton/stale-while-refresh behavior, and truthful 429/503/provider/cache states;
 - internal scroll regions consuming wheel input first, then chaining to workspace/global scroll only at their ends.
 
-This PRD is planning-only. It creates no Taskplane artifacts and does not authorize implementation by itself.
+This PRD is planning-only. It creates no implementation artifacts and does not authorize implementation by itself.
 
 ## User Stories
 
@@ -125,7 +125,7 @@ This PRD is planning-only. It creates no Taskplane artifacts and does not author
 ## Out of Scope
 
 - No implementation in this PRD step.
-- No Taskplane packets, `tasks/TP-*` folders, or Taskplane state edits.
+- No implementation artifacts, production code, test, schema, API, or UI edits in this PRD step.
 - No production code, test, schema, API, or UI edits in this PRD step.
 - No fake market bars, synthetic candles, demo chart data, fake analysis signals, fake backtest results, or mock production fallback data.
 - No browser direct access to Postgres, TimescaleDB, Redis, NATS, IBKR/iBeam, LEAN, or provider runtimes.

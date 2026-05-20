@@ -1,47 +1,48 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-04-29
-summary: Lightweight GitHub and Taskplane coordination contract after removal of the old role-based workforce.
+updated: 2026-05-21
+summary: Lightweight GitHub coordination contract for repository work.
 see_also:
   - ../../README.md
   - ../../PLAN.md
-  - ../../tasks/CONTEXT.md
   - ../INDEX.md
 ---
 
-# GitHub And Taskplane Coordination
+# GitHub Coordination
 
-ATrade now coordinates implementation through Taskplane task packets under
-`tasks/`. The old role-based workforce labels and per-role plans are no longer
-part of the active operating model.
+ATrade coordinates implementation through GitHub Issues, pull requests, active
+repository docs, and local verification commands.
 
 ## Source Of Truth
 
 | Need | Source |
 |------|--------|
-| Current active work | `PLAN.md` |
-| Task area state and next ID | `tasks/CONTEXT.md` |
-| Executable task instructions | `tasks/<TASK-ID>-<slug>/PROMPT.md` |
-| Task execution state | `tasks/<TASK-ID>-<slug>/STATUS.md` |
-| Finished task history | `tasks/archive/<TASK-ID>-<slug>/` |
+| Current implementation direction | `PLAN.md` |
+| Human-facing repository overview | `README.md` |
+| Issue and PR state | GitHub Issues and pull requests in `Mano-Liaoyan/ATrade` |
 | Active documentation | `docs/INDEX.md` |
 
-## Task Flow
+## Work Flow
 
-1. Create or update a Taskplane packet for implementation work.
-2. Keep dependencies in the packet's `## Dependencies` section.
-3. Keep file scope in the packet's `## File Scope` section so the orchestrator can avoid conflicts.
-4. Run work through `/orch <path/to/PROMPT.md>` or `/orch all`.
-5. When a task completes, leave its `.DONE` marker in place and move the whole task directory to `tasks/archive/`.
-6. Update `PLAN.md` and `tasks/CONTEXT.md` when the active queue changes.
+1. Use a GitHub issue or PR for durable work state when the work needs tracking.
+2. Keep acceptance criteria, blockers, and verification notes in the issue or PR.
+3. Use `docs/INDEX.md` to find active docs for the area being changed.
+4. Update active docs in the same change as durable runtime, architecture, or workflow changes.
+5. Run the relevant local verification before claiming completion.
 
 ## GitHub Labels
 
-GitHub labels may still be useful for human-visible issue/PR state, but they are
-not a replacement for Taskplane packet state.
+The default engineering-skill triage labels are configured in
+`docs/agents/triage-labels.md`:
 
-Recommended workflow labels:
+- `needs-triage`
+- `needs-info`
+- `ready-for-agent`
+- `ready-for-human`
+- `wontfix`
+
+Additional workflow labels may be useful for human-visible issue/PR state:
 
 - `agent:ready`
 - `agent:in-progress`
@@ -51,22 +52,20 @@ Recommended workflow labels:
 - `agent:merged`
 - `agent:docs-required`
 
-The old `role:*` label taxonomy is deprecated with the removal of the
-role-based workforce files.
-
 ## Blocked Work
 
-Blocked work must be resumable from repository files, not chat history.
+Blocked work must be resumable from repository files and GitHub discussion, not
+chat history.
 
 When blocked:
 
-1. Record the blocker in the task's `STATUS.md`.
-2. Add a concise unblock note to the related issue or PR if one exists.
-3. Mark the issue or PR with `agent:blocked` or `agent:needs-human` if GitHub is in use.
-4. Continue with another ready task when possible.
+1. Record the blocker in the related issue or PR.
+2. Add a concise unblock note with the decision or input needed.
+3. Mark the issue or PR with `agent:blocked` or `agent:needs-human` when those labels are in use.
+4. Continue with another ready issue when possible.
 
-When unblocked, update `STATUS.md`, remove/adjust the GitHub blocker label, and
-resume from the task packet.
+When unblocked, update the issue or PR, remove or adjust the blocker label, and
+resume from the recorded acceptance criteria.
 
 ## Documentation
 

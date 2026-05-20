@@ -1,8 +1,8 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-07
-summary: Human-facing overview of the current ATrade application, run contract, and active Taskplane work queue.
+updated: 2026-05-21
+summary: Human-facing overview of the current ATrade application, run contract, and active implementation direction.
 see_also:
   - PLAN.md
   - docs/INDEX.md
@@ -20,9 +20,8 @@ see_also:
 ATrade is a personal swing and position trading platform built as a modular
 monolith with .NET 10, Next.js, and Aspire 13.2.
 
-The repository currently contains a runnable local stack and a Taskplane work
-queue for architecture deepening across the provider-backed paper-trading
-workspace.
+The repository currently contains a runnable local stack for architecture
+deepening across the provider-backed paper-trading workspace.
 
 ## Current Stack
 
@@ -208,12 +207,9 @@ runs as new saved runs without exposing export controls, optimization, order
 controls, fake results, direct provider/runtime/database access, or account
 identifiers.
 
-## Active Task Queue
+## Implementation Direction
 
-Taskplane packets live directly under `tasks/`; completed packets are archived
-under `tasks/archive/`.
-
-The `TP-045` through `TP-068` frontend polish, routing, page-purpose, and backtesting MVP work
+The completed frontend polish, routing, page-purpose, and backtesting MVP work
 now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
 module/workflow shell, dense market monitor, chart/analysis workspaces, final
 no-command cutover, simplified rail-first full-bleed workspace, compact filters,
@@ -232,12 +228,9 @@ workflow actions rather than the retired old shell/list route wrappers, a comman
 system, cyan/blue-gradient-dominant styling, or the removed app-level, context,
 monitor, footer, and top-safety chrome.
 
-The frontend route/visibility UX batch through `TP-068` is complete. Future frontend tasks should build on the verified route matrix, `/symbols/{symbol}` removal, desktop scroll-ownership guardrails, `/chart` Stored stocks behavior, and distinct Home/Search/Watchlist page purposes.
-
-The next new Taskplane packet should use `TP-073`. Completed Taskplane packets
-through `TP-063` are present in `tasks/`; completed packets should be archived
-when convenient. During orchestrated runs the runtime handles post-merge
-archival for active task folders.
+Future frontend work should build on the verified route matrix,
+`/symbols/{symbol}` removal, desktop scroll-ownership guardrails, `/chart`
+Stored stocks behavior, and distinct Home/Search/Watchlist page purposes.
 
 ## Repository Map
 
@@ -249,13 +242,8 @@ ATrade/
 ├── scripts/              # Startup and local environment contracts
 ├── src/                  # .NET 10 backend modules and AppHost
 ├── workers/              # Long-running worker processes
-├── frontend/             # Next.js application
-├── tasks/                # Active Taskplane packets and archive
-└── .pi/                  # Taskplane/Pi runtime config, runtime agents, and skill symlinks
+└── frontend/             # Next.js application
 ```
-
-Reusable `.pi/skills/` entries are opt-in Pi skills. `.pi/agents/` files are Taskplane runtime
-agents used by the orchestrator.
 
 ## Documentation Rules
 
@@ -266,7 +254,7 @@ agents used by the orchestrator.
 - Durable code or runtime changes must update the relevant active docs in the same change.
 - Frontend desktop behavior must stay consistent across latest stable Safari, Firefox, Chrome, and Edge: if page-level scrolling is disabled, all rail/workspace/panel/table/module overflow must remain reachable through visible internal/custom scroll affordances. Mobile optimization is not in scope for the current frontend UX batch beyond preserving existing fallbacks.
 - Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
-- No task may introduce real order placement or live-trading behavior unless a future task explicitly changes the safety contract and docs.
+- No change may introduce real order placement or live-trading behavior unless a future update explicitly changes the safety contract and docs.
 
 ## Solution File Contract
 
@@ -279,8 +267,8 @@ dotnet build ATrade.slnx --nologo --verbosity minimal
 ```
 
 The legacy `ATrade.sln` remains temporarily as a non-authoritative compatibility
-artifact for tools that have not adopted `.slnx`; active scripts, tests, docs,
-and new Taskplane prompts should prefer `ATrade.slnx`.
+artifact for tools that have not adopted `.slnx`; active scripts, tests, and
+docs should prefer `ATrade.slnx`.
 
 ## Verification Entry Points
 
@@ -328,7 +316,8 @@ Common verification scripts live under `tests/`:
 - `tests/apphost/frontend-trading-workspace-tests.sh`
 - `tests/apphost/frontend-workspace-workflow-module-tests.sh`
 
-Task packets list their own targeted and full verification commands.
+GitHub issues and pull requests should list any additional targeted verification
+commands they require.
 
 ## License
 
