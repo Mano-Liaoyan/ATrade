@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-01
+updated: 2026-05-21
 summary: Target high-level architecture for the ATrade modular monolith, Aspire 13.2 orchestration, and the `start run` contract.
 see_also:
   - ../INDEX.md
@@ -18,8 +18,7 @@ see_also:
 > current runnable slice. The repository now has an Aspire AppHost graph that
 > starts Compose-managed `Postgres`, `TimescaleDB`, `Redis`, and `NATS`, then
 > launches `ATrade.Api`, `ATrade.Ibkr.Worker`, and the Next.js frontend through Aspire.
-> Active implementation work is tracked in `PLAN.md` and Taskplane packets
-> under `tasks/`.
+> Active implementation work is tracked in `PLAN.md` and GitHub Issues/PRs.
 >
 > **Current backend slice:** `ATrade.Api` provides stable `GET /health`,
 > `GET /api/accounts/overview`, `GET /api/broker/ibkr/status`,

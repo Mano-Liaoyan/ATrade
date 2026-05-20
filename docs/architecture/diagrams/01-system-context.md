@@ -1,7 +1,7 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-17
+updated: 2026-05-21
 summary: C4-ish system context diagram for ATrade external actors, runtime surfaces, provider seams, and major storage boundaries.
 see_also:
   - ../../INDEX.md
@@ -23,13 +23,12 @@ analysis runtimes, workers, and storage stay behind server-side seams.
 flowchart LR
     trader["Trader / local operator"]
     github["GitHub Issues and PRs"]
-    taskplane["Taskplane / Pi agents"]
     ibkr["IBKR Client Portal through local iBeam"]
     lean["Optional LEAN runtime"]
     polygon["Planned Polygon market-data provider"]
 
     subgraph atrade["ATrade repository and local system"]
-        docs["Active docs and Taskplane packets"]
+        docs["Active docs"]
         apphost["Aspire AppHost"]
         frontend["Next.js paper workspace"]
         api["ATrade.Api"]
@@ -67,8 +66,7 @@ flowchart LR
     modules -.->|"analysis provider seam when enabled"| lean
     modules -.->|"future provider seam"| polygon
 
-    github <-->|"implementation coordination"| taskplane
-    taskplane -->|"creates and runs scoped packets"| docs
+    github -->|"implementation coordination"| docs
     docs -->|"authoritative implementation context"| modules
 ```
 
@@ -83,5 +81,5 @@ flowchart LR
   Concrete providers plug in beneath those contracts.
 - Solid external arrows are implemented or current local contracts. Dashed
   arrows show optional or planned provider/runtime seams.
-- Taskplane and GitHub are coordination surfaces for repository work; they are
+- GitHub Issues and PRs are coordination surfaces for repository work; they are
   not part of the runtime trading path.

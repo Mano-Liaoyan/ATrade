@@ -1,36 +1,31 @@
 ---
 status: active
 owner: maintainer
-updated: 2026-05-17
-summary: Operations, Taskplane coordination, documentation authority, verification, and safety guardrail diagram for ATrade work.
+updated: 2026-05-21
+summary: Operations, GitHub coordination, documentation authority, verification, and safety guardrail diagram for ATrade work.
 see_also:
   - ../../INDEX.md
-  - ../../tooling/taskplane-runtime-artifacts.md
   - ../overview.md
   - ../../process/github-coordination.md
   - ../../../AGENTS.md
-  - ../../../tasks/CONTEXT.md
   - ../../../scripts/README.md
 ---
 
-# Operations, Taskplane, And Safety
+# Operations And Safety
 
-ATrade coordinates implementation through GitHub Issues and Taskplane packets,
-while active docs remain the durable authority for architecture, runtime, and
-safety decisions. Local runtime state and secrets stay outside committed files.
+ATrade coordinates implementation through GitHub Issues and pull requests, while
+active docs remain the durable authority for architecture, runtime, and safety
+decisions. Local runtime state and secrets stay outside committed files.
 
 ```mermaid
 flowchart TD
     issue["GitHub issue or maintainer request"]
-    packet["Taskplane packet<br/>PROMPT.md and STATUS.md"]
-    scope["Packet dependencies and file scope"]
-    agents["Pi runtime agents<br/>task-worker, task-reviewer, task-merger, supervisor"]
-    done["Completed packet<br/>.DONE and archive when convenient"]
+    branch["Local branch and code changes"]
+    pr["Pull request"]
 
     subgraph authority["Documentation authority"]
         readme["README.md"]
         plan["PLAN.md"]
-        context["tasks/CONTEXT.md"]
         index["docs/INDEX.md"]
         activeDocs["Active docs only"]
         diagrams["Architecture diagrams"]
@@ -59,19 +54,15 @@ flowchart TD
         browser["Desktop scroll ownership and API-only browser access"]
     end
 
-    issue --> packet
-    packet --> scope
-    scope --> agents
-    agents --> done
-    done --> plan
-    done --> context
+    issue --> branch
+    branch --> pr
+    pr --> plan
 
     readme --> plan
-    plan --> context
-    context --> index
+    plan --> index
     index --> activeDocs
     activeDocs --> diagrams
-    packet -->|"must align with"| activeDocs
+    branch -->|"must align with"| activeDocs
 
     start --> template
     start --> localEnv
@@ -81,7 +72,7 @@ flowchart TD
     template -->|"safe defaults"| paper
 
     guardrails --> verification
-    verification --> agents
+    verification --> pr
     startTests --> start
     apphostTests --> compose
     apphostTests --> apphost
@@ -92,25 +83,20 @@ flowchart TD
 ```mermaid
 stateDiagram-v2
     [*] --> Requested
-    Requested --> Packeted: create scoped Taskplane packet
-    Packeted --> Blocked: explicit dependency open
-    Blocked --> Packeted: dependency resolved
-    Packeted --> Running: orchestrator dispatches work
+    Requested --> Ready: acceptance criteria clear
+    Ready --> Running: implementation starts
     Running --> Review: implementation and verification ready
     Review --> Running: changes requested
     Review --> Merged: accepted and merged
-    Merged --> Archived: .DONE marker and completed packet archive
-    Archived --> [*]
+    Merged --> [*]
 ```
 
 ## How To Read It
 
 - `docs/INDEX.md` is the discovery layer. Only documents marked `active` are
   implementation authority.
-- Taskplane file scope and dependency sections are the conflict-avoidance
-  mechanism for orchestrated work. Local `.pi/` runtime state is not durable
-  repository truth unless the tooling artifact doc explicitly lists it as
-  committed project config.
+- GitHub issues and PRs hold durable work state, acceptance criteria, blockers,
+  and review discussion.
 - Verification is tied to the changed surface: solution-level .NET checks use
   `ATrade.slnx`, startup behavior uses the start-wrapper/AppHost/Compose tests,
   and frontend work keeps the route and desktop visibility guardrails.
