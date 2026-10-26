@@ -3,6 +3,23 @@
 ATrade is a personal trading platform. It finds stocks, shows charts, tests
 strategies on history and on live data, and sends orders to a broker.
 
+## Market data
+
+**Instrument**:
+A security that the user can trade. A stock symbol, an exchange, and a
+currency identify it. Examples: `AAPL / NASDAQ / USD`, `700 / SEHK / HKD`.
+_Avoid_: ticker. Use symbol only for the code part of an instrument.
+
+**Bar**:
+The open price, high price, low price, close price, and volume of one
+instrument in one time period. In Chinese, write K 线. A chart can show a bar
+as a candlestick, but the data is always a bar.
+_Avoid_: candle
+
+**Watchlist**:
+The list of instruments that the user saves. In Chinese, write 自选股.
+_Avoid_: favorites, pins
+
 ## Strategies
 
 **Strategy**:
@@ -33,6 +50,10 @@ and forward tests.
 _Avoid_: demo trading, simulated trading
 
 ## Orders
+
+**Paper account**:
+The broker account that holds no real money. Paper orders go to this account.
+_Avoid_: demo account, simulated account
 
 **Paper order**:
 A real order sent to the broker's paper account. The broker fills it at market
