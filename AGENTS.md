@@ -40,6 +40,21 @@ Current installed skills include:
 - `to-prd`, `to-issues`, and `triage` — PRD, issue, and triage workflow helpers.
 - `caveman`, `grill-me`, and `write-a-skill` — productivity and skill-authoring
   helpers.
+- `ste` (from `dualface/ste-zh`) and `asd-ste100` (from
+  `danyuchn/asd-ste100-skill`) — ASD-STE100 writing rules for Chinese and
+  English output.
+
+`.claude/skills/ste` and `.claude/skills/asd-ste100` are relative symlinks to
+`.agents/skills/` so Claude Code loads the same files. Other agents (Codex, pi)
+read `.agents/skills/` directly. On Windows, clone with Developer Mode enabled
+and `git config core.symlinks true`, or the links check out as plain text files.
+
+## Writing Style
+
+These rules are always on. They are not opt-in.
+
+- Chinese writing and conversation: follow the `ste` skill.
+- All other English writing and conversation: follow the `asd-ste100` skill.
 
 ## Agent skills
 
