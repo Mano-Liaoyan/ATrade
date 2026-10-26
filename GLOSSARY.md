@@ -3,6 +3,19 @@
 ATrade is a personal trading platform. It finds stocks, shows charts, tests
 strategies on history and on live data, and sends orders to a broker.
 
+## Strategies
+
+**Strategy**:
+A set of trading rules that the user writes as code in the browser. The same
+strategy runs in a backtest and in a forward test.
+_Avoid_: algorithm, bot, script
+
+**Strategy version**:
+One saved copy of the code of a strategy. A strategy version does not change
+after it is saved. Each backtest and each forward test records the strategy
+version that it used.
+_Avoid_: revision, snapshot, commit
+
 ## Strategy testing
 
 **Backtest**:
