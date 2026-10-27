@@ -92,6 +92,18 @@ def create_look_back_catalog(
     return DataCatalogConfig(str(catalog_path))
 
 
+def write_look_back_catalog(
+    look_back_bars: list[Bar], instrument: Instrument, bar_period: BarPeriod, work_directory: Path
+) -> DataCatalogConfig:
+    """The look-back catalog of `create_look_back_catalog` for a forward test LiveNode, with the bar type
+    `SYMBOL.EXCHANGE-<bar period>-LAST-EXTERNAL` (docs/architecture/forward_test.md section 12.15)."""
+    nautilus_instrument = create_instrument(instrument, look_back_bars)
+    bar_type = BarType.from_str(f"{nautilus_instrument.id}-{bar_period.value}-LAST-EXTERNAL")
+    volume_precision = max((count_decimal_places(bar.volume) for bar in look_back_bars), default=0)
+    wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, volume_precision)
+    return create_look_back_catalog(look_back_bars, wrangler, bar_period, work_directory)
+
+
 def create_engine(
     *,
     paper_capital_usd: Decimal,

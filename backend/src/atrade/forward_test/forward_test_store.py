@@ -215,13 +215,15 @@ async def write_end(
 ) -> None:
     """The process ended and its orders are cancelled, or it never sent orders: the client ID becomes free.
 
-    An open interruption ends at the same time.
+    An open interruption ends at the same time. The status "stopped" clears the message of an earlier crash: it is
+    not the current state. The crash interruptions keep the history (section 12.7).
     """
     await connection.execute(
         """
         UPDATE forward_test
         SET status = %(status)s, client_id = NULL, stopped_at_utc = %(stopped_at_utc)s,
-            error_message = COALESCE(error_message, %(error_message)s)
+            error_message = CASE WHEN %(status)s = 'stopped' THEN NULL
+                                 ELSE COALESCE(error_message, %(error_message)s) END
         WHERE id = %(id)s
         """,
         {"status": status, "stopped_at_utc": stopped_at_utc, "error_message": error_message, "id": forward_test_id},
@@ -321,11 +323,14 @@ async def write_waiting_for_gateway(
 async def write_live_node_start(
     connection: psycopg.AsyncConnection, *, forward_test_id: int, started_at_utc: datetime
 ) -> None:
-    """The child starts the LiveNode: the forward test runs again, and an open interruption ends."""
+    """The child starts the LiveNode: the forward test runs again, and an open interruption ends.
+
+    The message of an earlier crash is not the current state anymore. The crash interruption keeps the history.
+    """
     await connection.execute(
         """
-        UPDATE forward_test SET status = 'running'
-        WHERE id = %(id)s AND status IN ('starting', 'waiting_for_gateway')
+        UPDATE forward_test SET status = 'running', error_message = NULL
+        WHERE id = %(id)s AND status IN ('starting', 'running', 'waiting_for_gateway')
         """,
         {"id": forward_test_id},
     )

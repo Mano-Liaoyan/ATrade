@@ -95,8 +95,11 @@ async def test_rejects_backtest_without_saved_bars_in_the_time_range(
 
     assert response.status_code == 422
     assert response.json() == {
-        "detail": "PostgreSQL has no saved 1-DAY bars of BTEST / 100 / USD from 2026-03-01T00:00:00+00:00"
-        " to 2026-04-01T00:00:00+00:00. Open the bar chart of the instrument to load bars from IBKR."
+        "detail": "There are no saved 1 day bars of BTEST / 100 / USD from 2026-03-01 00:00 UTC to 2026-04-01 00:00 UTC."
+        " ATrade saves bars only when a bar chart loads them from IBKR."
+        " IBKR has bars only for the regular trading hours: a period when the market was closed has no bars."
+        " Open the bar chart of the instrument with this bar period to load the bars, or select a period with"
+        " trading hours."
     }
     assert (await web_client.get("/api/backtests")).json() == []
 

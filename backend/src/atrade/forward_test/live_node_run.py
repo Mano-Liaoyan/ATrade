@@ -18,9 +18,11 @@ from nautilus_trader.adapters.interactive_brokers import (
 )
 from nautilus_trader.common import Environment
 from nautilus_trader.config import StrategyConfig
-from nautilus_trader.live import LiveExecutionEngineConfig, LiveNode
+from nautilus_trader.live import LiveExecutionEngineConfig, LiveNode, LiveNodeBuilder, LiveNodeConfig
 from nautilus_trader.model import BarType, InstrumentId, Symbol, TraderId, Venue
+from nautilus_trader.persistence import DataCatalogConfig
 
+from atrade.backtest import write_look_back_catalog
 from atrade.forward_test.forward_test_child import LiveNodeEnd, LiveNodeInput
 from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
 from atrade.strategy import load_strategy_classes
@@ -74,7 +76,32 @@ def create_instrument_id(live_node_input: LiveNodeInput) -> InstrumentId:
     return InstrumentId(Symbol(instrument.symbol), Venue(instrument.exchange))
 
 
-def build_live_node(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> LiveNode:
+def create_live_node_builder(
+    live_node_input: LiveNodeInput, instrument_id: InstrumentId, warm_up_catalog: DataCatalogConfig
+) -> LiveNodeBuilder:
+    """The node without clients. The catalog holds the warm-up bars and says that it holds all times, so the data
+    engine answers each `request_bars` from the catalog and never asks IBKR (section 12.15).
+
+    The reason: the IB data client of NautilusTrader 2.0.0rc7 splits a long request into a part in days and a rest
+    in seconds. IBKR refuses a rest shorter than the bar (error 321), so a 7-day request of 1-minute bars fails.
+    """
+    # The account position on the instrument belongs to this forward test (section 12.2).
+    execution_engine_config = LiveExecutionEngineConfig(
+        reconciliation=True, reconciliation_instrument_ids=[str(instrument_id)]
+    )
+    config = LiveNodeConfig(
+        environment=Environment.LIVE,
+        trader_id=TraderId(f"{TRADER_ID_PREFIX}-{live_node_input.forward_test_id:03d}"),
+        exec_engine=execution_engine_config,
+        catalogs=[warm_up_catalog],
+    )
+    # The stub types the unused factory dicts without key and value types.
+    return LiveNodeBuilder.from_config(f"forward-test-{live_node_input.forward_test_id}", config)  # pyright: ignore[reportUnknownMemberType]
+
+
+def build_live_node(
+    live_node_input: LiveNodeInput, instrument_id: InstrumentId, warm_up_catalog: DataCatalogConfig
+) -> LiveNode:
     """IB data and execution clients with the client ID of the forward test, for this 1 instrument."""
     instrument_provider = InteractiveBrokersInstrumentProviderConfig(load_ids={instrument_id})
     data_client_config = InteractiveBrokersDataClientConfig(
@@ -90,13 +117,7 @@ def build_live_node(live_node_input: LiveNodeInput, instrument_id: InstrumentId)
         account_id=live_node_input.account_id,
         instrument_provider=instrument_provider,
     )
-    # The account position on the instrument belongs to this forward test (section 12.2).
-    execution_engine_config = LiveExecutionEngineConfig(
-        reconciliation=True, reconciliation_instrument_ids=[str(instrument_id)]
-    )
-    trader_id = TraderId(f"{TRADER_ID_PREFIX}-{live_node_input.forward_test_id:03d}")
-    builder = LiveNode.builder(f"forward-test-{live_node_input.forward_test_id}", trader_id, Environment.LIVE)
-    builder = builder.with_exec_engine_config(execution_engine_config)
+    builder = create_live_node_builder(live_node_input, instrument_id, warm_up_catalog)
     builder = builder.add_data_client(IB_CLIENT_NAME, InteractiveBrokersDataClientFactory(), data_client_config)
     builder = builder.add_exec_client(
         IB_CLIENT_NAME, InteractiveBrokersExecutionClientFactory(), execution_client_config
@@ -161,7 +182,10 @@ async def run_live_node(
     instrument_id = create_instrument_id(live_node_input)
     with tempfile.TemporaryDirectory(prefix=f"atrade-forward-test-{live_node_input.forward_test_id}-") as directory:
         strategy_class, config_class = load_strategy_classes(live_node_input.strategy_code, Path(directory))
-        live_node = build_live_node(live_node_input, instrument_id)
+        warm_up_catalog = write_look_back_catalog(
+            list(live_node_input.warm_up_bars), live_node_input.instrument, live_node_input.bar_period, Path(directory)
+        )
+        live_node = build_live_node(live_node_input, instrument_id, warm_up_catalog)
         live_node.add_strategy(strategy_class(create_strategy_config(config_class, live_node_input, instrument_id)))
         live_node.add_actor(create_recorder(live_node_input, instrument_id))
         try:

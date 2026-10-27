@@ -18,6 +18,7 @@
     type Backtest,
   } from '#lib/backtest';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { formatBarPeriod } from '#lib/foundation/value_format';
   import { BAR_PERIODS, DEFAULT_BAR_PERIOD, type BarPeriod } from '#lib/market_data';
   import { readPaperCapital } from '#lib/paper_trading';
   import {
@@ -276,7 +277,7 @@
             </th>
             <td>{formatVersionLabel(backtest.strategy_name, backtest.version_number)}</td>
             <td>{backtest.symbol} / {backtest.exchange} / {backtest.currency}</td>
-            <td>{backtest.bar_period}</td>
+            <td>{formatBarPeriod(backtest.bar_period)}</td>
             <td>{describeBacktestStatus(backtest.status)}</td>
             <td class="number">{backtest.metrics === null ? '' : formatUsd(backtest.metrics.final_equity_usd)}</td>
             <td class="number">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.total_return_percent)}</td>

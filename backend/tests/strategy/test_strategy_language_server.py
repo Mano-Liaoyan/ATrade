@@ -32,6 +32,8 @@ TYPE_ERROR_CODE = """from nautilus_trader.trading import Strategy
 count: int = "not a number"
 """
 PROCESS_END_SECONDS = 10.0
+# window/logMessage types: 1 error, 2 warning, 3 info, 4 log.
+LOG_TYPE_WARNING = 2
 
 
 @pytest.fixture
@@ -105,6 +107,23 @@ def test_the_strategy_template_has_no_diagnostics(test_client: TestClient) -> No
         diagnostics = session.wait_for_diagnostics(DOCUMENT_URI)
 
     assert [(item["range"]["start"]["line"], item["message"]) for item in diagnostics] == []
+
+
+def test_the_language_server_sends_no_warning_or_error_log_to_the_browser(test_client: TestClient) -> None:
+    # `@codemirror/lsp-client` writes each warning and error log of the server to the browser console.
+    with test_client.websocket_connect(STRATEGY_LANGUAGE_SERVER_PATH) as websocket:
+        session = LanguageServerSession(websocket)
+        session.initialize()
+        session.open_document(DOCUMENT_URI, STRATEGY_TEMPLATE)
+        session.wait_for_diagnostics(DOCUMENT_URI)
+
+    log_messages = [
+        (item["params"]["type"], item["params"]["message"])
+        for item in session.notifications
+        if item.get("method") == "window/logMessage"
+    ]
+    assert log_messages != []
+    assert [message for message in log_messages if message[0] <= LOG_TYPE_WARNING] == []
 
 
 def test_each_connection_starts_one_process_that_ends_when_the_connection_closes(test_client: TestClient) -> None:

@@ -175,6 +175,9 @@ async def test_three_crashes_in_a_row_fail_the_forward_test_and_keep_the_client_
 
     stopped = await read_forward_test(web_client, forward_test["id"])
     assert (stopped["status"], stopped["client_id"]) == ("stopped", None)
+    # The crash message is not the current state of a stopped forward test. The crash interruptions keep the history.
+    assert stopped["error_message"] is None
+    assert [interruption["reason"] for interruption in stopped["interruptions"]] == ["crash"]
     assert stopped["interruptions"][0]["ended_at_utc"] == "2026-01-02T03:04:05Z"
 
 

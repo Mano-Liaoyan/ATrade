@@ -1,5 +1,6 @@
-"""HTTP routes of the forward test comparison: start a backtest of the same period, and compare the forward test with
-a backtest (docs/architecture/forward_test.md section 12.10).
+"""HTTP routes of the forward test page and the comparison: the forward test with its records and its backtests of
+the same period, start a backtest of the same period, and compare the forward test with a backtest
+(docs/architecture/forward_test.md section 12.10).
 """
 
 from datetime import datetime
@@ -15,6 +16,7 @@ from atrade.backtest import (
     BacktestOutcome,
     BacktestRequest,
     BacktestStatus,
+    BacktestTrade,
     EquityPoint,
     calculate_metrics,
     check_backtest_request,
@@ -70,6 +72,26 @@ class ComparedInterruptionResponse(BaseModel):
 
     start_utc: datetime
     end_utc: datetime
+
+
+class ForwardTestFillResponse(BaseModel):
+    time_utc: datetime
+    side: Literal["BUY", "SELL"]
+    quantity_shares: Decimal
+    price_usd: Decimal
+    commission_usd: Decimal
+
+
+class ForwardTestDetailResponse(BaseModel):
+    """The forward test page: the forward test, its records, and the backtests that "Backtest the same period" started,
+    newest first."""
+
+    forward_test: ForwardTestResponse
+    # None until the forward test has a start balance.
+    metrics: ComparedMetricsResponse | None
+    equity_curve: list[ComparedEquityPointResponse]
+    fills: list[ForwardTestFillResponse]
+    same_period_backtests: list[ComparedBacktestSummaryResponse]
 
 
 class ForwardTestComparisonResponse(BaseModel):
@@ -139,6 +161,24 @@ def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryRe
     )
 
 
+def to_forward_test_fill_response(fill: BacktestTrade) -> ForwardTestFillResponse:
+    return ForwardTestFillResponse(
+        time_utc=fill.time_utc,
+        side=fill.side,
+        quantity_shares=fill.quantity_shares,
+        price_usd=fill.price_usd,
+        commission_usd=fill.commission_usd,
+    )
+
+
+def calculate_forward_test_metrics(
+    row: ForwardTestRow, equity_curve: list[EquityPoint], fills: list[BacktestTrade]
+) -> BacktestMetrics | None:
+    if row.start_balance_usd is None:
+        return None
+    return calculate_metrics(paper_capital_usd=row.start_balance_usd, equity_curve=equity_curve, trade_count=len(fills))
+
+
 def is_same_setup(row: ForwardTestRow, backtest: BacktestOutcome) -> bool:
     request = backtest.request
     return (
@@ -178,7 +218,29 @@ class ComparisonRoutes:
         if refusal is not None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
         backtest_id = await queue_backtest(database_url=self.database_url, request=request, created_at_utc=now_utc)
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            await forward_test_records.insert_same_period_backtest(
+                connection, forward_test_id=forward_test_id, backtest_id=backtest_id
+            )
         return SamePeriodBacktestResponse(backtest_id=backtest_id)
+
+    async def read_forward_test_detail(self, forward_test_id: int) -> ForwardTestDetailResponse:
+        row = await self.read_forward_test_row(forward_test_id)
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            fills = await forward_test_records.select_fills(connection, forward_test_id)
+            equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
+            backtest_ids = await forward_test_records.select_same_period_backtest_ids(connection, forward_test_id)
+        backtests = [
+            await read_backtest_outcome(database_url=self.database_url, backtest_id=backtest_id)
+            for backtest_id in backtest_ids
+        ]
+        return ForwardTestDetailResponse(
+            forward_test=await to_forward_test_response(self.database_url, row),
+            metrics=to_metrics_response(calculate_forward_test_metrics(row, equity_curve, fills)),
+            equity_curve=to_equity_curve_response(equity_curve),
+            fills=[to_forward_test_fill_response(fill) for fill in fills],
+            same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests if backtest is not None],
+        )
 
     async def compare_with_backtest(self, forward_test_id: int, backtest_id: int) -> ForwardTestComparisonResponse:
         row = await self.read_forward_test_row(forward_test_id)
@@ -194,11 +256,7 @@ class ComparisonRoutes:
             fills = await forward_test_records.select_fills(connection, forward_test_id)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
-        forward_test_metrics = None
-        if row.start_balance_usd is not None:
-            forward_test_metrics = calculate_metrics(
-                paper_capital_usd=row.start_balance_usd, equity_curve=equity_curve, trade_count=len(fills)
-            )
+        forward_test_metrics = calculate_forward_test_metrics(row, equity_curve, fills)
         fill_rows = compare_fills(
             forward_test_fills=fills,
             backtest_fills=backtest.trades,
@@ -225,5 +283,6 @@ def create_forward_test_comparison_router(*, database_url: str, clock: Clock) ->
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
     )
+    router.add_api_route("/{forward_test_id}", routes.read_forward_test_detail, methods=["GET"])
     router.add_api_route("/{forward_test_id}/comparison/{backtest_id}", routes.compare_with_backtest, methods=["GET"])
     return router

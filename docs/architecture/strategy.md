@@ -130,6 +130,13 @@ The checks run in the Web process. They do not import the user code.
     NautilusTrader types in the template.
   - The strategy template (section 9.2) has no diagnostics. A backend test
     checks this through the route.
+- basedpyright reads `workspaceFolders`, not the `rootUri` that the browser
+  sends. Without a workspace folder that exists, it logs the warning
+  `File or directory "/<default workspace root>" does not exist.`, and the
+  browser client writes it to the console. So the route creates an empty
+  temporary directory for each connection and sets it as the only workspace
+  folder of the `initialize` request. A backend test checks that the server
+  sends no warning or error log.
 - The browser client is `@codemirror/lsp-client` with
   `languageServerExtensions()` (completion, hover, signature help, live
   diagnostics). The file URI is `file:///atrade/strategy.py`. The file does not

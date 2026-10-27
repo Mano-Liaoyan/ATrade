@@ -10,11 +10,14 @@
     CandlestickSeries,
     createChart,
     type CandlestickData,
+    type ChartOptions,
+    type DeepPartial,
     type IChartApi,
     type ISeriesApi,
     type UTCTimestamp,
   } from 'lightweight-charts';
   import { untrack } from 'svelte';
+  import { watchColorScheme } from '#lib/foundation/color_scheme';
   import type { Bar } from './bars';
   import { canDrawLiveBar } from './live_bars';
 
@@ -32,11 +35,10 @@
     return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
   }
 
-  $effect(() => {
-    const createdChart = createChart(chartContainer, {
-      autoSize: true,
+  // The colors of the light or the dark tokens. A change of the color scheme applies them again, without a new chart.
+  function readThemeOptions(): DeepPartial<ChartOptions> {
+    return {
       layout: {
-        attributionLogo: true,
         background: { color: readColor('--color-surface') },
         textColor: readColor('--color-text'),
       },
@@ -44,11 +46,24 @@
         vertLines: { color: readColor('--color-border') },
         horzLines: { color: readColor('--color-border') },
       },
+    };
+  }
+
+  $effect(() => {
+    const themeOptions = readThemeOptions();
+    const createdChart = createChart(chartContainer, {
+      autoSize: true,
+      layout: { ...themeOptions.layout, attributionLogo: true },
+      grid: themeOptions.grid,
       timeScale: { timeVisible: true, secondsVisible: false },
     });
     candlestickSeries = createdChart.addSeries(CandlestickSeries);
     chart = createdChart;
+    const endColorSchemeWatch = watchColorScheme(() => {
+      createdChart.applyOptions(readThemeOptions());
+    });
     return () => {
+      endColorSchemeWatch();
       createdChart.remove();
       chart = undefined;
       candlestickSeries = undefined;

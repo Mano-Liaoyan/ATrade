@@ -69,6 +69,10 @@
     padding: 0.375rem 0.75rem;
     border-bottom: 1px solid var(--color-border);
     text-align: start;
+  }
+
+  /* A long value can break anywhere. A column name breaks only between words. */
+  .fill-table td {
     overflow-wrap: anywhere;
   }
 

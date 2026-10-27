@@ -1,12 +1,16 @@
 <!-- The forward tests with their actual status from /ws/forward-tests, a stop button for each running one, and a
      "Backtest the same period" button for each one with a start balance (docs/architecture/forward_test.md 12.10). -->
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { formatUtcTime } from '#lib/foundation/time_format';
+  import { formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
   import {
     canBacktestSamePeriod,
     canStop,
     describeForwardTestStatus,
     formatLocalTime,
+    showsCrashCount,
     stopForwardTest,
     type ForwardTest,
   } from './forward_test_api';
@@ -50,7 +54,7 @@
           <th scope="col">Status</th>
           <th scope="col">Client ID</th>
           <th scope="col">Start balance (USD)</th>
-          <th scope="col">Started (UTC)</th>
+          <th scope="col">Started</th>
           <th scope="col">End time (local)</th>
           <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
@@ -58,13 +62,17 @@
       <tbody>
         {#each forwardTests as forwardTest (forwardTest.id)}
           <tr>
-            <th scope="row">#{forwardTest.id}</th>
+            <th scope="row">
+              <a href={resolve('/forward-tests/[forwardTestId]', { forwardTestId: String(forwardTest.id) })}
+                >#{forwardTest.id}</a
+              >
+            </th>
             <td>{forwardTest.strategy_name} v{forwardTest.version_number}</td>
             <td>{forwardTest.symbol} / {forwardTest.exchange} / {forwardTest.currency}</td>
-            <td>{forwardTest.bar_period}</td>
+            <td>{formatBarPeriod(forwardTest.bar_period)}</td>
             <td>
               {describeForwardTestStatus(forwardTest.status)}
-              {#if forwardTest.crash_count > 0}
+              {#if showsCrashCount(forwardTest)}
                 <span class="crash-count">Crashes in a row: {forwardTest.crash_count} of 3</span>
               {/if}
               {#if forwardTest.error_message !== null}
@@ -72,8 +80,10 @@
               {/if}
             </td>
             <td class="number">{forwardTest.client_id ?? ''}</td>
-            <td class="number">{forwardTest.start_balance_usd ?? ''}</td>
-            <td>{forwardTest.created_at_utc}</td>
+            <td class="number">
+              {forwardTest.start_balance_usd === null ? '' : formatAmount(forwardTest.start_balance_usd)}
+            </td>
+            <td>{formatUtcTime(forwardTest.created_at_utc)}</td>
             <td>{formatLocalTime(forwardTest.end_time_utc)}</td>
             <td>
               <div class="actions">
@@ -130,6 +140,10 @@
     padding: 0.375rem 0.75rem;
     border-bottom: 1px solid var(--color-border);
     text-align: start;
+  }
+
+  /* A long value can break anywhere. A column name breaks only between words. */
+  .forward-tests td {
     overflow-wrap: anywhere;
   }
 

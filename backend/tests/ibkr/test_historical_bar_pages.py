@@ -28,6 +28,16 @@ def test_splits_a_long_range_into_steps_oldest_first() -> None:
     ]
 
 
+def test_splits_a_7_day_warm_up_of_1_minute_bars_into_7_requests_of_1_day() -> None:
+    """The forward test warm-up (docs/architecture/forward_test.md section 12.15). IBKR refuses "7 D" plus a rest in
+    seconds for 1-minute bars (error 321). Each request here is 1 whole day."""
+    requests = plan_historical_data_requests(TimeRange(utc(1, 1, 3, 10), utc(1, 8, 3, 10)), BarPeriod.ONE_MINUTE)
+
+    assert [request.duration for request in requests] == ["1 D"] * 7
+    assert requests[0].chunk.start_utc == utc(1, 1, 3, 10)
+    assert requests[-1].chunk.end_utc == utc(1, 8, 3, 10)
+
+
 def test_uses_the_ibkr_step_size_of_each_bar_period() -> None:
     year_range = TimeRange(utc(1, 1), datetime(2027, 1, 1, tzinfo=UTC))
 

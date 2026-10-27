@@ -1,6 +1,7 @@
 <!-- Result of one backtest: its status, the strategy error of a failed backtest, the metrics, the equity curve,
      and the trades. The trade table scrolls inside its own region. -->
 <script lang="ts">
+  import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { BacktestDetail } from './backtest_api';
   import { describeBacktestStatus, formatPercent, formatUsd } from './backtest_format';
@@ -54,7 +55,7 @@
           <thead>
             <tr>
               <th scope="col">Number</th>
-              <th scope="col">Time (UTC)</th>
+              <th scope="col">Time</th>
               <th scope="col">Side</th>
               <th scope="col">Quantity</th>
               <th scope="col">Price (USD)</th>
@@ -65,7 +66,7 @@
             {#each backtest.trades as trade, tradeIndex (tradeIndex)}
               <tr>
                 <th scope="row">{tradeIndex + 1}</th>
-                <td>{trade.time_utc}</td>
+                <td>{formatUtcTime(trade.time_utc)}</td>
                 <td>{trade.side}</td>
                 <td class="number">{trade.quantity_shares}</td>
                 <td class="number">{formatUsd(trade.price_usd)}</td>

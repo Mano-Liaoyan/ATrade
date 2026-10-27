@@ -1,5 +1,5 @@
 """The body of one forward test child process: the wait for IB Gateway, the paper account check, the cancel of old
-orders, the LiveNode run, and the stop steps (docs/architecture.md sections 12.5-12.7).
+orders, the warm-up bars, the LiveNode run, and the stop steps (docs/architecture.md sections 12.5-12.7).
 
 The child writes start_balance_usd, error_message, the status "waiting_for_gateway" and "running", and the
 interruption rows of a wait for IB Gateway. The worker reads the exit code and writes the other states.
@@ -14,6 +14,7 @@ from typing import Literal
 
 import psycopg
 
+from atrade.backtest import find_look_back_length
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.forward_test.forward_test_worker import (
@@ -21,7 +22,7 @@ from atrade.forward_test.forward_test_worker import (
     PAPER_CHECK_FAILED_EXIT_CODE,
     ChildMode,
 )
-from atrade.foundation.bar import BarPeriod
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import format_forward_test_order_tag
@@ -55,6 +56,8 @@ class LiveNodeInput:
     database_url: str
     # The balance at the first start. The equity of the records starts at this value.
     start_balance_usd: Decimal
+    # The bars before the start that answer `request_bars` of the strategy, oldest first (section 12.15).
+    warm_up_bars: tuple[Bar, ...]
 
 
 # "ended": the stop request came, or the LiveNode ended by itself. "gateway_lost": the IB connection was lost for
@@ -97,6 +100,7 @@ class CheckedAccount:
     account_id: str
     # The first start balance of the forward test. A restart keeps it (section 12.1).
     start_balance_usd: Decimal
+    warm_up_bars: tuple[Bar, ...]
 
 
 async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None) -> Decimal | None:
@@ -108,6 +112,25 @@ async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None)
             )
         row = await forward_test_store.select_forward_test(connection, job.row.id)
     return None if row is None else row.start_balance_usd
+
+
+async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection) -> tuple[Bar, ...]:
+    """The complete bars of the look-back length before now, the same length as a backtest look-back.
+
+    `read_historical_bars` splits the range into requests of the IBKR step size of the bar period. A failed read
+    gives no warm-up bars: the forward test starts, and the strategy gets an empty `request_bars` answer.
+    """
+    bar_period = BarPeriod(job.row.bar_period)
+    end_utc = floor_to_bar_start(job.ibkr_access.clock.read_now_utc(), bar_period)
+    time_range = TimeRange(start_utc=end_utc - find_look_back_length(bar_period), end_utc=end_utc)
+    try:
+        bars = await gateway_connection.read_historical_bars(
+            forward_test_store.read_instrument(job.row), bar_period, time_range
+        )
+    except GatewayRequestError as error:
+        logger.warning("Forward test %s: the warm-up bars were not read: %s", job.row.id, error)
+        return ()
+    return tuple(bars)
 
 
 async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
@@ -137,6 +160,7 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         except GatewayRequestError as error:
             await write_error_message(job, f"The open orders were not cancelled before the start: {error}")
             return FAILURE_EXIT_CODE
+        warm_up_bars = await read_warm_up_bars(job, gateway_connection)
     finally:
         gateway_connection.disconnect()
     start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
@@ -146,7 +170,7 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         message = "The paper account has no NetLiquidation value in USD."
         await write_error_message(job, message if reason is None else f"{message} {reason}")
         return PAPER_CHECK_FAILED_EXIT_CODE
-    return CheckedAccount(account_id=account_id, start_balance_usd=start_balance_usd)
+    return CheckedAccount(account_id=account_id, start_balance_usd=start_balance_usd, warm_up_bars=warm_up_bars)
 
 
 async def write_waiting_for_gateway(job: ChildJob) -> None:
@@ -207,6 +231,7 @@ async def read_live_node_input(job: ChildJob, checked_account: CheckedAccount) -
         gateway_port=job.settings.ibkr_paper_port,
         database_url=job.settings.database_url,
         start_balance_usd=checked_account.start_balance_usd,
+        warm_up_bars=checked_account.warm_up_bars,
     )
 
 

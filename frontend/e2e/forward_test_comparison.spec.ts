@@ -48,4 +48,20 @@ test('backtests the same period and compares the metrics, the equity curves, and
 
   await expect(lastRow).toBeInViewport();
   await expect(track).toHaveAttribute('aria-valuenow', '100');
+
+  // The forward test page links to the comparison with this backtest.
+  const comparisonUrl = page.url();
+  const backtestId = comparisonUrl.split('/').at(-1) ?? '';
+  await page.goto('/forward-tests');
+  await row.getByRole('link', { name: /^#\d+$/ }).click();
+  await expect(page).toHaveURL(/\/forward-tests\/\d+$/);
+  const setup = page.getByRole('definition');
+  await expect(setup.filter({ hasText: 'E2E compared forward test v1' })).toBeVisible();
+  await expect(setup.filter({ hasText: /^1 day$/ })).toBeVisible();
+  await expect(setup.filter({ hasText: /^10,000\.00$/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Interruptions' }).getByRole('row')).toHaveCount(2);
+  await expect(page.getByRole('img', { name: 'Forward test equity curve' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Forward test fills' })).toBeVisible();
+  await page.getByRole('link', { name: `Compare with backtest #${backtestId}` }).click();
+  await expect(page).toHaveURL(comparisonUrl);
 });
