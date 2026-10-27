@@ -167,6 +167,12 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 - Amounts and quantities are decimal text, for example `"101234.50"`.
 - The browser sends nothing. The server reads the socket only to see when the
   browser leaves.
+- The route and its message models are in `paper_trading/account_socket.py`.
+  `create_paper_trading_router` includes it. `paper_trading` exports the
+  message models in `PAPER_TRADING_SOCKET_MESSAGE_MODELS`;
+  `app/openapi_document.py` adds their JSON Schema to the OpenAPI document
+  (section 13). The order routes and the paper capital route are in
+  `paper_trading/http_routes.py`.
 
 ## 11.7 Account panel
 

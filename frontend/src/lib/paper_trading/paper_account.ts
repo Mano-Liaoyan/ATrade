@@ -3,7 +3,7 @@
 import type { components } from '#lib/api';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
-// The message models of backend/src/atrade/paper_trading/http_routes.py. Amounts are decimal text.
+// The message models of backend/src/atrade/paper_trading/account_socket.py. Amounts are decimal text.
 export type PaperAccountMessage = components['schemas']['PaperAccountMessage'];
 export type PaperAccountCheck = components['schemas']['PaperAccountCheckMessage'];
 export type PaperPosition = components['schemas']['PositionMessage'];
