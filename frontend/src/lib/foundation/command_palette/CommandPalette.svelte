@@ -13,9 +13,11 @@
     groups: PaletteCommandGroup[];
     /** Called each time the palette opens, for example to read the newest watchlist. */
     onOpen?: () => void;
+    /** True while `groups` can still change, for example while the watchlist read runs. Sets aria-busy on the list. */
+    busy?: boolean;
   }
 
-  const { groups, onOpen }: Props = $props();
+  const { groups, onOpen, busy = false }: Props = $props();
 
   const OPEN_LABEL = 'Open command palette';
 
@@ -84,7 +86,7 @@
                   <Command.Input class="cds--search-input" bind:value={commandText} placeholder="Command" />
                 </div>
                 <ScrollRegion label="Commands" maxHeight="50vh">
-                  <Command.List>
+                  <Command.List aria-busy={busy}>
                     <Command.Viewport>
                       <Command.Empty>
                         {#snippet child({ props: emptyProps })}

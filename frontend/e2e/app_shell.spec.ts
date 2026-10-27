@@ -189,6 +189,9 @@ async function openCommandPaletteWithKeys(page: Page): Promise<Locator> {
   await page.keyboard.press('ControlOrMeta+k');
   const palette = page.getByRole('dialog', { name: 'Command palette' });
   await expect(palette).toBeVisible();
+  // The palette reads the watchlist when it opens, and the list is aria-busy until the read ends. Watchlist commands
+  // that arrive later move the highlight to the first command (Bits UI Command sorts again), so wait for the read.
+  await expect(palette.getByRole('listbox')).toHaveAttribute('aria-busy', 'false');
   return palette;
 }
 

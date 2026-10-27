@@ -44,14 +44,17 @@
   let paperAccountCheck: PaperAccountCheck | null = $state(null);
   let nowMilliseconds = $state(Date.now());
   let paletteWatchlist: WatchlistInstrument[] = $state([]);
+  let paletteWatchlistReading = $state(false);
   const paletteCommandGroups = $derived(createPaletteCommandGroups(paletteWatchlist));
 
   // The palette reads the watchlist each time it opens, so it shows the instruments that the user added since.
   function readPaletteWatchlist(): void {
+    paletteWatchlistReading = true;
     void listWatchlist(fetch).then((listResult) => {
       if (listResult.kind === 'ok') {
         paletteWatchlist = listResult.value;
       }
+      paletteWatchlistReading = false;
     });
   }
 
@@ -141,7 +144,7 @@
           <Tag {...props} label="Paper" kind="blue" operational />
         {/snippet}
       </Tooltip>
-      <CommandPalette groups={paletteCommandGroups} onOpen={readPaletteWatchlist} />
+      <CommandPalette groups={paletteCommandGroups} onOpen={readPaletteWatchlist} busy={paletteWatchlistReading} />
       <ThemeButton />
     </div>
   </header>

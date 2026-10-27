@@ -409,7 +409,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (the form ids `start-backtest` and `start-forward-test`), and change the
   theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
   opens a page or a form. No command sends a paper order or starts a backtest
-  or a forward test.
+  or a forward test. The layout reads the watchlist each time the palette
+  opens. While the read runs, the command list has `aria-busy="true"` (prop
+  `busy`). New commands make Bits UI Command move the highlight to the first
+  command, so the e2e tests wait until `aria-busy` is `false`.
 - `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
   Combobox). The page gives the candidates as `items` (`value`, `label`,
   `disabled`). The list is a Bits UI `ContentStatic` in the
