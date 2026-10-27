@@ -349,6 +349,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   reads the account check from `/ws/paper-trading`. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
   navigation at all widths. Header buttons go in `cds--header__global`.
+- `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
+  Combobox). The page gives the candidates as `items` (`value`, `label`,
+  `disabled`). The list is a Bits UI `ContentStatic` in the
+  `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
+  `listLabel`. `statusText` and `invalidText` show below the field.
+  `Icon` draws one `@carbon/icons` icon.
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
