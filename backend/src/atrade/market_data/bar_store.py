@@ -156,10 +156,14 @@ async def select_saved_ranges(
     return [TimeRange(start_utc=row.start_utc, end_utc=row.end_utc) for row in rows]
 
 
-INSERT_BAR_QUERY: LiteralString = """
+# One statement for all bars of a range: a row-by-row insert of a few thousand bars took seconds on a loaded host.
+INSERT_BARS_QUERY: LiteralString = """
     INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
-    VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-        %(open)s, %(high)s, %(low)s, %(close)s, %(volume)s)
+    SELECT %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, new_bar.*
+    FROM unnest(
+        %(start_utc)s::timestamptz[], %(open)s::numeric[], %(high)s::numeric[], %(low)s::numeric[],
+        %(close)s::numeric[], %(volume)s::numeric[]
+    ) AS new_bar (start_utc, open, high, low, close, volume)
     ON CONFLICT (symbol, exchange, currency, bar_period, start_utc) DO UPDATE SET
         open = excluded.open, high = excluded.high, low = excluded.low,
         close = excluded.close, volume = excluded.volume
@@ -180,19 +184,19 @@ JOIN_SAVED_RANGE_QUERY: LiteralString = """
 """
 
 
-def create_bar_parameters(key_parameters: dict[str, str], bars: list[Bar]) -> list[dict[str, object]]:
-    return [
-        {
-            **key_parameters,
-            "start_utc": bar.start_utc,
-            "open": bar.open,
-            "high": bar.high,
-            "low": bar.low,
-            "close": bar.close,
-            "volume": bar.volume,
-        }
-        for bar in bars
-    ]
+def create_bars_parameters(key_parameters: dict[str, str], bars: list[Bar]) -> dict[str, object]:
+    """One array for each column. One statement cannot update a row twice, so a later bar with the same start wins."""
+    bars_by_start = {bar.start_utc: bar for bar in bars}
+    unique_bars = list(bars_by_start.values())
+    return {
+        **key_parameters,
+        "start_utc": [bar.start_utc for bar in unique_bars],
+        "open": [bar.open for bar in unique_bars],
+        "high": [bar.high for bar in unique_bars],
+        "low": [bar.low for bar in unique_bars],
+        "close": [bar.close for bar in unique_bars],
+        "volume": [bar.volume for bar in unique_bars],
+    }
 
 
 async def save_bars_of_range(
@@ -208,7 +212,7 @@ async def save_bars_of_range(
     """
     key_parameters = create_key_parameters(instrument, bar_period)
     async with connection.transaction(), connection.cursor() as cursor:
-        await cursor.executemany(INSERT_BAR_QUERY, create_bar_parameters(key_parameters, bars))
+        await cursor.execute(INSERT_BARS_QUERY, create_bars_parameters(key_parameters, bars))
         await cursor.execute(
             JOIN_SAVED_RANGE_QUERY,
             {**key_parameters, "start_utc": time_range.start_utc, "end_utc": time_range.end_utc},
@@ -225,7 +229,7 @@ def save_bars_of_range_blocking(
     """`save_bars_of_range` for synchronous callers, for example a NautilusTrader actor in `on_bar`."""
     key_parameters = create_key_parameters(instrument, bar_period)
     with connection.transaction(), connection.cursor() as cursor:
-        cursor.executemany(INSERT_BAR_QUERY, create_bar_parameters(key_parameters, bars))
+        cursor.execute(INSERT_BARS_QUERY, create_bars_parameters(key_parameters, bars))
         cursor.execute(
             JOIN_SAVED_RANGE_QUERY,
             {**key_parameters, "start_utc": time_range.start_utc, "end_utc": time_range.end_utc},

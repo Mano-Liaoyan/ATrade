@@ -14,7 +14,8 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await page.goto('/forward-tests');
 
   const row = page.getByRole('region', { name: 'Forward tests' }).getByRole('row', { name: /FTCMP/ });
-  await row.getByRole('button', { name: /Backtest the same period/ }).click();
+  await row.getByRole('button', { name: /^Actions for forward test \d+$/ }).click();
+  await page.getByRole('menuitem', { name: 'Backtest the same period' }).click();
 
   await expect(page).toHaveURL(/\/forward-tests\/\d+\/comparison\/\d+$/);
   await expect(page.getByRole('status', { name: 'Backtest status' })).toContainText('Finished', {
@@ -62,6 +63,6 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await expect(page.getByRole('region', { name: 'Interruptions' }).getByRole('row')).toHaveCount(2);
   await expect(page.getByRole('img', { name: 'Forward test equity curve' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Forward test fills' })).toBeVisible();
-  await page.getByRole('link', { name: `Compare with backtest #${backtestId}` }).click();
+  await page.getByRole('link', { name: `Compare with backtest #${backtestId}`, exact: true }).click();
   await expect(page).toHaveURL(comparisonUrl);
 });

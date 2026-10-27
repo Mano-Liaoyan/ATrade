@@ -62,20 +62,22 @@
 
 <style>
   .code-diff {
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    border: 1px solid var(--cds-border-subtle-01);
+    background: var(--cds-layer-01);
   }
 
   .diff-labels {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    border-bottom: 1px solid var(--color-border);
-    font-size: 0.875rem;
-    font-weight: 600;
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+    font-size: var(--cds-heading-compact-01-font-size);
+    font-weight: var(--cds-heading-compact-01-font-weight);
+    line-height: var(--cds-heading-compact-01-line-height);
+    letter-spacing: var(--cds-heading-compact-01-letter-spacing);
   }
 
   .diff-labels span {
-    padding: 0.375rem 0.75rem;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
   }
 
   /* The ScrollRegion scrolls the merge view, so the merge view does not scroll itself. */
@@ -84,6 +86,6 @@
   }
 
   .diff-view :global(.cm-editor) {
-    font-size: 0.8125rem;
+    font-size: var(--cds-code-01-font-size);
   }
 </style>

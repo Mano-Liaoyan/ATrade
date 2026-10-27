@@ -301,6 +301,134 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `src/routes/` combines capabilities.
 - Generic UI with no domain meaning goes in `foundation/`, for example
   `foundation/code_editor/`. Parts with domain meaning stay in the capability.
+- The UI uses IBM Carbon Design System v11 for the look and Bits UI 2 for
+  the behavior ([#84](https://github.com/Mano-Liaoyan/ATrade/issues/84)).
+  The look comes from the official `@carbon/styles` SCSS. Bits UI gives the
+  keyboard control, the focus control, the ARIA attributes, and the
+  positioning of floating content. Do not use `carbon-components-svelte` or
+  `@carbon/web-components`.
+- `foundation/carbon` combines Carbon and Bits UI into general components,
+  for example `Tag`, `Tooltip`, and `TooltipProvider`. A component writes the
+  Carbon HTML structure and class names (`cds--*`). Carbon CSS shows a state
+  with a class, for example `cds--popover--open`, not with `data-state`. The
+  component changes the Bits UI state into the Carbon class.
+  `foundation/carbon/carbon_state.ts` has these changes as functions with unit
+  tests, for example `dropdownClasses({ open, disabled })`.
+- Form components of `foundation/carbon`: `Button` (`kind`, `size`, bindable
+  `ref`), `TextInput` (`label`, bindable `value`, `invalidText`), `Select`
+  (Carbon dropdown on Bits UI Select: `label`, `items`, `value`,
+  `onValueChange`), `ContentSwitcher` (on Bits UI Tabs without panels:
+  `label`, `items`, `value`, `onValueChange`), and `Dialog` (Carbon modal on
+  Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
+  `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
+  the accessible name of the dialog.
+- `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
+  (`header`, `align: 'right'` for a number column, `isMenu` for the column
+  of row menus), `size`, and a `rows` snippet for the body rows. A number
+  cell has `align="right"` and tabular numbers.
+- `foundation/carbon` `OverflowMenu` is the Carbon overflow menu on Bits UI
+  DropdownMenu: `label` (the trigger name), `items` (`label`, `disabled`,
+  `danger`, `onSelect`), and `size`. The menu goes under `<body>`, so a
+  scroll region does not clip it.
+- `foundation/carbon` `InlineNotification` is the Carbon inline
+  notification: `kind` (`success` and `info` are a status, `error` and
+  `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
+  `onClose` (it adds the close button "Close notification"). A page keeps
+  the result of an action as a `NotificationMessage` (`kind`, `title`,
+  `subtitle`) and spreads it on the component.
+- `foundation/live_socket` has `LiveUpdatesNotification` (`isConnected`): the
+  "Live updates paused" warning that a page shows while its live socket is
+  not connected.
+- The global class `atrade-auto-grid` of `carbon.scss` is the grid of the
+  fields of a form or of a list of values: as many columns as fit, each at
+  least 12rem wide (9rem with `atrade-auto-grid--narrow`, 14rem with
+  `atrade-auto-grid--wide`), with a `--cds-spacing-05` gap.
+- While a button action runs, the button is disabled and its text says why,
+  for example "Saving…", "Creating…", or "Starting…".
+- `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
+  with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
+  `neutral`; each kind has its own icon shape) and `label`. `Select` takes
+  `placeholder` (the trigger text while no item is selected). `TextInput`
+  takes `type` `datetime-local` for a native date and time input.
+- The forward test pages use Carbon: the start form uses `Select` and
+  `TextInput`, the list and the fill tables use `DataTable`, and the row
+  `OverflowMenu` has only the actions that apply ("Stop forward test",
+  "Backtest the same period"). A forward test with no action has no menu.
+  The status of a forward test is a `StatusIndicator`
+  (`findForwardTestStatusKind` of `forward_test`).
+- Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
+  of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
+  use the components of `#lib/foundation/carbon`.
+- `foundation/carbon/carbon.scss` is the one global SCSS entry.
+  `foundation/carbon/index.ts` imports it, so each importer of
+  `#lib/foundation/carbon` gets the styles. The entry loads `config` (with
+  `$css--font-face: false`), `themes`, `theme`, `reset`, `zone` (only g100),
+  `layer`, `layout`, and the components that ATrade uses. `layer` and
+  `layout` are necessary: buttons, tabs, text inputs, and content switchers
+  read their sizes from them. Do not load the full Carbon `styles.css`, and
+  load the Carbon grid only when a page uses it.
+- To add a Carbon component, add
+  `@use '@carbon/styles/scss/components/<name>';` to the component list in
+  `carbon.scss`. Keep each `@use` above the theme rules: a component adds its
+  component tokens (for example `--cds-button-*`) when Sass loads it, and the
+  theme rules then write these tokens for each theme.
+- The Sass settings are in `css.preprocessorOptions.scss` of
+  `vite.config.ts`. The Carbon SCSS loads packages that are not direct
+  dependencies, for example `@carbon/layout`. pnpm keeps them in
+  `node_modules/.pnpm/node_modules`, so `loadPaths` includes that directory.
+- The fonts are IBM Plex Sans and IBM Plex Mono from the `@ibm/plex-sans`
+  and `@ibm/plex-mono` packages. `foundation/carbon/index.ts` imports their
+  CSS, and the build contains the font files. ATrade does not load fonts
+  from the IBM font server.
+- Themes: `:root` has the Carbon g10 tokens (light). With
+  `prefers-color-scheme: dark` and no `data-theme="light"` on `<html>`, it has
+  the g100 tokens (dark). `data-theme="dark"` on `<html>` also gives g100.
+- The theme button (`ThemeButton` of `foundation/color_scheme`) is a Carbon
+  header action button in `cds--header__global` with a Carbon tooltip. A
+  click changes the theme choice: System, Light, Dark, then System again.
+  System is the default. The icon (`@carbon/icons` Screen, Light, Asleep),
+  the accessible name, and the tooltip show the current choice, for example
+  "Theme: System". Light sets `data-theme="light"` (g10 with a dark system),
+  Dark sets `data-theme="dark"` (g100 with a light system), and System
+  removes the attribute. The choice is in `localStorage` (key
+  `atrade.theme`). A small script in `src/app.html` applies the saved choice
+  before the first paint. When the storage is not available, the page starts
+  with System and the button works until the page reloads.
+- `foundation/carbon` has `Icon`: it renders an icon descriptor of
+  `@carbon/icons`, for example `@carbon/icons/es/light/20.js`.
+  `carbon_icons.d.ts` declares these modules with the type `CarbonIcon`.
+- The app shell header (`src/routes/+layout.svelte`) is the Carbon UI shell
+  header in a `cds--g100` zone in all themes. It shows the product name, the
+  page links (Home, Strategies, Backtests, Forward tests) with
+  `aria-current="page"` on the current page, the backend status, the IB
+  Gateway status, the server time, and the Paper tag. The Paper tag is a
+  Carbon operational tag with a tooltip. The tooltip shows the checked paper
+  account number with its middle hidden, for example `DU****567`. The header
+  reads the account check from `/ws/paper-trading`. Carbon hides the header
+  navigation below 1056 px. ATrade is a desktop app, so it keeps the
+  navigation at all widths. Header buttons go in `cds--header__global`.
+- The command palette shell is `CommandPalette` of
+  `foundation/command_palette`: a header search icon button ("Open command
+  palette") and a Carbon modal with a large Carbon search field and Carbon
+  contained lists, on Bits UI Dialog and Command. Ctrl K or Cmd K opens and
+  closes it on each page, and Escape closes it. Bits UI Command has
+  `vimBindings` off, because they take Ctrl K. The text filters the commands,
+  Arrow Up and Arrow Down move the highlight, and Enter runs the command. When
+  no command matches, the palette shows "No results". `src/routes/` gives the
+  commands (`palette_commands.ts`): go to a page, go to the instrument page of
+  a watchlist instrument, open the start form of a backtest or a forward test
+  (the form ids `start-backtest` and `start-forward-test`), and change the
+  theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
+  opens a page or a form. No command sends a paper order or starts a backtest
+  or a forward test. The layout reads the watchlist each time the palette
+  opens. While the read runs, the command list has `aria-busy="true"` (prop
+  `busy`). New commands make Bits UI Command move the highlight to the first
+  command, so the e2e tests wait until `aria-busy` is `false`.
+- `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
+  Combobox). The page gives the candidates as `items` (`value`, `label`,
+  `disabled`). The list is a Bits UI `ContentStatic` in the
+  `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
+  `listLabel`. `statusText` and `invalidText` show below the field.
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -332,6 +460,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   dragged, a click on the track scrolls one page, and the track takes Arrow,
   Page Up, Page Down, Home, and End keys. Use it for each region that can
   overflow (section 13.1).
+  The track and the thumb use Carbon tokens.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -339,13 +468,67 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   delay from 1 to 10 seconds between attempts. A background tab can delay
   the timers, so when the page becomes visible (`visibilitychange`), it
   connects again at once if the last message is 25 seconds old or more, or
-  if it waits for a reconnection.
+  if it waits for a reconnection. After stop, a message of the closing
+  socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - A chart draws on a canvas and reads the color tokens only when it draws.
-  `foundation/color_scheme` has `watchColorScheme(onChange)`. Each chart
-  applies the new colors to the chart and its series after a change of
-  `prefers-color-scheme`, without a page reload and without a new chart.
+  `foundation/color_scheme` has `watchColorScheme(onChange)`. It calls
+  `onChange` after a change of `prefers-color-scheme` and after a change of
+  `data-theme` on `<html>` (the theme button). Each chart applies the new
+  colors to the chart and its series, without a page reload and without a
+  new chart. The code editor and the code diff use the same watch and
+  `isDarkColorScheme()` to change their syntax colors.
+- The bar chart reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
+  borders), `--cds-support-success` (up bars), and `--cds-support-error`
+  (down bars).
+- The instrument page (`/instruments/<exchange>/<symbol>`) shows the bar
+  periods as Carbon tabs (`Tabs` of `foundation/carbon`, on Bits UI Tabs).
+  The arrow keys, Home, and End select a bar period at once. The page
+  address keeps the bar period, and the tab keeps the focus. The tab panel
+  has the bar count, the live bar, and the chart. The bars and the live bar
+  of the page belong to one chart request, so the chart gets no data of the
+  previous bar period after a change.
+- `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
+  `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
+  The native checkbox is transparent and covers the label, so a pointer
+  click goes to the native checkbox.
+  A `DataTable` column with `isSelection` is the column of the row
+  checkboxes. Its cells have class `cds--table-column-checkbox`. `TextInput`
+  also takes `type` `date`. `InlineNotification` has `label` (the accessible
+  name of the status or alert).
+- The backtest pages use Carbon: the start form (`Select`, `TextInput`,
+  `Button`), the limits form, the backtest list (`DataTable` with a selection
+  column, in a `ScrollRegion`), the metrics as Carbon tiles, and the trades
+  and compared metrics as data tables. A backtest status is a
+  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity chart
+  reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid),
+  `--cds-text-primary` (first curve, solid), `--cds-interactive` (second
+  curve, dashed), and `--cds-layer-accent-01` (interruptions).
+- The code editor and the code diff (`foundation/code_editor`) use Carbon
+  tokens: `--cds-layer-01` (background), `--cds-text-primary`,
+  `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,
+  `--cds-layer-hover-01` (active line), `--cds-highlight` (selection), and
+  `--cds-support-error` and `--cds-support-success` (removed and added
+  lines). The font is IBM Plex Mono. The syntax colors in `code_colors.ts`
+  are Carbon palette colors from `@carbon/colors` (70 grade in g10, 40 grade
+  in g100), and plain text and comments are the `textPrimary` and
+  `textSecondary` tokens of `@carbon/themes` (section 13.1). A unit test
+  checks that each has 4.5:1 contrast on the `layer01` token. A live type error
+  has a wavy `--cds-support-error` underline, and its tooltip looks like a
+  low-contrast Carbon error notification. A type error does not block the
+  save.
+- The strategy pages use the components of `foundation/carbon`: the list
+  page has a `TextInput` and a `Button` for the new strategy, and the editor
+  has a `Select` for the version, the Save version button, an "Unsaved
+  changes" tag, and a danger `Dialog` that confirms Delete strategy. The save
+  result and the refused checks show as an `InlineNotification`.
+  `InlineNotification` also takes child content, for example a list of
+  problems.
+- `Button` sizes `sm` and `md` also write `cds--layout--size-<size>`: Carbon
+  v11 reads the button height from that class.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
@@ -363,10 +546,19 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   visible scroll track and thumb. Safari can hide native scrollbars, so use
   styled tracks where reachability matters.
 - No content can be clipped or unreachable.
-- Colors come from the tokens on `:root` in `src/routes/+layout.svelte`, with
-  a light and a dark set (`prefers-color-scheme`). Do not hard-code a color in
-  a component that the dark scheme does not also cover. The page side gutter
-  is `clamp(1rem, 3vw, 2.5rem)` for the header and the main region.
+- Colors come from the Carbon tokens (`--cds-*`) of the current theme
+  (section 13). Do not hard-code a color. Extra CSS for parts that Carbon
+  does not supply uses only Carbon color tokens, spacing tokens, and type
+  tokens.
+- The Carbon reset removes all margins. Extra CSS sets the margins with
+  Carbon spacing tokens. The app has no other color tokens than `--cds-*`.
+- A canvas chart reads a `--cds-*` token with `getComputedStyle`. The browser
+  gives the Carbon value of the current theme.
+- Exception: Carbon has no syntax color tokens. The CodeMirror highlight
+  style needs one color value for each syntax role, so
+  `foundation/code_editor/code_colors.ts` imports the colors from the
+  official Carbon packages `@carbon/colors` and `@carbon/themes`. It has no
+  color literal.
 
 ## 14. Deployment and external access
 

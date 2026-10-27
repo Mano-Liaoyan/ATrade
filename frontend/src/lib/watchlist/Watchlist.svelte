@@ -1,6 +1,9 @@
-<!-- Watchlist panel: each saved instrument is a link (the page decides the target) and has a Delete button.
-     The page owns the list, so the instrument search on the same page can add to it. -->
+<!-- Watchlist panel: a Carbon contained list. Each saved instrument is a link (the page decides the target) and has a
+     Delete button. The page owns the list, so the instrument search on the same page can add to it. -->
 <script lang="ts">
+  import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
+  import WarningFilled16 from '@carbon/icons/es/warning--filled/16.js';
+  import { Icon, Tooltip } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatWatchlistInstrument, type WatchlistInstrument } from './watchlist_api';
 
@@ -19,29 +22,44 @@
   } = $props();
 </script>
 
-<section class="watchlist" aria-labelledby="watchlist-heading">
-  <h2 id="watchlist-heading">Watchlist</h2>
+<section class="watchlist cds--contained-list cds--contained-list--on-page" aria-labelledby="watchlist-heading">
+  <div class="cds--contained-list__header">
+    <h2 id="watchlist-heading" class="cds--contained-list__label">Watchlist</h2>
+  </div>
   {#if message !== undefined}
-    <p class="watchlist-message watchlist-failed" role="alert">{message}</p>
+    <p class="watchlist-message watchlist-failed" role="alert"><Icon icon={WarningFilled16} />{message}</p>
   {/if}
   {#if isLoading}
     <p class="watchlist-message" role="status">Loading the watchlist.</p>
   {:else if instruments.length === 0}
-    <p class="watchlist-message">The watchlist is empty. Add instruments from the instrument search.</p>
+    <p class="watchlist-message">The watchlist is empty.</p>
   {:else}
     <ScrollRegion label="Watchlist instruments" maxHeight="18rem">
       <ul class="watchlist-list">
         {#each instruments as instrument (instrument.id)}
-          <li class="watchlist-item">
-            <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- The page resolves the link in instrumentHref. -->
-            <a href={instrumentHref(instrument)}>{formatWatchlistInstrument(instrument)}</a>
-            <button
-              type="button"
-              aria-label="Delete {formatWatchlistInstrument(instrument)} from the watchlist"
-              onclick={() => {
-                onDelete(instrument);
-              }}>Delete</button
-            >
+          {@const instrumentName = formatWatchlistInstrument(instrument)}
+          <li class="cds--contained-list-item cds--contained-list-item--with-action">
+            <div class="cds--contained-list-item__content">
+              <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- The page resolves the link in instrumentHref. -->
+              <a class="instrument-link" href={instrumentHref(instrument)}>{instrumentName}</a>
+            </div>
+            <div class="cds--contained-list-item__action">
+              <Tooltip text="Delete" align="left">
+                {#snippet trigger({ props })}
+                  <button
+                    {...props}
+                    type="button"
+                    class="cds--btn cds--btn--ghost cds--btn--icon-only"
+                    aria-label="Delete {instrumentName} from the watchlist"
+                    onclick={() => {
+                      onDelete(instrument);
+                    }}
+                  >
+                    <Icon icon={TrashCan16} class="cds--btn__icon" />
+                  </button>
+                {/snippet}
+              </Tooltip>
+            </div>
           </li>
         {/each}
       </ul>
@@ -51,41 +69,44 @@
 
 <style>
   .watchlist {
-    max-width: 28rem;
-    padding: 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
-    background: var(--color-surface);
+    max-inline-size: 28rem;
   }
 
-  h2 {
-    margin: 0 0 0.75rem;
-    font-size: 1rem;
+  /* The Carbon header row sets the type style. The heading inside takes it, not the browser size of h2. */
+  .cds--contained-list__label {
+    font: inherit;
+    letter-spacing: inherit;
   }
 
   .watchlist-message {
-    margin: 0 0 0.5rem;
-    color: var(--color-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+    margin: 0;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+    color: var(--cds-text-secondary);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
   }
 
   .watchlist-failed {
-    color: var(--color-warning);
-    font-weight: 600;
+    color: var(--cds-text-error);
   }
 
   .watchlist-list {
     margin: 0;
     padding: 0;
-    list-style: none;
   }
 
-  .watchlist-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid var(--color-border);
+  /* Carbon has no link style in the loaded modules. The link uses the Carbon link tokens. */
+  .instrument-link {
+    color: var(--cds-link-primary);
     font-variant-numeric: tabular-nums;
+    text-decoration: none;
+  }
+
+  .instrument-link:hover {
+    color: var(--cds-link-primary-hover);
+    text-decoration: underline;
   }
 </style>

@@ -91,13 +91,13 @@ test('compares two versions of the same strategy and refuses different strategie
 
   const selection = page.getByRole('status', { name: 'Comparison selection' });
   const compareButton = page.getByRole('button', { name: 'Compare selected backtests' });
-  await list.getByLabel(`Select backtest #${String(firstBacktestId)}`, { exact: true }).check();
-  await list.getByLabel(`Select backtest #${String(otherBacktestId)}`, { exact: true }).check();
+  await list.getByRole('checkbox', { name: `Select backtest #${String(firstBacktestId)}`, exact: true }).check();
+  await list.getByRole('checkbox', { name: `Select backtest #${String(otherBacktestId)}`, exact: true }).check();
   await expect(selection).toHaveText(/Only backtests of the same strategy can be compared/);
   await expect(compareButton).toBeDisabled();
 
-  await list.getByLabel(`Select backtest #${String(otherBacktestId)}`, { exact: true }).uncheck();
-  await list.getByLabel(`Select backtest #${String(secondBacktestId)}`, { exact: true }).check();
+  await list.getByRole('checkbox', { name: `Select backtest #${String(otherBacktestId)}`, exact: true }).uncheck();
+  await list.getByRole('checkbox', { name: `Select backtest #${String(secondBacktestId)}`, exact: true }).check();
   await expect(selection).toHaveText('Ready to compare.');
   await compareButton.click();
 

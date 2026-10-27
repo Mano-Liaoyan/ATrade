@@ -1,3 +1,4 @@
+import { g10, g100 } from '@carbon/themes';
 import { describe, expect, it } from 'vite-plus/test';
 import { CODE_COLORS } from './code_colors';
 
@@ -18,11 +19,16 @@ function readContrastRatio(firstColor: string, secondColor: string): number {
 // WCAG AA for normal text.
 const MIN_TEXT_CONTRAST = 4.5;
 
+// The editor background is the layer-01 token of the theme (code_theme.ts).
+const CODE_BACKGROUNDS = { light: g10.layer01, dark: g100.layer01 };
+
 describe('CODE_COLORS', () => {
-  for (const [scheme, colors] of Object.entries(CODE_COLORS)) {
+  for (const [scheme, background] of Object.entries(CODE_BACKGROUNDS)) {
+    const colors = scheme === 'light' ? CODE_COLORS.light : CODE_COLORS.dark;
     for (const [role, color] of Object.entries(colors.text)) {
       it(`${scheme} ${role} text meets WCAG AA contrast on the code background`, () => {
-        expect(readContrastRatio(color, colors.background)).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
+        expect(color).toMatch(/^#[0-9a-f]{6}$/i);
+        expect(readContrastRatio(color, background)).toBeGreaterThanOrEqual(MIN_TEXT_CONTRAST);
       });
     }
   }

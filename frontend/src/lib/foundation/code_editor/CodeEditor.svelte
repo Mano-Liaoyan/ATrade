@@ -1,7 +1,10 @@
 <!-- Python code editor: CodeMirror 6 with @codemirror/lang-python. It has no domain meaning (docs/architecture.md section 13). -->
 <script lang="ts">
+  import { acceptCompletion } from '@codemirror/autocomplete';
+  import { indentWithTab } from '@codemirror/commands';
   import { python } from '@codemirror/lang-python';
-  import type { Extension } from '@codemirror/state';
+  import { Prec, type Extension } from '@codemirror/state';
+  import { keymap } from '@codemirror/view';
   import { EditorView, basicSetup } from 'codemirror';
   import { createCodeTheme } from './code_theme';
 
@@ -23,6 +26,8 @@
       parent: container,
       doc: '',
       extensions: [
+        // Tab accepts the selected completion, or else indents. Escape and then Tab moves the focus out of the editor.
+        Prec.high(keymap.of([{ key: 'Tab', run: acceptCompletion }, indentWithTab])),
         basicSetup,
         python(),
         createCodeTheme(),
@@ -61,8 +66,8 @@
   .code-editor {
     height: 100%;
     min-height: 0;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    border: 1px solid var(--cds-border-subtle-01);
+    background: var(--cds-layer-01);
   }
 
   .code-editor :global(.cm-editor) {
@@ -73,16 +78,19 @@
   .code-editor :global(.cm-scroller) {
     overflow: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--color-muted) transparent;
+    scrollbar-color: var(--cds-icon-secondary) var(--cds-layer-accent-01);
   }
 
   .code-editor :global(.cm-scroller::-webkit-scrollbar) {
-    width: 10px;
-    height: 10px;
+    width: var(--cds-spacing-03);
+    height: var(--cds-spacing-03);
+  }
+
+  .code-editor :global(.cm-scroller::-webkit-scrollbar-track) {
+    background: var(--cds-layer-accent-01);
   }
 
   .code-editor :global(.cm-scroller::-webkit-scrollbar-thumb) {
-    border-radius: 5px;
-    background: var(--color-muted);
+    background: var(--cds-icon-secondary);
   }
 </style>

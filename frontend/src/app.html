@@ -4,6 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ATrade</title>
+    <script>
+      // The saved theme choice of the header theme button applies before the first paint, so the page does not flash
+      // the other theme. Same key and values as src/lib/foundation/color_scheme/theme_choice.ts (app_html_theme.test.ts).
+      try {
+        const theme = window.localStorage.getItem('atrade.theme');
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      } catch {
+        // Without the storage, the System choice applies.
+      }
+    </script>
     %sveltekit.head%
   </head>
   <body>

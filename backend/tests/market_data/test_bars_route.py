@@ -4,11 +4,12 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 
+import anyio
 import httpx
 import pytest
 
 from atrade.app.web import create_web_app
-from atrade.foundation.bar import BarPeriod, TimeRange
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
@@ -249,3 +250,72 @@ async def test_refuses_a_range_that_is_not_valid(
 
     assert response.status_code == 422
     assert gateway_connection.historical_bar_requests == []
+
+
+class HeldGatewayConnection(FakeGatewayConnection):
+    """Holds each historical bar request of `held_instrument` until the test sets `release`, like a slow IBKR."""
+
+    def __init__(self, held_instrument: Instrument) -> None:
+        super().__init__(managed_accounts=["DU1234567"])
+        self.connected = True
+        self.held_instrument = held_instrument
+        self.held_request_started = anyio.Event()
+        self.release = anyio.Event()
+
+    async def read_historical_bars(
+        self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+    ) -> list[Bar]:
+        if instrument == self.held_instrument:
+            self.held_request_started.set()
+            await self.release.wait()
+        return await super().read_historical_bars(instrument, bar_period, time_range)
+
+
+@pytest.fixture
+async def held_client(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> AsyncIterator[tuple[httpx.AsyncClient, HeldGatewayConnection]]:
+    gateway_connection = HeldGatewayConnection(held_instrument=TENCENT)
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir)
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http_client:
+        yield http_client, gateway_connection
+
+
+@pytest.mark.anyio
+async def test_a_slow_fill_of_one_instrument_does_not_block_the_bars_of_another_instrument(
+    held_client: tuple[httpx.AsyncClient, HeldGatewayConnection],
+) -> None:
+    client, gateway_connection = held_client
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(read_bars, client, TENCENT, "1-HOUR", utc(1, 0), utc(1, 2))
+        await gateway_connection.held_request_started.wait()
+
+        with anyio.fail_after(5):
+            response = await read_bars(client, APPLE, "1-HOUR", utc(1, 0), utc(1, 2))
+        gateway_connection.release.set()
+
+        assert response.status_code == 200
+        assert len(response.json()["bars"]) == 2
+
+
+@pytest.mark.anyio
+async def test_two_equal_requests_at_the_same_time_cause_one_ibkr_request(
+    held_client: tuple[httpx.AsyncClient, HeldGatewayConnection],
+) -> None:
+    client, gateway_connection = held_client
+    responses: list[httpx.Response] = []
+
+    async def read_and_keep() -> None:
+        responses.append(await read_bars(client, TENCENT, "1-HOUR", utc(1, 0), utc(1, 2)))
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(read_and_keep)
+        task_group.start_soon(read_and_keep)
+        await gateway_connection.held_request_started.wait()
+        # The second request has time to reach the lock before IBKR answers the first.
+        await anyio.sleep(0.2)
+        gateway_connection.release.set()
+
+    assert requested_ranges(gateway_connection) == [TimeRange(utc(1, 0), utc(1, 2))]
+    assert [len(response.json()["bars"]) for response in responses] == [2, 2]

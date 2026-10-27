@@ -1,0 +1,79 @@
+// The one global SCSS entry of the official Carbon v11 styles (docs/architecture.md section 13).
+// ATrade does not load the full Carbon styles.css. It loads only the modules below.
+//
+// To add a Carbon component: add `@use '@carbon/styles/scss/components/<name>';` to the component list below.
+// Keep every @use above the theme rules: a component adds its component tokens (for example --cds-button-*)
+// when Sass loads it, and the theme rules then write these tokens for each theme.
+
+// The IBM Plex fonts come from the font packages (index.ts), not from the IBM font server.
+@use '@carbon/styles/scss/config' with (
+  $css--font-face: false
+);
+@use '@carbon/styles/scss/themes';
+@use '@carbon/styles/scss/theme' with (
+  $theme: themes.$g10
+);
+@use '@carbon/styles/scss/reset';
+// ATrade uses only the g100 zone: the header is a `cds--g100` zone in all themes.
+@use '@carbon/styles/scss/zone' with (
+  $zones: (
+    g100: themes.$g100,
+  )
+);
+// Required: buttons, tabs, text inputs, and content switchers read their sizes from layer and layout.
+@use '@carbon/styles/scss/layer';
+@use '@carbon/styles/scss/layout';
+
+// Components.
+@use '@carbon/styles/scss/components/button';
+@use '@carbon/styles/scss/components/text-input';
+@use '@carbon/styles/scss/components/list-box';
+@use '@carbon/styles/scss/components/dropdown';
+@use '@carbon/styles/scss/components/content-switcher';
+@use '@carbon/styles/scss/components/modal';
+@use '@carbon/styles/scss/components/popover';
+@use '@carbon/styles/scss/components/link';
+@use '@carbon/styles/scss/components/tabs';
+@use '@carbon/styles/scss/components/tag';
+@use '@carbon/styles/scss/components/tooltip';
+@use '@carbon/styles/scss/components/ui-shell/header';
+@use '@carbon/styles/scss/components/form';
+@use '@carbon/styles/scss/components/combo-box';
+@use '@carbon/styles/scss/components/contained-list';
+@use '@carbon/styles/scss/components/data-table';
+@use '@carbon/styles/scss/components/overflow-menu';
+@use '@carbon/styles/scss/components/notification';
+@use '@carbon/styles/scss/components/tile';
+@use '@carbon/styles/scss/components/search';
+
+// Themes: g10 is the light theme and g100 is the dark theme.
+// The system theme applies when <html> has no data-theme attribute. data-theme="light" or "dark" overrides it.
+:root {
+  @include theme.theme(themes.$g10);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include theme.theme(themes.$g100);
+  }
+}
+
+:root[data-theme='dark'] {
+  @include theme.theme(themes.$g100);
+}
+
+// ATrade layout class (Carbon has no class for it): the grid of the fields of a form or of a list of values. It has
+// as many columns as fit, with a Carbon spacing gap. A form adds `align-items: end` to align its fields. A column is at least 12rem wide, 9rem with --narrow, and 14rem with --wide.
+.atrade-auto-grid {
+  display: grid;
+  gap: var(--cds-spacing-05);
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+
+.atrade-auto-grid--narrow {
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+}
+
+.atrade-auto-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}

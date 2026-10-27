@@ -1,5 +1,6 @@
 <!-- One backtest: its request and its result. The page reads the backtest again until its status is final. -->
 <script lang="ts">
+  import { InlineNotification } from '#lib/foundation/carbon';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { resolve } from '$app/paths';
@@ -45,11 +46,11 @@
   });
 </script>
 
-<p><a href={resolve('/backtests')}>All backtests</a></p>
+<p class="page-back"><a class="cds--link" href={resolve('/backtests')}>All backtests</a></p>
 <h1>Backtest #{backtestId}</h1>
 
 {#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+  <InlineNotification kind="error" title="Backtest not read" subtitle={errorMessage} lowContrast />
 {/if}
 
 {#if backtest !== null}
@@ -80,23 +81,28 @@
 {/if}
 
 <style>
-  .error {
-    color: var(--color-warning);
+  .page-back {
+    margin-block: 0 var(--cds-spacing-05);
   }
 
   .request {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem 1.5rem;
-    margin: 0 0 1rem;
+    gap: var(--cds-spacing-05) var(--cds-spacing-07);
+    margin: 0 0 var(--cds-spacing-06);
   }
 
   .request dt {
-    color: var(--color-muted);
-    font-size: 0.875rem;
+    font-size: var(--cds-label-01-font-size);
+    line-height: var(--cds-label-01-line-height);
+    letter-spacing: var(--cds-label-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 
   .request dd {
-    margin: 0;
+    margin: var(--cds-spacing-02) 0 0;
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
   }
 </style>

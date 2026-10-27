@@ -3,6 +3,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { InlineNotification } from '#lib/foundation/carbon';
   import { compareBacktests, ComparisonView, type BacktestComparison } from '#lib/backtest';
   import { formatVersionLabel } from '#lib/strategy';
 
@@ -38,11 +39,11 @@
   }
 </script>
 
-<p><a href={resolve('/backtests')}>All backtests</a></p>
+<p class="page-back"><a class="cds--link" href={resolve('/backtests')}>All backtests</a></p>
 <h1>Compare backtests #{firstBacktestId} and #{secondBacktestId}</h1>
 
 {#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+  <InlineNotification kind="error" title="Backtests not compared" subtitle={errorMessage} lowContrast />
 {/if}
 
 {#if comparison !== null}
@@ -62,7 +63,7 @@
 {/if}
 
 <style>
-  .error {
-    color: var(--color-warning);
+  .page-back {
+    margin-block: 0 var(--cds-spacing-05);
   }
 </style>

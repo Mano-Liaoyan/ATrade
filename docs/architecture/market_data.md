@@ -44,10 +44,15 @@ Source: [Instrument search](https://github.com/Mano-Liaoyan/ATrade/issues/64).
 | | `502` with `{"detail": "The instrument search failed: <reason>"}` when IB Gateway does not answer or answers with an error. |
 
 - The frontend panel is `InstrumentSearch` in `lib/market_data/`. The home
-  page (`src/routes/+page.svelte`) shows it. Each result is written as
-  `symbol / exchange / currency`, for example `700 / SEHK / HKD`. On `502` or
-  `503`, the panel shows the `detail` text of the backend.
-- The result list is in a `ScrollRegion` (section 13), so a long list has a
+  page (`src/routes/+page.svelte`) shows it. It is a Carbon combo box
+  (`Combobox` of `foundation/carbon`). The search starts 500 ms after the
+  user stops typing, because IBKR allows about 1 symbol search per second.
+  There is no Search button. Each result is a candidate written as
+  `symbol / exchange / currency`, for example `700 / SEHK / HKD`. ArrowUp
+  and ArrowDown choose a candidate, Enter confirms it, and Escape closes the
+  list. On `502` or `503`, the combo box shows the `detail` text of the
+  backend as its error message.
+- The candidate list is in a `ScrollRegion` (section 13), so a long list has a
   visible scroll track in all browsers.
 - The IBKR fake (`tests/fakes/ibkr.py`) finds instruments whose symbol starts
   with the query, without regard to letter case. Its default list has
@@ -97,11 +102,14 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
 | `DELETE /api/watchlist/{id}` | `204`. `404` with `{"detail": "This instrument is not in the watchlist."}` when the ID is not in the watchlist. |
 
 - Frontend: `#lib/watchlist` has the HTTP client and the `Watchlist` panel.
-  The home page owns the list. It gives `InstrumentSearch` a `resultAction`
-  snippet: an "Add" button for each result, or "In watchlist" when the
-  instrument is in the list. A capability does not import another
-  capability, so the page combines them.
-- The watchlist list is in a `ScrollRegion` named `Watchlist instruments`.
+  The home page owns the list. A confirmed candidate of `InstrumentSearch`
+  (`onSelect`) is added to the watchlist. The page gives a `marker`: a
+  candidate that is in the watchlist has an "In watchlist" tag and cannot be
+  chosen. A capability does not import another capability, so the page
+  combines them.
+- The watchlist is a Carbon contained list in a `ScrollRegion` named
+  `Watchlist instruments`. Each row has a Delete icon button named
+  "Delete <instrument> from the watchlist".
 - Each watchlist instrument is a link to
   `/instruments/<exchange>/<symbol>?currency=<currency>`. This page shows
   the bar chart (section 8.4).
@@ -129,8 +137,10 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   the range at the start of the current bar, because a bar that is not
   complete changes later. It reads the saved ranges, asks IBKR only for the
   missing parts, saves the bars and the range in one transaction for each
-  missing part, and then reads the bars from PostgreSQL. One lock in the
-  Web process lets only one fill run at a time.
+  missing part, and then reads the bars from PostgreSQL. One lock for each
+  instrument and bar period in the Web process lets only one fill of that
+  instrument and bar period run at a time. Fills of other instruments do not
+  wait. The store saves all bars of a range with one SQL statement.
 - When no part is missing, the route does not call IBKR. Saved bars are
   returned also when IB Gateway is not reachable.
 - The public entry exports `read_saved_bars(*, database_url, bar_request)`

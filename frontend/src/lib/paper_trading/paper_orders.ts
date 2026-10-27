@@ -30,6 +30,14 @@ export type OrderFormResult = { kind: 'valid'; request: SendOrderRequest } | { k
 export type SendOrderResult = { kind: 'sent'; ibkrOrderId: number } | { kind: 'failed'; message: string };
 export type CancelOrderResult = { kind: 'cancel_sent' } | { kind: 'failed'; message: string };
 
+// A forward test that holds a client ID on an instrument. src/routes/ makes the list from the forward tests.
+export interface BlockingForwardTest {
+  // For example "Forward test 7 (Bar count v1)".
+  label: string;
+  symbol: string;
+  exchange: string;
+}
+
 export interface ConfirmationLine {
   label: string;
   value: string;
@@ -76,16 +84,33 @@ export function readOrderForm(form: OrderForm): OrderFormResult {
   };
 }
 
-export function describeOrderForConfirmation(request: SendOrderRequest, accountId: string): ConfirmationLine[] {
+/** The title of the confirmation, for example "Buy 50 AAPL". */
+export function describeOrderTitle(request: SendOrderRequest): string {
+  return `${SIDE_NAMES[request.side]} ${String(request.quantity)} ${request.symbol}`;
+}
+
+/** The lines of the confirmation below the title. The title has the side and the quantity. */
+export function describeOrderForConfirmation(request: SendOrderRequest): ConfirmationLine[] {
   const price = request.limit_price === null ? 'Market price' : String(request.limit_price);
   return [
     { label: 'Instrument', value: `${request.symbol} / ${request.exchange} / ${request.currency}` },
-    { label: 'Side', value: SIDE_NAMES[request.side] },
-    { label: 'Quantity', value: String(request.quantity) },
     { label: 'Order type', value: `${ORDER_TYPE_NAMES[request.order_type]}, ${request.time_in_force}` },
     { label: 'Price', value: price },
-    { label: 'Account', value: accountId },
   ];
+}
+
+/**
+ * Why ATrade refuses an order by hand on the instrument of the form, or null. A forward test that holds a client ID on
+ * the instrument blocks the orders by hand on it (docs/architecture.md section 12.2). The backend checks it again.
+ */
+export function findOrderBlock(form: OrderForm, blockingForwardTests: readonly BlockingForwardTest[]): string | null {
+  const symbol = form.symbol.trim().toUpperCase();
+  const exchange = form.exchange.trim().toUpperCase();
+  const blocking = blockingForwardTests.find((forwardTest) => forwardTest.symbol === symbol && forwardTest.exchange === exchange);
+  if (blocking === undefined) {
+    return null;
+  }
+  return `${blocking.label} trades ${symbol} / ${exchange}. Stop the forward test to send an order by hand.`;
 }
 
 export function describeOrderSource(source: OrderSource): string {
@@ -93,6 +118,22 @@ export function describeOrderSource(source: OrderSource): string {
     return `forward test ${String(source.forward_test_id)}`;
   }
   return 'by hand';
+}
+
+export interface CancelAction {
+  label: string;
+  disabled: boolean;
+}
+
+/** The cancel item of the row menu. A disabled item says why ATrade cannot cancel the order. */
+export function describeCancelAction(order: Pick<OpenOrder, 'can_cancel' | 'source'>): CancelAction {
+  if (order.can_cancel) {
+    return { label: 'Cancel order', disabled: false };
+  }
+  if (order.source.kind === 'forward_test') {
+    return { label: `Stop forward test ${String(order.source.forward_test_id)} to cancel`, disabled: true };
+  }
+  return { label: 'Cancel order: sent by another IBKR client', disabled: true };
 }
 
 export function readOpenOrdersMessage(message: unknown): OpenOrder[] | null {

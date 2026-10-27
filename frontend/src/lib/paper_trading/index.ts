@@ -1,16 +1,18 @@
 // Public entry of paper_trading: the account panel with the paper account check, the balance, the positions,
 // the paper order form, the open orders, and the paper capital for the backtest form.
 export { default as PaperAccountPanel } from './PaperAccountPanel.svelte';
-export { describePaperAccountCheck, formatAmount, readPaperAccountMessage, PAPER_TRADING_SOCKET_PATH } from './paper_account';
+export { describePaperAccountCheck, describePaperAccountTag, formatAmount, readPaperAccountMessage, PAPER_TRADING_SOCKET_PATH } from './paper_account';
 export type { PaperAccountCheck, PaperAccountMessage, PaperPosition } from './paper_account';
 export { readPaperCapital } from './paper_capital';
 export {
   cancelPaperOrder,
   describeOrderForConfirmation,
+  describeOrderTitle,
+  findOrderBlock,
   describeOrderSource,
   readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
   sendPaperOrder,
 } from './paper_orders';
-export type { ManualOrder, OpenOrder, OrderForm, OrderSource, SendOrderRequest } from './paper_orders';
+export type { BlockingForwardTest, ManualOrder, OpenOrder, OrderForm, OrderSource, SendOrderRequest } from './paper_orders';

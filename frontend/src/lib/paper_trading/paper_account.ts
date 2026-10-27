@@ -1,6 +1,7 @@
 // Reads the /ws/paper-trading account messages and describes the paper account check for the account panel.
 
 import type { components } from '#lib/api';
+import type { StatusKind } from '#lib/foundation/carbon';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
 // The message models of backend/src/atrade/paper_trading/account_socket.py. Amounts are decimal text.
@@ -18,6 +19,16 @@ export function readPaperAccountMessage(message: unknown): PaperAccountMessage |
   return readSocketMessage<PaperAccountMessage>(message, ['account']);
 }
 
+const CHECK_STATUS_KINDS: Record<PaperAccountCheck['status'], StatusKind> = {
+  passed: 'success',
+  disconnected: 'warning',
+  failed: 'error',
+};
+
+export function findPaperAccountCheckKind(status: PaperAccountCheck['status']): StatusKind {
+  return CHECK_STATUS_KINDS[status];
+}
+
 export function describePaperAccountCheck(check: PaperAccountCheck): { title: string; detail: string | null } {
   switch (check.status) {
     case 'passed':
@@ -33,6 +44,33 @@ export function describePaperAccountCheck(check: PaperAccountCheck): { title: st
       };
     }
   }
+}
+
+// The Paper tag in the header shows the account number with its middle hidden: DU1234567 becomes DU****567.
+const SHOWN_LEADING_CHARACTERS = 2;
+const SHOWN_TRAILING_CHARACTERS = 3;
+const HIDDEN_CHARACTER = '*';
+
+function hideAccountNumberMiddle(account: string): string {
+  const hiddenLength = account.length - SHOWN_LEADING_CHARACTERS - SHOWN_TRAILING_CHARACTERS;
+  if (hiddenLength < 1) {
+    return HIDDEN_CHARACTER.repeat(account.length);
+  }
+  return (
+    account.slice(0, SHOWN_LEADING_CHARACTERS) +
+    HIDDEN_CHARACTER.repeat(hiddenLength) +
+    account.slice(account.length - SHOWN_TRAILING_CHARACTERS)
+  );
+}
+
+export function describePaperAccountTag(check: PaperAccountCheck | null): string {
+  if (check === null) {
+    return 'Checking the paper account.';
+  }
+  if (check.status !== 'passed') {
+    return describePaperAccountCheck(check).title;
+  }
+  return `Paper account ${check.actual_accounts.map(hideAccountNumberMiddle).join(', ')}`;
 }
 
 export function formatAmount(amount: string | null): string {

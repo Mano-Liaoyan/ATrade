@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { Button, Dialog, InlineNotification, Select, Tag, type SelectItem } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import {
     clearDraft,
@@ -28,6 +29,8 @@
   let saveMessage = $state('');
   let errorMessage = $state('');
   let isSaving = $state(false);
+  let isDeleteDialogOpen = $state(false);
+  let isDeleting = $state(false);
 
   // Code completion and live type errors. Type errors do not block the save.
   const languageServer = connectStrategyLanguageServer(window.location);
@@ -36,6 +39,13 @@
   });
 
   const hasUnsavedChanges = $derived(openVersion !== null && editorCode !== openVersion.code);
+  const versionItems: SelectItem<string>[] = $derived.by(() => {
+    const strategyName = strategy?.name ?? '';
+    return (strategy?.versions ?? []).map((version) => ({
+      value: String(version.version_number),
+      label: formatVersionLabel(strategyName, version.version_number),
+    }));
+  });
 
   $effect(() => {
     void loadStrategy(strategyId, null);
@@ -80,10 +90,9 @@
     }
   }
 
-  function selectVersion(event: Event): void {
-    const select = event.currentTarget as HTMLSelectElement;
+  function selectVersion(versionNumber: string): void {
     saveMessage = '';
-    void openStrategyVersion(Number(select.value));
+    void openStrategyVersion(Number(versionNumber));
   }
 
   async function saveVersion(): Promise<void> {
@@ -112,10 +121,10 @@
   }
 
   async function removeStrategy(): Promise<void> {
-    if (!window.confirm('Delete this strategy and all its versions?')) {
-      return;
-    }
+    isDeleting = true;
     const result = await deleteStrategy(fetch, strategyId);
+    isDeleting = false;
+    isDeleteDialogOpen = false;
     if (result.kind === 'failed') {
       errorMessage = result.message;
       return;
@@ -124,39 +133,60 @@
   }
 </script>
 
-<p><a href={resolve('/strategies')}>All strategies</a></p>
+<p class="back-link"><a class="cds--link" href={resolve('/strategies')}>All strategies</a></p>
 
 {#if strategy !== null}
   <h1>{strategy.name}</h1>
 
   <div class="toolbar">
-    <label>
-      Version
-      <select value={openVersion?.version_number} onchange={selectVersion}>
-        {#each strategy.versions as version (version.id)}
-          <option value={version.version_number}>{formatVersionLabel(strategy.name, version.version_number)}</option>
-        {/each}
-      </select>
-    </label>
-    <button type="button" onclick={saveVersion} disabled={isSaving}>Save version</button>
+    <div class="version-select">
+      <Select
+        label="Version"
+        items={versionItems}
+        value={String(openVersion?.version_number ?? '')}
+        onValueChange={(versionNumber: string) => {
+          selectVersion(versionNumber);
+        }}
+      />
+    </div>
+    <Button size="md" onclick={saveVersion} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save version'}</Button>
     {#if hasUnsavedChanges}
-      <span class="unsaved">Unsaved changes</span>
+      <Tag label="Unsaved changes" kind="warm-gray" />
     {/if}
-    <button type="button" class="delete-button" onclick={removeStrategy}>Delete strategy</button>
+    <Button
+      kind="danger"
+      size="md"
+      class="delete-button"
+      onclick={() => {
+        isDeleteDialogOpen = true;
+      }}
+    >
+      Delete strategy
+    </Button>
   </div>
 
-  {#if saveMessage !== ''}
-    <p role="status">{saveMessage}</p>
-  {/if}
+  {#if saveMessage !== '' || problems.length > 0}
+    <div class="results">
+      {#if saveMessage !== ''}
+        <InlineNotification
+          kind="success"
+          lowContrast
+          title={saveMessage}
+          onClose={() => {
+            saveMessage = '';
+          }}
+        />
+      {/if}
 
-  {#if problems.length > 0}
-    <div class="problems" role="alert">
-      <p>The code was not saved. Fix these problems:</p>
-      <ul>
-        {#each problems as problem, index (index)}
-          <li>Line {problem.line}: {problem.message}</li>
-        {/each}
-      </ul>
+      {#if problems.length > 0}
+        <InlineNotification kind="error" lowContrast title="The code was not saved. Fix these problems:">
+          <ul class="problem-list">
+            {#each problems as problem, index (index)}
+              <li>Line {problem.line}: {problem.message}</li>
+            {/each}
+          </ul>
+        </InlineNotification>
+      {/if}
     </div>
   {/if}
 
@@ -170,33 +200,74 @@
       />
     </div>
   {/if}
+
+  <Dialog
+    open={isDeleteDialogOpen}
+    onOpenChange={(open: boolean) => {
+      isDeleteDialogOpen = open;
+    }}
+    title="Delete {strategy.name}"
+    primaryText="Delete strategy"
+    primaryKind="danger"
+    busy={isDeleting}
+    onPrimary={() => {
+      void removeStrategy();
+    }}
+  >
+    <p>All versions of the strategy are deleted.</p>
+  </Dialog>
 {/if}
 
 {#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+  <div class="page-error">
+    <InlineNotification kind="error" lowContrast title={errorMessage} />
+  </div>
 {/if}
 
 <style>
+  .back-link {
+    margin-block: 0 var(--cds-spacing-05);
+  }
+
   .toolbar {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    align-items: end;
+    gap: var(--cds-spacing-05);
+    margin-block-end: var(--cds-spacing-05);
   }
 
-  .unsaved {
-    color: var(--color-muted);
-    font-style: italic;
+  .version-select {
+    inline-size: calc(2 * var(--cds-spacing-13));
   }
 
-  .delete-button {
-    margin-left: auto;
+  .toolbar :global(.delete-button) {
+    margin-inline-start: auto;
   }
 
-  .problems,
-  .error {
-    color: #cf222e;
+  .results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cds-spacing-03);
+    margin-block-end: var(--cds-spacing-05);
+  }
+
+  .results :global(.cds--inline-notification) {
+    margin-block: 0;
+  }
+
+  .page-error {
+    margin-block-start: var(--cds-spacing-05);
+  }
+
+  .page-error :global(.cds--inline-notification) {
+    margin-block: 0;
+  }
+
+  .problem-list {
+    margin-block: var(--cds-spacing-02) 0;
+    padding-inline-start: var(--cds-spacing-05);
+    list-style: disc;
   }
 
   .editor-region {

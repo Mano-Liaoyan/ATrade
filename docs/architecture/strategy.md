@@ -143,6 +143,8 @@ The checks run in the Web process. They do not import the user code.
   exist on the server. The request timeout is 15 seconds.
 - The editor works without completion when the connection fails. Type errors
   do not block the save (section 9.3).
+- Tab accepts the selected completion. When no completion list is open, Tab
+  indents. Escape and then Tab or Shift+Tab moves the focus out of the editor.
 
 ## 9.5 Comparison
 
@@ -182,9 +184,8 @@ returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
   no domain meaning. Its scroll region has a styled scrollbar.
 - `CodeEditor` and `CodeDiff` use one theme, `createCodeTheme()` in
   `code_theme.ts`. The editor parts (gutter, active line, selection, tooltips,
-  diff line colors) use the app color tokens of `src/routes/+layout.svelte`
-  (`--color-surface`, `--color-muted`, `--color-code-*`, `--color-diff-*`).
-  The syntax colors are in `code_colors.ts` (GitHub Primer colors). A Vitest
+  diff line colors) use the Carbon tokens (`--cds-*`) of the current theme.
+  The syntax colors are in `code_colors.ts` (Carbon palette colors). A Vitest
   test checks that each syntax color has WCAG AA contrast (4.5:1) on the code
   background. The theme follows `prefers-color-scheme` and also changes when
   the operating system scheme changes. It sets `EditorView.darkTheme`, so the

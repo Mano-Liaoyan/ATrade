@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { Tabs } from '#lib/foundation/carbon';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     BAR_PERIODS,
@@ -23,20 +24,34 @@
 
   const chartRequest = $derived(readChartRequest(page.params, page.url.searchParams));
 
-  let barsResult: BarsResult | undefined = $state();
-  let isLoading = $state(false);
+  // The bars and the live bar keep the chart request that they belong to. When the bar period changes, the chart
+  // gets no data of the previous bar period, also before the effects below run again: the chart cannot draw a live
+  // bar that is older than its last bar.
+  const chartKey = $derived(chartRequest === null ? null : formatLiveBarsPath(chartRequest));
+  let loadedBars: { key: string; result: BarsResult } | undefined = $state();
+  let receivedLiveBar: { key: string; bar: Bar } | undefined = $state();
+  const barsResult = $derived(loadedBars?.key === chartKey ? loadedBars.result : undefined);
+  const liveBar = $derived(receivedLiveBar?.key === chartKey ? receivedLiveBar.bar : null);
+  const isLoading = $derived(chartKey !== null && barsResult === undefined);
+  // A new array for each chart request: the chart then removes the bars and the live bar of the previous request,
+  // also while the new bars load.
+  const chartBars = $derived.by(() => {
+    if (chartKey === null || barsResult?.kind !== 'loaded') {
+      return [];
+    }
+    return barsResult.bars;
+  });
 
   $effect(() => {
     if (chartRequest === null) {
       return;
     }
     const { instrument, barPeriod } = chartRequest;
+    const key = formatLiveBarsPath(chartRequest);
     let isCurrent = true;
-    isLoading = true;
     void readBars(fetch, instrument, barPeriod).then((result) => {
       if (isCurrent) {
-        barsResult = result;
-        isLoading = false;
+        loadedBars = { key, result };
       }
     });
     return () => {
@@ -44,7 +59,6 @@
     };
   });
 
-  let liveBar: Bar | null = $state(null);
   let liveBarError: string | null = $state(null);
   let isLiveSocketConnected = $state(false);
 
@@ -52,15 +66,15 @@
     if (chartRequest === null) {
       return;
     }
-    liveBar = null;
+    const key = formatLiveBarsPath(chartRequest);
     liveBarError = null;
     // The live socket connects again after a close, a missing heartbeat, or when a background tab comes back.
     return openLiveSocket({
-      url: buildSocketUrl(formatLiveBarsPath(chartRequest), window.location),
+      url: buildSocketUrl(key, window.location),
       onMessage: (message) => {
         const liveBarMessage = readLiveBarMessage(message);
         if (liveBarMessage?.type === 'bar') {
-          liveBar = liveBarMessage.bar;
+          receivedLiveBar = { key, bar: liveBarMessage.bar };
           liveBarError = null;
         } else if (liveBarMessage?.type === 'error') {
           liveBarError = liveBarMessage.detail;
@@ -82,13 +96,13 @@
     return isLiveSocketConnected ? 'Waiting for live bars.' : 'Connecting to live bars.';
   });
 
-  function changeBarPeriod(event: Event & { currentTarget: HTMLSelectElement }): void {
+  function changeBarPeriod(value: string): void {
     if (chartRequest === null) {
       return;
     }
-    const barPeriod = event.currentTarget.value as BarPeriod;
+    const barPeriod = value as BarPeriod;
     const { instrument } = chartRequest;
-    // The same page opens with the new bar period. The bar period list keeps the focus.
+    // The same page opens with the new bar period. The selected tab keeps the focus.
     const instrumentPath = resolve('/instruments/[exchange]/[symbol]', {
       exchange: instrument.exchange,
       symbol: instrument.symbol,
@@ -105,51 +119,49 @@
 
 {#if chartRequest === null}
   <h1>Instrument not found</h1>
-  <p>The page address must name the symbol, the exchange, and the currency.</p>
 {:else}
   {@const instrumentName = formatInstrument(chartRequest.instrument)}
   <h1>{instrumentName}</h1>
-  <form class="chart-controls" onsubmit={(event) => { event.preventDefault(); }}>
-    <label for="bar-period">Bar period</label>
-    <select id="bar-period" value={chartRequest.barPeriod} onchange={changeBarPeriod}>
-      {#each BAR_PERIODS as barPeriod (barPeriod.value)}
-        <option value={barPeriod.value}>{barPeriod.label}</option>
-      {/each}
-    </select>
-    {#if isLoading}
-      <span class="chart-message" role="status">Loading bars.</span>
-    {:else if barsResult?.kind === 'failed'}
-      <span class="chart-message chart-failed" role="alert">{barsResult.message}</span>
-    {:else if barsResult?.kind === 'loaded'}
-      <span class="chart-message" role="status" aria-label="Bar count">{describeBarCount(barsResult.bars.length)}</span>
-    {/if}
-    <span class="chart-message" class:chart-failed={liveBarError !== null} role="status" aria-label="Live bar"
-      >{liveBarText}</span
-    >
-  </form>
-  <BarChart
-    bars={barsResult?.kind === 'loaded' ? barsResult.bars : []}
-    {liveBar}
-    label="Bar chart of {instrumentName}, {chartRequest.barPeriod} bars"
-  />
+  <Tabs label="Bar period" items={BAR_PERIODS} value={chartRequest.barPeriod} onValueChange={changeBarPeriod}>
+    {#snippet panel()}
+      <div class="chart-status">
+        {#if isLoading}
+          <span role="status">Loading bars.</span>
+        {:else if barsResult?.kind === 'failed'}
+          <span class="chart-failed" role="alert">{barsResult.message}</span>
+        {:else if barsResult?.kind === 'loaded'}
+          <span role="status" aria-label="Bar count">{describeBarCount(barsResult.bars.length)}</span>
+        {/if}
+        <span class:chart-failed={liveBarError !== null} role="status" aria-label="Live bar">{liveBarText}</span>
+      </div>
+      <BarChart
+        bars={chartBars}
+        {liveBar}
+        label="Bar chart of {instrumentName}, {chartRequest.barPeriod} bars"
+      />
+    {/snippet}
+  </Tabs>
 {/if}
-<p><a href={resolve('/')}>Back to the watchlist</a></p>
+<p class="instrument-back"><a class="cds--link" href={resolve('/')}>Back to the watchlist</a></p>
 
 <style>
-  .chart-controls {
+  .chart-status {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 0.75rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .chart-message {
-    color: var(--color-muted);
+    gap: var(--cds-spacing-03) var(--cds-spacing-06);
+    margin-block-end: var(--cds-spacing-05);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
+    color: var(--cds-text-secondary);
+    font-variant-numeric: tabular-nums;
   }
 
   .chart-failed {
-    color: var(--color-warning);
-    font-weight: 600;
+    color: var(--cds-text-error);
+  }
+
+  .instrument-back {
+    margin-block: 0;
   }
 </style>

@@ -52,7 +52,8 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   Unsaved edits stay in the browser. The editor shows code completion and
   live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
-- Watchlist: the user adds an instrument from the search results and deletes
+- Watchlist: the user adds an instrument from the search candidates (choose
+  it with the arrow keys and press Enter, or click it) and deletes
   it from the watchlist panel on the home page. The watchlist is in
   PostgreSQL, so it stays after a restart. A watchlist instrument opens the
   instrument page `/instruments/<exchange>/<symbol>?currency=<currency>`.

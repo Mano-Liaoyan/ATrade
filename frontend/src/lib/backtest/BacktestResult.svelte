@@ -1,80 +1,77 @@
 <!-- Result of one backtest: its status, the strategy error of a failed backtest, the metrics, the equity curve,
-     and the trades. The trade table scrolls inside its own region. -->
+     and the trades. The metrics are Carbon tiles. The trade table scrolls inside its own region. -->
 <script lang="ts">
+  import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import type { BacktestDetail } from './backtest_api';
-  import { describeBacktestStatus, formatPercent, formatUsd } from './backtest_format';
+  import type { BacktestDetail, BacktestMetrics } from './backtest_api';
+  import { describeBacktestStatus, findBacktestStatusKind, formatPercent, formatUsd } from './backtest_format';
   import EquityChart from './EquityChart.svelte';
 
   const { backtest }: { backtest: BacktestDetail } = $props();
+
+  const METRICS: { name: string; format: (metrics: BacktestMetrics) => string }[] = [
+    { name: 'Final equity (USD)', format: (metrics) => formatUsd(metrics.final_equity_usd) },
+    { name: 'Total return', format: (metrics) => formatPercent(metrics.total_return_percent) },
+    { name: 'Max drawdown', format: (metrics) => formatPercent(metrics.max_drawdown_percent) },
+    { name: 'Trades', format: (metrics) => String(metrics.trade_count) },
+  ];
+  const TRADE_COLUMNS: TableColumn[] = [
+    { header: 'Number', align: 'right' },
+    { header: 'Time' },
+    { header: 'Side' },
+    { header: 'Quantity', align: 'right' },
+    { header: 'Price (USD)', align: 'right' },
+    { header: 'Commission (USD)', align: 'right' },
+  ];
 </script>
 
 <section class="backtest-result" aria-label="Backtest result">
-  <p class="status" role="status" aria-label="Backtest status">{describeBacktestStatus(backtest.status)}</p>
+  <p role="status" aria-label="Backtest status">
+    <StatusIndicator label={describeBacktestStatus(backtest.status)} kind={findBacktestStatusKind(backtest.status)} />
+  </p>
 
   {#if backtest.status === 'failed' && backtest.error_message !== null}
     <h2>Strategy error</h2>
     <ScrollRegion label="Strategy error" maxHeight="24rem">
       <pre class="error-message">{backtest.error_message}</pre>
     </ScrollRegion>
-  {:else if backtest.status === 'timed_out'}
-    <p>The backtest ran longer than the timeout. ATrade stopped it.</p>
   {/if}
 
   {#if backtest.metrics !== null}
+    {@const metrics = backtest.metrics}
     <h2>Metrics</h2>
-    <dl class="metrics" aria-label="Metrics">
-      <div>
-        <dt>Final equity (USD)</dt>
-        <dd>{formatUsd(backtest.metrics.final_equity_usd)}</dd>
-      </div>
-      <div>
-        <dt>Total return</dt>
-        <dd>{formatPercent(backtest.metrics.total_return_percent)}</dd>
-      </div>
-      <div>
-        <dt>Max drawdown</dt>
-        <dd>{formatPercent(backtest.metrics.max_drawdown_percent)}</dd>
-      </div>
-      <div>
-        <dt>Trades</dt>
-        <dd>{backtest.metrics.trade_count}</dd>
-      </div>
+    <dl class="metrics atrade-auto-grid" aria-label="Metrics">
+      {#each METRICS as metric (metric.name)}
+        <div class="cds--tile metric">
+          <dt>{metric.name}</dt>
+          <dd>{metric.format(metrics)}</dd>
+        </div>
+      {/each}
     </dl>
 
     <h2>Equity curve</h2>
-    <EquityChart curves={[{ name: "Equity", points: backtest.equity_curve }]} label="Equity curve" />
+    <EquityChart curves={[{ name: 'Equity', points: backtest.equity_curve }]} label="Equity curve" />
 
     <h2>Trades</h2>
     {#if backtest.trades.length === 0}
       <p>The strategy made no trade.</p>
     {:else}
       <ScrollRegion label="Trades" maxHeight="18rem">
-        <table class="trades">
-          <thead>
-            <tr>
-              <th scope="col">Number</th>
-              <th scope="col">Time</th>
-              <th scope="col">Side</th>
-              <th scope="col">Quantity</th>
-              <th scope="col">Price (USD)</th>
-              <th scope="col">Commission (USD)</th>
-            </tr>
-          </thead>
-          <tbody>
+        <DataTable columns={TRADE_COLUMNS} size="sm">
+          {#snippet rows()}
             {#each backtest.trades as trade, tradeIndex (tradeIndex)}
               <tr>
-                <th scope="row">{tradeIndex + 1}</th>
+                <th scope="row" align="right">{tradeIndex + 1}</th>
                 <td>{formatUtcTime(trade.time_utc)}</td>
                 <td>{trade.side}</td>
-                <td class="number">{trade.quantity_shares}</td>
-                <td class="number">{formatUsd(trade.price_usd)}</td>
-                <td class="number">{formatUsd(trade.commission_usd)}</td>
+                <td align="right">{trade.quantity_shares}</td>
+                <td align="right">{formatUsd(trade.price_usd)}</td>
+                <td align="right">{formatUsd(trade.commission_usd)}</td>
               </tr>
             {/each}
-          </tbody>
-        </table>
+          {/snippet}
+        </DataTable>
       </ScrollRegion>
     {/if}
   {/if}
@@ -84,7 +81,7 @@
   .backtest-result {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--cds-spacing-05);
   }
 
   h2,
@@ -93,63 +90,41 @@
   }
 
   h2 {
-    font-size: 1.125rem;
-  }
-
-  .status {
-    font-weight: 600;
+    font-size: var(--cds-heading-03-font-size);
+    font-weight: var(--cds-heading-03-font-weight);
+    line-height: var(--cds-heading-03-line-height);
+    letter-spacing: var(--cds-heading-03-letter-spacing);
   }
 
   .error-message {
     margin: 0;
-    padding: 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
-    background: var(--color-surface);
-    color: var(--color-warning);
-    font-size: 0.8125rem;
+    padding: var(--cds-spacing-05);
+    background: var(--cds-layer-01);
+    color: var(--cds-text-error);
+    font-family: var(--cds-code-01-font-family);
+    font-size: var(--cds-code-01-font-size);
+    line-height: var(--cds-code-01-line-height);
     white-space: pre-wrap;
   }
 
   .metrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.5rem;
+    gap: var(--cds-spacing-01);
     margin: 0;
   }
 
-  .metrics dt {
-    color: var(--color-muted);
-    font-size: 0.875rem;
+  .metric dt {
+    font-size: var(--cds-label-01-font-size);
+    line-height: var(--cds-label-01-line-height);
+    letter-spacing: var(--cds-label-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 
-  .metrics dd {
-    margin: 0;
-    font-size: 1.25rem;
+  .metric dd {
+    margin: var(--cds-spacing-03) 0 0;
+    font-size: var(--cds-heading-04-font-size);
+    font-weight: var(--cds-heading-04-font-weight);
+    line-height: var(--cds-heading-04-line-height);
     font-variant-numeric: tabular-nums;
-  }
-
-  .trades {
-    border-collapse: collapse;
-    inline-size: 100%;
-    font-size: 0.875rem;
-  }
-
-  .trades th,
-  .trades td {
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: start;
-  }
-
-  .trades thead th {
-    position: sticky;
-    inset-block-start: 0;
-    background: var(--color-surface);
-  }
-
-  .trades .number {
     text-align: end;
-    font-variant-numeric: tabular-nums;
   }
 </style>

@@ -1,7 +1,15 @@
-<!-- The forward tests with their actual status from /ws/forward-tests, a stop button for each running one, and a
-     "Backtest the same period" button for each one with a start balance (docs/architecture/forward_test.md 12.10). -->
+<!-- The forward tests with their actual status from /ws/forward-tests. The row menu stops a running forward test and
+     starts a backtest of the same period for one with a start balance (docs/architecture/forward_test.md 12.10). -->
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import {
+    DataTable,
+    InlineNotification,
+    OverflowMenu,
+    StatusIndicator,
+    type OverflowMenuItem,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
@@ -9,6 +17,7 @@
     canBacktestSamePeriod,
     canStop,
     describeForwardTestStatus,
+    findForwardTestStatusKind,
     formatLocalTime,
     showsCrashCount,
     stopForwardTest,
@@ -23,153 +32,138 @@
 
   const { forwardTests, onBacktestSamePeriod }: Props = $props();
 
+  const COLUMNS: TableColumn[] = [
+    { header: 'Forward test' },
+    { header: 'Strategy version' },
+    { header: 'Instrument' },
+    { header: 'Bar period' },
+    { header: 'Status' },
+    { header: 'Client ID', align: 'right' },
+    { header: 'Start balance (USD)', align: 'right' },
+    { header: 'Started' },
+    { header: 'End time (local)' },
+    { header: 'Actions', isMenu: true },
+  ];
+
   let stoppingIds = $state<number[]>([]);
-  let stopMessage = $state<string | null>(null);
+  let stopFailure = $state<{ forwardTestId: number; message: string } | null>(null);
 
   async function stop(forwardTestId: number): Promise<void> {
-    stopMessage = null;
+    stopFailure = null;
     stoppingIds = [...stoppingIds, forwardTestId];
     const result = await stopForwardTest(fetch, forwardTestId);
     if (result.kind === 'failed') {
       stoppingIds = stoppingIds.filter((stoppingId) => stoppingId !== forwardTestId);
-      stopMessage = result.message;
+      stopFailure = { forwardTestId, message: result.message };
     }
+  }
+
+  // Only the actions that apply to the forward test. A forward test without an action has no menu.
+  function makeMenuItems(forwardTest: ForwardTest): OverflowMenuItem[] {
+    const items: OverflowMenuItem[] = [];
+    if (canStop(forwardTest)) {
+      const isStopping = stoppingIds.includes(forwardTest.id);
+      items.push({
+        label: isStopping ? 'Stop requested' : 'Stop forward test',
+        disabled: isStopping,
+        danger: true,
+        onSelect: () => void stop(forwardTest.id),
+      });
+    }
+    if (canBacktestSamePeriod(forwardTest)) {
+      items.push({
+        label: 'Backtest the same period',
+        onSelect: () => {
+          onBacktestSamePeriod(forwardTest.id);
+        },
+      });
+    }
+    return items;
   }
 </script>
 
-{#if stopMessage !== null}
-  <p class="stop-message" role="alert">{stopMessage}</p>
-{/if}
-{#if forwardTests.length === 0}
-  <p>No forward test yet.</p>
-{:else}
-  <ScrollRegion label="Forward tests" maxHeight="24rem">
-    <table class="forward-tests">
-      <thead>
-        <tr>
-          <th scope="col">Forward test</th>
-          <th scope="col">Strategy version</th>
-          <th scope="col">Instrument</th>
-          <th scope="col">Bar period</th>
-          <th scope="col">Status</th>
-          <th scope="col">Client ID</th>
-          <th scope="col">Start balance (USD)</th>
-          <th scope="col">Started</th>
-          <th scope="col">End time (local)</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each forwardTests as forwardTest (forwardTest.id)}
-          <tr>
-            <th scope="row">
-              <a href={resolve('/forward-tests/[forwardTestId]', { forwardTestId: String(forwardTest.id) })}
-                >#{forwardTest.id}</a
-              >
-            </th>
-            <td>{forwardTest.strategy_name} v{forwardTest.version_number}</td>
-            <td>{forwardTest.symbol} / {forwardTest.exchange} / {forwardTest.currency}</td>
-            <td>{formatBarPeriod(forwardTest.bar_period)}</td>
-            <td>
-              {describeForwardTestStatus(forwardTest.status)}
-              {#if showsCrashCount(forwardTest)}
-                <span class="crash-count">Crashes in a row: {forwardTest.crash_count} of 3</span>
-              {/if}
-              {#if forwardTest.error_message !== null}
-                <span class="error-message">{forwardTest.error_message}</span>
-              {/if}
-            </td>
-            <td class="number">{forwardTest.client_id ?? ''}</td>
-            <td class="number">
-              {forwardTest.start_balance_usd === null ? '' : formatAmount(forwardTest.start_balance_usd)}
-            </td>
-            <td>{formatUtcTime(forwardTest.created_at_utc)}</td>
-            <td>{formatLocalTime(forwardTest.end_time_utc)}</td>
-            <td>
-              <div class="actions">
-                {#if canStop(forwardTest)}
-                  <button
-                    type="button"
-                    aria-label={`Stop forward test ${String(forwardTest.id)}`}
-                    disabled={stoppingIds.includes(forwardTest.id)}
-                    onclick={() => stop(forwardTest.id)}>Stop</button
-                  >
+<div class="forward-test-list">
+  {#if stopFailure !== null}
+    <InlineNotification
+      kind="error"
+      title={`Forward test ${String(stopFailure.forwardTestId)} not stopped`}
+      subtitle={stopFailure.message}
+      lowContrast
+      onClose={() => (stopFailure = null)}
+    />
+  {/if}
+  {#if forwardTests.length === 0}
+    <p>No forward test yet.</p>
+  {:else}
+    <ScrollRegion label="Forward tests" maxHeight="24rem">
+      <DataTable columns={COLUMNS} size="sm">
+        {#snippet rows()}
+          {#each forwardTests as forwardTest (forwardTest.id)}
+            {@const menuItems = makeMenuItems(forwardTest)}
+            <tr>
+              <th scope="row">
+                <a class="cds--link" href={resolve('/forward-tests/[forwardTestId]', { forwardTestId: String(forwardTest.id) })}
+                  >#{forwardTest.id}</a
+                >
+              </th>
+              <td>{forwardTest.strategy_name} v{forwardTest.version_number}</td>
+              <td>{forwardTest.symbol} / {forwardTest.exchange} / {forwardTest.currency}</td>
+              <td>{formatBarPeriod(forwardTest.bar_period)}</td>
+              <td>
+                <StatusIndicator
+                  kind={findForwardTestStatusKind(forwardTest.status)}
+                  label={describeForwardTestStatus(forwardTest.status)}
+                />
+                {#if showsCrashCount(forwardTest)}
+                  <span class="note">Crashes in a row: {forwardTest.crash_count} of 3</span>
                 {/if}
-                {#if canBacktestSamePeriod(forwardTest)}
-                  <button
-                    type="button"
-                    aria-label={`Backtest the same period as forward test ${String(forwardTest.id)}`}
-                    onclick={() => {
-                      onBacktestSamePeriod(forwardTest.id);
-                    }}>Backtest the same period</button
-                  >
+                {#if forwardTest.error_message !== null}
+                  <span class="note error">{forwardTest.error_message}</span>
                 {/if}
-              </div>
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </ScrollRegion>
-{/if}
+              </td>
+              <td align="right">{forwardTest.client_id ?? ''}</td>
+              <td align="right">
+                {forwardTest.start_balance_usd === null ? '' : formatAmount(forwardTest.start_balance_usd)}
+              </td>
+              <td>{formatUtcTime(forwardTest.created_at_utc)}</td>
+              <td>{formatLocalTime(forwardTest.end_time_utc)}</td>
+              <td class="cds--table-column-menu">
+                {#if menuItems.length > 0}
+                  <OverflowMenu label={`Actions for forward test ${String(forwardTest.id)}`} items={menuItems} size="sm" />
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        {/snippet}
+      </DataTable>
+    </ScrollRegion>
+  {/if}
+</div>
 
 <style>
+  .forward-test-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cds-spacing-03);
+  }
+
   p {
     margin: 0;
   }
 
-  .stop-message,
-  .error-message {
-    color: var(--color-warning);
-  }
-
-  .error-message,
-  .crash-count {
-    display: block;
-    font-size: 0.75rem;
-  }
-
-  .forward-tests {
-    border-collapse: collapse;
-    inline-size: 100%;
-    font-size: 0.875rem;
-  }
-
-  .forward-tests th,
-  .forward-tests td {
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: start;
-  }
-
   /* A long value can break anywhere. A column name breaks only between words. */
-  .forward-tests td {
+  .forward-test-list :global(td) {
     overflow-wrap: anywhere;
   }
 
-  .forward-tests thead th {
-    position: sticky;
-    inset-block-start: 0;
-    background: var(--color-surface);
+  .note {
+    display: block;
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    color: var(--cds-text-secondary);
   }
 
-  .forward-tests .number {
-    text-align: end;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-  }
-
-  .visually-hidden {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .error {
+    color: var(--cds-text-error);
   }
 </style>

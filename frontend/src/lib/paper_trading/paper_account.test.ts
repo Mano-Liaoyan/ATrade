@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vite-plus/test';
 import {
   describeBalanceCurrency,
   describePaperAccountCheck,
+  describePaperAccountTag,
+  findPaperAccountCheckKind,
   formatAmount,
   readPaperAccountMessage,
   type PaperAccountBalance,
@@ -33,6 +35,14 @@ describe('readPaperAccountMessage', () => {
   it('ignores other messages', () => {
     expect(readPaperAccountMessage({ type: 'heartbeat' })).toBeNull();
     expect(readPaperAccountMessage('account')).toBeNull();
+  });
+});
+
+describe('findPaperAccountCheckKind', () => {
+  it('shows a passed check as success, a check without IB Gateway as warning, and a failed check as error', () => {
+    expect(findPaperAccountCheckKind('passed')).toBe('success');
+    expect(findPaperAccountCheckKind('disconnected')).toBe('warning');
+    expect(findPaperAccountCheckKind('failed')).toBe('error');
   });
 });
 
@@ -133,5 +143,36 @@ describe('describeBalanceCurrency', () => {
         message,
       }),
     ).toBe(message);
+  });
+});
+
+describe('describePaperAccountTag', () => {
+  const passedCheck = passedMessage.check;
+
+  it('names the checked paper account with the middle of the number hidden', () => {
+    expect(describePaperAccountTag(passedCheck)).toBe('Paper account DU****567');
+  });
+
+  it('hides the middle of each account number', () => {
+    expect(describePaperAccountTag({ ...passedCheck, actual_accounts: ['DU1234567', 'U7654321'] })).toBe(
+      'Paper account DU****567, U7***321',
+    );
+  });
+
+  it('hides a short account number completely', () => {
+    expect(describePaperAccountTag({ ...passedCheck, actual_accounts: ['DU12'] })).toBe('Paper account ****');
+  });
+
+  it('says that the check has not arrived', () => {
+    expect(describePaperAccountTag(null)).toBe('Checking the paper account.');
+  });
+
+  it('shows no account number when the check did not pass', () => {
+    expect(
+      describePaperAccountTag({ status: 'failed', message: 'IBKR sent a live account.', actual_accounts: ['U7654321'], expected_account: null }),
+    ).toBe('Paper account check failed. ATrade sends no orders.');
+    expect(describePaperAccountTag({ status: 'disconnected', message: null, actual_accounts: [], expected_account: null })).toBe(
+      'Paper account not checked. IB Gateway is not connected.',
+    );
   });
 });

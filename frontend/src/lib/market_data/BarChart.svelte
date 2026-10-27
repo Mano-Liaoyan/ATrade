@@ -10,6 +10,7 @@
     CandlestickSeries,
     createChart,
     type CandlestickData,
+    type CandlestickStyleOptions,
     type ChartOptions,
     type DeepPartial,
     type IChartApi,
@@ -35,18 +36,27 @@
     return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
   }
 
-  // The colors of the light or the dark tokens. A change of the color scheme applies them again, without a new chart.
+  // The chart colors are Carbon tokens of the current theme (g10 or g100).
+  // A change of the theme applies them again, without a new chart.
   function readThemeOptions(): DeepPartial<ChartOptions> {
+    const gridColor = readColor('--cds-border-subtle-01');
     return {
       layout: {
-        background: { color: readColor('--color-surface') },
-        textColor: readColor('--color-text'),
+        background: { color: readColor('--cds-layer-01') },
+        textColor: readColor('--cds-text-secondary'),
+        // IBM Plex Sans from the Carbon reset.
+        fontFamily: getComputedStyle(chartContainer).fontFamily,
       },
-      grid: {
-        vertLines: { color: readColor('--color-border') },
-        horzLines: { color: readColor('--color-border') },
-      },
+      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+      rightPriceScale: { borderColor: gridColor },
+      timeScale: { borderColor: gridColor },
     };
+  }
+
+  function readCandlestickOptions(): DeepPartial<CandlestickStyleOptions> {
+    const upColor = readColor('--cds-support-success');
+    const downColor = readColor('--cds-support-error');
+    return { upColor, downColor, borderUpColor: upColor, borderDownColor: downColor, wickUpColor: upColor, wickDownColor: downColor };
   }
 
   $effect(() => {
@@ -55,12 +65,15 @@
       autoSize: true,
       layout: { ...themeOptions.layout, attributionLogo: true },
       grid: themeOptions.grid,
-      timeScale: { timeVisible: true, secondsVisible: false },
+      rightPriceScale: themeOptions.rightPriceScale,
+      timeScale: { ...themeOptions.timeScale, timeVisible: true, secondsVisible: false },
     });
-    candlestickSeries = createdChart.addSeries(CandlestickSeries);
+    const createdSeries = createdChart.addSeries(CandlestickSeries, readCandlestickOptions());
+    candlestickSeries = createdSeries;
     chart = createdChart;
     const endColorSchemeWatch = watchColorScheme(() => {
       createdChart.applyOptions(readThemeOptions());
+      createdSeries.applyOptions(readCandlestickOptions());
     });
     return () => {
       endColorSchemeWatch();
@@ -96,7 +109,7 @@
 <figure class="bar-chart">
   <div class="chart-canvas" role="img" aria-label={label} bind:this={chartContainer}></div>
   <figcaption class="chart-attribution">
-    Chart by <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
+    Chart by <a class="cds--link cds--link--sm" href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
     Lightweight Charts™
   </figcaption>
 </figure>
@@ -110,14 +123,14 @@
     position: relative;
     height: min(32rem, 60vh);
     min-height: 16rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
     overflow: hidden;
   }
 
   .chart-attribution {
-    margin-top: 0.25rem;
-    color: var(--color-muted);
-    font-size: 0.75rem;
+    margin-block-start: var(--cds-spacing-03);
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    letter-spacing: var(--cds-helper-text-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 </style>

@@ -4,8 +4,10 @@ import {
   canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
+  findForwardTestStatusKind,
   formatLocalTime,
   isLiveBarPeriod,
+  listForwardTestsOnInstruments,
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestsMessage,
@@ -129,6 +131,18 @@ describe('labels', () => {
   });
 });
 
+describe('findForwardTestStatusKind', () => {
+  it('gives each status the kind of its icon and color', () => {
+    expect(findForwardTestStatusKind('starting')).toBe('in-progress');
+    expect(findForwardTestStatusKind('running')).toBe('success');
+    expect(findForwardTestStatusKind('waiting_for_gateway')).toBe('warning');
+    expect(findForwardTestStatusKind('stopping')).toBe('in-progress');
+    expect(findForwardTestStatusKind('stopped')).toBe('neutral');
+    expect(findForwardTestStatusKind('stop_failed')).toBe('error');
+    expect(findForwardTestStatusKind('failed')).toBe('error');
+  });
+});
+
 describe('canBacktestSamePeriod', () => {
   it('needs the start balance, because the backtest uses it as the paper capital', () => {
     expect(canBacktestSamePeriod(runningForwardTest)).toBe(true);
@@ -197,5 +211,15 @@ describe('the end time', () => {
   it('shows a UTC time in the local time zone', () => {
     expect(formatLocalTime(new Date(2026, 0, 3, 9, 30).toISOString())).toBe('2026-01-03 09:30');
     expect(formatLocalTime(null)).toBe('');
+  });
+});
+
+describe('listForwardTestsOnInstruments', () => {
+  it('names each forward test that holds a client ID, with its instrument', () => {
+    const stoppedForwardTest: ForwardTest = { ...runningForwardTest, id: 4, symbol: 'SPY', client_id: null, status: 'stopped' };
+
+    expect(listForwardTestsOnInstruments([runningForwardTest, stoppedForwardTest])).toEqual([
+      { label: 'Forward test 3 (Trend v2)', symbol: 'AAPL', exchange: 'NASDAQ' },
+    ]);
   });
 });

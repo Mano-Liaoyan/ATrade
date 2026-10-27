@@ -4,6 +4,7 @@ import type { components } from '#lib/api';
 import { readSocketMessage } from './socket_message';
 
 export { readSocketMessage } from './socket_message';
+export { default as LiveUpdatesNotification } from './LiveUpdatesNotification.svelte';
 
 type HeartbeatMessage = components['schemas']['HeartbeatMessage'];
 
@@ -110,6 +111,10 @@ export function openLiveSocket(options: LiveSocketOptions): () => void {
   }
 
   function receive(text: string): void {
+    // A closing socket can still fire a message event after stop.
+    if (isStopped) {
+      return;
+    }
     restartHeartbeatTimer();
     const message: unknown = JSON.parse(text);
     if (!isHeartbeat(message)) {
