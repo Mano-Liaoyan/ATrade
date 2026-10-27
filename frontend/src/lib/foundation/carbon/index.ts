@@ -13,3 +13,5 @@ export { default as Tooltip, type TooltipAlignment } from './Tooltip.svelte';
 export { default as TooltipProvider } from './TooltipProvider.svelte';
 export { default as Icon } from './Icon.svelte';
 export type { CarbonIcon, CarbonIconNode } from './carbon_icon';
+export { default as Combobox } from './Combobox.svelte';
+export type { ComboboxItem } from './combobox_classes';
