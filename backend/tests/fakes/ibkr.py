@@ -1,17 +1,19 @@
 """IBKR fake: the same functions as the GatewayConnection of the `ibkr` public entry. Data stays in memory.
 
 Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
-`instruments`, `search_error_message`, and `historical_bars_error_message` directly, and read
-`historical_bar_requests`. No mock library is used (section 17.3).
+`instruments`, `search_error_message`, `historical_bars_error_message`, `live_bars_error_message`,
+`live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read `historical_bar_requests`,
+`live_bar_subscriptions`, and `active_live_bar_stream_count`. No mock library is used (section 17.3).
 """
 
-from dataclasses import dataclass
-from datetime import datetime
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import anyio
 
-from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import AccountValue, GatewayRequestError, PortfolioPosition
 
@@ -34,6 +36,14 @@ SAMPLE_INSTRUMENTS = [
 SAMPLE_PRICE_BASE = 100
 SAMPLE_PRICE_STEPS = 50
 SAMPLE_VOLUME = Decimal(1000)
+# The live bar of the fake: the current bar at this time. It is the time of the test clock and of the e2e server clock.
+LIVE_BAR_NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+LIVE_BAR_INTERVAL_SECONDS = 0.2
+# Each update moves the close 0.25 up, from the open to the open + 1.75, and then starts again at the open.
+LIVE_CLOSE_STEP = Decimal("0.25")
+LIVE_CLOSE_STEP_COUNT = 8
+# Each update adds this volume, so the volume grows like the volume of a real bar that is not complete.
+LIVE_VOLUME_STEP = Decimal(10)
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,12 @@ class HistoricalBarRequest:
     instrument: Instrument
     bar_period: BarPeriod
     time_range: TimeRange
+
+
+@dataclass(frozen=True)
+class LiveBarSubscription:
+    instrument: Instrument
+    bar_period: BarPeriod
 
 
 def create_sample_bar(start_utc: datetime, bar_period: BarPeriod) -> Bar:
@@ -77,6 +93,13 @@ class FakeGatewayConnection:
         self.historical_bars_error_message: str | None = None
         # Each call of read_historical_bars, in order. Tests assert that only missing ranges reach IBKR.
         self.historical_bar_requests: list[HistoricalBarRequest] = []
+        # When it is set, stream_live_bars fails with this message, like missing market data permissions.
+        self.live_bars_error_message: str | None = None
+        self.live_bar_now_utc = LIVE_BAR_NOW_UTC
+        self.live_bar_interval_seconds = LIVE_BAR_INTERVAL_SECONDS
+        # Each call of stream_live_bars, in order, and the number of streams that did not end yet.
+        self.live_bar_subscriptions: list[LiveBarSubscription] = []
+        self.active_live_bar_stream_count = 0
         self.connection_number = 0
         self._connected = False
 
@@ -145,6 +168,28 @@ class FakeGatewayConnection:
             bars.append(create_sample_bar(bar_start_utc, bar_period))
             bar_start_utc += bar_period.length
         return bars
+
+    async def stream_live_bars(self, instrument: Instrument, bar_period: BarPeriod) -> AsyncGenerator[Bar]:
+        """Updates the current bar (at `live_bar_now_utc`) every `live_bar_interval_seconds` while connected."""
+        if not self.connected:
+            message = "Not connected"
+            raise GatewayRequestError(message)
+        self.live_bar_subscriptions.append(LiveBarSubscription(instrument, bar_period))
+        if self.live_bars_error_message is not None:
+            raise GatewayRequestError(self.live_bars_error_message)
+        sample_bar = create_sample_bar(floor_to_bar_start(self.live_bar_now_utc, bar_period), bar_period)
+        self.active_live_bar_stream_count += 1
+        try:
+            update_number = 0
+            while self.connected:
+                close = sample_bar.open + LIVE_CLOSE_STEP * (update_number % LIVE_CLOSE_STEP_COUNT)
+                update_number += 1
+                yield replace(sample_bar, close=close, volume=LIVE_VOLUME_STEP * update_number)
+                await anyio.sleep(self.live_bar_interval_seconds)
+            message = "The connection to IB Gateway was lost."
+            raise GatewayRequestError(message)
+        finally:
+            self.active_live_bar_stream_count -= 1
 
     def disconnect(self) -> None:
         self.connected = False

@@ -650,33 +650,33 @@
         "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format."
       },
       "BarResponse": {
+        "description": "`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings.",
         "properties": {
           "time": {
-            "type": "integer",
-            "title": "Time"
+            "title": "Time",
+            "type": "integer"
           },
           "open": {
-            "type": "number",
-            "title": "Open"
+            "title": "Open",
+            "type": "number"
           },
           "high": {
-            "type": "number",
-            "title": "High"
+            "title": "High",
+            "type": "number"
           },
           "low": {
-            "type": "number",
-            "title": "Low"
+            "title": "Low",
+            "type": "number"
           },
           "close": {
-            "type": "number",
-            "title": "Close"
+            "title": "Close",
+            "type": "number"
           },
           "volume": {
-            "type": "number",
-            "title": "Volume"
+            "title": "Volume",
+            "type": "number"
           }
         },
-        "type": "object",
         "required": [
           "time",
           "open",
@@ -686,7 +686,7 @@
           "volume"
         ],
         "title": "BarResponse",
-        "description": "`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings."
+        "type": "object"
       },
       "BarsResponse": {
         "properties": {
@@ -1115,6 +1115,56 @@
           "instruments"
         ],
         "title": "WatchlistResponse"
+      },
+      "HeartbeatMessage": {
+        "properties": {
+          "type": {
+            "const": "heartbeat",
+            "default": "heartbeat",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "HeartbeatMessage",
+        "type": "object"
+      },
+      "LiveBarErrorMessage": {
+        "properties": {
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "LiveBarErrorMessage",
+        "type": "object"
+      },
+      "LiveBarMessage": {
+        "description": "The current bar. A bar with the time of the last bar replaces it; a later time adds a bar.",
+        "properties": {
+          "type": {
+            "const": "bar",
+            "default": "bar",
+            "title": "Type",
+            "type": "string"
+          },
+          "bar": {
+            "$ref": "#/components/schemas/BarResponse"
+          }
+        },
+        "required": [
+          "bar"
+        ],
+        "title": "LiveBarMessage",
+        "type": "object"
       }
     }
   }

@@ -4,18 +4,18 @@ from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel
 
-from atrade.foundation.bar import Bar, BarPeriod, TimeRange
+from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError
+from atrade.market_data.bar_models import NOT_ONLY_SPACES_PATTERN, BarResponse, InstrumentField, to_bar_response
 from atrade.market_data.bar_reading import BarReader, BarRequest, GatewayNotConnectedError
+from atrade.market_data.live_bar_socket import create_live_bar_router
 
 # IBKR symbols are short. A longer query is a mistake, so the route refuses it before it calls IBKR.
 MAX_QUERY_LENGTH = 32
-# The query must have at least one character that is not a space.
-NOT_ONLY_SPACES_PATTERN = r"\S"
 
 
 class InstrumentResponse(BaseModel):
@@ -30,7 +30,6 @@ class InstrumentSearchResponse(BaseModel):
 
 # One answer has at most this many bars, for example 13 days of 1 minute bars. This keeps IBKR requests few.
 MAX_BARS_PER_REQUEST = 20_000
-MAX_INSTRUMENT_FIELD_LENGTH = 32
 # The chart range when the request has no start. Each default range has at most about 4300 bars.
 DEFAULT_RANGE_LENGTHS = {
     BarPeriod.ONE_MINUTE: timedelta(days=3),
@@ -46,35 +45,8 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
-class BarResponse(BaseModel):
-    """`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings."""
-
-    time: int
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
-
-
 class BarsResponse(BaseModel):
     bars: list[BarResponse]
-
-
-def to_bar_response(bar: Bar) -> BarResponse:
-    return BarResponse(
-        time=int(bar.start_utc.timestamp()),
-        open=float(bar.open),
-        high=float(bar.high),
-        low=float(bar.low),
-        close=float(bar.close),
-        volume=float(bar.volume),
-    )
-
-
-InstrumentField = Annotated[
-    str, Field(min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH, pattern=NOT_ONLY_SPACES_PATTERN)
-]
 
 
 class BarsQuery(BaseModel):
@@ -152,4 +124,5 @@ def create_market_data_router(
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=message) from error
         return BarsResponse(bars=[to_bar_response(bar) for bar in bars])
 
+    router.include_router(create_live_bar_router(gateway_connection=gateway_connection, host=host, port=port))
     return router

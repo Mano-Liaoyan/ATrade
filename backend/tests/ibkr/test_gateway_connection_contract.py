@@ -8,6 +8,7 @@ The case skips when `.env`, the account ID, or the Gateway is not available.
 """
 
 import socket
+from contextlib import aclosing
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -27,6 +28,8 @@ FAKE_ACCOUNT_ID = "DU1234567"
 CONTRACT_TEST_CLIENT_ID = 99
 CONNECT_WAIT_SECONDS = 30
 GATEWAY_PROBE_TIMEOUT_SECONDS = 3
+# keepUpToDate first returns the history of the duration, then the updates.
+LIVE_BAR_WAIT_SECONDS = 60
 
 
 class PaperAccountTestSettings(BaseSettings):
@@ -207,3 +210,32 @@ async def test_refuses_historical_bars_without_a_connection(
 
     with pytest.raises(GatewayRequestError):
         await connection.read_historical_bars(APPLE, BarPeriod.ONE_HOUR, HISTORICAL_RANGE)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("bar_period", [BarPeriod.ONE_MINUTE, BarPeriod.ONE_DAY])
+async def test_streams_the_current_live_bar(
+    connection_and_account: tuple[GatewayConnection, str], bar_period: BarPeriod
+) -> None:
+    connection, _account_id = connection_and_account
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        with anyio.fail_after(LIVE_BAR_WAIT_SECONDS):
+            async with aclosing(connection.stream_live_bars(APPLE, bar_period)) as live_bars:
+                bar = await anext(live_bars)
+        assert bar.start_utc == floor_to_bar_start(bar.start_utc, bar_period)
+        assert bar.low <= min(bar.open, bar.close)
+        assert bar.high >= max(bar.open, bar.close)
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+
+@pytest.mark.anyio
+async def test_refuses_live_bars_without_a_connection(connection_and_account: tuple[GatewayConnection, str]) -> None:
+    connection, _account_id = connection_and_account
+
+    with pytest.raises(GatewayRequestError):
+        async with aclosing(connection.stream_live_bars(APPLE, BarPeriod.ONE_MINUTE)) as live_bars:
+            await anext(live_bars)

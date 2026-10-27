@@ -398,6 +398,39 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["WatchlistInstrumentResponse"][];
         };
+        /** HeartbeatMessage */
+        HeartbeatMessage: {
+            /**
+             * Type
+             * @default heartbeat
+             * @constant
+             */
+            type: "heartbeat";
+        };
+        /** LiveBarErrorMessage */
+        LiveBarErrorMessage: {
+            /**
+             * Type
+             * @default error
+             * @constant
+             */
+            type: "error";
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * LiveBarMessage
+         * @description The current bar. A bar with the time of the last bar replaces it; a later time adds a bar.
+         */
+        LiveBarMessage: {
+            /**
+             * Type
+             * @default bar
+             * @constant
+             */
+            type: "bar";
+            bar: components["schemas"]["BarResponse"];
+        };
     };
     responses: never;
     parameters: never;

@@ -170,4 +170,57 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   that the fake receives), `tests/ibkr/test_historical_bar_pages.py`
   (internal paging test, the allowed exception of section 17), the contract
   test (section 7.5), and `e2e/bar_chart.spec.ts`.
-- Live bar updates over the WebSocket are not part of this section yet.
+- Live bars: section 8.5.
+
+## 8.5 Live bars
+
+Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/66).
+
+- `GatewayConnection.stream_live_bars(instrument, bar_period)` in `ibkr` is
+  an async generator. It yields the current bar at once and after each IBKR
+  update. The real connection calls `reqHistoricalData` with `keepUpToDate`,
+  an empty end time, `TRADES`, regular trading hours only, `formatDate=2`, and
+  a duration of `2 D` (intraday) or `1 W` (daily). It uses only the last bar
+  of the list. IBKR sends an update about every 5 seconds. Updates that come
+  at the same time are one update.
+- The generator raises `GatewayRequestError` when the request fails or when
+  the connection is lost (checked each second while no update comes). When
+  the generator closes, it cancels the IBKR subscription
+  (`cancelHistoricalData`). Use `contextlib.aclosing`.
+- Live bars are not saved in PostgreSQL. The bars route saves only complete
+  bars (section 8.4).
+
+| `/ws/market-data?symbol=&exchange=&currency=&bar_period=` message | When |
+|---|---|
+| `{"type": "bar", "bar": {"time", "open", "high", "low", "close", "volume"}}` | At once after the IBKR subscription starts, and after each update. The `bar` fields are the fields of the bars route. A bar with the time of the last bar replaces it. A later time adds a bar. |
+| `{"type": "heartbeat"}` | After 10 seconds without another message. |
+| `{"type": "error", "detail": "IB Gateway is not reachable at <host>:<port>. Live bars need IB Gateway."}` | When the Web process is not connected. The server then closes the socket with code 1011. |
+| `{"type": "error", "detail": "Reading live bars from IB Gateway failed: <reason>"}` | When the subscription fails or the connection is lost. The server then closes the socket with code 1011. |
+
+- The server refuses an unknown bar period or an empty or too long instrument
+  field before it accepts the socket (code 1008).
+- The browser sends nothing. When the browser leaves, the server closes the
+  generator, so the IBKR subscription ends.
+- The route is in `market_data/live_bar_socket.py`.
+  `create_market_data_router` includes it. `market_data` exports the message
+  models in `MARKET_DATA_SOCKET_MESSAGE_MODELS`; `app/openapi_document.py`
+  adds their JSON Schema to the OpenAPI document (section 13), so the
+  frontend types `LiveBarMessage`, `LiveBarErrorMessage`, and
+  `HeartbeatMessage` come from `#lib/api`.
+- Frontend: the instrument page opens the socket with
+  `foundation/live_socket` and gives the live bar to `BarChart` (prop
+  `liveBar`). `BarChart` calls `series.update()`: the view does not fit
+  again. A live bar older than the last bar is not drawn. The page shows the
+  live bar (`role="status"`, name `Live bar`), for example
+  `Live bar 2026-01-02 03:00 UTC: close 123.25`, or the `detail` text of the
+  error message. After an error, `live_socket` connects again with its
+  delay, so the chart continues when IB Gateway comes back.
+- The IBKR fake updates the bar that contains `live_bar_now_utc`
+  (2026-01-02 03:04:05 UTC, the time of the test clocks) every
+  `live_bar_interval_seconds` (0.2): the close moves up 0.25 from the open
+  to the open + 1.75 and starts again, and the volume grows by 10. It records
+  `live_bar_subscriptions` and `active_live_bar_stream_count`. Tests set
+  `live_bars_error_message`.
+- Tests: `tests/market_data/test_live_bar_socket.py` (through the WebSocket
+  route with the fake), the contract test (section 7.5), the Vitest tests of
+  `live_socket` and `live_bars`, and the last test of `e2e/bar_chart.spec.ts`.

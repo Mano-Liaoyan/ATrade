@@ -79,6 +79,9 @@ The public entry `atrade.ibkr` exports:
   connection number.
 - `search_instruments(query)` is the instrument search of
   [`docs/architecture/market_data.md`](market_data.md) section 8.2.
+- `read_historical_bars(...)` and `stream_live_bars(...)` are the bars and
+  the live bars of [`docs/architecture/market_data.md`](market_data.md)
+  sections 8.4 and 8.5.
 
 ## 7.3 Gateway status route
 
@@ -111,6 +114,10 @@ make sure that the `ib-gateway` service runs and is logged in.
   bars (`AAPL / NASDAQ / USD`, 1 minute and 1 day bars from 2026-03-02 to
   2026-03-05: the bars are in the range, ordered, unique, on bar period
   starts, on the 3 trading days, and a call without a connection raises
+  `GatewayRequestError`).
+  It also covers live bars (`stream_live_bars` for `AAPL`, 1 minute and 1
+  day: the first bar comes within 60 seconds, starts on a bar period start,
+  and has a valid high and low; a call without a connection raises
   `GatewayRequestError`).
 - The real case has the mark `ibkr_paper`. The default pytest options
   (`-m "not ibkr_paper"`) leave it out, so CI runs only the fake. Run it by

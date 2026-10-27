@@ -451,7 +451,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `tests/app/test_openapi_document.py` fails when `openapi.json` does not
   match the routes, and `pnpm check:api` fails when `index.ts` does not match
   `openapi.json`. Use `components['schemas'][...]`; do not write API types by
-  hand.
+  hand. OpenAPI does not describe WebSocket messages, so
+  `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
+  of each WebSocket message model to `components.schemas`. A capability
+  exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`. A
+  message schema must not have the name of a different schema.
 - `foundation/scroll_region/` has `ScrollRegion`: a region that scrolls inside
   itself. It hides the native scrollbar and draws its own track and thumb
   (`role="scrollbar"`, named "<region label> scroll bar"). The thumb can be
@@ -462,7 +466,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
   reconnection after 25 seconds without a message or after a close, and a
-  delay from 1 to 10 seconds between attempts.
+  delay from 1 to 10 seconds between attempts. A background tab can delay
+  the timers, so when the page becomes visible (`visibilitychange`), it
+  connects again at once if the last message is 25 seconds old or more, or
+  if it waits for a reconnection.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
@@ -854,7 +861,7 @@ ran them. The implementation must check them.
 | The paper Gateway needs a manual login or approval each week. | Watch the first week of operation. |
 | `ib_async` 2.1.0 connects with client protocol 178 at most. Features after 178 are not available. Its real connection to Gateway 10.50.1f is not checked. | The `ibkr_paper` contract tests. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |
-| Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. | Read the `ibapi` crate source, or run a forward test. |
+| Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. The Web process uses it for the chart (section 8.5), with the durations `2 D` and `1 W`. Not checked against a real Gateway, also not on a weekend. | `uv run pytest -m ibkr_paper -k live_bar` (contract test `test_streams_the_current_live_bar`), or run a forward test. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | Measure it in phase 1. |
 
 ### 21.1 Facts checked

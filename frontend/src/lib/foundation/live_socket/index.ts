@@ -16,6 +16,8 @@ export interface LiveSocketOptions {
   onMessage: (message: unknown) => void;
   onConnectionChange: (isConnected: boolean) => void;
   createSocket?: (url: string, events: SocketEvents) => OpenSocket;
+  // Calls onVisible each time the page becomes visible. Returns a function that stops the watch.
+  watchPageVisible?: (onVisible: () => void) => () => void;
   heartbeatTimeoutMilliseconds?: number;
   reconnectDelayMilliseconds?: number;
 }
@@ -47,6 +49,18 @@ function createBrowserSocket(url: string, events: SocketEvents): OpenSocket {
   return socket;
 }
 
+function watchDocumentVisible(onVisible: () => void): () => void {
+  function receiveVisibilityChange(): void {
+    if (document.visibilityState === 'visible') {
+      onVisible();
+    }
+  }
+  document.addEventListener('visibilitychange', receiveVisibilityChange);
+  return () => {
+    document.removeEventListener('visibilitychange', receiveVisibilityChange);
+  };
+}
+
 function isHeartbeat(message: unknown): boolean {
   return typeof message === 'object' && message !== null && 'type' in message && message.type === HEARTBEAT_MESSAGE_TYPE;
 }
@@ -59,6 +73,7 @@ export function buildSocketUrl(path: string, location: { protocol: string; host:
 /** Opens the socket and keeps it open. Returns a function that closes it for good. */
 export function openLiveSocket(options: LiveSocketOptions): () => void {
   const createSocket = options.createSocket ?? createBrowserSocket;
+  const watchPageVisible = options.watchPageVisible ?? watchDocumentVisible;
   const heartbeatTimeoutMilliseconds = options.heartbeatTimeoutMilliseconds ?? DEFAULT_HEARTBEAT_TIMEOUT_MILLISECONDS;
   const firstReconnectDelayMilliseconds = options.reconnectDelayMilliseconds ?? DEFAULT_RECONNECT_DELAY_MILLISECONDS;
   let reconnectDelayMilliseconds = firstReconnectDelayMilliseconds;
@@ -66,8 +81,11 @@ export function openLiveSocket(options: LiveSocketOptions): () => void {
   let socket: OpenSocket | null = null;
   let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  // A background tab can delay the timers for a long time, so the time of the last message is kept as well.
+  let lastMessageAtMilliseconds = Date.now();
 
   function restartHeartbeatTimer(): void {
+    lastMessageAtMilliseconds = Date.now();
     clearTimeout(heartbeatTimer);
     heartbeatTimer = setTimeout(() => socket?.close(), heartbeatTimeoutMilliseconds);
   }
@@ -94,6 +112,8 @@ export function openLiveSocket(options: LiveSocketOptions): () => void {
   }
 
   function connect(): void {
+    // A new socket gets the full heartbeat timeout to open and to send its first message.
+    lastMessageAtMilliseconds = Date.now();
     let newSocket: OpenSocket | null = null;
     newSocket = createSocket(options.url, {
       onOpen: () => {
@@ -113,9 +133,26 @@ export function openLiveSocket(options: LiveSocketOptions): () => void {
     socket = newSocket;
   }
 
+  // When a background tab becomes visible, a dead connection must not wait for timers that the browser delayed.
+  function checkAfterPageVisible(): void {
+    if (socket === null) {
+      clearTimeout(reconnectTimer);
+      reconnectDelayMilliseconds = firstReconnectDelayMilliseconds;
+      connect();
+      return;
+    }
+    if (Date.now() - lastMessageAtMilliseconds >= heartbeatTimeoutMilliseconds) {
+      socket.close();
+      clearTimeout(reconnectTimer);
+      connect();
+    }
+  }
+
   connect();
+  const stopWatchingPageVisible = watchPageVisible(checkAfterPageVisible);
   return () => {
     isStopped = true;
+    stopWatchingPageVisible();
     clearTimeout(reconnectTimer);
     clearTimeout(heartbeatTimer);
     socket?.close();

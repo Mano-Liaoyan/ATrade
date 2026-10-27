@@ -53,8 +53,12 @@ account panel (issue #74):
   `GET /api/market-data/bars`. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.4.
-- Live bar updates, backtests, paper trading, and forward tests are not
-  available yet.
+- Live bars: the chart gets the current bar from IBKR over the WebSocket
+  `/ws/market-data` and updates it without a page reload. The page connects
+  again after a lost connection and when a background tab becomes visible.
+  See [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.5.
+- Backtests, paper orders, and forward tests are not available yet.
 
 ## Requirements
 

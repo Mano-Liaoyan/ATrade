@@ -6,16 +6,23 @@ event loop of the caller, for example the uvicorn loop.
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Protocol
 
-from ib_async import IB, BarData, Contract, ContractDescription, RequestError
+from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, RequestError
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import require_usable_client_id
 from atrade.ibkr.account_data import AccountValue, PortfolioPosition, convert_account_value, convert_portfolio_item
-from atrade.ibkr.historical_bars import BAR_SIZE_SETTINGS, keep_bars_in_chunk, plan_historical_data_requests
+from atrade.ibkr.historical_bars import (
+    BAR_SIZE_SETTINGS,
+    LIVE_BAR_DURATIONS,
+    keep_bars_in_chunk,
+    plan_historical_data_requests,
+    to_bar,
+)
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
@@ -29,6 +36,8 @@ HISTORICAL_DATA_REQUEST_INTERVAL_SECONDS = 0.5
 NO_DATA_MESSAGE = "query returned no data"
 # formatDate=2: intraday bar times come as UNIX seconds, so ib_async returns UTC datetimes.
 UTC_FORMAT_DATE = 2
+# While no live bar update comes, the live bar stream checks the connection this often.
+LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
 
 logger = logging.getLogger("atrade.ibkr")
 
@@ -63,6 +72,14 @@ class GatewayConnection(Protocol):
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
     ) -> list[Bar]: ...
 
+    def stream_live_bars(self, instrument: Instrument, bar_period: BarPeriod) -> AsyncGenerator[Bar]:
+        """Yields the current bar at once and after each IBKR update. The bar can be new or the same bar, changed.
+
+        Raises GatewayRequestError when the subscription fails or the connection is lost. Close the generator
+        (`contextlib.aclosing`) to end the IBKR subscription.
+        """
+        ...
+
     def disconnect(self) -> None: ...
 
 
@@ -77,6 +94,16 @@ def read_stock_instruments(contract_descriptions: list[ContractDescription]) -> 
         if instrument not in instruments:
             instruments.append(instrument)
     return instruments
+
+
+def make_stock_contract(instrument: Instrument) -> Contract:
+    return Contract(
+        secType=STOCK_SECURITY_TYPE,
+        symbol=instrument.symbol,
+        exchange=SMART_ROUTING,
+        primaryExchange=instrument.exchange,
+        currency=instrument.currency,
+    )
 
 
 class IbAsyncGatewayConnection:
@@ -159,13 +186,7 @@ class IbAsyncGatewayConnection:
 
         https://interactivebrokers.github.io/tws-api/historical_bars.html
         """
-        contract = Contract(
-            secType=STOCK_SECURITY_TYPE,
-            symbol=instrument.symbol,
-            exchange=SMART_ROUTING,
-            primaryExchange=instrument.exchange,
-            currency=instrument.currency,
-        )
+        contract = make_stock_contract(instrument)
         bars: list[Bar] = []
         for request_index, request in enumerate(plan_historical_data_requests(time_range, bar_period)):
             if request_index > 0:
@@ -203,6 +224,56 @@ class IbAsyncGatewayConnection:
             message = "IB Gateway did not answer the historical data request in time."
             raise GatewayRequestError(message)
         return list(bars_data)
+
+    async def stream_live_bars(self, instrument: Instrument, bar_period: BarPeriod) -> AsyncGenerator[Bar]:
+        """Live TRADES bars of regular trading hours: reqHistoricalData with keepUpToDate (section 21).
+
+        IBKR sends an update of the last bar about every 5 seconds. The subscription ends when the generator closes.
+        https://interactivebrokers.github.io/tws-api/historical_bars.html#hd_request
+        """
+        bars_data = await self.subscribe_to_live_bars(make_stock_contract(instrument), bar_period)
+        updates: asyncio.Queue[None] = asyncio.Queue()
+
+        def receive_update(_bars_data: BarDataList, _has_new_bar: bool) -> None:
+            updates.put_nowait(None)
+
+        bars_data.updateEvent += receive_update
+        try:
+            if bars_data:
+                yield to_bar(bars_data[-1])
+            while True:
+                try:
+                    await asyncio.wait_for(updates.get(), LIVE_BAR_CONNECTION_CHECK_SECONDS)
+                except TimeoutError:
+                    if not self.ib.isConnected():
+                        message = "The connection to IB Gateway was lost."
+                        raise GatewayRequestError(message) from None
+                    continue
+                # Only the newest state counts. Updates that came at the same time are one update.
+                while not updates.empty():
+                    updates.get_nowait()
+                yield to_bar(bars_data[-1])
+        finally:
+            bars_data.updateEvent -= receive_update
+            if self.ib.isConnected():
+                self.ib.cancelHistoricalData(bars_data)
+
+    async def subscribe_to_live_bars(self, contract: Contract, bar_period: BarPeriod) -> BarDataList:
+        try:
+            # keepUpToDate needs an empty end time: the bars go up to now.
+            return await self.ib.reqHistoricalDataAsync(
+                contract,
+                endDateTime="",
+                durationStr=LIVE_BAR_DURATIONS[bar_period],
+                barSizeSetting=BAR_SIZE_SETTINGS[bar_period],
+                whatToShow="TRADES",
+                useRTH=True,
+                formatDate=UTC_FORMAT_DATE,
+                keepUpToDate=True,
+                timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
+            )
+        except (ConnectionError, RequestError) as error:
+            raise GatewayRequestError(str(error)) from error
 
     def disconnect(self) -> None:
         self.ib.disconnect()
