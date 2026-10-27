@@ -16,7 +16,8 @@ connection (issue #63), instrument search (issue #64), the strategy editor
 account panel (issue #74), and paper orders sent by hand (issue #75):
 
 - The `web` service serves the app shell, `GET /api/health`,
-  `GET /api/ibkr/gateway`, the strategy routes under `/api/strategies`, the
+  `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
+  `/api/watchlist`, the strategy routes under `/api/strategies`, the
   language server WebSocket `/ws/strategy-language-server`, the paper order
   routes under `/api/paper-trading`, and `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
@@ -44,7 +45,21 @@ account panel (issue #74), and paper orders sent by hand (issue #75):
   Unsaved edits stay in the browser. The editor shows code completion and
   live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
-- Bars, watchlist, backtests, and forward tests are not available yet.
+- Watchlist: the user adds an instrument from the search results and deletes
+  it from the watchlist panel on the home page. The watchlist is in
+  PostgreSQL, so it stays after a restart. A watchlist instrument opens the
+  instrument page `/instruments/<exchange>/<symbol>?currency=<currency>`.
+  Routes are under `/api/watchlist`. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.3.
+- Bar chart: the instrument page shows the bar chart of the instrument for
+  one bar period (1 minute to 1 day). Bars come from IBKR and stay in
+  PostgreSQL. The next request for the same range does not call IBKR, so
+  saved bars show also when IB Gateway is not reachable. The route is
+  `GET /api/market-data/bars`. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.4.
+- Live bar updates, backtests, and forward tests are not available yet.
 
 ## Requirements
 

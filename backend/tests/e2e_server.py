@@ -11,9 +11,11 @@ from pathlib import Path
 import uvicorn
 
 from atrade.app import create_web_app, upgrade_database
+from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
+    SAMPLE_INSTRUMENTS,
     FakeGatewayConnection,
     make_balance_values,
     make_forward_test_order,
@@ -27,6 +29,15 @@ E2E_FORWARD_TEST_ID = 42
 E2E_FORWARD_TEST_CLIENT_ID = 10
 FIXED_NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 LISTEN_HOST = "127.0.0.1"
+# The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
+# so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
+PLAYWRIGHT_PROJECT_NAMES = ["chromium", "firefox", "webkit", "msedge"]
+WATCHLIST_INSTRUMENTS_PER_PROJECT = 25
+WATCHLIST_INSTRUMENTS = [
+    Instrument(symbol=f"{project_name.upper()}{number:02d}", exchange="ARCA", currency="USD")
+    for project_name in PLAYWRIGHT_PROJECT_NAMES
+    for number in range(1, WATCHLIST_INSTRUMENTS_PER_PROJECT + 1)
+]
 
 
 def main() -> None:
@@ -37,7 +48,9 @@ def main() -> None:
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )
-    gateway_connection = FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID])
+    gateway_connection = FakeGatewayConnection(
+        managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS]
+    )
     gateway_connection.account_values = make_balance_values(
         FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd="25000.00"
     )

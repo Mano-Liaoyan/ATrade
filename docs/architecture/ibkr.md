@@ -48,7 +48,7 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
 | `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
@@ -77,10 +77,11 @@ The public entry `atrade.ibkr` exports:
   the same functions. Its data stays in memory. Tests set
   `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
-  `open_orders`, and `order_error_message` directly. Its orders get the
-  client ID `1` and order IDs from 1001. `make_forward_test_order(...)` makes
-  an open order of another client ID with a forward test `orderRef`. Each change of `connected` from false to true gives a new
-  connection number.
+  `historical_bars_error_message`, `open_orders`, and `order_error_message`
+  directly. Each change of `connected` from false to true gives a new
+  connection number. Its orders get the client ID `1` and order IDs from
+  1001. `make_forward_test_order(...)` makes an open order of another client
+  ID with a forward test `orderRef`.
 - `place_order(request)` sends a stock order to `SMART` routing with the
   primary exchange of the instrument, and returns the IBKR order ID. It does
   not check the account. The caller (`paper_trading`) runs the paper account
@@ -123,11 +124,15 @@ make sure that the `ib-gateway` service runs and is logged in.
 
 - `backend/tests/ibkr/test_gateway_connection_contract.py` runs the same
   assertions against the fake and against the real paper account. It covers
-  the connection, `managedAccounts`, the instrument search, and orders: it
-  sends a buy limit order for 1 AAPL at 1.00 USD (far from the market
-  price), sees it in `read_open_orders()`, and cancels it. Before the order,
-  the test asserts that the only managed account is the expected `DU`
-  account.
+  the connection, `managedAccounts`, the instrument search, orders, and
+  historical bars (`AAPL / NASDAQ / USD`, 1 minute and 1 day bars from 2026-03-02 to
+  2026-03-05: the bars are in the range, ordered, unique, on bar period
+  starts, on the 3 trading days, and a call without a connection raises
+  `GatewayRequestError`).
+- The order case sends a buy limit order for 1 AAPL at 1.00 USD (far from
+  the market price), sees it in `read_open_orders()`, and cancels it. Before
+  the order, the test asserts that the only managed account is the expected
+  `DU` account. It never runs in CI.
 - The real case has the mark `ibkr_paper`. The default pytest options
   (`-m "not ibkr_paper"`) leave it out, so CI runs only the fake. Run it by
   hand with `uv run pytest -m ibkr_paper` in `backend/`.

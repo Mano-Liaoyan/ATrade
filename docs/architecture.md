@@ -151,7 +151,7 @@ counts from `atrade/`.
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, and the paper account check. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
-| `foundation/` | `money`, `clock`, `instrument`, `settings`, `order_ref`. |
+| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`. |
 | `app/` | Program entry points. They create and connect all dependencies. |
 
 ### 6.2 Dependency direction
@@ -226,8 +226,9 @@ the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
 ## 8. Market data and watchlist
 
 Section 8 is in [`docs/architecture/market_data.md`](architecture/market_data.md).
-It holds the bar storage decisions, the watchlist decisions, and the
-instrument search (`GET /api/market-data/instrument-search`).
+It holds the bar storage decisions, the watchlist decisions, the
+instrument search (`GET /api/market-data/instrument-search`), and the
+watchlist routes (`/api/watchlist`).
 
 ## 9. Strategies and strategy versions
 
@@ -769,6 +770,10 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   asserts that it is visible. It also asserts that the app scrollbar element is
   visible (`getByRole('scrollbar', { name: '<region label> scroll bar' })`
   of `ScrollRegion`, section 13). No screenshot comparison.
+- The Playwright projects run at the same time against one database, and the
+  e2e database is not cleared. A test uses names or instruments that only its
+  project uses. For the watchlist, the e2e server adds the fake instruments
+  `<PROJECT NAME>01` to `<PROJECT NAME>25` on `ARCA` for each project.
 - WebKit is not Safari. Before each release, check a list by hand in real
   Safari.
 

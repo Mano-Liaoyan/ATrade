@@ -8,6 +8,7 @@ The case skips when `.env`, the account ID, or the Gateway is not available.
 """
 
 import socket
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -15,6 +16,7 @@ import anyio
 import pytest
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from atrade.foundation.bar import BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError, IbAsyncGatewayConnection, OpenOrder, OrderRequest
 from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values, make_stock_position
@@ -170,6 +172,42 @@ async def test_refuses_a_search_without_a_connection(connection_and_account: tup
 
     with pytest.raises(GatewayRequestError):
         await connection.search_instruments("AAPL")
+
+
+# A past week with trading days on NASDAQ. The range covers more than one IBKR step of 1 minute bars (1 day).
+HISTORICAL_RANGE = TimeRange(datetime(2026, 3, 2, tzinfo=UTC), datetime(2026, 3, 5, tzinfo=UTC))
+APPLE = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("bar_period", [BarPeriod.ONE_MINUTE, BarPeriod.ONE_DAY])
+async def test_reads_historical_bars_in_the_range_oldest_first(
+    connection_and_account: tuple[GatewayConnection, str], bar_period: BarPeriod
+) -> None:
+    connection, _account_id = connection_and_account
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        bars = await connection.read_historical_bars(APPLE, bar_period, HISTORICAL_RANGE)
+        bar_starts = [bar.start_utc for bar in bars]
+        assert bar_starts == sorted(set(bar_starts))
+        assert all(HISTORICAL_RANGE.start_utc <= start_utc < HISTORICAL_RANGE.end_utc for start_utc in bar_starts)
+        assert all(start_utc == floor_to_bar_start(start_utc, bar_period) for start_utc in bar_starts)
+        assert all(bar.low <= min(bar.open, bar.close) and bar.high >= max(bar.open, bar.close) for bar in bars)
+        assert {start_utc.date() for start_utc in bar_starts} == {date(2026, 3, 2), date(2026, 3, 3), date(2026, 3, 4)}
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+
+@pytest.mark.anyio
+async def test_refuses_historical_bars_without_a_connection(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, _account_id = connection_and_account
+
+    with pytest.raises(GatewayRequestError):
+        await connection.read_historical_bars(APPLE, BarPeriod.ONE_HOUR, HISTORICAL_RANGE)
 
 
 def make_far_limit_order(account_id: str) -> OrderRequest:

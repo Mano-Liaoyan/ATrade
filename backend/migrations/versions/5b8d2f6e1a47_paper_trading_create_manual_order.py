@@ -1,13 +1,13 @@
 """paper_trading: create the manual_order table
 
 Revision ID: 5b8d2f6e1a47
-Revises: 7c1e4a2b9d30
+Revises: 5b2d8e7f4a61
 """
 
 from alembic import op
 
 revision = "5b8d2f6e1a47"
-down_revision = "7c1e4a2b9d30"
+down_revision = "5b2d8e7f4a61"
 
 
 def upgrade() -> None:

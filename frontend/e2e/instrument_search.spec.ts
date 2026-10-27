@@ -11,7 +11,8 @@ test('finds an instrument and shows symbol, exchange, and currency', async ({ pa
   await searchFor(page, '700');
 
   const results = page.getByRole('region', { name: 'Instrument search results' }).getByRole('listitem');
-  await expect(results).toHaveText(['700 / SEHK / HKD']);
+  await expect(results).toHaveCount(1);
+  await expect(results).toContainText(['700 / SEHK / HKD']);
 });
 
 test('says that no instrument matches', async ({ page }) => {
@@ -25,7 +26,7 @@ test('long result list has a visible scroll track and every result is reachable'
 
   const resultRegion = page.getByRole('region', { name: 'Instrument search results' });
   const lastResult = resultRegion.getByRole('listitem').last();
-  await expect(lastResult).toHaveText('AZO / NASDAQ / USD');
+  await expect(lastResult).toContainText('AZO / NASDAQ / USD');
   await expect(lastResult).not.toBeInViewport();
   const scrollTrack = page.getByRole('scrollbar', { name: 'Instrument search results scroll bar' });
   await expect(scrollTrack).toBeVisible();
@@ -42,7 +43,7 @@ test('scrolling the result list with the mouse wheel moves the app scroll thumb'
 
   const resultRegion = page.getByRole('region', { name: 'Instrument search results' });
   const lastResult = resultRegion.getByRole('listitem').last();
-  await expect(lastResult).toHaveText('AZO / NASDAQ / USD');
+  await expect(lastResult).toContainText('AZO / NASDAQ / USD');
   await resultRegion.hover();
   // Firefox scrolls at most about one page for each wheel event, so the test sends several.
   await expect(async () => {
