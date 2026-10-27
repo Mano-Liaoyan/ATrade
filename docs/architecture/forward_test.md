@@ -6,7 +6,8 @@ to keep the specification shorter than 1000 lines (section 18). Terms have
 the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 
 Sources: [Forward test design](https://github.com/Mano-Liaoyan/ATrade/issues/41),
-[Start and stop forward tests](https://github.com/Mano-Liaoyan/ATrade/issues/76).
+[Start and stop forward tests](https://github.com/Mano-Liaoyan/ATrade/issues/76),
+[Forward test recovery and end time](https://github.com/Mano-Liaoyan/ATrade/issues/77).
 
 The NautilusTrader facts in this section come from the `v2.0.0rc7` source and
 documents. Nobody ran them.
@@ -23,6 +24,12 @@ documents. Nobody ran them.
   test runs.
 - At the end time, the worker stops the forward test with the steps of
   section 12.6.
+- Implementation (#77): `POST /api/forward-tests` takes `end_time_utc`, a
+  time with a time zone. The browser converts the local time of its
+  `datetime-local` input to UTC. An end time that is not later than now is
+  refused with `422`. No route changes the end time. The worker treats
+  `now >= end_time_utc` like `desired_state = stopped`
+  (`ForwardTestRow.is_stop_wanted()`). It does not write `desired_state`.
 - The bar type must use a period that IB live bars support. Backtests do not
   have this limit. The supported periods are:
   - 1, 5, 15, or 30 seconds
@@ -86,6 +93,12 @@ documents. Nobody ran them.
 - When the Gateway is not reachable, the child retries every 30 seconds. The
   UI shows "waiting for IB Gateway". This does not count toward the 3-crash
   limit (section 12.7).
+- Implementation (#77): "not reachable" is a `GatewayRequestError` during
+  the connection or the paper account check. The child writes the status
+  `waiting_for_gateway`, opens a `gateway` interruption, and waits 30 seconds
+  or until the stop request. A stop request during the wait runs the stop
+  steps. Without IB Gateway they fail, so the status becomes `stop_failed`
+  and the worker retries the cancel.
 
 ## 12.6 Stop
 
@@ -121,6 +134,38 @@ documents. Nobody ran them.
   3. The strategy indicators start from zero. NautilusTrader does not save
      strategy state without Redis.
 - An event table records the start and the end of each interruption.
+
+Implementation (#77):
+
+- A crash is the end of a `run` child without a stop request, with an exit
+  code other than 3 (paper account check) or 4 (IB Gateway). The worker adds
+  1 to `crash_count`, opens a `crash` interruption, and writes `starting`.
+  The next comparison starts a new `run` child. At `crash_count = 3` the
+  status is `failed`, the client ID stays taken, and there is no restart.
+  The Stop button then runs a `cancel_orders` child.
+- "In a row": a child that ran 10 minutes or more before its crash starts a
+  new count (`crash_count = 1`). The worker keeps the child start time in
+  memory.
+- Each `run` child cancels the open orders of its client ID after the paper
+  account check and before the `LiveNode` start (step 1), on the same
+  connection. A failed cancel there ends the child with exit code 1, which
+  is a crash.
+- IB Gateway lost: the child opens a TCP connection to the Gateway port every
+  30 seconds while the `LiveNode` runs. After 5 minutes without a
+  connection, it stops the `LiveNode` and exits with code 4
+  (`GATEWAY_UNREACHABLE_EXIT_CODE`) without the stop steps. The NautilusTrader
+  2.0.0rc7 `LiveNode` does not show the connection state of its IB execution
+  client to Python, so the probe is the replacement. The worker writes
+  `waiting_for_gateway`, opens a `gateway` interruption, and starts a new
+  `run` child, which waits for IB Gateway (section 12.5). `crash_count` does
+  not change.
+- A new worker (a restart of the `forward-test` service or of the server)
+  finds rows with `status = running` and no child. It opens a
+  `worker_restart` interruption and starts a `run` child. The interruption
+  starts at the time the new worker sees the row, because the time of the
+  old worker end is not known.
+- The child ends the open interruption and writes `running` when it starts
+  the `LiveNode`. A stop (`write_end`) also ends it.
 
 ## 12.8 Records
 
@@ -177,8 +222,8 @@ The public entry `atrade.forward_test` exports:
 | `ForwardTestWorker(*, database_url, clock, start_child)` | The worker loop of section 12.14. `compare_states()` is one comparison. `keep_comparing()` runs it every 2 seconds. |
 | `ChildMode`, `ForwardTestChild`, `StartForwardTestChild` | The child modes `run` and `cancel_orders`, the child protocol (`read_exit_code()`, `request_stop()`), and the start function type `(forward_test_id, mode) -> child`. Tests and the e2e server pass a fake. |
 | `run_forward_test_child(*, settings, forward_test_id, mode, ibkr_access, stop_requested)` | The body of the child process (section 12.15). Returns the exit code. |
-| `IbkrAccess`, `LiveNodeInput`, `run_live_node` | `IbkrAccess` holds `open_gateway_connection(client_id)` and `run_live_node(input, stop_requested)`. `run_live_node` is the real LiveNode run. |
-| `PAPER_CHECK_FAILED_EXIT_CODE` | `3`. The exit code of a child whose paper account check failed. |
+| `IbkrAccess`, `LiveNodeInput`, `LiveNodeEnd`, `run_live_node`, `GatewayWatch` | `IbkrAccess` holds `open_gateway_connection(client_id)`, `run_live_node(input, stop_requested)`, `clock` (default the system clock), and `gateway_retry_seconds` (default 30). `run_live_node` is the real LiveNode run. It takes an optional `gateway_watch` (`GatewayWatch(check_interval_seconds=30, lost_after_seconds=300)`). |
+| `PAPER_CHECK_FAILED_EXIT_CODE`, `GATEWAY_UNREACHABLE_EXIT_CODE` | `3`: the paper account check failed. `4`: IB Gateway was lost for more than 5 minutes (section 12.7). |
 | `FORWARD_TEST_SOCKET_MESSAGE_MODELS` | The models of `/ws/forward-tests` for the OpenAPI document. |
 
 - Entry points: `app/forward_test_worker.py` (Compose service
@@ -195,42 +240,48 @@ The public entry `atrade.forward_test` exports:
 `ON DELETE`), `symbol`, `exchange`, `currency`, `bar_period`,
 `desired_state` (`running`, `stopped`), `status`, `client_id` (`UNIQUE`,
 null when free), `start_balance_usd`, `error_message`, `created_at_utc`,
-`stopped_at_utc`. Migration `3e7a1c5d9b76_forward_test_create_table.py`.
+`stopped_at_utc`, `end_time_utc` (null when there is no end time),
+`crash_count` (the crashes in a row, default 0). Migrations
+`3e7a1c5d9b76_forward_test_create_table.py` and
+`3e7a1c5d9b77_forward_test_recovery_and_end_time.py`.
+
+`forward_test_interruption` (#77): `id`, `forward_test_id`, `reason`
+(`crash`, `gateway`, `worker_restart`), `started_at_utc`, `ended_at_utc`
+(null while the interruption lasts). A partial unique index allows only one
+open interruption for each forward test. A second start of an open
+interruption does nothing.
 
 | Status | Meaning |
 |---|---|
-| `starting` | The Web process inserted the row. The worker did not start a child yet. |
+| `starting` | The Web process inserted the row, or a crash happened. The worker did not start a child yet. |
 | `running` | A `run` child runs. |
+| `waiting_for_gateway` | IB Gateway is not reachable. The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
 | `stopping` | The worker sent the stop request, or a `cancel_orders` child runs. |
 | `stopped` | The orders are cancelled and the child ended. The client ID is free. |
 | `stop_failed` | A cancel failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
-| `failed` | The paper account check failed (client ID free, no retry), or the child ended without a stop request (client ID taken until a stop cancels the orders). |
+| `failed` | The paper account check failed (client ID free, no retry), or 3 crashes in a row (client ID taken until a stop cancels the orders). |
 
 - Writers: the Web process inserts the row (`desired_state = running`,
-  `status = starting`, the client ID) and after that writes only
-  `desired_state`. The worker writes `status`, `client_id`, and
-  `stopped_at_utc`. The child writes `start_balance_usd` (the
+  `status = starting`, the client ID, `end_time_utc`) and after that writes
+  only `desired_state`. The worker writes `status`, `client_id`,
+  `crash_count`, `stopped_at_utc`, and the `crash` and `worker_restart`
+  interruptions. The child writes `start_balance_usd` (the
   `NetLiquidation` in USD after the paper account check, only the first
-  value) and `error_message`.
+  value), `error_message`, the `gateway` interruptions, and two statuses:
+  `waiting_for_gateway` (only from `starting`, `running`, or
+  `waiting_for_gateway`) and `running` at the `LiveNode` start (only from
+  `starting` or `waiting_for_gateway`). The conditions keep a stop status of
+  the worker.
 - The start takes the client ID in one transaction:
   `LOCK TABLE forward_test IN SHARE ROW EXCLUSIVE MODE`, then the instrument
   check, then the lowest ID of the range that no row holds.
-- Until #77, a child that ends without a stop request fails the forward test
-  (no automatic restart). There is no "waiting for IB Gateway" status and no
-  event table yet. When IB Gateway is not reachable at the start, the child
-  writes "IB Gateway is not reachable: ..." and ends with exit code 3, like a
-  failed paper account check: the connection is a condition of the check
-  (section 11.2), and the child sent no order. A new worker (a restart of the `forward-test` service)
-  starts a `run` child again for each row with `desired_state = running` and
-  `status` `starting` or `running`, with the same client ID. The cancel of
-  the old orders before that start is #77.
 
 ## 12.13 Routes and `/ws/forward-tests`
 
 | Route | Behavior |
 |---|---|
-| `POST /api/forward-tests` | Body `StartForwardTestRequest`: `strategy_version_id`, `symbol`, `exchange`, `currency`, `bar_period`. `201` with `ForwardTestResponse`. `409` with `StartRefusedResponse` (`detail`, `forward_test_id`): `"limit of running forward tests reached"` (`forward_test_id` null), or `"Forward test 3 (Trend v2) already runs on AAPL / NASDAQ."`. `422` for a missing strategy version or a bar period that IB live bars do not support. |
-| `GET /api/forward-tests` | `200` with the list of `ForwardTestResponse`, newest first: the row of section 12.12 plus `strategy_id`, `strategy_name`, `version_number`. |
+| `POST /api/forward-tests` | Body `StartForwardTestRequest`: `strategy_version_id`, `symbol`, `exchange`, `currency`, `bar_period`, optional `end_time_utc` (with a time zone, later than now). `201` with `ForwardTestResponse`. `409` with `StartRefusedResponse` (`detail`, `forward_test_id`): `"limit of running forward tests reached"` (`forward_test_id` null), or `"Forward test 3 (Trend v2) already runs on AAPL / NASDAQ."`. `422` for a missing strategy version, a bar period that IB live bars do not support, or an end time that is not later than now or has no time zone. |
+| `GET /api/forward-tests` | `200` with the list of `ForwardTestResponse`, newest first: the row of section 12.12 plus `strategy_id`, `strategy_name`, `version_number`, and `interruptions` (`reason`, `started_at_utc`, `ended_at_utc`, oldest first). |
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
 | `/ws/forward-tests` | `{"type": "forward_tests", "forward_tests": [...]}` at once and after each change. The server reads the table every 2 seconds. `{"type": "heartbeat"}` after 10 seconds without a change. The browser sends nothing. |
 
@@ -243,25 +294,35 @@ null when free), `start_balance_usd`, `error_message`, `created_at_utc`,
 Each comparison reads the rows that are not done. A row is done when it is
 `stopped`, or `failed` without a client ID. For each row:
 
+"Stop wanted" is `desired_state = stopped`, or an end time that is not later
+than the worker clock.
+
 1. A child of the row ended: the worker writes the result. A stop (a
    `cancel_orders` child, or a `run` child after the stop request) with exit
-   code 0 is `stopped` and frees the client ID. A stop with another exit
-   code is `stop_failed`. Exit code 3 of a `run` child is `failed` and frees
-   the client ID. Each other end of a `run` child is `failed` and keeps the
-   client ID.
-2. No child, `desired_state = running`, status `starting` or `running`: the
-   worker starts a `run` child and writes `running`.
-3. No child, `desired_state = stopped`, a client ID: the worker starts a
-   `cancel_orders` child and writes `stopping`.
-4. A `run` child, `desired_state = stopped`: the worker sends the stop
-   request one time and writes `stopping`.
+   code 0 is `stopped`, frees the client ID, and ends an open interruption.
+   A stop with another exit code is `stop_failed`. Exit code 3 of a `run`
+   child is `failed` and frees the client ID. Exit code 4 is
+   `waiting_for_gateway`. Each other end of a `run` child is a crash
+   (section 12.7).
+2. No child, stop wanted, a client ID: the worker starts a `cancel_orders`
+   child and writes `stopping`.
+3. No child, stop not wanted, status `starting`, `running`, or
+   `waiting_for_gateway`: the worker starts a `run` child. For `running` it
+   first opens a `worker_restart` interruption. It writes `running`, except
+   for `waiting_for_gateway`, which stays until the child starts the
+   `LiveNode`.
+4. A `run` child, stop wanted: the worker sends the stop request one time
+   and writes `stopping`.
 
 ## 12.15 Child process
 
 - `run`: connect with `ib_async` and the client ID of the row, call
-  `require_paper_account()`, read the balance, disconnect, then
-  `run_live_node()` with the same client ID until `SIGTERM`. Then the stop
-  steps of section 12.6 and exit code 0.
+  `require_paper_account()`, read the balance, cancel the open orders of the
+  client ID, disconnect, then `run_live_node()` with the same client ID until
+  `SIGTERM`. Then the stop steps of section 12.6 and exit code 0. When IB
+  Gateway is not reachable, it waits (section 12.5). `run_live_node()`
+  returns `"ended"` or `"gateway_lost"` (`LiveNodeEnd`). `"gateway_lost"`
+  without a stop request gives exit code 4.
 - `cancel_orders`: only the stop steps 2 to 5 of section 12.6.
 - The stop steps use `GatewayConnection.read_own_open_orders()`
   (`reqOpenOrders`) and `cancel_order_and_wait(order_id)` (section 7). A
@@ -289,19 +350,29 @@ Each comparison reads the rows that are not done. A row is done when it is
   while `desired_state` is `running` and the row holds a client ID).
 - The page `/forward-tests` (nav link "Forward tests") has the start form
   (strategy, strategy version, symbol, exchange, currency, and a bar period
-  from the IB live bar periods), the metrics of the latest finished backtest
+  from the IB live bar periods, an optional end time in the local time zone),
+  the metrics of the latest finished backtest
   of the selected strategy version or "no backtest result", and the live
   list. A refused start shows the `detail` text.
 - Backend tests (`backend/tests/forward_test/`): the routes, the worker with
-  real PostgreSQL and the fake start function
-  (`tests/fakes/forward_test_child.py`), the child body with the IBKR fake
-  and a fake LiveNode run, and the real LiveNode stop without a Gateway.
+  real PostgreSQL, the fixed clock, and the fake start function
+  (`tests/fakes/forward_test_child.py`) (restarts, the 3-crash limit, the end
+  time, `stop_failed` retries, interruptions), the child body with the IBKR
+  fake and a fake LiveNode run (the wait for IB Gateway, the cancel before
+  the restart), and the real LiveNode without a Gateway (the stop request,
+  and `"gateway_lost"` with a short `GatewayWatch`).
+- The list shows the status ("Waiting for IB Gateway", "Stop failed",
+  "Failed"), the crash count when it is not 0, and the end time in the local
+  time zone.
 - `test_forward_test_paper_contract.py` (`ibkr_paper`, by hand): a real
   LiveNode sends a buy limit order for 1 AAPL at 1.00 USD. The Web side
   (`reqAllOpenOrders`, client ID 98) sees it with the forward test ID from
   `orderRef`. After the stop, the order is cancelled. It needs
   `ATRADE_TEST_DATABASE_URL`, `.env`, and a reachable Gateway. It skips
-  without them.
+  without them. A second contract test (#77) runs the worker with real child
+  processes, kills the first child with `SIGKILL`, and checks that the
+  restart keeps client ID 10 and cancels the old order, and that the stop
+  cancels the new one.
 - `backend/tests/e2e_server.py` runs the worker in the same process with
   fake children that stop at once, and adds 30 stopped forward tests. The
   Playwright test `frontend/e2e/forward_test.spec.ts` starts a forward test,

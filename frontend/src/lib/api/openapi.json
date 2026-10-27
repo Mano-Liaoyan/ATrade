@@ -1904,6 +1904,29 @@
               }
             ],
             "title": "Stopped At Utc"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
+          },
+          "crash_count": {
+            "title": "Crash Count",
+            "type": "integer"
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptionResponse"
+            },
+            "title": "Interruptions",
+            "type": "array"
           }
         },
         "required": [
@@ -1922,7 +1945,10 @@
           "start_balance_usd",
           "error_message",
           "created_at_utc",
-          "stopped_at_utc"
+          "stopped_at_utc",
+          "end_time_utc",
+          "crash_count",
+          "interruptions"
         ],
         "title": "ForwardTestResponse",
         "type": "object"
@@ -1931,6 +1957,7 @@
         "enum": [
           "starting",
           "running",
+          "waiting_for_gateway",
           "stopping",
           "stopped",
           "stop_failed",
@@ -2048,6 +2075,45 @@
           "instruments"
         ],
         "title": "InstrumentSearchResponse"
+      },
+      "InterruptionReason": {
+        "enum": [
+          "crash",
+          "gateway",
+          "worker_restart"
+        ],
+        "type": "string"
+      },
+      "InterruptionResponse": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/InterruptionReason"
+          },
+          "started_at_utc": {
+            "format": "date-time",
+            "title": "Started At Utc",
+            "type": "string"
+          },
+          "ended_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At Utc"
+          }
+        },
+        "required": [
+          "reason",
+          "started_at_utc",
+          "ended_at_utc"
+        ],
+        "title": "InterruptionResponse",
+        "type": "object"
       },
       "ManualOrderListResponse": {
         "properties": {
@@ -2630,6 +2696,18 @@
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
           }
         },
         "type": "object",

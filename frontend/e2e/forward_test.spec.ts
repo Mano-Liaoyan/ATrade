@@ -25,11 +25,15 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   await page.getByLabel('Symbol').fill(symbol);
   await page.getByLabel('Exchange').fill('ARCA');
   await page.getByLabel('Bar period').selectOption('1-MINUTE');
+  // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
+  await page.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
   await page.getByRole('button', { name: 'Start forward test' }).click();
 
   const forwardTests = page.getByRole('region', { name: 'Forward tests' });
   const row = forwardTests.getByRole('row', { name: new RegExp(symbol) });
   await expect(row).toContainText(`${strategyName} v1`);
+  // The browser sent UTC and shows the end time in its own time zone again.
+  await expect(row).toContainText('2099-12-31 23:30');
   // The worker compares the states every 2 seconds and the socket pushes the change.
   await expect(row).toContainText('Running');
   const forwardTestNumber = (await row.getByRole('rowheader').textContent())?.trim() ?? '';

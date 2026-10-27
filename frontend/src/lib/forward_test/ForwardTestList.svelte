@@ -1,7 +1,13 @@
 <!-- The forward tests with their actual status from /ws/forward-tests, and a stop button for each running one. -->
 <script lang="ts">
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { canStop, describeForwardTestStatus, stopForwardTest, type ForwardTest } from './forward_test_api';
+  import {
+    canStop,
+    describeForwardTestStatus,
+    formatLocalTime,
+    stopForwardTest,
+    type ForwardTest,
+  } from './forward_test_api';
 
   interface Props {
     forwardTests: ForwardTest[];
@@ -41,6 +47,7 @@
           <th scope="col">Client ID</th>
           <th scope="col">Start balance (USD)</th>
           <th scope="col">Started (UTC)</th>
+          <th scope="col">End time (local)</th>
           <th scope="col"><span class="visually-hidden">Action</span></th>
         </tr>
       </thead>
@@ -53,6 +60,9 @@
             <td>{forwardTest.bar_period}</td>
             <td>
               {describeForwardTestStatus(forwardTest.status)}
+              {#if forwardTest.crash_count > 0}
+                <span class="crash-count">Crashes in a row: {forwardTest.crash_count} of 3</span>
+              {/if}
               {#if forwardTest.error_message !== null}
                 <span class="error-message">{forwardTest.error_message}</span>
               {/if}
@@ -60,6 +70,7 @@
             <td class="number">{forwardTest.client_id ?? ''}</td>
             <td class="number">{forwardTest.start_balance_usd ?? ''}</td>
             <td>{forwardTest.created_at_utc}</td>
+            <td>{formatLocalTime(forwardTest.end_time_utc)}</td>
             <td>
               {#if canStop(forwardTest)}
                 <button
@@ -87,7 +98,8 @@
     color: var(--color-warning);
   }
 
-  .error-message {
+  .error-message,
+  .crash-count {
     display: block;
     font-size: 0.75rem;
   }

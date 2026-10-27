@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   canStop,
   describeForwardTestStatus,
+  formatLocalTime,
   isLiveBarPeriod,
+  readEndTimeUtc,
   readForwardTestsMessage,
   startForwardTest,
   stopForwardTest,
@@ -36,6 +38,9 @@ const runningForwardTest: ForwardTest = {
   error_message: null,
   created_at_utc: '2026-01-02T03:04:05Z',
   stopped_at_utc: null,
+  end_time_utc: null,
+  crash_count: 0,
+  interruptions: [],
 };
 
 function makeFetch(status: number, body: unknown, requests: Request[] = []): typeof fetch {
@@ -108,13 +113,31 @@ describe('labels', () => {
     expect(isLiveBarPeriod('1-DAY')).toBe(true);
   });
 
-  it('describes the statuses', () => {
+  it('describes the statuses, with the wait for IB Gateway and the failures', () => {
+    expect(describeForwardTestStatus('waiting_for_gateway')).toBe('Waiting for IB Gateway');
     expect(describeForwardTestStatus('stop_failed')).toBe('Stop failed');
+    expect(describeForwardTestStatus('failed')).toBe('Failed');
   });
 
   it('offers a stop only while the forward test runs and holds a client ID', () => {
     expect(canStop(runningForwardTest)).toBe(true);
     expect(canStop({ ...runningForwardTest, desired_state: 'stopped' })).toBe(false);
     expect(canStop({ ...runningForwardTest, status: 'failed', client_id: null })).toBe(false);
+  });
+});
+
+describe('the end time', () => {
+  it('turns the local time of the input into UTC', () => {
+    expect(readEndTimeUtc('2026-01-03T09:30')).toBe(new Date(2026, 0, 3, 9, 30).toISOString());
+  });
+
+  it('is null when the input is empty or not a time', () => {
+    expect(readEndTimeUtc('')).toBeNull();
+    expect(readEndTimeUtc('not a time')).toBeNull();
+  });
+
+  it('shows a UTC time in the local time zone', () => {
+    expect(formatLocalTime(new Date(2026, 0, 3, 9, 30).toISOString())).toBe('2026-01-03 09:30');
+    expect(formatLocalTime(null)).toBe('');
   });
 });

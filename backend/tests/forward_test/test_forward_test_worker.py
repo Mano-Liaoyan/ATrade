@@ -1,15 +1,16 @@
 """The forward-test worker: it compares the desired state with the actual state, starts and stops child processes,
-and writes the actual state (docs/architecture.md sections 12.3, 12.4, 12.6).
+and writes the actual state (docs/architecture.md sections 12.3, 12.4, 12.6, 12.7).
 
 Real PostgreSQL. The function that starts a child process is a fake (section 17.4).
 """
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
 import pytest
 
-from atrade.forward_test import PAPER_CHECK_FAILED_EXIT_CODE, ForwardTestWorker
+from atrade.forward_test import GATEWAY_UNREACHABLE_EXIT_CODE, PAPER_CHECK_FAILED_EXIT_CODE, ForwardTestWorker
 from tests.fakes.clock import FixedClock
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.forward_test.test_forward_test_routes import (
@@ -119,7 +120,7 @@ async def test_a_failed_paper_account_check_fails_the_forward_test_without_retry
 
 
 @pytest.mark.anyio
-async def test_a_crash_keeps_the_client_id_until_a_stop_cancels_the_orders(
+async def test_a_crash_restarts_the_forward_test_with_the_same_client_id(
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
 ) -> None:
     forward_test = await start_forward_test(web_client)
@@ -131,20 +132,136 @@ async def test_a_crash_keeps_the_client_id_until_a_stop_cancels_the_orders(
     await worker.compare_states()
 
     crashed = await read_forward_test(web_client, forward_test["id"])
-    assert (crashed["status"], crashed["client_id"]) == ("failed", 10)
+    assert (crashed["status"], crashed["client_id"], crashed["crash_count"]) == ("starting", 10, 1)
+    assert crashed["interruptions"] == [
+        {"reason": "crash", "started_at_utc": "2026-01-02T03:04:05Z", "ended_at_utc": None}
+    ]
+
+    await worker.compare_states()
+
+    assert child_starter.read_started() == [(forward_test["id"], "run"), (forward_test["id"], "run")]
+    restarted = await read_forward_test(web_client, forward_test["id"])
+    assert (restarted["status"], restarted["client_id"]) == ("running", 10)
+
+
+@pytest.mark.anyio
+async def test_three_crashes_in_a_row_fail_the_forward_test_and_keep_the_client_id(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+
+    for _ in range(3):
+        await worker.compare_states()
+        child_starter.children[-1].exit_code = 1
+        await worker.compare_states()
+    await worker.compare_states()
+
+    failed = await read_forward_test(web_client, forward_test["id"])
+    assert (failed["status"], failed["client_id"], failed["crash_count"]) == ("failed", 10, 3)
     assert (
-        crashed["error_message"]
+        failed["error_message"]
         == "The forward test process ended with exit code 1. The forward-test log has the reason."
     )
+    assert len(child_starter.children) == 3
 
+    # The stop cancels the orders of the client ID and frees it.
     await web_client.post(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/stop")
     await worker.compare_states()
-    assert child_starter.read_started() == [(forward_test["id"], "run"), (forward_test["id"], "cancel_orders")]
-    child_starter.children[1].exit_code = 0
+    assert child_starter.read_started()[-1] == (forward_test["id"], "cancel_orders")
+    child_starter.children[-1].exit_code = 0
     await worker.compare_states()
 
     stopped = await read_forward_test(web_client, forward_test["id"])
     assert (stopped["status"], stopped["client_id"]) == ("stopped", None)
+    assert stopped["interruptions"][0]["ended_at_utc"] == "2026-01-02T03:04:05Z"
+
+
+@pytest.mark.anyio
+async def test_a_crash_after_a_long_run_starts_a_new_count(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    for _ in range(2):
+        await worker.compare_states()
+        child_starter.children[-1].exit_code = 1
+        await worker.compare_states()
+
+    await worker.compare_states()
+    clock.now_utc += timedelta(hours=1)
+    child_starter.children[-1].exit_code = 1
+    await worker.compare_states()
+
+    restarting = await read_forward_test(web_client, forward_test["id"])
+    assert (restarting["status"], restarting["crash_count"]) == ("starting", 1)
+
+
+@pytest.mark.anyio
+async def test_a_lost_gateway_waits_for_it_without_a_crash_count(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    await worker.compare_states()
+
+    child_starter.children[0].exit_code = GATEWAY_UNREACHABLE_EXIT_CODE
+    await worker.compare_states()
+    await worker.compare_states()
+
+    # The new child waits for IB Gateway. It writes "running" when its LiveNode starts.
+    waiting = await read_forward_test(web_client, forward_test["id"])
+    assert (waiting["status"], waiting["client_id"], waiting["crash_count"]) == ("waiting_for_gateway", 10, 0)
+    assert child_starter.read_started() == [(forward_test["id"], "run"), (forward_test["id"], "run")]
+    assert [item["reason"] for item in waiting["interruptions"]] == ["gateway"]
+
+
+@pytest.mark.anyio
+async def test_the_end_time_stops_the_forward_test(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    request = make_start_request(strategy_version_id) | {"end_time_utc": "2026-01-02T05:00:00Z"}
+    forward_test = (await web_client.post(FORWARD_TESTS_PATH, json=request)).json()
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    await worker.compare_states()
+    [child] = child_starter.children
+
+    clock.now_utc = datetime(2026, 1, 2, 4, 59, 59, tzinfo=UTC)
+    await worker.compare_states()
+    assert not child.is_stop_requested
+
+    clock.now_utc = datetime(2026, 1, 2, 5, 0, 0, tzinfo=UTC)
+    await worker.compare_states()
+    assert child.is_stop_requested
+    child.exit_code = 0
+    await worker.compare_states()
+
+    stopped = await read_forward_test(web_client, forward_test["id"])
+    assert (stopped["status"], stopped["client_id"]) == ("stopped", None)
+    assert stopped["end_time_utc"] == "2026-01-02T05:00:00Z"
+    assert stopped["stopped_at_utc"] == "2026-01-02T05:00:00Z"
+
+
+@pytest.mark.anyio
+async def test_a_passed_end_time_without_a_child_cancels_the_orders(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    request = make_start_request(strategy_version_id) | {"end_time_utc": "2026-01-02T05:00:00Z"}
+    forward_test = (await web_client.post(FORWARD_TESTS_PATH, json=request)).json()
+    await make_worker(database_url, clock, FakeChildStarter()).compare_states()
+
+    # The forward-test service was down at the end time.
+    clock.now_utc = datetime(2026, 1, 2, 6, 0, 0, tzinfo=UTC)
+    child_starter = FakeChildStarter()
+    await make_worker(database_url, clock, child_starter).compare_states()
+
+    assert child_starter.read_started() == [(forward_test["id"], "cancel_orders")]
 
 
 @pytest.mark.anyio
@@ -182,4 +299,7 @@ async def test_a_new_worker_starts_the_running_forward_tests_again(
 
     assert child_starter.read_started() == [(forward_test["id"], "run")]
     restarted = await read_forward_test(web_client, forward_test["id"])
-    assert (restarted["status"], restarted["client_id"]) == ("running", 10)
+    assert (restarted["status"], restarted["client_id"], restarted["crash_count"]) == ("running", 10, 0)
+    assert restarted["interruptions"] == [
+        {"reason": "worker_restart", "started_at_utc": "2026-01-02T03:04:05Z", "ended_at_utc": None}
+    ]

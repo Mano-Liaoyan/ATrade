@@ -3,8 +3,10 @@ export { default as ForwardTestList } from './ForwardTestList.svelte';
 export {
   canStop,
   describeForwardTestStatus,
+  formatLocalTime,
   FORWARD_TESTS_SOCKET_PATH,
   isLiveBarPeriod,
+  readEndTimeUtc,
   readForwardTestsMessage,
   startForwardTest,
   stopForwardTest,

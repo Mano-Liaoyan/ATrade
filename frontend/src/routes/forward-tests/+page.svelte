@@ -7,6 +7,7 @@
     FORWARD_TESTS_SOCKET_PATH,
     ForwardTestList,
     isLiveBarPeriod,
+    readEndTimeUtc,
     readForwardTestsMessage,
     startForwardTest,
     type ForwardTest,
@@ -30,6 +31,8 @@
   let exchange = $state('');
   let currency = $state('USD');
   let barPeriod = $state<BarPeriod>(DEFAULT_BAR_PERIOD);
+  // The value of the datetime-local input: a local time, or '' for no end time.
+  let endTimeLocal = $state('');
   let backtests: Backtest[] = $state([]);
   let forwardTests: ForwardTest[] = $state([]);
   let isSocketConnected = $state(false);
@@ -97,6 +100,7 @@
       exchange: exchange.trim().toUpperCase(),
       currency: currency.trim().toUpperCase(),
       bar_period: barPeriod,
+      end_time_utc: readEndTimeUtc(endTimeLocal),
     });
     isStarting = false;
     if (result.kind === 'failed') {
@@ -110,7 +114,7 @@
 <h1>Forward tests</h1>
 <p class="explanation">
   A forward test runs a strategy version on live IB bars and sends orders to the paper account. It starts now and runs
-  until you stop it. A stop cancels its open orders. Its positions stay open.
+  until you stop it, or until its end time. A stop cancels its open orders. Its positions stay open.
 </p>
 
 <form class="forward-test-form" aria-label="Start a forward test" onsubmit={submitForwardTest}>
@@ -154,6 +158,10 @@
       {/each}
     </select>
   </div>
+  <label>
+    End time (local, optional)
+    <input type="datetime-local" bind:value={endTimeLocal} />
+  </label>
   <button type="submit" disabled={isStarting}>Start forward test</button>
 </form>
 

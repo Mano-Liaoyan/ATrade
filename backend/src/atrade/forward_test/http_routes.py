@@ -13,7 +13,7 @@ import anyio
 import psycopg
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, StringConstraints, field_validator
+from pydantic import AwareDatetime, BaseModel, StringConstraints, field_validator
 
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import (
@@ -22,6 +22,7 @@ from atrade.forward_test.forward_test_store import (
     ForwardTestRequest,
     ForwardTestRow,
     ForwardTestStatus,
+    InterruptionReason,
     StartRefusal,
 )
 from atrade.foundation.bar import BarPeriod
@@ -49,6 +50,8 @@ class StartForwardTestRequest(BaseModel):
     exchange: InstrumentField
     currency: InstrumentField
     bar_period: BarPeriod
+    # Optional. The worker stops the forward test at this time (section 12.1). It cannot change after the start.
+    end_time_utc: AwareDatetime | None = None
 
     @field_validator("bar_period")
     @classmethod
@@ -57,6 +60,12 @@ class StartForwardTestRequest(BaseModel):
             message = f"IB live bars do not support the bar period {bar_period.value}."
             raise ValueError(message)
         return bar_period
+
+
+class InterruptionResponse(BaseModel):
+    reason: InterruptionReason
+    started_at_utc: datetime
+    ended_at_utc: datetime | None
 
 
 class ForwardTestResponse(BaseModel):
@@ -76,6 +85,10 @@ class ForwardTestResponse(BaseModel):
     error_message: str | None
     created_at_utc: datetime
     stopped_at_utc: datetime | None
+    end_time_utc: datetime | None
+    # The crashes in a row. At 3 the status is "failed" and the worker stops the restarts (section 12.7).
+    crash_count: int
+    interruptions: list[InterruptionResponse]
 
 
 class StartRefusedResponse(BaseModel):
@@ -95,6 +108,8 @@ FORWARD_TEST_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [ForwardTestsMessage
 
 
 async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> ForwardTestResponse:
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        interruptions = await forward_test_store.select_interruptions(connection, row.id)
     strategy_version = await read_strategy_version(
         database_url=database_url, strategy_version_id=row.strategy_version_id
     )
@@ -118,6 +133,12 @@ async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> Fo
         error_message=row.error_message,
         created_at_utc=row.created_at_utc,
         stopped_at_utc=row.stopped_at_utc,
+        end_time_utc=row.end_time_utc,
+        crash_count=row.crash_count,
+        interruptions=[
+            InterruptionResponse(reason=item.reason, started_at_utc=item.started_at_utc, ended_at_utc=item.ended_at_utc)
+            for item in interruptions
+        ],
     )
 
 
@@ -178,8 +199,14 @@ class ForwardTestRoutes:
             detail = f"Strategy version {request.strategy_version_id} does not exist."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
+        if request.end_time_utc is not None and request.end_time_utc <= self.clock.read_now_utc():
+            detail = "The end time must be later than now."
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         forward_test_request = ForwardTestRequest(
-            strategy_version_id=request.strategy_version_id, instrument=instrument, bar_period=request.bar_period
+            strategy_version_id=request.strategy_version_id,
+            instrument=instrument,
+            bar_period=request.bar_period,
+            end_time_utc=request.end_time_utc,
         )
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             result = await forward_test_store.start_forward_test(

@@ -65,6 +65,12 @@ A test of a strategy that runs automatically on live market data and sends
 orders to a paper account.
 _Avoid_: paper trading run, live simulation
 
+**Interruption**:
+A time in which a forward test did not run: after a crash, while IB Gateway
+was not reachable, or after a restart of the forward-test service. The
+forward test records the start and the end of each interruption.
+_Avoid_: outage, downtime gap
+
 **Paper trading**:
 Trading on the broker's paper account. It includes paper orders sent by hand
 and forward tests.
