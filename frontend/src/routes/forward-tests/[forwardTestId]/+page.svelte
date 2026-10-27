@@ -6,6 +6,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { describeBacktestStatus, EquityChart, formatPercent, formatUsd, type TimeInterval } from '#lib/backtest';
+  import { Button, DataTable, InlineNotification, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
@@ -13,6 +14,7 @@
     canBacktestSamePeriod,
     describeForwardTestStatus,
     describeInterruptionReason,
+    findForwardTestStatusKind,
     formatLocalTime,
     ForwardTestFillTable,
     readForwardTestDetail,
@@ -23,6 +25,7 @@
   import { formatVersionLabel } from '#lib/strategy';
 
   const READ_INTERVAL_MILLISECONDS = 2000;
+  const INTERRUPTION_COLUMNS: TableColumn[] = [{ header: 'Reason' }, { header: 'From' }, { header: 'To' }];
 
   const forwardTestId = $derived(Number(page.params['forwardTestId']));
 
@@ -88,16 +91,16 @@
   }
 </script>
 
-<p><a href={resolve('/forward-tests')}>All forward tests</a></p>
+<p class="back-link"><a class="cds--link" href={resolve('/forward-tests')}>All forward tests</a></p>
 <h1>Forward test #{forwardTestId}</h1>
 
 {#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+  <InlineNotification kind="error" title={errorMessage} lowContrast />
 {/if}
 
 {#if detail !== null}
   {@const forwardTest = detail.forward_test}
-  <dl class="setup" aria-label="Forward test">
+  <dl class="values" aria-label="Forward test">
     <div>
       <dt>Strategy version</dt>
       <dd>{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</dd>
@@ -113,7 +116,10 @@
     <div>
       <dt>Status</dt>
       <dd>
-        {describeForwardTestStatus(forwardTest.status)}
+        <StatusIndicator
+          kind={findForwardTestStatusKind(forwardTest.status)}
+          label={describeForwardTestStatus(forwardTest.status)}
+        />
         {#if showsCrashCount(forwardTest)}
           <span class="note">Crashes in a row: {forwardTest.crash_count} of 3</span>
         {/if}
@@ -124,11 +130,13 @@
     </div>
     <div>
       <dt>Client ID</dt>
-      <dd>{forwardTest.client_id ?? 'None'}</dd>
+      <dd class="number">{forwardTest.client_id ?? 'None'}</dd>
     </div>
     <div>
       <dt>Start balance (USD)</dt>
-      <dd>{forwardTest.start_balance_usd === null ? 'Not read yet' : formatAmount(forwardTest.start_balance_usd)}</dd>
+      <dd class="number">
+        {forwardTest.start_balance_usd === null ? 'Not read yet' : formatAmount(forwardTest.start_balance_usd)}
+      </dd>
     </div>
     <div>
       <dt>Started</dt>
@@ -149,15 +157,8 @@
     <p>No interruption.</p>
   {:else}
     <ScrollRegion label="Interruptions" maxHeight="min(14rem, 35vh)">
-      <table class="detail-table">
-        <thead>
-          <tr>
-            <th scope="col">Reason</th>
-            <th scope="col">From</th>
-            <th scope="col">To</th>
-          </tr>
-        </thead>
-        <tbody>
+      <DataTable columns={INTERRUPTION_COLUMNS} size="sm">
+        {#snippet rows()}
           {#each forwardTest.interruptions as interruption (interruption.started_at_utc)}
             <tr>
               <th scope="row">{describeInterruptionReason(interruption.reason)}</th>
@@ -165,36 +166,36 @@
               <td>{interruption.ended_at_utc === null ? 'Still lasts' : formatUtcTime(interruption.ended_at_utc)}</td>
             </tr>
           {/each}
-        </tbody>
-      </table>
+        {/snippet}
+      </DataTable>
     </ScrollRegion>
   {/if}
 
   <h2>Result</h2>
   {#if detail.metrics === null}
-    <p>No result yet. The result starts at the start balance.</p>
+    <p>No result yet.</p>
   {:else}
-    <dl class="metrics" aria-label="Forward test metrics">
+    <dl class="values" aria-label="Forward test metrics">
       <div>
         <dt>Final equity (USD)</dt>
-        <dd>{formatUsd(detail.metrics.final_equity_usd)}</dd>
+        <dd class="number">{formatUsd(detail.metrics.final_equity_usd)}</dd>
       </div>
       <div>
         <dt>Total return</dt>
-        <dd>{formatPercent(detail.metrics.total_return_percent)}</dd>
+        <dd class="number">{formatPercent(detail.metrics.total_return_percent)}</dd>
       </div>
       <div>
         <dt>Max drawdown</dt>
-        <dd>{formatPercent(detail.metrics.max_drawdown_percent)}</dd>
+        <dd class="number">{formatPercent(detail.metrics.max_drawdown_percent)}</dd>
       </div>
       <div>
         <dt>Trades</dt>
-        <dd>{detail.metrics.trade_count}</dd>
+        <dd class="number">{detail.metrics.trade_count}</dd>
       </div>
     </dl>
   {/if}
   {#if detail.equity_curve.length === 0}
-    <p>No equity point yet. The forward test records one at the end of each bar.</p>
+    <p>No equity point yet.</p>
   {:else}
     <EquityChart
       curves={[{ name: 'Equity', points: detail.equity_curve }]}
@@ -214,6 +215,7 @@
       {#each detail.same_period_backtests as backtest (backtest.id)}
         <li>
           <a
+            class="cds--link"
             href={resolve('/forward-tests/[forwardTestId]/comparison/[backtestId]', {
               forwardTestId: String(forwardTest.id),
               backtestId: String(backtest.id),
@@ -226,70 +228,69 @@
     </ul>
   {/if}
   {#if canBacktestSamePeriod(forwardTest)}
-    <button type="button" disabled={isStartingBacktest} onclick={backtestSamePeriod}>Backtest the same period</button>
+    <Button kind="tertiary" disabled={isStartingBacktest} onclick={backtestSamePeriod}>Backtest the same period</Button>
   {/if}
 {/if}
 
 <style>
-  .error {
-    color: var(--color-warning);
+  .back-link {
+    margin-block-end: var(--cds-spacing-05);
+  }
+
+  h2 {
+    margin-block: var(--cds-spacing-07) var(--cds-spacing-05);
+    font-size: var(--cds-heading-03-font-size);
+    font-weight: var(--cds-heading-03-font-weight);
+    line-height: var(--cds-heading-03-line-height);
+  }
+
+  p,
+  .backtest-links {
+    margin-block: 0 var(--cds-spacing-05);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
+  }
+
+  .backtest-links {
+    padding: 0;
+    list-style: none;
+  }
+
+  .values {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: var(--cds-spacing-05) var(--cds-spacing-06);
+    margin: 0 0 var(--cds-spacing-05);
+  }
+
+  .values dt {
+    margin-block-end: var(--cds-spacing-02);
+    font-size: var(--cds-label-01-font-size);
+    line-height: var(--cds-label-01-line-height);
+    letter-spacing: var(--cds-label-01-letter-spacing);
+    color: var(--cds-text-secondary);
+  }
+
+  .values dd {
+    margin: 0;
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    overflow-wrap: anywhere;
+  }
+
+  .values .number {
+    font-variant-numeric: tabular-nums;
   }
 
   .note {
     display: block;
-    font-size: 0.875rem;
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    color: var(--cds-text-secondary);
   }
 
-  h2 {
-    margin: 1rem 0 0.5rem;
-    font-size: 1.125rem;
-  }
-
-  p {
-    margin: 0 0 0.5rem;
-  }
-
-  .setup,
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-    gap: 0.5rem 1rem;
-    margin: 0;
-  }
-
-  .setup dt,
-  .metrics dt {
-    color: var(--color-muted);
-    font-size: 0.875rem;
-  }
-
-  .setup dd,
-  .metrics dd {
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .detail-table {
-    border-collapse: collapse;
-    inline-size: 100%;
-    font-size: 0.875rem;
-  }
-
-  .detail-table th,
-  .detail-table td {
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: start;
-  }
-
-  .detail-table thead th {
-    position: sticky;
-    inset-block-start: 0;
-    background: var(--color-surface);
-  }
-
-  .backtest-links {
-    margin: 0 0 0.75rem;
-    padding-inline-start: 1.25rem;
+  .error {
+    color: var(--cds-text-error);
   }
 </style>

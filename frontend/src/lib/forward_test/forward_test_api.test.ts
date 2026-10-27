@@ -4,6 +4,7 @@ import {
   canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
+  findForwardTestStatusKind,
   formatLocalTime,
   isLiveBarPeriod,
   listForwardTestsOnInstruments,
@@ -127,6 +128,18 @@ describe('labels', () => {
     expect(canStop(runningForwardTest)).toBe(true);
     expect(canStop({ ...runningForwardTest, desired_state: 'stopped' })).toBe(false);
     expect(canStop({ ...runningForwardTest, status: 'failed', client_id: null })).toBe(false);
+  });
+});
+
+describe('findForwardTestStatusKind', () => {
+  it('gives each status the kind of its icon and color', () => {
+    expect(findForwardTestStatusKind('starting')).toBe('in-progress');
+    expect(findForwardTestStatusKind('running')).toBe('success');
+    expect(findForwardTestStatusKind('waiting_for_gateway')).toBe('warning');
+    expect(findForwardTestStatusKind('stopping')).toBe('in-progress');
+    expect(findForwardTestStatusKind('stopped')).toBe('neutral');
+    expect(findForwardTestStatusKind('stop_failed')).toBe('error');
+    expect(findForwardTestStatusKind('failed')).toBe('error');
   });
 });
 

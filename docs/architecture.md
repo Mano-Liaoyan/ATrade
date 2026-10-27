@@ -334,6 +334,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   notification: `kind` (`success` and `info` are a status, `error` and
   `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
   `onClose` (it adds the close button "Close notification").
+- `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
+  with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
+  `neutral`; each kind has its own icon shape) and `label`. `Select` takes
+  `placeholder` (the trigger text while no item is selected). `TextInput`
+  takes `type` `datetime-local` for a native date and time input.
+- The forward test pages use Carbon: the start form uses `Select` and
+  `TextInput`, the list and the fill tables use `DataTable`, and the row
+  `OverflowMenu` has only the actions that apply ("Stop forward test",
+  "Backtest the same period"). A forward test with no action has no menu.
+  The status of a forward test is a `StatusIndicator`
+  (`findForwardTestStatusKind` of `forward_test`).
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
   use the components of `#lib/foundation/carbon`.
