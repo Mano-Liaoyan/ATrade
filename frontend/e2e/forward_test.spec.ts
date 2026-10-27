@@ -2,7 +2,7 @@
 // and each fake child stops at once after the stop request. The server has 30 stopped forward tests of the strategy
 // "E2E stopped forward tests", so the list overflows. The client ID range 10-13 allows 4 forward tests at a time, and
 // the browser projects run at the same time, so each test starts only 1 forward test and stops it.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // The stop takes 2 worker comparisons (stopping, then stopped) and 1 socket read, each every 2 seconds. A backtest
 // child of another test can slow the server, so the wait is longer than the default 5 seconds.
@@ -36,6 +36,8 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   const forwardTests = page.getByRole('region', { name: 'Forward tests' });
   const row = forwardTests.getByRole('row', { name: new RegExp(symbol) });
   await expect(row).toContainText(`${strategyName} v1`);
+  await expect(row).toContainText('1 min');
+  await expect(row).toContainText('2026-01-02 03:04:05 UTC');
   // The browser sent UTC and shows the end time in its own time zone again.
   await expect(row).toContainText('2099-12-31 23:30');
   // The worker compares the states every 2 seconds and the socket pushes the change.
@@ -78,4 +80,38 @@ test('the forward test list has a visible scroll track', async ({ page }) => {
 
   await expect(lastRow).toBeInViewport();
   await expect(track).toHaveAttribute('aria-valuenow', '100');
+});
+
+/** The words of the element text that the browser breaks over 2 lines or more. */
+async function findBrokenWords(element: Locator): Promise<string[]> {
+  return element.evaluate((root) => {
+    const brokenWords: string[] = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      for (const match of (node.textContent ?? '').matchAll(/\S+/g)) {
+        const range = document.createRange();
+        range.setStart(node, match.index);
+        range.setEnd(node, match.index + match[0].length);
+        const lineTops = new Set(Array.from(range.getClientRects(), (rect) => Math.round(rect.top)));
+        if (lineTops.size > 1) {
+          brokenWords.push(match[0]);
+        }
+      }
+    }
+    return brokenWords;
+  });
+}
+
+test('at 1024 pixels the column names of the forward test list break only between words', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto('/forward-tests');
+
+  const forwardTests = page.getByRole('region', { name: 'Forward tests' });
+  const columnHeaders = forwardTests.getByRole('columnheader');
+  await expect(columnHeaders.first()).toBeVisible();
+  for (const columnHeader of await columnHeaders.all()) {
+    expect(await findBrokenWords(columnHeader)).toEqual([]);
+  }
+  // The table is not wider than its region, so no column is out of reach.
+  expect(await forwardTests.evaluate((region) => region.scrollWidth <= region.clientWidth)).toBe(true);
 });

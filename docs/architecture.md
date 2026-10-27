@@ -175,15 +175,16 @@ app           -> all modules
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
   start).
 - `forward_test -> ibkr` is only for the `GatewayConnection` protocol of the
-  child process: the connection for the paper account check and the stop
-  steps (`read_own_open_orders()`, `cancel_order_and_wait()`) (#76, section
-  22).
+  child process: the connection for the paper account check, the warm-up
+  bars (`read_historical_bars()`), and the stop steps
+  (`read_own_open_orders()`, `cancel_order_and_wait()`) (#76, section 22).
 - `paper_trading` does not import `forward_test`. The refusal of paper orders
   by hand on the instrument of a running forward test (section 12.2) gets a
   function from `app/web.py`, which calls
   `forward_test.find_forward_test_on_instrument()`.
-- `forward_test -> backtest` is only for the comparison and the metric
-  functions.
+- `forward_test -> backtest` is only for the comparison, the metric
+  functions, and the look-back of `request_bars` (`find_look_back_length()`,
+  `write_look_back_catalog()`).
 - `backtest` does not depend on `paper_trading`. A backtest request carries
   `paper_capital_usd` as an input.
 - `forward_test` and `paper_trading` do not depend on each other for order
@@ -333,6 +334,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   if it waits for a reconnection.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
+- A chart draws on a canvas and reads the color tokens only when it draws.
+  `foundation/color_scheme` has `watchColorScheme(onChange)`. Each chart
+  applies the new colors to the chart and its series after a change of
+  `prefers-color-scheme`, without a page reload and without a new chart.
+- `foundation/value_format` shows API values in tables: `formatBarPeriod`
+  ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
+  `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
+- The app shell header shows the server time and updates it every second:
+  the `time_utc` of `GET /api/health` plus the browser time since the answer
+  (`foundation/backend_health`).
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
   consistent.
 

@@ -10,6 +10,9 @@ export type ForwardTestStatus = components['schemas']['ForwardTestStatus'];
 export type ForwardTestComparison = components['schemas']['ForwardTestComparisonResponse'];
 export type FillComparison = components['schemas']['FillComparisonResponse'];
 export type ComparedInterruption = components['schemas']['ComparedInterruptionResponse'];
+export type ForwardTestDetail = components['schemas']['ForwardTestDetailResponse'];
+export type ForwardTestFill = components['schemas']['ForwardTestFillResponse'];
+export type ForwardTestInterruption = components['schemas']['InterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
 type ForwardTestsMessage = components['schemas']['ForwardTestsMessage'];
 type SamePeriodBacktestResponse = components['schemas']['SamePeriodBacktestResponse'];
@@ -18,6 +21,7 @@ export type StartResult = { kind: 'started'; forwardTest: ForwardTest } | { kind
 export type StopResult = { kind: 'stop_requested' } | { kind: 'failed'; message: string };
 export type SamePeriodBacktestResult = { kind: 'started'; backtestId: number } | { kind: 'failed'; message: string };
 export type ComparisonResult = { kind: 'ok'; value: ForwardTestComparison } | { kind: 'failed'; message: string };
+export type DetailResult = { kind: 'ok'; value: ForwardTestDetail } | { kind: 'failed'; message: string };
 
 export const FORWARD_TESTS_SOCKET_PATH = '/ws/forward-tests';
 const FORWARD_TESTS_PATH = '/api/forward-tests';
@@ -40,12 +44,22 @@ const STATUS_LABELS: Record<ForwardTestStatus, string> = {
   failed: 'Failed',
 };
 
+const INTERRUPTION_REASON_LABELS: Record<ForwardTestInterruption['reason'], string> = {
+  crash: 'Crash',
+  gateway: 'IB Gateway not reachable',
+  worker_restart: 'Worker restart',
+};
+
 export function isLiveBarPeriod(barPeriod: BarPeriod): boolean {
   return LIVE_BAR_PERIODS.includes(barPeriod);
 }
 
 export function describeForwardTestStatus(status: ForwardTestStatus): string {
   return STATUS_LABELS[status];
+}
+
+export function describeInterruptionReason(reason: ForwardTestInterruption['reason']): string {
+  return INTERRUPTION_REASON_LABELS[reason];
 }
 
 /**
@@ -74,6 +88,11 @@ export function formatLocalTime(utcTime: string | null): string {
   const time = new Date(utcTime);
   const date = `${String(time.getFullYear())}-${padTwoDigits(time.getMonth() + 1)}-${padTwoDigits(time.getDate())}`;
   return `${date} ${padTwoDigits(time.getHours())}:${padTwoDigits(time.getMinutes())}`;
+}
+
+/** A stopped forward test has no crash count as its current state. Its crash interruptions are the history. */
+export function showsCrashCount(forwardTest: ForwardTest): boolean {
+  return forwardTest.crash_count > 0 && forwardTest.status !== 'stopped';
 }
 
 /** A stop is useful while the forward test holds a client ID: then it can have open orders. */
@@ -170,4 +189,17 @@ export async function readForwardTestComparison(
     return outcome;
   }
   return { kind: 'ok', value: outcome.body as ForwardTestComparison };
+}
+
+export async function readForwardTestDetail(fetchFunction: typeof fetch, forwardTestId: number): Promise<DetailResult> {
+  const outcome = await sendForwardTestRequest(
+    fetchFunction,
+    `${FORWARD_TESTS_PATH}/${String(forwardTestId)}`,
+    undefined,
+    { notReachable: 'Backend not reachable. The forward test is not available.', failedAction: 'Reading the forward test' },
+  );
+  if (outcome.kind === 'failed') {
+    return outcome;
+  }
+  return { kind: 'ok', value: outcome.body as ForwardTestDetail };
 }

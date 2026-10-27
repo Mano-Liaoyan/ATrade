@@ -1099,6 +1099,45 @@
         }
       }
     },
+    "/api/forward-tests/{forward_test_id}": {
+      "get": {
+        "summary": "Read Forward Test Detail",
+        "operationId": "read_forward_test_detail_api_forward_tests__forward_test_id__get",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/forward-tests/{forward_test_id}/comparison/{backtest_id}": {
       "get": {
         "summary": "Compare With Backtest",
@@ -2246,6 +2285,92 @@
           "interruptions"
         ],
         "title": "ForwardTestComparisonResponse"
+      },
+      "ForwardTestDetailResponse": {
+        "properties": {
+          "forward_test": {
+            "$ref": "#/components/schemas/ForwardTestResponse"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparedMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+            },
+            "type": "array",
+            "title": "Equity Curve"
+          },
+          "fills": {
+            "items": {
+              "$ref": "#/components/schemas/ForwardTestFillResponse"
+            },
+            "type": "array",
+            "title": "Fills"
+          },
+          "same_period_backtests": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedBacktestSummaryResponse"
+            },
+            "type": "array",
+            "title": "Same Period Backtests"
+          }
+        },
+        "type": "object",
+        "required": [
+          "forward_test",
+          "metrics",
+          "equity_curve",
+          "fills",
+          "same_period_backtests"
+        ],
+        "title": "ForwardTestDetailResponse",
+        "description": "The forward test page: the forward test, its records, and the backtests that \"Backtest the same period\" started,\nnewest first."
+      },
+      "ForwardTestFillResponse": {
+        "properties": {
+          "time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Utc"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "title": "Side"
+          },
+          "quantity_shares": {
+            "type": "string",
+            "title": "Quantity Shares"
+          },
+          "price_usd": {
+            "type": "string",
+            "title": "Price Usd"
+          },
+          "commission_usd": {
+            "type": "string",
+            "title": "Commission Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_utc",
+          "side",
+          "quantity_shares",
+          "price_usd",
+          "commission_usd"
+        ],
+        "title": "ForwardTestFillResponse"
       },
       "ForwardTestResponse": {
         "properties": {

@@ -7,12 +7,13 @@ The IBKR connection is the fake. The function that runs the LiveNode is a fake: 
 
 import asyncio
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
 
 from atrade.forward_test import (
@@ -24,10 +25,16 @@ from atrade.forward_test import (
     LiveNodeInput,
     run_forward_test_child,
 )
+from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.settings import Settings
 from atrade.ibkr import AccountValue
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values, make_forward_test_order
+from tests.fakes.ibkr import (
+    FakeGatewayConnection,
+    HistoricalBarRequest,
+    make_balance_values,
+    make_forward_test_order,
+)
 from tests.forward_test.test_forward_test_routes import (
     FORWARD_TESTS_PATH,
     make_start_request,
@@ -35,6 +42,7 @@ from tests.forward_test.test_forward_test_routes import (
 )
 
 ACCOUNT_ID = "DU1234567"
+CHILD_NOW_UTC = datetime(2026, 1, 2, 3, 10, 30, tzinfo=UTC)
 TEST_GATEWAY_RETRY_SECONDS = 0.01
 FORWARD_TEST_CLIENT_ID = 10
 WEB_CLIENT_ID = 1
@@ -128,7 +136,7 @@ async def run_child(
         ibkr_access=IbkrAccess(
             open_gateway_connection=open_gateway_connection,
             run_live_node=live_node.run_live_node,
-            clock=FixedClock(datetime(2026, 1, 2, 3, 10, tzinfo=UTC)),
+            clock=FixedClock(CHILD_NOW_UTC),
             gateway_retry_seconds=TEST_GATEWAY_RETRY_SECONDS,
         ),
         stop_requested=stop_requested,
@@ -181,6 +189,72 @@ async def test_stop_cancels_only_the_open_orders_of_the_forward_test_client_id(
 
     assert [order.client_id for order in gateway_connection.open_orders] == [WEB_CLIENT_ID]
     assert not gateway_connection.connected
+
+
+@pytest.mark.anyio
+async def test_the_live_node_gets_the_warm_up_bars_of_7_days_before_the_start(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    live_node = FakeLiveNode(gateway_connection)
+
+    await run_child(make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node)
+
+    # The range ends at the start of the current 1-minute bar: the current bar is not complete.
+    warm_up_end_utc = datetime(2026, 1, 2, 3, 10, tzinfo=UTC)
+    [request] = gateway_connection.historical_bar_requests
+    assert request == HistoricalBarRequest(
+        live_node.inputs[0].instrument,
+        BarPeriod.ONE_MINUTE,
+        TimeRange(start_utc=warm_up_end_utc - timedelta(days=7), end_utc=warm_up_end_utc),
+    )
+    warm_up_bars = live_node.inputs[0].warm_up_bars
+    assert len(warm_up_bars) == 7 * 24 * 60
+    assert warm_up_bars[-1].start_utc == warm_up_end_utc - timedelta(minutes=1)
+
+
+@pytest.mark.anyio
+async def test_a_failed_warm_up_read_starts_the_live_node_without_warm_up_bars(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    gateway_connection.historical_bars_error_message = "Error 162: no market data permissions"
+    live_node = FakeLiveNode(gateway_connection)
+
+    exit_code, _ = await run_child(
+        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
+    )
+
+    assert exit_code == 0
+    assert live_node.inputs[0].warm_up_bars == ()
+
+
+@pytest.mark.anyio
+async def test_a_restart_that_runs_again_clears_the_crash_message(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE forward_test SET error_message = 'The forward test process ended with exit code 1.' WHERE id = %s",
+            [forward_test["id"]],
+        )
+    live_node = FakeLiveNode(make_forward_test_gateway())
+    run_fake_live_node = live_node.run_live_node
+    states_at_start: list[tuple[str, str | None]] = []
+
+    async def run_live_node(live_node_input: LiveNodeInput, stop_requested: asyncio.Event) -> LiveNodeEnd:
+        listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
+        states_at_start.append((listed["status"], listed["error_message"]))
+        return await run_fake_live_node(live_node_input, stop_requested)
+
+    live_node.run_live_node = run_live_node  # pyright: ignore[reportAttributeAccessIssue]
+
+    await run_child(make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node)
+
+    assert states_at_start == [("running", None)]
 
 
 @pytest.mark.anyio
@@ -374,7 +448,7 @@ async def test_the_child_waits_for_the_gateway_and_retries(
     assert statuses_at_start == ["running"]
     listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
     assert listed["interruptions"] == [
-        {"reason": "gateway", "started_at_utc": "2026-01-02T03:10:00Z", "ended_at_utc": "2026-01-02T03:10:00Z"}
+        {"reason": "gateway", "started_at_utc": "2026-01-02T03:10:30Z", "ended_at_utc": "2026-01-02T03:10:30Z"}
     ]
     assert listed["error_message"] is None
 

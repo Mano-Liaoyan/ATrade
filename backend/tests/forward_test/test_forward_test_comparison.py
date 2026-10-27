@@ -341,3 +341,57 @@ async def test_a_backtest_of_another_instrument_is_refused(web_client: httpx.Asy
     assert response.json()["detail"] == (
         "The backtest must use the strategy version, the instrument, and the bar period of the forward test."
     )
+
+
+@pytest.mark.anyio
+async def test_the_forward_test_page_has_the_records_and_links_each_same_period_backtest(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    write_forward_test_end(database_url, forward_test["id"])
+    write_forward_test_records(database_url, forward_test["id"])
+    first_backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+    write_backtest_result(database_url, first_backtest_id)
+    second_backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["forward_test"]["id"] == forward_test["id"]
+    assert detail["forward_test"]["interruptions"][0]["reason"] == "crash"
+    assert detail["metrics"]["trade_count"] == 2
+    assert [point["equity_usd"] for point in detail["equity_curve"]] == ["10000", "10010", "10020", "10006"]
+    assert detail["fills"][0] == {
+        "time_utc": "2026-01-02T03:05:02Z",
+        "side": "BUY",
+        "quantity_shares": "10",
+        "price_usd": "100.05",
+        "commission_usd": "1",
+    }
+    # Newest first. The page links to the comparison with each one.
+    assert [(item["id"], item["status"]) for item in detail["same_period_backtests"]] == [
+        (second_backtest_id, "queued"),
+        (first_backtest_id, "finished"),
+    ]
+
+
+@pytest.mark.anyio
+async def test_a_new_forward_test_page_has_no_records_and_no_backtests(web_client: httpx.AsyncClient) -> None:
+    forward_test = await start_forward_test(web_client)
+
+    detail = (await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")).json()
+
+    assert (detail["metrics"], detail["equity_curve"], detail["fills"], detail["same_period_backtests"]) == (
+        None,
+        [],
+        [],
+        [],
+    )
+
+
+@pytest.mark.anyio
+async def test_the_page_of_an_unknown_forward_test_is_not_found(web_client: httpx.AsyncClient) -> None:
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/999")
+
+    assert response.status_code == 404

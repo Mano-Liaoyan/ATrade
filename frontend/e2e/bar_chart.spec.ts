@@ -1,6 +1,16 @@
 // Bar chart on the instrument page, against the real backend with the IBKR fake. The fake has one bar for each bar
 // period, and the e2e server clock is 2026-01-02 03:04:05 UTC (backend/tests/e2e_server.py).
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
+
+/** The color of the chart background: a pixel near the top left corner of the largest chart canvas. */
+async function readChartBackground(chart: Locator): Promise<string> {
+  return chart.evaluate((element) => {
+    const canvases = Array.from(element.querySelectorAll('canvas'));
+    const largest = canvases.reduce((first, second) => (second.width * second.height > first.width * first.height ? second : first));
+    const pixel = largest.getContext('2d')?.getImageData(2, 2, 1, 1).data;
+    return pixel === undefined ? '' : `rgb(${String(pixel[0])}, ${String(pixel[1])}, ${String(pixel[2])})`;
+  });
+}
 
 test('opens the bar chart of an instrument with the TradingView attribution', async ({ page }) => {
   await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
@@ -47,4 +57,17 @@ test('the chart receives live bar updates over the WebSocket', async ({ page }) 
   const firstText = (await liveBar.textContent()) ?? '';
   await expect(liveBar).not.toHaveText(firstText);
   await expect(liveBar).toHaveText(/^Live bar 2026-01-02 03:00 UTC: close 12[34]\.\d+$/);
+});
+
+test('the chart takes the new color scheme without a page reload', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
+  const chart = page.getByRole('img', { name: 'Bar chart of 700 / SEHK / HKD, 1-HOUR bars' });
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('2160 bars');
+  // --color-surface of src/routes/+layout.svelte: #ffffff light, #161b22 dark.
+  await expect.poll(() => readChartBackground(chart)).toBe('rgb(255, 255, 255)');
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+
+  await expect.poll(() => readChartBackground(chart)).toBe('rgb(22, 27, 34)');
 });

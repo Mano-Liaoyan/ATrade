@@ -5,6 +5,7 @@
   import { resolve } from '$app/paths';
   import { formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { formatBarPeriod } from '#lib/foundation/value_format';
   import {
     FORWARD_TESTS_SOCKET_PATH,
     ForwardTestList,
@@ -191,7 +192,7 @@
     <p>no backtest result</p>
   {:else}
     <p>
-      Latest backtest #{latestBacktest.id} ({latestBacktest.symbol}, {latestBacktest.bar_period}): total return
+      Latest backtest #{latestBacktest.id} ({latestBacktest.symbol}, {formatBarPeriod(latestBacktest.bar_period)}): total return
       {formatPercent(latestBacktest.metrics.total_return_percent)}, max drawdown
       {formatPercent(latestBacktest.metrics.max_drawdown_percent)}, {latestBacktest.metrics.trade_count} trades, final
       equity {formatUsd(latestBacktest.metrics.final_equity_usd)} USD.

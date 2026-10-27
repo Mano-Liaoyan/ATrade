@@ -3,7 +3,7 @@ comparison with a backtest of the same period (docs/architecture/forward_test.md
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 import psycopg
 
@@ -39,13 +39,24 @@ def check_backtest_request(request: BacktestRequest) -> str | None:
     return None
 
 
+def format_message_time(time_utc: datetime) -> str:
+    return f"{time_utc.astimezone(UTC):%Y-%m-%d %H:%M} UTC"
+
+
 def describe_missing_bars(request: BacktestRequest) -> str:
-    """The message of a backtest without saved bars: the HTTP route refuses it with it, and the child fails with it."""
+    """The message of a backtest without saved bars: the HTTP route refuses it with it, and the child fails with it.
+
+    It names the bars, says how bars get saved, and says why a closed market gives no bars (section 10.1).
+    """
     instrument = request.instrument
     return (
-        f"PostgreSQL has no saved {request.bar_period.value} bars of {instrument.symbol} / {instrument.exchange}"
-        f" / {instrument.currency} from {request.time_range.start_utc.isoformat()}"
-        f" to {request.time_range.end_utc.isoformat()}. Open the bar chart of the instrument to load bars from IBKR."
+        f"There are no saved {request.bar_period.label} bars of {instrument.symbol} / {instrument.exchange}"
+        f" / {instrument.currency} from {format_message_time(request.time_range.start_utc)}"
+        f" to {format_message_time(request.time_range.end_utc)}."
+        " ATrade saves bars only when a bar chart loads them from IBKR."
+        " IBKR has bars only for the regular trading hours: a period when the market was closed has no bars."
+        " Open the bar chart of the instrument with this bar period to load the bars, or select a period with"
+        " trading hours."
     )
 
 

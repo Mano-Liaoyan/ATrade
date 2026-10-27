@@ -345,6 +345,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/forward-tests/{forward_test_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Forward Test Detail */
+        get: operations["read_forward_test_detail_api_forward_tests__forward_test_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forward-tests/{forward_test_id}/comparison/{backtest_id}": {
         parameters: {
             query?: never;
@@ -747,6 +764,40 @@ export interface components {
             fills: components["schemas"]["FillComparisonResponse"][];
             /** Interruptions */
             interruptions: components["schemas"]["ComparedInterruptionResponse"][];
+        };
+        /**
+         * ForwardTestDetailResponse
+         * @description The forward test page: the forward test, its records, and the backtests that "Backtest the same period" started,
+         *     newest first.
+         */
+        ForwardTestDetailResponse: {
+            forward_test: components["schemas"]["ForwardTestResponse"];
+            metrics: components["schemas"]["ComparedMetricsResponse"] | null;
+            /** Equity Curve */
+            equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            /** Fills */
+            fills: components["schemas"]["ForwardTestFillResponse"][];
+            /** Same Period Backtests */
+            same_period_backtests: components["schemas"]["ComparedBacktestSummaryResponse"][];
+        };
+        /** ForwardTestFillResponse */
+        ForwardTestFillResponse: {
+            /**
+             * Time Utc
+             * Format: date-time
+             */
+            time_utc: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "BUY" | "SELL";
+            /** Quantity Shares */
+            quantity_shares: string;
+            /** Price Usd */
+            price_usd: string;
+            /** Commission Usd */
+            commission_usd: string;
         };
         /** ForwardTestResponse */
         ForwardTestResponse: {
@@ -2231,6 +2282,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SamePeriodBacktestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_forward_test_detail_api_forward_tests__forward_test_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                forward_test_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestDetailResponse"];
                 };
             };
             /** @description Validation Error */

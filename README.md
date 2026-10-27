@@ -100,7 +100,12 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   paper account first. Orders go only to the IBKR paper account. A stop
   cancels the open orders of the forward test. Positions stay open. One
   forward test per instrument, 4 at the same time. A restart of `web` does
-  not stop forward tests. See
+  not stop forward tests. Before the start, the child reads the warm-up bars
+  of the last 7 days (or more for long bar periods) from IBKR, so
+  `request_bars` in the strategy gets them, as in a backtest. The forward
+  test ID in the list opens the forward test page: its state, its
+  interruptions, its equity curve and fills, and a link to the comparison
+  with each backtest of the same period. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
 - Forward test records and comparison: at the end of each bar, the
   forward test records its new fills and one equity point in PostgreSQL. The

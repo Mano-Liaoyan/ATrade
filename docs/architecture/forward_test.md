@@ -167,6 +167,12 @@ Implementation (#77):
   old worker end is not known.
 - The child ends the open interruption and writes `running` when it starts
   the `LiveNode`. A stop (`write_end`) also ends it.
+- A crash message in `error_message` is the current state only until the
+  forward test runs again or stops. The child clears `error_message` when it
+  starts the `LiveNode`, and a stop that ends with the status `stopped`
+  clears it. The `crash` interruptions keep the history. The list and the
+  forward test page show the crash count only when the status is not
+  `stopped`.
 
 ## 12.8 Records
 
@@ -245,7 +251,9 @@ Implementation (#77):
 - Forward test metrics use the same metric functions that `backtest` exports.
 - Implementation (#78):
   - `POST /api/forward-tests/{id}/same-period-backtests` queues the backtest
-    with `queue_backtest` of `backtest` (section 10.4). The period starts at
+    with `queue_backtest` of `backtest` (section 10.4). It records the
+    backtest ID in `forward_test_same_period_backtest`, so the forward test
+    page links to the comparison with each backtest of the same period. The period starts at
     `created_at_utc` and ends at `stopped_at_utc`, or now. The paper capital
     is `start_balance_usd`. `422` without a start balance, and for each
     refusal of `check_backtest_request` (not USD, an empty period). The
@@ -308,6 +316,11 @@ null when free), `start_balance_usd`, `error_message`, `created_at_utc`,
 `3e7a1c5d9b76_forward_test_create_table.py` and
 `3e7a1c5d9b77_forward_test_recovery_and_end_time.py`.
 
+`forward_test_same_period_backtest`: `forward_test_id`, `backtest_id`
+(both foreign keys with `ON DELETE CASCADE`, primary key on both). One row
+for each "Backtest the same period". Migration
+`3e7a1c5d9b79_forward_test_create_same_period_backtest.py`.
+
 `forward_test_interruption` (#77): `id`, `forward_test_id`, `reason`
 (`crash`, `gateway`, `worker_restart`), `started_at_utc`, `ended_at_utc`
 (null while the interruption lasts). A partial unique index allows only one
@@ -333,7 +346,8 @@ interruption does nothing.
   value), `error_message`, the `gateway` interruptions, and two statuses:
   `waiting_for_gateway` (only from `starting`, `running`, or
   `waiting_for_gateway`) and `running` at the `LiveNode` start (only from
-  `starting` or `waiting_for_gateway`). The conditions keep a stop status of
+  `starting`, `running`, or `waiting_for_gateway`; it also clears
+  `error_message`, section 12.7). The conditions keep a stop status of
   the worker.
 - The start takes the client ID in one transaction:
   `LOCK TABLE forward_test IN SHARE ROW EXCLUSIVE MODE`, then the instrument
@@ -345,6 +359,7 @@ interruption does nothing.
 |---|---|
 | `POST /api/forward-tests` | Body `StartForwardTestRequest`: `strategy_version_id`, `symbol`, `exchange`, `currency`, `bar_period`, optional `end_time_utc` (with a time zone, later than now). `201` with `ForwardTestResponse`. `409` with `StartRefusedResponse` (`detail`, `forward_test_id`): `"limit of running forward tests reached"` (`forward_test_id` null), or `"Forward test 3 (Trend v2) already runs on AAPL / NASDAQ."`. `422` for a missing strategy version, a bar period that IB live bars do not support, or an end time that is not later than now or has no time zone. |
 | `GET /api/forward-tests` | `200` with the list of `ForwardTestResponse`, newest first: the row of section 12.12 plus `strategy_id`, `strategy_name`, `version_number`, and `interruptions` (`reason`, `started_at_utc`, `ended_at_utc`, oldest first). |
+| `GET /api/forward-tests/{id}` | `200` with `ForwardTestDetailResponse`, for the forward test page: `forward_test` (`ForwardTestResponse`), `metrics` (null without a start balance), `equity_curve`, `fills` (`time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`, oldest first), and `same_period_backtests` (the backtest summary of the comparison route, newest first). `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/same-period-backtests` | `201` with `{"backtest_id"}`: a queued backtest of the same period (section 12.10). `404` for an unknown ID. `422` without a start balance (`"The forward test has no start balance yet. The backtest uses it as the paper capital."`), for a currency that is not USD, or for an empty period. |
 | `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
@@ -404,6 +419,24 @@ than the worker clock.
   `StrategyConfig.__new__`, and `instrument_id` and `bar_type` through the
   `__init__` of the user config class (section 9.2). The reason: the user
   `__init__` passes other keywords to `object.__init__`, which refuses them.
+- Warm-up bars: after the cancel of the old orders, on the same connection,
+  the child reads the bars of `find_look_back_length(bar_period)` of
+  `backtest` (the backtest look-back, 7 days at least) before the start of
+  the current bar, with `GatewayConnection.read_historical_bars()`. That
+  function splits the range into requests of the IBKR step size of the bar
+  period (1 day for 1-minute bars, `ibkr/historical_bars.py`). A failed read
+  logs a warning and gives no warm-up bars. The forward test still starts.
+- `run_live_node()` writes the warm-up bars to a catalog with
+  `write_look_back_catalog()` of `backtest` and builds the node with
+  `LiveNodeBuilder.from_config()` and `LiveNodeConfig(catalogs=[...])`. The
+  catalog says that it holds all times, so the data engine answers each
+  `request_bars` of the strategy from the catalog, as in a backtest
+  (section 10.3.1 of `backtest.md`). A request that starts earlier gets only
+  the warm-up bars. The reason: the IB data client of NautilusTrader
+  2.0.0rc7 splits a long request into a part in whole days and a rest in
+  seconds (`calculate_duration_segments`). For `now - 7 days` with 1-minute
+  bars, IBKR refuses the request (error 321), and the strategy gets no bars.
+  The live bars of `subscribe_bars` still come from the IB data client.
 - The stop request stops the LiveNode with `LiveNode.handle().stop()`. A CI
   test runs the real LiveNode without IB Gateway and stops it while it waits
   for the connection (`tests/forward_test/test_live_node_run.py`).
@@ -416,7 +449,21 @@ than the worker clock.
   "Backtest the same period" button when the row has a start balance; the
   page starts the backtest and opens the comparison page).
   `FillComparisonTable.svelte` (`ScrollRegion` "Compared fills") is the fill
-  table of section 12.10 (#78).
+  table of section 12.10 (#78). `ForwardTestFillTable.svelte` (`ScrollRegion`
+  "Forward test fills") is the fill table of the forward test page.
+- The forward test ID in the list links to the forward test page
+  `/forward-tests/{id}`. The page reads `GET /api/forward-tests/{id}` every
+  2 seconds and shows the strategy version, the instrument, the bar period,
+  the status with the current error and the crash count, the client ID, the
+  start balance, the start, stop, and end times, the interruptions
+  (`ScrollRegion` "Interruptions"), the metrics, the equity curve with the
+  interruptions in grey, the fills, a link "Compare with backtest #N" for
+  each backtest of the same period, and the "Backtest the same period"
+  button.
+- Tables show a bar period as "1 min" or "1 day", an amount with thousands
+  separators ("98,765.40"), and a UTC time as "2026-01-02 03:04:05 UTC"
+  (`#lib/foundation/value_format`, `#lib/foundation/time_format`). A column
+  name breaks only between words. A long cell value can break anywhere.
 - The page `/forward-tests` (nav link "Forward tests") has the start form
   (strategy, strategy version, symbol, exchange, currency, and a bar period
   from the IB live bar periods, an optional end time in the local time zone),

@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import sys
+import tempfile
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, cast
@@ -23,6 +24,7 @@ STOP_TIMEOUT_SECONDS = 5.0
 UNSUPPORTED_DATA_CLOSE_CODE = 1003
 HEADER_ENCODING = "ascii"
 CONTENT_LENGTH_HEADER = "content-length"
+WORKSPACE_FOLDER_NAME = "atrade-strategy"
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +40,14 @@ def create_strategy_language_server_router() -> APIRouter:
 async def serve_language_server(websocket: WebSocket) -> None:
     await websocket.accept()
     process = await start_language_server()
-    try:
-        await relay_messages(websocket, process)
-    finally:
-        await stop_language_server(process)
+    # basedpyright reads only workspaceFolders, not the rootUri of the browser. Without a folder that exists, it logs
+    # the warning "File or directory ... does not exist", and the browser shows it. The folder stays empty: the
+    # strategy document exists only in the editor.
+    with tempfile.TemporaryDirectory(prefix="atrade-strategy-workspace-") as workspace_directory:
+        try:
+            await relay_messages(websocket, process, Path(workspace_directory).as_uri())
+        finally:
+            await stop_language_server(process)
 
 
 def find_language_server_command() -> list[str]:
@@ -75,8 +81,8 @@ async def stop_language_server(process: asyncio.subprocess.Process) -> None:
             await process.wait()
 
 
-async def relay_messages(websocket: WebSocket, process: asyncio.subprocess.Process) -> None:
-    browser_task = asyncio.create_task(relay_browser_messages(websocket, process))
+async def relay_messages(websocket: WebSocket, process: asyncio.subprocess.Process, workspace_uri: str) -> None:
+    browser_task = asyncio.create_task(relay_browser_messages(websocket, process, workspace_uri))
     server_task = asyncio.create_task(relay_server_messages(websocket, process))
     done, pending = await asyncio.wait({browser_task, server_task}, return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
@@ -87,7 +93,7 @@ async def relay_messages(websocket: WebSocket, process: asyncio.subprocess.Proce
         task.result()
 
 
-async def relay_browser_messages(websocket: WebSocket, process: asyncio.subprocess.Process) -> None:
+async def relay_browser_messages(websocket: WebSocket, process: asyncio.subprocess.Process, workspace_uri: str) -> None:
     stdin = cast(asyncio.StreamWriter, process.stdin)
     try:
         while True:
@@ -97,7 +103,7 @@ async def relay_browser_messages(websocket: WebSocket, process: asyncio.subproce
             except json.JSONDecodeError:
                 await websocket.close(code=UNSUPPORTED_DATA_CLOSE_CODE, reason="The message is not JSON.")
                 return
-            write_message(stdin, adjust_browser_message(message))
+            write_message(stdin, adjust_browser_message(message, workspace_uri))
             await stdin.drain()
     except WebSocketDisconnect:
         return
@@ -121,7 +127,7 @@ async def relay_server_messages(websocket: WebSocket, process: asyncio.subproces
         await websocket.send_text(json.dumps(message))
 
 
-def adjust_browser_message(message: object) -> object:
+def adjust_browser_message(message: object, workspace_uri: str) -> object:
     if not isinstance(message, dict):
         return message
     request = cast(JsonObject, message)
@@ -132,6 +138,7 @@ def adjust_browser_message(message: object) -> object:
     workspace_capabilities = cast(JsonObject, capabilities.setdefault("workspace", {}))
     # basedpyright reads its settings only from a client with this capability.
     workspace_capabilities["configuration"] = True
+    params["workspaceFolders"] = [{"uri": workspace_uri, "name": WORKSPACE_FOLDER_NAME}]
     return request
 
 

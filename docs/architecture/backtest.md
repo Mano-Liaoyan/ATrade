@@ -28,8 +28,12 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 - A backtest needs saved bars. `POST /api/backtests` refuses (`422`, no
   row) a request when PostgreSQL has no saved bar of the instrument and bar
   period that starts in the time range. The message is the same message as
-  the child failure ("PostgreSQL has no saved ... Open the bar chart of the
-  instrument to load bars from IBKR."). Partial coverage is allowed: one
+  the child failure (`describe_missing_bars()`). It names the bar period
+  ("1 min"), the instrument, and the period in UTC ("2026-03-01 00:00 UTC").
+  It says that ATrade saves bars only when a bar chart loads them from IBKR,
+  and that IBKR has bars only for the regular trading hours, so a period when
+  the market was closed has no bars. It tells the user to open the bar chart
+  with this bar period or to select a period with trading hours. Partial coverage is allowed: one
   saved bar in the range is enough. The range can start before the first
   saved bar or end after the last one, and the backtest runs on the saved
   bars only. The check uses `has_saved_bars()` of `market_data`, which
@@ -160,6 +164,9 @@ in a forward test, and it can trade on the first bar of the range.
   starts earlier gets only these bars. When PostgreSQL has no saved bars
   before the start, `request_bars` gets no bars and the indicator warms up on
   the first bars of the range.
+- A forward test uses the same length and the same catalog for its warm-up
+  bars (`find_look_back_length()` and `write_look_back_catalog()` of the
+  public entry, [`forward_test.md`](forward_test.md) section 12.15).
 - Mechanism (`create_look_back_catalog()` in
   `backtest/strategy_engine_run.py`): the child writes the look-back bars to
   a catalog in its temporary work directory (`look_back_catalog/`) and gives

@@ -1,5 +1,6 @@
 <!-- Filled orders by hand: the stored order and its fills from IBKR (docs/architecture/paper_trading.md section 11.4). -->
 <script lang="ts">
+  import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatAmount } from './paper_account';
   import type { ManualOrder } from './paper_orders';
@@ -24,7 +25,7 @@
           <th scope="col">Filled</th>
           <th scope="col">Average fill price</th>
           <th scope="col">Type</th>
-          <th scope="col">Sent (UTC)</th>
+          <th scope="col">Sent</th>
         </tr>
       </thead>
       <tbody>
@@ -36,7 +37,7 @@
             <td class="number">{order.filled_quantity}</td>
             <td class="number">{formatAmount(order.average_fill_price)}</td>
             <td>{order.order_type} {order.time_in_force}</td>
-            <td>{order.created_at_utc}</td>
+            <td>{formatUtcTime(order.created_at_utc)}</td>
           </tr>
         {/each}
       </tbody>

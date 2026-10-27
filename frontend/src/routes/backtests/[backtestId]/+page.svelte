@@ -1,5 +1,7 @@
 <!-- One backtest: its request and its result. The page reads the backtest again until its status is final. -->
 <script lang="ts">
+  import { formatUtcTime } from '#lib/foundation/time_format';
+  import { formatBarPeriod } from '#lib/foundation/value_format';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { BacktestResult, formatUsd, isFinalStatus, readBacktest, type BacktestDetail } from '#lib/backtest';
@@ -62,11 +64,11 @@
     </div>
     <div>
       <dt>Bar period</dt>
-      <dd>{backtest.bar_period}</dd>
+      <dd>{formatBarPeriod(backtest.bar_period)}</dd>
     </div>
     <div>
-      <dt>Time range (UTC)</dt>
-      <dd>{backtest.start_utc} to {backtest.end_utc}</dd>
+      <dt>Time range</dt>
+      <dd>{formatUtcTime(backtest.start_utc)} to {formatUtcTime(backtest.end_utc)}</dd>
     </div>
     <div>
       <dt>Paper capital (USD)</dt>

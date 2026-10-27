@@ -2,7 +2,12 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
-  import { describeBackendHealth, fetchBackendHealth, type BackendHealth } from '#lib/foundation/backend_health';
+  import {
+    describeBackendHealth,
+    fetchBackendHealth,
+    SERVER_TIME_TICK_MILLISECONDS,
+    type BackendHealth,
+  } from '#lib/foundation/backend_health';
   import {
     describeGatewayStatus,
     fetchGatewayStatus,
@@ -14,11 +19,21 @@
 
   let backendHealth: BackendHealth = $state({ kind: 'checking' });
   let gatewayStatus: GatewayStatus = $state({ kind: 'checking' });
+  let nowMilliseconds = $state(Date.now());
 
   $effect(() => {
     void fetchBackendHealth(fetch).then((health) => {
       backendHealth = health;
     });
+  });
+
+  $effect(() => {
+    const tickTimer = setInterval(() => {
+      nowMilliseconds = Date.now();
+    }, SERVER_TIME_TICK_MILLISECONDS);
+    return () => {
+      clearInterval(tickTimer);
+    };
   });
 
   $effect(() => {
@@ -45,7 +60,7 @@
       <a href={resolve('/forward-tests')}>Forward tests</a>
     </nav>
     <span class="header-statuses">
-      <span class="backend-status" role="status" aria-label="Backend status">{describeBackendHealth(backendHealth)}</span>
+      <span class="backend-status" role="status" aria-label="Backend status">{describeBackendHealth(backendHealth, nowMilliseconds)}</span>
       <span
         class="gateway-status"
         class:gateway-unreachable={gatewayStatus.kind === 'unreachable'}

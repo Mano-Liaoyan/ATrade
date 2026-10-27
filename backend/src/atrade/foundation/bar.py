@@ -27,6 +27,11 @@ class BarPeriod(StrEnum):
     def length(self) -> timedelta:
         return timedelta(seconds=BAR_PERIOD_SECONDS[self])
 
+    @property
+    def label(self) -> str:
+        """The name in messages, for example "1 min". The frontend shows the same names."""
+        return BAR_PERIOD_LABELS[self]
+
 
 BAR_PERIOD_SECONDS = {
     BarPeriod.ONE_MINUTE: SECONDS_PER_MINUTE,
@@ -35,6 +40,15 @@ BAR_PERIOD_SECONDS = {
     BarPeriod.THIRTY_MINUTES: 30 * SECONDS_PER_MINUTE,
     BarPeriod.ONE_HOUR: SECONDS_PER_HOUR,
     BarPeriod.ONE_DAY: SECONDS_PER_DAY,
+}
+
+BAR_PERIOD_LABELS = {
+    BarPeriod.ONE_MINUTE: "1 min",
+    BarPeriod.FIVE_MINUTES: "5 min",
+    BarPeriod.FIFTEEN_MINUTES: "15 min",
+    BarPeriod.THIRTY_MINUTES: "30 min",
+    BarPeriod.ONE_HOUR: "1 hour",
+    BarPeriod.ONE_DAY: "1 day",
 }
 
 

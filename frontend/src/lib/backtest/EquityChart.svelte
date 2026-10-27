@@ -22,11 +22,15 @@
     HistogramSeries,
     LineSeries,
     LineStyle,
+    type ChartOptions,
+    type DeepPartial,
     type HistogramData,
     type IChartApi,
+    type ISeriesApi,
     type LineData,
     type UTCTimestamp,
   } from 'lightweight-charts';
+  import { watchColorScheme } from '#lib/foundation/color_scheme';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
 
@@ -51,6 +55,8 @@
   const CURVE_STYLES: CurveStyle[] = [FIRST_CURVE_STYLE, { colorVariable: '--color-accent', lineStyle: LineStyle.Dashed }];
 
   let chartContainer: HTMLDivElement;
+  // A series with the color token that it uses. A change of the color scheme reads each token again.
+  type ColoredSeries = [ISeriesApi<'Line'> | ISeriesApi<'Histogram'>, string];
 
   function readColor(variableName: string): string {
     return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
@@ -60,13 +66,26 @@
     return (Date.parse(timeUtc) / MILLISECONDS_PER_SECOND) as UTCTimestamp;
   }
 
-  function addInterruptionColumns(chart: IChartApi): void {
+  function readThemeOptions(): DeepPartial<ChartOptions> {
+    return {
+      layout: {
+        background: { color: readColor('--color-surface') },
+        textColor: readColor('--color-text'),
+      },
+      grid: {
+        vertLines: { color: readColor('--color-border') },
+        horzLines: { color: readColor('--color-border') },
+      },
+    };
+  }
+
+  function addInterruptionColumns(chart: IChartApi): ColoredSeries[] {
     const interruptedTimes = findInterruptedTimes(
       curves.map((curve) => curve.points),
       interruptions,
     );
     if (interruptedTimes.length === 0) {
-      return;
+      return [];
     }
     const columnSeries = chart.addSeries(HistogramSeries, {
       color: readColor('--color-border'),
@@ -80,6 +99,7 @@
       value: INTERRUPTION_COLUMN_VALUE,
     }));
     columnSeries.setData(columns);
+    return [[columnSeries, '--color-border']];
   }
 
   function readCurveStyle(curveIndex: number): CurveStyle {
@@ -87,21 +107,15 @@
   }
 
   $effect(() => {
+    const themeOptions = readThemeOptions();
     const chart = createChart(chartContainer, {
       autoSize: true,
-      layout: {
-        attributionLogo: true,
-        background: { color: readColor('--color-surface') },
-        textColor: readColor('--color-text'),
-      },
-      grid: {
-        vertLines: { color: readColor('--color-border') },
-        horzLines: { color: readColor('--color-border') },
-      },
+      layout: { ...themeOptions.layout, attributionLogo: true },
+      grid: themeOptions.grid,
       timeScale: { timeVisible: true, secondsVisible: false },
     });
     // Added first, so the curves are drawn on top of the grey columns.
-    addInterruptionColumns(chart);
+    const coloredSeries = addInterruptionColumns(chart);
     curves.forEach((curve, curveIndex) => {
       const style = readCurveStyle(curveIndex);
       const lineSeries = chart.addSeries(LineSeries, {
@@ -114,9 +128,17 @@
         value: Number(point.equity_usd),
       }));
       lineSeries.setData(linePoints);
+      coloredSeries.push([lineSeries, style.colorVariable]);
     });
     chart.timeScale().fitContent();
+    const endColorSchemeWatch = watchColorScheme(() => {
+      chart.applyOptions(readThemeOptions());
+      for (const [series, colorVariable] of coloredSeries) {
+        series.applyOptions({ color: readColor(colorVariable) });
+      }
+    });
     return () => {
+      endColorSchemeWatch();
       chart.remove();
     };
   });

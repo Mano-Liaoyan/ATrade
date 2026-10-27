@@ -46,6 +46,13 @@ async function replaceCode(page: Page, code: string): Promise<void> {
 }
 
 test('shows the members of the NautilusTrader Strategy class as completions', async ({ page }, currentTest) => {
+  // The client writes each warning and error log of the language server to the console with the prefix "[lsp]".
+  const languageServerConsoleMessages: string[] = [];
+  page.on('console', (message) => {
+    if (message.text().startsWith('[lsp]')) {
+      languageServerConsoleMessages.push(message.text());
+    }
+  });
   await openNewStrategy(page, createUniqueName(currentTest, 'Completion'));
 
   await replaceCode(page, STRATEGY_CODE);
@@ -54,6 +61,7 @@ test('shows the members of the NautilusTrader Strategy class as completions', as
   await expect(page.getByRole('option', { name: 'subscribe_bars', exact: true })).toBeVisible({
     timeout: LANGUAGE_SERVER_TIMEOUT_MILLISECONDS,
   });
+  expect(languageServerConsoleMessages).toEqual([]);
 });
 
 test('shows type errors live and still saves the code', async ({ page }, currentTest) => {

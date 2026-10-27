@@ -1,4 +1,5 @@
-"""SQL for the record tables of a forward test: forward_test_fill and forward_test_equity_point (section 12.8).
+"""SQL for the record tables of a forward test: forward_test_fill and forward_test_equity_point (section 12.8), and
+forward_test_same_period_backtest (section 12.10).
 
 The DataActor in the child process writes them with a synchronous connection, because NautilusTrader calls `on_bar`
 synchronously. The Web process reads them with an asynchronous connection.
@@ -104,3 +105,27 @@ async def select_equity_curve(connection: psycopg.AsyncConnection, forward_test_
             {"forward_test_id": forward_test_id},
         )
         return await cursor.fetchall()
+
+
+async def insert_same_period_backtest(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, backtest_id: int
+) -> None:
+    await connection.execute(
+        """
+        INSERT INTO forward_test_same_period_backtest (forward_test_id, backtest_id)
+        VALUES (%(forward_test_id)s, %(backtest_id)s)
+        """,
+        {"forward_test_id": forward_test_id, "backtest_id": backtest_id},
+    )
+
+
+async def select_same_period_backtest_ids(connection: psycopg.AsyncConnection, forward_test_id: int) -> list[int]:
+    """The backtests of "Backtest the same period" for the forward test, newest first."""
+    cursor = await connection.execute(
+        """
+        SELECT backtest_id FROM forward_test_same_period_backtest
+        WHERE forward_test_id = %(forward_test_id)s ORDER BY backtest_id DESC
+        """,
+        {"forward_test_id": forward_test_id},
+    )
+    return [int(row[0]) for row in await cursor.fetchall()]
