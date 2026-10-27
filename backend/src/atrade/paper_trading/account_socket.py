@@ -30,8 +30,18 @@ class PaperAccountCheckMessage(BaseModel):
 
 
 class PaperAccountBalanceMessage(BaseModel):
+    """The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9)."""
+
     net_liquidation_usd: Decimal | None
     cash_usd: Decimal | None
+    base_currency: str | None
+    net_liquidation_base: Decimal | None
+    cash_base: Decimal | None
+    # USD for 1 unit of the base currency. 1 for a USD account.
+    usd_per_base_unit: Decimal | None
+    exchange_rate_source: Literal["base_currency_is_usd", "account", "ibkr_forex"] | None
+    # Why the USD values are missing, or None.
+    message: str | None
 
 
 class PositionMessage(BaseModel):
@@ -76,13 +86,20 @@ def convert_position(position: PortfolioPosition) -> PositionMessage:
     )
 
 
-def build_account_message(paper_account_monitor: PaperAccountMonitor) -> PaperAccountMessage:
+async def build_account_message(paper_account_monitor: PaperAccountMonitor) -> PaperAccountMessage:
     check = paper_account_monitor.read_check()
-    balance = paper_account_monitor.read_balance()
+    balance = await paper_account_monitor.read_balance()
     balance_message = None
     if balance is not None:
         balance_message = PaperAccountBalanceMessage(
-            net_liquidation_usd=balance.net_liquidation_usd, cash_usd=balance.cash_usd
+            net_liquidation_usd=balance.net_liquidation_usd,
+            cash_usd=balance.cash_usd,
+            base_currency=balance.base_currency,
+            net_liquidation_base=balance.net_liquidation_base,
+            cash_base=balance.cash_base,
+            usd_per_base_unit=balance.usd_per_base_unit,
+            exchange_rate_source=balance.exchange_rate_source,
+            message=balance.message,
         )
     return PaperAccountMessage(
         check=PaperAccountCheckMessage(
@@ -109,7 +126,7 @@ async def push_account_changes(websocket: WebSocket, paper_account_monitor: Pape
     sender = ChangedMessageSender(websocket)
     seconds_since_order_refresh = ORDER_REFRESH_INTERVAL_SECONDS
     while True:
-        await sender.send_if_changed(build_account_message(paper_account_monitor))
+        await sender.send_if_changed(await build_account_message(paper_account_monitor))
         if seconds_since_order_refresh >= ORDER_REFRESH_INTERVAL_SECONDS:
             seconds_since_order_refresh = 0.0
             orders_message = await read_orders_message(paper_account_monitor)

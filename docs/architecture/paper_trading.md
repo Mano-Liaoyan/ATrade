@@ -116,7 +116,8 @@ The public entry `atrade.paper_trading` exports:
 | `require_paper_account(*, settings, gateway_connection)` | Runs the 4 conditions of section 11.2 on the given connection. Returns the paper account number. Raises `PaperAccountCheckError` (a `PermissionError`) when a condition fails or the connection is not there. A forward test child passes its own connection. |
 | `PaperAccountCheck` | The result: `status` (`disconnected`, `passed`, `failed`), `message` (the reason of the failure), `actual_accounts`, `expected_account`. |
 | `PaperAccountMonitor` | The check result of the Web process in memory, the balance, and the positions. |
-| `fetch_paper_capital_usd(paper_account_monitor)` | The `NetLiquidation` value in USD of the paper account after a passed check. Otherwise `settings.local_paper_capital_usd`. |
+| `PaperAccountBalance` | The balance of `read_balance()` (section 11.9): `net_liquidation_usd`, `cash_usd`, `base_currency`, `net_liquidation_base`, `cash_base`, `usd_per_base_unit`, `exchange_rate_source`, `message`. |
+| `fetch_paper_capital_usd(paper_account_monitor)` | Async. The `NetLiquidation` value of the paper account in USD (section 11.9) after a passed check. Otherwise, and when no exchange rate is available, `settings.local_paper_capital_usd`. |
 | `create_paper_trading_router(*, paper_account_monitor, database_url, clock, find_blocking_forward_test)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. `find_blocking_forward_test(instrument)` returns a `BlockingForwardTest` (`forward_test_id`, `label`) or `None`. `app/web.py` makes it from `forward_test.find_forward_test_on_instrument()`, because `paper_trading` does not import `forward_test`. |
 | `PAPER_TRADING_SOCKET_MESSAGE_MODELS` | The models of `/ws/paper-trading` (`PaperAccountMessage`, `OpenOrdersMessage`, `HeartbeatMessage`) for the OpenAPI document. The frontend uses their generated types. |
 
@@ -141,9 +142,10 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   It raises `PaperAccountCheckError` when the result is not `passed`.
 - The balance and the positions come only after a passed check, and only for
   the checked account. The balance is the `NetLiquidation` and the
-  `TotalCashValue` account values in USD. ib_async keeps them and the
-  portfolio up to date, because it subscribes to the account updates of the
-  only managed account.
+  `TotalCashValue` account values, converted to USD (section 11.9).
+  `read_balance()` is async, because the conversion can read a rate from
+  IBKR. ib_async keeps the account values and the portfolio up to date,
+  because it subscribes to the account updates of the only managed account.
 - `app/web.py` creates one monitor. The FastAPI lifespan runs
   `keep_checking()` every 0.5 seconds, so that a failed check reaches the log
   also when no browser is open. Each read also runs the check when needed.
@@ -157,8 +159,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 | `{"type": "heartbeat"}` | After 10 seconds without another message. |
 
 - `check` has the fields of `PaperAccountCheck`.
-- `balance` has `net_liquidation_usd` and `cash_usd`. It is `null` when the
-  check did not pass.
+- `balance` has the fields of `PaperAccountBalance` (section 11.9). It is
+  `null` when the check did not pass.
 - Each position has `symbol`, `security_type`, `exchange`, `currency`,
   `quantity`, `average_cost`, `market_price`, `market_value`,
   `unrealized_pnl`. The list is empty when the check did not pass.
@@ -180,6 +182,12 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   `PAPER` mark, the check result, the balance, and the positions.
 - When the check fails, the panel shows the reason, the actual account, and
   the expected account.
+- The balance shows "Net liquidation (USD)" and "Cash (USD)". For a base
+  currency that is not USD, it also shows the net liquidation in the base
+  currency. A note "Balance currency" under the balance names the base
+  currency and the rate, for example "Base currency EUR. Converted to USD
+  with the IBKR EUR.USD rate: 1 EUR = 1.1139 USD." Without a rate, the note
+  shows the `message` of the balance and the USD values show `–`.
 - The panel uses `foundation/live_socket` for reconnection and heartbeat, and
   `foundation/scroll_region` for the position table (section 13). The table
   text wraps, so the table does not overflow to the side.
@@ -211,3 +219,37 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 - The Playwright test `frontend/e2e/paper_orders.spec.ts` sends an order
   through the dialog, cancels it, and checks the scroll track of the order
   list. The e2e server has 30 open orders of forward test 42.
+
+## 11.9 Balance in USD for any base currency
+
+ATrade keeps money in USD (section 10). The paper account of the owner has
+the base currency EUR, and IBKR does not let the owner change it. IBKR sends
+`NetLiquidation` and `TotalCashValue` only in the base currency.
+`PaperAccountMonitor.read_balance()` therefore converts them:
+
+1. The base currency is the currency of `NetLiquidation` (not `BASE` and
+   not empty). When IBKR also sends a USD value, ATrade uses USD.
+2. Base currency USD: no conversion. `exchange_rate_source` is
+   `base_currency_is_usd` and `usd_per_base_unit` is `1`.
+3. Else, when the account values have `ExchangeRate` or
+   `$LEDGER-ExchangeRate` for `USD` (base currency units for 1 USD; IBKR
+   sends it only when the ledger has USD), the rate is `1 / value`.
+   `exchange_rate_source` is `account`. Not seen on the real account yet
+   (section 21.1).
+4. Else, the IBKR forex rate `GatewayConnection.read_exchange_rate(base,
+   "USD")` (section 7.2). `exchange_rate_source` is `ibkr_forex`. The monitor
+   keeps the rate for 60 seconds, and reads it again after a new connection
+   or for a new base currency. A failed read is also kept for 60 seconds.
+5. Without a rate, the USD values are `None` and `message` says why, for
+   example "The paper account has the base currency EUR and IBKR sent no EUR
+   to USD exchange rate: ...".
+
+- A converted amount is rounded to the cent. A USD amount stays as IBKR sent
+  it.
+- Fail closed: without a USD value, a forward test does not start (exit code
+  3, "The paper account has no NetLiquidation value in USD." and the
+  `message`, section 12.8), and `fetch_paper_capital_usd()` returns the local
+  value. Orders by hand do not use the balance, so a missing rate does not
+  block them.
+- The balance shows the base currency values and the rate, so the user sees
+  what ATrade converted (section 11.7).

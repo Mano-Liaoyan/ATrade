@@ -4,6 +4,7 @@
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
+    describeBalanceCurrency,
     describePaperAccountCheck,
     formatAmount,
     PAPER_TRADING_SOCKET_PATH,
@@ -84,7 +85,21 @@
           <dt>Cash (USD)</dt>
           <dd>{formatAmount(account.balance.cash_usd)}</dd>
         </div>
+        {#if account.balance.base_currency !== null && account.balance.base_currency !== 'USD'}
+          <div>
+            <dt>Net liquidation ({account.balance.base_currency})</dt>
+            <dd>{formatAmount(account.balance.net_liquidation_base)}</dd>
+          </div>
+        {/if}
       </dl>
+      <p
+        class="balance-currency"
+        class:balance-failed={account.balance.usd_per_base_unit === null}
+        role="note"
+        aria-label="Balance currency"
+      >
+        {describeBalanceCurrency(account.balance)}
+      </p>
 
       <h3>Positions</h3>
       {#if account.positions.length === 0}
@@ -201,6 +216,16 @@
     flex-wrap: wrap;
     gap: 1.5rem;
     margin: 0;
+  }
+
+  .balance-currency {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+  }
+
+  .balance-failed {
+    color: var(--color-warning);
   }
 
   .balance dt {

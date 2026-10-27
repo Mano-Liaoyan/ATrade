@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from atrade.foundation.settings import Settings
+from atrade.ibkr import AccountValue
 from atrade.paper_trading import PaperAccountMonitor, fetch_paper_capital_usd, require_paper_account
 from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values
 
@@ -32,22 +33,46 @@ def make_gateway(managed_accounts: list[str], *, connected: bool) -> FakeGateway
     return gateway_connection
 
 
-def test_paper_capital_is_the_paper_account_balance_after_a_passed_check() -> None:
+@pytest.mark.anyio
+async def test_paper_capital_is_the_paper_account_balance_after_a_passed_check() -> None:
     monitor = make_monitor(make_gateway([ACCOUNT_ID], connected=True))
 
-    assert fetch_paper_capital_usd(monitor) == Decimal("123456.78")
+    assert await fetch_paper_capital_usd(monitor) == Decimal("123456.78")
 
 
-def test_paper_capital_is_the_local_value_when_the_gateway_is_not_connected() -> None:
+@pytest.mark.anyio
+async def test_paper_capital_is_the_local_value_when_the_gateway_is_not_connected() -> None:
     monitor = make_monitor(make_gateway([ACCOUNT_ID], connected=False))
 
-    assert fetch_paper_capital_usd(monitor) == Decimal(50000)
+    assert await fetch_paper_capital_usd(monitor) == Decimal(50000)
 
 
-def test_paper_capital_is_the_local_value_when_the_check_fails() -> None:
+@pytest.mark.anyio
+async def test_paper_capital_is_the_local_value_when_the_check_fails() -> None:
     monitor = make_monitor(make_gateway(["DU7654321"], connected=True))
 
-    assert fetch_paper_capital_usd(monitor) == Decimal(50000)
+    assert await fetch_paper_capital_usd(monitor) == Decimal(50000)
+
+
+@pytest.mark.anyio
+async def test_paper_capital_is_the_eur_balance_in_usd() -> None:
+    gateway_connection = make_gateway([ACCOUNT_ID], connected=True)
+    gateway_connection.account_values = [
+        AccountValue(account=ACCOUNT_ID, tag="NetLiquidation", value="1000.00", currency="EUR"),
+    ]
+    gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
+
+    assert await fetch_paper_capital_usd(make_monitor(gateway_connection)) == Decimal("1113.90")
+
+
+@pytest.mark.anyio
+async def test_paper_capital_is_the_local_value_without_an_exchange_rate() -> None:
+    gateway_connection = make_gateway([ACCOUNT_ID], connected=True)
+    gateway_connection.account_values = [
+        AccountValue(account=ACCOUNT_ID, tag="NetLiquidation", value="1000.00", currency="EUR"),
+    ]
+
+    assert await fetch_paper_capital_usd(make_monitor(gateway_connection)) == Decimal(50000)
 
 
 @pytest.mark.anyio

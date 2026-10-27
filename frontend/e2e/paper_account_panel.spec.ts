@@ -8,6 +8,7 @@ test('account panel shows the checked paper account and its balance', async ({ p
   const balance = page.getByRole('definition');
   await expect(balance.first()).toHaveText('101,234.50');
   await expect(balance.nth(1)).toHaveText('25,000.00');
+  await expect(page.getByRole('note', { name: 'Balance currency' })).toHaveText('Base currency USD.');
 });
 
 test('position table has a visible scroll track and its last row can be scrolled into view', async ({ page }) => {

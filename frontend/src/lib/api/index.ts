@@ -1272,12 +1272,27 @@ export interface components {
             /** Orders */
             orders: components["schemas"]["OpenOrderResponse"][];
         };
-        /** PaperAccountBalanceMessage */
+        /**
+         * PaperAccountBalanceMessage
+         * @description The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).
+         */
         PaperAccountBalanceMessage: {
             /** Net Liquidation Usd */
             net_liquidation_usd: string | null;
             /** Cash Usd */
             cash_usd: string | null;
+            /** Base Currency */
+            base_currency: string | null;
+            /** Net Liquidation Base */
+            net_liquidation_base: string | null;
+            /** Cash Base */
+            cash_base: string | null;
+            /** Usd Per Base Unit */
+            usd_per_base_unit: string | null;
+            /** Exchange Rate Source */
+            exchange_rate_source: ("base_currency_is_usd" | "account" | "ibkr_forex") | null;
+            /** Message */
+            message: string | null;
         };
         /** PaperAccountCheckMessage */
         PaperAccountCheckMessage: {

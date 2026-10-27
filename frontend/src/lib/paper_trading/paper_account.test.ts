@@ -1,11 +1,27 @@
 // Turns /ws/paper-trading messages into the text of the account panel.
 import { describe, expect, it } from 'vitest';
-import { describePaperAccountCheck, formatAmount, readPaperAccountMessage, type PaperAccountMessage } from './paper_account';
+import {
+  describeBalanceCurrency,
+  describePaperAccountCheck,
+  formatAmount,
+  readPaperAccountMessage,
+  type PaperAccountBalance,
+  type PaperAccountMessage,
+} from './paper_account';
 
 const passedMessage: PaperAccountMessage = {
   type: 'account',
   check: { status: 'passed', message: null, actual_accounts: ['DU1234567'], expected_account: 'DU1234567' },
-  balance: { net_liquidation_usd: '101234.5', cash_usd: '25000.00' },
+  balance: {
+    net_liquidation_usd: '101234.5',
+    cash_usd: '25000.00',
+    base_currency: 'USD',
+    net_liquidation_base: '101234.5',
+    cash_base: '25000.00',
+    usd_per_base_unit: '1',
+    exchange_rate_source: 'base_currency_is_usd',
+    message: null,
+  },
   positions: [],
 };
 
@@ -74,5 +90,48 @@ describe('formatAmount', () => {
 
   it('shows a dash for a missing amount', () => {
     expect(formatAmount(null)).toBe('–');
+  });
+});
+
+const eurBalance: PaperAccountBalance = {
+  net_liquidation_usd: '111390.00',
+  cash_usd: '89112.00',
+  base_currency: 'EUR',
+  net_liquidation_base: '100000.00',
+  cash_base: '80000.00',
+  usd_per_base_unit: '1.1139',
+  exchange_rate_source: 'ibkr_forex',
+  message: null,
+};
+
+describe('describeBalanceCurrency', () => {
+  it('names the base currency of a USD account', () => {
+    expect(describeBalanceCurrency({ ...eurBalance, base_currency: 'USD', usd_per_base_unit: '1', exchange_rate_source: 'base_currency_is_usd' })).toBe('Base currency USD.');
+  });
+
+  it('shows the IBKR forex rate that converted a EUR balance', () => {
+    expect(describeBalanceCurrency(eurBalance)).toBe(
+      'Base currency EUR. Converted to USD with the IBKR EUR.USD rate: 1 EUR = 1.1139 USD.',
+    );
+  });
+
+  it('shows the account exchange rate that converted a EUR balance', () => {
+    expect(describeBalanceCurrency({ ...eurBalance, usd_per_base_unit: '1.25', exchange_rate_source: 'account' })).toBe(
+      'Base currency EUR. Converted to USD with the exchange rate of the IBKR account: 1 EUR = 1.25 USD.',
+    );
+  });
+
+  it('shows why the USD values are missing', () => {
+    const message = 'The paper account has the base currency EUR and IBKR sent no EUR to USD exchange rate: timeout';
+    expect(
+      describeBalanceCurrency({
+        ...eurBalance,
+        net_liquidation_usd: null,
+        cash_usd: null,
+        usd_per_base_unit: null,
+        exchange_rate_source: null,
+        message,
+      }),
+    ).toBe(message);
   });
 });

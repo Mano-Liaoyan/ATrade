@@ -2,10 +2,10 @@
 
 Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
 `instruments`, `search_error_message`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
-`cancel_error_message`, `executions`,
+`cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`,
 `live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
-`historical_bar_requests`, `live_bar_subscriptions`, and `active_live_bar_stream_count`. No mock library is used
-(section 17.3).
+`historical_bar_requests`, `exchange_rate_requests`, `live_bar_subscriptions`, and `active_live_bar_stream_count`.
+No mock library is used (section 17.3).
 """
 
 from collections.abc import AsyncGenerator
@@ -116,6 +116,12 @@ class FakeGatewayConnection:
         # Each call of stream_live_bars, in order, and the number of streams that did not end yet.
         self.live_bar_subscriptions: list[LiveBarSubscription] = []
         self.active_live_bar_stream_count = 0
+        # The IBKR forex rates: (currency, quote currency) -> quote currency units for 1 currency unit.
+        self.exchange_rates: dict[tuple[str, str], Decimal] = {}
+        # When it is set, read_exchange_rate fails with this message, like missing forex market data.
+        self.exchange_rate_error_message: str | None = None
+        # Each call of read_exchange_rate, in order.
+        self.exchange_rate_requests: list[tuple[str, str]] = []
         self.connection_number = 0
         self._connected = False
 
@@ -267,6 +273,19 @@ class FakeGatewayConnection:
             raise GatewayRequestError(message)
         finally:
             self.active_live_bar_stream_count -= 1
+
+    async def read_exchange_rate(self, currency: str, quote_currency: str) -> Decimal:
+        if not self.connected:
+            message = "ATrade is not connected to IB Gateway."
+            raise GatewayRequestError(message)
+        self.exchange_rate_requests.append((currency, quote_currency))
+        if self.exchange_rate_error_message is not None:
+            raise GatewayRequestError(self.exchange_rate_error_message)
+        rate = self.exchange_rates.get((currency, quote_currency))
+        if rate is None:
+            message = f"IBKR has no {currency} to {quote_currency} exchange rate."
+            raise GatewayRequestError(message)
+        return rate
 
     def disconnect(self) -> None:
         self.connected = False

@@ -79,8 +79,8 @@ def create_paper_trading_router(
     add_order_routes(router, routes)
 
     @router.get("/api/paper-trading/paper-capital")
-    def read_paper_capital() -> PaperCapitalResponse:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
-        return PaperCapitalResponse(paper_capital_usd=fetch_paper_capital_usd(paper_account_monitor))
+    async def read_paper_capital() -> PaperCapitalResponse:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
+        return PaperCapitalResponse(paper_capital_usd=await fetch_paper_capital_usd(paper_account_monitor))
 
     router.include_router(create_account_socket_router(paper_account_monitor=paper_account_monitor))
 

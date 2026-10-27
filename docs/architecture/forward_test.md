@@ -198,10 +198,13 @@ Implementation (#77):
     bar before the strategy, so a fill at a bar close counts in the equity
     from the next bar on.
   - The equity starts at `start_balance_usd`, not at the paper account
-    balance. Other positions of the paper account do not change it. A child
-    that has no `NetLiquidation` value in USD at the first start writes "The
-    paper account has no NetLiquidation value in USD." and ends with exit
-    code 3 before the `LiveNode` starts.
+    balance. Other positions of the paper account do not change it. The
+    start balance is `NetLiquidation` converted to USD (section 11.9 of
+    `paper_trading.md`). A child that has no `NetLiquidation` value in USD at
+    the first start, for example a EUR account without an exchange rate,
+    writes "The paper account has no NetLiquidation value in USD." and the
+    reason of the balance, and ends with exit code 3 before the `LiveNode`
+    starts.
 - Tables (migration `3e7a1c5d9b78_forward_test_create_record_tables.py`,
   `ON DELETE CASCADE` from `forward_test`). Each insert has
   `ON CONFLICT DO NOTHING`, so a restart that reads a fill or a bar again
@@ -326,7 +329,7 @@ interruption does nothing.
   only `desired_state`. The worker writes `status`, `client_id`,
   `crash_count`, `stopped_at_utc`, and the `crash` and `worker_restart`
   interruptions. The child writes `start_balance_usd` (the
-  `NetLiquidation` in USD after the paper account check, only the first
+  `NetLiquidation` converted to USD after the paper account check, only the first
   value), `error_message`, the `gateway` interruptions, and two statuses:
   `waiting_for_gateway` (only from `starting`, `running`, or
   `waiting_for_gateway`) and `running` at the `LiveNode` start (only from
