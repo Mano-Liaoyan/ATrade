@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_access import check_backtest_request
+from atrade.backtest.backtest_access import check_backtest_request, check_saved_bars
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -173,6 +173,10 @@ class BacktestRoutes:
         if strategy_version is None:
             detail = f"Strategy version {request.strategy_version_id} does not exist."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
+        missing_bars = await check_saved_bars(database_url=self.database_url, request=backtest_request)
+        if missing_bars is not None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_bars)
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             row = await backtest_store.insert_backtest(
                 connection, request=backtest_request, created_at_utc=self.clock.read_now_utc()

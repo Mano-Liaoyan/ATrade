@@ -10,6 +10,7 @@ import psycopg
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
+from atrade.market_data import BarRequest, has_saved_bars
 
 # A backtest has no exchange rates, so the paper capital in USD can only buy USD instruments.
 SUPPORTED_CURRENCY = "USD"
@@ -36,6 +37,28 @@ def check_backtest_request(request: BacktestRequest) -> str | None:
     if request.time_range.end_utc <= request.time_range.start_utc:
         return "The time range must end after it starts."
     return None
+
+
+def describe_missing_bars(request: BacktestRequest) -> str:
+    """The message of a backtest without saved bars: the HTTP route refuses it with it, and the child fails with it."""
+    instrument = request.instrument
+    return (
+        f"PostgreSQL has no saved {request.bar_period.value} bars of {instrument.symbol} / {instrument.exchange}"
+        f" / {instrument.currency} from {request.time_range.start_utc.isoformat()}"
+        f" to {request.time_range.end_utc.isoformat()}. Open the bar chart of the instrument to load bars from IBKR."
+    )
+
+
+async def check_saved_bars(*, database_url: str, request: BacktestRequest) -> str | None:
+    """Returns why a backtest cannot run on the saved bars, or None. At least one saved bar in the range is enough:
+    a backtest can start before the first saved bar or end after the last one (docs/architecture/backtest.md 10.1).
+    """
+    bar_request = BarRequest(
+        instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
+    )
+    if await has_saved_bars(database_url=database_url, bar_request=bar_request):
+        return None
+    return describe_missing_bars(request)
 
 
 async def queue_backtest(*, database_url: str, request: BacktestRequest, created_at_utc: datetime) -> int:

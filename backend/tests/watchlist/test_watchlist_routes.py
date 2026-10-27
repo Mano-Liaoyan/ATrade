@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import httpx
+import psycopg
 import pytest
 
 from atrade.app.web import create_web_app
@@ -44,10 +45,42 @@ async def test_lists_added_instruments_in_the_order_of_adding(
     assert list_response.status_code == 200
     assert list_response.json() == {
         "instruments": [
-            {"id": tencent_response.json()["id"], **TENCENT, "added_at_utc": ADDED_AT_UTC},
-            {"id": apple_response.json()["id"], **APPLE, "added_at_utc": ADDED_AT_UTC},
+            {"id": tencent_response.json()["id"], **TENCENT, "added_at_utc": ADDED_AT_UTC, "saved_bars": []},
+            {"id": apple_response.json()["id"], **APPLE, "added_at_utc": ADDED_AT_UTC, "saved_bars": []},
         ]
     }
+
+
+def save_bars(database_url: str, instrument: dict[str, str], bar_period: str, starts_utc: list[str]) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s, 100, 101, 99, 100, 1000)
+            """,
+            [{**instrument, "bar_period": bar_period, "start_utc": start_utc} for start_utc in starts_utc],
+        )
+
+
+@pytest.mark.anyio
+async def test_lists_the_saved_bars_of_each_instrument_for_each_bar_period(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    save_bars(database_url, APPLE, "1-DAY", ["2026-03-03T00:00:00Z", "2026-03-02T00:00:00Z", "2026-03-04T00:00:00Z"])
+    save_bars(database_url, APPLE, "1-HOUR", ["2026-03-02T14:00:00Z"])
+    # Bars of the same symbol on another exchange are not bars of the watchlist instrument.
+    save_bars(database_url, {**APPLE, "exchange": "100"}, "5-MINUTE", ["2026-03-02T14:00:00Z"])
+    async with create_watchlist_client(database_url, clock, frontend_build_dir, create_connected_fake()) as client:
+        await client.post(WATCHLIST_PATH, json=TENCENT)
+        await client.post(WATCHLIST_PATH, json=APPLE)
+        list_response = await client.get(WATCHLIST_PATH)
+
+    tencent, apple = list_response.json()["instruments"]
+    assert tencent["saved_bars"] == []
+    assert apple["saved_bars"] == [
+        {"bar_period": "1-HOUR", "first_start_utc": "2026-03-02T14:00:00Z", "last_start_utc": "2026-03-02T14:00:00Z"},
+        {"bar_period": "1-DAY", "first_start_utc": "2026-03-02T00:00:00Z", "last_start_utc": "2026-03-04T00:00:00Z"},
+    ]
 
 
 @pytest.mark.anyio

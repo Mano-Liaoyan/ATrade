@@ -5,6 +5,8 @@ from pathlib import Path
 import httpx
 import pytest
 
+from tests.backtest.real_runner import save_test_bars
+
 TEST_STRATEGY_FILE = Path(__file__).parent / "strategies" / "buy_and_sell_by_bar_count.py"
 
 
@@ -81,7 +83,63 @@ async def test_rejects_backtest_with_a_time_range_that_ends_before_it_starts(web
 
 
 @pytest.mark.anyio
-async def test_new_backtest_waits_in_the_queue(web_client: httpx.AsyncClient) -> None:
+async def test_rejects_backtest_without_saved_bars_in_the_time_range(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    saved = await save_test_strategy_version(web_client)
+    # The test bars are from 2026-03-02 to 2026-03-21. The exchange is not the exchange of the saved bars.
+    request = {**make_backtest_request(saved["strategy_version_id"]), "exchange": "100"}
+
+    response = await web_client.post("/api/backtests", json=request)
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "PostgreSQL has no saved 1-DAY bars of BTEST / 100 / USD from 2026-03-01T00:00:00+00:00"
+        " to 2026-04-01T00:00:00+00:00. Open the bar chart of the instrument to load bars from IBKR."
+    }
+    assert (await web_client.get("/api/backtests")).json() == []
+
+
+@pytest.mark.anyio
+async def test_rejects_backtest_with_a_time_range_before_the_saved_bars(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    saved = await save_test_strategy_version(web_client)
+    request = {
+        **make_backtest_request(saved["strategy_version_id"]),
+        "start_utc": "2026-02-01T00:00:00Z",
+        "end_utc": "2026-03-02T00:00:00Z",
+    }
+
+    response = await web_client.post("/api/backtests", json=request)
+
+    assert response.status_code == 422
+    assert (await web_client.get("/api/backtests")).json() == []
+
+
+@pytest.mark.anyio
+async def test_accepts_backtest_with_saved_bars_in_only_a_part_of_the_time_range(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    saved = await save_test_strategy_version(web_client)
+    # Only the last test bar (2026-03-21) is in the range. One saved bar is enough (docs/architecture/backtest.md 10.1).
+    request = {
+        **make_backtest_request(saved["strategy_version_id"]),
+        "start_utc": "2026-03-21T00:00:00Z",
+        "end_utc": "2026-06-01T00:00:00Z",
+    }
+
+    response = await web_client.post("/api/backtests", json=request)
+
+    assert response.status_code == 201
+
+
+@pytest.mark.anyio
+async def test_new_backtest_waits_in_the_queue(web_client: httpx.AsyncClient, database_url: str) -> None:
+    save_test_bars(database_url)
     saved = await save_test_strategy_version(web_client)
 
     response = await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))
@@ -109,7 +167,10 @@ async def test_missing_backtest_is_not_found(web_client: httpx.AsyncClient) -> N
 
 
 @pytest.mark.anyio
-async def test_strategy_that_a_backtest_uses_cannot_be_deleted(web_client: httpx.AsyncClient) -> None:
+async def test_strategy_that_a_backtest_uses_cannot_be_deleted(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
     saved = await save_test_strategy_version(web_client)
     await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))
 

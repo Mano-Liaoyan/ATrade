@@ -1019,6 +1019,23 @@ export interface components {
             /** Code */
             code: string;
         };
+        /**
+         * SavedBarsResponse
+         * @description The saved bars of one bar period: the start of the first and of the last saved bar.
+         */
+        SavedBarsResponse: {
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * First Start Utc
+             * Format: date-time
+             */
+            first_start_utc: string;
+            /**
+             * Last Start Utc
+             * Format: date-time
+             */
+            last_start_utc: string;
+        };
         /** SendOrderRequest */
         SendOrderRequest: {
             /** Symbol */
@@ -1192,6 +1209,8 @@ export interface components {
              * Format: date-time
              */
             added_at_utc: string;
+            /** Saved Bars */
+            saved_bars: components["schemas"]["SavedBarsResponse"][];
         };
         /** WatchlistResponse */
         WatchlistResponse: {

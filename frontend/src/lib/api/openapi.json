@@ -2992,6 +2992,31 @@
         ],
         "title": "SaveVersionRequest"
       },
+      "SavedBarsResponse": {
+        "properties": {
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "first_start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Start Utc"
+          },
+          "last_start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Start Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bar_period",
+          "first_start_utc",
+          "last_start_utc"
+        ],
+        "title": "SavedBarsResponse",
+        "description": "The saved bars of one bar period: the start of the first and of the last saved bar."
+      },
       "SendOrderRequest": {
         "properties": {
           "symbol": {
@@ -3437,6 +3462,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Added At Utc"
+          },
+          "saved_bars": {
+            "items": {
+              "$ref": "#/components/schemas/SavedBarsResponse"
+            },
+            "type": "array",
+            "title": "Saved Bars"
           }
         },
         "type": "object",
@@ -3445,7 +3477,8 @@
           "symbol",
           "exchange",
           "currency",
-          "added_at_utc"
+          "added_at_utc",
+          "saved_bars"
         ],
         "title": "WatchlistInstrumentResponse"
       },

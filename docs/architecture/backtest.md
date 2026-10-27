@@ -24,6 +24,20 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
   because the NautilusTrader backtest engine blocks the event loop.
 - In NautilusTrader 2.0, `BarDataWrangler` takes Arrow bytes, not a
   DataFrame. The child converts the bars from PostgreSQL to Arrow.
+- A backtest needs saved bars. `POST /api/backtests` refuses (`422`, no
+  row) a request when PostgreSQL has no saved bar of the instrument and bar
+  period that starts in the time range. The message is the same message as
+  the child failure ("PostgreSQL has no saved ... Open the bar chart of the
+  instrument to load bars from IBKR."). Partial coverage is allowed: one
+  saved bar in the range is enough. The range can start before the first
+  saved bar or end after the last one, and the backtest runs on the saved
+  bars only. The check uses `has_saved_bars()` of `market_data`, which
+  selects the same rows as `read_saved_bars()` (`bar.start_utc` in
+  `[start_utc, end_utc)`).
+- The backtest form offers only watchlist instruments with saved bars of the
+  selected bar period (section 10.6). It has no free-text symbol, exchange,
+  or currency fields, so a request cannot name an instrument that has no
+  bars by a typing error.
 - The isolation goal is to prevent accidents, not to stop hostile code. Only
   one user writes strategies.
 
@@ -75,7 +89,8 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 
 ## 10.3 Run flow
 
-1. `POST /api/backtests` checks the request and adds a `queued` row.
+1. `POST /api/backtests` checks the request, checks that saved bars exist in
+   the range (section 10.1), and adds a `queued` row.
 2. The backtest runner of the Web process (`backtest/backtest_runner.py`)
    checks the queue every 0.5 seconds. It reads the backtest limits from
    `backtest_limits`. While fewer backtests run than the
@@ -111,7 +126,9 @@ Failures that the user sees in `error_message`:
   writes `ERROR` log lines to a file. When the file is not empty, the backtest
   fails with its content.
 - No saved bars in the range: a message that tells the user to open the bar
-  chart of the instrument, which loads the bars from IBKR.
+  chart of the instrument, which loads the bars from IBKR. The start route
+  refuses such a request first. The child checks again, because it reads the
+  bars after the request is queued.
 - A Web restart during a run: the runner sets the `running` backtests to
   `failed` at start, because their children ended with the old process.
 
@@ -160,7 +177,7 @@ clock)`, `BacktestRunner(*, database_url, clock, process_command)` with
 
 | Route | Behavior |
 |---|---|
-| `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the currency is not USD, or the strategy version does not exist. |
+| `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the currency is not USD, the strategy version does not exist, or PostgreSQL has no saved bar of the instrument and bar period in the range (section 10.1). |
 | `GET /api/backtests` | `200` with all backtests, the newest first. |
 | `GET /api/backtest-limits` | `200` with `{"timeout_seconds", "concurrency"}`. The defaults are `7200` and `1`. |
 | `PUT /api/backtest-limits` | Body `{"timeout_seconds", "concurrency"}`. `200` with the saved limits. `422` when `timeout_seconds` is not from 1 to 604800 or `concurrency` is not from 1 to 16. |
@@ -182,8 +199,18 @@ the backtest finishes). Money values and percents are decimal strings.
   the trade table are in `ScrollRegion`s.
 - `/backtests` has the form and the list of backtests. The form combines the
   strategy versions (`#lib/strategy`), the bar periods (`#lib/market_data`),
-  and the default paper capital (`readPaperCapital()` of
-  `#lib/paper_trading`). Dates are days in UTC.
+  the watchlist instruments with saved bars (`#lib/watchlist`), and the
+  default paper capital (`readPaperCapital()` of `#lib/paper_trading`).
+  Dates are days in UTC.
+- The "Instrument" select offers the watchlist instruments that have saved
+  bars of the selected bar period (`selectInstrumentsWithSavedBars()`), as
+  `<symbol> / <exchange> / <currency>`. The `saved_bars` field of
+  `GET /api/watchlist` gives the bar periods with saved bars
+  (`docs/architecture/market_data.md` section 8.3). The status "Saved bars"
+  shows the first and the last saved bar of the selected instrument
+  (`describeSavedBars()`). When no watchlist instrument has saved bars of the
+  bar period, the select is disabled and the status links to the watchlist
+  on the home page: the bar chart of a watchlist instrument saves its bars.
 - `/backtests` also has the "Limits" form (`BacktestLimitsForm`). It shows
   the timeout in minutes (`formatTimeoutMinutes`) and takes only whole
   minutes (`convertTimeoutMinutesToSeconds`). The client functions are

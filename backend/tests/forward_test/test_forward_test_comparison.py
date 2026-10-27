@@ -310,6 +310,15 @@ async def test_an_interruption_that_still_lasts_ends_now_on_the_chart(
 @pytest.mark.anyio
 async def test_a_backtest_of_another_instrument_is_refused(web_client: httpx.AsyncClient, database_url: str) -> None:
     forward_test = await start_forward_test(web_client)
+    # The start route refuses a backtest without saved bars, so the other instrument gets one saved bar.
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES ('MSFT', 'NASDAQ', 'USD', '1-MINUTE', %(start_utc)s, 100, 101, 99, 100, 1000)
+            """,
+            {"start_utc": make_minute(5)},
+        )
     other_backtest = await web_client.post(
         "/api/backtests",
         json={

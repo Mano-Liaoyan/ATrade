@@ -11,6 +11,7 @@ from pathlib import Path
 import psycopg
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_access import describe_missing_bars
 from atrade.backtest.backtest_metrics import calculate_equity_curve, calculate_metrics
 from atrade.backtest.backtest_store import BacktestRequest, BacktestResult
 from atrade.backtest.strategy_engine_run import StrategyFailedError, run_strategy_on_bars
@@ -48,15 +49,6 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
         ),
     )
     return BacktestInputs(request=request, code=strategy_version.code, bars=bars)
-
-
-def describe_missing_bars(request: BacktestRequest) -> str:
-    instrument = request.instrument
-    return (
-        f"PostgreSQL has no saved {request.bar_period.value} bars of {instrument.symbol} / {instrument.exchange}"
-        f" / {instrument.currency} from {request.time_range.start_utc.isoformat()}"
-        f" to {request.time_range.end_utc.isoformat()}. Open the bar chart of the instrument to load bars from IBKR."
-    )
 
 
 @dataclass(frozen=True)

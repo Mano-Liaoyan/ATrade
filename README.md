@@ -80,9 +80,11 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   (default 120 minutes) and the number of backtests at the same time
   (default 1). Other backtests wait in the queue. A backtest that runs longer
   than the timeout stops with the status "Timed out". The backtest page shows the status, the
-  strategy error, the metrics, the equity curve, and the trades. Open the
-  bar chart of the instrument first: backtests read only bars that are in
-  PostgreSQL. See
+  strategy error, the metrics, the equity curve, and the trades. Backtests
+  read only bars that are in PostgreSQL. Add the instrument to the watchlist
+  and open its bar chart first: the form offers only watchlist instruments
+  with saved bars of the selected bar period, and `POST /api/backtests`
+  refuses a time range without saved bars (`422`). See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
 - Backtest comparison: the list on `/backtests` shows the metrics of all
   backtests side by side. Select 2 backtests of the same strategy and click

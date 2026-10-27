@@ -1,5 +1,7 @@
 <!-- Backtests: the form that starts a backtest, and the list of backtests with their metrics side by side. The form
-     combines strategy versions (strategy), bar periods (market_data), and the paper capital (paper_trading). The user
+     combines strategy versions (strategy), bar periods (market_data), watchlist instruments with saved bars
+     (watchlist), and the paper capital (paper_trading). A backtest reads only saved bars, so the form offers only
+     instruments with saved bars of the selected bar period (docs/architecture/backtest.md section 10.6). The user
      selects 2 backtests of the same strategy in the list to compare them (docs/architecture section 9.5). -->
 <script lang="ts">
   import { goto } from '$app/navigation';
@@ -19,6 +21,14 @@
   import { BAR_PERIODS, DEFAULT_BAR_PERIOD, type BarPeriod } from '#lib/market_data';
   import { readPaperCapital } from '#lib/paper_trading';
   import {
+    describeSavedBars,
+    findSavedBars,
+    formatWatchlistInstrument,
+    listWatchlist,
+    selectInstrumentsWithSavedBars,
+    type WatchlistInstrument,
+  } from '#lib/watchlist';
+  import {
     formatVersionLabel,
     listStrategies,
     readStrategy,
@@ -30,10 +40,18 @@
   let selectedStrategy = $state<StrategyDetail | null>(null);
   let strategyId = $state('');
   let strategyVersionId = $state('');
-  let symbol = $state('');
-  let exchange = $state('');
-  let currency = $state('USD');
+  let watchlistInstruments: WatchlistInstrument[] = $state([]);
+  let watchlistMessage = $state('Loading the watchlist.');
+  let watchlistInstrumentId = $state('');
   let barPeriod = $state<BarPeriod>(DEFAULT_BAR_PERIOD);
+  const barPeriodLabel = $derived(BAR_PERIODS.find((period) => period.value === barPeriod)?.label ?? barPeriod);
+  const instrumentChoices = $derived(selectInstrumentsWithSavedBars(watchlistInstruments, barPeriod));
+  const selectedInstrument = $derived(
+    instrumentChoices.find((instrument) => String(instrument.id) === watchlistInstrumentId),
+  );
+  const selectedSavedBars = $derived(
+    selectedInstrument === undefined ? undefined : findSavedBars(selectedInstrument, barPeriod),
+  );
   let startDate = $state('');
   let endDate = $state('');
   let paperCapitalUsd = $state('');
@@ -67,6 +85,14 @@
         strategies = result.value;
       }
     });
+    void listWatchlist(fetch).then((result) => {
+      if (result.kind === 'ok') {
+        watchlistInstruments = result.value;
+        watchlistMessage = '';
+      } else {
+        watchlistMessage = result.message;
+      }
+    });
     void readPaperCapital(fetch).then((paperCapital) => {
       paperCapitalUsd = paperCapital ?? '';
     });
@@ -75,6 +101,13 @@
         backtests = result.value;
       }
     });
+  });
+
+  // A change of the bar period can remove the selected instrument from the choices.
+  $effect(() => {
+    if (watchlistInstrumentId !== '' && selectedInstrument === undefined) {
+      watchlistInstrumentId = '';
+    }
   });
 
   async function selectStrategy(): Promise<void> {
@@ -95,13 +128,16 @@
 
   async function submitBacktest(event: SubmitEvent): Promise<void> {
     event.preventDefault();
+    if (selectedInstrument === undefined) {
+      return;
+    }
     isStarting = true;
     errorMessage = '';
     const result = await startBacktest(fetch, {
       strategy_version_id: Number(strategyVersionId),
-      symbol: symbol.trim().toUpperCase(),
-      exchange: exchange.trim().toUpperCase(),
-      currency: currency.trim().toUpperCase(),
+      symbol: selectedInstrument.symbol,
+      exchange: selectedInstrument.exchange,
+      currency: selectedInstrument.currency,
       bar_period: barPeriod,
       start_utc: convertDateToUtcStart(startDate),
       end_utc: convertDateToUtcStart(endDate),
@@ -140,18 +176,6 @@
     </select>
   </div>
   <label>
-    Symbol
-    <input bind:value={symbol} required maxlength="32" />
-  </label>
-  <label>
-    Exchange
-    <input bind:value={exchange} required maxlength="32" />
-  </label>
-  <label>
-    Currency
-    <input bind:value={currency} required maxlength="32" />
-  </label>
-  <label>
     Bar period
     <select bind:value={barPeriod}>
       {#each BAR_PERIODS as period (period.value)}
@@ -159,6 +183,32 @@
       {/each}
     </select>
   </label>
+  <div class="field">
+    <label for="backtest-instrument">Instrument</label>
+    <select
+      id="backtest-instrument"
+      bind:value={watchlistInstrumentId}
+      disabled={instrumentChoices.length === 0}
+      required
+    >
+      <option value="">Select an instrument</option>
+      {#each instrumentChoices as instrument (instrument.id)}
+        <option value={String(instrument.id)}>{formatWatchlistInstrument(instrument)}</option>
+      {/each}
+    </select>
+  </div>
+  <p class="form-note" role="status" aria-label="Saved bars">
+    {#if watchlistMessage !== ''}
+      {watchlistMessage}
+    {:else if instrumentChoices.length === 0}
+      No watchlist instrument has saved {barPeriodLabel} bars. Add an instrument to the
+      <a href={resolve('/')}>watchlist</a> and open its bar chart: the chart saves the bars.
+    {:else if selectedSavedBars !== undefined}
+      {describeSavedBars(selectedSavedBars)}
+    {:else}
+      The instruments are watchlist instruments with saved {barPeriodLabel} bars.
+    {/if}
+  </p>
   <label>
     Start date (UTC)
     <input type="date" bind:value={startDate} required />
@@ -257,6 +307,12 @@
 
   .error {
     color: var(--color-warning);
+  }
+
+  .form-note {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--color-muted);
   }
 
   .comparison-bar {

@@ -10,6 +10,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection
 from atrade.market_data import bar_store
+from atrade.market_data.bar_store import SavedBarCoverage
 
 
 class GatewayNotConnectedError(Exception):
@@ -84,3 +85,17 @@ async def read_saved_bars(*, database_url: str, bar_request: BarRequest) -> list
         return await bar_store.select_bars(
             connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range
         )
+
+
+async def has_saved_bars(*, database_url: str, bar_request: BarRequest) -> bool:
+    """True when PostgreSQL holds at least one bar that `read_saved_bars` would return. It never calls IBKR."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        return await bar_store.has_bars(
+            connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range
+        )
+
+
+async def read_saved_bar_coverage(*, database_url: str, instrument: Instrument) -> list[SavedBarCoverage]:
+    """The bar periods of `instrument` that have saved bars, with the first and the last saved bar. No IBKR call."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        return await bar_store.select_saved_bar_coverage(connection, instrument)

@@ -1,15 +1,20 @@
 // Backtest: start a backtest of the template strategy on saved bars and see its result. The bar chart saves the
 // bars first: the IBKR fake of backend/tests/e2e_server.py has one daily bar for each day, with saw-tooth prices.
+// The form offers only watchlist instruments with saved bars of the selected bar period.
 import { expect, test } from '@playwright/test';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
 
-test('starts a backtest and sees its metrics, equity curve, and trades', async ({ page }, currentTest) => {
+test('starts a backtest and sees its metrics, equity curve, and trades', async ({ page, request }, currentTest) => {
   test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
   // The chart saves the daily bars from 2023-01-02 to 2026-01-01 in PostgreSQL. Backtests read only saved bars.
   await page.goto('/instruments/NASDAQ/AAPL?currency=USD&bar_period=1-DAY');
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
+  // The browser projects share one database: another project can add AAPL first (409).
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const watchlistResponse = await request.post('/api/watchlist', { data: { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' } });
+  expect([201, 409]).toContain(watchlistResponse.status());
   // The e2e database is not cleared between tests and browser projects, so the strategy name is unique.
   const strategyName = `Backtest ${currentTest.project.name} ${String(Date.now())}`;
   await page.goto('/strategies');
@@ -22,9 +27,12 @@ test('starts a backtest and sees its metrics, equity curve, and trades', async (
   await expect(page.getByLabel('Paper capital (USD)')).toHaveValue('101234.50');
   await page.getByLabel('Strategy', { exact: true }).selectOption({ label: strategyName });
   await expect(page.getByLabel('Strategy version')).toHaveValue(/\d+/);
-  await page.getByLabel('Symbol').fill('AAPL');
-  await page.getByLabel('Exchange').fill('NASDAQ');
+  await expect(page.getByLabel('Symbol')).toHaveCount(0);
   await page.getByLabel('Bar period').selectOption('1-DAY');
+  await page.getByLabel('Instrument', { exact: true }).selectOption({ label: 'AAPL / NASDAQ / USD' });
+  await expect(page.getByRole('status', { name: 'Saved bars' })).toHaveText(
+    'Saved bars start from 2023-01-02 00:00:00 UTC to 2026-01-01 00:00:00 UTC.',
+  );
   await page.getByLabel('Start date (UTC)').fill('2023-01-02');
   await page.getByLabel('End date (UTC)').fill('2026-01-01');
   await page.getByRole('button', { name: 'Start backtest' }).click();
@@ -52,4 +60,18 @@ test('starts a backtest and sees its metrics, equity curve, and trades', async (
 
   await expect(lastRow).toBeInViewport();
   await expect(track).toHaveAttribute('aria-valuenow', '100');
+});
+
+test('shows how to save bars when no watchlist instrument has saved bars', async ({ page }) => {
+  await page.route('**/api/watchlist', (route) => route.fulfill({ json: { instruments: [] } }));
+
+  await page.goto('/backtests');
+
+  await expect(page.getByLabel('Instrument', { exact: true })).toBeDisabled();
+  const emptyState = page.getByRole('status', { name: 'Saved bars' });
+  await expect(emptyState).toHaveText(
+    'No watchlist instrument has saved 1 day bars. Add an instrument to the watchlist and open its bar chart: the chart saves the bars.',
+  );
+  await emptyState.getByRole('link', { name: 'watchlist' }).click();
+  await expect(page).toHaveURL(/\/$/);
 });

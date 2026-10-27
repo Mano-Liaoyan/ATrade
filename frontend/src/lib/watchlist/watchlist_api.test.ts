@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { addToWatchlist, deleteFromWatchlist, listWatchlist } from './index';
 
-const TENCENT = { id: 7, symbol: '700', exchange: 'SEHK', currency: 'HKD', added_at_utc: '2026-01-02T03:04:05Z' };
+const TENCENT = { id: 7, symbol: '700', exchange: 'SEHK', currency: 'HKD', added_at_utc: '2026-01-02T03:04:05Z', saved_bars: [] };
 
 interface RecordedRequest {
   url: string;

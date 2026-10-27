@@ -11,6 +11,22 @@ from atrade.foundation.instrument import Instrument
 
 
 @dataclass(frozen=True)
+class SavedBarCoverage:
+    """The first and the last saved bar of one instrument and one bar period."""
+
+    bar_period: BarPeriod
+    first_start_utc: datetime
+    last_start_utc: datetime
+
+
+@dataclass(frozen=True)
+class SavedBarCoverageRow:
+    bar_period: str
+    first_start_utc: datetime | None
+    last_start_utc: datetime | None
+
+
+@dataclass(frozen=True)
 class SavedRangeRow:
     start_utc: datetime
     end_utc: datetime
@@ -44,6 +60,65 @@ async def select_bars(
             },
         )
         return await cursor.fetchall()
+
+
+async def has_bars(
+    connection: psycopg.AsyncConnection, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+) -> bool:
+    """True when at least one bar starts in `time_range`. The same rows as `select_bars`, without reading them."""
+    async with connection.cursor() as cursor:
+        await cursor.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM bar
+                WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
+                    AND bar_period = %(bar_period)s AND start_utc >= %(start_utc)s AND start_utc < %(end_utc)s
+            )
+            """,
+            {
+                **create_key_parameters(instrument, bar_period),
+                "start_utc": time_range.start_utc,
+                "end_utc": time_range.end_utc,
+            },
+        )
+        row = await cursor.fetchone()
+    return row is not None and bool(row[0])
+
+
+async def select_saved_bar_coverage(
+    connection: psycopg.AsyncConnection, instrument: Instrument
+) -> list[SavedBarCoverage]:
+    """Returns the bar periods that have saved bars, in the order of BarPeriod. min() and max() use the primary key."""
+    async with connection.cursor(row_factory=class_row(SavedBarCoverageRow)) as cursor:
+        await cursor.execute(
+            """
+            SELECT
+                period.bar_period,
+                (SELECT min(bar.start_utc) FROM bar
+                    WHERE bar.symbol = %(symbol)s AND bar.exchange = %(exchange)s AND bar.currency = %(currency)s
+                        AND bar.bar_period = period.bar_period) AS first_start_utc,
+                (SELECT max(bar.start_utc) FROM bar
+                    WHERE bar.symbol = %(symbol)s AND bar.exchange = %(exchange)s AND bar.currency = %(currency)s
+                        AND bar.bar_period = period.bar_period) AS last_start_utc
+            FROM unnest(%(bar_periods)s::text[]) WITH ORDINALITY AS period (bar_period, position)
+            ORDER BY period.position
+            """,
+            {
+                "symbol": instrument.symbol,
+                "exchange": instrument.exchange,
+                "currency": instrument.currency,
+                "bar_periods": [bar_period.value for bar_period in BarPeriod],
+            },
+        )
+        rows = await cursor.fetchall()
+    return [
+        SavedBarCoverage(
+            bar_period=BarPeriod(row.bar_period), first_start_utc=row.first_start_utc, last_start_utc=row.last_start_utc
+        )
+        for row in rows
+        if row.first_start_utc is not None and row.last_start_utc is not None
+    ]
 
 
 async def select_saved_ranges(

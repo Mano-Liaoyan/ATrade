@@ -5,8 +5,11 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 90_000;
-// Backtests on an instrument without saved bars fail fast. They fill the list, so that it overflows its region.
+// Backtests of a few days run fast. They fill the list, so that it overflows its region. The start route refuses a
+// backtest without saved bars, so the filler backtests use the saved AAPL bars too.
 const FILLER_BACKTEST_COUNT = 6;
+const FULL_RANGE = { startUtc: '2023-01-02T00:00:00Z', endUtc: '2026-01-01T00:00:00Z' };
+const FILLER_RANGE = { startUtc: '2023-01-02T00:00:00Z', endUtc: '2023-01-06T00:00:00Z' };
 const CHANGED_CODE_LINE = '# Compared version: one more comment line.';
 
 interface StrategyVersion {
@@ -21,17 +24,21 @@ async function createStrategy(request: APIRequestContext, name: string): Promise
   return { id: strategy.id, version };
 }
 
-async function startBacktest(request: APIRequestContext, strategyVersionId: number, symbol: string): Promise<number> {
+async function startBacktest(
+  request: APIRequestContext,
+  strategyVersionId: number,
+  timeRange: { startUtc: string; endUtc: string } = FULL_RANGE,
+): Promise<number> {
   const response = await request.post('/api/backtests', {
     // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
     data: {
       strategy_version_id: strategyVersionId,
-      symbol,
+      symbol: 'AAPL',
       exchange: 'NASDAQ',
       currency: 'USD',
       bar_period: '1-DAY',
-      start_utc: '2023-01-02T00:00:00Z',
-      end_utc: '2026-01-01T00:00:00Z',
+      start_utc: timeRange.startUtc,
+      end_utc: timeRange.endUtc,
       paper_capital_usd: '10000',
     },
   });
@@ -64,11 +71,11 @@ test('compares two versions of the same strategy and refuses different strategie
     data: { code: `${compared.version.code}\n${CHANGED_CODE_LINE}\n` },
   });
   const secondVersion = (await secondVersionResponse.json()) as StrategyVersion;
-  const firstBacktestId = await startBacktest(request, compared.version.id, 'AAPL');
-  const secondBacktestId = await startBacktest(request, secondVersion.id, 'AAPL');
-  const otherBacktestId = await startBacktest(request, other.version.id, 'AAPL');
+  const firstBacktestId = await startBacktest(request, compared.version.id);
+  const secondBacktestId = await startBacktest(request, secondVersion.id);
+  const otherBacktestId = await startBacktest(request, other.version.id);
   for (let fillerIndex = 0; fillerIndex < FILLER_BACKTEST_COUNT; fillerIndex += 1) {
-    await startBacktest(request, other.version.id, 'NOBARS');
+    await startBacktest(request, other.version.id, FILLER_RANGE);
   }
   await waitUntilFinished(request, firstBacktestId);
   await waitUntilFinished(request, secondBacktestId);

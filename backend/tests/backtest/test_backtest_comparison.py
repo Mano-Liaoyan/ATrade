@@ -5,6 +5,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from tests.backtest.real_runner import save_test_bars
 from tests.backtest.test_backtest_routes import make_backtest_request
 
 TEST_STRATEGY_FILE = Path(__file__).parent / "strategies" / "buy_and_sell_by_bar_count.py"
@@ -26,7 +27,8 @@ async def start_backtest(web_client: httpx.AsyncClient, strategy_version_id: int
 
 
 @pytest.mark.anyio
-async def test_compares_two_versions_of_the_same_strategy(web_client: httpx.AsyncClient) -> None:
+async def test_compares_two_versions_of_the_same_strategy(web_client: httpx.AsyncClient, database_url: str) -> None:
+    save_test_bars(database_url)
     strategy_id = await save_strategy(web_client, "Bar count")
     first_code = TEST_STRATEGY_FILE.read_text()
     second_code = first_code + "\n# Version 3\n"
@@ -51,7 +53,8 @@ async def test_compares_two_versions_of_the_same_strategy(web_client: httpx.Asyn
 
 
 @pytest.mark.anyio
-async def test_rejects_comparison_of_different_strategies(web_client: httpx.AsyncClient) -> None:
+async def test_rejects_comparison_of_different_strategies(web_client: httpx.AsyncClient, database_url: str) -> None:
+    save_test_bars(database_url)
     code = TEST_STRATEGY_FILE.read_text()
     first_version_id = await save_version(web_client, await save_strategy(web_client, "Bar count"), code)
     second_version_id = await save_version(web_client, await save_strategy(web_client, "Other"), code)
@@ -67,7 +70,8 @@ async def test_rejects_comparison_of_different_strategies(web_client: httpx.Asyn
 
 
 @pytest.mark.anyio
-async def test_rejects_comparison_of_a_backtest_with_itself(web_client: httpx.AsyncClient) -> None:
+async def test_rejects_comparison_of_a_backtest_with_itself(web_client: httpx.AsyncClient, database_url: str) -> None:
+    save_test_bars(database_url)
     strategy_id = await save_strategy(web_client, "Bar count")
     version_id = await save_version(web_client, strategy_id, TEST_STRATEGY_FILE.read_text())
     backtest_id = await start_backtest(web_client, version_id)
@@ -79,7 +83,10 @@ async def test_rejects_comparison_of_a_backtest_with_itself(web_client: httpx.As
 
 
 @pytest.mark.anyio
-async def test_comparison_with_a_missing_backtest_is_not_found(web_client: httpx.AsyncClient) -> None:
+async def test_comparison_with_a_missing_backtest_is_not_found(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
     strategy_id = await save_strategy(web_client, "Bar count")
     version_id = await save_version(web_client, strategy_id, TEST_STRATEGY_FILE.read_text())
     backtest_id = await start_backtest(web_client, version_id)

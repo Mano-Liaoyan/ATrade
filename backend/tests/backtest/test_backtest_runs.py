@@ -5,6 +5,7 @@ the status and the result through the HTTP routes.
 """
 
 import httpx
+import psycopg
 import pytest
 
 from tests.backtest.real_runner import (
@@ -95,7 +96,11 @@ async def test_failed_backtest_shows_the_strategy_error(
 async def test_backtest_without_saved_bars_fails_with_a_clear_message(
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
 ) -> None:
+    # The start route refuses a backtest without saved bars. The child checks again, because it reads the bars later.
+    save_test_bars(database_url)
     backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text())
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute("DELETE FROM bar")
 
     async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
         backtest = await wait_for_final_status(web_client, backtest_id)

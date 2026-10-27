@@ -74,13 +74,19 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
 - `watchlist` exports `create_watchlist_router(database_url, clock,
   instrument_lookup)`. `watchlist` imports `market_data` and `foundation`
   only. An import-linter contract forbids a direct import of `ibkr`.
+- `market_data` exports `read_saved_bar_coverage(database_url, instrument)`
+  (`SavedBarCoverage`: bar period, first and last bar start) and
+  `has_saved_bars(database_url, bar_request)`. Both read PostgreSQL only.
+  The watchlist routes add `saved_bars` to each instrument with the first.
+  The backtest start route uses the second (`docs/architecture/backtest.md`
+  section 10.1).
 - Before it saves an instrument, the add route checks it with
   `InstrumentLookup`. Thus the watchlist holds only instruments that IBKR
   knows. Listing and deleting do not need IB Gateway.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/watchlist` | `200` with `{"instruments": [{"id", "symbol", "exchange", "currency", "added_at_utc"}, ...]}` in the order of adding. |
+| `GET /api/watchlist` | `200` with `{"instruments": [{"id", "symbol", "exchange", "currency", "added_at_utc", "saved_bars"}, ...]}` in the order of adding. `saved_bars` is `[{"bar_period", "first_start_utc", "last_start_utc"}, ...]`: only the bar periods with saved bars, in the order of the bar periods (1 minute first). |
 | `POST /api/watchlist` with `{"symbol", "exchange", "currency"}` | `201` with the new watchlist instrument. |
 | | `404` with `{"detail": "IBKR has no instrument <symbol> / <exchange> / <currency>. Add an instrument from the instrument search."}`. |
 | | `409` with `{"detail": "This instrument is already in the watchlist."}`. |
