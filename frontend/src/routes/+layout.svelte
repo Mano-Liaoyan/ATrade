@@ -1,5 +1,5 @@
 <!-- App shell: the Carbon UI shell header (product name, page navigation, backend status, IB Gateway status,
-     server time, and the Paper tag) and the main region for each page. -->
+     server time, the Paper tag, the command palette, and the theme button) and the main region for each page. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
@@ -12,6 +12,7 @@
   } from '#lib/foundation/backend_health';
   import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
   import { ThemeButton } from '#lib/foundation/color_scheme';
+  import { CommandPalette } from '#lib/foundation/command_palette';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     describeGatewayStatus,
@@ -25,6 +26,8 @@
     readPaperAccountMessage,
     type PaperAccountCheck,
   } from '#lib/paper_trading';
+  import { listWatchlist, type WatchlistInstrument } from '#lib/watchlist';
+  import { createPaletteCommandGroups } from './palette_commands';
 
   const { children }: { children: Snippet } = $props();
 
@@ -40,6 +43,17 @@
   let gatewayStatus: GatewayStatus = $state({ kind: 'checking' });
   let paperAccountCheck: PaperAccountCheck | null = $state(null);
   let nowMilliseconds = $state(Date.now());
+  let paletteWatchlist: WatchlistInstrument[] = $state([]);
+  const paletteCommandGroups = $derived(createPaletteCommandGroups(paletteWatchlist));
+
+  // The palette reads the watchlist each time it opens, so it shows the instruments that the user added since.
+  function readPaletteWatchlist(): void {
+    void listWatchlist(fetch).then((listResult) => {
+      if (listResult.kind === 'ok') {
+        paletteWatchlist = listResult.value;
+      }
+    });
+  }
 
   // A page link is current on its own page and on the pages below it. Home is current only on its own page.
   function isCurrentPage(href: string, pathname: string): boolean {
@@ -127,6 +141,7 @@
           <Tag {...props} label="Paper" kind="blue" operational />
         {/snippet}
       </Tooltip>
+      <CommandPalette groups={paletteCommandGroups} onOpen={readPaletteWatchlist} />
       <ThemeButton />
     </div>
   </header>

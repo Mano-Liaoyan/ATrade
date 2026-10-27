@@ -1,5 +1,5 @@
 // Opens the app shell that the backend serves, in each browser project.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // The browser clock stands still until a test moves it, so the server time in the header does not change by itself.
 async function stopBrowserClock(page: Page): Promise<void> {
@@ -181,4 +181,115 @@ test('the theme button works when the browser storage is not available', async (
 
   await expect(header.getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+});
+
+async function openCommandPaletteWithKeys(page: Page): Promise<Locator> {
+  // The palette listens for the keys after the app starts: the header button shows that the app runs.
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Open command palette' })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+k');
+  const palette = page.getByRole('dialog', { name: 'Command palette' });
+  await expect(palette).toBeVisible();
+  return palette;
+}
+
+test('the command palette opens and closes with Ctrl K or Cmd K, with Escape, and with the header button', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const palette = await openCommandPaletteWithKeys(page);
+  await expect(palette.getByRole('combobox')).toBeFocused();
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await expect(palette).toBeHidden();
+
+  await page.getByRole('banner').getByRole('button', { name: 'Open command palette' }).click();
+  await expect(palette).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(palette).toBeHidden();
+});
+
+test('the command palette filters the commands and runs the highlighted command with Enter', async ({ page }) => {
+  await page.goto('/');
+  const palette = await openCommandPaletteWithKeys(page);
+  const commandText = palette.getByRole('combobox');
+
+  await commandText.fill('Go to');
+  const highlighted = palette.getByRole('option', { selected: true });
+  await expect(highlighted).toHaveCount(1);
+  const firstName = (await highlighted.textContent()) ?? '';
+  await page.keyboard.press('ArrowDown');
+  await expect(highlighted).not.toHaveText(firstName);
+  await page.keyboard.press('ArrowUp');
+  await expect(highlighted).toHaveText(firstName);
+
+  await commandText.fill('zzzz');
+  await expect(palette.getByRole('option')).toHaveCount(0);
+  await expect(palette.getByText('No results', { exact: true })).toBeVisible();
+
+  await commandText.fill('strategies');
+  await expect(palette.getByRole('option')).toHaveText(['Go to Strategies']);
+  await page.keyboard.press('Enter');
+
+  await expect(palette).toBeHidden();
+  await expect(page).toHaveURL('/strategies');
+});
+
+test('the command palette goes to each page and has no command that sends an order or starts a test', async ({
+  page,
+}) => {
+  await page.goto('/strategies');
+  const palette = await openCommandPaletteWithKeys(page);
+  const commandNames = await palette.getByRole('option').allTextContents();
+  expect(commandNames).toEqual(
+    expect.arrayContaining(['Go to Home', 'Go to Strategies', 'Go to Backtests', 'Go to Forward tests']),
+  );
+  expect(commandNames.filter((name) => /send|start|stop|order/i.test(name))).toEqual([]);
+
+  await palette.getByRole('option', { name: 'Go to Forward tests' }).click();
+
+  await expect(palette).toBeHidden();
+  await expect(page).toHaveURL('/forward-tests');
+});
+
+test('the command palette opens the instrument page of a watchlist instrument', async ({ page, request }) => {
+  // The browser projects share one database: another project can add AAPL first (409).
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const addResponse = await request.post('/api/watchlist', { data: { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' } });
+  expect([201, 409]).toContain(addResponse.status());
+  await page.goto('/strategies');
+  const palette = await openCommandPaletteWithKeys(page);
+
+  await palette.getByRole('combobox').fill('AAPL');
+  await palette.getByRole('option', { name: 'AAPL / NASDAQ / USD' }).click();
+
+  await expect(page).toHaveURL('/instruments/NASDAQ/AAPL?currency=USD');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('AAPL / NASDAQ / USD');
+});
+
+test('the command palette opens the backtest form and the forward test form', async ({ page }) => {
+  await page.goto('/');
+  let palette = await openCommandPaletteWithKeys(page);
+  await palette.getByRole('option', { name: 'Open the backtest form' }).click();
+
+  await expect(page).toHaveURL('/backtests#start-backtest');
+  await expect(page.getByRole('form', { name: 'Start a backtest' }).locator(':focus')).toHaveCount(1);
+
+  palette = await openCommandPaletteWithKeys(page);
+  await palette.getByRole('option', { name: 'Open the forward test form' }).click();
+
+  await expect(page).toHaveURL('/forward-tests#start-forward-test');
+  await expect(page.getByRole('form', { name: 'Start a forward test' }).locator(':focus')).toHaveCount(1);
+});
+
+test('the command palette changes the theme, and the theme button shows the new choice', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  const palette = await openCommandPaletteWithKeys(page);
+
+  await palette.getByRole('option', { name: 'Use the dark theme' }).click();
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
 });
