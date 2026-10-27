@@ -177,7 +177,14 @@ Implementation (#77):
 ## 12.8 Records
 
 - A platform `DataActor` subscribes to the same bar type.
-- At the end of each bar, the actor reads `self.cache`. It appends new fills
+- At the end of each bar, the actor first saves the bar in the bar store of
+  `market_data` (`save_received_bars_blocking()`), with the bar range as a
+  saved range. Thus a same-period backtest (section 12.10) finds the bars of
+  the forward test period. The save is idempotent: a restart or a bar that
+  the bar chart saved before adds no row. A bar whose start is not a bar
+  period start is not saved. A failed save logs a warning and does not stop
+  the forward test or the records.
+- Then the actor reads `self.cache`. It appends new fills
   (unique by `trade_id`) and one equity snapshot row to the forward test
   tables.
 - Reasons:
@@ -295,7 +302,7 @@ The public entry `atrade.forward_test` exports:
 | `PAPER_CHECK_FAILED_EXIT_CODE`, `GATEWAY_UNREACHABLE_EXIT_CODE` | `3`: the paper account check failed. `4`: IB Gateway was lost for more than 5 minutes (section 12.7). |
 | `FORWARD_TEST_SOCKET_MESSAGE_MODELS` | The models of `/ws/forward-tests` for the OpenAPI document. |
 | `create_forward_test_comparison_router(*, database_url, clock)` | The two comparison routes of section 12.13 (#78). `app/web.py` adds it after `create_forward_test_router`. |
-| `ForwardTestRecorder`, `RecorderInput` | The records DataActor of section 12.8 (#78). `RecorderInput` has `database_url`, `forward_test_id`, `instrument_id`, `bar_type`, `bar_period`, and `start_balance_usd`. `LiveNodeInput` has `database_url` and `start_balance_usd` for it. |
+| `ForwardTestRecorder`, `RecorderInput` | The records DataActor of section 12.8 (#78). `RecorderInput` has `database_url`, `forward_test_id`, `instrument` (the key of the saved bars), `instrument_id`, `bar_type`, `bar_period`, and `start_balance_usd`. `LiveNodeInput` has `database_url` and `start_balance_usd` for it. |
 
 - Entry points: `app/forward_test_worker.py` (Compose service
   `forward-test`) runs the worker with a start function that runs
@@ -426,6 +433,9 @@ than the worker clock.
   function splits the range into requests of the IBKR step size of the bar
   period (1 day for 1-minute bars, `ibkr/historical_bars.py`). A failed read
   logs a warning and gives no warm-up bars. The forward test still starts.
+- The child saves the warm-up bars and their range in the bar store with
+  `save_received_bars()` of `market_data`, so a same-period backtest can use
+  them. A failed save logs a warning. The forward test still starts.
 - `run_live_node()` writes the warm-up bars to a catalog with
   `write_look_back_catalog()` of `backtest` and builds the node with
   `LiveNodeBuilder.from_config()` and `LiveNodeConfig(catalogs=[...])`. The

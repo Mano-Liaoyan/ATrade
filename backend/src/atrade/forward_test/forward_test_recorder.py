@@ -1,5 +1,5 @@
-"""The platform DataActor of a forward test: at the end of each bar it records the new fills and one equity point
-(docs/architecture/forward_test.md section 12.8).
+"""The platform DataActor of a forward test: at the end of each bar it saves the bar in the bar store of
+`market_data`, and records the new fills and one equity point (docs/architecture/forward_test.md section 12.8).
 
 A Python DataActor gets no order or fill events, so it reads the fills from `self.cache`. It does not use
 PostgresCacheConfig: those tables belong to NautilusTrader and can change in each release candidate.
@@ -8,6 +8,7 @@ PostgresCacheConfig: those tables belong to NautilusTrader and can change in eac
 # The NautilusTrader 2.0 stubs type the cache orders and the order events as Any (docs/architecture.md section 16 G).
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportAny=false
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -20,15 +21,21 @@ from nautilus_trader.model import BarType, InstrumentId, OrderFilled, OrderSide
 from atrade.backtest import BacktestTrade, calculate_equity_curve
 from atrade.forward_test import forward_test_records
 from atrade.forward_test.forward_test_records import RecordedFill
-from atrade.foundation.bar import Bar, BarPeriod
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
+from atrade.foundation.instrument import Instrument
+from atrade.market_data import BarRequest, save_received_bars_blocking
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
+
+logger = logging.getLogger("atrade.forward_test_recorder")
 
 
 @dataclass(frozen=True)
 class RecorderInput:
     database_url: str
     forward_test_id: int
+    # The key of the saved bars. A backtest of the same period reads them with it.
+    instrument: Instrument
     instrument_id: InstrumentId
     bar_type: BarType
     bar_period: BarPeriod
@@ -88,12 +95,42 @@ class ForwardTestRecorder(DataActor):
             new_fills.extend(read_fill(event) for event in fill_events if str(event.trade_id) not in self.fills)
         return new_fills
 
+    def save_bar(self, bar: Bar) -> None:
+        """Saves the complete bar for backtests. A failed save is logged and does not stop the forward test."""
+        bar_period = self.recorder_input.bar_period
+        if bar.start_utc != floor_to_bar_start(bar.start_utc, bar_period):
+            # The bar store keys bars by the bar period start. Another start would add a second bar for one period.
+            logger.warning(
+                "Forward test %s: a bar starts at %s, not at a bar period start. It is not saved.",
+                self.recorder_input.forward_test_id,
+                bar.start_utc,
+            )
+            return
+        bar_request = BarRequest(
+            instrument=self.recorder_input.instrument,
+            bar_period=bar_period,
+            time_range=TimeRange(start_utc=bar.start_utc, end_utc=bar.start_utc + bar_period.length),
+        )
+        try:
+            save_received_bars_blocking(
+                database_url=self.recorder_input.database_url, bar_request=bar_request, bars=[bar]
+            )
+        except psycopg.Error as error:
+            logger.warning(
+                "Forward test %s: the bar of %s was not saved: %s",
+                self.recorder_input.forward_test_id,
+                bar.start_utc,
+                error,
+            )
+
     def on_bar(self, bar: NautilusBar) -> None:
+        converted_bar = convert_bar(bar, self.recorder_input.bar_period)
+        self.save_bar(converted_bar)
         new_fills = self.read_new_fills()
         self.fills.update((fill.trade_id, fill) for fill in new_fills)
         [equity_point] = calculate_equity_curve(
             paper_capital_usd=self.recorder_input.start_balance_usd,
-            bars=[convert_bar(bar, self.recorder_input.bar_period)],
+            bars=[converted_bar],
             bar_period=self.recorder_input.bar_period,
             trades=[fill.trade for fill in self.fills.values()],
         )

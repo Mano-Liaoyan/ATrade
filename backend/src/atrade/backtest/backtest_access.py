@@ -53,7 +53,7 @@ def describe_missing_bars(request: BacktestRequest) -> str:
         f"There are no saved {request.bar_period.label} bars of {instrument.symbol} / {instrument.exchange}"
         f" / {instrument.currency} from {format_message_time(request.time_range.start_utc)}"
         f" to {format_message_time(request.time_range.end_utc)}."
-        " ATrade saves bars only when a bar chart loads them from IBKR."
+        " ATrade saves bars when a bar chart loads them from IBKR and when a forward test receives them."
         " IBKR has bars only for the regular trading hours: a period when the market was closed has no bars."
         " Open the bar chart of the instrument with this bar period to load the bars, or select a period with"
         " trading hours."

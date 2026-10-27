@@ -165,7 +165,7 @@ watchlist     -> market_data
 strategy      -> (foundation only)
 backtest      -> strategy, market_data
 paper_trading -> ibkr
-forward_test  -> strategy, paper_trading, backtest, ibkr
+forward_test  -> strategy, paper_trading, backtest, market_data, ibkr
 all modules   -> foundation
 app           -> all modules
 ```
@@ -178,6 +178,11 @@ app           -> all modules
   child process: the connection for the paper account check, the warm-up
   bars (`read_historical_bars()`), and the stop steps
   (`read_own_open_orders()`, `cancel_order_and_wait()`) (#76, section 22).
+- `forward_test -> market_data` is only to save the bars that a forward test
+  receives (`save_received_bars()` for the warm-up bars,
+  `save_received_bars_blocking()` for each live bar), so a same-period
+  backtest finds them (`docs/architecture/forward_test.md` sections 12.8 and
+  12.15).
 - `paper_trading` does not import `forward_test`. The refusal of paper orders
   by hand on the instrument of a running forward test (section 12.2) gets a
   function from `app/web.py`, which calls

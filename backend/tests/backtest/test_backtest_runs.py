@@ -111,7 +111,7 @@ async def test_backtest_without_saved_bars_fails_with_a_clear_message(
     assert backtest["status"] == "failed"
     assert backtest["error_message"] == (
         "There are no saved 1 day bars of BTEST / ARCA / USD from 2026-03-01 00:00 UTC to 2026-04-01 00:00 UTC."
-        " ATrade saves bars only when a bar chart loads them from IBKR."
+        " ATrade saves bars when a bar chart loads them from IBKR and when a forward test receives them."
         " IBKR has bars only for the regular trading hours: a period when the market was closed has no bars."
         " Open the bar chart of the instrument with this bar period to load the bars, or select a period with"
         " trading hours."

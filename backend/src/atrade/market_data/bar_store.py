@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import LiteralString
 
 import psycopg
 from psycopg.rows import class_row
@@ -155,6 +156,45 @@ async def select_saved_ranges(
     return [TimeRange(start_utc=row.start_utc, end_utc=row.end_utc) for row in rows]
 
 
+INSERT_BAR_QUERY: LiteralString = """
+    INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+    VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
+        %(open)s, %(high)s, %(low)s, %(close)s, %(volume)s)
+    ON CONFLICT (symbol, exchange, currency, bar_period, start_utc) DO UPDATE SET
+        open = excluded.open, high = excluded.high, low = excluded.low,
+        close = excluded.close, volume = excluded.volume
+"""
+
+# Join the new range with each saved range that overlaps or touches it, so the table stays small.
+JOIN_SAVED_RANGE_QUERY: LiteralString = """
+    WITH joined AS (
+        DELETE FROM bar_saved_range
+        WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
+            AND bar_period = %(bar_period)s AND start_utc <= %(end_utc)s AND end_utc >= %(start_utc)s
+        RETURNING start_utc, end_utc
+    )
+    INSERT INTO bar_saved_range (symbol, exchange, currency, bar_period, start_utc, end_utc)
+    SELECT %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s,
+        least(%(start_utc)s, min(joined.start_utc)), greatest(%(end_utc)s, max(joined.end_utc))
+    FROM joined
+"""
+
+
+def create_bar_parameters(key_parameters: dict[str, str], bars: list[Bar]) -> list[dict[str, object]]:
+    return [
+        {
+            **key_parameters,
+            "start_utc": bar.start_utc,
+            "open": bar.open,
+            "high": bar.high,
+            "low": bar.low,
+            "close": bar.close,
+            "volume": bar.volume,
+        }
+        for bar in bars
+    ]
+
+
 async def save_bars_of_range(
     connection: psycopg.AsyncConnection,
     instrument: Instrument,
@@ -162,44 +202,31 @@ async def save_bars_of_range(
     time_range: TimeRange,
     bars: list[Bar],
 ) -> None:
-    """Saves the bars that IBKR returned for `time_range`, and records the range as saved. One transaction."""
+    """Saves the bars that IBKR returned for `time_range`, and records the range as saved. One transaction.
+
+    A bar that is already saved gets the new values, so a second save of the same bars adds no row.
+    """
     key_parameters = create_key_parameters(instrument, bar_period)
     async with connection.transaction(), connection.cursor() as cursor:
-        await cursor.executemany(
-            """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
-            VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(open)s, %(high)s, %(low)s, %(close)s, %(volume)s)
-            ON CONFLICT (symbol, exchange, currency, bar_period, start_utc) DO UPDATE SET
-                open = excluded.open, high = excluded.high, low = excluded.low,
-                close = excluded.close, volume = excluded.volume
-            """,
-            [
-                {
-                    **key_parameters,
-                    "start_utc": bar.start_utc,
-                    "open": bar.open,
-                    "high": bar.high,
-                    "low": bar.low,
-                    "close": bar.close,
-                    "volume": bar.volume,
-                }
-                for bar in bars
-            ],
-        )
-        # Join the new range with each saved range that overlaps or touches it, so the table stays small.
+        await cursor.executemany(INSERT_BAR_QUERY, create_bar_parameters(key_parameters, bars))
         await cursor.execute(
-            """
-            WITH joined AS (
-                DELETE FROM bar_saved_range
-                WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
-                    AND bar_period = %(bar_period)s AND start_utc <= %(end_utc)s AND end_utc >= %(start_utc)s
-                RETURNING start_utc, end_utc
-            )
-            INSERT INTO bar_saved_range (symbol, exchange, currency, bar_period, start_utc, end_utc)
-            SELECT %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s,
-                least(%(start_utc)s, min(joined.start_utc)), greatest(%(end_utc)s, max(joined.end_utc))
-            FROM joined
-            """,
+            JOIN_SAVED_RANGE_QUERY,
+            {**key_parameters, "start_utc": time_range.start_utc, "end_utc": time_range.end_utc},
+        )
+
+
+def save_bars_of_range_blocking(
+    connection: psycopg.Connection,
+    instrument: Instrument,
+    bar_period: BarPeriod,
+    time_range: TimeRange,
+    bars: list[Bar],
+) -> None:
+    """`save_bars_of_range` for synchronous callers, for example a NautilusTrader actor in `on_bar`."""
+    key_parameters = create_key_parameters(instrument, bar_period)
+    with connection.transaction(), connection.cursor() as cursor:
+        cursor.executemany(INSERT_BAR_QUERY, create_bar_parameters(key_parameters, bars))
+        cursor.execute(
+            JOIN_SAVED_RANGE_QUERY,
             {**key_parameters, "start_utc": time_range.start_utc, "end_utc": time_range.end_utc},
         )

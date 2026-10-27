@@ -135,6 +135,7 @@ def create_recorder(live_node_input: LiveNodeInput, instrument_id: InstrumentId)
         RecorderInput(
             database_url=live_node_input.database_url,
             forward_test_id=live_node_input.forward_test_id,
+            instrument=live_node_input.instrument,
             instrument_id=instrument_id,
             bar_type=create_bar_type(live_node_input, instrument_id),
             bar_period=live_node_input.bar_period,

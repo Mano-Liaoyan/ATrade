@@ -1,8 +1,8 @@
-"""The platform DataActor that records the fills and the equity of a forward test (docs/architecture/forward_test.md
-section 12.8).
+"""The platform DataActor that saves the bars and records the fills and the equity of a forward test
+(docs/architecture/forward_test.md section 12.8).
 
 The actor runs in the NautilusTrader backtest engine with the bar count test strategy and a small bar file. The test
-asserts the exact rows of the record tables in a real PostgreSQL.
+asserts the exact rows of the bar and record tables in a real PostgreSQL.
 """
 
 import csv
@@ -12,7 +12,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import LiteralString
 
+import httpx
 import psycopg
+import pytest
 from nautilus_trader.model import BarType
 from nautilus_trader.persistence import BarDataWrangler
 
@@ -22,6 +24,8 @@ from atrade.forward_test import ForwardTestRecorder, RecorderInput
 from atrade.foundation.bar import Bar, BarPeriod
 from atrade.foundation.instrument import Instrument
 from atrade.strategy import load_strategy_classes
+from tests.backtest.real_runner import run_backtest_runner, wait_for_final_status
+from tests.fakes.clock import FixedClock
 
 TEST_DIRECTORY = Path(__file__).parents[1] / "backtest"
 TEST_STRATEGY_FILE = TEST_DIRECTORY / "strategies" / "buy_and_sell_by_bar_count.py"
@@ -82,7 +86,9 @@ def insert_forward_test(database_url: str) -> int:
         return int(forward_test_row[0])
 
 
-def run_engine_with_recorder(*, database_url: str, forward_test_id: int, work_directory: Path) -> None:
+def run_engine_with_recorder(
+    *, database_url: str, forward_test_id: int, work_directory: Path, instrument: Instrument = INSTRUMENT
+) -> None:
     bars = read_test_bars()
     nautilus_instrument = create_instrument(INSTRUMENT, bars)
     bar_type = BarType.from_str(f"{nautilus_instrument.id}-{DAY_BAR_PERIOD.value}-LAST-EXTERNAL")
@@ -101,6 +107,7 @@ def run_engine_with_recorder(*, database_url: str, forward_test_id: int, work_di
             RecorderInput(
                 database_url=database_url,
                 forward_test_id=forward_test_id,
+                instrument=instrument,
                 instrument_id=nautilus_instrument.id,
                 bar_type=bar_type,
                 bar_period=DAY_BAR_PERIOD,
@@ -168,3 +175,73 @@ def test_a_second_run_over_the_same_bars_adds_no_row(database_url: str, tmp_path
 
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM bar") == [(BAR_COUNT,)]
+
+
+def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str, tmp_path: Path) -> None:
+    forward_test_id = insert_forward_test(database_url)
+
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+
+    saved_bars = read_table_rows(
+        database_url,
+        """
+        SELECT symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume FROM bar
+        ORDER BY start_utc
+        """,
+    )
+    assert saved_bars == [
+        ("BTEST", "ARCA", "USD", "1-DAY", bar.start_utc, bar.open, bar.high, bar.low, bar.close, bar.volume)
+        for bar in read_test_bars()
+    ]
+    # The bar ranges touch, so the store joins them into one saved range.
+    assert read_table_rows(database_url, "SELECT symbol, bar_period, start_utc, end_utc FROM bar_saved_range") == [
+        ("BTEST", "1-DAY", make_time(2), make_time(12))
+    ]
+
+
+def test_a_failed_bar_save_does_not_stop_the_records(database_url: str, tmp_path: Path) -> None:
+    forward_test_id = insert_forward_test(database_url)
+    # PostgreSQL refuses a NUL character in a text column, so each bar save fails.
+    instrument_that_cannot_be_saved = Instrument(symbol="BTEST\x00", exchange="ARCA", currency="USD")
+
+    run_engine_with_recorder(
+        database_url=database_url,
+        forward_test_id=forward_test_id,
+        work_directory=tmp_path,
+        instrument=instrument_that_cannot_be_saved,
+    )
+
+    assert read_table_rows(database_url, "SELECT count(*) FROM bar") == [(0,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]
+
+
+@pytest.mark.anyio
+async def test_a_same_period_backtest_runs_on_the_bars_that_the_forward_test_saved(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, tmp_path: Path
+) -> None:
+    forward_test_id = insert_forward_test(database_url)
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            UPDATE forward_test SET status = 'stopped', desired_state = 'stopped', client_id = NULL,
+                stopped_at_utc = %(stopped_at_utc)s
+            WHERE id = %(id)s
+            """,
+            {"id": forward_test_id, "stopped_at_utc": make_time(12)},
+        )
+
+    response = await web_client.post(f"/api/forward-tests/{forward_test_id}/same-period-backtests")
+    assert response.status_code == 201
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, response.json()["backtest_id"])
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    assert (backtest["start_utc"], backtest["end_utc"]) == ("2026-03-01T00:00:00Z", "2026-03-12T00:00:00Z")
+    # The same bars give the same 2 trades as the forward test records.
+    assert [(trade["time_utc"], trade["side"]) for trade in backtest["trades"]] == [
+        ("2026-03-05T00:00:00Z", "BUY"),
+        ("2026-03-10T00:00:00Z", "SELL"),
+    ]
