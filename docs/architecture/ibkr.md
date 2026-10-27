@@ -48,8 +48,10 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_managed_accounts()`, `search_instruments(query)`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
+| `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
+| `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
 | `IbAsyncGatewayConnection` | The real connection. It uses one `ib_async.IB` object, on the event loop of the caller. |
 | `create_ibkr_router(...)` | The router of `GET /api/ibkr/gateway`. |
 
@@ -57,6 +59,12 @@ The public entry `atrade.ibkr` exports:
   not there, it tries to connect. It then waits `retry_seconds` (default 10)
   and checks again. A lost connection thus comes back without a restart. A
   failed attempt writes a warning with the Gateway address to the log.
+- `read_connection_number()` counts the successful connections. A new
+  number tells `paper_trading` to run the paper account check again
+  (section 11.5).
+- `read_account_values()` and `read_portfolio()` return the values that
+  ib_async keeps up to date after the connection. They return an empty list
+  when the connection is not there. They add no business rules.
 - The constructor refuses client ID 0 and multiples of 1000, with the same
   check as `foundation/settings`.
 - `app/web.py` gets a `GatewayConnection` as an argument of
@@ -65,8 +73,10 @@ The public entry `atrade.ibkr` exports:
   when the Gateway is not reachable.
 - The hand-written fake `tests/fakes/ibkr.py` (`FakeGatewayConnection`) has
   the same functions. Its data stays in memory. Tests set
-  `is_gateway_reachable`, `managed_accounts`, `instruments`, and
-  `search_error_message` directly.
+  `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
+  `account_values`, `portfolio`, `instruments`, and `search_error_message`
+  directly. Each change of `connected` from false to true gives a new
+  connection number.
 - `search_instruments(query)` is the instrument search of
   [`docs/architecture/market_data.md`](market_data.md) section 8.2.
 
@@ -106,5 +116,8 @@ make sure that the `ib-gateway` service runs and is logged in.
   Gateway listens at `ATRADE_IBKR_HOST:ATRADE_IBKR_PAPER_PORT`. The Gateway
   port is not published, so set these 2 variables to an address that the
   test machine can reach, for example an SSH tunnel to the server.
+- The assertions cover the connection, `managedAccounts` (exactly the paper
+  account), the `NetLiquidation` balance in USD, and the positions of the
+  account.
 - The real case uses client ID `99`. It does not compete with the Web client
   ID or the forward test range.

@@ -1,7 +1,9 @@
-<!-- Home page: the instrument search adds to the watchlist, and a watchlist instrument opens its instrument page. -->
+<!-- Home page: the instrument search adds to the watchlist, a watchlist instrument opens its instrument page, and the
+     paper account panel shows the paper account. -->
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { InstrumentSearch, type Instrument } from '#lib/market_data';
+  import { PaperAccountPanel } from '#lib/paper_trading';
   import {
     addToWatchlist,
     deleteFromWatchlist,
@@ -92,6 +94,7 @@
     }}
   />
 </div>
+<PaperAccountPanel />
 
 <style>
   .home-panels {

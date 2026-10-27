@@ -11,14 +11,22 @@ is in GitHub Issues.
 ## Current state
 
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
-connection (issue #63), and the strategy editor (issue #68):
+connection (issue #63), instrument search (issue #64), the strategy editor
+(issue #68), code completion (issue #69), and the paper account check with the
+account panel (issue #74):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
-  `/api/watchlist`, and the strategy routes under `/api/strategies`.
+  `/api/watchlist`, the strategy routes under `/api/strategies`, the
+  language server WebSocket `/ws/strategy-language-server`, and
+  `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
+- After each connection, the `web` service checks the paper account. The home
+  page shows the account panel: the check result, the balance, and the
+  positions, updated live. When the check fails, the panel shows the actual
+  and the expected account number. ATrade sends no orders yet.
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database.
@@ -28,7 +36,8 @@ connection (issue #63), and the strategy editor (issue #68):
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
 - Strategies: the page `/strategies` creates a strategy from a template. The
   editor saves the code as strategy versions after the checks before save.
-  Unsaved edits stay in the browser. See
+  Unsaved edits stay in the browser. The editor shows code completion and
+  live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
 - Watchlist: the user adds an instrument from the search results and deletes
   it from the watchlist panel on the home page. The watchlist is in
@@ -72,7 +81,8 @@ reachable". To connect:
    IBKR paper account. Set `ATRADE_IBKR_ACCOUNT_ID` to the paper account
    number (it starts with `DU`).
 3. Run `./start run`. The header shows "IB Gateway connected." after the
-   Gateway has logged in.
+   Gateway has logged in. The account panel shows "Paper account DU...
+   checked." when the paper account check passes.
 
 A login on the IBKR website or phone app with the same user name competes
 with the Gateway session.
@@ -135,7 +145,9 @@ One command runs the same checks as CI:
   `ATRADE_PLAYWRIGHT_PROJECTS` to the browsers on your machine, for example
   `ATRADE_PLAYWRIGHT_PROJECTS="chromium firefox"`. The value `none` skips the
   end-to-end tests. Install browsers with
-  `pnpm --dir frontend exec playwright install`.
+  `pnpm --dir frontend exec playwright install`. The Playwright backend
+  listens on port 4173. Set `ATRADE_E2E_PORT` to use a different port, for
+  example when 2 checkouts run the checks at the same time.
 - Real IBKR tests have the pytest mark `ibkr_paper`. CI does not run them,
   and the default pytest options leave them out. Run them by hand with
   `cd backend && uv run pytest -m ibkr_paper`. They read `.env`, and they skip

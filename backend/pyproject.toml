@@ -5,6 +5,9 @@ description = "ATrade backend: HTTP API, WebSocket, backtests, and forward tests
 requires-python = "==3.14.*"
 dependencies = [
     "alembic==1.20.1",
+    # Code completion: each editor WebSocket connection starts 1 basedpyright language server
+    # (docs/architecture/strategy.md section 9.4). The package brings Node.js (nodejs-wheel-binaries).
+    "basedpyright==1.40.2",
     "fastapi==0.162.0",
     "ib-async==2.1.0",
     "nautilus-trader==2.0.0rc7",
@@ -13,13 +16,15 @@ dependencies = [
     # The checks before save run ruff on strategy code in the Web process (docs/architecture/strategy.md section 9.3).
     "ruff==0.17.3",
     "uvicorn==0.54.0",
+    # uvicorn needs a WebSocket library for the /ws/ routes.
+    "websockets==17.3",
 ]
 
 [dependency-groups]
 dev = [
     "anyio==4.15.1",
-    "basedpyright==1.40.2",
     "httpx==0.28.1",
+    "httpx-ws==0.8.2",
     "import-linter==2.15",
     "pytest==9.1.1",
 ]

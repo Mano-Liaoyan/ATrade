@@ -14,9 +14,10 @@ from atrade.app import create_web_app, upgrade_database
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import SAMPLE_INSTRUMENTS, FakeGatewayConnection
+from tests.fakes.ibkr import SAMPLE_INSTRUMENTS, FakeGatewayConnection, make_balance_values, make_stock_position
 
 FAKE_ACCOUNT_ID = "DU1234567"
+E2E_POSITION_COUNT = 40
 FIXED_NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
@@ -35,10 +36,20 @@ def main() -> None:
     frontend_build_dir = Path(os.environ["ATRADE_E2E_FRONTEND_BUILD_DIR"])
     port = int(os.environ["ATRADE_E2E_PORT"])
     upgrade_database(database_url)
-    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir)
+    settings = Settings(
+        database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
+    )
     gateway_connection = FakeGatewayConnection(
         managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS]
     )
+    gateway_connection.account_values = make_balance_values(
+        FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd="25000.00"
+    )
+    # Enough positions to overflow the position table, so that the e2e tests can check its scroll track.
+    gateway_connection.portfolio = [
+        make_stock_position(FAKE_ACCOUNT_ID, symbol=f"TEST{number:02d}", quantity="10", market_price="100")
+        for number in range(1, E2E_POSITION_COUNT + 1)
+    ]
     app = create_web_app(settings=settings, clock=FixedClock(FIXED_NOW_UTC), gateway_connection=gateway_connection)
     uvicorn.run(app, host=LISTEN_HOST, port=port, workers=1)
 
