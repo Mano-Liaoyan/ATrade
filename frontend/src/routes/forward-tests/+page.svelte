@@ -137,7 +137,7 @@
   until you stop it, or until its end time. A stop cancels its open orders. Its positions stay open.
 </p>
 
-<form class="forward-test-form" aria-label="Start a forward test" onsubmit={submitForwardTest}>
+<form id="start-forward-test" class="forward-test-form" aria-label="Start a forward test" onsubmit={submitForwardTest}>
   <!-- The select is outside its label: the name of a select inside a label would also hold the selected option. -->
   <div class="field">
     <label for="forward-test-strategy">Strategy</label>
