@@ -126,4 +126,5 @@ The public entry `atrade.paper_trading` exports:
 - When the check fails, the panel shows the reason, the actual account, and
   the expected account.
 - The panel uses `foundation/live_socket` for reconnection and heartbeat, and
-  `foundation/scroll_area` for the position table (section 13).
+  `foundation/scroll_region` for the position table (section 13). The table
+  text wraps, so the table does not overflow to the side.

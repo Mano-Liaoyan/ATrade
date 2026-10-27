@@ -1,11 +1,8 @@
 // Public entry of foundation/backend_health: reads GET /api/health for the app shell status line.
 
-// Hand-written until the OpenAPI type generation exists. It matches HealthResponse in backend/src/atrade/app/health_routes.py.
-interface HealthResponse {
-  status: 'ok' | 'degraded';
-  database: 'ok' | 'unreachable';
-  time_utc: string;
-}
+import type { components } from '#lib/api';
+
+type HealthResponse = components['schemas']['HealthResponse'];
 
 export type BackendHealth =
   | { kind: 'ok'; serverTimeUtc: string }

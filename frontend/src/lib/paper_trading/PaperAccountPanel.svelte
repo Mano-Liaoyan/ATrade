@@ -1,7 +1,7 @@
 <!-- Account panel: the paper account check, the balance, and the positions, updated live from /ws/paper-trading. -->
 <script lang="ts">
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
-  import { ScrollArea } from '#lib/foundation/scroll_area';
+  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     describePaperAccountCheck,
     formatAmount,
@@ -70,7 +70,7 @@
       {#if account.positions.length === 0}
         <p>No positions.</p>
       {:else}
-        <ScrollArea label="Positions" maxBlockSize="18rem">
+        <ScrollRegion label="Positions" maxHeight="18rem">
           <table class="positions">
             <thead>
               <tr>
@@ -99,7 +99,7 @@
               {/each}
             </tbody>
           </table>
-        </ScrollArea>
+        </ScrollRegion>
       {/if}
     {/if}
   {/if}
@@ -187,7 +187,6 @@
     border-collapse: collapse;
     inline-size: 100%;
     font-size: 0.875rem;
-    white-space: nowrap;
   }
 
   .positions th,

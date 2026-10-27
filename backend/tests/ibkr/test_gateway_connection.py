@@ -6,7 +6,7 @@ import socket
 import anyio
 import pytest
 
-from atrade.ibkr import IbAsyncGatewayConnection
+from atrade.ibkr import GatewayRequestError, IbAsyncGatewayConnection
 
 LOCAL_HOST = "127.0.0.1"
 
@@ -34,6 +34,14 @@ async def test_keeps_trying_to_connect_while_the_gateway_is_not_reachable(caplog
     failed_attempts = [record for record in caplog.records if "IB Gateway is not reachable" in record.getMessage()]
     assert len(failed_attempts) > 1
     assert connection.read_managed_accounts() == []
+
+
+@pytest.mark.anyio
+async def test_reports_a_failed_instrument_search_without_a_connection() -> None:
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=find_closed_local_port(), client_id=1)
+
+    with pytest.raises(GatewayRequestError, match="Not connected"):
+        await connection.search_instruments("AAPL")
 
 
 def test_refuses_client_id_0() -> None:

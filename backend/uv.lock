@@ -70,6 +70,7 @@ dependencies = [
     { name = "nautilus-trader" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
+    { name = "ruff" },
     { name = "uvicorn" },
     { name = "websockets" },
 ]
@@ -82,7 +83,6 @@ dev = [
     { name = "httpx-ws" },
     { name = "import-linter" },
     { name = "pytest" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -93,6 +93,7 @@ requires-dist = [
     { name = "nautilus-trader", specifier = "==2.0.0rc7" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
     { name = "pydantic-settings", specifier = "==2.16.1" },
+    { name = "ruff", specifier = "==0.17.3" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "websockets", specifier = "==17.3" },
 ]
@@ -105,7 +106,6 @@ dev = [
     { name = "httpx-ws", specifier = "==0.8.2" },
     { name = "import-linter", specifier = "==2.15" },
     { name = "pytest", specifier = "==9.1.1" },
-    { name = "ruff", specifier = "==0.17.3" },
 ]
 
 [[package]]

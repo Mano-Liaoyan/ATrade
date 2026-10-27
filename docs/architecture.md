@@ -225,78 +225,16 @@ the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
 
 ## 8. Market data and watchlist
 
-- `market_data` reads bars from IBKR with `ib_async` and saves them in
-  PostgreSQL.
-- `market_data` requests only the time ranges that are not in PostgreSQL. This
-  keeps ATrade below the IBKR historical data rate limit.
-- Backtests read bars only from PostgreSQL.
-- The bar table key is the instrument, the bar period, and the bar start time.
-- Start with no partitions, no BRIN index, and no compression. Add native
-  PostgreSQL range partitions only when a measurement shows the need.
-- Data is always called a bar. "Candlestick" means only the chart drawing
-  (`CandlestickSeries` in `lightweight-charts`).
-- `watchlist` stores the instruments that the user saves. It uses
-  `market_data` to find instruments.
+Section 8 is in [`docs/architecture/market_data.md`](architecture/market_data.md).
+It holds the bar storage decisions, the watchlist decisions, and the
+instrument search (`GET /api/market-data/instrument-search`).
 
 ## 9. Strategies and strategy versions
 
-Source: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48).
-
-The user writes strategies in the browser. A saved strategy version can run in
-a backtest at once, with no deployment.
-
-### 9.1 Storage
-
-- PostgreSQL has two tables: `strategy` (the name) and `strategy_version`
-  (code text, sha256, sequence number, time). Do not use git or a PostgreSQL
-  extension for versions.
-- Strategy versions are append-only. They must not change.
-- The sequence number starts at 1 in each strategy and goes up by 1.
-- When the code is the same as the previous version, no new version is made.
-- The UI shows a version as "strategy name v3".
-- To go back, open an old version and save it as a new version.
-- Unsaved edits exist only in the browser `localStorage`.
-- The backtest table and the forward test table each have a
-  `strategy_version_id` foreign key. It must not be null.
-- Strategy versions cannot be deleted. A strategy that no backtest or forward
-  test uses can be deleted. A strategy in use cannot be deleted.
-
-### 9.2 Strategy file format
-
-- The file has exactly 1 `Strategy` subclass and exactly 1 `StrategyConfig`
-  subclass.
-- The platform fills in `instrument_id` and `bar_type` at run time.
-- All other configuration fields must have default values. This stage has no
-  parameter input form.
-- NautilusTrader 2.0 requires a keyword-only `__init__` in the strategy
-  configuration. The template shows it.
-- The strategy template shows how to warm up indicators with `request_bars` in
-  `on_start`.
-
-### 9.3 Checks before save
-
-The checks run in the Web process. They do not import the user code.
-
-| Check | Blocks save |
-|---|---|
-| `ast.parse` fails | Yes |
-| Not exactly 1 `Strategy` subclass and 1 `StrategyConfig` subclass (AST check) | Yes |
-| ruff `F` rule errors | Yes |
-| basedpyright type errors | No. The editor shows them live. |
-
-### 9.4 Code completion
-
-- basedpyright only does static analysis. It does not run user code, so it
-  needs no isolation.
-- Each editor WebSocket connection starts 1 basedpyright child process in the
-  `web` container. The process stops when the connection closes.
-
-### 9.5 Comparison
-
-- Compare only two versions of the same strategy. The user selects 2 backtest
-  results. The page shows the code diff (`@codemirror/merge`), the metric
-  table, and both equity curves on one chart.
-- For different strategies, the backtest list shows the metrics side by side.
+Section 9 is in [`docs/architecture/strategy.md`](architecture/strategy.md).
+It holds the storage rules, the `strategy` and `strategy_version` tables, the
+strategy file format and template, the checks before save, the strategy HTTP
+routes, and the editor pages.
 
 ## 10. Backtest
 
@@ -500,20 +438,30 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   and build time.
 - `src/lib/` has one directory per capability (`lib/market_data/`,
   `lib/backtest/`, and so on) and `lib/foundation/`.
-- A capability can import only `#lib/foundation/<module>`. Capabilities must
-  not import each other. Only `src/routes/` combines capabilities.
+- A capability can import only `#lib/foundation/<module>` and the generated
+  API types `#lib/api`. Capabilities must not import each other. Only
+  `src/routes/` combines capabilities.
 - Generic UI with no domain meaning goes in `foundation/`, for example
   `foundation/code_editor/`. Parts with domain meaning stay in the capability.
-- Generated API types go in `lib/api/`.
+- Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
+  writes the OpenAPI document to `lib/api/openapi.json`, and
+  `openapi-typescript` writes `lib/api/index.ts`. `pnpm generate:api` runs
+  both. Both files are committed. The backend test
+  `tests/app/test_openapi_document.py` fails when `openapi.json` does not
+  match the routes, and `pnpm check:api` fails when `index.ts` does not match
+  `openapi.json`. Use `components['schemas'][...]`; do not write API types by
+  hand.
+- `foundation/scroll_region/` has `ScrollRegion`: a region that scrolls inside
+  itself. It hides the native scrollbar and draws its own track and thumb
+  (`role="scrollbar"`, named "<region label> scroll bar"). The thumb can be
+  dragged, a click on the track scrolls one page, and the track takes Arrow,
+  Page Up, Page Down, Home, and End keys. Use it for each region that can
+  overflow (section 13.1).
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
   reconnection after 25 seconds without a message or after a close, and a
   delay from 1 to 10 seconds between attempts.
-- `foundation/scroll_area` is the scroll region with app-owned tracks and
-  thumbs (section 13.1). It hides the native scrollbars. The thumb can be
-  dragged, and a press on the track scrolls by one page. The track has the
-  role `scrollbar` and the name "<region> vertical scroll bar".
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
@@ -813,7 +761,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Playwright tests start, stop, the list, and the comparison page.
 - Scroll regions: Playwright scrolls to the last item of each region and
   asserts that it is visible. It also asserts that the app scrollbar element is
-  visible. No screenshot comparison.
+  visible (`getByRole('scrollbar', { name: '<region label> scroll bar' })`
+  of `ScrollRegion`, section 13). No screenshot comparison.
 - WebKit is not Safari. Before each release, check a list by hand in real
   Safari.
 
@@ -851,7 +800,9 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
 - This document (`docs/architecture.md`) is the architecture specification.
   When it is longer than 1000 lines, split it by capability. A moved section
   goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
-  is in `docs/architecture/ibkr.md`. Section 11 is in
+  is in `docs/architecture/ibkr.md`. Section 8 is in
+  `docs/architecture/market_data.md`. Section 9 is in
+  `docs/architecture/strategy.md`. Section 11 is in
   `docs/architecture/paper_trading.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
