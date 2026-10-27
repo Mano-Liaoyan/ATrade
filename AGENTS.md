@@ -1,64 +1,15 @@
 # ATrade Agent Guidance
 
-## Current Coordination Model
+## Sources of Truth
 
-- The plan and the implementation work are in GitHub Issues and pull requests
-  for `Mano-Liaoyan/ATrade`. There is no `PLAN.md`.
+- The plan and the implementation work are GitHub Issues and pull requests
+  for `Mano-Liaoyan/ATrade`. See `docs/agents/issue-tracker.md` and
+  `docs/agents/triage-labels.md`.
 - `README.md` tells how to run and check ATrade.
 - `docs/architecture.md` is the architecture specification. It is the
   implementation authority.
-- `GLOSSARY.md` holds the terms.
-- `docs/adr/` holds decisions that are hard to reverse, when they exist.
-
-## Repo-Local Agent Skills
-
-Reusable prompt skills are available under `.agents/skills/`. These are opt-in
-skills for the current agent session.
-
-- `skills-lock.json` records installed skill sources and hashes.
-- Keep `.agents/skills/` and `skills-lock.json` in sync when adding, updating,
-  or removing repo-local skills.
-
-Current installed skills include:
-
-- `setup-matt-pocock-skills` — configure issue-tracker, triage-label, and
-  domain-doc context before using engineering or issue-workflow skills.
-- `grill-with-docs` and `zoom-out` — domain/documentation-aware planning and
-  codebase orientation.
-- `diagnose`, `tdd`, and `improve-codebase-architecture` — bug investigation,
-  test-first changes, and architecture refactoring support.
-- `to-prd`, `to-issues`, and `triage` — PRD, issue, and triage workflow helpers.
-- `caveman`, `grill-me`, and `write-a-skill` — productivity and skill-authoring
-  helpers.
-- `ste` (from `dualface/ste-zh`) and `asd-ste100` (from
-  `danyuchn/asd-ste100-skill`) — ASD-STE100 writing rules for Chinese and
-  English output.
-
-`.claude/skills/ste` and `.claude/skills/asd-ste100` are relative symlinks to
-`.agents/skills/` so Claude Code loads the same files. Other agents (Codex, pi)
-read `.agents/skills/` directly. On Windows, clone with Developer Mode enabled
-and `git config core.symlinks true`, or the links check out as plain text files.
-
-## Writing Style
-
-These rules are always on. They are not opt-in.
-
-- Chinese writing and conversation: follow the `ste` skill.
-- All other English writing and conversation: follow the `asd-ste100` skill.
-
-## Agent skills
-
-### Issue tracker
-
-Issues are tracked in GitHub Issues for `Mano-Liaoyan/ATrade`. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-The default engineering-skill triage labels are used. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-The domain docs are `GLOSSARY.md` and `docs/architecture.md`. ADRs go under `docs/adr/` when added. See `docs/agents/domain.md`.
+- `GLOSSARY.md` holds the terms. `docs/agents/domain.md` tells how to use
+  the domain docs and ADRs (`docs/adr/`, when it exists).
 
 ## Startup Order For Coding Sessions
 
@@ -66,6 +17,24 @@ The domain docs are `GLOSSARY.md` and `docs/architecture.md`. ADRs go under `doc
 2. Read the sections of `docs/architecture.md` that the task touches.
 3. Read `GLOSSARY.md` for the terms.
 4. Read the relevant GitHub issue or PR when one is supplied.
+
+## Writing Style
+
+These rules are always on.
+
+- Chinese writing and conversation: follow the `ste` skill.
+- All other English writing and conversation: follow the `asd-ste100` skill.
+
+## Repo-Local Skills
+
+The skills are in `.agents/skills/`. Codex and pi read them there. Each
+`.claude/skills/<name>` is a relative symlink to `.agents/skills/<name>`, so
+Claude Code loads the same files. On Windows, clone with Developer Mode
+enabled and `git config core.symlinks true`, or the links check out as plain
+text files.
+
+When you add, update, or remove a skill, change `.agents/skills/`,
+`.claude/skills/`, and `skills-lock.json` together.
 
 ## Quality Gate
 
@@ -76,9 +45,7 @@ The domain docs are `GLOSSARY.md` and `docs/architecture.md`. ADRs go under `doc
 
 ## Frontend Design Rules
 
-Apply these rules to every UI change in `frontend/`. The migration to Carbon
-and Bits UI is issue #84. Before it is merged, apply the layout, copy, and
-state rules to the current CSS.
+Apply these rules to every UI change in `frontend/`.
 
 - **Avoid unnecessary secondary labels and descriptions. Let the layout do
   the explaining.** This rule has the highest priority. A heading is a name
@@ -110,6 +77,6 @@ state rules to the current CSS.
   `deploy/compose.yaml`. ATrade runs on Unix, and on Windows through WSL only.
 - Keep secrets, IBKR credentials, account identifiers, tokens, and session cookies out of git.
 - Real IBKR verification must use ignored local `.env` values and must skip cleanly when IB Gateway or `.env` is not available.
-- Do not add live order placement. `trading_mode=live` must stop the start.
-- Frontend desktop browser behavior is a major product guardrail: latest stable Safari, Firefox, Chrome, and Edge must behave the same. When page scrolling is off, each region that can overflow (rails, panels, tables, lists) must have its own visible scroll track and thumb. No content can be clipped or unreachable. Safari can hide native scrollbars, so use styled tracks where reachability matters. Mobile layout is out of scope.
+- Live order placement is not part of ATrade. `trading_mode=live` must stop the start.
+- Frontend desktop browser behavior is a major product guardrail: latest stable Safari, Firefox, Chrome, and Edge must behave the same. When page scrolling is off, each region that can overflow (rails, panels, tables, lists) must have its own visible scroll track and thumb. All content must stay reachable. Safari can hide native scrollbars, so use styled tracks where reachability matters. Mobile layout is out of scope.
 - Changes to HTTP or WebSocket interfaces, settings and `.env.example`, module boundaries, terms, or start and run commands must update the documents in the same change (`docs/architecture.md` section 18).
