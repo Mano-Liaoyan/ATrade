@@ -6,7 +6,8 @@ to keep the specification shorter than 1000 lines (section 18). Terms have
 the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 
 Sources: [Order module design](https://github.com/Mano-Liaoyan/ATrade/issues/40),
-[Paper account check and account panel](https://github.com/Mano-Liaoyan/ATrade/issues/74).
+[Paper account check and account panel](https://github.com/Mano-Liaoyan/ATrade/issues/74),
+[Paper orders sent by hand](https://github.com/Mano-Liaoyan/ATrade/issues/75).
 
 ## 11.1 Live order switch
 
@@ -50,8 +51,19 @@ orders only when all 4 conditions are true:
   order type, price, account number, and a clear `PAPER` mark.
 - When a forward test runs on an instrument, the Web process refuses paper
   orders by hand for that instrument. It shows which forward test blocks it.
+  Not implemented yet: forward tests do not exist yet (#75). The forward test
+  ticket adds this rule.
 - Positions, balance, and order status go to the browser on
   `/ws/paper-trading`.
+- Each order and each cancel calls `require_checked_paper_account()` first
+  (section 11.5). When the check did not pass, or the connection is not
+  there, ATrade does not send the order. The HTTP response is `403` with the
+  reason, the actual accounts, and the expected account.
+- The quantity is a whole number larger than 0. A limit order needs a limit
+  price larger than 0. A market order has no limit price.
+- ATrade sends each order to `SMART` routing with the primary exchange of the
+  instrument, to the checked account, with the `orderRef` `ATRADE-BY-HAND`
+  (section 12.9).
 
 ## 11.4 Order records and order list
 
@@ -65,7 +77,19 @@ orders only when all 4 conditions are true:
   source comes from `orderRef` (section 12.9).
 - Only orders sent by hand have a cancel button. To cancel forward test orders,
   stop the forward test.
+- An order can be cancelled (`can_cancel`) when its source is "by hand" and
+  its client ID is `settings.ibkr_web_client_id`. IBKR lets a client cancel
+  only its own orders. The cancel route also requires a row in the local
+  table.
 - Filled orders sent by hand show data from the local table and from IBKR.
+  Not implemented yet (#75): the list shows open orders only.
+  `GET /api/paper-trading/manual-orders` returns the local rows.
+- The local table is `manual_order`: `created_at_utc`, `account`, `symbol`,
+  `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`,
+  `time_in_force`, `ibkr_order_id`. It has no status column. ATrade writes
+  the row after IB Gateway accepts the order request.
+- The list has only the orders of the checked paper account. It is empty when
+  the check did not pass.
 - Positions and balance belong to the account, not to a client ID.
 
 ## 11.5 The `paper_trading` module
@@ -78,7 +102,7 @@ The public entry `atrade.paper_trading` exports:
 | `PaperAccountCheck` | The result: `status` (`disconnected`, `passed`, `failed`), `message` (the reason of the failure), `actual_accounts`, `expected_account`. |
 | `PaperAccountMonitor` | The check result of the Web process in memory, the balance, and the positions. |
 | `fetch_paper_capital_usd(paper_account_monitor)` | The `NetLiquidation` value in USD of the paper account after a passed check. Otherwise `settings.local_paper_capital_usd`. |
-| `create_paper_trading_router(*, paper_account_monitor)` | The router of `/ws/paper-trading`. |
+| `create_paper_trading_router(*, paper_account_monitor, database_url, clock)` | The router of the order routes (section 11.8) and of `/ws/paper-trading`. |
 
 - The check fails closed. A condition that ATrade cannot confirm is a failure,
   for example an empty `ATRADE_IBKR_ACCOUNT_ID`.
@@ -107,6 +131,7 @@ The public entry `atrade.paper_trading` exports:
 | Message | When |
 |---|---|
 | `{"type": "account", "check": {...}, "balance": {...} \| null, "positions": [...]}` | At once after the socket opens, and after each change. The server compares the state every 0.25 seconds. |
+| `{"type": "orders", "orders": [...]}` | At once after the socket opens, and after each change. The server reads the open orders (`reqAllOpenOrders`) every 1 second. |
 | `{"type": "heartbeat"}` | After 10 seconds without another message. |
 
 - `check` has the fields of `PaperAccountCheck`.
@@ -115,6 +140,8 @@ The public entry `atrade.paper_trading` exports:
 - Each position has `symbol`, `security_type`, `exchange`, `currency`,
   `quantity`, `average_cost`, `market_price`, `market_value`,
   `unrealized_pnl`. The list is empty when the check did not pass.
+- Each order has the fields of `OpenOrderResponse` (section 11.8). When IB
+  Gateway does not answer, the server keeps the last list and tries again.
 - Amounts and quantities are decimal text, for example `"101234.50"`.
 - The browser sends nothing. The server reads the socket only to see when the
   browser leaves.
@@ -128,3 +155,31 @@ The public entry `atrade.paper_trading` exports:
 - The panel uses `foundation/live_socket` for reconnection and heartbeat, and
   `foundation/scroll_region` for the position table (section 13). The table
   text wraps, so the table does not overflow to the side.
+- After a passed check, the panel shows the paper order form
+  (`PaperOrderTicket.svelte`): symbol, exchange, currency, side, quantity,
+  order type, limit price (limit orders only), and time in force. "Review
+  order" checks the form and opens a modal `<dialog>` "Confirm paper order"
+  with the `PAPER` mark, the instrument, side, quantity, order type, price,
+  and account number. Only "Send paper order" in the dialog sends the order.
+  "Back" or Escape sends nothing.
+- The open order list (`OpenOrderList.svelte`) comes from the "orders"
+  message. It shows the source of each order ("by hand" or "forward test
+  42") and a cancel button only when `can_cancel` is true. It uses
+  `foundation/scroll_region` with the label "Open orders".
+- An error of the order or cancel route shows in the panel as an alert, with
+  the actual and the expected account for a `403`.
+
+## 11.8 Order routes
+
+| Route | Behavior |
+|---|---|
+| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
+| `GET /api/paper-trading/orders` | `200` with `{"orders": [OpenOrderResponse]}`: the open orders of the checked account. Each order has `order_id`, `account`, `symbol`, `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`, `time_in_force`, `status` (IBKR text), `filled_quantity`, `source` (`kind`: `by_hand` or `forward_test`, `forward_test_id`), `can_cancel`. `502` when IB Gateway does not answer. |
+| `DELETE /api/paper-trading/orders/{order_id}` | `202` after ATrade sends the cancel request. IBKR confirms it later in the order list. `403` as for `POST`. `404` when no open order of the account has this ID, or when ATrade did not send it by hand. `409` for an order of a forward test or of another client. `502` when IB Gateway does not answer. |
+| `GET /api/paper-trading/manual-orders` | `200` with `{"manual_orders": [...]}`: the rows of `manual_order`, oldest first. |
+
+- The backend tests (`backend/tests/paper_trading/test_paper_orders.py`) go
+  through these routes with the IBKR fake and real PostgreSQL.
+- The Playwright test `frontend/e2e/paper_orders.spec.ts` sends an order
+  through the dialog, cancels it, and checks the scroll track of the order
+  list. The e2e server has 30 open orders of forward test 42.

@@ -270,8 +270,8 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 
 Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
 It holds the live order switch, the paper account check, paper orders sent by
-hand, the order list, the `paper_trading` module, `/ws/paper-trading`, and the
-account panel.
+hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
+account panel, and the order routes (11.8).
 
 ## 12. Forward test
 
@@ -408,6 +408,12 @@ documents. Nobody ran them.
   cannot change it.
 - `foundation/order_ref.py` holds the format rule. `forward_test` writes it.
   `paper_trading` reads it.
+  - `format_forward_test_order_tag(forward_test_id)` returns `FT<ID>`.
+  - `read_order_source(order_ref)` splits the `orderRef` at `-`. A part
+    `FT<digits>` gives the source "forward test <digits>". Each other
+    `orderRef` gives the source "by hand".
+  - Orders by hand from ATrade have the `orderRef` `ATRADE-BY-HAND`
+    (`MANUAL_ORDER_REF`) (#75).
 - The frontend changes the ID into the forward test name in `routes/`.
 
 ### 12.10 Comparison with a backtest

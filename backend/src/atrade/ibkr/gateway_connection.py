@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Protocol
 
-from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, RequestError
+from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Order, RequestError
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -23,12 +23,13 @@ from atrade.ibkr.historical_bars import (
     plan_historical_data_requests,
     to_bar,
 )
+from atrade.ibkr.orders import OpenOrder, OrderRequest, build_contract, build_order, convert_trade
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
+OPEN_ORDERS_TIMEOUT_SECONDS = 10.0
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
-SMART_ROUTING = "SMART"
 HISTORICAL_DATA_TIMEOUT_SECONDS = 60.0
 # IBKR refuses 6 or more historical data requests for the same contract within 2 seconds (pacing violation).
 HISTORICAL_DATA_REQUEST_INTERVAL_SECONDS = 0.5
@@ -66,7 +67,20 @@ class GatewayConnection(Protocol):
     def read_account_values(self) -> list[AccountValue]: ...
 
     def read_portfolio(self) -> list[PortfolioPosition]: ...
+
     async def search_instruments(self, query: str) -> list[Instrument]: ...
+
+    async def place_order(self, request: OrderRequest) -> int:
+        """Sends the order and returns its IBKR order ID. Raises GatewayRequestError without a connection."""
+        ...
+
+    async def read_open_orders(self) -> list[OpenOrder]:
+        """All open orders of all client IDs (reqAllOpenOrders). IBKR is the only source of order status."""
+        ...
+
+    async def cancel_order(self, order_id: int) -> None:
+        """Cancels an order that this client ID sent. Raises GatewayRequestError without a connection."""
+        ...
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
@@ -96,16 +110,6 @@ def read_stock_instruments(contract_descriptions: list[ContractDescription]) -> 
     return instruments
 
 
-def make_stock_contract(instrument: Instrument) -> Contract:
-    return Contract(
-        secType=STOCK_SECURITY_TYPE,
-        symbol=instrument.symbol,
-        exchange=SMART_ROUTING,
-        primaryExchange=instrument.exchange,
-        currency=instrument.currency,
-    )
-
-
 class IbAsyncGatewayConnection:
     def __init__(self, *, host: str, port: int, client_id: int, retry_seconds: float = DEFAULT_RETRY_SECONDS) -> None:
         require_usable_client_id(client_id)
@@ -115,6 +119,8 @@ class IbAsyncGatewayConnection:
         self.retry_seconds = retry_seconds
         self.connection_number = 0
         self.ib = IB()
+        # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
+        self.open_orders_lock = asyncio.Lock()
         # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
         self.ib.RaiseRequestErrors = True
 
@@ -179,6 +185,31 @@ class IbAsyncGatewayConnection:
             raise GatewayRequestError(message)
         return read_stock_instruments(contract_descriptions)
 
+    def require_connection(self) -> None:
+        if not self.ib.isConnected():
+            message = f"ATrade is not connected to IB Gateway at {self.host}:{self.port}."
+            raise GatewayRequestError(message)
+
+    async def place_order(self, request: OrderRequest) -> int:
+        self.require_connection()
+        trade = self.ib.placeOrder(build_contract(request.instrument), build_order(request))
+        return trade.order.orderId
+
+    async def read_open_orders(self) -> list[OpenOrder]:
+        """https://interactivebrokers.github.io/tws-api/open_orders.html"""
+        self.require_connection()
+        async with self.open_orders_lock:
+            try:
+                trades = await asyncio.wait_for(self.ib.reqAllOpenOrdersAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
+            except (ConnectionError, RequestError, TimeoutError) as error:
+                message = f"IB Gateway did not return the open orders: {error}"
+                raise GatewayRequestError(message) from error
+        return [convert_trade(trade) for trade in trades if not trade.isDone()]
+
+    async def cancel_order(self, order_id: int) -> None:
+        self.require_connection()
+        self.ib.cancelOrder(Order(orderId=order_id, clientId=self.client_id))
+
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
     ) -> list[Bar]:
@@ -186,7 +217,7 @@ class IbAsyncGatewayConnection:
 
         https://interactivebrokers.github.io/tws-api/historical_bars.html
         """
-        contract = make_stock_contract(instrument)
+        contract = build_contract(instrument)
         bars: list[Bar] = []
         for request_index, request in enumerate(plan_historical_data_requests(time_range, bar_period)):
             if request_index > 0:
@@ -231,7 +262,7 @@ class IbAsyncGatewayConnection:
         IBKR sends an update of the last bar about every 5 seconds. The subscription ends when the generator closes.
         https://interactivebrokers.github.io/tws-api/historical_bars.html#hd_request
         """
-        bars_data = await self.subscribe_to_live_bars(make_stock_contract(instrument), bar_period)
+        bars_data = await self.subscribe_to_live_bars(build_contract(instrument), bar_period)
         updates: asyncio.Queue[None] = asyncio.Queue()
 
         def receive_update(_bars_data: BarDataList, _has_new_bar: bool) -> None:

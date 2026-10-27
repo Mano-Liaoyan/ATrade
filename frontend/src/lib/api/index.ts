@@ -38,6 +38,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/paper-trading/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Open Orders */
+        get: operations["list_open_orders_api_paper_trading_orders_get"];
+        put?: never;
+        /** Send Order */
+        post: operations["send_order_api_paper_trading_orders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/paper-trading/orders/{order_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancel Order */
+        delete: operations["cancel_order_api_paper_trading_orders__order_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/paper-trading/manual-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Manual Orders */
+        get: operations["list_manual_orders_api_paper_trading_manual_orders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/instrument-search": {
         parameters: {
             query?: never;
@@ -299,10 +351,127 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["InstrumentResponse"][];
         };
+        /** ManualOrderListResponse */
+        ManualOrderListResponse: {
+            /** Manual Orders */
+            manual_orders: components["schemas"]["ManualOrderResponse"][];
+        };
+        /** ManualOrderResponse */
+        ManualOrderResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Account */
+            account: string;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Side */
+            side: string;
+            /** Quantity */
+            quantity: number;
+            /** Order Type */
+            order_type: string;
+            /** Limit Price */
+            limit_price: string | null;
+            /** Time In Force */
+            time_in_force: string;
+            /** Ibkr Order Id */
+            ibkr_order_id: number;
+        };
+        /** OpenOrderListResponse */
+        OpenOrderListResponse: {
+            /** Orders */
+            orders: components["schemas"]["OpenOrderResponse"][];
+        };
+        /** OpenOrderResponse */
+        OpenOrderResponse: {
+            /** Order Id */
+            order_id: number;
+            /** Account */
+            account: string;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Side */
+            side: string;
+            /** Quantity */
+            quantity: string;
+            /** Order Type */
+            order_type: string;
+            /** Limit Price */
+            limit_price: string | null;
+            /** Time In Force */
+            time_in_force: string;
+            /** Status */
+            status: string;
+            /** Filled Quantity */
+            filled_quantity: string;
+            source: components["schemas"]["OrderSourceResponse"];
+            /** Can Cancel */
+            can_cancel: boolean;
+        };
+        /** OrderErrorResponse */
+        OrderErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /**
+         * OrderRefusedResponse
+         * @description The paper account check did not pass. ATrade did not send the order.
+         */
+        OrderRefusedResponse: {
+            /** Detail */
+            detail: string;
+            /** Actual Accounts */
+            actual_accounts: string[];
+            /** Expected Account */
+            expected_account: string | null;
+        };
+        /** @enum {string} */
+        OrderSide: "BUY" | "SELL";
+        /** OrderSourceResponse */
+        OrderSourceResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "by_hand" | "forward_test";
+            /** Forward Test Id */
+            forward_test_id: number | null;
+        };
+        /** @enum {string} */
+        OrderType: "MKT" | "LMT";
         /** SaveVersionRequest */
         SaveVersionRequest: {
             /** Code */
             code: string;
+        };
+        /** SendOrderRequest */
+        SendOrderRequest: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            side: components["schemas"]["OrderSide"];
+            /** Quantity */
+            quantity: number;
+            order_type: components["schemas"]["OrderType"];
+            /** Limit Price */
+            limit_price: number | string | null;
+            time_in_force: components["schemas"]["TimeInForce"];
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -359,6 +528,8 @@ export interface components {
              */
             created_at_utc: string;
         };
+        /** @enum {string} */
+        TimeInForce: "DAY" | "GTC";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -476,6 +647,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GatewayStatusResponse"];
+                };
+            };
+        };
+    };
+    list_open_orders_api_paper_trading_orders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenOrderListResponse"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+        };
+    };
+    send_order_api_paper_trading_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualOrderResponse"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderRefusedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+        };
+    };
+    cancel_order_api_paper_trading_orders__order_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderRefusedResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+        };
+    };
+    list_manual_orders_api_paper_trading_manual_orders_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualOrderListResponse"];
                 };
             };
         };

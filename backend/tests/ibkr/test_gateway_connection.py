@@ -9,7 +9,7 @@ import pytest
 
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import GatewayRequestError, IbAsyncGatewayConnection
+from atrade.ibkr import GatewayRequestError, IbAsyncGatewayConnection, OrderRequest
 
 LOCAL_HOST = "127.0.0.1"
 
@@ -45,6 +45,28 @@ async def test_reports_a_failed_instrument_search_without_a_connection() -> None
 
     with pytest.raises(GatewayRequestError, match="Not connected"):
         await connection.search_instruments("AAPL")
+
+
+@pytest.mark.anyio
+async def test_sends_reads_and_cancels_no_order_without_a_connection() -> None:
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=find_closed_local_port(), client_id=1)
+    order_request = OrderRequest(
+        account="DU1234567",
+        instrument=Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD"),
+        side="BUY",
+        quantity=1,
+        order_type="MKT",
+        limit_price=None,
+        time_in_force="DAY",
+        order_ref="ATRADE-BY-HAND",
+    )
+
+    with pytest.raises(GatewayRequestError, match="not connected"):
+        await connection.place_order(order_request)
+    with pytest.raises(GatewayRequestError, match="not connected"):
+        await connection.read_open_orders()
+    with pytest.raises(GatewayRequestError, match="not connected"):
+        await connection.cancel_order(1)
 
 
 @pytest.mark.anyio

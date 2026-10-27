@@ -12,21 +12,27 @@ is in GitHub Issues.
 
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
-(issue #68), code completion (issue #69), and the paper account check with the
-account panel (issue #74):
+(issue #68), code completion (issue #69), the paper account check with the
+account panel (issue #74), and paper orders sent by hand (issue #75):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
-  language server WebSocket `/ws/strategy-language-server`, and
-  `/ws/paper-trading`.
+  language server WebSocket `/ws/strategy-language-server`, the paper order
+  routes under `/api/paper-trading`, and `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home
   page shows the account panel: the check result, the balance, and the
   positions, updated live. When the check fails, the panel shows the actual
-  and the expected account number. ATrade sends no orders yet.
+  and the expected account number.
+- Paper orders by hand: after a passed check, the account panel sends market
+  and limit orders (DAY or GTC) to the IBKR paper account, after a
+  confirmation dialog with a `PAPER` mark. The open order list shows all open
+  orders of the account with their source ("by hand" or "forward test N").
+  Only orders by hand can be cancelled. ATrade never sends live orders. See
+  [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md).
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database.
@@ -58,7 +64,7 @@ account panel (issue #74):
   again after a lost connection and when a background tab becomes visible.
   See [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.5.
-- Backtests, paper orders, and forward tests are not available yet.
+- Backtests and forward tests are not available yet.
 
 ## Requirements
 

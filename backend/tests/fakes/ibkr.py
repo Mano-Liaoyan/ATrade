@@ -1,9 +1,10 @@
 """IBKR fake: the same functions as the GatewayConnection of the `ibkr` public entry. Data stays in memory.
 
 Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
-`instruments`, `search_error_message`, `historical_bars_error_message`, `live_bars_error_message`,
-`live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read `historical_bar_requests`,
-`live_bar_subscriptions`, and `active_live_bar_stream_count`. No mock library is used (section 17.3).
+`instruments`, `search_error_message`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
+`live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
+`historical_bar_requests`, `live_bar_subscriptions`, and `active_live_bar_stream_count`. No mock library is used
+(section 17.3).
 """
 
 from collections.abc import AsyncGenerator
@@ -15,11 +16,14 @@ import anyio
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import AccountValue, GatewayRequestError, PortfolioPosition
+from atrade.ibkr import AccountValue, GatewayRequestError, OpenOrder, OrderRequest, PortfolioPosition
 
 # The fake checks the reachable flag this often. A short wait keeps the e2e server from using a full CPU.
 CHECK_INTERVAL_SECONDS = 0.05
 PAPER_PORT = 4004
+# The client ID of the Web process (settings.ibkr_web_client_id). Orders of the fake come from this client ID.
+WEB_CLIENT_ID = 1
+FIRST_ORDER_ID = 1001
 
 # Many symbols start with "A", so a search for "A" fills more than one screen of results in the e2e tests.
 SAMPLE_US_SYMBOLS = [
@@ -80,6 +84,7 @@ class FakeGatewayConnection:
         is_gateway_reachable: bool = True,
         port: int = PAPER_PORT,
         instruments: list[Instrument] | None = None,
+        client_id: int = WEB_CLIENT_ID,
     ) -> None:
         self.managed_accounts = managed_accounts
         self.is_gateway_reachable = is_gateway_reachable
@@ -89,6 +94,12 @@ class FakeGatewayConnection:
         self.instruments = list(SAMPLE_INSTRUMENTS) if instruments is None else instruments
         # When it is set, search_instruments fails with this message, like a timeout or an API error of IBKR.
         self.search_error_message: str | None = None
+        self.client_id = client_id
+        # All open orders of the account, like reqAllOpenOrders. Tests add orders of other client IDs here.
+        self.open_orders: list[OpenOrder] = []
+        # When it is set, place_order fails with this message, like an API error of IBKR.
+        self.order_error_message: str | None = None
+        self.next_order_id = FIRST_ORDER_ID
         # When it is set, read_historical_bars fails with this message.
         self.historical_bars_error_message: str | None = None
         # Each call of read_historical_bars, in order. Tests assert that only missing ranges reach IBKR.
@@ -151,6 +162,49 @@ class FakeGatewayConnection:
             raise GatewayRequestError(self.search_error_message)
         symbol_start = query.upper()
         return [instrument for instrument in self.instruments if instrument.symbol.startswith(symbol_start)]
+
+    def require_connection(self) -> None:
+        if not self.connected:
+            message = "Not connected"
+            raise GatewayRequestError(message)
+
+    async def place_order(self, request: OrderRequest) -> int:
+        self.require_connection()
+        if self.order_error_message is not None:
+            raise GatewayRequestError(self.order_error_message)
+        order_id = self.next_order_id
+        self.next_order_id += 1
+        self.open_orders.append(
+            OpenOrder(
+                order_id=order_id,
+                client_id=self.client_id,
+                perm_id=order_id * 10,
+                account=request.account,
+                instrument=request.instrument,
+                side=request.side,
+                quantity=Decimal(request.quantity),
+                order_type=request.order_type,
+                limit_price=request.limit_price,
+                time_in_force=request.time_in_force,
+                status="Submitted",
+                filled_quantity=Decimal(0),
+                order_ref=request.order_ref,
+            )
+        )
+        return order_id
+
+    async def read_open_orders(self) -> list[OpenOrder]:
+        self.require_connection()
+        return list(self.open_orders)
+
+    async def cancel_order(self, order_id: int) -> None:
+        # Like IBKR: a client can cancel only its own orders.
+        self.require_connection()
+        self.open_orders = [
+            order
+            for order in self.open_orders
+            if not (order.order_id == order_id and order.client_id == self.client_id)
+        ]
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
@@ -217,4 +271,25 @@ def make_stock_position(account_id: str, *, symbol: str, quantity: str, market_p
         market_price=price,
         market_value=price * position_quantity,
         unrealized_pnl=Decimal(0),
+    )
+
+
+def make_forward_test_order(
+    account_id: str, *, forward_test_id: int, order_id: int, client_id: int, symbol: str = "AAPL"
+) -> OpenOrder:
+    """An open order that a forward test child sent. NautilusTrader writes the ClientOrderId into orderRef."""
+    return OpenOrder(
+        order_id=order_id,
+        client_id=client_id,
+        perm_id=order_id * 10,
+        account=account_id,
+        instrument=Instrument(symbol=symbol, exchange="NASDAQ", currency="USD"),
+        side="BUY",
+        quantity=Decimal(5),
+        order_type="LMT",
+        limit_price=Decimal("10.50"),
+        time_in_force="GTC",
+        status="Submitted",
+        filled_quantity=Decimal(0),
+        order_ref=f"O-20260102-030405-001-FT{forward_test_id}-{order_id}",
     )
