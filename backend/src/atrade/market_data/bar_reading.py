@@ -87,6 +87,26 @@ async def read_saved_bars(*, database_url: str, bar_request: BarRequest) -> list
         )
 
 
+async def save_received_bars(*, database_url: str, bar_request: BarRequest, bars: list[Bar]) -> None:
+    """Saves complete bars that a caller received from IBKR for `bar_request.time_range`, and records the range as
+    saved. A forward test saves its warm-up bars with it, so a backtest of the same period finds them.
+
+    A bar that is already saved gets the new values: a second save of the same bars adds no row.
+    """
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
+        await bar_store.save_bars_of_range(
+            connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
+        )
+
+
+def save_received_bars_blocking(*, database_url: str, bar_request: BarRequest, bars: list[Bar]) -> None:
+    """`save_received_bars` for synchronous callers: the forward test DataActor saves each live bar in `on_bar`."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        bar_store.save_bars_of_range_blocking(
+            connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
+        )
+
+
 async def has_saved_bars(*, database_url: str, bar_request: BarRequest) -> bool:
     """True when PostgreSQL holds at least one bar that `read_saved_bars` would return. It never calls IBKR."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:

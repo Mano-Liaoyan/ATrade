@@ -28,6 +28,7 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import format_forward_test_order_tag
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, GatewayRequestError
+from atrade.market_data import BarRequest, save_received_bars
 from atrade.paper_trading import PaperAccountCheckError, PaperAccountMonitor, require_paper_account
 from atrade.strategy import read_strategy_version
 
@@ -115,7 +116,8 @@ async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None)
 
 
 async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection) -> tuple[Bar, ...]:
-    """The complete bars of the look-back length before now, the same length as a backtest look-back.
+    """The complete bars of the look-back length before now, the same length as a backtest look-back. The child also
+    saves them in the bar store of `market_data`, so a same-period backtest finds them (section 12.15).
 
     `read_historical_bars` splits the range into requests of the IBKR step size of the bar period. A failed read
     gives no warm-up bars: the forward test starts, and the strategy gets an empty `request_bars` answer.
@@ -123,14 +125,26 @@ async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection
     bar_period = BarPeriod(job.row.bar_period)
     end_utc = floor_to_bar_start(job.ibkr_access.clock.read_now_utc(), bar_period)
     time_range = TimeRange(start_utc=end_utc - find_look_back_length(bar_period), end_utc=end_utc)
+    bar_request = BarRequest(
+        instrument=forward_test_store.read_instrument(job.row), bar_period=bar_period, time_range=time_range
+    )
     try:
         bars = await gateway_connection.read_historical_bars(
-            forward_test_store.read_instrument(job.row), bar_period, time_range
+            bar_request.instrument, bar_request.bar_period, bar_request.time_range
         )
     except GatewayRequestError as error:
         logger.warning("Forward test %s: the warm-up bars were not read: %s", job.row.id, error)
         return ()
+    await save_warm_up_bars(job, bar_request, bars)
     return tuple(bars)
+
+
+async def save_warm_up_bars(job: ChildJob, bar_request: BarRequest, bars: list[Bar]) -> None:
+    """Saves the warm-up bars in the bar store, so a backtest can use them. A failed save does not stop the start."""
+    try:
+        await save_received_bars(database_url=job.settings.database_url, bar_request=bar_request, bars=bars)
+    except psycopg.Error as error:
+        logger.warning("Forward test %s: the warm-up bars were not saved: %s", job.row.id, error)
 
 
 async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:

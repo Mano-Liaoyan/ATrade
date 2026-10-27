@@ -136,6 +136,14 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
 - The public entry exports `read_saved_bars(*, database_url, bar_request)`
   with `BarRequest(instrument, bar_period, time_range)`. It reads only the
   bars in PostgreSQL and never calls IBKR. Backtests use it (section 10).
+- The public entry exports `save_received_bars(*, database_url, bar_request,
+  bars)` (async) and `save_received_bars_blocking(...)` (the same, for
+  synchronous callers). They save complete bars that a caller received from
+  IBKR for `bar_request.time_range`, and record that range as saved, in one
+  transaction. They use the same SQL as the bars route. A bar that is
+  already saved gets the new values, so a second save adds no row. A forward
+  test uses them for its warm-up bars and its live bars
+  (`docs/architecture/forward_test.md` sections 12.8 and 12.15).
 - `GatewayConnection.read_historical_bars(instrument, bar_period,
   time_range)` in `ibkr` calls `reqHistoricalData` with `TRADES`, regular
   trading hours only (`useRTH`), `formatDate=2` (UTC), and the contract
@@ -197,8 +205,10 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   the connection is lost (checked each second while no update comes). When
   the generator closes, it cancels the IBKR subscription
   (`cancelHistoricalData`). Use `contextlib.aclosing`.
-- Live bars are not saved in PostgreSQL. The bars route saves only complete
-  bars (section 8.4).
+- The live bars of `/ws/market-data` are not saved in PostgreSQL. The bars
+  route saves only complete bars (section 8.4). A forward test saves each
+  complete bar that its LiveNode receives (`docs/architecture/forward_test.md`
+  section 12.8).
 
 | `/ws/market-data?symbol=&exchange=&currency=&bar_period=` message | When |
 |---|---|

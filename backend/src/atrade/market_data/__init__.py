@@ -1,7 +1,14 @@
-"""Public entry of the market_data capability: instrument search, the instrument lookup, bars, saved bars, and live
-bars."""
+"""Public entry of the market_data capability: instrument search, the instrument lookup, bars, saved bars, received
+bars to save, and live bars."""
 
-from atrade.market_data.bar_reading import BarRequest, has_saved_bars, read_saved_bar_coverage, read_saved_bars
+from atrade.market_data.bar_reading import (
+    BarRequest,
+    has_saved_bars,
+    read_saved_bar_coverage,
+    read_saved_bars,
+    save_received_bars,
+    save_received_bars_blocking,
+)
 from atrade.market_data.bar_store import SavedBarCoverage
 from atrade.market_data.http_routes import create_market_data_router
 from atrade.market_data.instrument_lookup import (
@@ -24,4 +31,6 @@ __all__ = [
     "has_saved_bars",
     "read_saved_bar_coverage",
     "read_saved_bars",
+    "save_received_bars",
+    "save_received_bars_blocking",
 ]

@@ -30,7 +30,8 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
   period that starts in the time range. The message is the same message as
   the child failure (`describe_missing_bars()`). It names the bar period
   ("1 min"), the instrument, and the period in UTC ("2026-03-01 00:00 UTC").
-  It says that ATrade saves bars only when a bar chart loads them from IBKR,
+  It says that ATrade saves bars when a bar chart loads them from IBKR and
+  when a forward test receives them,
   and that IBKR has bars only for the regular trading hours, so a period when
   the market was closed has no bars. It tells the user to open the bar chart
   with this bar period or to select a period with trading hours. Partial coverage is allowed: one
