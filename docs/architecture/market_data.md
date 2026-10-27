@@ -137,8 +137,10 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   the range at the start of the current bar, because a bar that is not
   complete changes later. It reads the saved ranges, asks IBKR only for the
   missing parts, saves the bars and the range in one transaction for each
-  missing part, and then reads the bars from PostgreSQL. One lock in the
-  Web process lets only one fill run at a time.
+  missing part, and then reads the bars from PostgreSQL. One lock for each
+  instrument and bar period in the Web process lets only one fill of that
+  instrument and bar period run at a time. Fills of other instruments do not
+  wait. The store saves all bars of a range with one SQL statement.
 - When no part is missing, the route does not call IBKR. Saved bars are
   returned also when IB Gateway is not reachable.
 - The public entry exports `read_saved_bars(*, database_url, bar_request)`

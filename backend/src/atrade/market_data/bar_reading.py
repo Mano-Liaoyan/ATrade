@@ -1,6 +1,7 @@
 """Reads bars from PostgreSQL and asks IBKR only for the time ranges that are not saved yet."""
 
 import asyncio
+from collections import defaultdict
 from dataclasses import dataclass
 
 import psycopg
@@ -57,8 +58,9 @@ class BarReader:
         self.database_url = database_url
         self.clock = clock
         self.gateway_connection = gateway_connection
-        # One fill of missing ranges at a time: two equal chart requests then cause one IBKR request, not two.
-        self.fill_lock = asyncio.Lock()
+        # One fill of missing ranges at a time for each instrument and bar period: two equal chart requests then cause
+        # one IBKR request, not two. A slow fill of one instrument does not hold the bars of other instruments.
+        self.fill_locks: defaultdict[tuple[Instrument, BarPeriod], asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def read_bars(self, bar_request: BarRequest) -> list[Bar]:
         """Raises GatewayNotConnectedError, or GatewayRequestError of `ibkr`, when missing bars cannot be read."""
@@ -68,7 +70,7 @@ class BarReader:
         instrument = bar_request.instrument
         bar_period = bar_request.bar_period
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            async with self.fill_lock:
+            async with self.fill_locks[instrument, bar_period]:
                 saved_ranges = await bar_store.select_saved_ranges(connection, instrument, bar_period, complete_range)
                 missing_ranges = find_missing_ranges(complete_range, saved_ranges)
                 if missing_ranges and not self.gateway_connection.is_connected():
