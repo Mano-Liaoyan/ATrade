@@ -31,6 +31,7 @@ documents listed as `active` should guide implementation work.
 | [`architecture/modules.md`](architecture/modules.md)                                 | maintainer | Target module map for the ATrade modular monolith covering `src/`, `workers`, and `frontend` with provider-neutral broker/data seams.    |
 | [`architecture/paper-trading-workspace.md`](architecture/paper-trading-workspace.md) | maintainer | Authoritative paper-trading workspace architecture and paper-only configuration contract for the staged IBKR-backed trading UI slice.   |
 | [`process/github-coordination.md`](process/github-coordination.md)                   | maintainer | Lightweight GitHub coordination contract for repository work.                                                                           |
+| [`architecture.md`](architecture.md)                                                 | maintainer | Target architecture for the full rewrite. It replaces the other active documents when the first rewrite PR lands.                      |
 
 ## Legacy-Review-Pending Documents
 
