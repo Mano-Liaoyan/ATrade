@@ -1,0 +1,3769 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ATrade",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Read Health",
+        "operationId": "read_health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ibkr/gateway": {
+      "get": {
+        "summary": "Read Gateway Status",
+        "operationId": "read_gateway_status_api_ibkr_gateway_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/orders": {
+      "get": {
+        "summary": "List Open Orders",
+        "operationId": "list_open_orders_api_paper_trading_orders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenOrderListResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Send Order",
+        "operationId": "send_order_api_paper_trading_orders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualOrderResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRefusedResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderBlockedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/orders/{order_id}": {
+      "delete": {
+        "summary": "Cancel Order",
+        "operationId": "cancel_order_api_paper_trading_orders__order_id__delete",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRefusedResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/manual-orders": {
+      "get": {
+        "summary": "List Manual Orders",
+        "operationId": "list_manual_orders_api_paper_trading_manual_orders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualOrderListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/paper-capital": {
+      "get": {
+        "summary": "Read Paper Capital",
+        "operationId": "read_paper_capital_api_paper_trading_paper_capital_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperCapitalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/instrument-search": {
+      "get": {
+        "summary": "Search Instruments",
+        "operationId": "search_instruments_api_market_data_instrument_search_get",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Query"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentSearchResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/bars": {
+      "get": {
+        "summary": "Read Bars",
+        "description": "Returns the complete bars that start in the range, oldest first. Only missing ranges go to IBKR.",
+        "operationId": "read_bars_api_market_data_bars_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Exchange"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Currency"
+            }
+          },
+          {
+            "name": "bar_period",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/BarPeriod"
+            }
+          },
+          {
+            "name": "start_utc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Utc"
+            }
+          },
+          {
+            "name": "end_utc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Utc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarsResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies": {
+      "get": {
+        "summary": "List Strategies",
+        "operationId": "list_strategies_api_strategies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StrategyListItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Strategies Api Strategies Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Strategy",
+        "operationId": "create_strategy_api_strategies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStrategyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies/{strategy_id}": {
+      "get": {
+        "summary": "Read Strategy",
+        "operationId": "read_strategy_api_strategies__strategy_id__get",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Strategy",
+        "operationId": "delete_strategy_api_strategies__strategy_id__delete",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies/{strategy_id}/versions/{version_number}": {
+      "get": {
+        "summary": "Read Version",
+        "operationId": "read_version_api_strategies__strategy_id__versions__version_number__get",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          },
+          {
+            "name": "version_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies/{strategy_id}/versions": {
+      "post": {
+        "summary": "Save Version",
+        "description": "Checks the code first. Then it appends a version, or returns the latest version when the code is the same.",
+        "operationId": "save_version_api_strategies__strategy_id__versions_post",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The code is the same as the latest version. No new version is made.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/backtests": {
+      "get": {
+        "summary": "List Backtests",
+        "operationId": "list_backtests_api_backtests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BacktestResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Backtests Api Backtests Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Start Backtest",
+        "operationId": "start_backtest_api_backtests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartBacktestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtests/{backtest_id}": {
+      "get": {
+        "summary": "Read Backtest",
+        "operationId": "read_backtest_api_backtests__backtest_id__get",
+        "parameters": [
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtest-limits": {
+      "get": {
+        "summary": "Read Limits",
+        "operationId": "read_limits_api_backtest_limits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestLimitsBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change Limits",
+        "operationId": "change_limits_api_backtest_limits_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestLimitsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestLimitsBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtests/{first_backtest_id}/comparison/{second_backtest_id}": {
+      "get": {
+        "summary": "Compare Backtests",
+        "description": "Compare two backtests of the same strategy: two versions, or one version with other request fields.",
+        "operationId": "compare_backtests_api_backtests__first_backtest_id__comparison__second_backtest_id__get",
+        "parameters": [
+          {
+            "name": "first_backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "First Backtest Id"
+            }
+          },
+          {
+            "name": "second_backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Second Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/forward-tests": {
+      "get": {
+        "summary": "List Forward Tests",
+        "operationId": "list_forward_tests_api_forward_tests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ForwardTestResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Forward Tests Api Forward Tests Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Start Forward Test",
+        "operationId": "start_forward_test_api_forward_tests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartForwardTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartRefusedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forward-tests/{forward_test_id}/stop": {
+      "post": {
+        "summary": "Stop Forward Test",
+        "operationId": "stop_forward_test_api_forward_tests__forward_test_id__stop_post",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forward-tests/{forward_test_id}/same-period-backtests": {
+      "post": {
+        "summary": "Start Same Period Backtest",
+        "description": "A normal backtest from the forward test start to its end, or to now while it runs.",
+        "operationId": "start_same_period_backtest_api_forward_tests__forward_test_id__same_period_backtests_post",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamePeriodBacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forward-tests/{forward_test_id}/comparison/{backtest_id}": {
+      "get": {
+        "summary": "Compare With Backtest",
+        "operationId": "compare_with_backtest_api_forward_tests__forward_test_id__comparison__backtest_id__get",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          },
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist": {
+      "get": {
+        "summary": "List Instruments",
+        "operationId": "list_instruments_api_watchlist_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Instrument",
+        "description": "Checks the instrument through market_data first, so the watchlist holds only instruments that IBKR knows.",
+        "operationId": "add_instrument_api_watchlist_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddInstrumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistInstrumentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/{watchlist_instrument_id}": {
+      "delete": {
+        "summary": "Delete Instrument",
+        "operationId": "delete_instrument_api_watchlist__watchlist_instrument_id__delete",
+        "parameters": [
+          {
+            "name": "watchlist_instrument_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Watchlist Instrument Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddInstrumentRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 8,
+            "minLength": 1,
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency"
+        ],
+        "title": "AddInstrumentRequest"
+      },
+      "BacktestComparisonResponse": {
+        "properties": {
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "first": {
+            "$ref": "#/components/schemas/ComparedBacktestResponse"
+          },
+          "second": {
+            "$ref": "#/components/schemas/ComparedBacktestResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_id",
+          "strategy_name",
+          "first",
+          "second"
+        ],
+        "title": "BacktestComparisonResponse"
+      },
+      "BacktestDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "type": "string",
+            "title": "Paper Capital Usd"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BacktestStatus"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "started_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At Utc"
+          },
+          "ended_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At Utc"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/EquityPointResponse"
+            },
+            "type": "array",
+            "title": "Equity Curve"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradeResponse"
+            },
+            "type": "array",
+            "title": "Trades"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd",
+          "status",
+          "error_message",
+          "created_at_utc",
+          "started_at_utc",
+          "ended_at_utc",
+          "metrics",
+          "equity_curve",
+          "trades"
+        ],
+        "title": "BacktestDetailResponse"
+      },
+      "BacktestLimitsBody": {
+        "properties": {
+          "timeout_seconds": {
+            "type": "integer",
+            "maximum": 604800.0,
+            "minimum": 1.0,
+            "title": "Timeout Seconds"
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Concurrency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timeout_seconds",
+          "concurrency"
+        ],
+        "title": "BacktestLimitsBody",
+        "description": "The request and the response of the backtest limits routes."
+      },
+      "BacktestMetricsResponse": {
+        "properties": {
+          "final_equity_usd": {
+            "type": "string",
+            "title": "Final Equity Usd"
+          },
+          "total_return_percent": {
+            "type": "string",
+            "title": "Total Return Percent"
+          },
+          "max_drawdown_percent": {
+            "type": "string",
+            "title": "Max Drawdown Percent"
+          },
+          "trade_count": {
+            "type": "integer",
+            "title": "Trade Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final_equity_usd",
+          "total_return_percent",
+          "max_drawdown_percent",
+          "trade_count"
+        ],
+        "title": "BacktestMetricsResponse"
+      },
+      "BacktestResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "type": "string",
+            "title": "Paper Capital Usd"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BacktestStatus"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "started_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At Utc"
+          },
+          "ended_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At Utc"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd",
+          "status",
+          "error_message",
+          "created_at_utc",
+          "started_at_utc",
+          "ended_at_utc",
+          "metrics"
+        ],
+        "title": "BacktestResponse"
+      },
+      "BacktestStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "finished",
+          "failed",
+          "timed_out"
+        ]
+      },
+      "BarPeriod": {
+        "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format.",
+        "enum": [
+          "1-MINUTE",
+          "5-MINUTE",
+          "15-MINUTE",
+          "30-MINUTE",
+          "1-HOUR",
+          "1-DAY"
+        ],
+        "title": "BarPeriod",
+        "type": "string"
+      },
+      "BarResponse": {
+        "description": "`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings.",
+        "properties": {
+          "time": {
+            "title": "Time",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "number"
+          },
+          "high": {
+            "title": "High",
+            "type": "number"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          },
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "volume": {
+            "title": "Volume",
+            "type": "number"
+          }
+        },
+        "required": [
+          "time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "title": "BarResponse",
+        "type": "object"
+      },
+      "BarsResponse": {
+        "properties": {
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/BarResponse"
+            },
+            "type": "array",
+            "title": "Bars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bars"
+        ],
+        "title": "BarsResponse"
+      },
+      "CodeCheckFailedResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/CodeProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems"
+        ],
+        "title": "CodeCheckFailedResponse"
+      },
+      "CodeProblemResponse": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "message"
+        ],
+        "title": "CodeProblemResponse"
+      },
+      "ComparedBacktestResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "type": "string",
+            "title": "Paper Capital Usd"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BacktestStatus"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "started_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At Utc"
+          },
+          "ended_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At Utc"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/EquityPointResponse"
+            },
+            "type": "array",
+            "title": "Equity Curve"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/TradeResponse"
+            },
+            "type": "array",
+            "title": "Trades"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd",
+          "status",
+          "error_message",
+          "created_at_utc",
+          "started_at_utc",
+          "ended_at_utc",
+          "metrics",
+          "equity_curve",
+          "trades",
+          "code"
+        ],
+        "title": "ComparedBacktestResponse"
+      },
+      "ComparedBacktestSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BacktestStatus"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "type": "string",
+            "title": "Paper Capital Usd"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparedMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "error_message",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd",
+          "metrics"
+        ],
+        "title": "ComparedBacktestSummaryResponse"
+      },
+      "ComparedEquityPointResponse": {
+        "properties": {
+          "time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Utc"
+          },
+          "equity_usd": {
+            "type": "string",
+            "title": "Equity Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_utc",
+          "equity_usd"
+        ],
+        "title": "ComparedEquityPointResponse"
+      },
+      "ComparedInterruptionResponse": {
+        "properties": {
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_utc",
+          "end_utc"
+        ],
+        "title": "ComparedInterruptionResponse",
+        "description": "A time without a running LiveNode (section 12.7). The chart marks it grey."
+      },
+      "ComparedMetricsResponse": {
+        "properties": {
+          "final_equity_usd": {
+            "type": "string",
+            "title": "Final Equity Usd"
+          },
+          "total_return_percent": {
+            "type": "string",
+            "title": "Total Return Percent"
+          },
+          "max_drawdown_percent": {
+            "type": "string",
+            "title": "Max Drawdown Percent"
+          },
+          "trade_count": {
+            "type": "integer",
+            "title": "Trade Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final_equity_usd",
+          "total_return_percent",
+          "max_drawdown_percent",
+          "trade_count"
+        ],
+        "title": "ComparedMetricsResponse"
+      },
+      "CreateStrategyRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateStrategyRequest"
+      },
+      "DesiredState": {
+        "enum": [
+          "running",
+          "stopped"
+        ],
+        "type": "string"
+      },
+      "EquityPointResponse": {
+        "properties": {
+          "time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Utc"
+          },
+          "equity_usd": {
+            "type": "string",
+            "title": "Equity Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_utc",
+          "equity_usd"
+        ],
+        "title": "EquityPointResponse"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse"
+      },
+      "FillComparisonResponse": {
+        "properties": {
+          "bar_end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Bar End Utc"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "title": "Side"
+          },
+          "forward_test_quantity_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Quantity Shares"
+          },
+          "forward_test_price_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Price Usd"
+          },
+          "backtest_quantity_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Quantity Shares"
+          },
+          "backtest_price_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Price Usd"
+          },
+          "price_difference_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Difference Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bar_end_utc",
+          "side",
+          "forward_test_quantity_shares",
+          "forward_test_price_usd",
+          "backtest_quantity_shares",
+          "backtest_price_usd",
+          "price_difference_usd"
+        ],
+        "title": "FillComparisonResponse"
+      },
+      "ForwardTestComparisonResponse": {
+        "properties": {
+          "forward_test": {
+            "$ref": "#/components/schemas/ForwardTestResponse"
+          },
+          "backtest": {
+            "$ref": "#/components/schemas/ComparedBacktestSummaryResponse"
+          },
+          "forward_test_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparedMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forward_test_equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+            },
+            "type": "array",
+            "title": "Forward Test Equity Curve"
+          },
+          "backtest_equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+            },
+            "type": "array",
+            "title": "Backtest Equity Curve"
+          },
+          "fills": {
+            "items": {
+              "$ref": "#/components/schemas/FillComparisonResponse"
+            },
+            "type": "array",
+            "title": "Fills"
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedInterruptionResponse"
+            },
+            "type": "array",
+            "title": "Interruptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "forward_test",
+          "backtest",
+          "forward_test_metrics",
+          "forward_test_equity_curve",
+          "backtest_equity_curve",
+          "fills",
+          "interruptions"
+        ],
+        "title": "ForwardTestComparisonResponse"
+      },
+      "ForwardTestResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "strategy_version_id": {
+            "title": "Strategy Version Id",
+            "type": "integer"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "integer"
+          },
+          "strategy_name": {
+            "title": "Strategy Name",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "desired_state": {
+            "$ref": "#/components/schemas/DesiredState"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ForwardTestStatus"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "start_balance_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Balance Usd"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at_utc": {
+            "format": "date-time",
+            "title": "Created At Utc",
+            "type": "string"
+          },
+          "stopped_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped At Utc"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
+          },
+          "crash_count": {
+            "title": "Crash Count",
+            "type": "integer"
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptionResponse"
+            },
+            "title": "Interruptions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "desired_state",
+          "status",
+          "client_id",
+          "start_balance_usd",
+          "error_message",
+          "created_at_utc",
+          "stopped_at_utc",
+          "end_time_utc",
+          "crash_count",
+          "interruptions"
+        ],
+        "title": "ForwardTestResponse",
+        "type": "object"
+      },
+      "ForwardTestStatus": {
+        "enum": [
+          "starting",
+          "running",
+          "waiting_for_gateway",
+          "stopping",
+          "stopped",
+          "stop_failed",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "GatewayStatusResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "unreachable"
+            ],
+            "title": "Status"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "host",
+          "port"
+        ],
+        "title": "GatewayStatusResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unreachable"
+            ],
+            "title": "Database"
+          },
+          "time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database",
+          "time_utc"
+        ],
+        "title": "HealthResponse"
+      },
+      "InstrumentResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency"
+        ],
+        "title": "InstrumentResponse"
+      },
+      "InstrumentSearchResponse": {
+        "properties": {
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instruments"
+        ],
+        "title": "InstrumentSearchResponse"
+      },
+      "InterruptionReason": {
+        "enum": [
+          "crash",
+          "gateway",
+          "worker_restart"
+        ],
+        "type": "string"
+      },
+      "InterruptionResponse": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/InterruptionReason"
+          },
+          "started_at_utc": {
+            "format": "date-time",
+            "title": "Started At Utc",
+            "type": "string"
+          },
+          "ended_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At Utc"
+          }
+        },
+        "required": [
+          "reason",
+          "started_at_utc",
+          "ended_at_utc"
+        ],
+        "title": "InterruptionResponse",
+        "type": "object"
+      },
+      "ManualOrderListResponse": {
+        "properties": {
+          "manual_orders": {
+            "items": {
+              "$ref": "#/components/schemas/ManualOrderWithFillsResponse"
+            },
+            "type": "array",
+            "title": "Manual Orders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manual_orders"
+        ],
+        "title": "ManualOrderListResponse"
+      },
+      "ManualOrderResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "order_type": {
+            "type": "string",
+            "title": "Order Type"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "type": "string",
+            "title": "Time In Force"
+          },
+          "ibkr_order_id": {
+            "type": "integer",
+            "title": "Ibkr Order Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at_utc",
+          "account",
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force",
+          "ibkr_order_id"
+        ],
+        "title": "ManualOrderResponse"
+      },
+      "ManualOrderWithFillsResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "order_type": {
+            "type": "string",
+            "title": "Order Type"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "type": "string",
+            "title": "Time In Force"
+          },
+          "ibkr_order_id": {
+            "type": "integer",
+            "title": "Ibkr Order Id"
+          },
+          "filled_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled Quantity"
+          },
+          "average_fill_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Fill Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at_utc",
+          "account",
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force",
+          "ibkr_order_id",
+          "filled_quantity",
+          "average_fill_price"
+        ],
+        "title": "ManualOrderWithFillsResponse",
+        "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
+      },
+      "OpenOrderListResponse": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OpenOrderResponse"
+            },
+            "type": "array",
+            "title": "Orders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orders"
+        ],
+        "title": "OpenOrderListResponse"
+      },
+      "OpenOrderResponse": {
+        "properties": {
+          "order_id": {
+            "title": "Order Id",
+            "type": "integer"
+          },
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "order_type": {
+            "title": "Order Type",
+            "type": "string"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "title": "Time In Force",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "filled_quantity": {
+            "title": "Filled Quantity",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/OrderSourceResponse"
+          },
+          "can_cancel": {
+            "title": "Can Cancel",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "order_id",
+          "account",
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force",
+          "status",
+          "filled_quantity",
+          "source",
+          "can_cancel"
+        ],
+        "title": "OpenOrderResponse",
+        "type": "object"
+      },
+      "OrderBlockedResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "forward_test_id": {
+            "type": "integer",
+            "title": "Forward Test Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "forward_test_id"
+        ],
+        "title": "OrderBlockedResponse",
+        "description": "A forward test runs on the instrument. ATrade did not send the order (section 12.2)."
+      },
+      "OrderErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "OrderErrorResponse"
+      },
+      "OrderRefusedResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "actual_accounts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actual Accounts"
+          },
+          "expected_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Account"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "actual_accounts",
+          "expected_account"
+        ],
+        "title": "OrderRefusedResponse",
+        "description": "The paper account check did not pass. ATrade did not send the order."
+      },
+      "OrderSide": {
+        "type": "string",
+        "enum": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "OrderSourceResponse": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "by_hand",
+              "forward_test"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "required": [
+          "kind",
+          "forward_test_id"
+        ],
+        "title": "OrderSourceResponse",
+        "type": "object"
+      },
+      "OrderType": {
+        "type": "string",
+        "enum": [
+          "MKT",
+          "LMT"
+        ]
+      },
+      "PaperCapitalResponse": {
+        "properties": {
+          "paper_capital_usd": {
+            "type": "string",
+            "title": "Paper Capital Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "paper_capital_usd"
+        ],
+        "title": "PaperCapitalResponse",
+        "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
+      },
+      "SamePeriodBacktestResponse": {
+        "properties": {
+          "backtest_id": {
+            "type": "integer",
+            "title": "Backtest Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backtest_id"
+        ],
+        "title": "SamePeriodBacktestResponse"
+      },
+      "SaveVersionRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "SaveVersionRequest"
+      },
+      "SavedBarsResponse": {
+        "properties": {
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "first_start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Start Utc"
+          },
+          "last_start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Start Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bar_period",
+          "first_start_utc",
+          "last_start_utc"
+        ],
+        "title": "SavedBarsResponse",
+        "description": "The saved bars of one bar period: the start of the first and of the last saved bar."
+      },
+      "SendOrderRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Currency"
+          },
+          "side": {
+            "$ref": "#/components/schemas/OrderSide"
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "order_type": {
+            "$ref": "#/components/schemas/OrderType"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "$ref": "#/components/schemas/TimeInForce"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force"
+        ],
+        "title": "SendOrderRequest"
+      },
+      "StartBacktestRequest": {
+        "properties": {
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Paper Capital Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_version_id",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd"
+        ],
+        "title": "StartBacktestRequest"
+      },
+      "StartForwardTestRequest": {
+        "properties": {
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_version_id",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period"
+        ],
+        "title": "StartForwardTestRequest"
+      },
+      "StartRefusedResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "forward_test_id"
+        ],
+        "title": "StartRefusedResponse",
+        "description": "The start was refused. `forward_test_id` is the forward test that already runs on the instrument."
+      },
+      "StrategyListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "latest_version_number": {
+            "type": "integer",
+            "title": "Latest Version Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "latest_version_number"
+        ],
+        "title": "StrategyListItem"
+      },
+      "StrategyResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVersionSummary"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at_utc",
+          "versions"
+        ],
+        "title": "StrategyResponse"
+      },
+      "StrategyVersionResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "code_sha256": {
+            "type": "string",
+            "title": "Code Sha256"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_id",
+          "version_number",
+          "code",
+          "code_sha256",
+          "created_at_utc"
+        ],
+        "title": "StrategyVersionResponse"
+      },
+      "StrategyVersionSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "code_sha256": {
+            "type": "string",
+            "title": "Code Sha256"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_number",
+          "code_sha256",
+          "created_at_utc"
+        ],
+        "title": "StrategyVersionSummary"
+      },
+      "TimeInForce": {
+        "type": "string",
+        "enum": [
+          "DAY",
+          "GTC"
+        ]
+      },
+      "TradeResponse": {
+        "properties": {
+          "time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Utc"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "title": "Side"
+          },
+          "quantity_shares": {
+            "type": "string",
+            "title": "Quantity Shares"
+          },
+          "price_usd": {
+            "type": "string",
+            "title": "Price Usd"
+          },
+          "commission_usd": {
+            "type": "string",
+            "title": "Commission Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_utc",
+          "side",
+          "quantity_shares",
+          "price_usd",
+          "commission_usd"
+        ],
+        "title": "TradeResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WatchlistErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "WatchlistErrorResponse"
+      },
+      "WatchlistInstrumentResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "added_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At Utc"
+          },
+          "saved_bars": {
+            "items": {
+              "$ref": "#/components/schemas/SavedBarsResponse"
+            },
+            "type": "array",
+            "title": "Saved Bars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "currency",
+          "added_at_utc",
+          "saved_bars"
+        ],
+        "title": "WatchlistInstrumentResponse"
+      },
+      "WatchlistResponse": {
+        "properties": {
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistInstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instruments"
+        ],
+        "title": "WatchlistResponse"
+      },
+      "ForwardTestsMessage": {
+        "properties": {
+          "type": {
+            "const": "forward_tests",
+            "default": "forward_tests",
+            "title": "Type",
+            "type": "string"
+          },
+          "forward_tests": {
+            "items": {
+              "$ref": "#/components/schemas/ForwardTestResponse"
+            },
+            "title": "Forward Tests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "forward_tests"
+        ],
+        "title": "ForwardTestsMessage",
+        "type": "object"
+      },
+      "HeartbeatMessage": {
+        "properties": {
+          "type": {
+            "const": "heartbeat",
+            "default": "heartbeat",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "HeartbeatMessage",
+        "type": "object"
+      },
+      "LiveBarErrorMessage": {
+        "properties": {
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "LiveBarErrorMessage",
+        "type": "object"
+      },
+      "LiveBarMessage": {
+        "description": "The current bar. A bar with the time of the last bar replaces it; a later time adds a bar.",
+        "properties": {
+          "type": {
+            "const": "bar",
+            "default": "bar",
+            "title": "Type",
+            "type": "string"
+          },
+          "bar": {
+            "$ref": "#/components/schemas/BarResponse"
+          }
+        },
+        "required": [
+          "bar"
+        ],
+        "title": "LiveBarMessage",
+        "type": "object"
+      },
+      "OpenOrdersMessage": {
+        "properties": {
+          "type": {
+            "const": "orders",
+            "default": "orders",
+            "title": "Type",
+            "type": "string"
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OpenOrderResponse"
+            },
+            "title": "Orders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "orders"
+        ],
+        "title": "OpenOrdersMessage",
+        "type": "object"
+      },
+      "PaperAccountBalanceMessage": {
+        "properties": {
+          "net_liquidation_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Liquidation Usd"
+          },
+          "cash_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Usd"
+          }
+        },
+        "required": [
+          "net_liquidation_usd",
+          "cash_usd"
+        ],
+        "title": "PaperAccountBalanceMessage",
+        "type": "object"
+      },
+      "PaperAccountCheckMessage": {
+        "properties": {
+          "status": {
+            "enum": [
+              "disconnected",
+              "passed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "actual_accounts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actual Accounts",
+            "type": "array"
+          },
+          "expected_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Account"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "actual_accounts",
+          "expected_account"
+        ],
+        "title": "PaperAccountCheckMessage",
+        "type": "object"
+      },
+      "PaperAccountMessage": {
+        "properties": {
+          "type": {
+            "const": "account",
+            "default": "account",
+            "title": "Type",
+            "type": "string"
+          },
+          "check": {
+            "$ref": "#/components/schemas/PaperAccountCheckMessage"
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaperAccountBalanceMessage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionMessage"
+            },
+            "title": "Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "check",
+          "balance",
+          "positions"
+        ],
+        "title": "PaperAccountMessage",
+        "type": "object"
+      },
+      "PositionMessage": {
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "security_type": {
+            "title": "Security Type",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "average_cost": {
+            "title": "Average Cost",
+            "type": "string"
+          },
+          "market_price": {
+            "title": "Market Price",
+            "type": "string"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "title": "Unrealized Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "security_type",
+          "exchange",
+          "currency",
+          "quantity",
+          "average_cost",
+          "market_price",
+          "market_value",
+          "unrealized_pnl"
+        ],
+        "title": "PositionMessage",
+        "type": "object"
+      }
+    }
+  }
+}

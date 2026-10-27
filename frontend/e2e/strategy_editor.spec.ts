@@ -1,0 +1,84 @@
+// Strategy editor: create a strategy, edit and save its code, see a failed save, and keep unsaved edits after a reload.
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
+
+const VALID_CODE = `from nautilus_trader.config import StrategyConfig
+from nautilus_trader.trading import Strategy
+
+
+class EmptyConfig(StrategyConfig):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+
+
+class EmptyStrategy(Strategy):
+    pass
+`;
+
+// The e2e database is not cleared between tests and browser projects, so each strategy name is unique.
+function createUniqueName(currentTest: TestInfo, title: string): string {
+  return `${title} ${currentTest.project.name} ${String(Date.now())}`;
+}
+
+async function createStrategy(page: Page, name: string): Promise<void> {
+  await page.goto('/strategies');
+  await page.getByLabel('Strategy name').fill(name);
+  await page.getByRole('button', { name: 'Create strategy' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+}
+
+async function replaceCode(page: Page, code: string): Promise<void> {
+  const editor = page.getByRole('textbox', { name: 'Strategy code' });
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.insertText(code);
+}
+
+test('creates a strategy that starts from the template as version 1', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Create');
+
+  await createStrategy(page, name);
+
+  await expect(page.getByLabel('Version')).toHaveValue('1');
+  await expect(page.getByLabel('Version').locator('option:checked')).toHaveText(`${name} v1`);
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await page.goto('/strategies');
+  await expect(page.getByRole('link', { name: `${name} v1` })).toBeVisible();
+});
+
+test('saves edited code as a new version', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Save');
+  await createStrategy(page, name);
+
+  await replaceCode(page, VALID_CODE);
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await page.getByRole('button', { name: 'Save version' }).click();
+
+  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveText(`Saved as ${name} v2.`);
+  await expect(page.getByLabel('Version').locator('option:checked')).toHaveText(`${name} v2`);
+  await expect(page.getByText('Unsaved changes')).toBeHidden();
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
+});
+
+test('shows the line and the reason when the checks refuse the code', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Refuse');
+  await createStrategy(page, name);
+
+  await replaceCode(page, `${VALID_CODE}\nlimit = undefined_limit\n`);
+  await page.getByRole('button', { name: 'Save version' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Line 13: F821 Undefined name `undefined_limit`');
+  await expect(page.getByLabel('Version').locator('option')).toHaveCount(1);
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
+});
+
+test('keeps unsaved edits in the browser after a reload', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Draft');
+  await createStrategy(page, name);
+
+  await replaceCode(page, VALID_CODE);
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await page.reload();
+
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
+});

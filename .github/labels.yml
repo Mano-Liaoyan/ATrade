@@ -2,7 +2,7 @@ labels:
   # Workflow state labels
   - name: agent:ready
     color: "0e8a16"
-    description: Ready to be picked up through Taskplane or a human-owned PR.
+    description: Ready to be picked up by an agent or a human-owned PR.
   - name: agent:claimed
     color: "1d76db"
     description: Claimed and queued for work in a branch or worktree.

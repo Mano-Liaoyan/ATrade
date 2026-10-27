@@ -39,10 +39,43 @@ _Avoid_: revision, snapshot, commit
 A test of a strategy on historical bars. No order goes to a broker.
 _Avoid_: simulation, historical run
 
+**Backtest limits**:
+The timeout of one backtest and the number of backtests that run at the same
+time (the concurrency). The user changes them in the UI. Other backtests wait
+in the queue.
+_Avoid_: backtest settings, quota
+
+**Trade**:
+One fill of an order in a backtest or a forward test: the time, the side, the
+quantity, and the price.
+_Avoid_: deal, execution
+
+**Equity curve**:
+The cash plus the value of the position at the end of each bar of a test.
+_Avoid_: balance curve, PnL curve
+
+**Metric**:
+One number that describes the result of a test, for example the total return
+or the max drawdown. Backtests and forward tests use the same metric
+functions.
+_Avoid_: statistic, KPI
+
 **Forward test**:
 A test of a strategy that runs automatically on live market data and sends
 orders to a paper account.
 _Avoid_: paper trading run, live simulation
+
+**Same-period backtest**:
+A backtest of the strategy version, instrument, and bar period of a forward
+test, from the forward test start to its end (or to now), with the start
+balance as paper capital. The user compares it with the forward test.
+_Avoid_: shadow backtest, replay
+
+**Interruption**:
+A time in which a forward test did not run: after a crash, while IB Gateway
+was not reachable, or after a restart of the forward-test service. The
+forward test records the start and the end of each interruption.
+_Avoid_: outage, downtime gap
 
 **Paper trading**:
 Trading on the broker's paper account. It includes paper orders sent by hand

@@ -1,17 +1,87 @@
 #!/usr/bin/env bash
+# The only start command of ATrade (Unix, or Windows through WSL).
+#   ./start run [docker compose up options]   builds and starts all services
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-command_name="${1:-}"
+compose_file="$repo_root/deploy/compose.yaml"
 
 usage() {
-  printf 'Usage: ./start run\n' >&2
+  printf 'Usage: ./start run [docker compose up options, for example -d]\n' >&2
 }
 
+select_env_file() {
+  if [[ -f "$repo_root/.env" ]]; then
+    printf '%s\n' "$repo_root/.env"
+    return
+  fi
+  printf 'WARNING: .env not found. Using the placeholder values in .env.example.\n' >&2
+  printf 'WARNING: Copy .env.example to .env and set real values before you use ATrade.\n' >&2
+  printf '%s\n' "$repo_root/.env.example"
+}
+
+# Variables of the old ATrade stack (.NET, Aspire, iBeam, LEAN). The rewrite does not read them.
+old_variable_pattern='^(ATRADE_API_HTTP_PORT|ATRADE_FRONTEND_DIRECT_HTTP_PORT|ATRADE_APPHOST_FRONTEND_HTTP_PORT|ATRADE_ASPIRE_DASHBOARD_HTTP_PORT|ATRADE_BROKER_[A-Z_]+|ATRADE_IBKR_GATEWAY_[A-Z_]+|ATRADE_IBKR_PAPER_ACCOUNT_ID|ATRADE_FRONTEND_API_BASE_URL|NEXT_PUBLIC_[A-Z_]+|ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES|ATRADE_ANALYSIS_ENGINE|ATRADE_LEAN_[A-Z_]+)$'
+# Compose stops without these variables. The process environment can also set them.
+required_variables=(ATRADE_POSTGRES_PASSWORD)
+
+# Prints the value of a variable in the env file (the last assignment), without quotes.
+read_env_value() {
+  local env_file="$1" name="$2"
+  sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${name}[[:space:]]*=[[:space:]]*//p" "$env_file" \
+    | tail -n 1 | sed -E 's/[[:space:]]+$//; s/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/'
+}
+
+# Stops the start with a clear message when the env file lacks a required variable.
+# Writes a warning for each variable of the old stack.
+check_env_file() {
+  local env_file="$1"
+  local old_variables
+  old_variables="$(sed -n -E 's/^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=.*/\2/p' "$env_file" \
+    | grep -E "$old_variable_pattern" | sort -u || true)"
+  local missing_variables=()
+  local name value
+  for name in "${required_variables[@]}"; do
+    value="${!name:-}"
+    if [[ -z "$value" ]]; then
+      value="$(read_env_value "$env_file" "$name")"
+    fi
+    if [[ -z "$value" ]]; then
+      missing_variables+=("$name")
+    fi
+  done
+  if [[ -n "$old_variables" ]]; then
+    printf 'WARNING: %s has variables of the old ATrade stack. ATrade does not read them:\n' "$env_file" >&2
+    printf '  %s\n' $old_variables >&2
+  fi
+  if (( ${#missing_variables[@]} > 0 )); then
+    printf 'ERROR: %s does not set these required variables:\n' "$env_file" >&2
+    printf '  %s\n' "${missing_variables[@]}" >&2
+    if [[ -n "$old_variables" ]]; then
+      printf 'This .env is from the old ATrade stack. Keep a copy of it, copy .env.example to .env, and set the values again.\n' >&2
+    else
+      printf 'Compare .env with .env.example and add the missing variables.\n' >&2
+    fi
+    exit 1
+  fi
+}
+
+run_compose() {
+  if ! command -v docker >/dev/null 2>&1; then
+    printf 'ERROR: docker is not installed or not on PATH. ATrade runs with Docker Compose.\n' >&2
+    exit 1
+  fi
+  local env_file
+  env_file="$(select_env_file)"
+  check_env_file "$env_file"
+  exec docker compose --file "$compose_file" --env-file "$env_file" up --build "$@"
+}
+
+command_name="${1:-}"
 case "$command_name" in
   run)
     shift
-    exec "$repo_root/scripts/start.run.sh" "$@"
+    run_compose "$@"
     ;;
   "")
     usage

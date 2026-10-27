@@ -1,0 +1,170 @@
+"""The platform DataActor that records the fills and the equity of a forward test (docs/architecture/forward_test.md
+section 12.8).
+
+The actor runs in the NautilusTrader backtest engine with the bar count test strategy and a small bar file. The test
+asserts the exact rows of the record tables in a real PostgreSQL.
+"""
+
+import csv
+import hashlib
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
+from typing import LiteralString
+
+import psycopg
+from nautilus_trader.model import BarType
+from nautilus_trader.persistence import BarDataWrangler
+
+from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
+from atrade.backtest.strategy_engine_run import create_engine, create_instrument
+from atrade.forward_test import ForwardTestRecorder, RecorderInput
+from atrade.foundation.bar import Bar, BarPeriod
+from atrade.foundation.instrument import Instrument
+from atrade.strategy import load_strategy_classes
+
+TEST_DIRECTORY = Path(__file__).parents[1] / "backtest"
+TEST_STRATEGY_FILE = TEST_DIRECTORY / "strategies" / "buy_and_sell_by_bar_count.py"
+TEST_BAR_FILE = TEST_DIRECTORY / "bars" / "btest_arca_usd_1_day.csv"
+BAR_COUNT = 10
+START_BALANCE_USD = Decimal(10000)
+DAY_BAR_PERIOD = BarPeriod("1-DAY")
+INSTRUMENT = Instrument(symbol="BTEST", exchange="ARCA", currency="USD")
+
+
+def read_test_bars() -> list[Bar]:
+    with TEST_BAR_FILE.open() as bar_file:
+        rows = list(csv.DictReader(bar_file))[:BAR_COUNT]
+    return [
+        Bar(
+            start_utc=datetime.fromisoformat(row["start_utc"]),
+            open=Decimal(row["open"]),
+            high=Decimal(row["high"]),
+            low=Decimal(row["low"]),
+            close=Decimal(row["close"]),
+            volume=Decimal(row["volume"]),
+        )
+        for row in rows
+    ]
+
+
+def insert_forward_test(database_url: str) -> int:
+    code = TEST_STRATEGY_FILE.read_text()
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        now_utc = datetime(2026, 3, 1, tzinfo=UTC)
+        strategy_row = connection.execute(
+            "INSERT INTO strategy (name, created_at_utc) VALUES ('Bar count', %(now)s) RETURNING id", {"now": now_utc}
+        ).fetchone()
+        assert strategy_row is not None
+        version_row = connection.execute(
+            """
+            INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc)
+            VALUES (%(strategy_id)s, 1, %(code)s, %(code_sha256)s, %(now)s) RETURNING id
+            """,
+            {
+                "strategy_id": strategy_row[0],
+                "code": code,
+                "code_sha256": hashlib.sha256(code.encode()).hexdigest(),
+                "now": now_utc,
+            },
+        ).fetchone()
+        assert version_row is not None
+        forward_test_row = connection.execute(
+            """
+            INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
+                status, client_id, start_balance_usd, created_at_utc)
+            VALUES (%(version_id)s, 'BTEST', 'ARCA', 'USD', '1-DAY', 'running', 'running', 10, 10000, %(now)s)
+            RETURNING id
+            """,
+            {"version_id": version_row[0], "now": now_utc},
+        ).fetchone()
+        assert forward_test_row is not None
+        return int(forward_test_row[0])
+
+
+def run_engine_with_recorder(*, database_url: str, forward_test_id: int, work_directory: Path) -> None:
+    bars = read_test_bars()
+    nautilus_instrument = create_instrument(INSTRUMENT, bars)
+    bar_type = BarType.from_str(f"{nautilus_instrument.id}-{DAY_BAR_PERIOD.value}-LAST-EXTERNAL")
+    wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, 0)
+    nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(bars, DAY_BAR_PERIOD))
+    engine = create_engine(
+        paper_capital_usd=START_BALANCE_USD, venue=nautilus_instrument.venue, work_directory=work_directory
+    )
+    engine.add_instrument(nautilus_instrument)
+    engine.add_data(nautilus_bars)
+    strategy_class, config_class = load_strategy_classes(TEST_STRATEGY_FILE.read_text(), work_directory)
+    config = config_class(instrument_id=nautilus_instrument.id, bar_type=bar_type)  # pyright: ignore[reportCallIssue]
+    engine.add_strategy(strategy_class(config))
+    engine.add_actor(
+        ForwardTestRecorder(
+            RecorderInput(
+                database_url=database_url,
+                forward_test_id=forward_test_id,
+                instrument_id=nautilus_instrument.id,
+                bar_type=bar_type,
+                bar_period=DAY_BAR_PERIOD,
+                start_balance_usd=START_BALANCE_USD,
+            )
+        )
+    )
+    engine.run()
+    engine.dispose()
+
+
+def read_table_rows(database_url: str, query: LiteralString) -> list[tuple[object, ...]]:
+    with psycopg.connect(database_url) as connection:
+        return connection.execute(query).fetchall()
+
+
+def make_time(day: int) -> datetime:
+    return datetime(2026, 3, day, tzinfo=UTC)
+
+
+def test_records_each_new_fill_once_and_one_equity_point_at_the_end_of_each_bar(
+    database_url: str, tmp_path: Path
+) -> None:
+    forward_test_id = insert_forward_test(database_url)
+
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+
+    fills = read_table_rows(
+        database_url,
+        """
+        SELECT forward_test_id, time_utc, side, quantity_shares, price_usd, commission_usd FROM forward_test_fill
+        ORDER BY time_utc
+        """,
+    )
+    # The strategy buys 10 shares at the close of bar 3 and sells them at the close of bar 8.
+    assert fills == [
+        (forward_test_id, make_time(5), "BUY", Decimal(10), Decimal("104.00"), Decimal(0)),
+        (forward_test_id, make_time(10), "SELL", Decimal(10), Decimal("106.00"), Decimal(0)),
+    ]
+    equity_points = read_table_rows(
+        database_url, "SELECT time_utc, equity_usd FROM forward_test_equity_point ORDER BY time_utc"
+    )
+    # The actor gets a bar before the strategy, so a fill at a bar close counts from the next bar on.
+    # 10000 - 10 * 104 = 8960 cash, plus 10 shares at the close.
+    assert equity_points == [
+        (make_time(3), Decimal(10000)),
+        (make_time(4), Decimal(10000)),
+        (make_time(5), Decimal(10000)),
+        (make_time(6), Decimal(10020)),
+        (make_time(7), Decimal(10040)),
+        (make_time(8), Decimal(10060)),
+        (make_time(9), Decimal(10040)),
+        (make_time(10), Decimal(10020)),
+        (make_time(11), Decimal(10020)),
+        (make_time(12), Decimal(10020)),
+    ]
+
+
+def test_a_second_run_over_the_same_bars_adds_no_row(database_url: str, tmp_path: Path) -> None:
+    forward_test_id = insert_forward_test(database_url)
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+
+    # A restart reads the same fills from the cache again (section 12.7).
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+
+    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]

@@ -117,9 +117,11 @@ frontend/
   src/lib/             # one directory per capability, plus foundation/
   src/routes/          # pages, the only place that combines capabilities
   e2e/                 # Playwright tests
-deploy/                # Docker Compose and service configuration
+deploy/                # compose.yaml, web.Dockerfile
+scripts/check          # the quality gate: the same checks as CI (section 17.7)
 docs/
   architecture.md      # this document
+  architecture/        # sections moved to their own file (section 18)
   adr/                 # decisions that are hard to reverse
 start                  # Unix only: ./start run calls docker compose up
 README.md
@@ -128,9 +130,10 @@ GLOSSARY.md
 .env.example
 ```
 
-The first implementation PR deletes the old code and the old documents. This
-includes the .NET code, `workers/`, the old `frontend/`, `start.cmd`,
-`start.ps1`, `PLAN.md`, and `docs/INDEX.md`. Git history keeps the old content.
+The first implementation PR (#62) deleted the old code and the old documents.
+This included the .NET code, `workers/`, the old `frontend/`, `start.cmd`,
+`start.ps1`, `PLAN.md`, `docs/INDEX.md`, and the old Windows workflow. Git
+history keeps the old content.
 
 ## 6. Backend modules
 
@@ -148,7 +151,7 @@ counts from `atrade/`.
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, and the paper account check. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
-| `foundation/` | `money`, `clock`, `instrument`, `settings`, `order_ref`. |
+| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
 
 ### 6.2 Dependency direction
@@ -162,13 +165,23 @@ watchlist     -> market_data
 strategy      -> (foundation only)
 backtest      -> strategy, market_data
 paper_trading -> ibkr
-forward_test  -> strategy, paper_trading, backtest
+forward_test  -> strategy, paper_trading, backtest, ibkr
 all modules   -> foundation
 app           -> all modules
 ```
 
 - `ibkr` depends on no capability.
-- `forward_test -> paper_trading` is only for the paper account check.
+- `forward_test -> paper_trading` is only for the paper account check
+  (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
+  start).
+- `forward_test -> ibkr` is only for the `GatewayConnection` protocol of the
+  child process: the connection for the paper account check and the stop
+  steps (`read_own_open_orders()`, `cancel_order_and_wait()`) (#76, section
+  22).
+- `paper_trading` does not import `forward_test`. The refusal of paper orders
+  by hand on the instrument of a running forward test (section 12.2) gets a
+  function from `app/web.py`, which calls
+  `forward_test.find_forward_test_on_instrument()`.
 - `forward_test -> backtest` is only for the comparison and the metric
   functions.
 - `backtest` does not depend on `paper_trading`. A backtest request carries
@@ -202,363 +215,61 @@ app           -> all modules
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker. |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. |
+| `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
 A restart of `web` does not stop forward tests.
 
+### 6.5 Web app routes outside the capabilities
+
+`app/` owns two routers that belong to no capability:
+
+| Route | Behavior |
+|---|---|
+| `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
+| `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
+
 ## 7. IBKR access
 
-Sources: [IBKR access research](https://github.com/Mano-Liaoyan/ATrade/issues/30),
-[Broker and data source research](https://github.com/Mano-Liaoyan/ATrade/issues/43),
-[ib_async compared with nautilus-ibapi](https://github.com/Mano-Liaoyan/ATrade/issues/54),
-[Can the Web process use only NautilusTrader 2.0 for IBKR](https://github.com/Mano-Liaoyan/ATrade/issues/55),
-[IB Gateway paper account check](https://github.com/Mano-Liaoyan/ATrade/issues/50).
-
-- IBKR is the only broker. Bars come from IBKR historical data first. When
-  IBKR limits block backtests, add one US data vendor (Tiingo or Massive).
-- One IB Gateway container runs and logs in to the paper account.
-- The Web process uses `ib_async` for all IBKR access:
-  - bars
-  - instrument search
-  - paper orders sent by hand, and order cancellation
-  - the order list
-  - `managedAccounts`
-  - account balance and positions
-- The Web process uses 1 fixed client ID (default `1`), set in `settings`.
-- Forward test orders go from the NautilusTrader IB execution client inside a
-  `LiveNode`. They do not go through `paper_trading`.
-- Do not use client ID 0.
-- Many client IDs can connect to one paper account Gateway at the same time.
-  `reqAllOpenOrders` reads the open orders of other client IDs.
-- One IBKR user name can have only one session. Set
-  `EXISTING_SESSION_DETECTED_ACTION: primary` on the Gateway. A login on the
-  IBKR website or phone app then competes with the Gateway session.
-- The first login of the paper account did not ask for IB Key. Do not set
-  `TWOFA_TIMEOUT_ACTION` or `RELOGIN_AFTER_TWOFA_TIMEOUT`.
-- IBC in the Gateway image does the automatic login and the daily restart.
-- Other containers connect to the paper API at `ib-gateway:4004` (socat in the
-  gnzsnz image). The Gateway API port is not published outside the Compose
-  network.
-- Do not call `ib_async.util.patchAsyncio()` or `startLoop()`. `nest_asyncio`
-  must not patch the uvicorn event loop.
+Section 7 is in [`docs/architecture/ibkr.md`](architecture/ibkr.md). It holds
+the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
+`ib-gateway` Compose service, and the contract tests.
 
 ## 8. Market data and watchlist
 
-- `market_data` reads bars from IBKR with `ib_async` and saves them in
-  PostgreSQL.
-- `market_data` requests only the time ranges that are not in PostgreSQL. This
-  keeps ATrade below the IBKR historical data rate limit.
-- Backtests read bars only from PostgreSQL.
-- The bar table key is the instrument, the bar period, and the bar start time.
-- Start with no partitions, no BRIN index, and no compression. Add native
-  PostgreSQL range partitions only when a measurement shows the need.
-- Data is always called a bar. "Candlestick" means only the chart drawing
-  (`CandlestickSeries` in `lightweight-charts`).
-- `watchlist` stores the instruments that the user saves. It uses
-  `market_data` to find instruments.
+Section 8 is in [`docs/architecture/market_data.md`](architecture/market_data.md).
+It holds the bar storage decisions, the watchlist decisions, the
+instrument search (`GET /api/market-data/instrument-search`), and the
+watchlist routes (`/api/watchlist`).
 
 ## 9. Strategies and strategy versions
 
-Source: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48).
-
-The user writes strategies in the browser. A saved strategy version can run in
-a backtest at once, with no deployment.
-
-### 9.1 Storage
-
-- PostgreSQL has two tables: `strategy` (the name) and `strategy_version`
-  (code text, sha256, sequence number, time). Do not use git or a PostgreSQL
-  extension for versions.
-- Strategy versions are append-only. They must not change.
-- The sequence number starts at 1 in each strategy and goes up by 1.
-- When the code is the same as the previous version, no new version is made.
-- The UI shows a version as "strategy name v3".
-- To go back, open an old version and save it as a new version.
-- Unsaved edits exist only in the browser `localStorage`.
-- The backtest table and the forward test table each have a
-  `strategy_version_id` foreign key. It must not be null.
-- Strategy versions cannot be deleted. A strategy that no backtest or forward
-  test uses can be deleted. A strategy in use cannot be deleted.
-
-### 9.2 Strategy file format
-
-- The file has exactly 1 `Strategy` subclass and exactly 1 `StrategyConfig`
-  subclass.
-- The platform fills in `instrument_id` and `bar_type` at run time.
-- All other configuration fields must have default values. This stage has no
-  parameter input form.
-- NautilusTrader 2.0 requires a keyword-only `__init__` in the strategy
-  configuration. The template shows it.
-- The strategy template shows how to warm up indicators with `request_bars` in
-  `on_start`.
-
-### 9.3 Checks before save
-
-The checks run in the Web process. They do not import the user code.
-
-| Check | Blocks save |
-|---|---|
-| `ast.parse` fails | Yes |
-| Not exactly 1 `Strategy` subclass and 1 `StrategyConfig` subclass (AST check) | Yes |
-| ruff `F` rule errors | Yes |
-| basedpyright type errors | No. The editor shows them live. |
-
-### 9.4 Code completion
-
-- basedpyright only does static analysis. It does not run user code, so it
-  needs no isolation.
-- Each editor WebSocket connection starts 1 basedpyright child process in the
-  `web` container. The process stops when the connection closes.
-
-### 9.5 Comparison
-
-- Compare only two versions of the same strategy. The user selects 2 backtest
-  results. The page shows the code diff (`@codemirror/merge`), the metric
-  table, and both equity curves on one chart.
-- For different strategies, the backtest list shows the metrics side by side.
+Section 9 is in [`docs/architecture/strategy.md`](architecture/strategy.md).
+It holds the storage rules, the `strategy` and `strategy_version` tables, the
+strategy file format and template, the checks before save, the strategy HTTP
+routes, and the editor pages.
 
 ## 10. Backtest
 
-Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48),
-[Module division](https://github.com/Mano-Liaoyan/ATrade/issues/38).
-
-- A backtest request contains the strategy version, the instrument, the bar
-  type, the time range, and `paper_capital_usd`. `paper_capital_usd` is
-  required.
-- `paper_trading` exports `fetch_paper_capital_usd()`. It returns the paper
-  account balance when IBKR is connected. Otherwise it returns the local value
-  from `settings`. The frontend uses it to fill in the backtest form.
-- Each backtest runs in its own child process (`app/backtest_process.py`),
-  because the NautilusTrader backtest engine blocks the event loop.
-- In NautilusTrader 2.0, `BarDataWrangler` takes Arrow bytes, not a
-  DataFrame. The child converts the bars from PostgreSQL to Arrow.
-- The isolation goal is to prevent accidents, not to stop hostile code. Only
-  one user writes strategies.
-
-| Control | Rule |
-|---|---|
-| Timeout | Default 120 minutes. After the timeout, the parent stops the child. The status is "timed out". |
-| Concurrency | Default 1 backtest at a time. Other backtests wait in a queue. |
-| Defaults | The user can change the timeout and the concurrency in the UI. PostgreSQL stores them. |
-| Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. |
-| CPU | The child runs with `nice 10`. |
-| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. |
-| Network | No network isolation. The child must connect to PostgreSQL. |
-| File system | The container root file system is read-only. Only `/tmp` is writable. |
+Section 10 is in [`docs/architecture/backtest.md`](architecture/backtest.md).
+It holds the backtest decisions and isolation controls, the backtest tables,
+the run flow in the child process, the metric functions, the backtest HTTP
+routes (`/api/backtests`), and the backtest pages.
 
 ## 11. Paper trading
 
-Source: [Order module design](https://github.com/Mano-Liaoyan/ATrade/issues/40).
-
-### 11.1 Live order switch
-
-- `settings.trading_mode` is `paper` or `live`.
-- `settings.ibkr_account_id` is the expected IBKR account number. Its value is
-  in `.env`, not in git.
-- In this stage, when `trading_mode` is `live`, the program does not start. It
-  writes the reason. The structure has a place for live orders, but no
-  implementation.
-
-### 11.2 Paper account check
-
-`paper_trading` exports `require_paper_account()`. ATrade calls it before each
-paper order sent by hand and before each forward test start. ATrade sends
-orders only when all 4 conditions are true:
-
-| Condition | Source |
-|---|---|
-| a. `trading_mode == "paper"` | ATrade setting |
-| b. `managedAccounts` returns exactly 1 account, and it equals `settings.ibkr_account_id` | IB Gateway |
-| c. The account number starts with `DU` | Protects against a live account number in `.env`. The user checked it on the paper account. |
-| d. The Gateway runs with `TRADING_MODE=paper`, and ATrade connects to the paper port from `settings` | The only official IBKR method to tell paper from live |
-
-- The Web process runs the check once after each connection and reconnection.
-  It keeps the result in memory. Each order reads that result.
-- When the connection drops, the result is cleared. Orders are refused.
-- When the check fails:
-  - ATrade does not send the order.
-  - The HTTP response is an error. The UI shows the reason, with the actual
-    and the expected account number.
-  - A forward test does not start, and its status is "failed".
-  - The log gets one error line.
-  - ATrade does not retry.
-
-### 11.3 Paper orders sent by hand
-
-- Order types: market and limit. Time in force: DAY and GTC. No stop orders.
-- The user can cancel an order. There is no order change. To change an order,
-  cancel it and send a new one.
-- Before sending, a confirmation dialog shows the instrument, side, quantity,
-  order type, price, account number, and a clear `PAPER` mark.
-- When a forward test runs on an instrument, the Web process refuses paper
-  orders by hand for that instrument. It shows which forward test blocks it.
-- Positions, balance, and order status go to the browser on
-  `/ws/paper-trading`.
-
-### 11.4 Order records and order list
-
-- IBKR is the only source of order status.
-- `paper_trading` stores only the paper orders that ATrade sent by hand: time,
-  instrument, side, quantity, order type, price, IBKR order ID. It does not
-  store status.
-- The order list uses `reqAllOpenOrders`. It shows all open orders, including
-  forward test orders.
-- The list marks the source of each order: "by hand" or "forward test 42". The
-  source comes from `orderRef` (section 12.9).
-- Only orders sent by hand have a cancel button. To cancel forward test orders,
-  stop the forward test.
-- Filled orders sent by hand show data from the local table and from IBKR.
-- Positions and balance belong to the account, not to a client ID.
+Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
+It holds the live order switch, the paper account check, paper orders sent by
+hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
+account panel, and the order routes (11.8).
 
 ## 12. Forward test
 
-Source: [Forward test design](https://github.com/Mano-Liaoyan/ATrade/issues/41).
-The NautilusTrader facts in this section come from the `v2.0.0rc7` source and
-documents. Nobody ran them.
-
-### 12.1 Input and process
-
-- Each forward test has 1 child process. The process has 1 `LiveNode`,
-  1 user `Strategy`, and 1 client ID.
-- Input: a strategy version, 1 instrument, 1 bar type, and an optional end
-  time. The start time is always "now".
-- Without an end time, the forward test runs until the user stops it.
-- The end time is a date and a time. The browser shows it in the local time
-  zone. The database stores UTC. The end time cannot change while the forward
-  test runs.
-- At the end time, the worker stops the forward test with the steps of
-  section 12.6.
-- The bar type must use a period that IB live bars support. Backtests do not
-  have this limit. The supported periods are:
-  - 1, 5, 15, or 30 seconds
-  - 1, 2, 3, 5, 10, 15, 20, or 30 minutes
-  - 1, 2, 3, 4, or 8 hours
-  - 1 day, 1 week, or 1 month
-- A forward test does not use paper capital. It uses the real paper account
-  balance and records the balance at start.
-- A forward test does not need a backtest first. The start form shows the
-  metrics of the latest backtest of the strategy version, or "no backtest
-  result".
-- The strategy version is fixed at start. To use a new version, stop the
-  forward test and start a new one.
-
-### 12.2 One forward test per instrument
-
-- NautilusTrader reconciles by account, not by client ID. With two position
-  sources on one instrument, NautilusTrader generates synthetic fills to align
-  the positions. When it cannot align them, the start fails.
-- So only 1 forward test can run on one instrument at a time.
-- Paper orders by hand on that instrument are refused (section 11.3).
-
-### 12.3 Web and worker
-
-- The forward test table has a `desired_state` column (`running` or
-  `stopped`). The Web process writes only this column.
-- Every 2 seconds, the worker compares `desired_state` with the actual state.
-  It starts or stops child processes and writes the actual state back.
-- Every 2 seconds, the Web process reads the actual state and pushes it on
-  `/ws/forward-tests`.
-
-### 12.4 Client IDs
-
-- The forward test client ID range is in `settings`. The default is `10–13`.
-- The range size is the limit of forward tests that run at the same time
-  (default 4). There is no other limit.
-- At start, one transaction takes the lowest free ID in the range. A unique
-  constraint prevents two forward tests from getting the same ID.
-- A forward test keeps its ID while it runs, restarts, or has the status "stop
-  failed". The ID becomes free after the orders are cancelled and the process
-  ends.
-- When no ID is free, the start is refused. The UI shows "limit of running
-  forward tests reached".
-
-### 12.5 Paper account check
-
-- Before each `LiveNode` start, including automatic restarts, the child
-  process:
-  1. Connects with `ib_async` and its own client ID.
-  2. Calls `require_paper_account()`.
-  3. Disconnects.
-  4. Starts the `LiveNode` with the same client ID.
-- The Web process does not repeat the check.
-- The child passes `settings.ibkr_account_id` to the IB execution client
-  `account_id`.
-- When the check fails, the status is "failed". There is no retry.
-- When the Gateway is not reachable, the child retries every 30 seconds. The
-  UI shows "waiting for IB Gateway". This does not count toward the 3-crash
-  limit (section 12.7).
-
-### 12.6 Stop
-
-1. The child stops the `LiveNode`.
-2. The child connects with `ib_async` and the same client ID.
-3. The child reads the open orders of this client ID with `reqOpenOrders`.
-4. The child cancels each order and waits for the confirmation.
-5. The child exits.
-
-- Positions stay open. The user handles them by hand.
-- Do not use `manage_stop`. It closes positions. `LiveNode.stop()` does not
-  cancel orders.
-- When a cancellation fails, the status is "stop failed". The client ID stays
-  taken. The worker retries the cancellation.
-
-### 12.7 Recovery after restart
-
-- Daily IB Gateway restart: NautilusTrader reconnects and subscribes to bars
-  again. When the IB execution client is disconnected for more than 5 minutes,
-  the child exits. The worker waits for the Gateway (section 12.5) and starts
-  it again. This does not count toward the 3-crash limit.
-- Other stops are a restart of the `forward-test` service, a server restart,
-  or a child crash. After each of them, the worker restarts the forward test.
-  It uses the same client ID and the same strategy version.
-- After 3 crashes in a row, the status is "failed". The worker stops the
-  restarts.
-- Restart steps:
-  1. Cancel all open orders of this client ID (section 12.6). This prevents
-     duplicate orders.
-  2. Start the `LiveNode`. Set `external_order_instrument_ids` and
-     `reconciliation_instrument_ids` to the instrument. The account position
-     on this instrument belongs to this strategy (section 12.2).
-  3. The strategy indicators start from zero. NautilusTrader does not save
-     strategy state without Redis.
-- An event table records the start and the end of each interruption.
-
-### 12.8 Records
-
-- A platform `DataActor` subscribes to the same bar type.
-- At the end of each bar, the actor reads `self.cache`. It appends new fills
-  (unique by `trade_id`) and one equity snapshot row to the forward test
-  tables.
-- Reasons:
-  - A Python `DataActor` cannot subscribe to order and fill events. Only a
-    `Strategy` gets them.
-  - Do not use `PostgresCacheConfig`. Its tables belong to NautilusTrader and
-    can change in each release candidate.
-  - Do not write a `Strategy` base class. The readability rules forbid our own
-    inheritance.
-- The current state of open orders still comes from IBKR.
-
-### 12.9 Order source
-
-- The forward test sets `order_id_tag` to `FT<forward test ID>`.
-- The IB execution client writes the `ClientOrderId` into `orderRef`. User code
-  cannot change it.
-- `foundation/order_ref.py` holds the format rule. `forward_test` writes it.
-  `paper_trading` reads it.
-- The frontend changes the ID into the forward test name in `routes/`.
-
-### 12.10 Comparison with a backtest
-
-- The forward test page has a "backtest the same period" button. It creates a
-  normal backtest with:
-  - the same strategy version, instrument, and bar type
-  - the period from the forward test start to its end, or to now while it runs
-  - `paper_capital_usd` equal to the balance at forward test start
-- The comparison page uses the comparison view of section 9.5: the metric
-  table and both equity curves on one chart.
-- A fill table shows, for each bar, the fill price on each side and the
-  difference.
-- The chart marks interruptions in grey.
-- Forward test metrics use the same metric functions that `backtest` exports.
+Section 12 is in [`docs/architecture/forward_test.md`](architecture/forward_test.md).
+It holds the forward test decisions (input, one forward test per instrument,
+Web and worker, client IDs, paper account check, stop, recovery, records,
+order source, comparison) and the implementation: the `forward_test` table,
+the routes under `/api/forward-tests`, `/ws/forward-tests`, the worker, the
+child process, and the forward test page.
 
 ## 13. Frontend
 
@@ -575,13 +286,50 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   and build time.
 - `src/lib/` has one directory per capability (`lib/market_data/`,
   `lib/backtest/`, and so on) and `lib/foundation/`.
-- A capability can import only `#lib/foundation/<module>`. Capabilities must
-  not import each other. Only `src/routes/` combines capabilities.
+- A capability can import only `#lib/foundation/<module>` and the generated
+  API types `#lib/api`. Capabilities must not import each other. Only
+  `src/routes/` combines capabilities.
 - Generic UI with no domain meaning goes in `foundation/`, for example
   `foundation/code_editor/`. Parts with domain meaning stay in the capability.
-- Generated API types go in `lib/api/`.
+- Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
+  writes the OpenAPI document to `lib/api/openapi.json`, and
+  `openapi-typescript` writes `lib/api/index.ts`. `pnpm generate:api` runs
+  both. Both files are committed. The backend test
+  `tests/app/test_openapi_document.py` fails when `openapi.json` does not
+  match the routes, and `pnpm check:api` fails when `index.ts` does not match
+  `openapi.json`. Use `components['schemas'][...]`; do not write API types by
+  hand. OpenAPI does not describe WebSocket messages, so
+  `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
+  of each WebSocket message model to `components.schemas`. A capability
+  exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`,
+  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`, and
+  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`. Each list has `HeartbeatMessage` of
+  `foundation/socket_push`. A message schema must not have the name of a
+  different schema. Routes declare their error bodies with `responses=`
+  (`ErrorResponse` of `foundation/error_response`), so the frontend does not
+  write error types by hand.
+- `foundation/http_request` sends the HTTP requests of the capabilities:
+  `sendRequest`, `requestJson`, `readJsonBody`, `readErrorMessage`,
+  `describeErrorBody`, `BACKEND_NOT_REACHABLE`, and the type `RequestResult`.
+  An error message is the `detail` text, the first field error of a list
+  `detail` ("<field>: <message>"), or "<action> failed with HTTP status N.".
+- `foundation/live_socket` also has `readSocketMessage`: it returns a parsed
+  socket message with its generated type when its `type` matches, else
+  `null`.
+- `foundation/scroll_region/` has `ScrollRegion`: a region that scrolls inside
+  itself. It hides the native scrollbar and draws its own track and thumb
+  (`role="scrollbar"`, named "<region label> scroll bar"). The thumb can be
+  dragged, a click on the track scrolls one page, and the track takes Arrow,
+  Page Up, Page Down, Home, and End keys. Use it for each region that can
+  overflow (section 13.1).
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
+  `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
+  reconnection after 25 seconds without a message or after a close, and a
+  delay from 1 to 10 seconds between attempts. A background tab can delay
+  the timers, so when the page becomes visible (`visibilitychange`), it
+  connects again at once if the last message is 25 seconds old or more, or
+  if it waits for a reconnection.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
@@ -595,6 +343,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   visible scroll track and thumb. Safari can hide native scrollbars, so use
   styled tracks where reachability matters.
 - No content can be clipped or unreachable.
+- Colors come from the tokens on `:root` in `src/routes/+layout.svelte`, with
+  a light and a dark set (`prefers-color-scheme`). Do not hard-code a color in
+  a component that the dark scheme does not also cover. The page side gutter
+  is `clamp(1rem, 3vw, 2.5rem)` for the header and the main region.
 
 ## 14. Deployment and external access
 
@@ -618,6 +370,51 @@ One Docker Compose project on the user's own server runs all services:
 - The Cloudflare cost is 0 USD per month (Zero Trust Free plan).
 - `./start run` calls `docker compose up`. It is the only start command.
 
+### 14.1 Compose file and the `web` service
+
+- The Compose file is `deploy/compose.yaml`. `./start run` runs
+  `docker compose --file deploy/compose.yaml --env-file .env up --build`, and
+  sends its other arguments to `docker compose up`. When `.env` is not there,
+  it writes a warning and uses `.env.example`.
+- The image of `web` comes from `deploy/web.Dockerfile`. A Node stage builds
+  the SPA with `adapter-static`. The Python stage installs the backend with
+  `uv sync --frozen --no-dev` and copies the built files to
+  `/app/frontend-build`.
+- `web` serves the built frontend from FastAPI. There is no separate web
+  server. A catch-all route in `app/frontend_files.py` returns the requested
+  file when it exists in the build directory. For every other path it returns
+  the SPA fallback page `200.html`. Paths under `/api/` and `/ws/` never get
+  the fallback page: they return `404`. A path that resolves outside the build
+  directory gets the fallback page, never the file.
+- At start, `web` runs the Alembic migrations, then starts uvicorn with
+  1 worker on port 8000. Compose publishes it on
+  `127.0.0.1:${ATRADE_WEB_PORT}` only.
+- `web` has `read_only: true`, a `tmpfs` on `/tmp`, and
+  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`). `0` turns the memory
+  limit off. Use `0` only on a host that cannot set memory limits, for example
+  rootless Podman without the memory cgroup controller.
+- `postgres` uses the image `postgres:18.3` and the new volume
+  `atrade-postgres18-data` (section 19). Its port is not published.
+  PostgreSQL keeps the password of the first start in the volume. When
+  PostgreSQL refuses the password, `web` writes one line that names the
+  volume and stops (`check_database_password` in `app/web.py`).
+- Before Compose starts, `./start run` checks the env file. It stops with a
+  message when `ATRADE_POSTGRES_PASSWORD` is not set in the env file or in the
+  process environment. It writes a warning for each variable of the old stack
+  (for example `ATRADE_API_HTTP_PORT`, `ATRADE_IBKR_PAPER_ACCOUNT_ID`). The
+  test is `backend/tests/app/test_start_script.py`.
+- Services added later (`ib-gateway`, `forward-test`, `cloudflared`) must not
+  block the local start when their credentials are missing. They fail with a
+  clear message, or they are in a Compose profile. `ib-gateway` is in the
+  profile `ibkr` (section 7.4).
+- `forward-test` uses the image of `web` with the command
+  `python -m atrade.app.forward_test_worker`. It has the same read-only root
+  file system and `/tmp`, the database URL, and the IBKR settings, but not
+  `ATRADE_IBKR_USERNAME` or `ATRADE_IBKR_PASSWORD`. It waits until the
+  health check of `web` passes, because `web` runs the migrations. It starts
+  also without IB Gateway: a forward test start then fails with the reason
+  in its `error_message` (#76).
+
 ## 15. Secrets and configuration
 
 Sources: [Secret management research (Enpass first)](https://github.com/Mano-Liaoyan/ATrade/issues/35),
@@ -640,13 +437,27 @@ Settings that `foundation/settings` reads:
 
 | Setting | Meaning |
 |---|---|
-| `trading_mode` | `paper` or `live`. `live` stops the start in this stage. |
-| `ibkr_account_id` | Expected IBKR account number. |
-| IBKR host and paper port | Where the Web process and forward tests connect. |
-| Web client ID | Default `1`. |
-| Forward test client ID range | Default `10–13`. |
-| Local paper capital in USD | Used when IBKR is not connected. |
-| `DATABASE_URL` | PostgreSQL connection. |
+| `trading_mode` (`ATRADE_TRADING_MODE`) | `paper` or `live`. `live` stops the start in this stage. |
+| `ibkr_account_id` (`ATRADE_IBKR_ACCOUNT_ID`) | Expected IBKR account number. Empty means not configured. |
+| `ibkr_host`, `ibkr_paper_port` (`ATRADE_IBKR_HOST`, `ATRADE_IBKR_PAPER_PORT`) | Where the Web process and forward tests connect. Default `ib-gateway:4004`. |
+| `ibkr_web_client_id` (`ATRADE_IBKR_WEB_CLIENT_ID`) | Default `1`. |
+| `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
+| `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
+| `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
+
+Settings refuse client ID 0, client IDs that are multiples of 1000, a range
+that ends before it starts, and a Web client ID inside the forward test range.
+`ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`,
+`ATRADE_IBKR_AUTO_RESTART_TIME`, and `ATRADE_IBKR_TIME_ZONE` are not settings:
+only the `ib-gateway` service reads them (section 7.4).
+
+Environment variable names: `DATABASE_URL` has no prefix, because the backtest
+child process gets it by this name (section 10). All other settings use the
+prefix `ATRADE_`, for example `ATRADE_TRADING_MODE`. `foundation/settings`
+also reads `ATRADE_FRONTEND_BUILD_DIR` (default `/app/frontend-build`, the
+path in the `web` image). Compose builds `DATABASE_URL` from
+`ATRADE_POSTGRES_PASSWORD`. The ticket that first uses a setting adds it to
+`foundation/settings` and to `.env.example`.
 
 The backtest timeout and concurrency are not in `settings`. PostgreSQL stores
 them (section 10).
@@ -838,7 +649,12 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Playwright tests start, stop, the list, and the comparison page.
 - Scroll regions: Playwright scrolls to the last item of each region and
   asserts that it is visible. It also asserts that the app scrollbar element is
-  visible. No screenshot comparison.
+  visible (`getByRole('scrollbar', { name: '<region label> scroll bar' })`
+  of `ScrollRegion`, section 13). No screenshot comparison.
+- The Playwright projects run at the same time against one database, and the
+  e2e database is not cleared. A test uses names or instruments that only its
+  project uses. For the watchlist, the e2e server adds the fake instruments
+  `<PROJECT NAME>01` to `<PROJECT NAME>25` on `ARCA` for each project.
 - WebKit is not Safari. Before each release, check a list by hand in real
   Safari.
 
@@ -856,6 +672,36 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Frontend: ESLint, `svelte-check`, Vitest.
 - End to end: Playwright with 4 projects.
 - Not in CI: `ibkr_paper`.
+- `.github/workflows/ci.yml` runs `./scripts/check backend`,
+  `./scripts/check frontend`, and `./scripts/check e2e` as 3 jobs. The backend
+  and end-to-end jobs use a `postgres:18.3` service container. Local runs use
+  the same script. Without `ATRADE_TEST_DATABASE_URL`, the script starts a
+  temporary PostgreSQL container.
+- Backend formatting: `ruff format --check` with line length 120.
+- The test PostgreSQL fixture runs the migrations one time per session and
+  truncates all tables except `alembic_version` before each test.
+
+### 17.8 Release checklist
+
+Do these checks by hand before each release. Tests cannot do them.
+
+1. Real Safari (section 17.5): open each page. Each scroll region must
+   scroll and show its scroll bar.
+2. Backtest memory limit (section 10.1). The kernel must stop the backtest
+   child before the Web process when memory is low:
+   1. In `.env`, set `ATRADE_WEB_MEMORY_LIMIT=1g`. Run `./start run -d`.
+   2. Save a strategy that keeps memory in `on_bar`, for example
+      `self.blocks.append(bytearray(100_000_000))`. Start a backtest of it on
+      saved bars.
+   3. While the backtest runs, run
+      `docker compose --file deploy/compose.yaml --env-file .env exec web sh -c 'for p in /proc/[0-9]*; do echo "$p $(cat $p/oom_score_adj) $(cut -d" " -f19 $p/stat) $(tr "\0" " " < $p/cmdline)"; done'`.
+      The `atrade.app.backtest_process` line must show `oom_score_adj` 1000
+      and niceness 10.
+   4. Wait until the backtest ends. Its status must be "Failed" with exit
+      code -9. The header must still show the backend status, and
+      `GET /api/health` must answer: the Web process did not stop.
+   5. Set `ATRADE_WEB_MEMORY_LIMIT` back to its earlier value. Run
+      `./start run -d` again.
 
 ## 18. Documentation rules
 
@@ -866,7 +712,14 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
   - `AGENTS.md`: rules for agents.
   - `GLOSSARY.md`: terms.
 - This document (`docs/architecture.md`) is the architecture specification.
-  When it is longer than 1000 lines, split it by capability.
+  When it is longer than 1000 lines, split it by capability. A moved section
+  goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
+  is in `docs/architecture/ibkr.md`. Section 8 is in
+  `docs/architecture/market_data.md`. Section 9 is in
+  `docs/architecture/strategy.md`. Section 10 is in
+  `docs/architecture/backtest.md`. Section 11 is in
+  `docs/architecture/paper_trading.md`. Section 12 is in
+  `docs/architecture/forward_test.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
 - There is no document index and no `active` or `obsolete` status.
@@ -891,6 +744,9 @@ Source: [Old data migration](https://github.com/Mano-Liaoyan/ATrade/issues/58).
   tables.
 - The user adds the watchlist again in the new UI. The new system has no
   migration code.
+- The rewrite uses the volume `atrade-postgres18-data`. It does not use the
+  volume `atrade-pgdata` of earlier test starts. ATrade never deletes or
+  changes a volume. The user removes old volumes by hand.
 
 ## 20. Implementation phases
 
@@ -905,8 +761,6 @@ ran them. The implementation must check them.
 
 | Fact | How to check |
 |---|---|
-| `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Run `uv lock` in the first implementation PR. |
-| `ib_async` 2.1.0 runs on Python 3.14. | Run the backend tests. |
 | `ib_async` 2.1.0 limits `tzdata` to `<2026.0`. A later dependency can conflict with it ([ib_async#209](https://github.com/ib-api-reloaded/ib_async/issues/209)). | Watch `uv lock` on each upgrade. Upgrade to `ib_async` 3.0.0 after its release. |
 | The NautilusTrader 2.0 forward test behavior in section 12 (reconciliation, `orderRef`, reconnection, `DataActor` cache reads). | The `ibkr_paper` contract tests in section 17.4. |
 | `reqExecutions` and `reqCompletedOrders` read filled orders of other client IDs. | The contract test in section 17.4. |
@@ -914,22 +768,39 @@ ran them. The implementation must check them.
 | The paper Gateway needs a manual login or approval each week. | Watch the first week of operation. |
 | `ib_async` 2.1.0 connects with client protocol 178 at most. Features after 178 are not available. Its real connection to Gateway 10.50.1f is not checked. | The `ibkr_paper` contract tests. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |
-| Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. | Read the `ibapi` crate source, or run a forward test. |
-| Start time of a backtest child process (estimated 1 to 3 seconds). | Measure it in phase 1. |
-| Editor input latency and completion latency in the browser. | Measure them in phase 1. |
+| The forward test LiveNode of section 12.15: the IB data client and the IB execution client use the same client ID; the venue of `SYMBOL.EXCHANGE` matches the primary exchange of IBKR; the `ClientOrderId` with `order_id_tag = FT<ID>` reaches `orderRef`; `reqOpenOrders` returns the orders of the LiveNode on a new connection with the same client ID (#76). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it`). |
+| The forward test recovery of section 12.7 (#77): after `kill -9` of the child, the worker restarts it with the same client ID, the restart cancels the old order, and the stop cancels the new one. The child detects a lost IB execution client with a TCP probe of the Gateway port, because the rc7 `LiveNode` does not show the client connection state to Python. A daily Gateway restart was not watched. | `uv run pytest -m ibkr_paper tests/forward_test` (`test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_cancels_the_old_order`). |
+| The forward test records of section 12.8 (#78) in a real `LiveNode`: the IB bar `ts_event` is the bar end, the `DataActor` gets the bars of the strategy bar type, and `self.cache.orders(instrument_id=...)` holds the `OrderFilled` events of the IB execution client with stable `trade_id` values after a restart. Only the backtest engine run is checked (`test_forward_test_recorder.py`). | Run a forward test on the paper account, then compare `forward_test_equity_point` times with the bar ends and `forward_test_fill` with the IBKR executions. |
+| `reqExecutions` returns the executions of the current day only. The filled orders by hand (section 11.4) show only those fills. | The `ibkr_paper` contract tests, during US market hours. |
+| Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. The Web process uses it for the chart (section 8.5), with the durations `2 D` and `1 W`. Not checked against a real Gateway, also not on a weekend. | `uv run pytest -m ibkr_paper -k live_bar` (contract test `test_streams_the_current_live_bar`), or run a forward test. |
+
+### 21.1 Facts checked
+
+| Fact | Result |
+|---|---|
+| `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Yes. On 2026-10-27, `uv lock` (uv 0.13.5) resolved `ib-async==2.1.0`, `nautilus-trader==2.0.0rc7`, and `tzdata==2025.3` for Python 3.14 (#62). |
+| `ghcr.io/gnzsnz/ib-gateway:stable` digest. | On 2026-10-27, the `stable` index was `sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581` (IB Gateway 10.50.1f) (#63). |
+| `ib_async` 2.1.0 and NautilusTrader 2.0.0rc7 import on Python 3.14. | Yes. Both packages import on CPython 3.14.9 (#62). A real IB Gateway connection is not checked. |
+| Editor input latency and completion latency in the browser. | On 2026-10-27, Playwright 1.64.1 (headless Chromium and Firefox) against `tests.e2e_server` on the same machine, basedpyright 1.40.2 (#69). Input latency (key press to the next painted frame, 50 keys): Chromium median 9.8 ms, p95 16.6 ms; Firefox median 3.0 ms, p95 6.0 ms. Completion latency (Ctrl+Space to the visible list for `self.subscribe_ba` in a `Strategy` subclass): first request after the page opens 782 ms (Chromium) and 808 ms (Firefox); next 10 requests 74 to 76 ms (Chromium) and 81 to 86 ms (Firefox). Not measured through the Cloudflare tunnel. |
+| Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
 
 The decisions do not name these details. The implementation picks the simplest
 option and records it in this document.
 
-- The module that cancels the open orders of a forward test client ID
-  (section 12.6). The dependency list in section 6.2 has no `forward_test ->
-  ibkr` edge. Either `paper_trading` exports the cancel function, or the edge
-  is added. The change must update section 6.2.
-- How `web` serves the built frontend files (for example FastAPI static files).
-- How a forward test child passes its own `ib_async` connection to
-  `require_paper_account()` (section 12.5).
+- Decided (#76): `forward_test` cancels the open orders of its client ID
+  itself (section 12.6), with the `ibkr` functions `read_own_open_orders()`
+  (`reqOpenOrders`) and `cancel_order_and_wait()`. Section 6.2 has the new
+  edge `forward_test -> ibkr`. `paper_trading` exports no cancel function.
+- Decided (#76): the child process gets its connections through
+  `IbkrAccess.open_gateway_connection(client_id)`. `app/forward_test_process.py`
+  passes a function that makes a new `IbAsyncGatewayConnection` with the
+  client ID of the forward test. The child connects it with `connect()` for
+  the paper account check and again for the stop steps, and disconnects it
+  before the LiveNode starts.
+- Decided (#74): a forward test child passes its own connection as the
+  `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `cloudflared`

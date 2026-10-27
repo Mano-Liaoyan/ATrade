@@ -1,0 +1,89 @@
+# Runs the quality gate (scripts/check) on each pull request and on main.
+# ibkr_paper tests do not run in CI. They need the real paper account.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  ATRADE_TEST_DATABASE_URL: postgresql://atrade:atrade@127.0.0.1:5432/atrade
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18.3
+        env:
+          POSTGRES_USER: atrade
+          POSTGRES_PASSWORD: atrade
+          POSTGRES_DB: atrade
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready --username=atrade"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.5"
+      - run: ./scripts/check backend
+
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: ./scripts/check frontend
+
+  e2e:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:18.3
+        env:
+          POSTGRES_USER: atrade
+          POSTGRES_PASSWORD: atrade
+          POSTGRES_DB: atrade
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready --username=atrade"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.5"
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit msedge
+        working-directory: frontend
+      - run: ./scripts/check e2e
+        env:
+          ATRADE_PLAYWRIGHT_PROJECTS: chromium firefox webkit msedge
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/test-results/
+          retention-days: 7

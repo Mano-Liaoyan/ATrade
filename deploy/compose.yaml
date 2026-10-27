@@ -1,0 +1,109 @@
+# The ATrade Docker Compose project. `./start run` runs `docker compose up` with this file.
+# Variables come from the .env file in the repository root. .env.example lists them.
+name: atrade
+
+services:
+  postgres:
+    image: postgres:18.3
+    environment:
+      POSTGRES_DB: atrade
+      POSTGRES_USER: atrade
+      POSTGRES_PASSWORD: ${ATRADE_POSTGRES_PASSWORD:?Set ATRADE_POSTGRES_PASSWORD in .env}
+    volumes:
+      # A new volume. The volumes of the old stack (atrade_postgres_data and others) and the volume atrade-pgdata
+      # of earlier test starts are not used, and no data is migrated. PostgreSQL keeps the password of the first
+      # start in this volume.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=atrade", "--dbname=atrade"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    pids_limit: 2048
+    restart: unless-stopped
+
+  # IB Gateway with IBC, logged in to the IBKR paper account (docs/architecture.md section 7).
+  # It is in the profile "ibkr", so ./start run works without IBKR credentials.
+  # Set COMPOSE_PROFILES=ibkr in .env to start it.
+  ib-gateway:
+    # ghcr.io/gnzsnz/ib-gateway:stable (IB Gateway 10.50.1f), pinned by digest.
+    image: ghcr.io/gnzsnz/ib-gateway:stable@sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581
+    profiles: ["ibkr"]
+    environment:
+      TWS_USERID: ${ATRADE_IBKR_USERNAME:-}
+      TWS_PASSWORD: ${ATRADE_IBKR_PASSWORD:-}
+      TRADING_MODE: paper
+      # One IBKR user name has one session. The Gateway takes the session from other logins.
+      EXISTING_SESSION_DETECTED_ACTION: primary
+      # IBC restarts the Gateway each day at this time, without a new login (docs/architecture/ibkr.md 7.4).
+      # Format "hh:mm AM" or "hh:mm PM", in TIME_ZONE.
+      AUTO_RESTART_TIME: ${ATRADE_IBKR_AUTO_RESTART_TIME:-11:45 PM}
+      TIME_ZONE: ${ATRADE_IBKR_TIME_ZONE:-America/New_York}
+    # No "ports": the API (ib-gateway:4004 for paper, through socat) stays inside the Compose network.
+    pids_limit: 2048
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: atrade-web:local
+    environment:
+      DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
+      ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
+      ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
+      ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
+      ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
+      ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
+      ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
+      ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+      ATRADE_LOCAL_PAPER_CAPITAL_USD: ${ATRADE_LOCAL_PAPER_CAPITAL_USD:-100000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${ATRADE_WEB_PORT:-8000}:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-4g}
+    pids_limit: 2048
+    # The forward-test service waits for this check: web runs the database migrations before it serves HTTP.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+
+  # The forward-test worker and its child processes, 1 per running forward test (docs/architecture.md section 12).
+  # It is a separate service, so a restart of web does not stop forward tests. It has no IBKR user name or password.
+  forward-test:
+    # The same image as web. The build section stops Compose from trying to pull the local image name.
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: atrade-web:local
+    command: ["python", "-m", "atrade.app.forward_test_worker"]
+    environment:
+      DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
+      ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
+      ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
+      ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
+      ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
+      ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
+      ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
+      ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+    depends_on:
+      web:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 2048
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    # backend/src/atrade/app/web.py names this volume when PostgreSQL refuses the password.
+    name: atrade-postgres18-data
