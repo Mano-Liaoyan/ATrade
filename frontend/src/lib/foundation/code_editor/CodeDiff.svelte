@@ -1,19 +1,24 @@
 <!-- Read-only side-by-side diff of two Python texts: @codemirror/merge. It has no domain meaning (docs/architecture.md
-     section 13). Long unchanged parts are collapsed. The diff owns its scroll region with a styled scrollbar. -->
+     section 13). Long unchanged parts are collapsed and long lines wrap. The diff scrolls inside a ScrollRegion, which
+     draws its own track in all browsers (section 13.1). -->
 <script lang="ts">
   import { MergeView } from '@codemirror/merge';
   import { python } from '@codemirror/lang-python';
   import { EditorState, type EditorStateConfig } from '@codemirror/state';
   import { EditorView, basicSetup } from 'codemirror';
+  import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { createCodeTheme } from './code_theme';
 
   interface Props {
     firstCode: string;
     secondCode: string;
     firstLabel: string;
     secondLabel: string;
+    /** Collapse long unchanged parts. Turn it off to show all code, for example when both sides are the same. */
+    collapseUnchanged?: boolean;
   }
 
-  const { firstCode, secondCode, firstLabel, secondLabel }: Props = $props();
+  const { firstCode, secondCode, firstLabel, secondLabel, collapseUnchanged = true }: Props = $props();
 
   let container: HTMLDivElement;
 
@@ -23,6 +28,8 @@
       extensions: [
         basicSetup,
         python(),
+        createCodeTheme(),
+        EditorView.lineWrapping,
         EditorState.readOnly.of(true),
         EditorView.editable.of(false),
         EditorView.contentAttributes.of({ 'aria-label': label }),
@@ -35,7 +42,7 @@
       parent: container,
       a: makeSide(firstCode, firstLabel),
       b: makeSide(secondCode, secondLabel),
-      collapseUnchanged: { margin: 3, minSize: 4 },
+      ...(collapseUnchanged ? { collapseUnchanged: { margin: 3, minSize: 4 } } : {}),
     });
     return () => {
       mergeView.destroy();
@@ -48,7 +55,9 @@
     <span>{firstLabel}</span>
     <span>{secondLabel}</span>
   </div>
-  <div class="diff-view" bind:this={container}></div>
+  <ScrollRegion label="Code difference" maxHeight="min(32rem, 60vh)">
+    <div class="diff-view" bind:this={container}></div>
+  </ScrollRegion>
 </div>
 
 <style>
@@ -69,22 +78,9 @@
     padding: 0.375rem 0.75rem;
   }
 
-  /* The merge view scrolls inside itself. The scrollbar is styled, so Safari also shows it (section 13.1). */
+  /* The ScrollRegion scrolls the merge view, so the merge view does not scroll itself. */
   .diff-view :global(.cm-mergeView) {
-    max-height: 28rem;
-    overflow: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-muted) transparent;
-  }
-
-  .diff-view :global(.cm-mergeView::-webkit-scrollbar) {
-    width: 10px;
-    height: 10px;
-  }
-
-  .diff-view :global(.cm-mergeView::-webkit-scrollbar-thumb) {
-    border-radius: 5px;
-    background: var(--color-muted);
+    overflow: visible;
   }
 
   .diff-view :global(.cm-editor) {

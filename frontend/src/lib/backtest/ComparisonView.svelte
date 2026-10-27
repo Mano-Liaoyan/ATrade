@@ -34,6 +34,8 @@
 
   const { first, second, code, interruptions = [] }: Props = $props();
 
+  let isSameCodeOpen = $state(false);
+
   const METRIC_ROWS: { name: string; format: (metrics: BacktestMetrics) => string }[] = [
     { name: 'Final equity (USD)', format: (metrics) => formatUsd(metrics.final_equity_usd) },
     { name: 'Total return', format: (metrics) => formatPercent(metrics.total_return_percent) },
@@ -50,7 +52,24 @@
 <section class="comparison" aria-label="Comparison">
   {#if code !== undefined}
     <h2>Code difference</h2>
-    <CodeDiff firstCode={code.firstCode} secondCode={code.secondCode} firstLabel={first.label} secondLabel={second.label} />
+    {#if code.firstCode === code.secondCode}
+      <!-- Saving the same code again keeps the version, so the same code means the same strategy version. -->
+      <p class="same-code" role="status" aria-label="Code difference">Same strategy version: no code difference.</p>
+      <details bind:open={isSameCodeOpen}>
+        <summary>Show the code</summary>
+        {#if isSameCodeOpen}
+          <CodeDiff
+            firstCode={code.firstCode}
+            secondCode={code.secondCode}
+            firstLabel={first.label}
+            secondLabel={second.label}
+            collapseUnchanged={false}
+          />
+        {/if}
+      </details>
+    {:else}
+      <CodeDiff firstCode={code.firstCode} secondCode={code.secondCode} firstLabel={first.label} secondLabel={second.label} />
+    {/if}
   {/if}
 
   <h2>Metrics</h2>
@@ -96,6 +115,24 @@
   h2 {
     margin: 0;
     font-size: 1.125rem;
+  }
+
+  .same-code {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-accent);
+    background: var(--color-surface);
+  }
+
+  summary {
+    cursor: pointer;
+    color: var(--color-muted);
+    font-size: 0.875rem;
+  }
+
+  details[open] summary {
+    margin-bottom: 0.5rem;
   }
 
   .metric-table {

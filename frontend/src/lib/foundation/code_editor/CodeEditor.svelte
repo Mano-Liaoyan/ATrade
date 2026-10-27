@@ -3,6 +3,7 @@
   import { python } from '@codemirror/lang-python';
   import type { Extension } from '@codemirror/state';
   import { EditorView, basicSetup } from 'codemirror';
+  import { createCodeTheme } from './code_theme';
 
   interface Props {
     code: string;
@@ -24,6 +25,7 @@
       extensions: [
         basicSetup,
         python(),
+        createCodeTheme(),
         ...extensions,
         EditorView.contentAttributes.of({ 'aria-label': label }),
         EditorView.updateListener.of((update) => {

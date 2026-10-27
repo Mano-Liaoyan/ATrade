@@ -70,6 +70,15 @@
     --color-border: #d0d7de;
     --color-warning: #9a6700;
     --color-accent: #0969da;
+    /* Code editor and code diff (src/lib/foundation/code_editor/code_theme.ts). */
+    --color-code-active-line: #eaeef280;
+    --color-code-selection: #0969da33;
+    --color-diff-removed-line: #ffebe9;
+    --color-diff-removed-text: #ff818266;
+    --color-diff-removed-mark: #cf222e;
+    --color-diff-added-line: #dafbe1;
+    --color-diff-added-text: #4ac26b66;
+    --color-diff-added-mark: #1a7f37;
     color-scheme: light dark;
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
@@ -83,6 +92,14 @@
       --color-border: #30363d;
       --color-warning: #d29922;
       --color-accent: #4493f8;
+      --color-code-active-line: #6e768126;
+      --color-code-selection: #4493f84d;
+      --color-diff-removed-line: #f8514926;
+      --color-diff-removed-text: #f8514966;
+      --color-diff-removed-mark: #f85149;
+      --color-diff-added-line: #2ea04326;
+      --color-diff-added-text: #2ea04366;
+      --color-diff-added-mark: #3fb950;
     }
   }
 
@@ -103,7 +120,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem clamp(1rem, 3vw, 2.5rem);
     border-bottom: 1px solid var(--color-border);
     background: var(--color-surface);
   }
@@ -137,8 +154,9 @@
     font-weight: 600;
   }
 
+  /* The side gutter grows with the window, so page content does not sit near the window edge on wide screens. */
   .app-main {
     flex: 1;
-    padding: 1rem;
+    padding: 1.25rem clamp(1rem, 3vw, 2.5rem);
   }
 </style>

@@ -11,6 +11,8 @@ const FILLER_BACKTEST_COUNT = 6;
 const FULL_RANGE = { startUtc: '2023-01-02T00:00:00Z', endUtc: '2026-01-01T00:00:00Z' };
 const FILLER_RANGE = { startUtc: '2023-01-02T00:00:00Z', endUtc: '2023-01-06T00:00:00Z' };
 const CHANGED_CODE_LINE = '# Compared version: one more comment line.';
+// More changed lines than the code difference region shows, so that it scrolls with a visible track.
+const ADDED_COMMENT_LINES = Array.from({ length: 40 }, (_, index) => `# Added line ${String(index + 1)}.`).join('\n');
 
 interface StrategyVersion {
   id: number;
@@ -68,7 +70,7 @@ test('compares two versions of the same strategy and refuses different strategie
   const other = await createStrategy(request, `Other ${suffix}`);
   const secondVersionResponse = await request.post(`/api/strategies/${String(compared.id)}/versions`, {
     // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
-    data: { code: `${compared.version.code}\n${CHANGED_CODE_LINE}\n` },
+    data: { code: `${compared.version.code}\n${CHANGED_CODE_LINE}\n${ADDED_COMMENT_LINES}\n` },
   });
   const secondVersion = (await secondVersionResponse.json()) as StrategyVersion;
   const firstBacktestId = await startBacktest(request, compared.version.id);
@@ -105,6 +107,12 @@ test('compares two versions of the same strategy and refuses different strategie
   const firstLabel = `#${String(firstBacktestId)} Compared ${suffix} v1`;
   const secondLabel = `#${String(secondBacktestId)} Compared ${suffix} v2`;
   await expect(page.locator('.cm-mergeView')).toContainText(CHANGED_CODE_LINE);
+  // Only the changed lines and a few lines around them show. The unchanged lines are collapsed.
+  await expect(page.locator('.cm-collapsedLines').first()).toBeVisible();
+  await expect(page.locator('.cm-mergeView')).not.toContainText('class MovingAverageStrategy(Strategy):');
+  const diffTrack = page.getByRole('scrollbar', { name: 'Code difference scroll bar' });
+  await expect(diffTrack).toBeVisible();
+  await expect(diffTrack.locator('.scroll-thumb')).toBeVisible();
   const metrics = page.getByRole('region', { name: 'Compared metrics' });
   await expect(metrics.getByRole('columnheader', { name: firstLabel })).toBeVisible();
   await expect(metrics.getByRole('columnheader', { name: secondLabel })).toBeVisible();
@@ -116,4 +124,29 @@ test('compares two versions of the same strategy and refuses different strategie
   // The backend also refuses a comparison of different strategies, for example from a typed URL.
   await page.goto(`/backtests/${String(firstBacktestId)}/comparison/${String(otherBacktestId)}`);
   await expect(page.getByRole('alert')).toHaveText(/Only backtests of the same strategy can be compared/);
+});
+
+test('shows a note instead of an empty code difference for the same strategy version', async ({ page, request }, currentTest) => {
+  // The chart saves the daily bars in PostgreSQL. The start route refuses a backtest without saved bars.
+  await page.goto('/instruments/NASDAQ/AAPL?currency=USD&bar_period=1-DAY');
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
+  const compared = await createStrategy(request, `Same version ${currentTest.project.name} ${String(Date.now())}`);
+  const firstBacktestId = await startBacktest(request, compared.version.id, FILLER_RANGE);
+  const secondBacktestId = await startBacktest(request, compared.version.id, FILLER_RANGE);
+
+  await page.goto(`/backtests/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
+
+  await expect(page.getByRole('status', { name: 'Code difference' })).toHaveText(
+    'Same strategy version: no code difference.',
+  );
+  await expect(page.locator('.cm-mergeView')).toHaveCount(0);
+  await page.getByText('Show the code').click();
+  // The full code shows: no collapsed lines. CodeMirror draws only the lines near the visible part.
+  await expect(page.locator('.cm-mergeView')).toContainText('from nautilus_trader.trading import Strategy');
+  await expect(page.locator('.cm-collapsedLines')).toHaveCount(0);
+  // The code scrolls inside its region, and CodeMirror draws the lines that the scroll shows.
+  await page.getByRole('region', { name: 'Code difference' }).evaluate((region) => {
+    region.scrollTop = region.scrollHeight;
+  });
+  await expect(page.locator('.cm-mergeView')).toContainText('self.submit_order(order)');
 });

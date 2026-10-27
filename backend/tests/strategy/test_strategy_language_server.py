@@ -16,6 +16,7 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from atrade.strategy import STRATEGY_LANGUAGE_SERVER_PATH, create_strategy_language_server_router
+from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from tests.strategy.language_server_session import LanguageServerSession
 
 DOCUMENT_URI = "file:///atrade/strategy.py"
@@ -92,6 +93,18 @@ def test_publishes_type_errors_of_the_document(test_client: TestClient) -> None:
 
     error_lines = [item["range"]["start"]["line"] for item in diagnostics if item.get("severity") == 1]
     assert error_lines == [2]
+
+
+def test_the_strategy_template_has_no_diagnostics(test_client: TestClient) -> None:
+    # A new strategy starts with the template. The editor must not mark problems in code that the user did not write.
+    with test_client.websocket_connect(STRATEGY_LANGUAGE_SERVER_PATH) as websocket:
+        session = LanguageServerSession(websocket)
+        session.initialize()
+        session.open_document(DOCUMENT_URI, STRATEGY_TEMPLATE)
+
+        diagnostics = session.wait_for_diagnostics(DOCUMENT_URI)
+
+    assert [(item["range"]["start"]["line"], item["message"]) for item in diagnostics] == []
 
 
 def test_each_connection_starts_one_process_that_ends_when_the_connection_closes(test_client: TestClient) -> None:

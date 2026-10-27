@@ -299,9 +299,14 @@ section 9.5.
   | `code` | `ComparedCode`: `{firstCode, secondCode}`, optional | Shows the code diff. Leave it out when both runs use the same strategy version. |
 
   It shows the code diff (`CodeDiff` of `#lib/foundation/code_editor`,
-  read-only `@codemirror/merge` with collapsed unchanged lines and a styled
-  scrollbar), the metric table (in a `ScrollRegion` named "Compared
+  read-only `@codemirror/merge` with wrapped lines, unchanged lines collapsed
+  to the changed parts and 3 lines around them, in a `ScrollRegion` named
+  "Code difference"), the metric table (in a `ScrollRegion` named "Compared
   metrics"), and both equity curves on one chart.
+- When `firstCode` and `secondCode` are the same (two backtests of the same
+  strategy version), the view shows the status "Same strategy version: no code
+  difference." in place of the diff. A closed "Show the code" disclosure shows
+  the full code without collapsed lines.
 - `EquityChart` takes `curves: [{name, points}]`. The first curve is a solid
   line in `--color-text`, the second a dashed line in `--color-accent`. With
   more than one curve, a legend names each curve.

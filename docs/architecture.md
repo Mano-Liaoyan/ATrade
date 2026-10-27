@@ -343,6 +343,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   visible scroll track and thumb. Safari can hide native scrollbars, so use
   styled tracks where reachability matters.
 - No content can be clipped or unreachable.
+- Colors come from the tokens on `:root` in `src/routes/+layout.svelte`, with
+  a light and a dark set (`prefers-color-scheme`). Do not hard-code a color in
+  a component that the dark scheme does not also cover. The page side gutter
+  is `clamp(1rem, 3vw, 2.5rem)` for the header and the main region.
 
 ## 14. Deployment and external access
 

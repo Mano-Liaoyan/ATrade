@@ -145,12 +145,18 @@ def answer_configuration_request(request: JsonObject) -> JsonObject:
 
 
 def read_setting_section(section: object) -> JsonObject | None:
+    # basedpyright 1.40 asks for the top sections "python", "basedpyright", and "pyright". It reads the analysis
+    # settings from the "analysis" key of the "basedpyright" or "python" section. Without them, basedpyright uses its
+    # default "recommended" mode, which marks unknown NautilusTrader types in the strategy template.
+    analysis_settings: JsonObject = {"typeCheckingMode": TYPE_CHECKING_MODE, "diagnosticMode": "openFilesOnly"}
     match section:
         case "python":
             # The Web process environment has NautilusTrader 2.0 and its `.pyi` stubs.
-            return {"pythonPath": sys.executable}
+            return {"pythonPath": sys.executable, "analysis": analysis_settings}
+        case "basedpyright":
+            return {"analysis": analysis_settings}
         case "basedpyright.analysis" | "python.analysis":
-            return {"typeCheckingMode": TYPE_CHECKING_MODE, "diagnosticMode": "openFilesOnly"}
+            return analysis_settings
         case _:
             return None
 

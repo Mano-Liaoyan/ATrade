@@ -119,11 +119,17 @@ The checks run in the Web process. They do not import the user code.
   seconds, then sends `SIGKILL`.
 - The route sets the basedpyright settings, not the browser. It adds the
   `workspace.configuration` capability to the `initialize` request and answers
-  the `workspace/configuration` requests itself:
+  the `workspace/configuration` requests itself. basedpyright 1.40 asks for
+  the sections `python`, `basedpyright`, and `pyright`, and reads the analysis
+  settings from the `analysis` key of the `python` and `basedpyright` answers:
   - `python.pythonPath` is the Python of the Web process. This environment has
     NautilusTrader 2.0, so basedpyright resolves `Strategy`.
-  - `typeCheckingMode` is `standard`. Strategy code is user code, so the
-    strict rules of the ATrade code do not apply.
+  - `analysis.typeCheckingMode` is `standard`. Strategy code is user code, so
+    the strict rules of the ATrade code do not apply. Without this setting,
+    basedpyright uses its default `recommended` mode, which marks unknown
+    NautilusTrader types in the template.
+  - The strategy template (section 9.2) has no diagnostics. A backend test
+    checks this through the route.
 - The browser client is `@codemirror/lsp-client` with
   `languageServerExtensions()` (completion, hover, signature help, live
   diagnostics). The file URI is `file:///atrade/strategy.py`. The file does not
@@ -167,6 +173,15 @@ returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
 - `frontend/src/lib/foundation/code_editor/` holds the `CodeEditor` Svelte
   component: CodeMirror 6 (`codemirror`, `@codemirror/lang-python`). It has
   no domain meaning. Its scroll region has a styled scrollbar.
+- `CodeEditor` and `CodeDiff` use one theme, `createCodeTheme()` in
+  `code_theme.ts`. The editor parts (gutter, active line, selection, tooltips,
+  diff line colors) use the app color tokens of `src/routes/+layout.svelte`
+  (`--color-surface`, `--color-muted`, `--color-code-*`, `--color-diff-*`).
+  The syntax colors are in `code_colors.ts` (GitHub Primer colors). A Vitest
+  test checks that each syntax color has WCAG AA contrast (4.5:1) on the code
+  background. The theme follows `prefers-color-scheme` and also changes when
+  the operating system scheme changes. It sets `EditorView.darkTheme`, so the
+  CodeMirror base themes also use their dark variants.
 - `CodeEditor` takes more CodeMirror extensions in its `extensions` property.
   The editor page passes the language server extension.
 - `frontend/src/lib/strategy/` holds the HTTP client of the strategy routes,
