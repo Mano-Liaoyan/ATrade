@@ -225,18 +225,9 @@ the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
 
 ## 8. Market data and watchlist
 
-- `market_data` reads bars from IBKR with `ib_async` and saves them in
-  PostgreSQL.
-- `market_data` requests only the time ranges that are not in PostgreSQL. This
-  keeps ATrade below the IBKR historical data rate limit.
-- Backtests read bars only from PostgreSQL.
-- The bar table key is the instrument, the bar period, and the bar start time.
-- Start with no partitions, no BRIN index, and no compression. Add native
-  PostgreSQL range partitions only when a measurement shows the need.
-- Data is always called a bar. "Candlestick" means only the chart drawing
-  (`CandlestickSeries` in `lightweight-charts`).
-- `watchlist` stores the instruments that the user saves. It uses
-  `market_data` to find instruments.
+Section 8 is in [`docs/architecture/market_data.md`](architecture/market_data.md).
+It holds the bar storage decisions, the watchlist decisions, and the
+instrument search (`GET /api/market-data/instrument-search`).
 
 ## 9. Strategies and strategy versions
 
@@ -504,11 +495,25 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   and build time.
 - `src/lib/` has one directory per capability (`lib/market_data/`,
   `lib/backtest/`, and so on) and `lib/foundation/`.
-- A capability can import only `#lib/foundation/<module>`. Capabilities must
-  not import each other. Only `src/routes/` combines capabilities.
+- A capability can import only `#lib/foundation/<module>` and the generated
+  API types `#lib/api`. Capabilities must not import each other. Only
+  `src/routes/` combines capabilities.
 - Generic UI with no domain meaning goes in `foundation/`, for example
   `foundation/code_editor/`. Parts with domain meaning stay in the capability.
-- Generated API types go in `lib/api/`.
+- Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
+  writes the OpenAPI document to `lib/api/openapi.json`, and
+  `openapi-typescript` writes `lib/api/index.ts`. `pnpm generate:api` runs
+  both. Both files are committed. The backend test
+  `tests/app/test_openapi_document.py` fails when `openapi.json` does not
+  match the routes, and `pnpm check:api` fails when `index.ts` does not match
+  `openapi.json`. Use `components['schemas'][...]`; do not write API types by
+  hand.
+- `foundation/scroll_region/` has `ScrollRegion`: a region that scrolls inside
+  itself. It hides the native scrollbar and draws its own track and thumb
+  (`role="scrollbar"`, named "<region label> scroll bar"). The thumb can be
+  dragged, a click on the track scrolls one page, and the track takes Arrow,
+  Page Up, Page Down, Home, and End keys. Use it for each region that can
+  overflow (section 13.1).
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
@@ -810,7 +815,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Playwright tests start, stop, the list, and the comparison page.
 - Scroll regions: Playwright scrolls to the last item of each region and
   asserts that it is visible. It also asserts that the app scrollbar element is
-  visible. No screenshot comparison.
+  visible (`getByRole('scrollbar', { name: '<region label> scroll bar' })`
+  of `ScrollRegion`, section 13). No screenshot comparison.
 - WebKit is not Safari. Before each release, check a list by hand in real
   Safari.
 
@@ -848,7 +854,8 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
 - This document (`docs/architecture.md`) is the architecture specification.
   When it is longer than 1000 lines, split it by capability. A moved section
   goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
-  is in `docs/architecture/ibkr.md`. Section 9 is in
+  is in `docs/architecture/ibkr.md`. Section 8 is in
+  `docs/architecture/market_data.md`. Section 9 is in
   `docs/architecture/strategy.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.

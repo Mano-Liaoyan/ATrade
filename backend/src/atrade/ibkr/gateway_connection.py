@@ -8,14 +8,21 @@ import asyncio
 import logging
 from typing import Protocol
 
-from ib_async import IB
+from ib_async import IB, ContractDescription, RequestError
 
+from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import require_usable_client_id
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
+# ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
+STOCK_SECURITY_TYPE = "STK"
 
 logger = logging.getLogger("atrade.ibkr")
+
+
+class GatewayRequestError(Exception):
+    """IB Gateway did not answer a request: no connection, a timeout, or an API error."""
 
 
 class GatewayConnection(Protocol):
@@ -27,7 +34,22 @@ class GatewayConnection(Protocol):
 
     def read_managed_accounts(self) -> list[str]: ...
 
+    async def search_instruments(self, query: str) -> list[Instrument]: ...
+
     def disconnect(self) -> None: ...
+
+
+def read_stock_instruments(contract_descriptions: list[ContractDescription]) -> list[Instrument]:
+    """Keeps the stocks, in the IBKR order, without duplicates. The exchange is the primary exchange."""
+    instruments: list[Instrument] = []
+    for description in contract_descriptions:
+        contract = description.contract
+        if contract is None or contract.secType != STOCK_SECURITY_TYPE:
+            continue
+        instrument = Instrument(symbol=contract.symbol, exchange=contract.primaryExchange, currency=contract.currency)
+        if instrument not in instruments:
+            instruments.append(instrument)
+    return instruments
 
 
 class IbAsyncGatewayConnection:
@@ -67,6 +89,21 @@ class IbAsyncGatewayConnection:
         if not self.ib.isConnected():
             return []
         return self.ib.managedAccounts()
+
+    async def search_instruments(self, query: str) -> list[Instrument]:
+        """Finds stocks whose symbol starts with the query, or whose name has a word that matches it. IBKR allows 1
+        reqMatchingSymbols request per second.
+
+        https://interactivebrokers.github.io/tws-api/matching_symbols.html
+        """
+        try:
+            contract_descriptions = await self.ib.reqMatchingSymbolsAsync(query)
+        except (ConnectionError, RequestError) as error:
+            raise GatewayRequestError(str(error)) from error
+        if contract_descriptions is None:
+            message = "IB Gateway did not answer the instrument search in time."
+            raise GatewayRequestError(message)
+        return read_stock_instruments(contract_descriptions)
 
     def disconnect(self) -> None:
         self.ib.disconnect()

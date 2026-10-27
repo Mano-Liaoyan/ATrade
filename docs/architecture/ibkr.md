@@ -48,7 +48,8 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_managed_accounts()`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_managed_accounts()`, `search_instruments(query)`, `disconnect()`. |
+| `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `IbAsyncGatewayConnection` | The real connection. It uses one `ib_async.IB` object, on the event loop of the caller. |
 | `create_ibkr_router(...)` | The router of `GET /api/ibkr/gateway`. |
 
@@ -64,7 +65,10 @@ The public entry `atrade.ibkr` exports:
   when the Gateway is not reachable.
 - The hand-written fake `tests/fakes/ibkr.py` (`FakeGatewayConnection`) has
   the same functions. Its data stays in memory. Tests set
-  `is_gateway_reachable` and `managed_accounts` directly.
+  `is_gateway_reachable`, `managed_accounts`, `instruments`, and
+  `search_error_message` directly.
+- `search_instruments(query)` is the instrument search of
+  [`docs/architecture/market_data.md`](market_data.md) section 8.2.
 
 ## 7.3 Gateway status route
 
@@ -92,7 +96,8 @@ make sure that the `ib-gateway` service runs and is logged in.
 ## 7.5 Contract tests
 
 - `backend/tests/ibkr/test_gateway_connection_contract.py` runs the same
-  assertions against the fake and against the real paper account.
+  assertions against the fake and against the real paper account. It covers
+  the connection, `managedAccounts`, and the instrument search.
 - The real case has the mark `ibkr_paper`. The default pytest options
   (`-m "not ibkr_paper"`) leave it out, so CI runs only the fake. Run it by
   hand with `uv run pytest -m ibkr_paper` in `backend/`.

@@ -1,11 +1,8 @@
 // Public entry of ibkr: reads GET /api/ibkr/gateway for the IB Gateway status line of the app shell.
 
-// Hand-written until the OpenAPI type generation exists. It matches GatewayStatusResponse in backend/src/atrade/ibkr/http_routes.py.
-interface GatewayStatusResponse {
-  status: 'connected' | 'unreachable';
-  host: string;
-  port: number;
-}
+import type { components } from '#lib/api';
+
+type GatewayStatusResponse = components['schemas']['GatewayStatusResponse'];
 
 export type GatewayStatus =
   | { kind: 'connected' }

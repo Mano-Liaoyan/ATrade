@@ -1,47 +1,17 @@
 // Calls the strategy HTTP routes (backend/src/atrade/strategy/http_routes.py).
 
-// Hand-written until the OpenAPI type generation exists. They match the response models in http_routes.py.
-export interface StrategyVersionSummary {
-  id: number;
-  version_number: number;
-  code_sha256: string;
-  created_at_utc: string;
-}
+import type { components } from '#lib/api';
 
-export interface StrategyDetail {
-  id: number;
-  name: string;
-  created_at_utc: string;
-  versions: StrategyVersionSummary[];
-}
-
-export interface StrategyListItem {
-  id: number;
-  name: string;
-  latest_version_number: number;
-}
-
-export interface StrategyVersion {
-  id: number;
-  strategy_id: number;
-  version_number: number;
-  code: string;
-  code_sha256: string;
-  created_at_utc: string;
-}
-
-export interface CodeProblem {
-  line: number;
-  message: string;
-}
-
+export type StrategyVersionSummary = components['schemas']['StrategyVersionSummary'];
+export type StrategyDetail = components['schemas']['StrategyResponse'];
+export type StrategyListItem = components['schemas']['StrategyListItem'];
+export type StrategyVersion = components['schemas']['StrategyVersionResponse'];
+export type CodeProblem = components['schemas']['CodeProblemResponse'];
+// The strategy routes do not declare their error model. FastAPI HTTPException sends {"detail": "<message>"}.
 interface ErrorResponse {
   detail: string;
 }
-
-interface CodeCheckFailedResponse {
-  problems: CodeProblem[];
-}
+type CodeCheckFailedResponse = components['schemas']['CodeCheckFailedResponse'];
 
 export type RequestResult<T> = { kind: 'ok'; value: T } | { kind: 'failed'; message: string };
 

@@ -11,8 +11,8 @@ is in GitHub Issues.
 ## Current state
 
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
-connection (issue #63), the strategy editor (issue #68), and code completion
-(issue #69):
+connection (issue #63), instrument search (issue #64), the strategy editor
+(issue #68), and code completion (issue #69):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the strategy routes under `/api/strategies`, and the
@@ -23,12 +23,16 @@ connection (issue #63), the strategy editor (issue #68), and code completion
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database.
+- Instrument search: the home page finds instruments by symbol through
+  IB Gateway and shows each match as symbol / exchange / currency, for
+  example `700 / SEHK / HKD`. The search needs a connected IB Gateway. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
 - Strategies: the page `/strategies` creates a strategy from a template. The
   editor saves the code as strategy versions after the checks before save.
   Unsaved edits stay in the browser. The editor shows code completion and
   live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
-- Market data, watchlist, backtests, paper trading, and forward tests are not
+- Bars, watchlist, backtests, paper trading, and forward tests are not
   available yet.
 
 ## Requirements
@@ -115,7 +119,7 @@ One command runs the same checks as CI:
 ```sh
 ./scripts/check            # all checks
 ./scripts/check backend    # ruff, basedpyright, import-linter, file length, pytest
-./scripts/check frontend   # ESLint, svelte-check, Vitest, build
+./scripts/check frontend   # API types, ESLint, svelte-check, Vitest, build
 ./scripts/check e2e        # Playwright
 ```
 
@@ -134,6 +138,21 @@ One command runs the same checks as CI:
   Gateway port is not published, so set `ATRADE_IBKR_HOST` and
   `ATRADE_IBKR_PAPER_PORT` to an address that you can reach, for example an
   SSH tunnel. See `docs/architecture/ibkr.md` section 7.5.
+
+## Generate the API types
+
+The frontend API types come from the OpenAPI document of the backend. After a
+change to an HTTP route or to its request or response model, run:
+
+```sh
+cd frontend && pnpm generate:api
+```
+
+This writes `frontend/src/lib/api/openapi.json` and
+`frontend/src/lib/api/index.ts`. Commit both files. A backend test fails when
+`openapi.json` does not match the routes. `pnpm check:api` (in
+`./scripts/check frontend`) fails when `index.ts` does not match
+`openapi.json`.
 
 ## Development without Docker
 
