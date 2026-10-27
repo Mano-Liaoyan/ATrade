@@ -12,6 +12,7 @@ dependencies = [
     "ib-async==2.1.0",
     "nautilus-trader==2.0.0rc7",
     "psycopg[binary]==3.3.6",
+    "pyarrow==26.0.0",
     "pydantic-settings==2.16.1",
     # The checks before save run ruff on strategy code in the Web process (docs/architecture/strategy.md section 9.3).
     "ruff==0.17.3",

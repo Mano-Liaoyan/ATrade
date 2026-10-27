@@ -1,5 +1,6 @@
-"""/ws/paper-trading: pushes the paper account check result, the balance, and the positions to the browser.
+"""/ws/paper-trading pushes the paper account check, the balance, and the positions to the browser.
 
+GET /api/paper-trading/paper-capital returns the default paper capital of the backtest form.
 The socket sends an "account" message at once and after each change, and a "heartbeat" message at a fixed
 interval, so that the browser can see a dead connection and connect again (section 13).
 """
@@ -12,7 +13,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from atrade.ibkr import PortfolioPosition
-from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
+from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor, fetch_paper_capital_usd
 
 PUSH_INTERVAL_SECONDS = 0.25
 HEARTBEAT_INTERVAL_SECONDS = 10.0
@@ -48,6 +49,12 @@ class PaperAccountMessage(BaseModel):
     check: PaperAccountCheckMessage
     balance: PaperAccountBalanceMessage | None
     positions: list[PositionMessage]
+
+
+class PaperCapitalResponse(BaseModel):
+    """The default paper capital of the backtest form (docs/architecture.md section 10)."""
+
+    paper_capital_usd: Decimal
 
 
 def convert_position(position: PortfolioPosition) -> PositionMessage:
@@ -111,6 +118,10 @@ async def wait_for_disconnect(websocket: WebSocket) -> None:
 
 def create_paper_trading_router(*, paper_account_monitor: PaperAccountMonitor) -> APIRouter:
     router = APIRouter()
+
+    @router.get("/api/paper-trading/paper-capital")
+    def read_paper_capital() -> PaperCapitalResponse:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
+        return PaperCapitalResponse(paper_capital_usd=fetch_paper_capital_usd(paper_account_monitor))
 
     @router.websocket("/ws/paper-trading")
     async def stream_paper_account(websocket: WebSocket) -> None:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.

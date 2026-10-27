@@ -41,6 +41,7 @@
     <nav class="app-navigation">
       <a href={resolve('/')}>Home</a>
       <a href={resolve('/strategies')}>Strategies</a>
+      <a href={resolve('/backtests')}>Backtests</a>
     </nav>
     <span class="header-statuses">
       <span class="backend-status" role="status" aria-label="Backend status">{describeBackendHealth(backendHealth)}</span>

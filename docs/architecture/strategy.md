@@ -143,6 +143,12 @@ entry exports `create_strategy_router(database_url=..., clock=...)`.
 There is no route that changes or deletes one version. `PUT` and `DELETE` on a
 version path return `405`.
 
+The public entry also exports `read_strategy_version(*, database_url,
+strategy_version_id)` for the capabilities that run strategy versions. It
+returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
+`version_number`, `code`), or `None` when the version does not exist
+(backtest, section 10).
+
 ## 9.7 Frontend
 
 - `frontend/src/lib/foundation/code_editor/` holds the `CodeEditor` Svelte

@@ -126,6 +126,9 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   Web process lets only one fill run at a time.
 - When no part is missing, the route does not call IBKR. Saved bars are
   returned also when IB Gateway is not reachable.
+- The public entry exports `read_saved_bars(*, database_url, bar_request)`
+  with `BarRequest(instrument, bar_period, time_range)`. It reads only the
+  bars in PostgreSQL and never calls IBKR. Backtests use it (section 10).
 - `GatewayConnection.read_historical_bars(instrument, bar_period,
   time_range)` in `ibkr` calls `reqHistoricalData` with `TRADES`, regular
   trading hours only (`useRTH`), `formatDate=2` (UTC), and the contract

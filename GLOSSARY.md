@@ -39,6 +39,21 @@ _Avoid_: revision, snapshot, commit
 A test of a strategy on historical bars. No order goes to a broker.
 _Avoid_: simulation, historical run
 
+**Trade**:
+One fill of an order in a backtest or a forward test: the time, the side, the
+quantity, and the price.
+_Avoid_: deal, execution
+
+**Equity curve**:
+The cash plus the value of the position at the end of each bar of a test.
+_Avoid_: balance curve, PnL curve
+
+**Metric**:
+One number that describes the result of a test, for example the total return
+or the max drawdown. Backtests and forward tests use the same metric
+functions.
+_Avoid_: statistic, KPI
+
 **Forward test**:
 A test of a strategy that runs automatically on live market data and sends
 orders to a paper account.

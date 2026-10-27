@@ -239,32 +239,10 @@ routes, and the editor pages.
 
 ## 10. Backtest
 
-Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48),
-[Module division](https://github.com/Mano-Liaoyan/ATrade/issues/38).
-
-- A backtest request contains the strategy version, the instrument, the bar
-  type, the time range, and `paper_capital_usd`. `paper_capital_usd` is
-  required.
-- `paper_trading` exports `fetch_paper_capital_usd()`. It returns the paper
-  account balance (`NetLiquidation` in USD) after a passed paper account check.
-  Otherwise it returns the local value from `settings` (section 11.5). The frontend uses it to fill in the backtest form.
-- Each backtest runs in its own child process (`app/backtest_process.py`),
-  because the NautilusTrader backtest engine blocks the event loop.
-- In NautilusTrader 2.0, `BarDataWrangler` takes Arrow bytes, not a
-  DataFrame. The child converts the bars from PostgreSQL to Arrow.
-- The isolation goal is to prevent accidents, not to stop hostile code. Only
-  one user writes strategies.
-
-| Control | Rule |
-|---|---|
-| Timeout | Default 120 minutes. After the timeout, the parent stops the child. The status is "timed out". |
-| Concurrency | Default 1 backtest at a time. Other backtests wait in a queue. |
-| Defaults | The user can change the timeout and the concurrency in the UI. PostgreSQL stores them. |
-| Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. |
-| CPU | The child runs with `nice 10`. |
-| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. |
-| Network | No network isolation. The child must connect to PostgreSQL. |
-| File system | The container root file system is read-only. Only `/tmp` is writable. |
+Section 10 is in [`docs/architecture/backtest.md`](architecture/backtest.md).
+It holds the backtest decisions and isolation controls, the backtest tables,
+the run flow in the child process, the metric functions, the backtest HTTP
+routes (`/api/backtests`), and the backtest pages.
 
 ## 11. Paper trading
 
@@ -807,7 +785,8 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
   goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
   is in `docs/architecture/ibkr.md`. Section 8 is in
   `docs/architecture/market_data.md`. Section 9 is in
-  `docs/architecture/strategy.md`. Section 11 is in
+  `docs/architecture/strategy.md`. Section 10 is in
+  `docs/architecture/backtest.md`. Section 11 is in
   `docs/architecture/paper_trading.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
@@ -855,7 +834,6 @@ ran them. The implementation must check them.
 | `ib_async` 2.1.0 connects with client protocol 178 at most. Features after 178 are not available. Its real connection to Gateway 10.50.1f is not checked. | The `ibkr_paper` contract tests. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |
 | Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. | Read the `ibapi` crate source, or run a forward test. |
-| Start time of a backtest child process (estimated 1 to 3 seconds). | Measure it in phase 1. |
 
 ### 21.1 Facts checked
 
@@ -865,6 +843,7 @@ ran them. The implementation must check them.
 | `ghcr.io/gnzsnz/ib-gateway:stable` digest. | On 2026-10-27, the `stable` index was `sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581` (IB Gateway 10.50.1f) (#63). |
 | `ib_async` 2.1.0 and NautilusTrader 2.0.0rc7 import on Python 3.14. | Yes. Both packages import on CPython 3.14.9 (#62). A real IB Gateway connection is not checked. |
 | Editor input latency and completion latency in the browser. | On 2026-10-27, Playwright 1.64.1 (headless Chromium and Firefox) against `tests.e2e_server` on the same machine, basedpyright 1.40.2 (#69). Input latency (key press to the next painted frame, 50 keys): Chromium median 9.8 ms, p95 16.6 ms; Firefox median 3.0 ms, p95 6.0 ms. Completion latency (Ctrl+Space to the visible list for `self.subscribe_ba` in a `Strategy` subclass): first request after the page opens 782 ms (Chromium) and 808 ms (Firefox); next 10 requests 74 to 76 ms (Chromium) and 81 to 86 ms (Firefox). Not measured through the Cloudflare tunnel. |
+| Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
 

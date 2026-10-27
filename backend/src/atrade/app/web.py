@@ -13,9 +13,11 @@ import uvicorn
 from fastapi import FastAPI
 from pydantic import ValidationError
 
+from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
 from atrade.app.health_routes import create_health_router
+from atrade.backtest import BacktestRunner, create_backtest_router
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
@@ -28,11 +30,22 @@ from atrade.watchlist import create_watchlist_router
 LISTEN_HOST = "0.0.0.0"
 LISTEN_PORT = 8000
 
+# Defaults of docs/architecture.md section 10. Issue #71 stores them in PostgreSQL and lets the user change them.
+BACKTEST_TIMEOUT_SECONDS = 120 * 60
+BACKTEST_CONCURRENCY = 1
+
 logger = logging.getLogger("atrade.web")
 
 
 def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: GatewayConnection) -> FastAPI:
     paper_account_monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
+    backtest_runner = BacktestRunner(
+        database_url=settings.database_url,
+        clock=clock,
+        process_command=BACKTEST_PROCESS_COMMAND,
+        timeout_seconds=BACKTEST_TIMEOUT_SECONDS,
+        concurrency=BACKTEST_CONCURRENCY,
+    )
 
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
@@ -40,8 +53,9 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
         connection_task = asyncio.create_task(gateway_connection.keep_connected())
         # The paper account check runs after each connection, also when no browser is open.
         check_task = asyncio.create_task(paper_account_monitor.keep_checking())
+        backtest_task = asyncio.create_task(backtest_runner.keep_running())
         yield
-        for task in (check_task, connection_task):
+        for task in (backtest_task, check_task, connection_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
@@ -66,6 +80,7 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
     )
     app.include_router(create_strategy_router(database_url=settings.database_url, clock=clock))
     app.include_router(create_strategy_language_server_router())
+    app.include_router(create_backtest_router(database_url=settings.database_url, clock=clock))
     instrument_lookup = InstrumentLookup(
         gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
     )

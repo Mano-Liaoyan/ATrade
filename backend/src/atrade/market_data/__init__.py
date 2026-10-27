@@ -1,5 +1,6 @@
-"""Public entry of the market_data capability: instrument search and the instrument lookup."""
+"""Public entry of the market_data capability: instrument search, the instrument lookup, and saved bars."""
 
+from atrade.market_data.bar_reading import BarRequest, read_saved_bars
 from atrade.market_data.http_routes import create_market_data_router
 from atrade.market_data.instrument_lookup import (
     GatewayNotReachableError,
@@ -9,9 +10,11 @@ from atrade.market_data.instrument_lookup import (
 )
 
 __all__ = [
+    "BarRequest",
     "GatewayNotReachableError",
     "InstrumentLookup",
     "InstrumentLookupError",
     "InstrumentLookupFailedError",
     "create_market_data_router",
+    "read_saved_bars",
 ]

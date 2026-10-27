@@ -12,13 +12,14 @@ is in GitHub Issues.
 
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
-(issue #68), code completion (issue #69), and the paper account check with the
-account panel (issue #74):
+(issue #68), code completion (issue #69), the paper account check with the
+account panel (issue #74), and backtests (issue #70):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
-  language server WebSocket `/ws/strategy-language-server`, and
+  language server WebSocket `/ws/strategy-language-server`, the backtest
+  routes under `/api/backtests`, `GET /api/paper-trading/paper-capital`, and
   `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
@@ -53,8 +54,16 @@ account panel (issue #74):
   `GET /api/market-data/bars`. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.4.
-- Live bar updates, backtests, paper trading, and forward tests are not
-  available yet.
+- Backtests: the page `/backtests` starts a backtest of a strategy version on
+  the saved bars of one USD instrument, with paper capital from the paper
+  account balance or the local setting. Each backtest runs in its own child
+  process of `web`, one at a time. The backtest page shows the status, the
+  strategy error, the metrics, the equity curve, and the trades. Open the
+  bar chart of the instrument first: backtests read only bars that are in
+  PostgreSQL. See
+  [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
+- Live bar updates, paper orders, forward tests, the backtest limits UI, and
+  the backtest comparison are not available yet.
 
 ## Requirements
 

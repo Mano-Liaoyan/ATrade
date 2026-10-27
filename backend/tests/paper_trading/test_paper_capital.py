@@ -3,6 +3,7 @@
 from decimal import Decimal
 from pathlib import Path
 
+import httpx
 import pytest
 
 from atrade.foundation.settings import Settings
@@ -47,6 +48,17 @@ def test_paper_capital_is_the_local_value_when_the_check_fails() -> None:
     monitor = make_monitor(make_gateway(["DU7654321"], connected=True))
 
     assert fetch_paper_capital_usd(monitor) == Decimal(50000)
+
+
+@pytest.mark.anyio
+async def test_paper_capital_route_returns_the_local_value_without_a_passed_check(
+    web_client: httpx.AsyncClient,
+) -> None:
+    # The web_client settings have no IBKR account ID, so the paper account check does not pass.
+    response = await web_client.get("/api/paper-trading/paper-capital")
+
+    assert response.status_code == 200
+    assert response.json() == {"paper_capital_usd": "100000"}
 
 
 def test_require_paper_account_returns_the_checked_account() -> None:

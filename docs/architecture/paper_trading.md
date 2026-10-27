@@ -78,7 +78,13 @@ The public entry `atrade.paper_trading` exports:
 | `PaperAccountCheck` | The result: `status` (`disconnected`, `passed`, `failed`), `message` (the reason of the failure), `actual_accounts`, `expected_account`. |
 | `PaperAccountMonitor` | The check result of the Web process in memory, the balance, and the positions. |
 | `fetch_paper_capital_usd(paper_account_monitor)` | The `NetLiquidation` value in USD of the paper account after a passed check. Otherwise `settings.local_paper_capital_usd`. |
-| `create_paper_trading_router(*, paper_account_monitor)` | The router of `/ws/paper-trading`. |
+| `create_paper_trading_router(*, paper_account_monitor)` | The router of `/ws/paper-trading` and `GET /api/paper-trading/paper-capital`. |
+
+`GET /api/paper-trading/paper-capital` returns `200` with
+`{"paper_capital_usd": "<amount>"}`, the value of
+`fetch_paper_capital_usd()`. The backtest form uses it as the default paper
+capital (section 10). The frontend reads it with `readPaperCapital()` of
+`#lib/paper_trading`.
 
 - The check fails closed. A condition that ATrade cannot confirm is a failure,
   for example an empty `ATRADE_IBKR_ACCOUNT_ID`.

@@ -76,3 +76,11 @@ class BarReader:
                     bars = await self.gateway_connection.read_historical_bars(instrument, bar_period, missing_range)
                     await bar_store.save_bars_of_range(connection, instrument, bar_period, missing_range, bars)
             return await bar_store.select_bars(connection, instrument, bar_period, complete_range)
+
+
+async def read_saved_bars(*, database_url: str, bar_request: BarRequest) -> list[Bar]:
+    """Reads only the bars that PostgreSQL holds. It never calls IBKR, so backtests do not depend on IB Gateway."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        return await bar_store.select_bars(
+            connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range
+        )

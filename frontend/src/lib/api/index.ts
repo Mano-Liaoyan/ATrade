@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/paper-trading/paper-capital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Paper Capital */
+        get: operations["read_paper_capital_api_paper_trading_paper_capital_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/instrument-search": {
         parameters: {
             query?: never;
@@ -148,6 +165,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backtests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Backtests */
+        get: operations["list_backtests_api_backtests_get"];
+        put?: never;
+        /** Start Backtest */
+        post: operations["start_backtest_api_backtests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Backtest */
+        get: operations["read_backtest_api_backtests__backtest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -199,6 +251,113 @@ export interface components {
             /** Currency */
             currency: string;
         };
+        /** BacktestDetailResponse */
+        BacktestDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: string;
+            status: components["schemas"]["BacktestStatus"];
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Started At Utc */
+            started_at_utc: string | null;
+            /** Ended At Utc */
+            ended_at_utc: string | null;
+            metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Equity Curve */
+            equity_curve: components["schemas"]["EquityPointResponse"][];
+            /** Trades */
+            trades: components["schemas"]["TradeResponse"][];
+        };
+        /** BacktestMetricsResponse */
+        BacktestMetricsResponse: {
+            /** Final Equity Usd */
+            final_equity_usd: string;
+            /** Total Return Percent */
+            total_return_percent: string;
+            /** Max Drawdown Percent */
+            max_drawdown_percent: string;
+            /** Trade Count */
+            trade_count: number;
+        };
+        /** BacktestResponse */
+        BacktestResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: string;
+            status: components["schemas"]["BacktestStatus"];
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Started At Utc */
+            started_at_utc: string | null;
+            /** Ended At Utc */
+            ended_at_utc: string | null;
+            metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+        };
+        /** @enum {string} */
+        BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
         /**
          * BarPeriod
          * @description The bar periods that the chart offers. The values use the NautilusTrader bar specification format.
@@ -244,6 +403,16 @@ export interface components {
         CreateStrategyRequest: {
             /** Name */
             name: string;
+        };
+        /** EquityPointResponse */
+        EquityPointResponse: {
+            /**
+             * Time Utc
+             * Format: date-time
+             */
+            time_utc: string;
+            /** Equity Usd */
+            equity_usd: string;
         };
         /** ErrorResponse */
         ErrorResponse: {
@@ -299,10 +468,42 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["InstrumentResponse"][];
         };
+        /**
+         * PaperCapitalResponse
+         * @description The default paper capital of the backtest form (docs/architecture.md section 10).
+         */
+        PaperCapitalResponse: {
+            /** Paper Capital Usd */
+            paper_capital_usd: string;
+        };
         /** SaveVersionRequest */
         SaveVersionRequest: {
             /** Code */
             code: string;
+        };
+        /** StartBacktestRequest */
+        StartBacktestRequest: {
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: number | string;
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -358,6 +559,25 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+        };
+        /** TradeResponse */
+        TradeResponse: {
+            /**
+             * Time Utc
+             * Format: date-time
+             */
+            time_utc: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "BUY" | "SELL";
+            /** Quantity Shares */
+            quantity_shares: string;
+            /** Price Usd */
+            price_usd: string;
+            /** Commission Usd */
+            commission_usd: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -443,6 +663,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GatewayStatusResponse"];
+                };
+            };
+        };
+    };
+    read_paper_capital_api_paper_trading_paper_capital_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperCapitalResponse"];
                 };
             };
         };
@@ -735,6 +975,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    list_backtests_api_backtests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestResponse"][];
+                };
+            };
+        };
+    };
+    start_backtest_api_backtests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartBacktestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_backtest_api_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
