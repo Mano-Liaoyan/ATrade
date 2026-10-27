@@ -105,3 +105,80 @@ test('the page text uses IBM Plex fonts from the ATrade build', async ({ page })
   expect(loadedFamilies).toContain('IBM Plex Sans');
   expect(loadedFamilies).toContain('IBM Plex Mono');
 });
+
+// The theme button changes the choice in the order System, Light, Dark, System. The icon shows the choice.
+test('the theme button changes the theme from System to Light to Dark and back to System', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  const body = page.locator('body');
+
+  const systemButton = header.getByRole('button', { name: 'Theme: System' });
+  await expect(systemButton).toBeVisible();
+  const systemIcon = await systemButton.locator('svg').innerHTML();
+  await expect(body).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+
+  await systemButton.click();
+  // Light is Carbon g10 although the system is dark.
+  const lightButton = header.getByRole('button', { name: 'Theme: Light' });
+  await expect(lightButton).toBeVisible();
+  await expect(body).toHaveCSS('background-color', 'rgb(244, 244, 244)');
+  const lightIcon = await lightButton.locator('svg').innerHTML();
+  expect(lightIcon).not.toBe(systemIcon);
+
+  await lightButton.click();
+  const darkButton = header.getByRole('button', { name: 'Theme: Dark' });
+  await expect(darkButton).toBeVisible();
+  await expect(body).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+  const darkIcon = await darkButton.locator('svg').innerHTML();
+  expect(darkIcon).not.toBe(systemIcon);
+  expect(darkIcon).not.toBe(lightIcon);
+
+  await darkButton.click();
+  const systemButtonAgain = header.getByRole('button', { name: 'Theme: System' });
+  await expect(systemButtonAgain).toBeVisible();
+  expect(await systemButtonAgain.locator('svg').innerHTML()).toBe(systemIcon);
+});
+
+test('the theme button shows its choice in a tooltip', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('banner').getByRole('button', { name: 'Theme: System' }).hover();
+
+  await expect(page.getByRole('tooltip')).toHaveText('Theme: System');
+});
+
+test('the theme choice stays after a page reload', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  await header.getByRole('button', { name: 'Theme: System' }).click();
+  await header.getByRole('button', { name: 'Theme: Light' }).click();
+  // Dark is Carbon g100 although the system is light.
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+
+  await page.reload();
+
+  await expect(header.getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+});
+
+test('the theme button works when the browser storage is not available', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      get() {
+        throw new DOMException('The storage is not available.', 'SecurityError');
+      },
+    });
+  });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  const header = page.getByRole('banner');
+
+  await header.getByRole('button', { name: 'Theme: System' }).click();
+  await header.getByRole('button', { name: 'Theme: Light' }).click();
+
+  await expect(header.getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 22, 22)');
+});

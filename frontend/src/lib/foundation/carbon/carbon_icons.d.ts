@@ -1,12 +1,6 @@
-// Types of the @carbon/icons ES modules. The package has no TypeScript declarations.
-// The shape is the same as CarbonIcon in icon_types.ts.
+// @carbon/icons has no TypeScript declarations. An icon module (`@carbon/icons/es/<name>/<size>.js`) exports one
+// icon descriptor. Render it with the Icon component.
 declare module '@carbon/icons/es/*' {
-  interface CarbonIconNode {
-    elem: string;
-    attrs: Record<string, string | number>;
-    content?: CarbonIconNode[];
-  }
-
-  const icon: CarbonIconNode & { name: string; size: number };
+  const icon: import('./carbon_icon').CarbonIcon;
   export default icon;
 }

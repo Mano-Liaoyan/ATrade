@@ -1,10 +1,10 @@
-<!-- One @carbon/icons icon as inline SVG. Import the icon from `@carbon/icons/es/<name>/<size>.js`.
-     The icon is decorative (aria-hidden) unless it has a `label`. -->
+<!-- A Carbon icon from @carbon/icons, for example `import Light20 from '@carbon/icons/es/light/20.js'`.
+     Without `label` the icon is decorative and hidden from assistive technology. -->
 <script lang="ts">
-  import type { CarbonIcon } from './icon_types';
+  import type { CarbonIconNode } from './carbon_icon';
 
   interface Props {
-    icon: CarbonIcon;
+    icon: Pick<CarbonIconNode, 'attrs' | 'content'>;
     label?: string;
     class?: string;
   }
