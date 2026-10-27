@@ -1,5 +1,5 @@
 """The forward-test worker: every 2 seconds it compares the desired state with the actual state of each forward test,
-starts and stops child processes, and writes the actual state (docs/architecture.md sections 12.3-12.6).
+starts, stops, and restarts child processes, and writes the actual state (docs/architecture.md sections 12.3-12.7).
 
 The function that starts a child comes in as an argument, so that tests and the e2e server pass a fake.
 """
@@ -7,6 +7,7 @@ The function that starts a child comes in as an argument, so that tests and the 
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Literal, Protocol
 
 import psycopg
@@ -19,6 +20,13 @@ COMPARE_INTERVAL_SECONDS = 2.0
 # The child exits with this code when the paper account check fails. It sent no order, so there is no retry.
 PAPER_CHECK_FAILED_EXIT_CODE = 3
 PAPER_CHECK_FAILED_MESSAGE = "The paper account check failed."
+# The child exits with this code when IB Gateway is not reachable for a long time (section 12.7). It is not a crash:
+# the worker writes "waiting_for_gateway" and starts the child again, which waits for IB Gateway.
+GATEWAY_UNREACHABLE_EXIT_CODE = 4
+# After this number of crashes in a row, the worker stops the restarts (section 12.7).
+CRASH_LIMIT = 3
+# A run child that ran this long before its crash starts a new count: the crashes are not "in a row".
+CRASH_COUNT_RESET_AFTER = timedelta(minutes=10)
 
 # "run": check the paper account, run the LiveNode until the stop request, then cancel the open orders.
 # "cancel_orders": only cancel the open orders of the client ID, for a stop without a running child.
@@ -42,6 +50,7 @@ type StartForwardTestChild = Callable[[int, ChildMode], Awaitable[ForwardTestChi
 class RunningChild:
     child: ForwardTestChild
     mode: ChildMode
+    started_at_utc: datetime
     is_stop_requested: bool = False
 
 
@@ -77,37 +86,47 @@ class ForwardTestWorker:
             del self.running_children[row.id]
             await self.record_child_end(connection, row, running_child, exit_code)
             return
-        if row.desired_state == "stopped" and running_child.mode == "run" and not running_child.is_stop_requested:
+        is_stop_wanted = row.is_stop_wanted(self.clock.read_now_utc())
+        if is_stop_wanted and running_child.mode == "run" and not running_child.is_stop_requested:
             running_child.child.request_stop()
             running_child.is_stop_requested = True
             await forward_test_store.write_status(connection, forward_test_id=row.id, status="stopping")
 
     async def start_child_when_needed(self, connection: psycopg.AsyncConnection, row: ForwardTestRow) -> None:
-        # A row with status "running" and no child is a forward test of an earlier worker: start it again.
-        if row.desired_state == "running" and row.status in {"starting", "running"}:
-            await self.start_running_child(row.id, "run")
-            await forward_test_store.write_status(connection, forward_test_id=row.id, status="running")
+        now_utc = self.clock.read_now_utc()
+        # A stop without a running child, after a crash, a failed cancel, a worker restart, or the end time:
+        # cancel the orders of the client ID.
+        if row.is_stop_wanted(now_utc):
+            if row.client_id is not None:
+                await self.start_running_child(row.id, "cancel_orders")
+                await forward_test_store.write_status(connection, forward_test_id=row.id, status="stopping")
             return
-        # A stop without a running child, after a crash or a failed cancel: cancel the orders of the client ID.
-        if row.desired_state == "stopped" and row.client_id is not None:
-            await self.start_running_child(row.id, "cancel_orders")
-            await forward_test_store.write_status(connection, forward_test_id=row.id, status="stopping")
+        if row.status not in {"starting", "running", "waiting_for_gateway"}:
+            return
+        # A row with status "running" and no child is a forward test of an earlier worker: start it again.
+        if row.status == "running":
+            await forward_test_store.start_interruption(
+                connection, forward_test_id=row.id, reason="worker_restart", started_at_utc=now_utc
+            )
+        await self.start_running_child(row.id, "run")
+        # While the child waits for IB Gateway, the status stays. The child writes "running" at the LiveNode start.
+        if row.status != "waiting_for_gateway":
+            await forward_test_store.write_status(connection, forward_test_id=row.id, status="running")
 
     async def start_running_child(self, forward_test_id: int, mode: ChildMode) -> None:
         child = await self.start_child(forward_test_id, mode)
-        self.running_children[forward_test_id] = RunningChild(child=child, mode=mode)
+        self.running_children[forward_test_id] = RunningChild(
+            child=child, mode=mode, started_at_utc=self.clock.read_now_utc()
+        )
 
     async def record_child_end(
         self, connection: psycopg.AsyncConnection, row: ForwardTestRow, running_child: RunningChild, exit_code: int
     ) -> None:
+        now_utc = self.clock.read_now_utc()
         is_stop = running_child.mode == "cancel_orders" or running_child.is_stop_requested
         if is_stop and exit_code == 0:
             await forward_test_store.write_end(
-                connection,
-                forward_test_id=row.id,
-                status="stopped",
-                stopped_at_utc=self.clock.read_now_utc(),
-                error_message=None,
+                connection, forward_test_id=row.id, status="stopped", stopped_at_utc=now_utc, error_message=None
             )
             return
         if is_stop:
@@ -120,12 +139,38 @@ class ForwardTestWorker:
                 connection,
                 forward_test_id=row.id,
                 status="failed",
-                stopped_at_utc=self.clock.read_now_utc(),
+                stopped_at_utc=now_utc,
                 error_message=PAPER_CHECK_FAILED_MESSAGE,
             )
             return
-        # Issue #77 adds the automatic restarts. Until then a crash fails the forward test. Its orders can still be
-        # open, so the client ID stays taken until a stop cancels them.
-        await forward_test_store.write_failure_with_client_id(
-            connection, forward_test_id=row.id, status="failed", error_message=describe_crash(exit_code)
+        if exit_code == GATEWAY_UNREACHABLE_EXIT_CODE:
+            await forward_test_store.write_waiting_for_gateway(
+                connection, forward_test_id=row.id, started_at_utc=now_utc
+            )
+            return
+        await self.record_crash(connection, row, running_child, now_utc, exit_code)
+
+    async def record_crash(
+        self,
+        connection: psycopg.AsyncConnection,
+        row: ForwardTestRow,
+        running_child: RunningChild,
+        now_utc: datetime,
+        exit_code: int,
+    ) -> None:
+        """A run child ended without a stop request. Its orders can still be open, so the client ID stays taken.
+
+        The next comparison restarts it (the restart child cancels the old orders first), until CRASH_LIMIT.
+        """
+        is_new_count = now_utc - running_child.started_at_utc >= CRASH_COUNT_RESET_AFTER
+        crash_count = 1 if is_new_count else row.crash_count + 1
+        await forward_test_store.start_interruption(
+            connection, forward_test_id=row.id, reason="crash", started_at_utc=now_utc
+        )
+        await forward_test_store.write_crash(
+            connection,
+            forward_test_id=row.id,
+            status="failed" if crash_count >= CRASH_LIMIT else "starting",
+            crash_count=crash_count,
+            error_message=describe_crash(exit_code),
         )

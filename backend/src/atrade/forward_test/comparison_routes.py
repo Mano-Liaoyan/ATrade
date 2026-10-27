@@ -22,14 +22,8 @@ from atrade.backtest import (
     read_backtest_outcome,
 )
 from atrade.forward_test import forward_test_records, forward_test_store
-from atrade.forward_test.backtest_comparison import (
-    FillComparisonRow,
-    FillTotal,
-    Interruption,
-    compare_fills,
-    find_interruptions,
-)
-from atrade.forward_test.forward_test_store import ForwardTestRow
+from atrade.forward_test.backtest_comparison import FillComparisonRow, FillTotal, compare_fills
+from atrade.forward_test.forward_test_store import ForwardTestInterruption, ForwardTestRow
 from atrade.forward_test.http_routes import ForwardTestResponse, to_forward_test_response
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
@@ -71,7 +65,9 @@ class FillComparisonResponse(BaseModel):
     price_difference_usd: Decimal | None
 
 
-class InterruptionResponse(BaseModel):
+class ComparedInterruptionResponse(BaseModel):
+    """A time without a running LiveNode (section 12.7). The chart marks it grey."""
+
     start_utc: datetime
     end_utc: datetime
 
@@ -84,7 +80,7 @@ class ForwardTestComparisonResponse(BaseModel):
     forward_test_equity_curve: list[ComparedEquityPointResponse]
     backtest_equity_curve: list[ComparedEquityPointResponse]
     fills: list[FillComparisonResponse]
-    interruptions: list[InterruptionResponse]
+    interruptions: list[ComparedInterruptionResponse]
 
 
 def to_metrics_response(metrics: BacktestMetrics | None) -> ComparedMetricsResponse | None:
@@ -122,8 +118,13 @@ def to_fill_response(row: FillComparisonRow) -> FillComparisonResponse:
     )
 
 
-def to_interruption_response(interruption: Interruption) -> InterruptionResponse:
-    return InterruptionResponse(start_utc=interruption.start_utc, end_utc=interruption.end_utc)
+def to_interruption_response(
+    interruption: ForwardTestInterruption, open_end_utc: datetime
+) -> ComparedInterruptionResponse:
+    """An interruption that still lasts ends at the forward test stop, or now."""
+    return ComparedInterruptionResponse(
+        start_utc=interruption.started_at_utc, end_utc=interruption.ended_at_utc or open_end_utc
+    )
 
 
 def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryResponse:
@@ -192,6 +193,7 @@ class ComparisonRoutes:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             fills = await forward_test_records.select_fills(connection, forward_test_id)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
+            interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
         forward_test_metrics = None
         if row.start_balance_usd is not None:
             forward_test_metrics = calculate_metrics(
@@ -202,9 +204,7 @@ class ComparisonRoutes:
             backtest_fills=backtest.trades,
             equity_curves=[equity_curve, backtest.equity_curve],
         )
-        interruptions = find_interruptions(
-            forward_test_curve=equity_curve, backtest_curve=backtest.equity_curve, bar_period=BarPeriod(row.bar_period)
-        )
+        open_end_utc = row.stopped_at_utc or self.clock.read_now_utc()
         return ForwardTestComparisonResponse(
             forward_test=await to_forward_test_response(self.database_url, row),
             backtest=to_compared_backtest(backtest),
@@ -212,7 +212,7 @@ class ComparisonRoutes:
             forward_test_equity_curve=to_equity_curve_response(equity_curve),
             backtest_equity_curve=to_equity_curve_response(backtest.equity_curve),
             fills=[to_fill_response(fill_row) for fill_row in fill_rows],
-            interruptions=[to_interruption_response(interruption) for interruption in interruptions],
+            interruptions=[to_interruption_response(interruption, open_end_utc) for interruption in interruptions],
         )
 
 

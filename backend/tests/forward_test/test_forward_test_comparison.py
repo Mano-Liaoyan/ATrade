@@ -54,7 +54,8 @@ def write_forward_test_end(database_url: str, forward_test_id: int, *, is_stoppe
 
 
 def write_forward_test_records(database_url: str, forward_test_id: int) -> None:
-    """Rows like the DataActor writes them. No equity point at 03:07 and 03:08: the forward test was interrupted."""
+    """Rows like the DataActor writes them, and an interruption like the worker writes it (section 12.7). No equity
+    point at 03:07 and 03:08: the LiveNode did not run."""
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
@@ -90,6 +91,13 @@ def write_forward_test_records(database_url: str, forward_test_id: int) -> None:
                 {"id": forward_test_id, "time_utc": make_minute(9), "equity_usd": "10020"},
                 {"id": forward_test_id, "time_utc": make_minute(10), "equity_usd": "10006"},
             ],
+        )
+        cursor.execute(
+            """
+            INSERT INTO forward_test_interruption (forward_test_id, reason, started_at_utc, ended_at_utc)
+            VALUES (%(id)s, 'crash', %(started_at_utc)s, %(ended_at_utc)s)
+            """,
+            {"id": forward_test_id, "started_at_utc": make_minute(6, 30), "ended_at_utc": make_minute(8, 30)},
         )
 
 
@@ -256,9 +264,8 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
             "price_difference_usd": None,
         },
     ]
-    # The backtest has bars at 03:07 and 03:08, the forward test has no record of them.
     assert comparison["interruptions"] == [
-        {"start_utc": "2026-01-02T03:06:00Z", "end_utc": "2026-01-02T03:08:00Z"},
+        {"start_utc": "2026-01-02T03:06:30Z", "end_utc": "2026-01-02T03:08:30Z"},
     ]
 
 
@@ -276,6 +283,28 @@ async def test_a_queued_backtest_has_no_result_yet(web_client: httpx.AsyncClient
     assert comparison["forward_test_metrics"]["trade_count"] == 0
     assert comparison["fills"] == []
     assert comparison["interruptions"] == []
+
+
+@pytest.mark.anyio
+async def test_an_interruption_that_still_lasts_ends_now_on_the_chart(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    write_forward_test_end(database_url, forward_test["id"], is_stopped=False)
+    clock.now_utc = STOPPED_UTC
+    backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO forward_test_interruption (forward_test_id, reason, started_at_utc)
+            VALUES (%(id)s, 'gateway', %(started_at_utc)s)
+            """,
+            {"id": forward_test["id"], "started_at_utc": make_minute(9)},
+        )
+
+    comparison = (await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/comparison/{backtest_id}")).json()
+
+    assert comparison["interruptions"] == [{"start_utc": "2026-01-02T03:09:00Z", "end_utc": "2026-01-02T03:10:05Z"}]
 
 
 @pytest.mark.anyio

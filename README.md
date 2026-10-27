@@ -100,8 +100,15 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   forward test per instrument, 4 at the same time. A restart of `web` does
   not stop forward tests. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
-- The automatic recovery of forward tests, the forward test end time, and
-  the forward test records and comparison are not available yet.
+- Forward test records and comparison: at the end of each bar, the
+  forward test records its new fills and one equity point in PostgreSQL. The
+  button "Backtest the same period" starts a normal backtest of the same
+  strategy version, instrument, bar period, and period, with the start
+  balance as paper capital. The comparison page shows the metric table, both
+  equity curves on one chart with the interruptions in grey, and the fill
+  price of each side and the difference for each bar. See
+  [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md)
+  section 12.10.
 
 ## Requirements
 

@@ -7,7 +7,7 @@ export type ForwardTestRequest = components['schemas']['StartForwardTestRequest'
 export type ForwardTestStatus = components['schemas']['ForwardTestStatus'];
 export type ForwardTestComparison = components['schemas']['ForwardTestComparisonResponse'];
 export type FillComparison = components['schemas']['FillComparisonResponse'];
-export type Interruption = components['schemas']['InterruptionResponse'];
+export type ComparedInterruption = components['schemas']['ComparedInterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
 type ValidationError = components['schemas']['ValidationError'];
 
@@ -30,6 +30,7 @@ const LIVE_BAR_PERIODS: readonly string[] = [
 const STATUS_LABELS: Record<ForwardTestStatus, string> = {
   starting: 'Starting',
   running: 'Running',
+  waiting_for_gateway: 'Waiting for IB Gateway',
   stopping: 'Stopping',
   stopped: 'Stopped',
   stop_failed: 'Stop failed',
@@ -42,6 +43,34 @@ export function isLiveBarPeriod(barPeriod: BarPeriod): boolean {
 
 export function describeForwardTestStatus(status: ForwardTestStatus): string {
   return STATUS_LABELS[status];
+}
+
+/**
+ * The value of a datetime-local input is a local time without a time zone. The API takes UTC (section 12.1).
+ * Returns null for an empty input: the forward test then runs until the user stops it.
+ */
+export function readEndTimeUtc(localValue: string): string | null {
+  if (localValue === '') {
+    return null;
+  }
+  const endTime = new Date(localValue);
+  return Number.isNaN(endTime.getTime()) ? null : endTime.toISOString();
+}
+
+const TIME_PART_DIGITS = 2;
+
+function padTwoDigits(value: number): string {
+  return String(value).padStart(TIME_PART_DIGITS, '0');
+}
+
+/** Shows a UTC time of the API in the local time zone of the browser, like "2026-01-03 09:30". */
+export function formatLocalTime(utcTime: string | null): string {
+  if (utcTime === null) {
+    return '';
+  }
+  const time = new Date(utcTime);
+  const date = `${String(time.getFullYear())}-${padTwoDigits(time.getMonth() + 1)}-${padTwoDigits(time.getDate())}`;
+  return `${date} ${padTwoDigits(time.getHours())}:${padTwoDigits(time.getMinutes())}`;
 }
 
 /** A stop is useful while the forward test holds a client ID: then it can have open orders. */

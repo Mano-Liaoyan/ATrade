@@ -1,4 +1,4 @@
-"""The comparison of a forward test with a backtest of the same period: the fill table and the interruptions
+"""The fill table of the comparison of a forward test with a backtest of the same period
 (docs/architecture/forward_test.md section 12.10). The metrics come from the metric functions of `backtest`.
 """
 
@@ -9,7 +9,6 @@ from decimal import Decimal
 from typing import Literal
 
 from atrade.backtest import BacktestTrade, EquityPoint
-from atrade.foundation.bar import BarPeriod
 
 # The average price of more fills in one bar has many decimal places. IBKR prices have at most 4.
 AVERAGE_PRICE_STEP = Decimal("0.0001")
@@ -32,14 +31,6 @@ class FillComparisonRow:
     backtest: FillTotal | None
     # The forward test price minus the backtest price. None when one side has no fill.
     price_difference_usd: Decimal | None
-
-
-@dataclass(frozen=True)
-class Interruption:
-    """Bars of the period that the forward test did not record: from the end of the last recorded bar."""
-
-    start_utc: datetime
-    end_utc: datetime
 
 
 def find_bar_end(bar_ends_utc: list[datetime], time_utc: datetime) -> datetime:
@@ -97,32 +88,3 @@ def compare_fills(
             )
         )
     return rows
-
-
-def is_recorded(recorded_times_utc: list[datetime], time_utc: datetime, bar_period: BarPeriod) -> bool:
-    """True when the forward test has an equity point less than one bar period away from the time."""
-    index = bisect_right(recorded_times_utc, time_utc)
-    nearby_times_utc = recorded_times_utc[max(index - 1, 0) : index + 1]
-    return any(abs(recorded_time_utc - time_utc) < bar_period.length for recorded_time_utc in nearby_times_utc)
-
-
-def find_interruptions(
-    *, forward_test_curve: list[EquityPoint], backtest_curve: list[EquityPoint], bar_period: BarPeriod
-) -> list[Interruption]:
-    """The backtest has a point at the end of each bar with market data. Each run of backtest points without a
-    forward test point is one interruption. Hours without trading have no bar, so they are not interruptions."""
-    recorded_times_utc = sorted(point.time_utc for point in forward_test_curve)
-    interruptions: list[Interruption] = []
-    is_in_interruption = False
-    previous_time_utc: datetime | None = None
-    for point in backtest_curve:
-        if is_recorded(recorded_times_utc, point.time_utc, bar_period):
-            is_in_interruption = False
-        elif is_in_interruption:
-            interruptions[-1] = Interruption(start_utc=interruptions[-1].start_utc, end_utc=point.time_utc)
-        else:
-            start_utc = point.time_utc - bar_period.length if previous_time_utc is None else previous_time_utc
-            interruptions.append(Interruption(start_utc=start_utc, end_utc=point.time_utc))
-            is_in_interruption = True
-        previous_time_utc = point.time_utc
-    return interruptions

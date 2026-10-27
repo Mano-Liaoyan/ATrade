@@ -155,3 +155,22 @@ async def test_uses_the_client_id_range_of_the_settings(
 
     assert first.json()["client_id"] == 21
     assert second.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_the_end_time_is_optional_and_must_be_later_than_now(web_client: httpx.AsyncClient) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    past = make_start_request(strategy_version_id) | {"end_time_utc": "2026-01-02T03:04:05Z"}
+    without_time_zone = make_start_request(strategy_version_id) | {"end_time_utc": "2026-01-03T00:00:00"}
+    later = make_start_request(strategy_version_id) | {"end_time_utc": "2026-01-03T09:30:00+08:00"}
+
+    past_response = await web_client.post(FORWARD_TESTS_PATH, json=past)
+    without_time_zone_response = await web_client.post(FORWARD_TESTS_PATH, json=without_time_zone)
+    later_response = await web_client.post(FORWARD_TESTS_PATH, json=later)
+
+    assert (past_response.status_code, past_response.json()["detail"]) == (422, "The end time must be later than now.")
+    assert without_time_zone_response.status_code == 422
+    assert later_response.status_code == 201
+    # The database stores UTC (section 12.1).
+    assert later_response.json()["end_time_utc"] == "2026-01-03T01:30:00Z"
+    assert (later_response.json()["crash_count"], later_response.json()["interruptions"]) == (0, [])

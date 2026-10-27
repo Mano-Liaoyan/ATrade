@@ -1,4 +1,5 @@
-"""The real LiveNode run without IB Gateway: it builds the node with the strategy version and stops at the request.
+"""The real LiveNode run without IB Gateway: it builds the node with the strategy version, stops at the request, and
+stops when IB Gateway is not reachable for too long.
 
 Orders on a real paper account are in test_forward_test_paper_contract.py (ibkr_paper).
 """
@@ -10,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from atrade.forward_test import LiveNodeInput, run_live_node
+from atrade.forward_test import GatewayWatch, LiveNodeInput, run_live_node
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.instrument import Instrument
 
@@ -25,9 +26,8 @@ def find_closed_port() -> int:
         return free_socket.getsockname()[1]
 
 
-@pytest.mark.anyio
-async def test_the_live_node_stops_at_the_stop_request_while_it_waits_for_ib_gateway(database_url: str) -> None:
-    live_node_input = LiveNodeInput(
+def make_live_node_input(database_url: str) -> LiveNodeInput:
+    return LiveNodeInput(
         forward_test_id=1,
         client_id=10,
         account_id="DU1234567",
@@ -40,12 +40,28 @@ async def test_the_live_node_stops_at_the_stop_request_while_it_waits_for_ib_gat
         database_url=database_url,
         start_balance_usd=Decimal(100000),
     )
+
+
+@pytest.mark.anyio
+async def test_the_live_node_stops_at_the_stop_request_while_it_waits_for_ib_gateway(database_url: str) -> None:
     stop_requested = asyncio.Event()
 
-    run_task = asyncio.create_task(run_live_node(live_node_input, stop_requested))
+    run_task = asyncio.create_task(run_live_node(make_live_node_input(database_url), stop_requested))
     await asyncio.sleep(STOP_AFTER_SECONDS)
     # The node waits for the IB clients to connect. It does not end by itself.
     assert not run_task.done()
     stop_requested.set()
 
-    await asyncio.wait_for(run_task, MAX_STOP_SECONDS)
+    assert await asyncio.wait_for(run_task, MAX_STOP_SECONDS) == "ended"
+
+
+@pytest.mark.anyio
+async def test_the_live_node_stops_when_ib_gateway_is_not_reachable_for_too_long(database_url: str) -> None:
+    gateway_watch = GatewayWatch(check_interval_seconds=0.1, lost_after_seconds=0.5)
+
+    live_node_end = await asyncio.wait_for(
+        run_live_node(make_live_node_input(database_url), asyncio.Event(), gateway_watch=gateway_watch),
+        MAX_STOP_SECONDS,
+    )
+
+    assert live_node_end == "gateway_lost"

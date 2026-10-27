@@ -15,7 +15,11 @@ from atrade.foundation.bar import BarPeriod
 from atrade.foundation.instrument import Instrument
 
 type DesiredState = Literal["running", "stopped"]
-type ForwardTestStatus = Literal["starting", "running", "stopping", "stopped", "stop_failed", "failed"]
+type ForwardTestStatus = Literal[
+    "starting", "running", "waiting_for_gateway", "stopping", "stopped", "stop_failed", "failed"
+]
+# Why the forward test did not run for a time (section 12.7).
+type InterruptionReason = Literal["crash", "gateway", "worker_restart"]
 
 NO_FREE_CLIENT_ID_MESSAGE = "limit of running forward tests reached"
 
@@ -25,6 +29,7 @@ class ForwardTestRequest:
     strategy_version_id: int
     instrument: Instrument
     bar_period: BarPeriod
+    end_time_utc: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -42,6 +47,20 @@ class ForwardTestRow:
     error_message: str | None
     created_at_utc: datetime
     stopped_at_utc: datetime | None
+    end_time_utc: datetime | None
+    crash_count: int
+
+    def is_stop_wanted(self, now_utc: datetime) -> bool:
+        """The user stopped the forward test, or its end time came (section 12.1)."""
+        return self.desired_state == "stopped" or (self.end_time_utc is not None and now_utc >= self.end_time_utc)
+
+
+@dataclass(frozen=True)
+class ForwardTestInterruption:
+    reason: InterruptionReason
+    started_at_utc: datetime
+    # None while the interruption lasts.
+    ended_at_utc: datetime | None
 
 
 @dataclass(frozen=True)
@@ -54,7 +73,7 @@ class StartRefusal:
 
 FORWARD_TEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, desired_state, status, client_id,
-    start_balance_usd, error_message, created_at_utc, stopped_at_utc
+    start_balance_usd, error_message, created_at_utc, stopped_at_utc, end_time_utc, crash_count
 """
 
 
@@ -97,10 +116,10 @@ async def insert_forward_test(
             f"""
             INSERT INTO forward_test (
                 strategy_version_id, symbol, exchange, currency, bar_period, desired_state, status, client_id,
-                created_at_utc
+                created_at_utc, end_time_utc
             ) VALUES (
                 %(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, 'running',
-                'starting', %(client_id)s, %(created_at_utc)s
+                'starting', %(client_id)s, %(created_at_utc)s, %(end_time_utc)s
             )
             RETURNING {FORWARD_TEST_COLUMNS}
             """,
@@ -112,6 +131,7 @@ async def insert_forward_test(
                 "bar_period": request.bar_period.value,
                 "client_id": client_id,
                 "created_at_utc": created_at_utc,
+                "end_time_utc": request.end_time_utc,
             },
         )
         row = await cursor.fetchone()
@@ -193,7 +213,10 @@ async def write_end(
     stopped_at_utc: datetime,
     error_message: str | None,
 ) -> None:
-    """The process ended and its orders are cancelled, or it never sent orders: the client ID becomes free."""
+    """The process ended and its orders are cancelled, or it never sent orders: the client ID becomes free.
+
+    An open interruption ends at the same time.
+    """
     await connection.execute(
         """
         UPDATE forward_test
@@ -203,6 +226,7 @@ async def write_end(
         """,
         {"status": status, "stopped_at_utc": stopped_at_utc, "error_message": error_message, "id": forward_test_id},
     )
+    await end_interruption(connection, forward_test_id=forward_test_id, ended_at_utc=stopped_at_utc)
 
 
 async def write_failure_with_client_id(
@@ -216,6 +240,96 @@ async def write_failure_with_client_id(
         """,
         {"status": status, "error_message": error_message, "id": forward_test_id},
     )
+
+
+async def write_crash(
+    connection: psycopg.AsyncConnection,
+    *,
+    forward_test_id: int,
+    status: ForwardTestStatus,
+    crash_count: int,
+    error_message: str,
+) -> None:
+    """A run child ended without a stop request. The client ID stays taken: its orders can still be open."""
+    await connection.execute(
+        """
+        UPDATE forward_test
+        SET status = %(status)s, crash_count = %(crash_count)s,
+            error_message = COALESCE(error_message, %(error_message)s)
+        WHERE id = %(id)s
+        """,
+        {"status": status, "crash_count": crash_count, "error_message": error_message, "id": forward_test_id},
+    )
+
+
+async def start_interruption(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, reason: InterruptionReason, started_at_utc: datetime
+) -> None:
+    """Records the start of an interruption. When one is already open, it stays and this call does nothing."""
+    await connection.execute(
+        """
+        INSERT INTO forward_test_interruption (forward_test_id, reason, started_at_utc)
+        VALUES (%(id)s, %(reason)s, %(started_at_utc)s)
+        ON CONFLICT (forward_test_id) WHERE ended_at_utc IS NULL DO NOTHING
+        """,
+        {"id": forward_test_id, "reason": reason, "started_at_utc": started_at_utc},
+    )
+
+
+async def end_interruption(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, ended_at_utc: datetime
+) -> None:
+    await connection.execute(
+        """
+        UPDATE forward_test_interruption SET ended_at_utc = %(ended_at_utc)s
+        WHERE forward_test_id = %(id)s AND ended_at_utc IS NULL
+        """,
+        {"id": forward_test_id, "ended_at_utc": ended_at_utc},
+    )
+
+
+async def select_interruptions(
+    connection: psycopg.AsyncConnection, forward_test_id: int
+) -> list[ForwardTestInterruption]:
+    async with connection.cursor(row_factory=class_row(ForwardTestInterruption)) as cursor:
+        await cursor.execute(
+            """
+            SELECT reason, started_at_utc, ended_at_utc FROM forward_test_interruption
+            WHERE forward_test_id = %(id)s ORDER BY started_at_utc, id
+            """,
+            {"id": forward_test_id},
+        )
+        return await cursor.fetchall()
+
+
+async def write_waiting_for_gateway(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, started_at_utc: datetime
+) -> None:
+    """IB Gateway is not reachable (section 12.5). The child writes it. A stop that came first stays."""
+    await connection.execute(
+        """
+        UPDATE forward_test SET status = 'waiting_for_gateway'
+        WHERE id = %(id)s AND status IN ('starting', 'running', 'waiting_for_gateway')
+        """,
+        {"id": forward_test_id},
+    )
+    await start_interruption(
+        connection, forward_test_id=forward_test_id, reason="gateway", started_at_utc=started_at_utc
+    )
+
+
+async def write_live_node_start(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, started_at_utc: datetime
+) -> None:
+    """The child starts the LiveNode: the forward test runs again, and an open interruption ends."""
+    await connection.execute(
+        """
+        UPDATE forward_test SET status = 'running'
+        WHERE id = %(id)s AND status IN ('starting', 'waiting_for_gateway')
+        """,
+        {"id": forward_test_id},
+    )
+    await end_interruption(connection, forward_test_id=forward_test_id, ended_at_utc=started_at_utc)
 
 
 async def write_error_message(connection: psycopg.AsyncConnection, *, forward_test_id: int, error_message: str) -> None:

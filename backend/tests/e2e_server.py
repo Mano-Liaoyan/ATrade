@@ -46,8 +46,9 @@ E2E_COMPARED_BAR_COUNT = 45
 E2E_COMPARED_FIRST_BAR_START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
 # Enough forward test fills to overflow the fill table, so that the e2e tests can check its scroll track.
 E2E_COMPARED_FILL_COUNT = 40
-# No equity points for these bars: the chart marks them grey as an interruption.
+# An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
+E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
@@ -136,7 +137,8 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
 
 
 def add_compared_records(connection: psycopg.Connection, forward_test_id: int) -> None:
-    """Rows like the DataActor writes them: 1 fill after each bar end and 1 equity point at each bar end."""
+    """Rows like the DataActor writes them: 1 fill after each bar end and 1 equity point at each bar end. And 1
+    interruption like the worker writes it."""
     bar_ends_utc = {
         bar_number: E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=bar_number)
         for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
@@ -169,6 +171,19 @@ def add_compared_records(connection: psycopg.Connection, forward_test_id: int) -
                 for bar_number, bar_end_utc in bar_ends_utc.items()
                 if bar_number not in E2E_COMPARED_INTERRUPTED_BAR_NUMBERS
             ],
+        )
+        cursor.execute(
+            """
+            INSERT INTO forward_test_interruption (forward_test_id, reason, started_at_utc, ended_at_utc)
+            VALUES (%(id)s, 'crash', %(started_at_utc)s, %(ended_at_utc)s)
+            """,
+            {
+                "id": forward_test_id,
+                "started_at_utc": bar_ends_utc[E2E_COMPARED_INTERRUPTED_BAR_NUMBERS.start - 1]
+                + E2E_COMPARED_INTERRUPTION_OFFSET,
+                "ended_at_utc": bar_ends_utc[E2E_COMPARED_INTERRUPTED_BAR_NUMBERS.stop - 1]
+                + E2E_COMPARED_INTERRUPTION_OFFSET,
+            },
         )
 
 

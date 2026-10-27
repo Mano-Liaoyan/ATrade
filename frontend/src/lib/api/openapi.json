@@ -1922,6 +1922,27 @@
         ],
         "title": "ComparedEquityPointResponse"
       },
+      "ComparedInterruptionResponse": {
+        "properties": {
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_utc",
+          "end_utc"
+        ],
+        "title": "ComparedInterruptionResponse",
+        "description": "A time without a running LiveNode (section 12.7). The chart marks it grey."
+      },
       "ComparedMetricsResponse": {
         "properties": {
           "final_equity_usd": {
@@ -2128,7 +2149,7 @@
           },
           "interruptions": {
             "items": {
-              "$ref": "#/components/schemas/InterruptionResponse"
+              "$ref": "#/components/schemas/ComparedInterruptionResponse"
             },
             "type": "array",
             "title": "Interruptions"
@@ -2238,6 +2259,29 @@
               }
             ],
             "title": "Stopped At Utc"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
+          },
+          "crash_count": {
+            "title": "Crash Count",
+            "type": "integer"
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptionResponse"
+            },
+            "title": "Interruptions",
+            "type": "array"
           }
         },
         "required": [
@@ -2256,7 +2300,10 @@
           "start_balance_usd",
           "error_message",
           "created_at_utc",
-          "stopped_at_utc"
+          "stopped_at_utc",
+          "end_time_utc",
+          "crash_count",
+          "interruptions"
         ],
         "title": "ForwardTestResponse",
         "type": "object"
@@ -2265,6 +2312,7 @@
         "enum": [
           "starting",
           "running",
+          "waiting_for_gateway",
           "stopping",
           "stopped",
           "stop_failed",
@@ -2383,25 +2431,44 @@
         ],
         "title": "InstrumentSearchResponse"
       },
+      "InterruptionReason": {
+        "enum": [
+          "crash",
+          "gateway",
+          "worker_restart"
+        ],
+        "type": "string"
+      },
       "InterruptionResponse": {
         "properties": {
-          "start_utc": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Start Utc"
+          "reason": {
+            "$ref": "#/components/schemas/InterruptionReason"
           },
-          "end_utc": {
-            "type": "string",
+          "started_at_utc": {
             "format": "date-time",
-            "title": "End Utc"
+            "title": "Started At Utc",
+            "type": "string"
+          },
+          "ended_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At Utc"
           }
         },
-        "type": "object",
         "required": [
-          "start_utc",
-          "end_utc"
+          "reason",
+          "started_at_utc",
+          "ended_at_utc"
         ],
-        "title": "InterruptionResponse"
+        "title": "InterruptionResponse",
+        "type": "object"
       },
       "ManualOrderListResponse": {
         "properties": {
@@ -2997,6 +3064,18 @@
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
           }
         },
         "type": "object",

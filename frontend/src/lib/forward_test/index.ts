@@ -6,8 +6,10 @@ export {
   canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
+  formatLocalTime,
   FORWARD_TESTS_SOCKET_PATH,
   isLiveBarPeriod,
+  readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestsMessage,
   startForwardTest,
@@ -18,5 +20,5 @@ export {
   type ForwardTestComparison,
   type ForwardTestRequest,
   type ForwardTestStatus,
-  type Interruption,
+  type ComparedInterruption,
 } from './forward_test_api';

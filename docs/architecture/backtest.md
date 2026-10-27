@@ -137,6 +137,15 @@ use the same functions for the comparison (section 12.10).
 | `calculate_equity_curve(*, paper_capital_usd, bars, bar_period, trades)` | One point at the end of each bar: the cash plus the position at the bar close price. A trade counts in the first point at or after its time. |
 | `calculate_metrics(*, paper_capital_usd, equity_curve, trade_count)` | `BacktestMetrics`: `final_equity_usd`, `total_return_percent`, `max_drawdown_percent` (the largest fall from a peak, as a percent of the peak; the paper capital is the first peak), and `trade_count`. Percents have 2 decimal places. |
 
+For other capabilities (#78), the public entry exports
+`BacktestRequest`, `BacktestStatus`, `check_backtest_request(request)` (the
+reason why the request cannot run, or `None`: not USD, an empty time range;
+`POST /api/backtests` uses it too), `queue_backtest(*, database_url,
+request, created_at_utc)` (returns the ID of a queued backtest), and
+`read_backtest_outcome(*, database_url, backtest_id)` (`BacktestOutcome`:
+the request, status, error message, metrics, equity curve, and trades, or
+`None`). They are in `backtest_access.py`.
+
 The public entry also exports `create_backtest_router(*, database_url,
 clock)`, `BacktestRunner(*, database_url, clock, process_command)` with
 `keep_running()`, and

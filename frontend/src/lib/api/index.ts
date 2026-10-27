@@ -662,6 +662,22 @@ export interface components {
             /** Equity Usd */
             equity_usd: string;
         };
+        /**
+         * ComparedInterruptionResponse
+         * @description A time without a running LiveNode (section 12.7). The chart marks it grey.
+         */
+        ComparedInterruptionResponse: {
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+        };
         /** ComparedMetricsResponse */
         ComparedMetricsResponse: {
             /** Final Equity Usd */
@@ -730,7 +746,7 @@ export interface components {
             /** Fills */
             fills: components["schemas"]["FillComparisonResponse"][];
             /** Interruptions */
-            interruptions: components["schemas"]["InterruptionResponse"][];
+            interruptions: components["schemas"]["ComparedInterruptionResponse"][];
         };
         /** ForwardTestResponse */
         ForwardTestResponse: {
@@ -766,9 +782,15 @@ export interface components {
             created_at_utc: string;
             /** Stopped At Utc */
             stopped_at_utc: string | null;
+            /** End Time Utc */
+            end_time_utc: string | null;
+            /** Crash Count */
+            crash_count: number;
+            /** Interruptions */
+            interruptions: components["schemas"]["InterruptionResponse"][];
         };
         /** @enum {string} */
-        ForwardTestStatus: "starting" | "running" | "stopping" | "stopped" | "stop_failed" | "failed";
+        ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
         /** GatewayStatusResponse */
         GatewayStatusResponse: {
             /**
@@ -818,18 +840,18 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["InstrumentResponse"][];
         };
+        /** @enum {string} */
+        InterruptionReason: "crash" | "gateway" | "worker_restart";
         /** InterruptionResponse */
         InterruptionResponse: {
+            reason: components["schemas"]["InterruptionReason"];
             /**
-             * Start Utc
+             * Started At Utc
              * Format: date-time
              */
-            start_utc: string;
-            /**
-             * End Utc
-             * Format: date-time
-             */
-            end_utc: string;
+            started_at_utc: string;
+            /** Ended At Utc */
+            ended_at_utc: string | null;
         };
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
@@ -1048,6 +1070,8 @@ export interface components {
             /** Currency */
             currency: string;
             bar_period: components["schemas"]["BarPeriod"];
+            /** End Time Utc */
+            end_time_utc?: string | null;
         };
         /**
          * StartRefusedResponse
