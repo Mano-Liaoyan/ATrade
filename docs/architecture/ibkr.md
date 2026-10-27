@@ -61,6 +61,10 @@ The public entry `atrade.ibkr` exports:
   not there, it tries to connect. It then waits `retry_seconds` (default 10)
   and checks again. A lost connection thus comes back without a restart. A
   failed attempt writes a warning with the Gateway address to the log.
+- `is_connected()` is true only after `connectAsync` has ended. ib_async
+  reports the API as ready before its startup synchronization reads the
+  managed accounts, the open orders, and the account values. Before that end,
+  the connection number and `NetLiquidation` are not there yet.
 - `read_connection_number()` counts the successful connections. A new
   number tells `paper_trading` to run the paper account check again
   (section 11.5).
@@ -126,7 +130,17 @@ make sure that the `ib-gateway` service runs and is logged in.
 
 - Image: `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by the digest of the
   multi-platform index (IB Gateway 10.50.1f on 2026-10-27).
-- `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`.
+- `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`,
+  `READ_ONLY_API: "no"`. Without `READ_ONLY_API`, IBC keeps the Gateway
+  default, a read-only API. Then IBKR refuses each order with warning 321
+  ("The API interface is currently in Read-Only mode"). It also refuses
+  `reqOpenOrders` and `reqCompletedOrders` with warning 321, and ib_async
+  waits for an answer that does not come. Each ib_async connection then waits
+  for the connection timeout (10 seconds), and `read_own_open_orders()`
+  raises `GatewayRequestError`. `reqAllOpenOrders` still answers. Checked on
+  2026-10-27. After a change of this
+  value, recreate the service: `docker compose --file deploy/compose.yaml
+  --env-file .env up -d ib-gateway`.
   `TWS_USERID` and `TWS_PASSWORD` come from `ATRADE_IBKR_USERNAME` and
   `ATRADE_IBKR_PASSWORD`. Only `ib-gateway` gets these values.
 - IBC restarts the Gateway each day at `AUTO_RESTART_TIME`, in `TIME_ZONE`,
@@ -169,4 +183,19 @@ make sure that the `ib-gateway` service runs and is logged in.
   account), the `NetLiquidation` balance in USD, and the positions of the
   account.
 - The real case uses client ID `99`. It does not compete with the Web client
-  ID or the forward test range.
+  ID or the forward test range. The fixture disconnects after each test, so
+  a failed test does not block the client ID for the next test (error 326).
+- To run the real case on the server without a tunnel, run it in a one-off
+  container on the Compose network `atrade_default` (for example
+  `python:3.14-slim` with `backend/` mounted, `uv sync`, then
+  `uv run pytest -m ibkr_paper`). Set `ATRADE_IBKR_HOST=ib-gateway`. The
+  forward test case also needs `ATRADE_TEST_DATABASE_URL` with a test
+  database: the test empties all tables. Do not use the database of the
+  running stack.
+- Results on 2026-10-27 (IB Gateway 10.50.1f, ib_async 2.1.0, server version
+  178): the connection, `managedAccounts`, the instrument search, the
+  historical bars, the live bars, and the refusals without a connection pass.
+  The order cases fail while the Gateway API is read-only (section 7.4). The
+  balance case fails because the paper account has the base currency EUR:
+  IBKR sends `NetLiquidation` only in EUR, and no USD value or exchange rate
+  (section 21.1).

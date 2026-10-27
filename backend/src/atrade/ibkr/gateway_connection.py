@@ -148,6 +148,9 @@ class IbAsyncGatewayConnection:
         self.client_id = client_id
         self.retry_seconds = retry_seconds
         self.connection_number = 0
+        # ib_async reports the API as ready before connectAsync has read the accounts, the open orders and the
+        # balance. ATrade reports "connected" only after that startup synchronization.
+        self.synchronized = False
         self.ib = IB()
         # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
         self.open_orders_lock = asyncio.Lock()
@@ -162,6 +165,7 @@ class IbAsyncGatewayConnection:
             await asyncio.sleep(self.retry_seconds)
 
     async def try_to_connect(self) -> None:
+        self.synchronized = False
         try:
             await self.ib.connectAsync(self.host, self.port, clientId=self.client_id, timeout=CONNECT_TIMEOUT_SECONDS)
         except (OSError, TimeoutError) as error:
@@ -173,11 +177,12 @@ class IbAsyncGatewayConnection:
                 self.retry_seconds,
             )
             return
+        self.synchronized = True
         self.connection_number += 1
         logger.info("Connected to IB Gateway at %s:%s with client ID %s.", self.host, self.port, self.client_id)
 
     def is_connected(self) -> bool:
-        return self.ib.isConnected()
+        return self.synchronized and self.ib.isConnected()
 
     def read_port(self) -> int:
         return self.port
@@ -381,4 +386,5 @@ class IbAsyncGatewayConnection:
             raise GatewayRequestError(str(error)) from error
 
     def disconnect(self) -> None:
+        self.synchronized = False
         self.ib.disconnect()

@@ -8,6 +8,7 @@ The case skips when `.env`, the account ID, or the Gateway is not available.
 """
 
 import socket
+from collections.abc import Iterator
 from contextlib import aclosing
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -50,12 +51,13 @@ def can_open_tcp_connection(host: str, port: int) -> bool:
 
 
 @pytest.fixture(params=["fake", pytest.param("ibkr_paper", marks=pytest.mark.ibkr_paper)])
-def connection_and_account(request: pytest.FixtureRequest) -> tuple[GatewayConnection, str]:
+def connection_and_account(request: pytest.FixtureRequest) -> Iterator[tuple[GatewayConnection, str]]:
     if request.param == "fake":
         fake = FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID])
         fake.account_values = make_balance_values(FAKE_ACCOUNT_ID, net_liquidation_usd="100000.00", cash_usd="99000")
         fake.portfolio = [make_stock_position(FAKE_ACCOUNT_ID, symbol="AAPL", quantity="10", market_price="100")]
-        return fake, FAKE_ACCOUNT_ID
+        yield fake, FAKE_ACCOUNT_ID
+        return
     if not REPOSITORY_ENV_FILE.exists():
         pytest.skip(f"{REPOSITORY_ENV_FILE} does not exist.")
     settings = PaperAccountTestSettings()
@@ -66,7 +68,9 @@ def connection_and_account(request: pytest.FixtureRequest) -> tuple[GatewayConne
     connection = IbAsyncGatewayConnection(
         host=settings.ibkr_host, port=settings.ibkr_paper_port, client_id=CONTRACT_TEST_CLIENT_ID
     )
-    return connection, settings.ibkr_account_id
+    yield connection, settings.ibkr_account_id
+    # A failed test leaves its connection open. IB Gateway then refuses the client ID in the next test (error 326).
+    connection.disconnect()
 
 
 async def wait_until_connected(connection: GatewayConnection) -> None:

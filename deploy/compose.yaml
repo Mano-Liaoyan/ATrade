@@ -33,6 +33,9 @@ services:
       TWS_USERID: ${ATRADE_IBKR_USERNAME:-}
       TWS_PASSWORD: ${ATRADE_IBKR_PASSWORD:-}
       TRADING_MODE: paper
+      # The Gateway default is a read-only API. Then IBKR refuses each order, reqOpenOrders, and
+      # reqCompletedOrders with warning 321 (docs/architecture/ibkr.md 7.4).
+      READ_ONLY_API: "no"
       # One IBKR user name has one session. The Gateway takes the session from other logins.
       EXISTING_SESSION_DETECTED_ACTION: primary
       # IBC restarts the Gateway each day at this time, without a new login (docs/architecture/ibkr.md 7.4).

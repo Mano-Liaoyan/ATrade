@@ -83,3 +83,29 @@ async def test_reports_failed_historical_bars_without_a_connection() -> None:
 def test_refuses_client_id_0() -> None:
     with pytest.raises(ValueError, match="client ID 0"):
         IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=0)
+
+
+@pytest.mark.anyio
+async def test_reports_connected_only_after_the_startup_synchronization(monkeypatch: pytest.MonkeyPatch) -> None:
+    # ib_async reports the API as ready before connectAsync has read the accounts, the orders and the balance.
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
+    api_ready = anyio.Event()
+    synchronization_done = anyio.Event()
+
+    async def connect_and_synchronize(*_args: object, **_kwargs: object) -> None:
+        monkeypatch.setattr(connection.ib, "isConnected", lambda: True)
+        api_ready.set()
+        await synchronization_done.wait()
+
+    monkeypatch.setattr(connection.ib, "connectAsync", connect_and_synchronize)
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.try_to_connect)
+        await api_ready.wait()
+        assert not connection.is_connected()
+        assert connection.read_connection_number() == 0
+        synchronization_done.set()
+        with anyio.fail_after(1):
+            while not connection.is_connected():
+                await anyio.sleep(0.01)
+        assert connection.read_connection_number() == 1
