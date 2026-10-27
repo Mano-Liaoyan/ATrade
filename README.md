@@ -14,7 +14,8 @@ The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), and the strategy editor (issue #68):
 
 - The `web` service serves the app shell, `GET /api/health`,
-  `GET /api/ibkr/gateway`, and the strategy routes under `/api/strategies`.
+  `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
+  `/api/watchlist`, and the strategy routes under `/api/strategies`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
@@ -29,8 +30,15 @@ connection (issue #63), and the strategy editor (issue #68):
   editor saves the code as strategy versions after the checks before save.
   Unsaved edits stay in the browser. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
-- Bars, watchlist, backtests, paper trading, and forward tests are not
-  available yet.
+- Watchlist: the user adds an instrument from the search results and deletes
+  it from the watchlist panel on the home page. The watchlist is in
+  PostgreSQL, so it stays after a restart. A watchlist instrument opens the
+  instrument page `/instruments/<exchange>/<symbol>?currency=<currency>`.
+  This page is a placeholder until the bar chart is available. Routes are
+  under `/api/watchlist`. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.3.
+- Bars, backtests, paper trading, and forward tests are not available yet.
 
 ## Requirements
 

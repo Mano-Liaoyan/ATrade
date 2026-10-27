@@ -97,6 +97,14 @@ layers = [
     "atrade.foundation",
 ]
 
+# watchlist -> market_data only (docs/architecture.md section 6.2). The layers above allow ibkr, so this forbids it.
+[[tool.importlinter.contracts]]
+name = "watchlist finds instruments through market_data"
+type = "forbidden"
+source_modules = ["atrade.watchlist"]
+forbidden_modules = ["atrade.ibkr"]
+allow_indirect_imports = true
+
 # F2: only the capability itself can import its internal modules. Other
 # modules import the public entry (the package __init__.py) only.
 [[tool.importlinter.contracts]]
