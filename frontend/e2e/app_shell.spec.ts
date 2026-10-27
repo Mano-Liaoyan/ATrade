@@ -148,6 +148,19 @@ test('the theme button shows its choice in a tooltip', async ({ page }) => {
   await expect(page.getByRole('tooltip')).toHaveText('Theme: System');
 });
 
+// A user points at the button first, so the tooltip is open at the click. The open tooltip must not take the click.
+test('the theme button changes the theme while its tooltip is open', async ({ page }) => {
+  await page.goto('/');
+  const header = page.getByRole('banner');
+
+  await header.getByRole('button', { name: 'Theme: System' }).hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Theme: System');
+  await header.getByRole('button', { name: 'Theme: System' }).click();
+
+  await expect(header.getByRole('button', { name: 'Theme: Light' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
 test('the theme choice stays after a page reload', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/');

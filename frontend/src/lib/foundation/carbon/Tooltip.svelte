@@ -37,9 +37,12 @@
       {/snippet}
     </Tooltip.Trigger>
     <Tooltip.ContentStatic>
+      <!-- Carbon sizes .cds--popover to the trigger and gives it pointer-events: none. The Bits props set
+           pointer-events: auto, so they go on the bubble. On .cds--popover they make the open tooltip take the
+           clicks of the trigger. -->
       {#snippet child({ props })}
-        <span {...props} class="cds--popover" role="tooltip">
-          <span class="cds--popover-content cds--tooltip-content">{text}</span>
+        <span class="cds--popover">
+          <span {...props} class="cds--popover-content cds--tooltip-content" role="tooltip">{text}</span>
           <span class="cds--popover-caret"></span>
         </span>
       {/snippet}
