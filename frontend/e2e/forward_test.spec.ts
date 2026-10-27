@@ -4,6 +4,10 @@
 // the browser projects run at the same time, so each test starts only 1 forward test and stops it.
 import { expect, test, type Page } from '@playwright/test';
 
+// The stop takes 2 worker comparisons (stopping, then stopped) and 1 socket read, each every 2 seconds. A backtest
+// child of another test can slow the server, so the wait is longer than the default 5 seconds.
+const STOP_TIMEOUT_MILLISECONDS = 15_000;
+
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
   await page.getByLabel('Strategy name').fill(strategyName);
@@ -54,7 +58,7 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   await page.getByRole('link', { name: 'Forward tests' }).click();
   await row.getByRole('button', { name: /Stop forward test/ }).click();
 
-  await expect(row).toContainText('Stopped');
+  await expect(row).toContainText('Stopped', { timeout: STOP_TIMEOUT_MILLISECONDS });
   await expect(row.getByRole('button', { name: /Stop forward test/ })).toHaveCount(0);
 });
 
