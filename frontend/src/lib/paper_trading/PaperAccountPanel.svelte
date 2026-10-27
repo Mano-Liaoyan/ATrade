@@ -1,12 +1,13 @@
 <!-- Account panel: the paper account check, the balance, the positions, the order form, and the open orders,
      updated live from /ws/paper-trading. -->
 <script lang="ts">
-  import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { DataTable, InlineNotification, StatusIndicator, Tag, type TableColumn } from '#lib/foundation/carbon';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     describeBalanceCurrency,
     describePaperAccountCheck,
+    findPaperAccountCheckKind,
     formatAmount,
     PAPER_TRADING_SOCKET_PATH,
     readPaperAccountMessage,
@@ -78,23 +79,18 @@
 </script>
 
 <section class="account-panel" aria-labelledby="account-panel-title">
-  <header class="panel-header">
-    <h2 id="account-panel-title">Paper account <span class="paper-mark">PAPER</span></h2>
-    {#if !isSocketConnected}
-      <span class="live-status">Live updates paused. ATrade connects again.</span>
-    {/if}
-  </header>
+  <h2 id="account-panel-title">Paper account <Tag label="PAPER" kind="red" size="sm" /></h2>
+  {#if !isSocketConnected}
+    <InlineNotification kind="warning" title="Live updates paused" subtitle="ATrade connects again." lowContrast />
+  {/if}
 
   {#if account === null || checkDescription === null}
-    <p role="status" aria-label="Paper account check">Reading the paper account.</p>
+    <p role="status" aria-label="Paper account check">
+      <StatusIndicator kind="in-progress" label="Reading the paper account." />
+    </p>
   {:else}
-    <div
-      class="account-check"
-      class:check-failed={account.check.status === 'failed'}
-      role="status"
-      aria-label="Paper account check"
-    >
-      <p class="check-title">{checkDescription.title}</p>
+    <div role="status" aria-label="Paper account check">
+      <StatusIndicator kind={findPaperAccountCheckKind(account.check.status)} label={checkDescription.title} />
       {#if checkDescription.detail !== null}
         <p class="check-detail">{checkDescription.detail}</p>
       {/if}
@@ -169,87 +165,68 @@
   .account-panel {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--cds-spacing-05);
     max-inline-size: 60rem;
-    padding: 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
-    background: var(--color-surface);
-  }
-
-  .panel-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  h2,
-  h3,
-  p {
-    margin: 0;
+    margin-block-start: var(--cds-spacing-07);
   }
 
   h2 {
-    font-size: 1.125rem;
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+    font-size: var(--cds-heading-compact-02-font-size);
+    font-weight: var(--cds-heading-compact-02-font-weight);
+    line-height: var(--cds-heading-compact-02-line-height);
+    letter-spacing: var(--cds-heading-compact-02-letter-spacing);
   }
 
   h3 {
-    font-size: 1rem;
+    margin-block-start: var(--cds-spacing-05);
+    font-size: var(--cds-heading-compact-01-font-size);
+    font-weight: var(--cds-heading-compact-01-font-weight);
+    line-height: var(--cds-heading-compact-01-line-height);
+    letter-spacing: var(--cds-heading-compact-01-letter-spacing);
   }
 
-  .paper-mark {
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-    background: var(--color-warning);
-    color: var(--color-surface);
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
-  }
-
-  .live-status {
-    color: var(--color-warning);
-    font-size: 0.875rem;
-  }
-
-  .check-title {
-    font-weight: 600;
-  }
-
-  .check-failed {
-    color: var(--color-warning);
+  p {
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
   }
 
   .check-detail {
-    font-size: 0.875rem;
+    margin-block-start: var(--cds-spacing-02);
   }
 
   .balance {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.5rem;
-    margin: 0;
-  }
-
-  .balance-currency {
-    margin: 0;
-    color: var(--color-muted);
-    font-size: 0.875rem;
-  }
-
-  .balance-failed {
-    color: var(--color-warning);
+    gap: var(--cds-spacing-07);
   }
 
   .balance dt {
-    color: var(--color-muted);
-    font-size: 0.875rem;
+    margin-block-end: var(--cds-spacing-02);
+    font-size: var(--cds-label-01-font-size);
+    line-height: var(--cds-label-01-line-height);
+    letter-spacing: var(--cds-label-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 
   .balance dd {
-    margin: 0;
-    font-size: 1.25rem;
+    font-size: var(--cds-heading-03-font-size);
+    font-weight: var(--cds-heading-03-font-weight);
+    line-height: var(--cds-heading-03-line-height);
     font-variant-numeric: tabular-nums;
+  }
+
+  .balance-currency {
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    letter-spacing: var(--cds-helper-text-01-letter-spacing);
+    color: var(--cds-text-secondary);
+  }
+
+  .balance-failed {
+    color: var(--cds-text-error);
   }
 </style>

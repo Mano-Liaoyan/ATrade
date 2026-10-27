@@ -118,10 +118,10 @@
 </script>
 
 {#if chartRequest === null}
-  <h1 class="instrument-heading">Instrument not found</h1>
+  <h1>Instrument not found</h1>
 {:else}
   {@const instrumentName = formatInstrument(chartRequest.instrument)}
-  <h1 class="instrument-heading">{instrumentName}</h1>
+  <h1>{instrumentName}</h1>
   <Tabs label="Bar period" items={BAR_PERIODS} value={chartRequest.barPeriod} onValueChange={changeBarPeriod}>
     {#snippet panel()}
       <div class="chart-status">
@@ -145,14 +145,6 @@
 <p class="instrument-back"><a class="cds--link" href={resolve('/')}>Back to the watchlist</a></p>
 
 <style>
-  .instrument-heading {
-    margin-block: 0 var(--cds-spacing-06);
-    font-size: var(--cds-heading-04-font-size);
-    font-weight: var(--cds-heading-04-font-weight);
-    line-height: var(--cds-heading-04-line-height);
-    letter-spacing: var(--cds-heading-04-letter-spacing);
-  }
-
   .chart-status {
     display: flex;
     flex-wrap: wrap;

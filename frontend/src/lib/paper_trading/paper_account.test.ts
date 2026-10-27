@@ -4,6 +4,7 @@ import {
   describeBalanceCurrency,
   describePaperAccountCheck,
   describePaperAccountTag,
+  findPaperAccountCheckKind,
   formatAmount,
   readPaperAccountMessage,
   type PaperAccountBalance,
@@ -34,6 +35,14 @@ describe('readPaperAccountMessage', () => {
   it('ignores other messages', () => {
     expect(readPaperAccountMessage({ type: 'heartbeat' })).toBeNull();
     expect(readPaperAccountMessage('account')).toBeNull();
+  });
+});
+
+describe('findPaperAccountCheckKind', () => {
+  it('shows a passed check as success, a check without IB Gateway as warning, and a failed check as error', () => {
+    expect(findPaperAccountCheckKind('passed')).toBe('success');
+    expect(findPaperAccountCheckKind('disconnected')).toBe('warning');
+    expect(findPaperAccountCheckKind('failed')).toBe('error');
   });
 });
 

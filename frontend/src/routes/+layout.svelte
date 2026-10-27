@@ -154,36 +154,6 @@
 </TooltipProvider>
 
 <style>
-  /* Parallel migration (#84): the --color-* tokens of the components that are not migrated yet point to the Carbon
-     tokens, so they follow the Carbon theme. #96 removes them. */
-  :global(:root) {
-    --color-background: var(--cds-background);
-    --color-surface: var(--cds-layer-01);
-    --color-text: var(--cds-text-primary);
-    --color-muted: var(--cds-text-secondary);
-    --color-border: var(--cds-border-subtle-01);
-    --color-warning: var(--cds-text-error);
-    --color-accent: var(--cds-link-primary);
-    --color-scroll-track: var(--cds-layer-accent-01);
-    --color-scroll-thumb: var(--cds-icon-secondary);
-    /* Code editor and code diff (src/lib/foundation/code_editor/code_theme.ts). */
-    --color-code-active-line: var(--cds-layer-hover-01);
-    --color-code-selection: var(--cds-highlight);
-    --color-diff-removed-line: color-mix(in srgb, var(--cds-support-error) 15%, transparent);
-    --color-diff-removed-text: color-mix(in srgb, var(--cds-support-error) 40%, transparent);
-    --color-diff-removed-mark: var(--cds-support-error);
-    --color-diff-added-line: color-mix(in srgb, var(--cds-support-success) 15%, transparent);
-    --color-diff-added-text: color-mix(in srgb, var(--cds-support-success) 40%, transparent);
-    --color-diff-added-mark: var(--cds-support-success);
-  }
-
-  /* Parallel migration (#84): the Carbon reset removes all margins. The pages that are not migrated yet get the
-     browser margins back. The selector has the specificity of one class: more than the reset, less than the CSS of a
-     component (a class and the Svelte scope class). #96 removes this rule. */
-  :global(.app-main :where(h1, h2, h3, h4, p, ul, ol, dl, dd, fieldset, form)) {
-    margin-block: revert;
-  }
-
   /* Carbon hides the header navigation below the lg breakpoint (1056px). ATrade is a desktop app and keeps it. */
   .app-navigation {
     display: block;
@@ -206,6 +176,15 @@
 
   .app-header-status--error {
     color: var(--cds-text-error);
+  }
+
+  /* The page heading of each page. */
+  .app-main :global(h1) {
+    margin-block: 0 var(--cds-spacing-06);
+    font-size: var(--cds-heading-04-font-size);
+    font-weight: var(--cds-heading-04-font-weight);
+    line-height: var(--cds-heading-04-line-height);
+    letter-spacing: var(--cds-heading-04-letter-spacing);
   }
 
   /* The Carbon header is fixed at the top and is 3rem high. */

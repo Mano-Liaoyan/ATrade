@@ -37,7 +37,7 @@
   }
 </script>
 
-<h1 class="page-heading">Strategies</h1>
+<h1>Strategies</h1>
 
 <form class="create-form" onsubmit={submitNewStrategy}>
   <div class="create-name">
@@ -72,14 +72,6 @@
 {/if}
 
 <style>
-  .page-heading {
-    margin-block: 0 var(--cds-spacing-06);
-    font-size: var(--cds-heading-04-font-size);
-    font-weight: var(--cds-heading-04-font-weight);
-    line-height: var(--cds-heading-04-line-height);
-    letter-spacing: var(--cds-heading-04-letter-spacing);
-  }
-
   .create-form {
     display: flex;
     align-items: end;

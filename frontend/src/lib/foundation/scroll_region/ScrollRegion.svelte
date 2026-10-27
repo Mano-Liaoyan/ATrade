@@ -136,10 +136,10 @@
 </div>
 
 <style>
-  /* Carbon tokens only. The sizes are Carbon spacing: 0.25rem is $spacing-02 and 0.5rem is $spacing-03. */
+  /* Carbon tokens only. */
   .scroll-region {
     display: flex;
-    gap: 0.25rem;
+    gap: var(--cds-spacing-02);
     min-height: 0;
   }
 
@@ -157,7 +157,7 @@
   .scroll-track {
     position: relative;
     flex: none;
-    width: 0.5rem;
+    width: var(--cds-spacing-03);
     background: var(--cds-layer-accent-01);
     touch-action: none;
   }

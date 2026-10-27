@@ -5,6 +5,7 @@ import { resolve } from '$app/paths';
 import { selectThemeChoice, type ThemeChoice } from '#lib/foundation/color_scheme';
 import type { PaletteCommand, PaletteCommandGroup } from '#lib/foundation/command_palette';
 import { formatWatchlistInstrument, type WatchlistInstrument } from '#lib/watchlist';
+import { createInstrumentHref } from './instrument_href';
 
 /** The id of the start form on the backtests page. The palette goes to it and puts the focus in it. */
 export const START_BACKTEST_FORM_ID = 'start-backtest';
@@ -50,12 +51,7 @@ function useTheme(choice: ThemeChoice): PaletteCommand {
 }
 
 function openInstrumentPage(instrument: WatchlistInstrument): PaletteCommand {
-  const instrumentPath = resolve('/instruments/[exchange]/[symbol]', {
-    exchange: instrument.exchange,
-    symbol: instrument.symbol,
-  });
-  const searchParameters = new URLSearchParams({ currency: instrument.currency });
-  return goToHref(formatWatchlistInstrument(instrument), `${instrumentPath}?${searchParameters.toString()}`);
+  return goToHref(formatWatchlistInstrument(instrument), createInstrumentHref(instrument));
 }
 
 function goToHref(label: string, href: string): PaletteCommand {

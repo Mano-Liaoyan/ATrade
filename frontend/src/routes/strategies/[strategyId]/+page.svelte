@@ -136,7 +136,7 @@
 <p class="back-link"><a class="cds--link" href={resolve('/strategies')}>All strategies</a></p>
 
 {#if strategy !== null}
-  <h1 class="page-heading">{strategy.name}</h1>
+  <h1>{strategy.name}</h1>
 
   <div class="toolbar">
     <div class="version-select">
@@ -227,14 +227,6 @@
 <style>
   .back-link {
     margin-block: 0 var(--cds-spacing-05);
-  }
-
-  .page-heading {
-    margin-block: 0 var(--cds-spacing-06);
-    font-size: var(--cds-heading-04-font-size);
-    font-weight: var(--cds-heading-04-font-weight);
-    line-height: var(--cds-heading-04-line-height);
-    letter-spacing: var(--cds-heading-04-letter-spacing);
   }
 
   .toolbar {

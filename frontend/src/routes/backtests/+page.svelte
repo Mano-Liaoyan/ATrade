@@ -189,7 +189,7 @@
   }
 </script>
 
-<h1 class="page-heading">Backtests</h1>
+<h1>Backtests</h1>
 
 <form id="start-backtest" class="backtest-form" aria-label="Start a backtest" onsubmit={submitBacktest}>
   <Select
@@ -305,14 +305,6 @@
 {/if}
 
 <style>
-  .page-heading {
-    margin-block: 0 var(--cds-spacing-06);
-    font-size: var(--cds-heading-04-font-size);
-    font-weight: var(--cds-heading-04-font-weight);
-    line-height: var(--cds-heading-04-line-height);
-    letter-spacing: var(--cds-heading-04-letter-spacing);
-  }
-
   .section-heading {
     margin-block: var(--cds-spacing-07) var(--cds-spacing-05);
     font-size: var(--cds-heading-03-font-size);

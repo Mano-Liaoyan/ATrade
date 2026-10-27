@@ -91,7 +91,7 @@
   .open-orders {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--cds-spacing-03);
   }
 
   p {

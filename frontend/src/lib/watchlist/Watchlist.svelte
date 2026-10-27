@@ -72,6 +72,12 @@
     max-inline-size: 28rem;
   }
 
+  /* The Carbon header row sets the type style. The heading inside takes it, not the browser size of h2. */
+  .cds--contained-list__label {
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
   .watchlist-message {
     display: flex;
     align-items: center;

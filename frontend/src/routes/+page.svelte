@@ -2,7 +2,6 @@
      paper account panel shows the paper account. The running forward tests from /ws/forward-tests block paper orders
      by hand on their instruments. -->
 <script lang="ts">
-  import { resolve } from '$app/paths';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import { FORWARD_TESTS_SOCKET_PATH, listForwardTestsOnInstruments, readForwardTestsMessage } from '#lib/forward_test';
   import { InstrumentSearch, type Instrument } from '#lib/market_data';
@@ -14,6 +13,7 @@
     Watchlist,
     type WatchlistInstrument,
   } from '#lib/watchlist';
+  import { createInstrumentHref } from './instrument_href';
 
   let watchlistInstruments: WatchlistInstrument[] = $state([]);
   let isWatchlistLoading = $state(true);
@@ -74,15 +74,6 @@
     } else {
       watchlistMessage = deleteResult.message;
     }
-  }
-
-  function createInstrumentHref(instrument: WatchlistInstrument): string {
-    const instrumentPath = resolve('/instruments/[exchange]/[symbol]', {
-      exchange: instrument.exchange,
-      symbol: instrument.symbol,
-    });
-    const searchParameters = new URLSearchParams({ currency: instrument.currency });
-    return `${instrumentPath}?${searchParameters.toString()}`;
   }
 </script>
 

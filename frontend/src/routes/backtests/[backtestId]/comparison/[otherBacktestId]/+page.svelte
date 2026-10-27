@@ -40,7 +40,7 @@
 </script>
 
 <p class="page-back"><a class="cds--link" href={resolve('/backtests')}>All backtests</a></p>
-<h1 class="page-heading">Compare backtests #{firstBacktestId} and #{secondBacktestId}</h1>
+<h1>Compare backtests #{firstBacktestId} and #{secondBacktestId}</h1>
 
 {#if errorMessage !== ''}
   <InlineNotification kind="error" title="Backtests not compared" subtitle={errorMessage} lowContrast />
@@ -65,13 +65,5 @@
 <style>
   .page-back {
     margin-block: 0 var(--cds-spacing-05);
-  }
-
-  .page-heading {
-    margin-block: 0 var(--cds-spacing-06);
-    font-size: var(--cds-heading-04-font-size);
-    font-weight: var(--cds-heading-04-font-weight);
-    line-height: var(--cds-heading-04-line-height);
-    letter-spacing: var(--cds-heading-04-letter-spacing);
   }
 </style>

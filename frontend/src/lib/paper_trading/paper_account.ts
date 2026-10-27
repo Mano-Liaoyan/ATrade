@@ -1,6 +1,7 @@
 // Reads the /ws/paper-trading account messages and describes the paper account check for the account panel.
 
 import type { components } from '#lib/api';
+import type { StatusKind } from '#lib/foundation/carbon';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
 // The message models of backend/src/atrade/paper_trading/account_socket.py. Amounts are decimal text.
@@ -16,6 +17,16 @@ const MISSING_AMOUNT = '–';
 
 export function readPaperAccountMessage(message: unknown): PaperAccountMessage | null {
   return readSocketMessage<PaperAccountMessage>(message, ['account']);
+}
+
+const CHECK_STATUS_KINDS: Record<PaperAccountCheck['status'], StatusKind> = {
+  passed: 'success',
+  disconnected: 'warning',
+  failed: 'error',
+};
+
+export function findPaperAccountCheckKind(status: PaperAccountCheck['status']): StatusKind {
+  return CHECK_STATUS_KINDS[status];
 }
 
 export function describePaperAccountCheck(check: PaperAccountCheck): { title: string; detail: string | null } {

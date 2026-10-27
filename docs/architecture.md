@@ -535,17 +535,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (section 13). Do not hard-code a color. Extra CSS for parts that Carbon
   does not supply uses only Carbon color tokens, spacing tokens, and type
   tokens.
-- Parallel migration ([#84](https://github.com/Mano-Liaoyan/ATrade/issues/84)):
-  the old `--color-*` tokens on `:root` in `src/routes/+layout.svelte` point
-  to Carbon tokens, so the components that are not migrated yet follow the
-  Carbon theme. For example `--color-surface` is `--cds-layer-01` and
-  `--color-text` is `--cds-text-primary`. A migrated component uses the
-  `--cds-*` tokens directly. The layout also gives the browser margins back
-  to the headings, paragraphs, and lists in the main region, because the
-  Carbon reset removes them. The last migration step removes the `--color-*`
-  tokens and this rule.
-- A canvas chart reads a `--color-*` token with `getComputedStyle`. The
-  browser gives the Carbon value of the current theme.
+- The Carbon reset removes all margins. Extra CSS sets the margins with
+  Carbon spacing tokens. The app has no other color tokens than `--cds-*`.
+- A canvas chart reads a `--cds-*` token with `getComputedStyle`. The browser
+  gives the Carbon value of the current theme.
 
 ## 14. Deployment and external access
 

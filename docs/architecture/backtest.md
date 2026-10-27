@@ -317,5 +317,5 @@ section 9.5.
   difference." in place of the diff. A closed "Show the code" disclosure shows
   the full code without collapsed lines.
 - `EquityChart` takes `curves: [{name, points}]`. The first curve is a solid
-  line in `--color-text`, the second a dashed line in `--color-accent`. With
+  line in `--cds-text-primary`, the second a dashed line in `--cds-interactive`. With
   more than one curve, a legend names each curve.
