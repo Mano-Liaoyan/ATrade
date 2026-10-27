@@ -24,13 +24,4 @@ frontend/.vitest/
 .idea/
 .vscode/
 .worktrees/
-
-# Retired Taskplane / Pi runtime files
-.pi/agents/
-.pi/batch-state.json
-.pi/batch-history.json
-.pi/settings.json
-.pi/taskplane.json
-.pi/taskplane-config.json
-.pi/runtime/
-.taskplane-tasks/
+.claude/worktrees/
