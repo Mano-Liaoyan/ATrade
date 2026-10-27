@@ -7,7 +7,8 @@ the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 
 Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48),
 [Module division](https://github.com/Mano-Liaoyan/ATrade/issues/38),
-[Run a backtest and see the result](https://github.com/Mano-Liaoyan/ATrade/issues/70).
+[Run a backtest and see the result](https://github.com/Mano-Liaoyan/ATrade/issues/70),
+[Backtest list and version comparison](https://github.com/Mano-Liaoyan/ATrade/issues/72).
 
 ## 10.1 Decisions
 
@@ -132,6 +133,7 @@ timeout_seconds, concurrency)` with `keep_running()`, and
 | `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the currency is not USD, or the strategy version does not exist. |
 | `GET /api/backtests` | `200` with all backtests, the newest first. |
 | `GET /api/backtests/{backtest_id}` | `200` with the backtest, `equity_curve` (`[{"time_utc", "equity_usd"}]`), and `trades`. `404` when the backtest does not exist. |
+| `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `200` with `{"strategy_id", "strategy_name", "first", "second"}`. `first` and `second` are the two backtests as `GET /api/backtests/{backtest_id}` gives them, each with the `code` of its strategy version. `422` when the two backtests use different strategies, or when the two IDs are the same. `404` when a backtest does not exist. Section 10.7. |
 
 A backtest has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`,
 `version_number`, the request fields, `status`, `error_message`,
@@ -152,8 +154,47 @@ the backtest finishes). Money values and percents are decimal strings.
   `#lib/paper_trading`). Dates are days in UTC.
 - `/backtests/<id>` shows the request and the result. It reads the backtest
   each second until the status is final.
+- `/backtests/<id>/comparison/<other id>` is the comparison page (section
+  10.7).
 - Tests: `backend/tests/backtest/` (HTTP routes, metric functions, and real
   child processes on the bar file `bars/btest_arca_usd_1_day.csv` with the
   test strategy `strategies/buy_and_sell_by_bar_count.py`; the tests assert
   exact results), `frontend/src/lib/backtest/*.test.ts`, and
-  `e2e/backtest.spec.ts`.
+  `e2e/backtest.spec.ts`, `e2e/backtest_comparison.spec.ts`.
+
+## 10.7 Backtest list and comparison
+
+Source: [#72](https://github.com/Mano-Liaoyan/ATrade/issues/72). Rules:
+section 9.5.
+
+- The backtest list on `/backtests` shows the metrics of each backtest side by
+  side: the final equity, the total return, the maximum drawdown, and the
+  trade count. It is in a `ScrollRegion` with the height
+  `min(24rem, 50vh)`.
+- Each row has a check box. `checkComparisonSelection()` of `#lib/backtest`
+  accepts exactly 2 backtests of the same strategy. For other selections, the
+  "Compare selected backtests" button is disabled and the status line gives
+  the reason. The backend route applies the same rule (section 10.5), so a
+  typed URL with different strategies shows the refusal.
+- Two backtests of the same strategy version are also accepted. They can
+  differ in the instrument, the period, or the paper capital. Their code diff
+  is empty.
+- The page `/backtests/<id>/comparison/<other id>` reads
+  `compareBacktests()` and shows `ComparisonView`. The backtest with the
+  lower ID is first.
+- `ComparisonView` (`frontend/src/lib/backtest/ComparisonView.svelte`) is the
+  comparison view for backtests and forward tests (section 12.10). Its
+  properties:
+
+  | Property | Type | Meaning |
+  |---|---|---|
+  | `first`, `second` | `ComparedRun`: `{label, metrics, equityCurve}` | `metrics` is `BacktestMetrics` or `null` (shown as "No result"). `equityCurve` is a list of `EquityPoint`. |
+  | `code` | `ComparedCode`: `{firstCode, secondCode}`, optional | Shows the code diff. Leave it out when both runs use the same strategy version. |
+
+  It shows the code diff (`CodeDiff` of `#lib/foundation/code_editor`,
+  read-only `@codemirror/merge` with collapsed unchanged lines and a styled
+  scrollbar), the metric table (in a `ScrollRegion` named "Compared
+  metrics"), and both equity curves on one chart.
+- `EquityChart` takes `curves: [{name, points}]`. The first curve is a solid
+  line in `--color-text`, the second a dashed line in `--color-accent`. With
+  more than one curve, a legend names each curve.

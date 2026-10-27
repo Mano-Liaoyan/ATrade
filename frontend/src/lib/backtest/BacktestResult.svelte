@@ -43,7 +43,7 @@
     </dl>
 
     <h2>Equity curve</h2>
-    <EquityChart equityCurve={backtest.equity_curve} label="Equity curve" />
+    <EquityChart curves={[{ name: "Equity", points: backtest.equity_curve }]} label="Equity curve" />
 
     <h2>Trades</h2>
     {#if backtest.trades.length === 0}

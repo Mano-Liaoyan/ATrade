@@ -9,6 +9,7 @@ export type BacktestStatus = components['schemas']['BacktestStatus'];
 export type BacktestMetrics = components['schemas']['BacktestMetricsResponse'];
 export type EquityPoint = components['schemas']['EquityPointResponse'];
 export type BacktestTrade = components['schemas']['TradeResponse'];
+export type BacktestComparison = components['schemas']['BacktestComparisonResponse'];
 type ValidationError = components['schemas']['ValidationError'];
 
 export type RequestResult<T> = { kind: 'ok'; value: T } | { kind: 'failed'; message: string };
@@ -71,4 +72,12 @@ export function listBacktests(fetchFunction: typeof fetch): Promise<RequestResul
 
 export function readBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<RequestResult<BacktestDetail>> {
   return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(backtestId)}`);
+}
+
+export function compareBacktests(
+  fetchFunction: typeof fetch,
+  firstBacktestId: number,
+  secondBacktestId: number,
+): Promise<RequestResult<BacktestComparison>> {
+  return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
 }

@@ -13,8 +13,8 @@ is in GitHub Issues.
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
 (issue #68), code completion (issue #69), the paper account check with the
-account panel (issue #74), paper orders sent by hand (issue #75), and backtests
-(issue #70):
+account panel (issue #74), paper orders sent by hand (issue #75), backtests
+(issue #70), and the backtest comparison (issue #72):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
@@ -74,8 +74,13 @@ account panel (issue #74), paper orders sent by hand (issue #75), and backtests
   bar chart of the instrument first: backtests read only bars that are in
   PostgreSQL. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
-- Forward tests, the backtest limits UI, and the backtest comparison are not
-  available yet.
+- Backtest comparison: the list on `/backtests` shows the metrics of all
+  backtests side by side. Select 2 backtests of the same strategy and click
+  "Compare selected backtests". The comparison page shows the code diff, the
+  metric table, and both equity curves on one chart. ATrade refuses 2
+  backtests of different strategies. See
+  [`docs/architecture/backtest.md`](docs/architecture/backtest.md) section 10.7.
+- Forward tests and the backtest limits UI are not available yet.
 
 ## Requirements
 
