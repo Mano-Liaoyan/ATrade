@@ -4,6 +4,7 @@ import type { components } from '#lib/api';
 import { readSocketMessage } from './socket_message';
 
 export { readSocketMessage } from './socket_message';
+export { default as LiveUpdatesNotification } from './LiveUpdatesNotification.svelte';
 
 type HeartbeatMessage = components['schemas']['HeartbeatMessage'];
 

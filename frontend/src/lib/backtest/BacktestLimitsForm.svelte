@@ -1,7 +1,7 @@
 <!-- The backtest limits: the timeout in minutes and the number of backtests that run at the same time. PostgreSQL
      stores them. A change applies to the next backtest that starts. -->
 <script lang="ts">
-  import { Button, InlineNotification, TextInput } from '#lib/foundation/carbon';
+  import { Button, InlineNotification, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
   import { changeBacktestLimits, readBacktestLimits } from './backtest_api';
   import { convertTimeoutMinutesToSeconds, formatTimeoutMinutes } from './backtest_format';
 
@@ -9,13 +9,13 @@
   // The backend checks the range of the concurrency (1 to 16). The form shows its reason.
   let concurrency = $state('');
   let timeoutError = $state<string | null>(null);
-  let result = $state<{ isError: boolean; title: string; subtitle: string } | null>(null);
+  let result = $state<NotificationMessage | null>(null);
   let isSaving = $state(false);
 
   $effect(() => {
     void readBacktestLimits(fetch).then((readResult) => {
       if (readResult.kind === 'failed') {
-        result = { isError: true, title: 'Limits not read', subtitle: readResult.message };
+        result = { kind: 'error', title: 'Limits not read', subtitle: readResult.message };
         return;
       }
       timeoutMinutes = formatTimeoutMinutes(readResult.value.timeout_seconds);
@@ -36,28 +36,26 @@
     const saveResult = await changeBacktestLimits(fetch, { timeout_seconds: timeoutSeconds, concurrency: Number(concurrency) });
     isSaving = false;
     if (saveResult.kind === 'failed') {
-      result = { isError: true, title: 'Limits not saved', subtitle: saveResult.message };
+      result = { kind: 'error', title: 'Limits not saved', subtitle: saveResult.message };
       return;
     }
     timeoutMinutes = formatTimeoutMinutes(saveResult.value.timeout_seconds);
     concurrency = String(saveResult.value.concurrency);
-    result = { isError: false, title: 'Limits saved', subtitle: 'They apply to the next backtest that starts.' };
+    result = { kind: 'success', title: 'Limits saved', subtitle: 'They apply to the next backtest that starts.' };
   }
 </script>
 
-<form class="limits-form" aria-label="Backtest limits" onsubmit={saveLimits}>
+<form class="limits-form atrade-auto-grid" aria-label="Backtest limits" onsubmit={saveLimits}>
   <TextInput label="Timeout (minutes)" inputmode="numeric" class="number" invalidText={timeoutError} bind:value={timeoutMinutes} required />
   <TextInput label="Backtests at the same time" inputmode="numeric" class="number" bind:value={concurrency} required />
   <div>
-    <Button type="submit" size="md" disabled={isSaving}>Save limits</Button>
+    <Button type="submit" size="md" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save limits'}</Button>
   </div>
 </form>
 {#if result !== null}
   <InlineNotification
-    kind={result.isError ? 'error' : 'success'}
-    label={result.isError ? undefined : 'Backtest limits status'}
-    title={result.title}
-    subtitle={result.subtitle}
+    {...result}
+    label={result.kind === 'success' ? 'Backtest limits status' : undefined}
     lowContrast
     onClose={() => (result = null)}
   />
@@ -65,10 +63,7 @@
 
 <style>
   .limits-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     align-items: end;
-    gap: var(--cds-spacing-05);
     margin-block-end: var(--cds-spacing-05);
   }
 

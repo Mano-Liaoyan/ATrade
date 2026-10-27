@@ -26,6 +26,7 @@
     Select,
     StatusIndicator,
     TextInput,
+    type NotificationMessage,
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
@@ -93,7 +94,7 @@
   let endDate = $state('');
   let paperCapitalUsd = $state('');
   let backtests: Backtest[] = $state([]);
-  let startError = $state<{ title: string; subtitle: string } | null>(null);
+  let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let selectedBacktestIds: number[] = $state([]);
   const comparisonSelection = $derived(checkComparisonSelection(backtests, selectedBacktestIds));
@@ -153,7 +154,7 @@
     strategyVersionId = '';
     const result = await readStrategy(fetch, Number(selectedId));
     if (result.kind === 'failed') {
-      startError = { title: 'Strategy not read', subtitle: result.message };
+      startError = { kind: 'error', title: 'Strategy not read', subtitle: result.message };
       return;
     }
     selectedStrategy = result.value;
@@ -165,7 +166,7 @@
     event.preventDefault();
     // The dropdowns are not native selects, so the form checks them itself.
     if (strategyVersionId === '' || selectedInstrument === undefined) {
-      startError = { title: 'Backtest not started', subtitle: 'Select a strategy version and an instrument.' };
+      startError = { kind: 'error', title: 'Backtest not started', subtitle: 'Select a strategy version and an instrument.' };
       return;
     }
     isStarting = true;
@@ -182,7 +183,7 @@
     });
     isStarting = false;
     if (result.kind === 'failed') {
-      startError = { title: 'Backtest not started', subtitle: result.message };
+      startError = { kind: 'error', title: 'Backtest not started', subtitle: result.message };
       return;
     }
     await goto(resolve('/backtests/[backtestId]', { backtestId: String(result.value.id) }));
@@ -191,7 +192,7 @@
 
 <h1>Backtests</h1>
 
-<form id="start-backtest" class="backtest-form" aria-label="Start a backtest" onsubmit={submitBacktest}>
+<form id="start-backtest" class="backtest-form atrade-auto-grid" aria-label="Start a backtest" onsubmit={submitBacktest}>
   <Select
     label="Strategy"
     placeholder="Select a strategy"
@@ -241,14 +242,12 @@
   <TextInput label="End date (UTC)" type="date" bind:value={endDate} required />
   <TextInput label="Paper capital (USD)" inputmode="decimal" class="number" bind:value={paperCapitalUsd} required />
   <div>
-    <Button type="submit" size="md" disabled={isStarting}>Start backtest</Button>
+    <Button type="submit" size="md" disabled={isStarting}>{isStarting ? 'Starting…' : 'Start backtest'}</Button>
   </div>
 </form>
 {#if startError !== null}
   <InlineNotification
-    kind="error"
-    title={startError.title}
-    subtitle={startError.subtitle}
+    {...startError}
     lowContrast
     onClose={() => (startError = null)}
   />
@@ -314,10 +313,7 @@
   }
 
   .backtest-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     align-items: end;
-    gap: var(--cds-spacing-05);
     margin-block-end: var(--cds-spacing-05);
   }
 

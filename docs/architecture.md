@@ -333,7 +333,18 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `InlineNotification` is the Carbon inline
   notification: `kind` (`success` and `info` are a status, `error` and
   `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
-  `onClose` (it adds the close button "Close notification").
+  `onClose` (it adds the close button "Close notification"). A page keeps
+  the result of an action as a `NotificationMessage` (`kind`, `title`,
+  `subtitle`) and spreads it on the component.
+- `foundation/live_socket` has `LiveUpdatesNotification` (`isConnected`): the
+  "Live updates paused" warning that a page shows while its live socket is
+  not connected.
+- The global class `atrade-auto-grid` of `carbon.scss` is the grid of the
+  fields of a form or of a list of values: as many columns as fit, each at
+  least 12rem wide (9rem with `atrade-auto-grid--narrow`, 14rem with
+  `atrade-auto-grid--wide`), with a `--cds-spacing-05` gap.
+- While a button action runs, the button is disabled and its text says why,
+  for example "Saving…", "Creating…", or "Starting…".
 - `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
   with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
   `neutral`; each kind has its own icon shape) and `label`. `Select` takes
@@ -363,7 +374,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   theme rules then write these tokens for each theme.
 - The Sass settings are in `css.preprocessorOptions.scss` of
   `vite.config.ts`. The Carbon SCSS loads packages that are not direct
-  dependencies, for example `@carbon/themes`. pnpm keeps them in
+  dependencies, for example `@carbon/layout`. pnpm keeps them in
   `node_modules/.pnpm/node_modules`, so `loadPaths` includes that directory.
 - The fonts are IBM Plex Sans and IBM Plex Mono from the `@ibm/plex-sans`
   and `@ibm/plex-mono` packages. `foundation/carbon/index.ts` imports their
@@ -481,6 +492,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   previous bar period after a change.
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
+  The native checkbox is transparent and covers the label, so a pointer
+  click goes to the native checkbox.
   A `DataTable` column with `isSelection` is the column of the row
   checkboxes. Its cells have class `cds--table-column-checkbox`. `TextInput`
   also takes `type` `date`. `InlineNotification` has `label` (the accessible
@@ -500,8 +513,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-layer-hover-01` (active line), `--cds-highlight` (selection), and
   `--cds-support-error` and `--cds-support-success` (removed and added
   lines). The font is IBM Plex Mono. The syntax colors in `code_colors.ts`
-  are Carbon palette colors (70 grade in g10, 40 grade in g100). A unit test
-  checks that each has 4.5:1 contrast on `--cds-layer-01`. A live type error
+  are Carbon palette colors from `@carbon/colors` (70 grade in g10, 40 grade
+  in g100), and plain text and comments are the `textPrimary` and
+  `textSecondary` tokens of `@carbon/themes` (section 13.1). A unit test
+  checks that each has 4.5:1 contrast on the `layer01` token. A live type error
   has a wavy `--cds-support-error` underline, and its tooltip looks like a
   low-contrast Carbon error notification. A type error does not block the
   save.
@@ -539,6 +554,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   Carbon spacing tokens. The app has no other color tokens than `--cds-*`.
 - A canvas chart reads a `--cds-*` token with `getComputedStyle`. The browser
   gives the Carbon value of the current theme.
+- Exception: Carbon has no syntax color tokens. The CodeMirror highlight
+  style needs one color value for each syntax role, so
+  `foundation/code_editor/code_colors.ts` imports the colors from the
+  official Carbon packages `@carbon/colors` and `@carbon/themes`. It has no
+  color literal.
 
 ## 14. Deployment and external access
 

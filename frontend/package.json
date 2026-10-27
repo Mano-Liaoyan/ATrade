@@ -15,8 +15,10 @@
     "check:api": "openapi-typescript src/lib/api/openapi.json --output src/lib/api/index.ts --check"
   },
   "devDependencies": {
+    "@carbon/colors": "11.61.0",
     "@carbon/icons": "11.91.0",
     "@carbon/styles": "1.118.0",
+    "@carbon/themes": "11.84.0",
     "@codemirror/lang-python": "6.2.1",
     "@codemirror/language": "6.13.1",
     "@codemirror/lsp-client": "6.3.0",

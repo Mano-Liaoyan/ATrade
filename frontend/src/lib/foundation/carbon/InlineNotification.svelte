@@ -1,9 +1,5 @@
 <!-- Carbon inline notification. It shows a result with an icon and a color: success and info are a status, error and
      warning are an alert. With onClose, it has a close button. -->
-<script module lang="ts">
-  export type NotificationKind = 'success' | 'error' | 'info' | 'warning';
-</script>
-
 <script lang="ts">
   import CheckmarkFilled20 from '@carbon/icons/es/checkmark--filled/20.js';
   import Close20 from '@carbon/icons/es/close/20.js';
@@ -13,6 +9,7 @@
   import type { Snippet } from 'svelte';
   import type { CarbonIconNode } from './carbon_icon';
   import Icon from './Icon.svelte';
+  import type { NotificationKind } from './notification_message';
 
   interface Props {
     kind: NotificationKind;

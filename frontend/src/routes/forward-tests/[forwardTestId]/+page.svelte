@@ -100,7 +100,7 @@
 
 {#if detail !== null}
   {@const forwardTest = detail.forward_test}
-  <dl class="values" aria-label="Forward test">
+  <dl class="values atrade-auto-grid atrade-auto-grid--wide" aria-label="Forward test">
     <div>
       <dt>Strategy version</dt>
       <dd>{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</dd>
@@ -175,7 +175,7 @@
   {#if detail.metrics === null}
     <p>No result yet.</p>
   {:else}
-    <dl class="values" aria-label="Forward test metrics">
+    <dl class="values atrade-auto-grid atrade-auto-grid--wide" aria-label="Forward test metrics">
       <div>
         <dt>Final equity (USD)</dt>
         <dd class="number">{formatUsd(detail.metrics.final_equity_usd)}</dd>
@@ -228,7 +228,7 @@
     </ul>
   {/if}
   {#if canBacktestSamePeriod(forwardTest)}
-    <Button kind="tertiary" disabled={isStartingBacktest} onclick={backtestSamePeriod}>Backtest the same period</Button>
+    <Button kind="tertiary" disabled={isStartingBacktest} onclick={backtestSamePeriod}>{isStartingBacktest ? 'Starting…' : 'Backtest the same period'}</Button>
   {/if}
 {/if}
 
@@ -258,8 +258,6 @@
   }
 
   .values {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
     gap: var(--cds-spacing-05) var(--cds-spacing-06);
     margin: 0 0 var(--cds-spacing-05);
   }

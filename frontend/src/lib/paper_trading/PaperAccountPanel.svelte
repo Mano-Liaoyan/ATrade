@@ -1,8 +1,8 @@
 <!-- Account panel: the paper account check, the balance, the positions, the order form, and the open orders,
      updated live from /ws/paper-trading. -->
 <script lang="ts">
-  import { DataTable, InlineNotification, StatusIndicator, Tag, type TableColumn } from '#lib/foundation/carbon';
-  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { DataTable, StatusIndicator, Tag, type TableColumn } from '#lib/foundation/carbon';
+  import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     describeBalanceCurrency,
@@ -80,9 +80,7 @@
 
 <section class="account-panel" aria-labelledby="account-panel-title">
   <h2 id="account-panel-title">Paper account <Tag label="PAPER" kind="red" size="sm" /></h2>
-  {#if !isSocketConnected}
-    <InlineNotification kind="warning" title="Live updates paused" subtitle="ATrade connects again." lowContrast />
-  {/if}
+  <LiveUpdatesNotification isConnected={isSocketConnected} />
 
   {#if account === null || checkDescription === null}
     <p role="status" aria-label="Paper account check">

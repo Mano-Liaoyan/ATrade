@@ -41,7 +41,7 @@
   {#if backtest.metrics !== null}
     {@const metrics = backtest.metrics}
     <h2>Metrics</h2>
-    <dl class="metrics" aria-label="Metrics">
+    <dl class="metrics atrade-auto-grid" aria-label="Metrics">
       {#each METRICS as metric (metric.name)}
         <div class="cds--tile metric">
           <dt>{metric.name}</dt>
@@ -108,8 +108,6 @@
   }
 
   .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     gap: var(--cds-spacing-01);
     margin: 0;
   }

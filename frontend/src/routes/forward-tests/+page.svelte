@@ -4,8 +4,8 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
-  import { Button, InlineNotification, Select, TextInput, type SelectItem } from '#lib/foundation/carbon';
-  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { Button, InlineNotification, Select, TextInput, type NotificationMessage, type SelectItem } from '#lib/foundation/carbon';
+  import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import {
     FORWARD_TESTS_SOCKET_PATH,
@@ -45,7 +45,7 @@
   let forwardTests: ForwardTest[] = $state([]);
   let isSocketConnected = $state(false);
   // The failed action and the reason from the backend.
-  let failure = $state<{ title: string; subtitle: string } | null>(null);
+  let failure = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
 
   const strategyItems = $derived<SelectItem<string>[]>(
@@ -105,7 +105,7 @@
     }
     const result = await readStrategy(fetch, Number(strategyId));
     if (result.kind === 'failed') {
-      failure = { title: 'Strategy not read', subtitle: result.message };
+      failure = { kind: 'error', title: 'Strategy not read', subtitle: result.message };
       return;
     }
     selectedStrategy = result.value;
@@ -127,7 +127,7 @@
     });
     isStarting = false;
     if (result.kind === 'failed') {
-      failure = { title: 'Forward test not started', subtitle: result.message };
+      failure = { kind: 'error', title: 'Forward test not started', subtitle: result.message };
       return;
     }
     forwardTests = [result.forwardTest, ...forwardTests.filter((item) => item.id !== result.forwardTest.id)];
@@ -138,7 +138,7 @@
     failure = null;
     const result = await startSamePeriodBacktest(fetch, forwardTestId);
     if (result.kind === 'failed') {
-      failure = { title: 'Backtest not started', subtitle: result.message };
+      failure = { kind: 'error', title: 'Backtest not started', subtitle: result.message };
       return;
     }
     await goto(
@@ -152,7 +152,7 @@
 
 <h1>Forward tests</h1>
 
-<form id="start-forward-test" class="forward-test-form" aria-label="Start a forward test" onsubmit={submitForwardTest}>
+<form id="start-forward-test" class="forward-test-form atrade-auto-grid" aria-label="Start a forward test" onsubmit={submitForwardTest}>
   <Select
     label="Strategy"
     placeholder="Select a strategy"
@@ -162,6 +162,7 @@
   />
   <Select
     label="Strategy version"
+    placeholder="Select a strategy first"
     items={versionItems}
     value={strategyVersionId}
     disabled={selectedStrategy === null}
@@ -185,7 +186,7 @@
     <Button
       type="submit"
       disabled={startBlock !== null || isStarting}
-      aria-describedby={startBlock === null ? undefined : startBlockId}>Start forward test</Button
+      aria-describedby={startBlock === null ? undefined : startBlockId}>{isStarting ? 'Starting…' : 'Start forward test'}</Button
     >
     {#if startBlock !== null}
       <p id={startBlockId} class="message">{startBlock}</p>
@@ -210,26 +211,19 @@
 
 {#if failure !== null}
   <InlineNotification
-    kind="error"
-    title={failure.title}
-    subtitle={failure.subtitle}
+    {...failure}
     lowContrast
     onClose={() => (failure = null)}
   />
 {/if}
 
 <h2>All forward tests</h2>
-{#if !isSocketConnected}
-  <InlineNotification kind="warning" title="Live updates paused" subtitle="ATrade connects again." lowContrast />
-{/if}
+<LiveUpdatesNotification isConnected={isSocketConnected} />
 <ForwardTestList {forwardTests} onBacktestSamePeriod={backtestSamePeriod} />
 
 <style>
   .forward-test-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     align-items: end;
-    gap: var(--cds-spacing-05);
     margin-block-end: var(--cds-spacing-06);
   }
 

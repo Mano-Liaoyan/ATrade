@@ -1,7 +1,7 @@
 <!-- Open orders of the paper account from IBKR, with the source of each order. The row menu cancels an order by hand.
      For other orders, the cancel item is disabled and says why. -->
 <script lang="ts">
-  import { DataTable, InlineNotification, OverflowMenu, type TableColumn } from '#lib/foundation/carbon';
+  import { DataTable, InlineNotification, OverflowMenu, type NotificationMessage, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatAmount } from './paper_account';
   import { cancelPaperOrder, describeCancelAction, describeOrderSource, type OpenOrder } from './paper_orders';
@@ -25,7 +25,7 @@
   ];
 
   let cancellingOrderIds = $state<number[]>([]);
-  let cancelResult = $state<{ title: string; subtitle?: string; isError: boolean } | null>(null);
+  let cancelResult = $state<NotificationMessage | null>(null);
 
   async function cancelOrder(orderId: number): Promise<void> {
     cancelResult = null;
@@ -34,8 +34,8 @@
     cancellingOrderIds = cancellingOrderIds.filter((cancellingOrderId) => cancellingOrderId !== orderId);
     cancelResult =
       result.kind === 'failed'
-        ? { title: `Order ${String(orderId)} not cancelled`, subtitle: result.message, isError: true }
-        : { title: `Cancel request sent for order ${String(orderId)}`, isError: false };
+        ? { kind: 'error', title: `Order ${String(orderId)} not cancelled`, subtitle: result.message }
+        : { kind: 'success', title: `Cancel request sent for order ${String(orderId)}` };
   }
 
   function makeMenuItems(order: OpenOrder) {
@@ -53,9 +53,7 @@
 <div class="open-orders">
   {#if cancelResult !== null}
     <InlineNotification
-      kind={cancelResult.isError ? 'error' : 'success'}
-      title={cancelResult.title}
-      subtitle={cancelResult.subtitle}
+      {...cancelResult}
       lowContrast
       onClose={() => (cancelResult = null)}
     />

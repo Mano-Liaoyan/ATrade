@@ -20,12 +20,18 @@ importers:
 
   .:
     devDependencies:
+      '@carbon/colors':
+        specifier: 11.61.0
+        version: 11.61.0
       '@carbon/icons':
         specifier: 11.91.0
         version: 11.91.0
       '@carbon/styles':
         specifier: 1.118.0
         version: 1.118.0(sass@1.106.1)
+      '@carbon/themes':
+        specifier: 11.84.0
+        version: 11.84.0
       '@codemirror/lang-python':
         specifier: 6.2.1
         version: 6.2.1

@@ -149,7 +149,7 @@
         }}
       />
     </div>
-    <Button size="md" onclick={saveVersion} disabled={isSaving}>Save version</Button>
+    <Button size="md" onclick={saveVersion} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save version'}</Button>
     {#if hasUnsavedChanges}
       <Tag label="Unsaved changes" kind="warm-gray" />
     {/if}

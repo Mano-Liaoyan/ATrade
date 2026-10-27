@@ -75,9 +75,8 @@ const editorChrome = EditorView.theme({
   '&.cm-merge-b .cm-changedLine': { backgroundColor: 'color-mix(in srgb, var(--cds-support-success) 15%, transparent)' },
   '&.cm-merge-a .cm-changedText, .cm-deletedChunk .cm-deletedText': {
     background: 'color-mix(in srgb, var(--cds-support-error) 40%, transparent)',
-    borderRadius: '2px',
   },
-  '&.cm-merge-b .cm-changedText': { background: 'color-mix(in srgb, var(--cds-support-success) 40%, transparent)', borderRadius: '2px' },
+  '&.cm-merge-b .cm-changedText': { background: 'color-mix(in srgb, var(--cds-support-success) 40%, transparent)' },
   '&.cm-merge-a .cm-changedLineGutter, .cm-deletedLineGutter': { background: 'var(--cds-support-error)' },
   '&.cm-merge-b .cm-changedLineGutter': { background: 'var(--cds-support-success)' },
   '.cm-collapsedLines': {

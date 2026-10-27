@@ -1,7 +1,7 @@
 <!-- Order form for paper orders by hand. A confirmation dialog with the PAPER mark comes before each order. A forward
      test that trades the instrument of the form disables the form button, and the form says why. -->
 <script lang="ts">
-  import { Button, ContentSwitcher, Dialog, InlineNotification, Select, Tag, TextInput } from '#lib/foundation/carbon';
+  import { Button, ContentSwitcher, Dialog, InlineNotification, Select, Tag, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
   import {
     describeOrderForConfirmation,
     describeOrderTitle,
@@ -48,7 +48,7 @@
     timeInForce: 'DAY',
   });
   let formMessage = $state<string | null>(null);
-  let resultMessage = $state<{ title: string; subtitle?: string; isError: boolean } | null>(null);
+  let resultMessage = $state<NotificationMessage | null>(null);
   let reviewedRequest = $state<SendOrderRequest | null>(null);
   let isDialogOpen = $state(false);
   let isSending = $state(false);
@@ -81,14 +81,14 @@
     isSending = false;
     isDialogOpen = false;
     if (result.kind === 'sent') {
-      resultMessage = { title: `Order ${String(result.ibkrOrderId)} sent`, isError: false };
+      resultMessage = { kind: 'success', title: `Order ${String(result.ibkrOrderId)} sent` };
     } else {
-      resultMessage = { title: 'Order not sent', subtitle: result.message, isError: true };
+      resultMessage = { kind: 'error', title: 'Order not sent', subtitle: result.message };
     }
   }
 </script>
 
-<form class="order-ticket" aria-label="Paper order" onsubmit={reviewOrder}>
+<form class="order-ticket atrade-auto-grid atrade-auto-grid--narrow" aria-label="Paper order" onsubmit={reviewOrder}>
   <div class="side">
     <ContentSwitcher
       label="Side"
@@ -142,9 +142,7 @@
 {/if}
 {#if resultMessage !== null}
   <InlineNotification
-    kind={resultMessage.isError ? 'error' : 'success'}
-    title={resultMessage.title}
-    subtitle={resultMessage.subtitle}
+    {...resultMessage}
     lowContrast
     onClose={() => (resultMessage = null)}
   />
@@ -179,10 +177,7 @@
 
 <style>
   .order-ticket {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
     align-items: end;
-    gap: var(--cds-spacing-05);
   }
 
   .side,

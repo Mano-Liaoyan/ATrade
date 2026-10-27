@@ -61,3 +61,19 @@
 :root[data-theme='dark'] {
   @include theme.theme(themes.$g100);
 }
+
+// ATrade layout class (Carbon has no class for it): the grid of the fields of a form or of a list of values. It has
+// as many columns as fit, with a Carbon spacing gap. A form adds `align-items: end` to align its fields. A column is at least 12rem wide, 9rem with --narrow, and 14rem with --wide.
+.atrade-auto-grid {
+  display: grid;
+  gap: var(--cds-spacing-05);
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+
+.atrade-auto-grid--narrow {
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+}
+
+.atrade-auto-grid--wide {
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}

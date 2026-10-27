@@ -82,9 +82,9 @@
   .floating-options {
     position: relative;
     inset: auto;
-    /* An item label is never cut: the menu is as wide as its longest label, and at least the Carbon menu width. */
-    /* 10rem is Carbon $spacing-13, the width that Carbon gives the menu. */
-    min-inline-size: 10rem;
+    /* An item label is never cut: the menu is as wide as its longest label, and at least the Carbon menu width
+       ($spacing-13). */
+    min-inline-size: var(--cds-spacing-13);
     inline-size: max-content;
   }
 

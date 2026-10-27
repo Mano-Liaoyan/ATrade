@@ -43,7 +43,7 @@
   <div class="create-name">
     <TextInput label="Strategy name" name="name" bind:value={newName} required maxlength={STRATEGY_NAME_MAX_LENGTH} />
   </div>
-  <Button type="submit" size="md" disabled={isCreating}>Create strategy</Button>
+  <Button type="submit" size="md" disabled={isCreating}>{isCreating ? 'Creating…' : 'Create strategy'}</Button>
 </form>
 {#if createError !== ''}
   <div class="page-message">
