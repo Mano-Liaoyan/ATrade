@@ -9,6 +9,7 @@ The case skips when `.env`, the account ID, or the Gateway is not available.
 
 import socket
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 
 import anyio
@@ -18,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from atrade.foundation.bar import BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError, IbAsyncGatewayConnection
-from tests.fakes.ibkr import FakeGatewayConnection
+from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values, make_stock_position
 
 REPOSITORY_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 FAKE_ACCOUNT_ID = "DU1234567"
@@ -47,7 +48,10 @@ def can_open_tcp_connection(host: str, port: int) -> bool:
 @pytest.fixture(params=["fake", pytest.param("ibkr_paper", marks=pytest.mark.ibkr_paper)])
 def connection_and_account(request: pytest.FixtureRequest) -> tuple[GatewayConnection, str]:
     if request.param == "fake":
-        return FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID]), FAKE_ACCOUNT_ID
+        fake = FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID])
+        fake.account_values = make_balance_values(FAKE_ACCOUNT_ID, net_liquidation_usd="100000.00", cash_usd="99000")
+        fake.portfolio = [make_stock_position(FAKE_ACCOUNT_ID, symbol="AAPL", quantity="10", market_price="100")]
+        return fake, FAKE_ACCOUNT_ID
     if not REPOSITORY_ENV_FILE.exists():
         pytest.skip(f"{REPOSITORY_ENV_FILE} does not exist.")
     settings = PaperAccountTestSettings()
@@ -95,6 +99,21 @@ async def test_reports_not_connected_after_disconnect(connection_and_account: tu
 
 
 @pytest.mark.anyio
+async def test_returns_exactly_the_paper_account_from_managed_accounts(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, account_id = connection_and_account
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        assert connection.read_managed_accounts() == [account_id]
+        assert connection.read_connection_number() >= 1
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     ("query", "expected_instrument"),
     [
@@ -114,6 +133,36 @@ async def test_finds_stocks_by_symbol_with_exchange_and_currency(
         assert expected_instrument in instruments
         task_group.cancel_scope.cancel()
     connection.disconnect()
+
+
+@pytest.mark.anyio
+async def test_reads_the_balance_and_the_positions_of_the_paper_account(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, account_id = connection_and_account
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        # ib_async reports "connected" before the first account update arrives.
+        with anyio.fail_after(CONNECT_WAIT_SECONDS):
+            while not connection.read_account_values():
+                await anyio.sleep(0.05)
+        net_liquidation_values = [
+            Decimal(value.value)
+            for value in connection.read_account_values()
+            if value.account == account_id and value.tag == "NetLiquidation" and value.currency == "USD"
+        ]
+        positions = connection.read_portfolio()
+        assert len(net_liquidation_values) == 1
+        assert net_liquidation_values[0] > 0
+        assert all(position.account == account_id for position in positions)
+        assert all(position.quantity != 0 for position in positions)
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+    assert connection.read_account_values() == []
+    assert connection.read_portfolio() == []
 
 
 @pytest.mark.anyio

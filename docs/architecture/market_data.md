@@ -57,3 +57,46 @@ Source: [Instrument search](https://github.com/Mano-Liaoyan/ATrade/issues/64).
   search for `AAPL` finds `AAPL / NASDAQ / USD`, that a search for `700`
   finds `700 / SEHK / HKD`, and that a search without a connection raises
   `GatewayRequestError`.
+
+## 8.3 Watchlist
+
+Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
+
+- The table `watchlist_instrument` belongs to `watchlist`. Columns: `id`,
+  `symbol`, `exchange`, `currency`, `added_at_utc`. One instrument
+  (`symbol`, `exchange`, `currency`) is in the watchlist at most once. The
+  migration is `04f7d8d54c2b_watchlist_create_table.py`.
+- `market_data` exports `InstrumentLookup(gateway_connection, host, port)`.
+  `find_instrument(instrument)` searches IBKR for the symbol and returns the
+  instrument only when the symbol, the exchange, and the currency are the
+  same. It raises `GatewayNotReachableError` or `InstrumentLookupFailedError`
+  (both are `InstrumentLookupError`).
+- `watchlist` exports `create_watchlist_router(database_url, clock,
+  instrument_lookup)`. `watchlist` imports `market_data` and `foundation`
+  only. An import-linter contract forbids a direct import of `ibkr`.
+- Before it saves an instrument, the add route checks it with
+  `InstrumentLookup`. Thus the watchlist holds only instruments that IBKR
+  knows. Listing and deleting do not need IB Gateway.
+
+| Route | Behavior |
+|---|---|
+| `GET /api/watchlist` | `200` with `{"instruments": [{"id", "symbol", "exchange", "currency", "added_at_utc"}, ...]}` in the order of adding. |
+| `POST /api/watchlist` with `{"symbol", "exchange", "currency"}` | `201` with the new watchlist instrument. |
+| | `404` with `{"detail": "IBKR has no instrument <symbol> / <exchange> / <currency>. Add an instrument from the instrument search."}`. |
+| | `409` with `{"detail": "This instrument is already in the watchlist."}`. |
+| | `422` when a field is empty or too long (symbol 32, exchange 32, currency 8 characters). |
+| | `503` with `{"detail": "IB Gateway is not reachable at <host>:<port>. The instrument check needs IB Gateway."}`. |
+| | `502` with `{"detail": "The instrument check failed: <reason>"}`. |
+| `DELETE /api/watchlist/{id}` | `204`. `404` with `{"detail": "This instrument is not in the watchlist."}` when the ID is not in the watchlist. |
+
+- Frontend: `#lib/watchlist` has the HTTP client and the `Watchlist` panel.
+  The home page owns the list. It gives `InstrumentSearch` a `resultAction`
+  snippet: an "Add" button for each result, or "In watchlist" when the
+  instrument is in the list. A capability does not import another
+  capability, so the page combines them.
+- The watchlist list is in a `ScrollRegion` named `Watchlist instruments`.
+- Each watchlist instrument is a link to
+  `/instruments/<exchange>/<symbol>?currency=<currency>`. This page is a
+  placeholder that shows the instrument name. The bar chart ticket
+  ([#65](https://github.com/Mano-Liaoyan/ATrade/issues/65)) replaces it with
+  the chart.

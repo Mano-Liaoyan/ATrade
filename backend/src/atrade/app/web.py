@@ -19,8 +19,10 @@ from atrade.app.health_routes import create_health_router
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
-from atrade.market_data import create_market_data_router
-from atrade.strategy import create_strategy_router
+from atrade.market_data import InstrumentLookup, create_market_data_router
+from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
+from atrade.strategy import create_strategy_language_server_router, create_strategy_router
+from atrade.watchlist import create_watchlist_router
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -30,14 +32,19 @@ logger = logging.getLogger("atrade.web")
 
 
 def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: GatewayConnection) -> FastAPI:
+    paper_account_monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
+
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
         # The Web process starts without IB Gateway. The connection task connects again after each loss.
         connection_task = asyncio.create_task(gateway_connection.keep_connected())
+        # The paper account check runs after each connection, also when no browser is open.
+        check_task = asyncio.create_task(paper_account_monitor.keep_checking())
         yield
-        connection_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await connection_task
+        for task in (check_task, connection_task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         gateway_connection.disconnect()
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
@@ -47,6 +54,7 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
             gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
         )
     )
+    app.include_router(create_paper_trading_router(paper_account_monitor=paper_account_monitor))
     app.include_router(
         create_market_data_router(
             gateway_connection=gateway_connection,
@@ -57,6 +65,13 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
         )
     )
     app.include_router(create_strategy_router(database_url=settings.database_url, clock=clock))
+    app.include_router(create_strategy_language_server_router())
+    instrument_lookup = InstrumentLookup(
+        gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
+    )
+    app.include_router(
+        create_watchlist_router(database_url=settings.database_url, clock=clock, instrument_lookup=instrument_lookup)
+    )
     # The frontend router matches every path, so it is mounted last.
     app.include_router(create_frontend_router(settings.frontend_build_dir))
     return app

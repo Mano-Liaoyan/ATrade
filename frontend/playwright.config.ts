@@ -3,7 +3,8 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 
-const E2E_PORT = '4173';
+// ATRADE_E2E_PORT lets parallel checkouts run the e2e tests at the same time.
+const E2E_PORT = process.env['ATRADE_E2E_PORT'] ?? '4173';
 const BACKEND_DIR = path.resolve(import.meta.dirname, '../backend');
 const BUILD_DIR = path.resolve(import.meta.dirname, 'build');
 

@@ -1,7 +1,11 @@
-<!-- Instrument search panel: the user types a symbol, and the panel lists each match as symbol / exchange / currency. -->
+<!-- Instrument search panel: the user types a symbol, and the panel lists each match as symbol / exchange / currency.
+     A page can give `resultAction` to show a control next to each result, for example "Add to watchlist". -->
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { formatInstrument, searchInstruments, type InstrumentSearchResult } from './instrument_search';
+  import { formatInstrument, searchInstruments, type Instrument, type InstrumentSearchResult } from './instrument_search';
+
+  const { resultAction }: { resultAction?: Snippet<[Instrument]> } = $props();
 
   let query = $state('');
   let searchedQuery = $state('');
@@ -39,7 +43,10 @@
     <ScrollRegion label="Instrument search results" maxHeight="18rem">
       <ul class="result-list">
         {#each searchResult.instruments as instrument (formatInstrument(instrument))}
-          <li class="result-item">{formatInstrument(instrument)}</li>
+          <li class="result-item">
+            <span class="result-name">{formatInstrument(instrument)}</span>
+            {@render resultAction?.(instrument)}
+          </li>
         {/each}
       </ul>
     </ScrollRegion>
@@ -89,6 +96,10 @@
   }
 
   .result-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     padding: 0.375rem 0.5rem;
     border-bottom: 1px solid var(--color-border);
     font-variant-numeric: tabular-nums;

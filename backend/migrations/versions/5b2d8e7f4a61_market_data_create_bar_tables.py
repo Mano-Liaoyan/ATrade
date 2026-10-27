@@ -1,13 +1,13 @@
 """market_data: create the bar and bar_saved_range tables
 
 Revision ID: 5b2d8e7f4a61
-Revises: 7c1e4a2b9d30
+Revises: 04f7d8d54c2b
 """
 
 from alembic import op
 
 revision = "5b2d8e7f4a61"
-down_revision = "7c1e4a2b9d30"
+down_revision = "04f7d8d54c2b"
 
 
 def upgrade() -> None:

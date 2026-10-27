@@ -14,6 +14,7 @@ from ib_async import IB, BarData, Contract, ContractDescription, RequestError
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import require_usable_client_id
+from atrade.ibkr.account_data import AccountValue, PortfolioPosition, convert_account_value, convert_portfolio_item
 from atrade.ibkr.historical_bars import BAR_SIZE_SETTINGS, keep_bars_in_chunk, plan_historical_data_requests
 
 DEFAULT_RETRY_SECONDS = 10.0
@@ -43,8 +44,19 @@ class GatewayConnection(Protocol):
 
     def is_connected(self) -> bool: ...
 
+    def read_port(self) -> int:
+        """The Gateway API port that this connection uses."""
+        ...
+
+    def read_connection_number(self) -> int:
+        """Counts the successful connections. A new number means a new connection or a reconnection."""
+        ...
+
     def read_managed_accounts(self) -> list[str]: ...
 
+    def read_account_values(self) -> list[AccountValue]: ...
+
+    def read_portfolio(self) -> list[PortfolioPosition]: ...
     async def search_instruments(self, query: str) -> list[Instrument]: ...
 
     async def read_historical_bars(
@@ -74,6 +86,7 @@ class IbAsyncGatewayConnection:
         self.port = port
         self.client_id = client_id
         self.retry_seconds = retry_seconds
+        self.connection_number = 0
         self.ib = IB()
         # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
         self.ib.RaiseRequestErrors = True
@@ -97,15 +110,32 @@ class IbAsyncGatewayConnection:
                 self.retry_seconds,
             )
             return
+        self.connection_number += 1
         logger.info("Connected to IB Gateway at %s:%s with client ID %s.", self.host, self.port, self.client_id)
 
     def is_connected(self) -> bool:
         return self.ib.isConnected()
 
+    def read_port(self) -> int:
+        return self.port
+
+    def read_connection_number(self) -> int:
+        return self.connection_number
+
     def read_managed_accounts(self) -> list[str]:
         if not self.ib.isConnected():
             return []
         return self.ib.managedAccounts()
+
+    def read_account_values(self) -> list[AccountValue]:
+        if not self.ib.isConnected():
+            return []
+        return [convert_account_value(account_value) for account_value in self.ib.accountValues()]
+
+    def read_portfolio(self) -> list[PortfolioPosition]:
+        if not self.ib.isConnected():
+            return []
+        return [convert_portfolio_item(portfolio_item) for portfolio_item in self.ib.portfolio()]
 
     async def search_instruments(self, query: str) -> list[Instrument]:
         """Finds stocks whose symbol starts with the query, or whose name has a word that matches it. IBKR allows 1
