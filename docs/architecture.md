@@ -307,8 +307,8 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
   type, the time range, and `paper_capital_usd`. `paper_capital_usd` is
   required.
 - `paper_trading` exports `fetch_paper_capital_usd()`. It returns the paper
-  account balance when IBKR is connected. Otherwise it returns the local value
-  from `settings`. The frontend uses it to fill in the backtest form.
+  account balance (`NetLiquidation` in USD) after a passed paper account check.
+  Otherwise it returns the local value from `settings` (section 11.5). The frontend uses it to fill in the backtest form.
 - Each backtest runs in its own child process (`app/backtest_process.py`),
   because the NautilusTrader backtest engine blocks the event loop.
 - In NautilusTrader 2.0, `BarDataWrangler` takes Arrow bytes, not a
@@ -329,67 +329,10 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 
 ## 11. Paper trading
 
-Source: [Order module design](https://github.com/Mano-Liaoyan/ATrade/issues/40).
-
-### 11.1 Live order switch
-
-- `settings.trading_mode` is `paper` or `live`.
-- `settings.ibkr_account_id` is the expected IBKR account number. Its value is
-  in `.env`, not in git.
-- In this stage, when `trading_mode` is `live`, the program does not start. It
-  writes the reason. The structure has a place for live orders, but no
-  implementation.
-
-### 11.2 Paper account check
-
-`paper_trading` exports `require_paper_account()`. ATrade calls it before each
-paper order sent by hand and before each forward test start. ATrade sends
-orders only when all 4 conditions are true:
-
-| Condition | Source |
-|---|---|
-| a. `trading_mode == "paper"` | ATrade setting |
-| b. `managedAccounts` returns exactly 1 account, and it equals `settings.ibkr_account_id` | IB Gateway |
-| c. The account number starts with `DU` | Protects against a live account number in `.env`. The user checked it on the paper account. |
-| d. The Gateway runs with `TRADING_MODE=paper`, and ATrade connects to the paper port from `settings` | The only official IBKR method to tell paper from live |
-
-- The Web process runs the check once after each connection and reconnection.
-  It keeps the result in memory. Each order reads that result.
-- When the connection drops, the result is cleared. Orders are refused.
-- When the check fails:
-  - ATrade does not send the order.
-  - The HTTP response is an error. The UI shows the reason, with the actual
-    and the expected account number.
-  - A forward test does not start, and its status is "failed".
-  - The log gets one error line.
-  - ATrade does not retry.
-
-### 11.3 Paper orders sent by hand
-
-- Order types: market and limit. Time in force: DAY and GTC. No stop orders.
-- The user can cancel an order. There is no order change. To change an order,
-  cancel it and send a new one.
-- Before sending, a confirmation dialog shows the instrument, side, quantity,
-  order type, price, account number, and a clear `PAPER` mark.
-- When a forward test runs on an instrument, the Web process refuses paper
-  orders by hand for that instrument. It shows which forward test blocks it.
-- Positions, balance, and order status go to the browser on
-  `/ws/paper-trading`.
-
-### 11.4 Order records and order list
-
-- IBKR is the only source of order status.
-- `paper_trading` stores only the paper orders that ATrade sent by hand: time,
-  instrument, side, quantity, order type, price, IBKR order ID. It does not
-  store status.
-- The order list uses `reqAllOpenOrders`. It shows all open orders, including
-  forward test orders.
-- The list marks the source of each order: "by hand" or "forward test 42". The
-  source comes from `orderRef` (section 12.9).
-- Only orders sent by hand have a cancel button. To cancel forward test orders,
-  stop the forward test.
-- Filled orders sent by hand show data from the local table and from IBKR.
-- Positions and balance belong to the account, not to a client ID.
+Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
+It holds the live order switch, the paper account check, paper orders sent by
+hand, the order list, the `paper_trading` module, `/ws/paper-trading`, and the
+account panel.
 
 ## 12. Forward test
 
@@ -564,6 +507,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - Generated API types go in `lib/api/`.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
+  `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
+  reconnection after 25 seconds without a message or after a close, and a
+  delay from 1 to 10 seconds between attempts.
+- `foundation/scroll_area` is the scroll region with app-owned tracks and
+  thumbs (section 13.1). It hides the native scrollbars. The thumb can be
+  dragged, and a press on the track scrolls by one page. The track has the
+  role `scrollbar` and the name "<region> vertical scroll bar".
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
@@ -901,7 +851,8 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
 - This document (`docs/architecture.md`) is the architecture specification.
   When it is longer than 1000 lines, split it by capability. A moved section
   goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
-  is in `docs/architecture/ibkr.md`.
+  is in `docs/architecture/ibkr.md`. Section 11 is in
+  `docs/architecture/paper_trading.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
 - There is no document index and no `active` or `obsolete` status.
@@ -968,8 +919,8 @@ option and records it in this document.
   (section 12.6). The dependency list in section 6.2 has no `forward_test ->
   ibkr` edge. Either `paper_trading` exports the cancel function, or the edge
   is added. The change must update section 6.2.
-- How a forward test child passes its own `ib_async` connection to
-  `require_paper_account()` (section 12.5).
+- Decided (#74): a forward test child passes its own connection as the
+  `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `cloudflared`

@@ -7,6 +7,7 @@
 #   ATRADE_PLAYWRIGHT_PROJECTS  Space-separated Playwright projects. Default: "chromium firefox webkit msedge".
 #                               Set it to the browsers installed on this machine, for example "chromium firefox".
 #                               "none" skips the end-to-end tests.
+#   ATRADE_E2E_PORT             Port of the Playwright backend test server. Default: 4173.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
