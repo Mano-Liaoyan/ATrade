@@ -41,6 +41,185 @@
         }
       }
     },
+    "/api/paper-trading/orders": {
+      "get": {
+        "summary": "List Open Orders",
+        "operationId": "list_open_orders_api_paper_trading_orders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenOrderListResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Send Order",
+        "operationId": "send_order_api_paper_trading_orders_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualOrderResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRefusedResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/orders/{order_id}": {
+      "delete": {
+        "summary": "Cancel Order",
+        "operationId": "cancel_order_api_paper_trading_orders__order_id__delete",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Order Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderRefusedResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/manual-orders": {
+      "get": {
+        "summary": "List Manual Orders",
+        "operationId": "list_manual_orders_api_paper_trading_manual_orders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualOrderListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/market-data/instrument-search": {
       "get": {
         "summary": "Search Instruments",
@@ -514,6 +693,288 @@
         ],
         "title": "InstrumentSearchResponse"
       },
+      "ManualOrderListResponse": {
+        "properties": {
+          "manual_orders": {
+            "items": {
+              "$ref": "#/components/schemas/ManualOrderResponse"
+            },
+            "type": "array",
+            "title": "Manual Orders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "manual_orders"
+        ],
+        "title": "ManualOrderListResponse"
+      },
+      "ManualOrderResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "order_type": {
+            "type": "string",
+            "title": "Order Type"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "type": "string",
+            "title": "Time In Force"
+          },
+          "ibkr_order_id": {
+            "type": "integer",
+            "title": "Ibkr Order Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at_utc",
+          "account",
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force",
+          "ibkr_order_id"
+        ],
+        "title": "ManualOrderResponse"
+      },
+      "OpenOrderListResponse": {
+        "properties": {
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OpenOrderResponse"
+            },
+            "type": "array",
+            "title": "Orders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orders"
+        ],
+        "title": "OpenOrderListResponse"
+      },
+      "OpenOrderResponse": {
+        "properties": {
+          "order_id": {
+            "type": "integer",
+            "title": "Order Id"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "string",
+            "title": "Quantity"
+          },
+          "order_type": {
+            "type": "string",
+            "title": "Order Type"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "type": "string",
+            "title": "Time In Force"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "filled_quantity": {
+            "type": "string",
+            "title": "Filled Quantity"
+          },
+          "source": {
+            "$ref": "#/components/schemas/OrderSourceResponse"
+          },
+          "can_cancel": {
+            "type": "boolean",
+            "title": "Can Cancel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "account",
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force",
+          "status",
+          "filled_quantity",
+          "source",
+          "can_cancel"
+        ],
+        "title": "OpenOrderResponse"
+      },
+      "OrderErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "OrderErrorResponse"
+      },
+      "OrderRefusedResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "actual_accounts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actual Accounts"
+          },
+          "expected_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Account"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "actual_accounts",
+          "expected_account"
+        ],
+        "title": "OrderRefusedResponse",
+        "description": "The paper account check did not pass. ATrade did not send the order."
+      },
+      "OrderSide": {
+        "type": "string",
+        "enum": [
+          "BUY",
+          "SELL"
+        ]
+      },
+      "OrderSourceResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "by_hand",
+              "forward_test"
+            ],
+            "title": "Kind"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "forward_test_id"
+        ],
+        "title": "OrderSourceResponse"
+      },
+      "OrderType": {
+        "type": "string",
+        "enum": [
+          "MKT",
+          "LMT"
+        ]
+      },
       "SaveVersionRequest": {
         "properties": {
           "code": {
@@ -526,6 +987,69 @@
           "code"
         ],
         "title": "SaveVersionRequest"
+      },
+      "SendOrderRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Currency"
+          },
+          "side": {
+            "$ref": "#/components/schemas/OrderSide"
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity"
+          },
+          "order_type": {
+            "$ref": "#/components/schemas/OrderType"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "$ref": "#/components/schemas/TimeInForce"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force"
+        ],
+        "title": "SendOrderRequest"
       },
       "StrategyListItem": {
         "properties": {
@@ -649,6 +1173,13 @@
           "created_at_utc"
         ],
         "title": "StrategyVersionSummary"
+      },
+      "TimeInForce": {
+        "type": "string",
+        "enum": [
+          "DAY",
+          "GTC"
+        ]
       },
       "ValidationError": {
         "properties": {

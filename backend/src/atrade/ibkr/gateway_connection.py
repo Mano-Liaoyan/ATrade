@@ -8,14 +8,16 @@ import asyncio
 import logging
 from typing import Protocol
 
-from ib_async import IB, ContractDescription, RequestError
+from ib_async import IB, ContractDescription, Order, RequestError
 
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import require_usable_client_id
 from atrade.ibkr.account_data import AccountValue, PortfolioPosition, convert_account_value, convert_portfolio_item
+from atrade.ibkr.orders import OpenOrder, OrderRequest, build_contract, build_order, convert_trade
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
+OPEN_ORDERS_TIMEOUT_SECONDS = 10.0
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
 
@@ -46,7 +48,20 @@ class GatewayConnection(Protocol):
     def read_account_values(self) -> list[AccountValue]: ...
 
     def read_portfolio(self) -> list[PortfolioPosition]: ...
+
     async def search_instruments(self, query: str) -> list[Instrument]: ...
+
+    async def place_order(self, request: OrderRequest) -> int:
+        """Sends the order and returns its IBKR order ID. Raises GatewayRequestError without a connection."""
+        ...
+
+    async def read_open_orders(self) -> list[OpenOrder]:
+        """All open orders of all client IDs (reqAllOpenOrders). IBKR is the only source of order status."""
+        ...
+
+    async def cancel_order(self, order_id: int) -> None:
+        """Cancels an order that this client ID sent. Raises GatewayRequestError without a connection."""
+        ...
 
     def disconnect(self) -> None: ...
 
@@ -73,6 +88,8 @@ class IbAsyncGatewayConnection:
         self.retry_seconds = retry_seconds
         self.connection_number = 0
         self.ib = IB()
+        # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
+        self.open_orders_lock = asyncio.Lock()
 
     async def keep_connected(self) -> None:
         """Connects, and connects again after each lost connection. Runs until the caller cancels it."""
@@ -134,6 +151,31 @@ class IbAsyncGatewayConnection:
             message = "IB Gateway did not answer the instrument search in time."
             raise GatewayRequestError(message)
         return read_stock_instruments(contract_descriptions)
+
+    def require_connection(self) -> None:
+        if not self.ib.isConnected():
+            message = f"ATrade is not connected to IB Gateway at {self.host}:{self.port}."
+            raise GatewayRequestError(message)
+
+    async def place_order(self, request: OrderRequest) -> int:
+        self.require_connection()
+        trade = self.ib.placeOrder(build_contract(request.instrument), build_order(request))
+        return trade.order.orderId
+
+    async def read_open_orders(self) -> list[OpenOrder]:
+        """https://interactivebrokers.github.io/tws-api/open_orders.html"""
+        self.require_connection()
+        async with self.open_orders_lock:
+            try:
+                trades = await asyncio.wait_for(self.ib.reqAllOpenOrdersAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
+            except (ConnectionError, TimeoutError) as error:
+                message = f"IB Gateway did not return the open orders: {error}"
+                raise GatewayRequestError(message) from error
+        return [convert_trade(trade) for trade in trades if not trade.isDone()]
+
+    async def cancel_order(self, order_id: int) -> None:
+        self.require_connection()
+        self.ib.cancelOrder(Order(orderId=order_id, clientId=self.client_id))
 
     def disconnect(self) -> None:
         self.ib.disconnect()

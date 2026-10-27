@@ -16,7 +16,7 @@ import pytest
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import GatewayConnection, GatewayRequestError, IbAsyncGatewayConnection
+from atrade.ibkr import GatewayConnection, GatewayRequestError, IbAsyncGatewayConnection, OpenOrder, OrderRequest
 from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values, make_stock_position
 
 REPOSITORY_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
@@ -25,6 +25,7 @@ FAKE_ACCOUNT_ID = "DU1234567"
 CONTRACT_TEST_CLIENT_ID = 99
 CONNECT_WAIT_SECONDS = 30
 GATEWAY_PROBE_TIMEOUT_SECONDS = 3
+CONTRACT_TEST_ORDER_REF = "ATRADE-CONTRACT-TEST"
 
 
 class PaperAccountTestSettings(BaseSettings):
@@ -169,3 +170,66 @@ async def test_refuses_a_search_without_a_connection(connection_and_account: tup
 
     with pytest.raises(GatewayRequestError):
         await connection.search_instruments("AAPL")
+
+
+def make_far_limit_order(account_id: str) -> OrderRequest:
+    # A buy limit far below the market price stays open, so the test can see it and cancel it. Paper account only.
+    return OrderRequest(
+        account=account_id,
+        instrument=Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD"),
+        side="BUY",
+        quantity=1,
+        order_type="LMT",
+        limit_price=Decimal("1.00"),
+        time_in_force="DAY",
+        order_ref=CONTRACT_TEST_ORDER_REF,
+    )
+
+
+async def wait_for_open_order(connection: GatewayConnection, order_id: int, *, is_open: bool) -> list[OpenOrder]:
+    with anyio.fail_after(CONNECT_WAIT_SECONDS):
+        while True:
+            open_orders = await connection.read_open_orders()
+            matching_orders = [order for order in open_orders if order.order_id == order_id]
+            if bool(matching_orders) == is_open:
+                return matching_orders
+            await anyio.sleep(0.25)
+
+
+@pytest.mark.anyio
+async def test_sends_a_far_limit_order_sees_it_in_the_open_orders_and_cancels_it(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, account_id = connection_and_account
+    open_orders: list[OpenOrder] = []
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        # Fail closed: send nothing unless the only managed account is the expected paper account.
+        assert connection.read_managed_accounts() == [account_id]
+        assert account_id.startswith("DU")
+        order_id = await connection.place_order(make_far_limit_order(account_id))
+        open_orders = await wait_for_open_order(connection, order_id, is_open=True)
+        await connection.cancel_order(order_id)
+        await wait_for_open_order(connection, order_id, is_open=False)
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+    open_order = open_orders[0]
+    assert open_order.account == account_id
+    assert open_order.instrument.symbol == "AAPL"
+    assert open_order.side == "BUY"
+    assert open_order.quantity == 1
+    assert open_order.order_type == "LMT"
+    assert open_order.limit_price == Decimal("1.00")
+    assert open_order.time_in_force == "DAY"
+    assert open_order.order_ref == CONTRACT_TEST_ORDER_REF
+
+
+@pytest.mark.anyio
+async def test_refuses_an_order_without_a_connection(connection_and_account: tuple[GatewayConnection, str]) -> None:
+    connection, account_id = connection_and_account
+
+    with pytest.raises(GatewayRequestError):
+        await connection.place_order(make_far_limit_order(account_id))

@@ -48,10 +48,12 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
 | `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
+| `OrderRequest` | An order to send: `account`, `instrument`, `side` (`BUY`, `SELL`), `quantity` (whole number), `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`), `order_ref`. |
+| `OpenOrder` | One open order from `reqAllOpenOrders`: order ID, client ID, perm ID, account, instrument, side, quantity, order type, limit price, time in force, IBKR status, filled quantity, `order_ref`. |
 | `IbAsyncGatewayConnection` | The real connection. It uses one `ib_async.IB` object, on the event loop of the caller. |
 | `create_ibkr_router(...)` | The router of `GET /api/ibkr/gateway`. |
 
@@ -74,9 +76,23 @@ The public entry `atrade.ibkr` exports:
 - The hand-written fake `tests/fakes/ibkr.py` (`FakeGatewayConnection`) has
   the same functions. Its data stays in memory. Tests set
   `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
-  `account_values`, `portfolio`, `instruments`, and `search_error_message`
-  directly. Each change of `connected` from false to true gives a new
+  `account_values`, `portfolio`, `instruments`, `search_error_message`,
+  `open_orders`, and `order_error_message` directly. Its orders get the
+  client ID `1` and order IDs from 1001. `make_forward_test_order(...)` makes
+  an open order of another client ID with a forward test `orderRef`. Each change of `connected` from false to true gives a new
   connection number.
+- `place_order(request)` sends a stock order to `SMART` routing with the
+  primary exchange of the instrument, and returns the IBKR order ID. It does
+  not check the account. The caller (`paper_trading`) runs the paper account
+  check first.
+- `read_open_orders()` calls `reqAllOpenOrders` and returns the orders that
+  are not done, from all client IDs. A lock allows only one request at a
+  time, because ib_async keeps one result per request type. The timeout is
+  10 seconds.
+- `cancel_order(order_id)` cancels an order of this client ID. IBKR lets a
+  client cancel only its own orders.
+- The 3 order functions raise `GatewayRequestError` when the connection is
+  not there.
 - `search_instruments(query)` is the instrument search of
   [`docs/architecture/market_data.md`](market_data.md) section 8.2.
 
@@ -107,7 +123,11 @@ make sure that the `ib-gateway` service runs and is logged in.
 
 - `backend/tests/ibkr/test_gateway_connection_contract.py` runs the same
   assertions against the fake and against the real paper account. It covers
-  the connection, `managedAccounts`, and the instrument search.
+  the connection, `managedAccounts`, the instrument search, and orders: it
+  sends a buy limit order for 1 AAPL at 1.00 USD (far from the market
+  price), sees it in `read_open_orders()`, and cancels it. Before the order,
+  the test asserts that the only managed account is the expected `DU`
+  account.
 - The real case has the mark `ibkr_paper`. The default pytest options
   (`-m "not ibkr_paper"`) leave it out, so CI runs only the fake. Run it by
   hand with `uv run pytest -m ibkr_paper` in `backend/`.

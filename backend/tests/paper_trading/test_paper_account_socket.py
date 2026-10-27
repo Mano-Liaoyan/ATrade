@@ -20,7 +20,12 @@ from httpx_ws.transport import ASGIWebSocketTransport
 from atrade.app import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values, make_stock_position
+from tests.fakes.ibkr import (
+    FakeGatewayConnection,
+    make_balance_values,
+    make_forward_test_order,
+    make_stock_position,
+)
 
 ACCOUNT_ID = "DU1234567"
 FIXED_NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
@@ -229,3 +234,43 @@ async def test_shows_no_balance_when_the_gateway_is_not_connected(frontend_build
     assert account["check"]["status"] == "disconnected"
     assert account["balance"] is None
     assert account["positions"] == []
+
+
+async def receive_orders(socket: AsyncWebSocketSession) -> list[JsonObject]:
+    with anyio.fail_after(MESSAGE_WAIT_SECONDS):
+        while True:
+            message: JsonObject = json.loads(await socket.receive_text())
+            if message["type"] == "orders":
+                return message["orders"]
+
+
+@pytest.mark.anyio
+async def test_pushes_the_open_orders_and_each_change(frontend_build_dir: Path) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    forward_test_order = make_forward_test_order(ACCOUNT_ID, forward_test_id=42, order_id=7, client_id=10)
+
+    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+        first = await receive_orders(socket)
+        gateway_connection.open_orders = [forward_test_order]
+        after_new_order = await receive_orders(socket)
+        gateway_connection.open_orders = []
+        after_fill = await receive_orders(socket)
+
+    assert first == []
+    assert [order["order_id"] for order in after_new_order] == [7]
+    assert after_new_order[0]["source"] == {"kind": "forward_test", "forward_test_id": 42}
+    assert after_new_order[0]["status"] == "Submitted"
+    assert after_fill == []
+
+
+@pytest.mark.anyio
+async def test_pushes_no_orders_when_the_check_did_not_pass(frontend_build_dir: Path) -> None:
+    gateway_connection = make_connected_gateway(["DU7654321"])
+    gateway_connection.open_orders = [
+        make_forward_test_order("DU7654321", forward_test_id=42, order_id=7, client_id=10)
+    ]
+
+    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+        orders = await receive_orders(socket)
+
+    assert orders == []
