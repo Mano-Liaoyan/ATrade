@@ -7,6 +7,7 @@ import '@ibm/plex-sans/css/ibm-plex-sans-default.min.css';
 import '@ibm/plex-mono/css/ibm-plex-mono-default.min.css';
 import './carbon.scss';
 
+export { default as Tabs, type TabItem } from './Tabs.svelte';
 export { default as Tag, type TagKind } from './Tag.svelte';
 export { default as Tooltip, type TooltipAlignment } from './Tooltip.svelte';
 export { default as TooltipProvider } from './TooltipProvider.svelte';

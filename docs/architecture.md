@@ -387,13 +387,25 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   delay from 1 to 10 seconds between attempts. A background tab can delay
   the timers, so when the page becomes visible (`visibilitychange`), it
   connects again at once if the last message is 25 seconds old or more, or
-  if it waits for a reconnection.
+  if it waits for a reconnection. After stop, a message of the closing
+  socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - A chart draws on a canvas and reads the color tokens only when it draws.
   `foundation/color_scheme` has `watchColorScheme(onChange)`. Each chart
   applies the new colors to the chart and its series after a change of
   `prefers-color-scheme`, without a page reload and without a new chart.
+- The bar chart reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
+  borders), `--cds-support-success` (up bars), and `--cds-support-error`
+  (down bars).
+- The instrument page (`/instruments/<exchange>/<symbol>`) shows the bar
+  periods as Carbon tabs (`Tabs` of `foundation/carbon`, on Bits UI Tabs).
+  The arrow keys, Home, and End select a bar period at once. The page
+  address keeps the bar period, and the tab keeps the focus. The tab panel
+  has the bar count, the live bar, and the chart. The bars and the live bar
+  of the page belong to one chart request, so the chart gets no data of the
+  previous bar period after a change.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
