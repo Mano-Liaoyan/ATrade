@@ -36,13 +36,24 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
   await expect(dialog).toContainText('DU1234567');
   await dialog.getByRole('button', { name: 'Send paper order' }).click();
   await expect(dialog).toBeHidden();
+  const sentNotification = page.getByRole('status').filter({ hasText: /Order \d+ sent/ });
+  await expect(sentNotification).toBeVisible();
+  await sentNotification.getByRole('button', { name: 'Close notification' }).click();
+  await expect(sentNotification).toHaveCount(0);
 
   const orders = page.getByRole('region', { name: 'Open orders' });
   const orderRow = orders.getByRole('row', { name: new RegExp(symbol) });
   await orderRow.scrollIntoViewIfNeeded();
   await expect(orderRow).toContainText('by hand');
   await expect(orderRow).toContainText('Submitted');
-  await orderRow.getByRole('button', { name: /Cancel order/ }).click();
+  // The row actions are in an overflow menu that the keyboard opens and uses.
+  await orderRow.getByRole('button', { name: /^Actions for order \d+$/ }).focus();
+  await page.keyboard.press('Enter');
+  const cancelItem = page.getByRole('menuitem', { name: 'Cancel order' });
+  await expect(cancelItem).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: /Cancel request sent for order \d+/ })).toBeVisible();
   await expect(orderRow).toHaveCount(0);
 });
 
@@ -59,12 +70,36 @@ test('sends no order when the user goes back from the confirmation', async ({ pa
   await expect(page.getByRole('region', { name: 'Open orders' }).getByRole('row', { name: new RegExp(symbol) })).toHaveCount(0);
 });
 
-test('shows forward test orders without a cancel button', async ({ page }) => {
+test('disables the cancel item of a forward test order and says why', async ({ page }) => {
   await page.goto('/');
   const orderRow = page.getByRole('region', { name: 'Open orders' }).getByRole('row', { name: /FTO01/ });
-
   await expect(orderRow).toContainText('forward test 42');
-  await expect(orderRow.getByRole('button')).toHaveCount(0);
+
+  await orderRow.getByRole('button', { name: /^Actions for order \d+$/ }).focus();
+  await page.keyboard.press('Enter');
+  const cancelItem = page.getByRole('menuitem', { name: 'Stop forward test 42 to cancel' });
+  await expect(cancelItem).toBeVisible();
+  await expect(cancelItem).toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(orderRow).toBeAttached();
+});
+
+test('the overflow menu of the last open order is not clipped by the scroll region', async ({ page }) => {
+  await page.goto('/');
+  const orders = page.getByRole('region', { name: 'Open orders' });
+  const lastRow = orders.getByRole('row').last();
+  await orders.scrollIntoViewIfNeeded();
+  await page.getByRole('scrollbar', { name: 'Open orders scroll bar' }).focus();
+  await page.keyboard.press('End');
+  await expect(lastRow).toBeInViewport();
+
+  await lastRow.getByRole('button', { name: /^Actions for order \d+$/ }).click();
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  // The menu content is under <body>, outside the scroll region, so the region cannot clip it.
+  await expect(orders.getByRole('menu')).toHaveCount(0);
+  await expect(menu.getByRole('menuitem')).toBeInViewport({ ratio: 1 });
 });
 
 test('order list has a visible scroll track and its last row can be scrolled into view', async ({ page }) => {

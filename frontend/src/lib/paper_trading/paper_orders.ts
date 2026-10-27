@@ -95,6 +95,22 @@ export function describeOrderSource(source: OrderSource): string {
   return 'by hand';
 }
 
+export interface CancelAction {
+  label: string;
+  disabled: boolean;
+}
+
+/** The cancel item of the row menu. A disabled item says why ATrade cannot cancel the order. */
+export function describeCancelAction(order: Pick<OpenOrder, 'can_cancel' | 'source'>): CancelAction {
+  if (order.can_cancel) {
+    return { label: 'Cancel order', disabled: false };
+  }
+  if (order.source.kind === 'forward_test') {
+    return { label: `Stop forward test ${String(order.source.forward_test_id)} to cancel`, disabled: true };
+  }
+  return { label: 'Cancel order: sent by another IBKR client', disabled: true };
+}
+
 export function readOpenOrdersMessage(message: unknown): OpenOrder[] | null {
   return readSocketMessage<OpenOrdersMessage>(message, ['orders'])?.orders ?? null;
 }

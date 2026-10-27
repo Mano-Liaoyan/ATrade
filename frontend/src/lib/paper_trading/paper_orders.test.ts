@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
   cancelPaperOrder,
+  describeCancelAction,
   describeOrderSource,
   describeOrderForConfirmation,
   readFilledManualOrders,
@@ -99,6 +100,29 @@ describe('describeOrderSource', () => {
   it('names orders by hand and forward test orders', () => {
     expect(describeOrderSource({ kind: 'by_hand', forward_test_id: null })).toBe('by hand');
     expect(describeOrderSource({ kind: 'forward_test', forward_test_id: 42 })).toBe('forward test 42');
+  });
+});
+
+describe('describeCancelAction', () => {
+  it('enables the cancel action of an order by hand that ATrade can cancel', () => {
+    expect(describeCancelAction({ can_cancel: true, source: { kind: 'by_hand', forward_test_id: null } })).toEqual({
+      label: 'Cancel order',
+      disabled: false,
+    });
+  });
+
+  it('disables the cancel action of a forward test order and says how to cancel it', () => {
+    expect(describeCancelAction({ can_cancel: false, source: { kind: 'forward_test', forward_test_id: 42 } })).toEqual({
+      label: 'Stop forward test 42 to cancel',
+      disabled: true,
+    });
+  });
+
+  it('disables the cancel action of an order that another IBKR client sent', () => {
+    expect(describeCancelAction({ can_cancel: false, source: { kind: 'by_hand', forward_test_id: null } })).toEqual({
+      label: 'Cancel order: sent by another IBKR client',
+      disabled: true,
+    });
   });
 });
 

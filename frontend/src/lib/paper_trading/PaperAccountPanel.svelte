@@ -1,6 +1,7 @@
 <!-- Account panel: the paper account check, the balance, the positions, the order form, and the open orders,
      updated live from /ws/paper-trading. -->
 <script lang="ts">
+  import { DataTable, type TableColumn } from '#lib/foundation/carbon';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
@@ -15,6 +16,17 @@
   import OpenOrderList from './OpenOrderList.svelte';
   import { readFilledManualOrders, readOpenOrdersMessage, type ManualOrder, type OpenOrder } from './paper_orders';
   import PaperOrderTicket from './PaperOrderTicket.svelte';
+
+  const POSITION_COLUMNS: TableColumn[] = [
+    { header: 'Symbol' },
+    { header: 'Exchange' },
+    { header: 'Currency' },
+    { header: 'Quantity', align: 'right' },
+    { header: 'Average cost', align: 'right' },
+    { header: 'Market price', align: 'right' },
+    { header: 'Market value', align: 'right' },
+    { header: 'Unrealized P&L', align: 'right' },
+  ];
 
   let account = $state<PaperAccountMessage | null>(null);
   let isSocketConnected = $state(false);
@@ -105,35 +117,24 @@
       {#if account.positions.length === 0}
         <p>No positions.</p>
       {:else}
+        {@const positions = account.positions}
         <ScrollRegion label="Positions" maxHeight="18rem">
-          <table class="positions">
-            <thead>
-              <tr>
-                <th scope="col">Symbol</th>
-                <th scope="col">Exchange</th>
-                <th scope="col">Currency</th>
-                <th scope="col">Quantity</th>
-                <th scope="col">Average cost</th>
-                <th scope="col">Market price</th>
-                <th scope="col">Market value</th>
-                <th scope="col">Unrealized P&amp;L</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each account.positions as position (`${position.symbol}-${position.exchange}-${position.security_type}`)}
+          <DataTable columns={POSITION_COLUMNS} size="sm">
+            {#snippet rows()}
+              {#each positions as position (`${position.symbol}-${position.exchange}-${position.security_type}`)}
                 <tr>
                   <th scope="row">{position.symbol}</th>
                   <td>{position.exchange}</td>
                   <td>{position.currency}</td>
-                  <td class="number">{position.quantity}</td>
-                  <td class="number">{formatAmount(position.average_cost)}</td>
-                  <td class="number">{formatAmount(position.market_price)}</td>
-                  <td class="number">{formatAmount(position.market_value)}</td>
-                  <td class="number">{formatAmount(position.unrealized_pnl)}</td>
+                  <td align="right">{position.quantity}</td>
+                  <td align="right">{formatAmount(position.average_cost)}</td>
+                  <td align="right">{formatAmount(position.market_price)}</td>
+                  <td align="right">{formatAmount(position.market_value)}</td>
+                  <td align="right">{formatAmount(position.unrealized_pnl)}</td>
                 </tr>
               {/each}
-            </tbody>
-          </table>
+            {/snippet}
+          </DataTable>
         </ScrollRegion>
       {/if}
     {/if}
@@ -236,30 +237,6 @@
   .balance dd {
     margin: 0;
     font-size: 1.25rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .positions {
-    border-collapse: collapse;
-    inline-size: 100%;
-    font-size: 0.875rem;
-  }
-
-  .positions th,
-  .positions td {
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: start;
-  }
-
-  .positions thead th {
-    position: sticky;
-    inset-block-start: 0;
-    background: var(--color-surface);
-  }
-
-  .positions .number {
-    text-align: end;
     font-variant-numeric: tabular-nums;
   }
 </style>

@@ -81,8 +81,8 @@ orders only when all 4 conditions are true:
   forward test orders.
 - The list marks the source of each order: "by hand" or "forward test 42". The
   source comes from `orderRef` (section 12.9).
-- Only orders sent by hand have a cancel button. To cancel forward test orders,
-  stop the forward test.
+- Only orders sent by hand can be cancelled in the order list. To cancel
+  forward test orders, stop the forward test.
 - An order can be cancelled (`can_cancel`) when its source is "by hand" and
   its client ID is `settings.ibkr_web_client_id`. IBKR lets a client cancel
   only its own orders. The cancel route also requires a row in the local
@@ -200,10 +200,14 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   "Back" or Escape sends nothing.
 - The open order list (`OpenOrderList.svelte`) comes from the "orders"
   message. It shows the source of each order ("by hand" or "forward test
-  42") and a cancel button only when `can_cancel` is true. It uses
+  42"). Each row has an overflow menu "Actions for order N". Its cancel item
+  is enabled only when `can_cancel` is true. A disabled item says why, for
+  example "Stop forward test 42 to cancel". It uses
   `foundation/scroll_region` with the label "Open orders".
-- An error of the order or cancel route shows in the panel as an alert, with
-  the actual and the expected account for a `403`.
+- The result of the order and cancel routes shows in the panel as an inline
+  notification that the user can close: "Order N sent", "Cancel request sent
+  for order N", or an error (an alert) with the actual and the expected
+  account for a `403`.
 
 ## 11.8 Order routes
 

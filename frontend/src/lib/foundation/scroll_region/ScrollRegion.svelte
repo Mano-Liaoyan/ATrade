@@ -136,6 +136,7 @@
 </div>
 
 <style>
+  /* Carbon tokens only. The sizes are Carbon spacing: 0.25rem is $spacing-02 and 0.5rem is $spacing-03. */
   .scroll-region {
     display: flex;
     gap: 0.25rem;
@@ -156,24 +157,26 @@
   .scroll-track {
     position: relative;
     flex: none;
-    width: 0.625rem;
-    border-radius: 0.3125rem;
-    background: var(--color-scroll-track, #d0d7de80);
+    width: 0.5rem;
+    background: var(--cds-layer-accent-01);
     touch-action: none;
   }
 
   .scroll-track:focus-visible {
-    outline: 2px solid var(--color-scroll-thumb, #59636e);
+    outline: 2px solid var(--cds-focus);
     outline-offset: 1px;
   }
 
   .scroll-thumb {
     position: absolute;
     top: 0;
-    right: 1px;
-    left: 1px;
-    border-radius: 0.25rem;
-    background: var(--color-scroll-thumb, #59636e);
+    right: 0;
+    left: 0;
+    background: var(--cds-icon-secondary);
     cursor: grab;
+  }
+
+  .scroll-track:hover .scroll-thumb {
+    background: var(--cds-icon-primary);
   }
 </style>

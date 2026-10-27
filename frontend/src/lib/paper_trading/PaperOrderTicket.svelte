@@ -1,5 +1,6 @@
 <!-- Order form for paper orders by hand. A confirmation dialog with the PAPER mark comes before each order. -->
 <script lang="ts">
+  import { InlineNotification } from '#lib/foundation/carbon';
   import {
     describeOrderForConfirmation,
     readOrderForm,
@@ -26,7 +27,7 @@
     timeInForce: 'DAY',
   });
   let formMessage = $state<string | null>(null);
-  let resultMessage = $state<{ text: string; isError: boolean } | null>(null);
+  let resultMessage = $state<{ title: string; subtitle?: string; isError: boolean } | null>(null);
   let reviewedRequest = $state<SendOrderRequest | null>(null);
   let isSending = $state(false);
   let dialog: HTMLDialogElement | undefined = $state();
@@ -62,9 +63,9 @@
     isSending = false;
     closeDialog();
     if (result.kind === 'sent') {
-      resultMessage = { text: `Paper order sent. IBKR order ID ${String(result.ibkrOrderId)}.`, isError: false };
+      resultMessage = { title: `Order ${String(result.ibkrOrderId)} sent`, isError: false };
     } else {
-      resultMessage = { text: result.message, isError: true };
+      resultMessage = { title: 'Order not sent', subtitle: result.message, isError: true };
     }
   }
 </script>
@@ -120,9 +121,13 @@
   <p class="message error" role="alert">{formMessage}</p>
 {/if}
 {#if resultMessage !== null}
-  <p class="message" class:error={resultMessage.isError} role={resultMessage.isError ? 'alert' : 'status'}>
-    {resultMessage.text}
-  </p>
+  <InlineNotification
+    kind={resultMessage.isError ? 'error' : 'success'}
+    title={resultMessage.title}
+    subtitle={resultMessage.subtitle}
+    lowContrast
+    onClose={() => (resultMessage = null)}
+  />
 {/if}
 
 <dialog bind:this={dialog} aria-labelledby="confirm-order-title" oncancel={closeDialog}>

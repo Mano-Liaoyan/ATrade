@@ -312,6 +312,18 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   Carbon HTML structure and class names (`cds--*`). Carbon CSS shows a state
   with a class, for example `cds--popover--open`, not with `data-state`. The
   component changes the Bits UI state into the Carbon class.
+- `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
+  (`header`, `align: 'right'` for a number column, `isMenu` for the column
+  of row menus), `size`, and a `rows` snippet for the body rows. A number
+  cell has `align="right"` and tabular numbers.
+- `foundation/carbon` `OverflowMenu` is the Carbon overflow menu on Bits UI
+  DropdownMenu: `label` (the trigger name), `items` (`label`, `disabled`,
+  `danger`, `onSelect`), and `size`. The menu goes under `<body>`, so a
+  scroll region does not clip it.
+- `foundation/carbon` `InlineNotification` is the Carbon inline
+  notification: `kind` (`success` and `info` are a status, `error` and
+  `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
+  `onClose` (it adds the close button "Close notification").
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
   use the components of `#lib/foundation/carbon`.
@@ -380,6 +392,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   dragged, a click on the track scrolls one page, and the track takes Arrow,
   Page Up, Page Down, Home, and End keys. Use it for each region that can
   overflow (section 13.1).
+  The track and the thumb use Carbon tokens.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a

@@ -10,3 +10,6 @@ import './carbon.scss';
 export { default as Tag, type TagKind } from './Tag.svelte';
 export { default as Tooltip, type TooltipAlignment } from './Tooltip.svelte';
 export { default as TooltipProvider } from './TooltipProvider.svelte';
+export { default as DataTable, type TableColumn } from './DataTable.svelte';
+export { default as OverflowMenu, type OverflowMenuItem } from './OverflowMenu.svelte';
+export { default as InlineNotification, type NotificationKind } from './InlineNotification.svelte';
