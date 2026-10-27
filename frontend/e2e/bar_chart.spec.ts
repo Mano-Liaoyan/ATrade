@@ -100,3 +100,25 @@ test('the chart takes the new color scheme without a page reload', async ({ page
 
   await expect.poll(() => readChartBackground(chart)).toBe('rgb(38, 38, 38)');
 });
+
+test('the chart takes the theme of the theme button without a new chart', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
+  const chart = page.getByRole('img', { name: 'Bar chart of 700 / SEHK / HKD, 1-HOUR bars' });
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('2160 bars');
+  await expect.poll(() => readChartBackground(chart)).toBe('rgb(255, 255, 255)');
+  // A mark on each canvas of the chart. A new chart has new canvases without the mark.
+  await chart.evaluate((element) => {
+    for (const canvas of element.querySelectorAll('canvas')) {
+      canvas.dataset.firstChart = 'true';
+    }
+  });
+  const header = page.getByRole('banner');
+
+  await header.getByRole('button', { name: 'Theme: System' }).click();
+  await header.getByRole('button', { name: 'Theme: Light' }).click();
+
+  await expect(header.getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
+  await expect.poll(() => readChartBackground(chart)).toBe('rgb(38, 38, 38)');
+  await expect(chart.locator('canvas:not([data-first-chart])')).toHaveCount(0);
+});

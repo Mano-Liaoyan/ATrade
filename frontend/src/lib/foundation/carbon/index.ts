@@ -11,3 +11,5 @@ export { default as Tabs, type TabItem } from './Tabs.svelte';
 export { default as Tag, type TagKind } from './Tag.svelte';
 export { default as Tooltip, type TooltipAlignment } from './Tooltip.svelte';
 export { default as TooltipProvider } from './TooltipProvider.svelte';
+export { default as Icon } from './Icon.svelte';
+export type { CarbonIcon, CarbonIconNode } from './carbon_icon';
