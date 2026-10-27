@@ -5,6 +5,8 @@ import {
   describeCancelAction,
   describeOrderSource,
   describeOrderForConfirmation,
+  describeOrderTitle,
+  findOrderBlock,
   readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
@@ -66,19 +68,16 @@ describe('readOrderForm', () => {
 });
 
 describe('describeOrderForConfirmation', () => {
-  it('lists the instrument, side, quantity, order type, price, and account', () => {
+  it('lists the instrument, the order type, and the price', () => {
     const result = readOrderForm(limitForm);
     if (result.kind !== 'valid') {
       throw new Error('The form must be valid.');
     }
 
-    expect(describeOrderForConfirmation(result.request, 'DU1234567')).toEqual([
+    expect(describeOrderForConfirmation(result.request)).toEqual([
       { label: 'Instrument', value: 'AAPL / NASDAQ / USD' },
-      { label: 'Side', value: 'Buy' },
-      { label: 'Quantity', value: '3' },
       { label: 'Order type', value: 'Limit, GTC' },
       { label: 'Price', value: '1.25' },
-      { label: 'Account', value: 'DU1234567' },
     ]);
   });
 
@@ -88,11 +87,37 @@ describe('describeOrderForConfirmation', () => {
       throw new Error('The form must be valid.');
     }
 
-    const lines = describeOrderForConfirmation(result.request, 'DU1234567');
+    const lines = describeOrderForConfirmation(result.request);
 
-    expect(lines).toContainEqual({ label: 'Side', value: 'Sell' });
     expect(lines).toContainEqual({ label: 'Order type', value: 'Market, DAY' });
     expect(lines).toContainEqual({ label: 'Price', value: 'Market price' });
+  });
+});
+
+describe('describeOrderTitle', () => {
+  it('names the side, the quantity, and the symbol', () => {
+    const result = readOrderForm({ ...limitForm, quantity: '50' });
+    if (result.kind !== 'valid') {
+      throw new Error('The form must be valid.');
+    }
+
+    expect(describeOrderTitle(result.request)).toBe('Buy 50 AAPL');
+    expect(describeOrderTitle({ ...result.request, side: 'SELL' })).toBe('Sell 50 AAPL');
+  });
+});
+
+describe('findOrderBlock', () => {
+  const runningForwardTest = { label: 'Forward test 7 (Bar count v1)', symbol: 'SPY', exchange: 'ARCA' };
+
+  it('names the forward test that trades the instrument of the form', () => {
+    expect(findOrderBlock({ ...limitForm, symbol: ' spy ', exchange: 'arca' }, [runningForwardTest])).toBe(
+      'Forward test 7 (Bar count v1) trades SPY / ARCA. Stop the forward test to send an order by hand.',
+    );
+  });
+
+  it('blocks no order on another instrument', () => {
+    expect(findOrderBlock({ ...limitForm, symbol: 'SPY', exchange: 'NASDAQ' }, [runningForwardTest])).toBeNull();
+    expect(findOrderBlock(limitForm, [])).toBeNull();
   });
 });
 

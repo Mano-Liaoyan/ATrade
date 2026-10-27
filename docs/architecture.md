@@ -312,6 +312,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   Carbon HTML structure and class names (`cds--*`). Carbon CSS shows a state
   with a class, for example `cds--popover--open`, not with `data-state`. The
   component changes the Bits UI state into the Carbon class.
+  `foundation/carbon/carbon_state.ts` has these changes as functions with unit
+  tests, for example `dropdownClasses({ open, disabled })`.
+- Form components of `foundation/carbon`: `Button` (`kind`, `size`, bindable
+  `ref`), `TextInput` (`label`, bindable `value`, `invalidText`), `Select`
+  (Carbon dropdown on Bits UI Select: `label`, `items`, `value`,
+  `onValueChange`), `ContentSwitcher` (on Bits UI Tabs without panels:
+  `label`, `items`, `value`, `onValueChange`), and `Dialog` (Carbon modal on
+  Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
+  `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
+  the accessible name of the dialog.
 - `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
   (`header`, `align: 'right'` for a number column, `isMenu` for the column
   of row menus), `size`, and a `rows` snippet for the body rows. A number

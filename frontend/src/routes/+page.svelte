@@ -1,9 +1,12 @@
 <!-- Home page: the instrument search adds to the watchlist, a watchlist instrument opens its instrument page, and the
-     paper account panel shows the paper account. -->
+     paper account panel shows the paper account. The running forward tests from /ws/forward-tests block paper orders
+     by hand on their instruments. -->
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { FORWARD_TESTS_SOCKET_PATH, listForwardTestsOnInstruments, readForwardTestsMessage } from '#lib/forward_test';
   import { InstrumentSearch, type Instrument } from '#lib/market_data';
-  import { PaperAccountPanel } from '#lib/paper_trading';
+  import { PaperAccountPanel, type BlockingForwardTest } from '#lib/paper_trading';
   import {
     addToWatchlist,
     deleteFromWatchlist,
@@ -15,6 +18,20 @@
   let watchlistInstruments: WatchlistInstrument[] = $state([]);
   let isWatchlistLoading = $state(true);
   let watchlistMessage: string | undefined = $state();
+  let blockingForwardTests: BlockingForwardTest[] = $state([]);
+
+  $effect(() => {
+    return openLiveSocket({
+      url: buildSocketUrl(FORWARD_TESTS_SOCKET_PATH, window.location),
+      onMessage: (message) => {
+        const forwardTests = readForwardTestsMessage(message);
+        if (forwardTests !== null) {
+          blockingForwardTests = listForwardTestsOnInstruments(forwardTests);
+        }
+      },
+      onConnectionChange: () => undefined,
+    });
+  });
 
   $effect(() => {
     void listWatchlist(fetch).then((listResult) => {
@@ -87,7 +104,7 @@
     }}
   />
 </div>
-<PaperAccountPanel />
+<PaperAccountPanel {blockingForwardTests} />
 
 <style>
   .home-panels {
