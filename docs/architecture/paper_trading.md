@@ -192,12 +192,24 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   `foundation/scroll_region` for the position table (section 13). The table
   text wraps, so the table does not overflow to the side.
 - After a passed check, the panel shows the paper order form
-  (`PaperOrderTicket.svelte`): symbol, exchange, currency, side, quantity,
-  order type, limit price (limit orders only), and time in force. "Review
-  order" checks the form and opens a modal `<dialog>` "Confirm paper order"
-  with the `PAPER` mark, the instrument, side, quantity, order type, price,
-  and account number. Only "Send paper order" in the dialog sends the order.
-  "Back" or Escape sends nothing.
+  (`PaperOrderTicket.svelte`, Carbon components of `foundation/carbon`): side
+  (content switcher Buy / Sell), symbol, exchange, currency, quantity, order
+  type (select Limit / Market), limit price (limit orders only), and time in
+  force (select DAY / GTC). "Review order" checks the form and opens the
+  Carbon modal. The modal label is the paper account number, and the modal
+  title is the full order, for example "Buy 50 AAPL". The body has the
+  `PAPER` mark, the instrument, the order type, and the price. Only "Send
+  paper order" in the modal sends the order. "Cancel", the close button, a
+  click outside, and Escape send nothing. Focus stays in the modal while it is
+  open, and goes back to "Review order" when it closes.
+- The home page (`src/routes/+page.svelte`) reads `/ws/forward-tests` and
+  gives the panel the forward tests that hold a client ID
+  (`listForwardTestsOnInstruments` of `forward_test`, type
+  `BlockingForwardTest` of `paper_trading`). When the symbol and exchange of
+  the form match one of them, "Review order" is disabled and the form says
+  why, for example "Forward test 3 (Trend v2) trades AAPL / NASDAQ. Stop the
+  forward test to send an order by hand." (`findOrderBlock`). The backend
+  still refuses the order with `409` (section 11.3).
 - The open order list (`OpenOrderList.svelte`) comes from the "orders"
   message. It shows the source of each order ("by hand" or "forward test
   42") and a cancel button only when `can_cancel` is true. It uses
@@ -217,8 +229,9 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 - The backend tests (`backend/tests/paper_trading/test_paper_orders.py`) go
   through these routes with the IBKR fake and real PostgreSQL.
 - The Playwright test `frontend/e2e/paper_orders.spec.ts` sends an order
-  through the dialog, cancels it, and checks the scroll track of the order
-  list. The e2e server has 30 open orders of forward test 42.
+  through the modal, cancels it, checks the focus trap, Escape, and the focus
+  return of the modal, checks the keyboard control of the side, order type,
+  and time in force, and checks the scroll track of the order list. The e2e server has 30 open orders of forward test 42.
 
 ## 11.9 Balance in USD for any base currency
 

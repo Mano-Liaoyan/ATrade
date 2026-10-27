@@ -13,8 +13,21 @@
   } from './paper_account';
   import FilledManualOrderList from './FilledManualOrderList.svelte';
   import OpenOrderList from './OpenOrderList.svelte';
-  import { readFilledManualOrders, readOpenOrdersMessage, type ManualOrder, type OpenOrder } from './paper_orders';
+  import {
+    readFilledManualOrders,
+    readOpenOrdersMessage,
+    type BlockingForwardTest,
+    type ManualOrder,
+    type OpenOrder,
+  } from './paper_orders';
   import PaperOrderTicket from './PaperOrderTicket.svelte';
+
+  interface Props {
+    // The forward tests that block orders by hand on their instruments.
+    blockingForwardTests?: readonly BlockingForwardTest[];
+  }
+
+  const { blockingForwardTests = [] }: Props = $props();
 
   let account = $state<PaperAccountMessage | null>(null);
   let isSocketConnected = $state(false);
@@ -140,7 +153,7 @@
 
     {#if account.check.status === 'passed' && account.check.actual_accounts[0] !== undefined}
       <h3>New paper order</h3>
-      <PaperOrderTicket accountId={account.check.actual_accounts[0]} />
+      <PaperOrderTicket accountId={account.check.actual_accounts[0]} {blockingForwardTests} />
     {/if}
 
     <h3>Open orders</h3>

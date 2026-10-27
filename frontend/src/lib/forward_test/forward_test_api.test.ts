@@ -6,6 +6,7 @@ import {
   describeForwardTestStatus,
   formatLocalTime,
   isLiveBarPeriod,
+  listForwardTestsOnInstruments,
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestsMessage,
@@ -197,5 +198,15 @@ describe('the end time', () => {
   it('shows a UTC time in the local time zone', () => {
     expect(formatLocalTime(new Date(2026, 0, 3, 9, 30).toISOString())).toBe('2026-01-03 09:30');
     expect(formatLocalTime(null)).toBe('');
+  });
+});
+
+describe('listForwardTestsOnInstruments', () => {
+  it('names each forward test that holds a client ID, with its instrument', () => {
+    const stoppedForwardTest: ForwardTest = { ...runningForwardTest, id: 4, symbol: 'SPY', client_id: null, status: 'stopped' };
+
+    expect(listForwardTestsOnInstruments([runningForwardTest, stoppedForwardTest])).toEqual([
+      { label: 'Forward test 3 (Trend v2)', symbol: 'AAPL', exchange: 'NASDAQ' },
+    ]);
   });
 });

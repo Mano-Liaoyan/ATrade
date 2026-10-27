@@ -44,17 +44,15 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   await expect(row).toContainText('Running');
   const forwardTestNumber = (await row.getByRole('rowheader').textContent())?.trim() ?? '';
 
-  // A paper order by hand on the instrument of the running forward test is refused, with the forward test named.
+  // The order form does not send a paper order by hand on the instrument of the running forward test, and says why.
   await page.getByRole('link', { name: 'Home' }).click();
   const ticket = page.getByRole('form', { name: 'Paper order' });
   await ticket.getByLabel('Order symbol').fill(symbol);
   await ticket.getByLabel('Exchange').fill('ARCA');
-  await ticket.getByLabel('Quantity').fill('1');
-  await ticket.getByLabel('Order type').selectOption('MKT');
-  await ticket.getByRole('button', { name: 'Review order' }).click();
-  await page.getByRole('dialog', { name: 'Confirm paper order' }).getByRole('button', { name: 'Send paper order' }).click();
-  await expect(page.getByRole('alert')).toContainText(
-    `Forward test ${forwardTestNumber.replace('#', '')} (${strategyName} v1) trades ${symbol} / ARCA.`,
+  const reviewButton = ticket.getByRole('button', { name: 'Review order' });
+  await expect(reviewButton).toBeDisabled();
+  await expect(reviewButton).toHaveAccessibleDescription(
+    `Forward test ${forwardTestNumber.replace('#', '')} (${strategyName} v1) trades ${symbol} / ARCA. Stop the forward test to send an order by hand.`,
   );
 
   await page.getByRole('link', { name: 'Forward tests' }).click();
