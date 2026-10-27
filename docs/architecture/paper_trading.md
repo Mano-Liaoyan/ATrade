@@ -7,7 +7,8 @@ the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 
 Sources: [Order module design](https://github.com/Mano-Liaoyan/ATrade/issues/40),
 [Paper account check and account panel](https://github.com/Mano-Liaoyan/ATrade/issues/74),
-[Paper orders sent by hand](https://github.com/Mano-Liaoyan/ATrade/issues/75).
+[Paper orders sent by hand](https://github.com/Mano-Liaoyan/ATrade/issues/75),
+[Start and stop forward tests](https://github.com/Mano-Liaoyan/ATrade/issues/76).
 
 ## 11.1 Live order switch
 
@@ -50,9 +51,14 @@ orders only when all 4 conditions are true:
 - Before sending, a confirmation dialog shows the instrument, side, quantity,
   order type, price, account number, and a clear `PAPER` mark.
 - When a forward test runs on an instrument, the Web process refuses paper
-  orders by hand for that instrument. It shows which forward test blocks it.
-  Not implemented yet: forward tests do not exist yet (#75). The forward test
-  ticket adds this rule.
+  orders by hand for that instrument. It shows which forward test blocks it
+  (#76). "Runs" means that the forward test holds a client ID
+  ([`forward_test.md`](forward_test.md) section 12.2). The refusal is `409`
+  with `OrderBlockedResponse` (`detail`, `forward_test_id`), for example
+  "Forward test 3 (Trend v2) trades AAPL / NASDAQ. ATrade refuses orders by
+  hand for this instrument until the forward test stops." It comes after the
+  paper account check. ATrade sends nothing and stores nothing. Cancels of
+  orders by hand are not blocked.
 - Positions, balance, and order status go to the browser on
   `/ws/paper-trading`.
 - Each order and each cancel calls `require_checked_paper_account()` first
@@ -81,9 +87,18 @@ orders only when all 4 conditions are true:
   its client ID is `settings.ibkr_web_client_id`. IBKR lets a client cancel
   only its own orders. The cancel route also requires a row in the local
   table.
-- Filled orders sent by hand show data from the local table and from IBKR.
-  Not implemented yet (#75): the list shows open orders only.
-  `GET /api/paper-trading/manual-orders` returns the local rows.
+- Filled orders sent by hand show data from the local table and from IBKR
+  (#76). `GET /api/paper-trading/manual-orders` returns the local rows with
+  `filled_quantity` and `average_fill_price` from `reqExecutions`
+  (`GatewayConnection.read_executions()`): the executions with the IBKR order
+  ID of the row, the Web client ID, and the account of the row. Both values
+  are `null` when the check did not pass or IB Gateway does not answer.
+  `reqExecutions` returns only the executions of the current day (section
+  21), so an older fill shows `filled_quantity` `"0"`.
+- The account panel shows the list "Filled orders by hand"
+  (`FilledManualOrderList.svelte`, `ScrollRegion` with the same label): the
+  rows with `filled_quantity` larger than 0, newest first. It reads the route
+  again after each "orders" message, because a fill changes the open orders.
 - The local table is `manual_order`: `created_at_utc`, `account`, `symbol`,
   `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`,
   `time_in_force`, `ibkr_order_id`. It has no status column. ATrade writes
@@ -102,7 +117,7 @@ The public entry `atrade.paper_trading` exports:
 | `PaperAccountCheck` | The result: `status` (`disconnected`, `passed`, `failed`), `message` (the reason of the failure), `actual_accounts`, `expected_account`. |
 | `PaperAccountMonitor` | The check result of the Web process in memory, the balance, and the positions. |
 | `fetch_paper_capital_usd(paper_account_monitor)` | The `NetLiquidation` value in USD of the paper account after a passed check. Otherwise `settings.local_paper_capital_usd`. |
-| `create_paper_trading_router(*, paper_account_monitor, database_url, clock)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. |
+| `create_paper_trading_router(*, paper_account_monitor, database_url, clock, find_blocking_forward_test)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. `find_blocking_forward_test(instrument)` returns a `BlockingForwardTest` (`forward_test_id`, `label`) or `None`. `app/web.py` makes it from `forward_test.find_forward_test_on_instrument()`, because `paper_trading` does not import `forward_test`. |
 
 `GET /api/paper-trading/paper-capital` returns `200` with
 `{"paper_capital_usd": "<amount>"}`, the value of
@@ -179,10 +194,10 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 
 | Route | Behavior |
 |---|---|
-| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
+| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `409` (`OrderBlockedResponse`: `detail`, `forward_test_id`) when a forward test runs on the instrument (section 11.3). `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
 | `GET /api/paper-trading/orders` | `200` with `{"orders": [OpenOrderResponse]}`: the open orders of the checked account. Each order has `order_id`, `account`, `symbol`, `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`, `time_in_force`, `status` (IBKR text), `filled_quantity`, `source` (`kind`: `by_hand` or `forward_test`, `forward_test_id`), `can_cancel`. `502` when IB Gateway does not answer. |
 | `DELETE /api/paper-trading/orders/{order_id}` | `202` after ATrade sends the cancel request. IBKR confirms it later in the order list. `403` as for `POST`. `404` when no open order of the account has this ID, or when ATrade did not send it by hand. `409` for an order of a forward test or of another client. `502` when IB Gateway does not answer. |
-| `GET /api/paper-trading/manual-orders` | `200` with `{"manual_orders": [...]}`: the rows of `manual_order`, oldest first. |
+| `GET /api/paper-trading/manual-orders` | `200` with `{"manual_orders": [ManualOrderWithFillsResponse]}`: the rows of `manual_order`, oldest first, each with `filled_quantity` and `average_fill_price` (section 11.4). |
 
 - The backend tests (`backend/tests/paper_trading/test_paper_orders.py`) go
   through these routes with the IBKR fake and real PostgreSQL.

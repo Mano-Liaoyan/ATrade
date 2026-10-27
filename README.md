@@ -13,15 +13,16 @@ is in GitHub Issues.
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
 (issue #68), code completion (issue #69), the paper account check with the
-account panel (issue #74), paper orders sent by hand (issue #75), and backtests
-(issue #70):
+account panel (issue #74), paper orders sent by hand (issue #75), backtests
+(issue #70), and the start and stop of forward tests (issue #76):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
   language server WebSocket `/ws/strategy-language-server`, the paper order
   routes under `/api/paper-trading`, the backtest routes under
-  `/api/backtests`, and `/ws/paper-trading`.
+  `/api/backtests`, the forward test routes under `/api/forward-tests`,
+  `/ws/paper-trading`, and `/ws/forward-tests`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
@@ -33,7 +34,10 @@ account panel (issue #74), paper orders sent by hand (issue #75), and backtests
   and limit orders (DAY or GTC) to the IBKR paper account, after a
   confirmation dialog with a `PAPER` mark. The open order list shows all open
   orders of the account with their source ("by hand" or "forward test N").
-  Only orders by hand can be cancelled. ATrade never sends live orders. See
+  Only orders by hand can be cancelled. ATrade never sends live orders. An
+  order by hand on the instrument of a running forward test is refused, with
+  the forward test named. The panel also lists the filled orders by hand of
+  the current day, with the fills from IBKR. See
   [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md).
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
@@ -74,8 +78,19 @@ account panel (issue #74), paper orders sent by hand (issue #75), and backtests
   bar chart of the instrument first: backtests read only bars that are in
   PostgreSQL. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
-- Forward tests, the backtest limits UI, and the backtest comparison are not
-  available yet.
+- Forward tests: the page `/forward-tests` starts a forward test of a
+  strategy version on one instrument and one IB live bar period, and shows
+  the metrics of the latest backtest of that version. The `forward-test`
+  service runs each forward test in its own child process with a
+  NautilusTrader LiveNode and the client ID 10 to 13. The child checks the
+  paper account first. Orders go only to the IBKR paper account. A stop
+  cancels the open orders of the forward test. Positions stay open. One
+  forward test per instrument, 4 at the same time. A restart of `web` does
+  not stop forward tests. See
+  [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
+- The automatic recovery of forward tests, the forward test end time, the
+  forward test records and comparison, the backtest limits UI, and the
+  backtest comparison are not available yet.
 
 ## Requirements
 
@@ -135,7 +150,8 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 |---|---|
 | `postgres` | PostgreSQL 18. Volume `atrade-pgdata`. Not published outside the Compose network. |
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
-| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. |
+| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
+| `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
 `live`, `web` does not start and writes the reason.

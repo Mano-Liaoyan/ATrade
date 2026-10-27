@@ -14,7 +14,7 @@ import pytest
 from atrade.app import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection, make_forward_test_order
+from tests.fakes.ibkr import FakeGatewayConnection, make_execution, make_forward_test_order
 
 ACCOUNT_ID = "DU1234567"
 ORDERS_PATH = "/api/paper-trading/orders"
@@ -134,6 +134,9 @@ async def test_stores_the_order_by_hand_without_status(
                 "limit_price": None,
                 "time_in_force": "DAY",
                 "ibkr_order_id": send_response.json()["ibkr_order_id"],
+                # IBKR is the only source of fills. The fake has no execution of this order.
+                "filled_quantity": "0",
+                "average_fill_price": None,
             }
         ]
     }
@@ -326,3 +329,106 @@ async def test_reports_an_unknown_order_on_cancel(
         cancel_response = await client.delete(f"{ORDERS_PATH}/999")
 
     assert cancel_response.status_code == 404
+
+
+async def start_forward_test_on(client: httpx.AsyncClient, *, symbol: str) -> JsonObject:
+    # A new strategy has version 1 from the template. A forward test can use it.
+    strategy = (await client.post("/api/strategies", json={"name": f"Blocker {symbol}"})).json()
+    strategy_version_id = (await client.get(f"/api/strategies/{strategy['id']}/versions/1")).json()["id"]
+    request = {
+        "strategy_version_id": strategy_version_id,
+        "symbol": symbol,
+        "exchange": "NASDAQ",
+        "currency": "USD",
+        "bar_period": "1-MINUTE",
+    }
+    return (await client.post("/api/forward-tests", json=request)).json()
+
+
+@pytest.mark.anyio
+async def test_refuses_an_order_by_hand_on_the_instrument_of_a_running_forward_test(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        forward_test = await start_forward_test_on(client, symbol="AAPL")
+        response = await client.post(ORDERS_PATH, json=LIMIT_ORDER)
+        manual_orders = (await client.get(MANUAL_ORDERS_PATH)).json()["manual_orders"]
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": (
+            f"Forward test {forward_test['id']} (Blocker AAPL v1) trades AAPL / NASDAQ. ATrade refuses orders by hand"
+            " for this instrument until the forward test stops."
+        ),
+        "forward_test_id": forward_test["id"],
+    }
+    assert gateway_connection.open_orders == []
+    assert manual_orders == []
+
+
+@pytest.mark.anyio
+async def test_sends_an_order_by_hand_when_the_forward_test_runs_on_another_instrument(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        await start_forward_test_on(client, symbol="MSFT")
+        response = await client.post(ORDERS_PATH, json=LIMIT_ORDER)
+
+    assert response.status_code == 201
+
+
+@pytest.mark.anyio
+async def test_lists_orders_by_hand_with_the_fills_from_ibkr(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        filled_order_id = (await client.post(ORDERS_PATH, json=MARKET_ORDER)).json()["ibkr_order_id"]
+        open_order_id = (await client.post(ORDERS_PATH, json=LIMIT_ORDER)).json()["ibkr_order_id"]
+        gateway_connection.executions = [
+            make_execution(ACCOUNT_ID, order_id=filled_order_id, quantity="60", price="380.20"),
+            make_execution(ACCOUNT_ID, order_id=filled_order_id, quantity="40", price="380.70"),
+            # The same order ID from another client ID is another order.
+            make_execution(
+                ACCOUNT_ID, order_id=open_order_id, quantity="3", price="1.25", client_id=FORWARD_TEST_CLIENT_ID
+            ),
+        ]
+        manual_orders = (await client.get(MANUAL_ORDERS_PATH)).json()["manual_orders"]
+
+    fills = [(order["symbol"], order["filled_quantity"], order["average_fill_price"]) for order in manual_orders]
+    assert fills == [("700", "100", "380.40"), ("AAPL", "0", None)]
+
+
+@pytest.mark.anyio
+async def test_lists_orders_by_hand_without_fills_when_the_check_did_not_pass(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        await client.post(ORDERS_PATH, json=MARKET_ORDER)
+        gateway_connection.connected = False
+        manual_orders = (await client.get(MANUAL_ORDERS_PATH)).json()["manual_orders"]
+
+    assert [(order["filled_quantity"], order["average_fill_price"]) for order in manual_orders] == [(None, None)]

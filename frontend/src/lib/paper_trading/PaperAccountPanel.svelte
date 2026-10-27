@@ -10,13 +10,23 @@
     readPaperAccountMessage,
     type PaperAccountMessage,
   } from './paper_account';
+  import FilledManualOrderList from './FilledManualOrderList.svelte';
   import OpenOrderList from './OpenOrderList.svelte';
-  import { readOpenOrdersMessage, type OpenOrder } from './paper_orders';
+  import { readFilledManualOrders, readOpenOrdersMessage, type ManualOrder, type OpenOrder } from './paper_orders';
   import PaperOrderTicket from './PaperOrderTicket.svelte';
 
   let account = $state<PaperAccountMessage | null>(null);
   let isSocketConnected = $state(false);
   let openOrders = $state<OpenOrder[]>([]);
+  let filledManualOrders = $state<ManualOrder[]>([]);
+
+  // A fill changes the open orders, and the server sends the orders message only after a change.
+  async function refreshFilledManualOrders(): Promise<void> {
+    const orders = await readFilledManualOrders(fetch);
+    if (orders !== null) {
+      filledManualOrders = orders;
+    }
+  }
 
   const checkDescription = $derived(account === null ? null : describePaperAccountCheck(account.check));
 
@@ -31,6 +41,7 @@
         const ordersMessage = readOpenOrdersMessage(message);
         if (ordersMessage !== null) {
           openOrders = ordersMessage;
+          void refreshFilledManualOrders();
         }
       },
       onConnectionChange: (isConnected) => {
@@ -119,6 +130,9 @@
 
     <h3>Open orders</h3>
     <OpenOrderList orders={openOrders} />
+
+    <h3>Filled orders by hand</h3>
+    <FilledManualOrderList orders={filledManualOrders} />
   {/if}
 </section>
 

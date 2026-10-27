@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from pydantic.json_schema import models_json_schema
 
 from atrade.app.web import create_web_app
+from atrade.forward_test import FORWARD_TEST_SOCKET_MESSAGE_MODELS
 from atrade.foundation.clock import SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import IbAsyncGatewayConnection
@@ -26,7 +27,7 @@ UNUSED_GATEWAY_HOST = "127.0.0.1"
 UNUSED_GATEWAY_PORT = 4004
 UNUSED_CLIENT_ID = 1
 SCHEMA_REF_TEMPLATE = "#/components/schemas/{model}"
-SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [*MARKET_DATA_SOCKET_MESSAGE_MODELS]
+SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [*MARKET_DATA_SOCKET_MESSAGE_MODELS, *FORWARD_TEST_SOCKET_MESSAGE_MODELS]
 
 
 def add_socket_message_schemas(document: dict[str, Any], models: list[type[BaseModel]]) -> None:

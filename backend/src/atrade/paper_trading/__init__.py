@@ -1,4 +1,5 @@
-"""Public entry of paper_trading: the paper account check, the paper account state, and /ws/paper-trading."""
+"""Public entry of paper_trading: the paper account check, the paper account state, orders by hand, and
+/ws/paper-trading."""
 
 from atrade.paper_trading.http_routes import create_paper_trading_router
 from atrade.paper_trading.paper_account_check import PaperAccountCheck, PaperAccountCheckError, require_paper_account
@@ -7,8 +8,11 @@ from atrade.paper_trading.paper_account_monitor import (
     PaperAccountMonitor,
     fetch_paper_capital_usd,
 )
+from atrade.paper_trading.paper_orders import BlockingForwardTest, FindBlockingForwardTest
 
 __all__ = [
+    "BlockingForwardTest",
+    "FindBlockingForwardTest",
     "PaperAccountBalance",
     "PaperAccountCheck",
     "PaperAccountCheckError",

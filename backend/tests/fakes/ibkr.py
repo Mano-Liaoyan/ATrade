@@ -2,6 +2,7 @@
 
 Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
 `instruments`, `search_error_message`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
+`cancel_error_message`, `executions`,
 `live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
 `historical_bar_requests`, `live_bar_subscriptions`, and `active_live_bar_stream_count`. No mock library is used
 (section 17.3).
@@ -16,7 +17,7 @@ import anyio
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import AccountValue, GatewayRequestError, OpenOrder, OrderRequest, PortfolioPosition
+from atrade.ibkr import AccountValue, Execution, GatewayRequestError, OpenOrder, OrderRequest, PortfolioPosition
 
 # The fake checks the reachable flag this often. A short wait keeps the e2e server from using a full CPU.
 CHECK_INTERVAL_SECONDS = 0.05
@@ -99,6 +100,10 @@ class FakeGatewayConnection:
         self.open_orders: list[OpenOrder] = []
         # When it is set, place_order fails with this message, like an API error of IBKR.
         self.order_error_message: str | None = None
+        # When it is set, cancel_order_and_wait fails with this message, like a cancel without a confirmation.
+        self.cancel_error_message: str | None = None
+        # All executions that reqExecutions returns. Tests add them.
+        self.executions: list[Execution] = []
         self.next_order_id = FIRST_ORDER_ID
         # When it is set, read_historical_bars fails with this message.
         self.historical_bars_error_message: str | None = None
@@ -206,6 +211,24 @@ class FakeGatewayConnection:
             if not (order.order_id == order_id and order.client_id == self.client_id)
         ]
 
+    async def connect(self) -> None:
+        self.connected = self.is_gateway_reachable
+        self.require_connection()
+
+    async def read_own_open_orders(self) -> list[OpenOrder]:
+        self.require_connection()
+        return [order for order in self.open_orders if order.client_id == self.client_id]
+
+    async def cancel_order_and_wait(self, order_id: int) -> None:
+        self.require_connection()
+        if self.cancel_error_message is not None:
+            raise GatewayRequestError(self.cancel_error_message)
+        await self.cancel_order(order_id)
+
+    async def read_executions(self) -> list[Execution]:
+        self.require_connection()
+        return list(self.executions)
+
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
     ) -> list[Bar]:
@@ -292,4 +315,19 @@ def make_forward_test_order(
         status="Submitted",
         filled_quantity=Decimal(0),
         order_ref=f"O-20260102-030405-001-FT{forward_test_id}-{order_id}",
+    )
+
+
+def make_execution(
+    account_id: str, *, order_id: int, quantity: str, price: str, client_id: int = WEB_CLIENT_ID
+) -> Execution:
+    """One fill from reqExecutions."""
+    return Execution(
+        order_id=order_id,
+        client_id=client_id,
+        account=account_id,
+        time_utc=LIVE_BAR_NOW_UTC,
+        side="BOT",
+        quantity=Decimal(quantity),
+        price=Decimal(price),
     )

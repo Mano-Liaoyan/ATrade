@@ -4,6 +4,8 @@ Each order and each cancel runs the paper account check first and fails closed (
 source of order status. ATrade stores only its orders by hand, without status (section 11.4).
 """
 
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Self
@@ -16,7 +18,7 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import MANUAL_ORDER_REF, read_order_source
-from atrade.ibkr import GatewayRequestError, OpenOrder, OrderRequest, OrderSide, OrderType, TimeInForce
+from atrade.ibkr import Execution, GatewayRequestError, OpenOrder, OrderRequest, OrderSide, OrderType, TimeInForce
 from atrade.paper_trading import manual_order_store
 from atrade.paper_trading.paper_account_check import PaperAccountCheckError
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
@@ -49,6 +51,18 @@ class SendOrderRequest(BaseModel):
         return self
 
 
+@dataclass(frozen=True)
+class BlockingForwardTest:
+    """A forward test that runs on the instrument of an order by hand. `label` is like "Forward test 3 (Name v1)"."""
+
+    forward_test_id: int
+    label: str
+
+
+# paper_trading does not import forward_test (docs/architecture.md section 6.2). app/web.py passes this function.
+type FindBlockingForwardTest = Callable[[Instrument], Awaitable[BlockingForwardTest | None]]
+
+
 class ManualOrderResponse(BaseModel):
     id: int
     created_at_utc: datetime
@@ -64,8 +78,15 @@ class ManualOrderResponse(BaseModel):
     ibkr_order_id: int
 
 
+class ManualOrderWithFillsResponse(ManualOrderResponse):
+    """A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."""
+
+    filled_quantity: Decimal | None
+    average_fill_price: Decimal | None
+
+
 class ManualOrderListResponse(BaseModel):
-    manual_orders: list[ManualOrderResponse]
+    manual_orders: list[ManualOrderWithFillsResponse]
 
 
 class OrderSourceResponse(BaseModel):
@@ -104,6 +125,13 @@ class OrderRefusedResponse(BaseModel):
 
 class OrderErrorResponse(BaseModel):
     detail: str
+
+
+class OrderBlockedResponse(BaseModel):
+    """A forward test runs on the instrument. ATrade did not send the order (section 12.2)."""
+
+    detail: str
+    forward_test_id: int
 
 
 def to_manual_order_response(record: manual_order_store.ManualOrderRecord) -> ManualOrderResponse:
@@ -148,6 +176,42 @@ def to_open_order_response(order: OpenOrder, web_client_id: int) -> OpenOrderRes
     )
 
 
+def add_fills(
+    record: manual_order_store.ManualOrderRecord, executions: list[Execution] | None, web_client_id: int
+) -> ManualOrderWithFillsResponse:
+    order = to_manual_order_response(record)
+    if executions is None:
+        return ManualOrderWithFillsResponse(**order.model_dump(), filled_quantity=None, average_fill_price=None)
+    # IBKR order IDs belong to a client ID. Orders by hand come from the Web client ID.
+    order_executions = [
+        execution
+        for execution in executions
+        if execution.order_id == record.ibkr_order_id
+        and execution.client_id == web_client_id
+        and execution.account == record.account
+    ]
+    filled_quantity = sum((execution.quantity for execution in order_executions), Decimal(0))
+    average_fill_price = None
+    if filled_quantity > 0:
+        filled_amount = sum((execution.quantity * execution.price for execution in order_executions), Decimal(0))
+        average_fill_price = filled_amount / filled_quantity
+    return ManualOrderWithFillsResponse(
+        **order.model_dump(), filled_quantity=filled_quantity, average_fill_price=average_fill_price
+    )
+
+
+async def read_executions_of_checked_account(paper_account_monitor: PaperAccountMonitor) -> list[Execution] | None:
+    """None when the check did not pass or IB Gateway does not answer: then ATrade does not know the fills."""
+    account_id = paper_account_monitor.read_checked_account_id()
+    if account_id is None:
+        return None
+    try:
+        executions = await paper_account_monitor.gateway_connection.read_executions()
+    except GatewayRequestError:
+        return None
+    return [execution for execution in executions if execution.account == account_id]
+
+
 def refuse_order(error: PaperAccountCheckError) -> JSONResponse:
     refused = OrderRefusedResponse(
         detail=error.check.message or "The paper account check did not pass.",
@@ -171,19 +235,31 @@ async def read_open_orders_of_checked_account(paper_account_monitor: PaperAccoun
 class PaperOrderRoutes:
     """The route functions. They share the paper account monitor, the database URL, and the clock."""
 
-    def __init__(self, *, paper_account_monitor: PaperAccountMonitor, database_url: str, clock: Clock) -> None:
+    def __init__(
+        self,
+        *,
+        paper_account_monitor: PaperAccountMonitor,
+        database_url: str,
+        clock: Clock,
+        find_blocking_forward_test: FindBlockingForwardTest,
+    ) -> None:
         self.paper_account_monitor = paper_account_monitor
         self.database_url = database_url
         self.clock = clock
+        self.find_blocking_forward_test = find_blocking_forward_test
 
     async def send_order(self, request: SendOrderRequest) -> ManualOrderResponse | JSONResponse:
         try:
             account_id = self.paper_account_monitor.require_checked_paper_account()
         except PaperAccountCheckError as error:
             return refuse_order(error)
+        instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
+        blocking_forward_test = await self.find_blocking_forward_test(instrument)
+        if blocking_forward_test is not None:
+            return block_order(blocking_forward_test, instrument)
         order_request = OrderRequest(
             account=account_id,
-            instrument=Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency),
+            instrument=instrument,
             side=request.side,
             quantity=request.quantity,
             order_type=request.order_type,
@@ -223,7 +299,11 @@ class PaperOrderRoutes:
     async def list_manual_orders(self) -> ManualOrderListResponse:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             records = await manual_order_store.select_manual_orders(connection)
-        return ManualOrderListResponse(manual_orders=[to_manual_order_response(record) for record in records])
+        executions = await read_executions_of_checked_account(self.paper_account_monitor)
+        web_client_id = self.paper_account_monitor.settings.ibkr_web_client_id
+        return ManualOrderListResponse(
+            manual_orders=[add_fills(record, executions, web_client_id) for record in records]
+        )
 
     async def cancel_order(self, order_id: int) -> JSONResponse | None:
         try:
@@ -249,6 +329,17 @@ class PaperOrderRoutes:
         except GatewayRequestError as error:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
         return None
+
+
+def block_order(blocking_forward_test: BlockingForwardTest, instrument: Instrument) -> JSONResponse:
+    blocked = OrderBlockedResponse(
+        detail=(
+            f"{blocking_forward_test.label} trades {instrument.symbol} / {instrument.exchange}. ATrade refuses orders"
+            " by hand for this instrument until the forward test stops."
+        ),
+        forward_test_id=blocking_forward_test.forward_test_id,
+    )
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=blocked.model_dump())
 
 
 def raise_not_cancellable(matching_orders: list[OpenOrder]) -> None:

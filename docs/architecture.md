@@ -165,13 +165,23 @@ watchlist     -> market_data
 strategy      -> (foundation only)
 backtest      -> strategy, market_data
 paper_trading -> ibkr
-forward_test  -> strategy, paper_trading, backtest
+forward_test  -> strategy, paper_trading, backtest, ibkr
 all modules   -> foundation
 app           -> all modules
 ```
 
 - `ibkr` depends on no capability.
-- `forward_test -> paper_trading` is only for the paper account check.
+- `forward_test -> paper_trading` is only for the paper account check
+  (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
+  start).
+- `forward_test -> ibkr` is only for the `GatewayConnection` protocol of the
+  child process: the connection for the paper account check and the stop
+  steps (`read_own_open_orders()`, `cancel_order_and_wait()`) (#76, section
+  22).
+- `paper_trading` does not import `forward_test`. The refusal of paper orders
+  by hand on the instrument of a running forward test (section 12.2) gets a
+  function from `app/web.py`, which calls
+  `forward_test.find_forward_test_on_instrument()`.
 - `forward_test -> backtest` is only for the comparison and the metric
   functions.
 - `backtest` does not depend on `paper_trading`. A backtest request carries
@@ -205,6 +215,7 @@ app           -> all modules
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker. |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. |
+| `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
 A restart of `web` does not stop forward tests.
 
@@ -253,160 +264,12 @@ account panel, and the order routes (11.8).
 
 ## 12. Forward test
 
-Source: [Forward test design](https://github.com/Mano-Liaoyan/ATrade/issues/41).
-The NautilusTrader facts in this section come from the `v2.0.0rc7` source and
-documents. Nobody ran them.
-
-### 12.1 Input and process
-
-- Each forward test has 1 child process. The process has 1 `LiveNode`,
-  1 user `Strategy`, and 1 client ID.
-- Input: a strategy version, 1 instrument, 1 bar type, and an optional end
-  time. The start time is always "now".
-- Without an end time, the forward test runs until the user stops it.
-- The end time is a date and a time. The browser shows it in the local time
-  zone. The database stores UTC. The end time cannot change while the forward
-  test runs.
-- At the end time, the worker stops the forward test with the steps of
-  section 12.6.
-- The bar type must use a period that IB live bars support. Backtests do not
-  have this limit. The supported periods are:
-  - 1, 5, 15, or 30 seconds
-  - 1, 2, 3, 5, 10, 15, 20, or 30 minutes
-  - 1, 2, 3, 4, or 8 hours
-  - 1 day, 1 week, or 1 month
-- A forward test does not use paper capital. It uses the real paper account
-  balance and records the balance at start.
-- A forward test does not need a backtest first. The start form shows the
-  metrics of the latest backtest of the strategy version, or "no backtest
-  result".
-- The strategy version is fixed at start. To use a new version, stop the
-  forward test and start a new one.
-
-### 12.2 One forward test per instrument
-
-- NautilusTrader reconciles by account, not by client ID. With two position
-  sources on one instrument, NautilusTrader generates synthetic fills to align
-  the positions. When it cannot align them, the start fails.
-- So only 1 forward test can run on one instrument at a time.
-- Paper orders by hand on that instrument are refused (section 11.3).
-
-### 12.3 Web and worker
-
-- The forward test table has a `desired_state` column (`running` or
-  `stopped`). The Web process writes only this column.
-- Every 2 seconds, the worker compares `desired_state` with the actual state.
-  It starts or stops child processes and writes the actual state back.
-- Every 2 seconds, the Web process reads the actual state and pushes it on
-  `/ws/forward-tests`.
-
-### 12.4 Client IDs
-
-- The forward test client ID range is in `settings`. The default is `10–13`.
-- The range size is the limit of forward tests that run at the same time
-  (default 4). There is no other limit.
-- At start, one transaction takes the lowest free ID in the range. A unique
-  constraint prevents two forward tests from getting the same ID.
-- A forward test keeps its ID while it runs, restarts, or has the status "stop
-  failed". The ID becomes free after the orders are cancelled and the process
-  ends.
-- When no ID is free, the start is refused. The UI shows "limit of running
-  forward tests reached".
-
-### 12.5 Paper account check
-
-- Before each `LiveNode` start, including automatic restarts, the child
-  process:
-  1. Connects with `ib_async` and its own client ID.
-  2. Calls `require_paper_account()`.
-  3. Disconnects.
-  4. Starts the `LiveNode` with the same client ID.
-- The Web process does not repeat the check.
-- The child passes `settings.ibkr_account_id` to the IB execution client
-  `account_id`.
-- When the check fails, the status is "failed". There is no retry.
-- When the Gateway is not reachable, the child retries every 30 seconds. The
-  UI shows "waiting for IB Gateway". This does not count toward the 3-crash
-  limit (section 12.7).
-
-### 12.6 Stop
-
-1. The child stops the `LiveNode`.
-2. The child connects with `ib_async` and the same client ID.
-3. The child reads the open orders of this client ID with `reqOpenOrders`.
-4. The child cancels each order and waits for the confirmation.
-5. The child exits.
-
-- Positions stay open. The user handles them by hand.
-- Do not use `manage_stop`. It closes positions. `LiveNode.stop()` does not
-  cancel orders.
-- When a cancellation fails, the status is "stop failed". The client ID stays
-  taken. The worker retries the cancellation.
-
-### 12.7 Recovery after restart
-
-- Daily IB Gateway restart: NautilusTrader reconnects and subscribes to bars
-  again. When the IB execution client is disconnected for more than 5 minutes,
-  the child exits. The worker waits for the Gateway (section 12.5) and starts
-  it again. This does not count toward the 3-crash limit.
-- Other stops are a restart of the `forward-test` service, a server restart,
-  or a child crash. After each of them, the worker restarts the forward test.
-  It uses the same client ID and the same strategy version.
-- After 3 crashes in a row, the status is "failed". The worker stops the
-  restarts.
-- Restart steps:
-  1. Cancel all open orders of this client ID (section 12.6). This prevents
-     duplicate orders.
-  2. Start the `LiveNode`. Set `external_order_instrument_ids` and
-     `reconciliation_instrument_ids` to the instrument. The account position
-     on this instrument belongs to this strategy (section 12.2).
-  3. The strategy indicators start from zero. NautilusTrader does not save
-     strategy state without Redis.
-- An event table records the start and the end of each interruption.
-
-### 12.8 Records
-
-- A platform `DataActor` subscribes to the same bar type.
-- At the end of each bar, the actor reads `self.cache`. It appends new fills
-  (unique by `trade_id`) and one equity snapshot row to the forward test
-  tables.
-- Reasons:
-  - A Python `DataActor` cannot subscribe to order and fill events. Only a
-    `Strategy` gets them.
-  - Do not use `PostgresCacheConfig`. Its tables belong to NautilusTrader and
-    can change in each release candidate.
-  - Do not write a `Strategy` base class. The readability rules forbid our own
-    inheritance.
-- The current state of open orders still comes from IBKR.
-
-### 12.9 Order source
-
-- The forward test sets `order_id_tag` to `FT<forward test ID>`.
-- The IB execution client writes the `ClientOrderId` into `orderRef`. User code
-  cannot change it.
-- `foundation/order_ref.py` holds the format rule. `forward_test` writes it.
-  `paper_trading` reads it.
-  - `format_forward_test_order_tag(forward_test_id)` returns `FT<ID>`.
-  - `read_order_source(order_ref)` splits the `orderRef` at `-`. A part
-    `FT<digits>` gives the source "forward test <digits>". Each other
-    `orderRef` gives the source "by hand".
-  - Orders by hand from ATrade have the `orderRef` `ATRADE-BY-HAND`
-    (`MANUAL_ORDER_REF`) (#75).
-- The frontend changes the ID into the forward test name in `routes/`.
-
-### 12.10 Comparison with a backtest
-
-- The forward test page has a "backtest the same period" button. It creates a
-  normal backtest with:
-  - the same strategy version, instrument, and bar type
-  - the period from the forward test start to its end, or to now while it runs
-  - `paper_capital_usd` equal to the balance at forward test start
-- The comparison page uses the comparison view of section 9.5: the metric
-  table and both equity curves on one chart.
-- A fill table shows, for each bar, the fill price on each side and the
-  difference.
-- The chart marks interruptions in grey.
-- Forward test metrics use the same metric functions that `backtest` exports.
+Section 12 is in [`docs/architecture/forward_test.md`](architecture/forward_test.md).
+It holds the forward test decisions (input, one forward test per instrument,
+Web and worker, client IDs, paper account check, stop, recovery, records,
+order source, comparison) and the implementation: the `forward_test` table,
+the routes under `/api/forward-tests`, `/ws/forward-tests`, the worker, the
+child process, and the forward test page.
 
 ## 13. Frontend
 
@@ -519,6 +382,13 @@ One Docker Compose project on the user's own server runs all services:
   block the local start when their credentials are missing. They fail with a
   clear message, or they are in a Compose profile. `ib-gateway` is in the
   profile `ibkr` (section 7.4).
+- `forward-test` uses the image of `web` with the command
+  `python -m atrade.app.forward_test_worker`. It has the same read-only root
+  file system and `/tmp`, the database URL, and the IBKR settings, but not
+  `ATRADE_IBKR_USERNAME` or `ATRADE_IBKR_PASSWORD`. It waits until the
+  health check of `web` passes, because `web` runs the migrations. It starts
+  also without IB Gateway: a forward test start then fails with the reason
+  in its `error_message` (#76).
 
 ## 15. Secrets and configuration
 
@@ -800,7 +670,8 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
   `docs/architecture/market_data.md`. Section 9 is in
   `docs/architecture/strategy.md`. Section 10 is in
   `docs/architecture/backtest.md`. Section 11 is in
-  `docs/architecture/paper_trading.md`.
+  `docs/architecture/paper_trading.md`. Section 12 is in
+  `docs/architecture/forward_test.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
 - There is no document index and no `active` or `obsolete` status.
@@ -846,6 +717,8 @@ ran them. The implementation must check them.
 | The paper Gateway needs a manual login or approval each week. | Watch the first week of operation. |
 | `ib_async` 2.1.0 connects with client protocol 178 at most. Features after 178 are not available. Its real connection to Gateway 10.50.1f is not checked. | The `ibkr_paper` contract tests. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |
+| The forward test LiveNode of section 12.15: the IB data client and the IB execution client use the same client ID; the venue of `SYMBOL.EXCHANGE` matches the primary exchange of IBKR; the `ClientOrderId` with `order_id_tag = FT<ID>` reaches `orderRef`; `reqOpenOrders` returns the orders of the LiveNode on a new connection with the same client ID (#76). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it`). |
+| `reqExecutions` returns the executions of the current day only. The filled orders by hand (section 11.4) show only those fills. | The `ibkr_paper` contract tests, during US market hours. |
 | Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. The Web process uses it for the chart (section 8.5), with the durations `2 D` and `1 W`. Not checked against a real Gateway, also not on a weekend. | `uv run pytest -m ibkr_paper -k live_bar` (contract test `test_streams_the_current_live_bar`), or run a forward test. |
 
 ### 21.1 Facts checked
@@ -863,10 +736,16 @@ ran them. The implementation must check them.
 The decisions do not name these details. The implementation picks the simplest
 option and records it in this document.
 
-- The module that cancels the open orders of a forward test client ID
-  (section 12.6). The dependency list in section 6.2 has no `forward_test ->
-  ibkr` edge. Either `paper_trading` exports the cancel function, or the edge
-  is added. The change must update section 6.2.
+- Decided (#76): `forward_test` cancels the open orders of its client ID
+  itself (section 12.6), with the `ibkr` functions `read_own_open_orders()`
+  (`reqOpenOrders`) and `cancel_order_and_wait()`. Section 6.2 has the new
+  edge `forward_test -> ibkr`. `paper_trading` exports no cancel function.
+- Decided (#76): the child process gets its connections through
+  `IbkrAccess.open_gateway_connection(client_id)`. `app/forward_test_process.py`
+  passes a function that makes a new `IbAsyncGatewayConnection` with the
+  client ID of the forward test. The child connects it with `connect()` for
+  the paper account check and again for the stop steps, and disconnects it
+  before the LiveNode starts.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - These names are choices of this document, not decisions of a ticket. The

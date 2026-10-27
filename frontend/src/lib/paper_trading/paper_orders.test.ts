@@ -4,9 +4,11 @@ import {
   cancelPaperOrder,
   describeOrderSource,
   describeOrderForConfirmation,
+  readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
   sendPaperOrder,
+  type ManualOrder,
   type OrderForm,
 } from './paper_orders';
 
@@ -166,5 +168,58 @@ describe('cancelPaperOrder', () => {
     const cancelled = await cancelPaperOrder(makeFetch(409, { detail: 'This order belongs to forward test 42.' }), 7);
 
     expect(cancelled).toEqual({ kind: 'failed', message: 'This order belongs to forward test 42.' });
+  });
+});
+
+describe('sendPaperOrder refused by a forward test', () => {
+  it('shows which forward test blocks the instrument', async () => {
+    const result = readOrderForm(limitForm);
+    if (result.kind !== 'valid') {
+      throw new Error('The form must be valid.');
+    }
+    const detail = 'Forward test 3 (Trend v1) trades AAPL / NASDAQ. ATrade refuses orders by hand for this instrument until the forward test stops.';
+
+    const sent = await sendPaperOrder(makeFetch(409, { detail, forward_test_id: 3 }), result.request);
+
+    expect(sent).toEqual({ kind: 'failed', message: `ATrade did not send the order. ${detail}` });
+  });
+});
+
+describe('readFilledManualOrders', () => {
+  const filledOrder: ManualOrder = {
+    id: 1,
+    created_at_utc: '2026-01-02T03:04:05Z',
+    account: 'DU1234567',
+    symbol: '700',
+    exchange: 'SEHK',
+    currency: 'HKD',
+    side: 'SELL',
+    quantity: 100,
+    order_type: 'MKT',
+    limit_price: null,
+    time_in_force: 'DAY',
+    ibkr_order_id: 1001,
+    filled_quantity: '100',
+    average_fill_price: '380.40',
+  };
+
+  it('keeps only the orders by hand with a fill, newest first', async () => {
+    const openOrder = { ...filledOrder, id: 2, ibkr_order_id: 1002, filled_quantity: '0', average_fill_price: null };
+    const unknownOrder = { ...filledOrder, id: 3, filled_quantity: null, average_fill_price: null };
+    const newerFilledOrder = { ...filledOrder, id: 4, ibkr_order_id: 1004 };
+    const requests: Request[] = [];
+
+    const orders = await readFilledManualOrders(
+      makeFetch(200, { manual_orders: [filledOrder, openOrder, unknownOrder, newerFilledOrder] }, requests),
+    );
+
+    expect(orders).toEqual([newerFilledOrder, filledOrder]);
+    expect(new URL(requests[0]?.url ?? '').pathname).toBe('/api/paper-trading/manual-orders');
+  });
+
+  it('returns null when the backend is not reachable', async () => {
+    const orders = await readFilledManualOrders(() => Promise.reject(new TypeError('offline')));
+
+    expect(orders).toBeNull();
   });
 });

@@ -269,6 +269,39 @@ async def test_sends_a_far_limit_order_sees_it_in_the_open_orders_and_cancels_it
 
 
 @pytest.mark.anyio
+async def test_connects_once_and_cancels_an_own_order_with_confirmation(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, account_id = connection_and_account
+
+    await connection.connect()
+    # Fail closed: send nothing unless the only managed account is the expected paper account.
+    assert connection.read_managed_accounts() == [account_id]
+    assert account_id.startswith("DU")
+    order_id = await connection.place_order(make_far_limit_order(account_id))
+    await wait_for_open_order(connection, order_id, is_open=True)
+    own_order_ids = [order.order_id for order in await connection.read_own_open_orders()]
+    await connection.cancel_order_and_wait(order_id)
+    own_order_ids_after_cancel = [order.order_id for order in await connection.read_own_open_orders()]
+    executions = await connection.read_executions()
+    connection.disconnect()
+
+    assert order_id in own_order_ids
+    assert order_id not in own_order_ids_after_cancel
+    assert all(execution.account == account_id for execution in executions)
+
+
+@pytest.mark.anyio
+async def test_refuses_to_cancel_and_wait_without_a_connection(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, _account_id = connection_and_account
+
+    with pytest.raises(GatewayRequestError):
+        await connection.cancel_order_and_wait(1)
+
+
+@pytest.mark.anyio
 async def test_refuses_an_order_without_a_connection(connection_and_account: tuple[GatewayConnection, str]) -> None:
     connection, account_id = connection_and_account
 

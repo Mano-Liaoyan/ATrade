@@ -62,6 +62,39 @@ services:
       - /tmp
     mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-4g}
     pids_limit: 2048
+    # The forward-test service waits for this check: web runs the database migrations before it serves HTTP.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+
+  # The forward-test worker and its child processes, 1 per running forward test (docs/architecture.md section 12).
+  # It is a separate service, so a restart of web does not stop forward tests. It has no IBKR user name or password.
+  forward-test:
+    # The same image as web. The build section stops Compose from trying to pull the local image name.
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: atrade-web:local
+    command: ["python", "-m", "atrade.app.forward_test_worker"]
+    environment:
+      DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
+      ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
+      ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
+      ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
+      ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
+      ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
+      ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
+      ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+    depends_on:
+      web:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 2048
     restart: unless-stopped
 
 volumes:

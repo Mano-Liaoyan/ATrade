@@ -1,14 +1,15 @@
-"""Order data that the Web process sends to and reads from IB Gateway: an order request and an open order.
+"""Order data that ATrade sends to and reads from IB Gateway: an order request, an open order, and an execution.
 
 The `ibkr` module converts between these types and the ib_async types. It adds no business rules. The paper
 account check is the job of `paper_trading` (docs/architecture/paper_trading.md section 11.2).
 """
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
-from ib_async import Contract, LimitOrder, MarketOrder, Order, Stock, Trade
+from ib_async import Contract, Fill, LimitOrder, MarketOrder, Order, Stock, Trade
 
 from atrade.foundation.instrument import Instrument
 
@@ -55,6 +56,20 @@ class OpenOrder:
     order_ref: str
 
 
+@dataclass(frozen=True)
+class Execution:
+    """One fill of an order from reqExecutions. One order can have many executions."""
+
+    order_id: int
+    client_id: int
+    account: str
+    time_utc: datetime
+    # "BOT" or "SLD", the text of IBKR.
+    side: str
+    quantity: Decimal
+    price: Decimal
+
+
 def build_contract(instrument: Instrument) -> Contract:
     return Stock(
         symbol=instrument.symbol,
@@ -87,6 +102,19 @@ def read_price(price: float | Decimal | None) -> Decimal | None:
         return None
     # str() first, so that the Decimal has the short form of the float, for example 1.1 and not 1.0999...
     return Decimal(str(price))
+
+
+def convert_fill(fill: Fill) -> Execution:
+    execution = fill.execution
+    return Execution(
+        order_id=execution.orderId,
+        client_id=execution.clientId,
+        account=execution.acctNumber,
+        time_utc=execution.time.astimezone(UTC),
+        side=execution.side,
+        quantity=Decimal(str(execution.shares)),
+        price=Decimal(str(execution.price)),
+    )
 
 
 def convert_trade(trade: Trade) -> OpenOrder:

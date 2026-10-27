@@ -252,6 +252,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/forward-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Forward Tests */
+        get: operations["list_forward_tests_api_forward_tests_get"];
+        put?: never;
+        /** Start Forward Test */
+        post: operations["start_forward_test_api_forward_tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forward-tests/{forward_test_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Forward Test */
+        post: operations["stop_forward_test_api_forward_tests__forward_test_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -456,6 +491,8 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** @enum {string} */
+        DesiredState: "running" | "stopped";
         /** EquityPointResponse */
         EquityPointResponse: {
             /**
@@ -471,6 +508,43 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** ForwardTestResponse */
+        ForwardTestResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+            desired_state: components["schemas"]["DesiredState"];
+            status: components["schemas"]["ForwardTestStatus"];
+            /** Client Id */
+            client_id: number | null;
+            /** Start Balance Usd */
+            start_balance_usd: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Stopped At Utc */
+            stopped_at_utc: string | null;
+        };
+        /** @enum {string} */
+        ForwardTestStatus: "starting" | "running" | "stopping" | "stopped" | "stop_failed" | "failed";
         /** GatewayStatusResponse */
         GatewayStatusResponse: {
             /**
@@ -523,7 +597,7 @@ export interface components {
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
-            manual_orders: components["schemas"]["ManualOrderResponse"][];
+            manual_orders: components["schemas"]["ManualOrderWithFillsResponse"][];
         };
         /** ManualOrderResponse */
         ManualOrderResponse: {
@@ -554,6 +628,43 @@ export interface components {
             time_in_force: string;
             /** Ibkr Order Id */
             ibkr_order_id: number;
+        };
+        /**
+         * ManualOrderWithFillsResponse
+         * @description A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR.
+         */
+        ManualOrderWithFillsResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Account */
+            account: string;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Side */
+            side: string;
+            /** Quantity */
+            quantity: number;
+            /** Order Type */
+            order_type: string;
+            /** Limit Price */
+            limit_price: string | null;
+            /** Time In Force */
+            time_in_force: string;
+            /** Ibkr Order Id */
+            ibkr_order_id: number;
+            /** Filled Quantity */
+            filled_quantity: string | null;
+            /** Average Fill Price */
+            average_fill_price: string | null;
         };
         /** OpenOrderListResponse */
         OpenOrderListResponse: {
@@ -589,6 +700,16 @@ export interface components {
             source: components["schemas"]["OrderSourceResponse"];
             /** Can Cancel */
             can_cancel: boolean;
+        };
+        /**
+         * OrderBlockedResponse
+         * @description A forward test runs on the instrument. ATrade did not send the order (section 12.2).
+         */
+        OrderBlockedResponse: {
+            /** Detail */
+            detail: string;
+            /** Forward Test Id */
+            forward_test_id: number;
         };
         /** OrderErrorResponse */
         OrderErrorResponse: {
@@ -673,6 +794,28 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+        };
+        /** StartForwardTestRequest */
+        StartForwardTestRequest: {
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+        };
+        /**
+         * StartRefusedResponse
+         * @description The start was refused. `forward_test_id` is the forward test that already runs on the instrument.
+         */
+        StartRefusedResponse: {
+            /** Detail */
+            detail: string;
+            /** Forward Test Id */
+            forward_test_id: number | null;
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -788,6 +931,17 @@ export interface components {
         WatchlistResponse: {
             /** Instruments */
             instruments: components["schemas"]["WatchlistInstrumentResponse"][];
+        };
+        /** ForwardTestsMessage */
+        ForwardTestsMessage: {
+            /**
+             * Type
+             * @default forward_tests
+             * @constant
+             */
+            type: "forward_tests";
+            /** Forward Tests */
+            forward_tests: components["schemas"]["ForwardTestResponse"][];
         };
         /** HeartbeatMessage */
         HeartbeatMessage: {
@@ -929,6 +1083,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderRefusedResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderBlockedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1421,6 +1584,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_forward_tests_api_forward_tests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestResponse"][];
+                };
+            };
+        };
+    };
+    start_forward_test_api_forward_tests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartForwardTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartRefusedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_forward_test_api_forward_tests__forward_test_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                forward_test_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

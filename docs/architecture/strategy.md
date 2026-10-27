@@ -61,6 +61,14 @@ Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
 - A new strategy starts with the template as version 1. The template is in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy.
+- `strategy` exports `load_strategy_classes(code, work_directory)`. It writes
+  the code to a file, imports it, and returns the 2 classes. It raises
+  `StrategyFileError` when the file does not have exactly 1 of each. The
+  backtest child and the forward test child use it (#76). A forward test
+  gives `order_id_tag` and `external_order_instrument_ids` to
+  `StrategyConfig.__new__`, so the user `__init__` gets only
+  `instrument_id` and `bar_type` ([`forward_test.md`](forward_test.md)
+  section 12.15).
 
 ## 9.3 Checks before save
 

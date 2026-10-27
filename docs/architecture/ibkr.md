@@ -48,7 +48,7 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
 | `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
@@ -77,7 +77,7 @@ The public entry `atrade.ibkr` exports:
   the same functions. Its data stays in memory. Tests set
   `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
-  `historical_bars_error_message`, `open_orders`, and `order_error_message`
+  `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, and `executions`
   directly. Each change of `connected` from false to true gives a new
   connection number. Its orders get the client ID `1` and order IDs from
   1001. `make_forward_test_order(...)` makes an open order of another client
@@ -92,7 +92,19 @@ The public entry `atrade.ibkr` exports:
   10 seconds.
 - `cancel_order(order_id)` cancels an order of this client ID. IBKR lets a
   client cancel only its own orders.
-- The 3 order functions raise `GatewayRequestError` when the connection is
+- `connect()` connects one time and raises `GatewayRequestError` when the
+  Gateway is not reachable. The forward test child uses it instead of
+  `keep_connected()` (#76).
+- `read_own_open_orders()` calls `reqOpenOrders` and returns the open orders
+  of this client ID only. It shares the lock of `read_open_orders()`.
+- `cancel_order_and_wait(order_id)` cancels an open order of this client ID
+  and waits until IBKR reports it done. It raises `GatewayRequestError`
+  after 10 seconds without the confirmation. An order that is not open any
+  more needs no cancel.
+- `read_executions()` calls `reqExecutions` and returns `Execution` values
+  (`order_id`, `client_id`, `account`, `time_utc`, `side`, `quantity`,
+  `price`). `paper_trading` uses it for the fills of orders by hand.
+- The order functions raise `GatewayRequestError` when the connection is
   not there.
 - `search_instruments(query)` is the instrument search of
   [`docs/architecture/market_data.md`](market_data.md) section 8.2.

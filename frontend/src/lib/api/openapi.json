@@ -112,6 +112,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderBlockedResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -761,6 +771,111 @@
         }
       }
     },
+    "/api/forward-tests": {
+      "get": {
+        "summary": "List Forward Tests",
+        "operationId": "list_forward_tests_api_forward_tests_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ForwardTestResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Forward Tests Api Forward Tests Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Start Forward Test",
+        "operationId": "start_forward_test_api_forward_tests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartForwardTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartRefusedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forward-tests/{forward_test_id}/stop": {
+      "post": {
+        "summary": "Stop Forward Test",
+        "operationId": "stop_forward_test_api_forward_tests__forward_test_id__stop_post",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/watchlist": {
       "get": {
         "summary": "List Instruments",
@@ -1241,7 +1356,7 @@
         ]
       },
       "BarPeriod": {
-        "type": "string",
+        "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format.",
         "enum": [
           "1-MINUTE",
           "5-MINUTE",
@@ -1251,7 +1366,7 @@
           "1-DAY"
         ],
         "title": "BarPeriod",
-        "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format."
+        "type": "string"
       },
       "BarResponse": {
         "description": "`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings.",
@@ -1357,6 +1472,13 @@
         ],
         "title": "CreateStrategyRequest"
       },
+      "DesiredState": {
+        "enum": [
+          "running",
+          "stopped"
+        ],
+        "type": "string"
+      },
       "EquityPointResponse": {
         "properties": {
           "time_utc": {
@@ -1388,6 +1510,132 @@
           "detail"
         ],
         "title": "ErrorResponse"
+      },
+      "ForwardTestResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "strategy_version_id": {
+            "title": "Strategy Version Id",
+            "type": "integer"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "integer"
+          },
+          "strategy_name": {
+            "title": "Strategy Name",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "desired_state": {
+            "$ref": "#/components/schemas/DesiredState"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ForwardTestStatus"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "start_balance_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Balance Usd"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at_utc": {
+            "format": "date-time",
+            "title": "Created At Utc",
+            "type": "string"
+          },
+          "stopped_at_utc": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped At Utc"
+          }
+        },
+        "required": [
+          "id",
+          "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "desired_state",
+          "status",
+          "client_id",
+          "start_balance_usd",
+          "error_message",
+          "created_at_utc",
+          "stopped_at_utc"
+        ],
+        "title": "ForwardTestResponse",
+        "type": "object"
+      },
+      "ForwardTestStatus": {
+        "enum": [
+          "starting",
+          "running",
+          "stopping",
+          "stopped",
+          "stop_failed",
+          "failed"
+        ],
+        "type": "string"
       },
       "GatewayStatusResponse": {
         "properties": {
@@ -1504,7 +1752,7 @@
         "properties": {
           "manual_orders": {
             "items": {
-              "$ref": "#/components/schemas/ManualOrderResponse"
+              "$ref": "#/components/schemas/ManualOrderWithFillsResponse"
             },
             "type": "array",
             "title": "Manual Orders"
@@ -1591,6 +1839,107 @@
           "ibkr_order_id"
         ],
         "title": "ManualOrderResponse"
+      },
+      "ManualOrderWithFillsResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "side": {
+            "type": "string",
+            "title": "Side"
+          },
+          "quantity": {
+            "type": "integer",
+            "title": "Quantity"
+          },
+          "order_type": {
+            "type": "string",
+            "title": "Order Type"
+          },
+          "limit_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit Price"
+          },
+          "time_in_force": {
+            "type": "string",
+            "title": "Time In Force"
+          },
+          "ibkr_order_id": {
+            "type": "integer",
+            "title": "Ibkr Order Id"
+          },
+          "filled_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filled Quantity"
+          },
+          "average_fill_price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Fill Price"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at_utc",
+          "account",
+          "symbol",
+          "exchange",
+          "currency",
+          "side",
+          "quantity",
+          "order_type",
+          "limit_price",
+          "time_in_force",
+          "ibkr_order_id",
+          "filled_quantity",
+          "average_fill_price"
+        ],
+        "title": "ManualOrderWithFillsResponse",
+        "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
       },
       "OpenOrderListResponse": {
         "properties": {
@@ -1691,6 +2040,25 @@
           "can_cancel"
         ],
         "title": "OpenOrderResponse"
+      },
+      "OrderBlockedResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "forward_test_id": {
+            "type": "integer",
+            "title": "Forward Test Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "forward_test_id"
+        ],
+        "title": "OrderBlockedResponse",
+        "description": "A forward test runs on the instrument. ATrade did not send the order (section 12.2)."
       },
       "OrderErrorResponse": {
         "properties": {
@@ -1934,6 +2302,70 @@
           "paper_capital_usd"
         ],
         "title": "StartBacktestRequest"
+      },
+      "StartForwardTestRequest": {
+        "properties": {
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_version_id",
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period"
+        ],
+        "title": "StartForwardTestRequest"
+      },
+      "StartRefusedResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "forward_test_id"
+        ],
+        "title": "StartRefusedResponse",
+        "description": "The start was refused. `forward_test_id` is the forward test that already runs on the instrument."
       },
       "StrategyListItem": {
         "properties": {
@@ -2205,6 +2637,28 @@
           "instruments"
         ],
         "title": "WatchlistResponse"
+      },
+      "ForwardTestsMessage": {
+        "properties": {
+          "type": {
+            "const": "forward_tests",
+            "default": "forward_tests",
+            "title": "Type",
+            "type": "string"
+          },
+          "forward_tests": {
+            "items": {
+              "$ref": "#/components/schemas/ForwardTestResponse"
+            },
+            "title": "Forward Tests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "forward_tests"
+        ],
+        "title": "ForwardTestsMessage",
+        "type": "object"
       },
       "HeartbeatMessage": {
         "properties": {

@@ -4,16 +4,13 @@ Only the backtest child process calls this module, because the engine blocks the
 code is user code (docs/architecture.md section 10).
 """
 
-import importlib.util
 import traceback
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from types import ModuleType
 
 from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
 from nautilus_trader.common import FileWriterConfig, LoggerConfig, LogLevel, logger_flush
-from nautilus_trader.config import StrategyConfig
 from nautilus_trader.execution import FixedFeeModel
 from nautilus_trader.model import (
     AccountType,
@@ -30,19 +27,18 @@ from nautilus_trader.model import (
     Venue,
 )
 from nautilus_trader.persistence import BarDataWrangler
-from nautilus_trader.trading import Strategy
 
 from atrade.backtest.arrow_bars import NANOSECONDS_PER_SECOND, convert_bars_to_arrow_bytes
 from atrade.backtest.backtest_metrics import BacktestTrade
 from atrade.backtest.backtest_store import BacktestRequest
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
+from atrade.strategy import StrategyFileError, load_strategy_classes
 
 MIN_PRICE_PRECISION = 2
 # NautilusTrader refuses a precision above 9 in its standard-precision build. IBKR prices have fewer places.
 MAX_PRECISION = 9
 ERROR_LOG_FILE_NAME = "strategy_errors"
-STRATEGY_MODULE_NAME = "strategy_version"
 
 
 class StrategyFailedError(Exception):
@@ -54,33 +50,6 @@ def count_decimal_places(value: Decimal) -> int:
     if not isinstance(exponent, int) or exponent >= 0:
         return 0
     return min(-exponent, MAX_PRECISION)
-
-
-def load_strategy_module(code: str, work_directory: Path) -> ModuleType:
-    """Imports the strategy code from a file, so that tracebacks show its line numbers."""
-    code_file = work_directory / f"{STRATEGY_MODULE_NAME}.py"
-    code_file.write_text(code)
-    module_spec = importlib.util.spec_from_file_location(STRATEGY_MODULE_NAME, code_file)
-    if module_spec is None or module_spec.loader is None:
-        message = f"Python cannot load {code_file}."
-        raise RuntimeError(message)
-    module = importlib.util.module_from_spec(module_spec)
-    # readability-exception: running the user strategy code is the purpose of a backtest (E1).
-    module_spec.loader.exec_module(module)
-    return module
-
-
-def find_strategy_classes(module: ModuleType) -> tuple[type[Strategy], type[StrategyConfig]]:
-    """The checks before save make sure that the file has exactly 1 subclass of each (strategy.md section 9.3)."""
-    defined_classes = [
-        value for value in vars(module).values() if isinstance(value, type) and value.__module__ == module.__name__
-    ]
-    strategy_classes = [value for value in defined_classes if issubclass(value, Strategy)]
-    config_classes = [value for value in defined_classes if issubclass(value, StrategyConfig)]
-    if len(strategy_classes) != 1 or len(config_classes) != 1:
-        message = "The strategy file must have exactly 1 Strategy subclass and 1 StrategyConfig subclass."
-        raise StrategyFailedError(message)
-    return strategy_classes[0], config_classes[0]
 
 
 def create_instrument(instrument: Instrument, bars: list[Bar]) -> Equity:
@@ -160,14 +129,14 @@ def run_strategy_on_bars(
     engine.add_instrument(nautilus_instrument)
     engine.add_data(nautilus_bars)
     try:
-        strategy_class, config_class = find_strategy_classes(load_strategy_module(code, work_directory))
+        strategy_class, config_class = load_strategy_classes(code, work_directory)
         # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
         # them (docs/architecture/strategy.md section 9.2).
         config = config_class(instrument_id=nautilus_instrument.id, bar_type=bar_type)  # pyright: ignore[reportCallIssue]
         engine.add_strategy(strategy_class(config))
         engine.run()
-    except StrategyFailedError:
-        raise
+    except StrategyFileError as error:
+        raise StrategyFailedError(str(error)) from error
     except Exception as error:
         # readability-exception: any error of the user code ends the backtest with its traceback (G1).
         raise StrategyFailedError("".join(traceback.format_exception(error))) from error

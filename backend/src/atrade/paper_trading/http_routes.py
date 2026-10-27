@@ -16,8 +16,10 @@ from atrade.foundation.clock import Clock
 from atrade.ibkr import GatewayRequestError, PortfolioPosition
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor, fetch_paper_capital_usd
 from atrade.paper_trading.paper_orders import (
+    FindBlockingForwardTest,
     ManualOrderResponse,
     OpenOrderResponse,
+    OrderBlockedResponse,
     OrderErrorResponse,
     OrderRefusedResponse,
     PaperOrderRoutes,
@@ -154,10 +156,7 @@ async def wait_for_disconnect(websocket: WebSocket) -> None:
         return
 
 
-def add_order_routes(
-    router: APIRouter, *, paper_account_monitor: PaperAccountMonitor, database_url: str, clock: Clock
-) -> None:
-    routes = PaperOrderRoutes(paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock)
+def add_order_routes(router: APIRouter, routes: PaperOrderRoutes) -> None:
     refused_or_failed: dict[int | str, dict[str, Any]] = {
         status.HTTP_403_FORBIDDEN: {"model": OrderRefusedResponse},
         status.HTTP_502_BAD_GATEWAY: {"model": OrderErrorResponse},
@@ -168,7 +167,7 @@ def add_order_routes(
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=ManualOrderResponse,
-        responses=refused_or_failed,
+        responses={**refused_or_failed, status.HTTP_409_CONFLICT: {"model": OrderBlockedResponse}},
     )
     router.add_api_route(
         "/api/paper-trading/orders",
@@ -192,10 +191,21 @@ def add_order_routes(
 
 
 def create_paper_trading_router(
-    *, paper_account_monitor: PaperAccountMonitor, database_url: str, clock: Clock
+    *,
+    paper_account_monitor: PaperAccountMonitor,
+    database_url: str,
+    clock: Clock,
+    find_blocking_forward_test: FindBlockingForwardTest,
 ) -> APIRouter:
+    """`find_blocking_forward_test` returns the forward test that runs on an instrument (section 12.2)."""
     router = APIRouter()
-    add_order_routes(router, paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock)
+    routes = PaperOrderRoutes(
+        paper_account_monitor=paper_account_monitor,
+        database_url=database_url,
+        clock=clock,
+        find_blocking_forward_test=find_blocking_forward_test,
+    )
+    add_order_routes(router, routes)
 
     @router.get("/api/paper-trading/paper-capital")
     def read_paper_capital() -> PaperCapitalResponse:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.

@@ -10,7 +10,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Protocol
 
-from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Order, RequestError
+from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Order, RequestError, Trade
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -23,11 +23,21 @@ from atrade.ibkr.historical_bars import (
     plan_historical_data_requests,
     to_bar,
 )
-from atrade.ibkr.orders import OpenOrder, OrderRequest, build_contract, build_order, convert_trade
+from atrade.ibkr.orders import (
+    Execution,
+    OpenOrder,
+    OrderRequest,
+    build_contract,
+    build_order,
+    convert_fill,
+    convert_trade,
+)
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
 OPEN_ORDERS_TIMEOUT_SECONDS = 10.0
+CANCEL_CONFIRMATION_TIMEOUT_SECONDS = 10.0
+CANCEL_CONFIRMATION_CHECK_SECONDS = 0.1
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
 HISTORICAL_DATA_TIMEOUT_SECONDS = 60.0
@@ -80,6 +90,26 @@ class GatewayConnection(Protocol):
 
     async def cancel_order(self, order_id: int) -> None:
         """Cancels an order that this client ID sent. Raises GatewayRequestError without a connection."""
+        ...
+
+    async def connect(self) -> None:
+        """Connects one time. Raises GatewayRequestError when IB Gateway is not reachable. A forward test child uses
+        it instead of keep_connected, because it needs the connection only for a short time (section 12.5)."""
+        ...
+
+    async def read_own_open_orders(self) -> list[OpenOrder]:
+        """The open orders of this client ID only (reqOpenOrders)."""
+        ...
+
+    async def cancel_order_and_wait(self, order_id: int) -> None:
+        """Cancels an order of this client ID and waits until IBKR confirms that the order is done.
+
+        Raises GatewayRequestError without a connection or without the confirmation in time.
+        """
+        ...
+
+    async def read_executions(self) -> list[Execution]:
+        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows."""
         ...
 
     async def read_historical_bars(
@@ -209,6 +239,50 @@ class IbAsyncGatewayConnection:
     async def cancel_order(self, order_id: int) -> None:
         self.require_connection()
         self.ib.cancelOrder(Order(orderId=order_id, clientId=self.client_id))
+
+    async def connect(self) -> None:
+        await self.try_to_connect()
+        self.require_connection()
+
+    async def read_own_open_orders(self) -> list[OpenOrder]:
+        """https://interactivebrokers.github.io/tws-api/open_orders.html"""
+        self.require_connection()
+        trades = await self.request_own_open_trades()
+        return [convert_trade(trade) for trade in trades]
+
+    async def request_own_open_trades(self) -> list[Trade]:
+        async with self.open_orders_lock:
+            try:
+                trades = await asyncio.wait_for(self.ib.reqOpenOrdersAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
+            except (ConnectionError, RequestError, TimeoutError) as error:
+                message = f"IB Gateway did not return the open orders of client ID {self.client_id}: {error}"
+                raise GatewayRequestError(message) from error
+        return [trade for trade in trades if not trade.isDone() and trade.order.clientId == self.client_id]
+
+    async def cancel_order_and_wait(self, order_id: int) -> None:
+        self.require_connection()
+        trades = [trade for trade in await self.request_own_open_trades() if trade.order.orderId == order_id]
+        if not trades:
+            return
+        trade = trades[0]
+        self.ib.cancelOrder(trade.order)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + CANCEL_CONFIRMATION_TIMEOUT_SECONDS
+        while not trade.isDone():
+            if loop.time() >= deadline or not self.ib.isConnected():
+                message = f"IB Gateway did not confirm the cancel of order {order_id} in time."
+                raise GatewayRequestError(message)
+            await asyncio.sleep(CANCEL_CONFIRMATION_CHECK_SECONDS)
+
+    async def read_executions(self) -> list[Execution]:
+        """https://interactivebrokers.github.io/tws-api/executions_commissions.html"""
+        self.require_connection()
+        try:
+            fills = await asyncio.wait_for(self.ib.reqExecutionsAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
+        except (ConnectionError, RequestError, TimeoutError) as error:
+            message = f"IB Gateway did not return the executions: {error}"
+            raise GatewayRequestError(message) from error
+        return [convert_fill(fill) for fill in fills]
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange

@@ -8,8 +8,9 @@ export {
   cancelPaperOrder,
   describeOrderForConfirmation,
   describeOrderSource,
+  readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
   sendPaperOrder,
 } from './paper_orders';
-export type { OpenOrder, OrderForm, OrderSource, SendOrderRequest } from './paper_orders';
+export type { ManualOrder, OpenOrder, OrderForm, OrderSource, SendOrderRequest } from './paper_orders';

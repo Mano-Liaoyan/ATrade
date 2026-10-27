@@ -5,6 +5,7 @@ import type { components } from '#lib/api';
 export type SendOrderRequest = components['schemas']['SendOrderRequest'];
 export type OpenOrder = components['schemas']['OpenOrderResponse'];
 export type OrderSource = components['schemas']['OrderSourceResponse'];
+export type ManualOrder = components['schemas']['ManualOrderWithFillsResponse'];
 type OrderSide = components['schemas']['OrderSide'];
 type OrderType = components['schemas']['OrderType'];
 type TimeInForce = components['schemas']['TimeInForce'];
@@ -31,6 +32,7 @@ export interface ConfirmationLine {
 }
 
 export const PAPER_ORDERS_PATH = '/api/paper-trading/orders';
+const MANUAL_ORDERS_PATH = '/api/paper-trading/manual-orders';
 
 const WHOLE_NUMBER_PATTERN = /^\d+$/;
 const SIDE_NAMES: Record<OrderSide, string> = { BUY: 'Buy', SELL: 'Sell' };
@@ -129,6 +131,25 @@ export async function cancelPaperOrder(fetchFunction: typeof fetch, orderId: num
     return { kind: 'failed', message: describeError(await readJson(response), response.status) };
   }
   return { kind: 'cancel_sent' };
+}
+
+function isFilled(order: ManualOrder): boolean {
+  return order.filled_quantity !== null && Number(order.filled_quantity) > 0;
+}
+
+/** The orders by hand with a fill from IBKR, newest first. Null when the backend does not answer. */
+export async function readFilledManualOrders(fetchFunction: typeof fetch): Promise<ManualOrder[] | null> {
+  let response: Response;
+  try {
+    response = await fetchFunction(MANUAL_ORDERS_PATH);
+  } catch {
+    return null;
+  }
+  if (!response.ok) {
+    return null;
+  }
+  const body = (await response.json()) as components['schemas']['ManualOrderListResponse'];
+  return body.manual_orders.filter(isFilled).reverse();
 }
 
 async function readJson(response: Response): Promise<unknown> {
