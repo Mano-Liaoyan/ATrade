@@ -269,7 +269,7 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 
 Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
 It holds the live order switch, the paper account check, paper orders sent by
-hand, the order list, the `paper_trading` module, `/ws/paper-trading`, and the
+hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
 account panel, and the order routes (11.8).
 
 ## 12. Forward test
