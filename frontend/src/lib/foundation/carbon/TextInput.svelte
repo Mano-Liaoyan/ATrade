@@ -5,8 +5,10 @@
   import Icon from './Icon.svelte';
   import { textInputClasses } from './carbon_state';
 
-  interface Props extends Omit<HTMLInputAttributes, 'class' | 'value'> {
+  interface Props extends Omit<HTMLInputAttributes, 'class' | 'value' | 'type'> {
     label: string;
+    // A text input, or a native date and time input with the Carbon text input look.
+    type?: 'text' | 'datetime-local';
     value?: string;
     // The message that tells the user how to correct the value. The input is invalid when it is set.
     invalidText?: string | null;
@@ -15,7 +17,7 @@
   }
 
   const uid = $props.id();
-  let { label, value = $bindable(''), invalidText = null, id, class: className, ...restProps }: Props = $props();
+  let { label, type = 'text', value = $bindable(''), invalidText = null, id, class: className, ...restProps }: Props = $props();
 
   const invalid = $derived(invalidText !== null);
   const inputId = $derived(id ?? `text-input-${uid}`);
@@ -31,7 +33,7 @@
       <input
         {...restProps}
         id={inputId}
-        type="text"
+        {type}
         class={[...textInputClasses(invalid), className]}
         aria-invalid={invalid ? 'true' : undefined}
         aria-describedby={invalid ? errorId : undefined}

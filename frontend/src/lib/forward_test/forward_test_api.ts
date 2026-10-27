@@ -1,6 +1,7 @@
 // Calls the forward test routes and reads /ws/forward-tests (backend/src/atrade/forward_test/http_routes.py).
 // The Web process writes only the desired state. The forward-test worker writes the status (docs/architecture.md 12.3).
 import type { components } from '#lib/api';
+import type { StatusKind } from '#lib/foundation/carbon';
 import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
@@ -44,6 +45,17 @@ const STATUS_LABELS: Record<ForwardTestStatus, string> = {
   failed: 'Failed',
 };
 
+// The icon and the color of each status (AGENTS.md: a status shows an icon and a word together with its color).
+const STATUS_KINDS: Record<ForwardTestStatus, StatusKind> = {
+  starting: 'in-progress',
+  running: 'success',
+  waiting_for_gateway: 'warning',
+  stopping: 'in-progress',
+  stopped: 'neutral',
+  stop_failed: 'error',
+  failed: 'error',
+};
+
 const INTERRUPTION_REASON_LABELS: Record<ForwardTestInterruption['reason'], string> = {
   crash: 'Crash',
   gateway: 'IB Gateway not reachable',
@@ -56,6 +68,10 @@ export function isLiveBarPeriod(barPeriod: BarPeriod): boolean {
 
 export function describeForwardTestStatus(status: ForwardTestStatus): string {
   return STATUS_LABELS[status];
+}
+
+export function findForwardTestStatusKind(status: ForwardTestStatus): StatusKind {
+  return STATUS_KINDS[status];
 }
 
 export function describeInterruptionReason(reason: ForwardTestInterruption['reason']): string {
