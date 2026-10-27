@@ -10,12 +10,17 @@ is in GitHub Issues.
 
 ## Current state
 
-The repository holds the minimum runnable skeleton (issue #62):
+The repository holds the minimum runnable skeleton (issue #62) and these
+capabilities:
 
-- The `web` service serves an empty app shell and `GET /api/health`.
-- The `postgres` service holds the database. It has no tables yet.
-- No capability (market data, watchlist, strategies, backtests, paper trading,
-  forward tests) is available yet.
+- The `web` service serves the app shell and `GET /api/health`.
+- The `postgres` service holds the database.
+- Strategies (#68): the page `/strategies` creates a strategy from a template.
+  The editor saves the code as strategy versions after the checks before save.
+  Unsaved edits stay in the browser. See
+  [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
+- Market data, watchlist, backtests, paper trading, and forward tests are not
+  available yet.
 
 ## Requirements
 

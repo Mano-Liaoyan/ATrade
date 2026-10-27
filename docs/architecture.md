@@ -121,6 +121,7 @@ deploy/                # compose.yaml, web.Dockerfile
 scripts/check          # the quality gate: the same checks as CI (section 17.7)
 docs/
   architecture.md      # this document
+  architecture/        # capability sections split out of this document (section 18)
   adr/                 # decisions that are hard to reverse
 start                  # Unix only: ./start run calls docker compose up
 README.md
@@ -269,63 +270,26 @@ Sources: [IBKR access research](https://github.com/Mano-Liaoyan/ATrade/issues/30
 
 ## 9. Strategies and strategy versions
 
-Source: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48).
+The full specification of this capability is in
+[`docs/architecture/strategy.md`](architecture/strategy.md). This document
+became longer than 1000 lines, so the strategy section moved there (section
+18). The old subsections have these new places:
 
-The user writes strategies in the browser. A saved strategy version can run in
-a backtest at once, with no deployment.
-
-### 9.1 Storage
-
-- PostgreSQL has two tables: `strategy` (the name) and `strategy_version`
-  (code text, sha256, sequence number, time). Do not use git or a PostgreSQL
-  extension for versions.
-- Strategy versions are append-only. They must not change.
-- The sequence number starts at 1 in each strategy and goes up by 1.
-- When the code is the same as the previous version, no new version is made.
-- The UI shows a version as "strategy name v3".
-- To go back, open an old version and save it as a new version.
-- Unsaved edits exist only in the browser `localStorage`.
-- The backtest table and the forward test table each have a
-  `strategy_version_id` foreign key. It must not be null.
-- Strategy versions cannot be deleted. A strategy that no backtest or forward
-  test uses can be deleted. A strategy in use cannot be deleted.
-
-### 9.2 Strategy file format
-
-- The file has exactly 1 `Strategy` subclass and exactly 1 `StrategyConfig`
-  subclass.
-- The platform fills in `instrument_id` and `bar_type` at run time.
-- All other configuration fields must have default values. This stage has no
-  parameter input form.
-- NautilusTrader 2.0 requires a keyword-only `__init__` in the strategy
-  configuration. The template shows it.
-- The strategy template shows how to warm up indicators with `request_bars` in
-  `on_start`.
-
-### 9.3 Checks before save
-
-The checks run in the Web process. They do not import the user code.
-
-| Check | Blocks save |
+| Old section | New place in `docs/architecture/strategy.md` |
 |---|---|
-| `ast.parse` fails | Yes |
-| Not exactly 1 `Strategy` subclass and 1 `StrategyConfig` subclass (AST check) | Yes |
-| ruff `F` rule errors | Yes |
-| basedpyright type errors | No. The editor shows them live. |
+| 9.1 Storage | 1. Storage |
+| 9.2 Strategy file format | 2. Strategy file format |
+| 9.3 Checks before save | 3. Checks before save |
+| 9.4 Code completion | 6. Code completion |
+| 9.5 Comparison | 7. Comparison |
 
-### 9.4 Code completion
+Summary:
 
-- basedpyright only does static analysis. It does not run user code, so it
-  needs no isolation.
-- Each editor WebSocket connection starts 1 basedpyright child process in the
-  `web` container. The process stops when the connection closes.
-
-### 9.5 Comparison
-
-- Compare only two versions of the same strategy. The user selects 2 backtest
-  results. The page shows the code diff (`@codemirror/merge`), the metric
-  table, and both equity curves on one chart.
-- For different strategies, the backtest list shows the metrics side by side.
+- The user writes strategies in the browser. A saved strategy version can run
+  in a backtest at once, with no deployment.
+- Strategy versions are append-only. Each backtest and each forward test
+  references one strategy version (`strategy_version_id`, not null).
+- The checks before save do not import the user code.
 
 ## 10. Backtest
 
@@ -923,6 +887,9 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
   - `GLOSSARY.md`: terms.
 - This document (`docs/architecture.md`) is the architecture specification.
   When it is longer than 1000 lines, split it by capability.
+  A split section goes to `docs/architecture/<capability>.md` and is part of
+  the specification. Its old section here keeps a link and a short summary.
+  Split sections: `strategy.md` (section 9, #68).
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
 - There is no document index and no `active` or `obsolete` status.

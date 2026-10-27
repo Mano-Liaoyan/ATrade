@@ -1,6 +1,7 @@
 <!-- App shell: header with the product name and the backend status, and the main region for each page. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { resolve } from '$app/paths';
   import { describeBackendHealth, fetchBackendHealth, type BackendHealth } from '#lib/foundation/backend_health';
 
   const { children }: { children: Snippet } = $props();
@@ -17,6 +18,10 @@
 <div class="app-shell">
   <header class="app-header">
     <span class="product-name">ATrade</span>
+    <nav class="app-navigation">
+      <a href={resolve('/')}>Home</a>
+      <a href={resolve('/strategies')}>Strategies</a>
+    </nav>
     <span class="backend-status" role="status">{describeBackendHealth(backendHealth)}</span>
   </header>
   <main class="app-main">
@@ -70,6 +75,12 @@
   .product-name {
     font-weight: 700;
     font-size: 1.125rem;
+  }
+
+  .app-navigation {
+    display: flex;
+    gap: 1rem;
+    margin-right: auto;
   }
 
   .backend-status {

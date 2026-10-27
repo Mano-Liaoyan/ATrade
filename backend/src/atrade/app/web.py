@@ -15,6 +15,7 @@ from atrade.app.frontend_files import create_frontend_router
 from atrade.app.health_routes import create_health_router
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
+from atrade.strategy import create_strategy_router
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -26,6 +27,7 @@ logger = logging.getLogger("atrade.web")
 def create_web_app(*, settings: Settings, clock: Clock) -> FastAPI:
     app = FastAPI(title="ATrade")
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))
+    app.include_router(create_strategy_router(database_url=settings.database_url, clock=clock))
     # The frontend router matches every path, so it is mounted last.
     app.include_router(create_frontend_router(settings.frontend_build_dir))
     return app
