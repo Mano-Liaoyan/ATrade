@@ -10,7 +10,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "check": "svelte-kit sync && svelte-check --fail-on-warnings",
-    "lint": "eslint .",
+    "lint": "svelte-kit sync && eslint .",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "generate:api": "uv run --directory ../backend python -m atrade.app.openapi_document ../frontend/src/lib/api/openapi.json && openapi-typescript src/lib/api/openapi.json --output src/lib/api/index.ts",
