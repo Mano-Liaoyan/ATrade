@@ -1,6 +1,6 @@
-// Calls GET /api/market-data/bars and reads the chart instrument and bar period from the page URL.
+// Calls GET /api/market-data/bars and reads the chart instrument and bar period from the instrument page URL.
 import { describe, expect, it } from 'vitest';
-import { formatChartQuery, readBars, readChartRequest } from './index';
+import { formatChartSearch, readBars, readChartRequest } from './index';
 
 const TENCENT = { symbol: '700', exchange: 'SEHK', currency: 'HKD' };
 const BAR = { time: 1767225600, open: 146, high: 148, low: 145, close: 146.5, volume: 1000 };
@@ -54,28 +54,38 @@ describe('readBars', () => {
 });
 
 describe('readChartRequest', () => {
-  it('reads the instrument and the bar period from the URL', () => {
-    const searchParameters = new URLSearchParams('symbol=700&exchange=SEHK&currency=HKD&bar_period=5-MINUTE');
+  it('reads the instrument from the route and the bar period from the URL', () => {
+    const searchParameters = new URLSearchParams('currency=HKD&bar_period=5-MINUTE');
 
-    expect(readChartRequest(searchParameters)).toEqual({ instrument: TENCENT, barPeriod: '5-MINUTE' });
+    const chartRequest = readChartRequest({ exchange: 'SEHK', symbol: '700' }, searchParameters);
+
+    expect(chartRequest).toEqual({ instrument: TENCENT, barPeriod: '5-MINUTE' });
   });
 
   it('uses daily bars when the URL has no bar period or an unknown one', () => {
-    const searchParameters = new URLSearchParams('symbol=700&exchange=SEHK&currency=HKD&bar_period=1-candle');
+    const route = { exchange: 'SEHK', symbol: '700' };
 
-    expect(readChartRequest(searchParameters)).toEqual({ instrument: TENCENT, barPeriod: '1-DAY' });
+    expect(readChartRequest(route, new URLSearchParams('currency=HKD'))).toEqual({ instrument: TENCENT, barPeriod: '1-DAY' });
+    expect(readChartRequest(route, new URLSearchParams('currency=HKD&bar_period=1-WEEK'))).toEqual({
+      instrument: TENCENT,
+      barPeriod: '1-DAY',
+    });
   });
 
   it('returns null when the URL does not name a complete instrument', () => {
-    expect(readChartRequest(new URLSearchParams('symbol=700&exchange=SEHK'))).toBeNull();
+    expect(readChartRequest({ exchange: 'SEHK', symbol: '700' }, new URLSearchParams(''))).toBeNull();
+    expect(readChartRequest({ symbol: '700' }, new URLSearchParams('currency=HKD'))).toBeNull();
   });
 });
 
-describe('formatChartQuery', () => {
-  it('writes the query that readChartRequest reads', () => {
-    const chartQuery = formatChartQuery({ instrument: TENCENT, barPeriod: '1-HOUR' });
+describe('formatChartSearch', () => {
+  it('writes the URL search that readChartRequest reads', () => {
+    const chartSearch = formatChartSearch({ instrument: TENCENT, barPeriod: '1-HOUR' });
 
-    expect(chartQuery).toBe('symbol=700&exchange=SEHK&currency=HKD&bar_period=1-HOUR');
-    expect(readChartRequest(new URLSearchParams(chartQuery))).toEqual({ instrument: TENCENT, barPeriod: '1-HOUR' });
+    expect(chartSearch).toBe('currency=HKD&bar_period=1-HOUR');
+    expect(readChartRequest({ exchange: 'SEHK', symbol: '700' }, new URLSearchParams(chartSearch))).toEqual({
+      instrument: TENCENT,
+      barPeriod: '1-HOUR',
+    });
   });
 });

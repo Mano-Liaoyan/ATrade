@@ -43,11 +43,18 @@ account panel (issue #74):
   it from the watchlist panel on the home page. The watchlist is in
   PostgreSQL, so it stays after a restart. A watchlist instrument opens the
   instrument page `/instruments/<exchange>/<symbol>?currency=<currency>`.
-  This page is a placeholder until the bar chart is available. Routes are
-  under `/api/watchlist`. See
+  Routes are under `/api/watchlist`. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.3.
-- Bars, backtests, paper trading, and forward tests are not available yet.
+- Bar chart: the instrument page shows the bar chart of the instrument for
+  one bar period (1 minute to 1 day). Bars come from IBKR and stay in
+  PostgreSQL. The next request for the same range does not call IBKR, so
+  saved bars show also when IB Gateway is not reachable. The route is
+  `GET /api/market-data/bars`. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.4.
+- Live bar updates, backtests, paper trading, and forward tests are not
+  available yet.
 
 ## Requirements
 

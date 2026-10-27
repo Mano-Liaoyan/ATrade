@@ -107,7 +107,11 @@ make sure that the `ib-gateway` service runs and is logged in.
 
 - `backend/tests/ibkr/test_gateway_connection_contract.py` runs the same
   assertions against the fake and against the real paper account. It covers
-  the connection, `managedAccounts`, and the instrument search.
+  the connection, `managedAccounts`, the instrument search, and historical
+  bars (`AAPL / NASDAQ / USD`, 1 minute and 1 day bars from 2026-03-02 to
+  2026-03-05: the bars are in the range, ordered, unique, on bar period
+  starts, on the 3 trading days, and a call without a connection raises
+  `GatewayRequestError`).
 - The real case has the mark `ibkr_paper`. The default pytest options
   (`-m "not ibkr_paper"`) leave it out, so CI runs only the fake. Run it by
   hand with `uv run pytest -m ibkr_paper` in `backend/`.

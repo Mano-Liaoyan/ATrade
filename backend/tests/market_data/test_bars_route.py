@@ -233,7 +233,7 @@ async def test_reads_the_default_range_of_the_bar_period_up_to_now_without_times
         ("1-HOUR", "2026-01-01T02:00:00Z", "2026-01-01T02:00:00Z"),
         ("1-HOUR", "2026-01-01T02:00:00Z", "2026-01-01T01:00:00Z"),
         ("1-HOUR", "2026-01-01T00:00:00", "2026-01-01T02:00:00Z"),
-        ("1-candle", "2026-01-01T00:00:00Z", "2026-01-01T02:00:00Z"),
+        ("1-WEEK", "2026-01-01T00:00:00Z", "2026-01-01T02:00:00Z"),
         ("1-MINUTE", "2025-01-01T00:00:00Z", "2026-01-01T00:00:00Z"),
     ],
     ids=["empty range", "end before start", "no time zone", "unknown bar period", "too many bars"],

@@ -151,7 +151,7 @@ counts from `atrade/`.
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, and the paper account check. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
-| `foundation/` | `money`, `clock`, `instrument`, `settings`, `order_ref`. |
+| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`. |
 | `app/` | Program entry points. They create and connect all dependencies. |
 
 ### 6.2 Dependency direction

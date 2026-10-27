@@ -96,7 +96,78 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
   capability, so the page combines them.
 - The watchlist list is in a `ScrollRegion` named `Watchlist instruments`.
 - Each watchlist instrument is a link to
-  `/instruments/<exchange>/<symbol>?currency=<currency>`. This page is a
-  placeholder that shows the instrument name. The bar chart ticket
-  ([#65](https://github.com/Mano-Liaoyan/ATrade/issues/65)) replaces it with
-  the chart.
+  `/instruments/<exchange>/<symbol>?currency=<currency>`. This page shows
+  the bar chart (section 8.4).
+
+## 8.4 Bars and the bar chart
+
+Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/65).
+
+- `foundation/bar.py` has `Bar` (`start_utc`, `open`, `high`, `low`,
+  `close`, `volume`, all prices and the volume as `Decimal`), `BarPeriod`,
+  and `TimeRange` (start included, end not included). The `BarPeriod`
+  values use the NautilusTrader bar specification format: `1-MINUTE`,
+  `5-MINUTE`, `15-MINUTE`, `30-MINUTE`, `1-HOUR`, `1-DAY`. Bar periods
+  start at the UNIX epoch in UTC. A daily bar starts at 00:00 UTC of its
+  trading date.
+- Tables (migration `5b2d8e7f4a61`):
+  - `bar`: primary key `(symbol, exchange, currency, bar_period,
+    start_utc)`, `numeric` prices and volume. No partitions, no BRIN index,
+    no compression.
+  - `bar_saved_range`: the time ranges that ATrade read from IBKR for one
+    instrument and bar period. A saved range can have no bars, for example a
+    weekend or a holiday. The store joins ranges that overlap or touch, so
+    the table stays small.
+- The bars route widens the requested range to whole bar periods. It cuts
+  the range at the start of the current bar, because a bar that is not
+  complete changes later. It reads the saved ranges, asks IBKR only for the
+  missing parts, saves the bars and the range in one transaction for each
+  missing part, and then reads the bars from PostgreSQL. One lock in the
+  Web process lets only one fill run at a time.
+- When no part is missing, the route does not call IBKR. Saved bars are
+  returned also when IB Gateway is not reachable.
+- `GatewayConnection.read_historical_bars(instrument, bar_period,
+  time_range)` in `ibkr` calls `reqHistoricalData` with `TRADES`, regular
+  trading hours only (`useRTH`), `formatDate=2` (UTC), and the contract
+  `STK`, `SMART`, primary exchange, currency.
+  - Paging (`ibkr/historical_bars.py`): the range is split, newest first,
+    into requests of at most the IBKR step size of the bar period: 1 day
+    (1 minute), 7 days (5 minutes), 14 days (15 minutes), 28 days (30
+    minutes and 1 hour), 364 days (1 day). The duration is in whole days
+    (`"<n> D"`). Bars outside each request range are dropped. The requests
+    are 0.5 seconds apart, because IBKR refuses 6 or more requests for the
+    same contract in 2 seconds.
+  - `ib.RaiseRequestErrors` is on, so an API error is not read as "no
+    bars". Error 162 "query returned no data" is an empty list. A timeout
+    (60 seconds) or another error raises `GatewayRequestError`. A failed
+    part is not saved, so the next request asks IBKR again.
+
+| Route | Behavior |
+|---|---|
+| `GET /api/market-data/bars?symbol=&exchange=&currency=&bar_period=&start_utc=&end_utc=` | `200` with `{"bars": [{"time", "open", "high", "low", "close", "volume"}, ...]}`, oldest first. `time` is the bar start in UNIX seconds. |
+| | Without `end_utc`, the range ends now (the clock of `foundation`). Without `start_utc`, it starts a default length before the end: 3 days (1 minute), 10 days (5 minutes), 30 days (15 minutes), 60 days (30 minutes), 90 days (1 hour), 1096 days (1 day). |
+| | `422` when a time has no time zone, the bar period is unknown, the start is not before the end, or the range has more than 20000 bars. |
+| | `503` with `{"detail": "IB Gateway is not reachable at <host>:<port>. Bars that are not saved need IB Gateway."}` when a part is missing and the Web process is not connected. |
+| | `502` with `{"detail": "Reading bars from IB Gateway failed: <reason>"}` when IB Gateway answers with an error or does not answer. |
+
+- Frontend: `#lib/market_data` has `readBars`, `readChartRequest`,
+  `formatChartSearch`, `BAR_PERIODS`, and the `BarChart` component.
+  `BarChart` uses `createChart` and `addSeries(CandlestickSeries)` of
+  `lightweight-charts` 5.2.1 with `autoSize`. The times are UNIX timestamps.
+- The instrument page `/instruments/<exchange>/<symbol>?currency=<currency>&bar_period=<bar period>`
+  shows the chart. Without `bar_period`, it shows daily bars. The bar period
+  list changes `bar_period` in the page address. The page shows the bar
+  count (`role="status"`, name `Bar count`) or the `detail` text of the
+  backend.
+- TradingView attribution: the chart shows the TradingView logo link
+  (`attributionLogo`), the text under the chart links to
+  `https://www.tradingview.com/`, and `BarChart.svelte` holds the
+  attribution notice.
+- The IBKR fake returns one sample bar for each bar period in the range
+  (its market never closes) and records each call in
+  `historical_bar_requests`. Tests set `historical_bars_error_message`.
+- Tests: `tests/market_data/test_bars_route.py` (HTTP, assert the ranges
+  that the fake receives), `tests/ibkr/test_historical_bar_pages.py`
+  (internal paging test, the allowed exception of section 17), the contract
+  test (section 7.5), and `e2e/bar_chart.spec.ts`.
+- Live bar updates over the WebSocket are not part of this section yet.
