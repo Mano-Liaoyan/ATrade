@@ -25,13 +25,25 @@
 @use '@carbon/styles/scss/layout';
 
 // Components.
+@use '@carbon/styles/scss/components/button';
+@use '@carbon/styles/scss/components/text-input';
+@use '@carbon/styles/scss/components/list-box';
+@use '@carbon/styles/scss/components/dropdown';
+@use '@carbon/styles/scss/components/content-switcher';
+@use '@carbon/styles/scss/components/modal';
 @use '@carbon/styles/scss/components/popover';
+@use '@carbon/styles/scss/components/link';
+@use '@carbon/styles/scss/components/tabs';
 @use '@carbon/styles/scss/components/tag';
 @use '@carbon/styles/scss/components/tooltip';
 @use '@carbon/styles/scss/components/ui-shell/header';
-@use '@carbon/styles/scss/components/modal';
-@use '@carbon/styles/scss/components/search';
+@use '@carbon/styles/scss/components/form';
+@use '@carbon/styles/scss/components/combo-box';
 @use '@carbon/styles/scss/components/contained-list';
+@use '@carbon/styles/scss/components/data-table';
+@use '@carbon/styles/scss/components/overflow-menu';
+@use '@carbon/styles/scss/components/notification';
+@use '@carbon/styles/scss/components/search';
 
 // Themes: g10 is the light theme and g100 is the dark theme.
 // The system theme applies when <html> has no data-theme attribute. data-theme="light" or "dark" overrides it.

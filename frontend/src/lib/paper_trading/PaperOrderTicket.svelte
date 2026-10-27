@@ -1,9 +1,14 @@
-<!-- Order form for paper orders by hand. A confirmation dialog with the PAPER mark comes before each order. -->
+<!-- Order form for paper orders by hand. A confirmation dialog with the PAPER mark comes before each order. A forward
+     test that trades the instrument of the form disables the form button, and the form says why. -->
 <script lang="ts">
+  import { Button, ContentSwitcher, Dialog, InlineNotification, Select, Tag, TextInput } from '#lib/foundation/carbon';
   import {
     describeOrderForConfirmation,
+    describeOrderTitle,
+    findOrderBlock,
     readOrderForm,
     sendPaperOrder,
+    type BlockingForwardTest,
     type OrderForm,
     type SendOrderRequest,
   } from './paper_orders';
@@ -11,9 +16,26 @@
   interface Props {
     // The checked paper account. The backend checks it again before it sends the order.
     accountId: string;
+    blockingForwardTests?: readonly BlockingForwardTest[];
   }
 
-  const { accountId }: Props = $props();
+  const { accountId, blockingForwardTests = [] }: Props = $props();
+
+  const SIDES = [
+    { value: 'BUY' as const, label: 'Buy' },
+    { value: 'SELL' as const, label: 'Sell' },
+  ];
+  const ORDER_TYPES = [
+    { value: 'LMT' as const, label: 'Limit' },
+    { value: 'MKT' as const, label: 'Market' },
+  ];
+  const TIMES_IN_FORCE = [
+    { value: 'DAY' as const, label: 'DAY' },
+    { value: 'GTC' as const, label: 'GTC' },
+  ];
+
+  const uid = $props.id();
+  const blockReasonId = `order-block-${uid}`;
 
   const form = $state<OrderForm>({
     symbol: '',
@@ -26,17 +48,19 @@
     timeInForce: 'DAY',
   });
   let formMessage = $state<string | null>(null);
-  let resultMessage = $state<{ text: string; isError: boolean } | null>(null);
+  let resultMessage = $state<{ title: string; subtitle?: string; isError: boolean } | null>(null);
   let reviewedRequest = $state<SendOrderRequest | null>(null);
+  let isDialogOpen = $state(false);
   let isSending = $state(false);
-  let dialog: HTMLDialogElement | undefined = $state();
+  let reviewButton: HTMLButtonElement | null = $state(null);
 
-  const confirmationLines = $derived(
-    reviewedRequest === null ? [] : describeOrderForConfirmation(reviewedRequest, accountId),
-  );
+  const blockReason = $derived(findOrderBlock(form, blockingForwardTests));
 
   function reviewOrder(event: SubmitEvent): void {
     event.preventDefault();
+    if (blockReason !== null) {
+      return;
+    }
     resultMessage = null;
     const result = readOrderForm(form);
     if (result.kind === 'invalid') {
@@ -45,12 +69,7 @@
     }
     formMessage = null;
     reviewedRequest = result.request;
-    dialog?.showModal();
-  }
-
-  function closeDialog(): void {
-    dialog?.close();
-    reviewedRequest = null;
+    isDialogOpen = true;
   }
 
   async function sendReviewedOrder(): Promise<void> {
@@ -60,170 +79,154 @@
     isSending = true;
     const result = await sendPaperOrder(fetch, reviewedRequest);
     isSending = false;
-    closeDialog();
+    isDialogOpen = false;
     if (result.kind === 'sent') {
-      resultMessage = { text: `Paper order sent. IBKR order ID ${String(result.ibkrOrderId)}.`, isError: false };
+      resultMessage = { title: `Order ${String(result.ibkrOrderId)} sent`, isError: false };
     } else {
-      resultMessage = { text: result.message, isError: true };
+      resultMessage = { title: 'Order not sent', subtitle: result.message, isError: true };
     }
   }
 </script>
 
 <form class="order-ticket" aria-label="Paper order" onsubmit={reviewOrder}>
-  <label>
-    Order symbol
-    <input name="symbol" autocomplete="off" placeholder="AAPL" bind:value={form.symbol} />
-  </label>
-  <label>
-    Exchange
-    <input name="exchange" autocomplete="off" placeholder="NASDAQ" bind:value={form.exchange} />
-  </label>
-  <label>
-    Currency
-    <input name="currency" autocomplete="off" bind:value={form.currency} />
-  </label>
-  <label>
-    Side
-    <select name="side" bind:value={form.side}>
-      <option value="BUY">Buy</option>
-      <option value="SELL">Sell</option>
-    </select>
-  </label>
-  <label>
-    Quantity
-    <input name="quantity" inputmode="numeric" bind:value={form.quantity} />
-  </label>
-  <label>
-    Order type
-    <select name="order_type" bind:value={form.orderType}>
-      <option value="LMT">Limit</option>
-      <option value="MKT">Market</option>
-    </select>
-  </label>
+  <div class="side">
+    <ContentSwitcher
+      label="Side"
+      items={SIDES}
+      value={form.side}
+      onValueChange={(side: OrderForm['side']) => {
+        form.side = side;
+      }}
+    />
+  </div>
+  <TextInput label="Order symbol" name="symbol" autocomplete="off" placeholder="AAPL" bind:value={form.symbol} />
+  <TextInput label="Exchange" name="exchange" autocomplete="off" placeholder="NASDAQ" bind:value={form.exchange} />
+  <TextInput label="Currency" name="currency" autocomplete="off" bind:value={form.currency} />
+  <TextInput label="Quantity" name="quantity" inputmode="numeric" class="number" bind:value={form.quantity} />
+  <Select
+    label="Order type"
+    items={ORDER_TYPES}
+    value={form.orderType}
+    onValueChange={(orderType: OrderForm['orderType']) => {
+      form.orderType = orderType;
+    }}
+  />
   {#if form.orderType === 'LMT'}
-    <label>
-      Limit price
-      <input name="limit_price" inputmode="decimal" bind:value={form.limitPrice} />
-    </label>
+    <TextInput label="Limit price" name="limit_price" inputmode="decimal" class="number" bind:value={form.limitPrice} />
   {/if}
-  <label>
-    Time in force
-    <select name="time_in_force" bind:value={form.timeInForce}>
-      <option value="DAY">DAY</option>
-      <option value="GTC">GTC</option>
-    </select>
-  </label>
-  <button type="submit">Review order</button>
+  <Select
+    label="Time in force"
+    items={TIMES_IN_FORCE}
+    value={form.timeInForce}
+    onValueChange={(timeInForce: OrderForm['timeInForce']) => {
+      form.timeInForce = timeInForce;
+    }}
+  />
+  <div class="submit">
+    <Button
+      type="submit"
+      bind:ref={reviewButton}
+      disabled={blockReason !== null}
+      aria-describedby={blockReason === null ? undefined : blockReasonId}
+    >
+      Review order
+    </Button>
+  </div>
 </form>
 
+{#if blockReason !== null}
+  <p id={blockReasonId} class="message">{blockReason}</p>
+{/if}
 {#if formMessage !== null}
   <p class="message error" role="alert">{formMessage}</p>
 {/if}
 {#if resultMessage !== null}
-  <p class="message" class:error={resultMessage.isError} role={resultMessage.isError ? 'alert' : 'status'}>
-    {resultMessage.text}
-  </p>
+  <InlineNotification
+    kind={resultMessage.isError ? 'error' : 'success'}
+    title={resultMessage.title}
+    subtitle={resultMessage.subtitle}
+    lowContrast
+    onClose={() => (resultMessage = null)}
+  />
 {/if}
 
-<dialog bind:this={dialog} aria-labelledby="confirm-order-title" oncancel={closeDialog}>
-  <h3 id="confirm-order-title">Confirm paper order</h3>
-  <p class="paper-mark">PAPER</p>
-  <dl class="confirmation">
-    {#each confirmationLines as line (line.label)}
-      <div>
-        <dt>{line.label}</dt>
-        <dd>{line.value}</dd>
-      </div>
-    {/each}
-  </dl>
-  <div class="dialog-buttons">
-    <button type="button" onclick={closeDialog} disabled={isSending}>Back</button>
-    <button type="button" class="send" onclick={sendReviewedOrder} disabled={isSending}>Send paper order</button>
-  </div>
-</dialog>
+{#if reviewedRequest !== null}
+  <Dialog
+    open={isDialogOpen}
+    onOpenChange={(open: boolean) => {
+      isDialogOpen = open;
+    }}
+    label={accountId}
+    title={describeOrderTitle(reviewedRequest)}
+    primaryText="Send paper order"
+    busy={isSending}
+    returnFocus={reviewButton}
+    onPrimary={() => {
+      void sendReviewedOrder();
+    }}
+  >
+    <Tag label="PAPER" kind="blue" />
+    <dl class="confirmation">
+      {#each describeOrderForConfirmation(reviewedRequest) as line (line.label)}
+        <div>
+          <dt>{line.label}</dt>
+          <dd>{line.value}</dd>
+        </div>
+      {/each}
+    </dl>
+  </Dialog>
+{/if}
 
 <style>
   .order-ticket {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
     align-items: end;
-    gap: 0.5rem 0.75rem;
+    gap: var(--cds-spacing-05);
   }
 
-  .order-ticket label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.875rem;
+  .side,
+  .submit {
+    grid-column: 1 / -1;
   }
 
-  .order-ticket input {
-    inline-size: 7rem;
+  .order-ticket :global(input.number) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
   }
 
   .message {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 
   .error {
-    color: var(--color-warning);
-    font-weight: 600;
-  }
-
-  dialog {
-    max-inline-size: min(28rem, calc(100vw - 2rem));
-    border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
-    background: var(--color-surface);
-    color: inherit;
-  }
-
-  h3 {
-    margin: 0 0 0.5rem;
-    font-size: 1rem;
-  }
-
-  .paper-mark {
-    display: inline-block;
-    margin: 0 0 0.75rem;
-    padding: 0.125rem 0.5rem;
-    border-radius: 0.25rem;
-    background: var(--color-warning);
-    color: var(--color-surface);
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    color: var(--cds-text-error);
   }
 
   .confirmation {
     display: grid;
-    gap: 0.375rem;
-    margin: 0 0 1rem;
+    margin: var(--cds-spacing-05) 0 0;
   }
 
   .confirmation div {
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--cds-spacing-05);
+    padding-block: var(--cds-spacing-03);
+    border-block-end: 1px solid var(--cds-border-subtle-01);
   }
 
   .confirmation dt {
-    color: var(--color-muted);
+    color: var(--cds-text-secondary);
   }
 
   .confirmation dd {
     margin: 0;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
-  }
-
-  .dialog-buttons {
-    display: flex;
-    justify-content: end;
-    gap: 0.5rem;
-  }
-
-  .send {
-    font-weight: 600;
   }
 </style>

@@ -32,9 +32,9 @@ async function addThroughBackend(request: APIRequestContext, symbol: string): Pr
   await request.post(WATCHLIST_PATH, { data: instrument });
 }
 
+// The search runs while the user types. There is no Search button.
 async function searchFor(page: Page, query: string): Promise<void> {
   await page.getByLabel('Symbol', { exact: true }).fill(query);
-  await page.getByRole('button', { name: 'Search' }).click();
 }
 
 test.beforeEach(async ({ request }, currentTest) => {
@@ -47,11 +47,16 @@ test('adds an instrument from the search, keeps it after a reload, and deletes i
   await page.goto('/');
 
   await searchFor(page, symbol);
-  await page.getByRole('button', { name: `Add ${instrumentName} to the watchlist` }).click();
+  await page.getByRole('option', { name: instrumentName }).click();
 
   const watchlistRegion = page.getByRole('region', { name: 'Watchlist instruments' });
   await expect(watchlistRegion.getByRole('link', { name: instrumentName })).toBeVisible();
-  await expect(page.getByText('In watchlist')).toBeVisible();
+  // The candidate list marks an instrument that is in the watchlist.
+  await page.getByLabel('Symbol', { exact: true }).press('ArrowDown');
+  const savedOption = page.getByRole('option', { name: instrumentName });
+  await expect(savedOption).toContainText('In watchlist');
+  await expect(savedOption).toHaveAttribute('aria-disabled', 'true');
+  await page.getByLabel('Symbol', { exact: true }).press('Escape');
 
   await page.reload();
   await expect(watchlistRegion.getByRole('link', { name: instrumentName })).toBeVisible();

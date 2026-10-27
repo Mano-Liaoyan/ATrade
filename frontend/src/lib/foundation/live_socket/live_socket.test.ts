@@ -135,6 +135,18 @@ describe('openLiveSocket', () => {
     expect(sockets).toHaveLength(1);
     expect(latestSocket(sockets).isClosed).toBe(true);
   });
+
+  it('does not pass on a message that arrives after stop', () => {
+    const { sockets, messages, stop } = startSocket();
+    const socket = latestSocket(sockets);
+    socket.open();
+
+    stop();
+    // A closing browser socket can still fire a message event.
+    socket.receive({ type: 'bar', close: 123 });
+
+    expect(messages).toEqual([]);
+  });
 });
 
 describe('buildSocketUrl', () => {

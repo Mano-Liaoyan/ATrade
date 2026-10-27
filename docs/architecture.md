@@ -312,6 +312,28 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   Carbon HTML structure and class names (`cds--*`). Carbon CSS shows a state
   with a class, for example `cds--popover--open`, not with `data-state`. The
   component changes the Bits UI state into the Carbon class.
+  `foundation/carbon/carbon_state.ts` has these changes as functions with unit
+  tests, for example `dropdownClasses({ open, disabled })`.
+- Form components of `foundation/carbon`: `Button` (`kind`, `size`, bindable
+  `ref`), `TextInput` (`label`, bindable `value`, `invalidText`), `Select`
+  (Carbon dropdown on Bits UI Select: `label`, `items`, `value`,
+  `onValueChange`), `ContentSwitcher` (on Bits UI Tabs without panels:
+  `label`, `items`, `value`, `onValueChange`), and `Dialog` (Carbon modal on
+  Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
+  `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
+  the accessible name of the dialog.
+- `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
+  (`header`, `align: 'right'` for a number column, `isMenu` for the column
+  of row menus), `size`, and a `rows` snippet for the body rows. A number
+  cell has `align="right"` and tabular numbers.
+- `foundation/carbon` `OverflowMenu` is the Carbon overflow menu on Bits UI
+  DropdownMenu: `label` (the trigger name), `items` (`label`, `disabled`,
+  `danger`, `onSelect`), and `size`. The menu goes under `<body>`, so a
+  scroll region does not clip it.
+- `foundation/carbon` `InlineNotification` is the Carbon inline
+  notification: `kind` (`success` and `info` are a status, `error` and
+  `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
+  `onClose` (it adds the close button "Close notification").
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
   use the components of `#lib/foundation/carbon`.
@@ -377,6 +399,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
   opens a page or a form. No command sends a paper order or starts a backtest
   or a forward test.
+- `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
+  Combobox). The page gives the candidates as `items` (`value`, `label`,
+  `disabled`). The list is a Bits UI `ContentStatic` in the
+  `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
+  `listLabel`. `statusText` and `invalidText` show below the field.
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -408,6 +435,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   dragged, a click on the track scrolls one page, and the track takes Arrow,
   Page Up, Page Down, Home, and End keys. Use it for each region that can
   overflow (section 13.1).
+  The track and the thumb use Carbon tokens.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -415,7 +443,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   delay from 1 to 10 seconds between attempts. A background tab can delay
   the timers, so when the page becomes visible (`visibilitychange`), it
   connects again at once if the last message is 25 seconds old or more, or
-  if it waits for a reconnection.
+  if it waits for a reconnection. After stop, a message of the closing
+  socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - A chart draws on a canvas and reads the color tokens only when it draws.
@@ -425,6 +454,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   colors to the chart and its series, without a page reload and without a
   new chart. The code editor and the code diff use the same watch and
   `isDarkColorScheme()` to change their syntax colors.
+- The bar chart reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
+  borders), `--cds-support-success` (up bars), and `--cds-support-error`
+  (down bars).
+- The instrument page (`/instruments/<exchange>/<symbol>`) shows the bar
+  periods as Carbon tabs (`Tabs` of `foundation/carbon`, on Bits UI Tabs).
+  The arrow keys, Home, and End select a bar period at once. The page
+  address keeps the bar period, and the tab keeps the focus. The tab panel
+  has the bar count, the live bar, and the chart. The bars and the live bar
+  of the page belong to one chart request, so the chart gets no data of the
+  previous bar period after a change.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".

@@ -11,6 +11,7 @@ export {
   formatLocalTime,
   FORWARD_TESTS_SOCKET_PATH,
   isLiveBarPeriod,
+  listForwardTestsOnInstruments,
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestDetail,

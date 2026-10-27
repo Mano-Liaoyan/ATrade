@@ -1,13 +1,15 @@
 <!-- Home page: the instrument search adds to the watchlist, a watchlist instrument opens its instrument page, and the
-     paper account panel shows the paper account. -->
+     paper account panel shows the paper account. The running forward tests from /ws/forward-tests block paper orders
+     by hand on their instruments. -->
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { FORWARD_TESTS_SOCKET_PATH, listForwardTestsOnInstruments, readForwardTestsMessage } from '#lib/forward_test';
   import { InstrumentSearch, type Instrument } from '#lib/market_data';
-  import { PaperAccountPanel } from '#lib/paper_trading';
+  import { PaperAccountPanel, type BlockingForwardTest } from '#lib/paper_trading';
   import {
     addToWatchlist,
     deleteFromWatchlist,
-    formatWatchlistInstrument,
     listWatchlist,
     Watchlist,
     type WatchlistInstrument,
@@ -16,6 +18,20 @@
   let watchlistInstruments: WatchlistInstrument[] = $state([]);
   let isWatchlistLoading = $state(true);
   let watchlistMessage: string | undefined = $state();
+  let blockingForwardTests: BlockingForwardTest[] = $state([]);
+
+  $effect(() => {
+    return openLiveSocket({
+      url: buildSocketUrl(FORWARD_TESTS_SOCKET_PATH, window.location),
+      onMessage: (message) => {
+        const forwardTests = readForwardTestsMessage(message);
+        if (forwardTests !== null) {
+          blockingForwardTests = listForwardTestsOnInstruments(forwardTests);
+        }
+      },
+      onConnectionChange: () => undefined,
+    });
+  });
 
   $effect(() => {
     void listWatchlist(fetch).then((listResult) => {
@@ -70,23 +86,14 @@
   }
 </script>
 
-{#snippet addToWatchlistButton(instrument: Instrument)}
-  {#if isInWatchlist(instrument)}
-    <span class="in-watchlist">In watchlist</span>
-  {:else}
-    <button
-      type="button"
-      aria-label="Add {formatWatchlistInstrument(instrument)} to the watchlist"
-      onclick={() => {
-        void addInstrument(instrument);
-      }}>Add</button
-    >
-  {/if}
-{/snippet}
-
 <h1>ATrade</h1>
 <div class="home-panels">
-  <InstrumentSearch resultAction={addToWatchlistButton} />
+  <InstrumentSearch
+    onSelect={(instrument: Instrument) => {
+      void addInstrument(instrument);
+    }}
+    marker={(instrument: Instrument) => (isInWatchlist(instrument) ? 'In watchlist' : undefined)}
+  />
   <Watchlist
     instruments={watchlistInstruments}
     isLoading={isWatchlistLoading}
@@ -97,22 +104,17 @@
     }}
   />
 </div>
-<PaperAccountPanel />
+<PaperAccountPanel {blockingForwardTests} />
 
 <style>
   .home-panels {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 1rem;
+    gap: var(--cds-spacing-05);
   }
 
   .home-panels > :global(section) {
     flex: 1 1 22rem;
-  }
-
-  .in-watchlist {
-    color: var(--color-muted);
-    font-size: 0.875rem;
   }
 </style>

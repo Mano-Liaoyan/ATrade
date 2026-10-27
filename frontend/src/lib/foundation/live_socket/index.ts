@@ -110,6 +110,10 @@ export function openLiveSocket(options: LiveSocketOptions): () => void {
   }
 
   function receive(text: string): void {
+    // A closing socket can still fire a message event after stop.
+    if (isStopped) {
+      return;
+    }
     restartHeartbeatTimer();
     const message: unknown = JSON.parse(text);
     if (!isHeartbeat(message)) {
