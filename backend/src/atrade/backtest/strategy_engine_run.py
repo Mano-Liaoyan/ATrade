@@ -26,12 +26,12 @@ from nautilus_trader.model import (
     Symbol,
     Venue,
 )
-from nautilus_trader.persistence import BarDataWrangler
+from nautilus_trader.persistence import BarDataWrangler, DataCatalogConfig, ParquetDataCatalog
 
 from atrade.backtest.arrow_bars import NANOSECONDS_PER_SECOND, convert_bars_to_arrow_bytes
 from atrade.backtest.backtest_metrics import BacktestTrade
 from atrade.backtest.backtest_store import BacktestRequest
-from atrade.foundation.bar import Bar
+from atrade.foundation.bar import Bar, BarPeriod
 from atrade.foundation.instrument import Instrument
 from atrade.strategy import StrategyFileError, load_strategy_classes
 
@@ -39,6 +39,12 @@ MIN_PRICE_PRECISION = 2
 # NautilusTrader refuses a precision above 9 in its standard-precision build. IBKR prices have fewer places.
 MAX_PRECISION = 9
 ERROR_LOG_FILE_NAME = "strategy_errors"
+LOOK_BACK_CATALOG_DIRECTORY_NAME = "look_back_catalog"
+# The catalog says that it holds all bars from the first to the last UNIX nanosecond (1, not 0: 0 means "no time").
+# Then the data engine sends each `request_bars` only to the catalog. A part of the request that the catalog does
+# not hold goes to the venue data client. The backtest data client cannot answer, and the request never ends.
+CATALOG_FIRST_NS = 1
+CATALOG_LAST_NS = 2**63 - 1
 
 
 class StrategyFailedError(Exception):
@@ -66,7 +72,33 @@ def create_instrument(instrument: Instrument, bars: list[Bar]) -> Equity:
     )
 
 
-def create_engine(*, paper_capital_usd: Decimal, venue: Venue, work_directory: Path) -> BacktestEngine:
+def create_look_back_catalog(
+    look_back_bars: list[Bar], wrangler: BarDataWrangler, bar_period: BarPeriod, work_directory: Path
+) -> DataCatalogConfig:
+    """A temporary catalog that answers `request_bars` with the look-back bars (bars before the backtest start).
+
+    The engine replays only the bars of the range. The look-back bars go only to the catalog, so they never fill
+    an order and never make an equity point.
+    """
+    catalog_path = work_directory / LOOK_BACK_CATALOG_DIRECTORY_NAME
+    catalog_path.mkdir()
+    catalog = ParquetDataCatalog(str(catalog_path))
+    nautilus_bars = (
+        wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(look_back_bars, bar_period))
+        if look_back_bars
+        else []
+    )
+    catalog.write_bars(nautilus_bars, start=CATALOG_FIRST_NS, end=CATALOG_LAST_NS)
+    return DataCatalogConfig(str(catalog_path))
+
+
+def create_engine(
+    *,
+    paper_capital_usd: Decimal,
+    venue: Venue,
+    work_directory: Path,
+    look_back_catalog: DataCatalogConfig | None = None,
+) -> BacktestEngine:
     # The engine logs strategy errors and goes on. shutdown_on_error stops it at the first error, and the
     # error log file lets the child read the error (the engine does not raise it).
     logging = LoggerConfig(
@@ -75,7 +107,11 @@ def create_engine(*, paper_capital_usd: Decimal, venue: Venue, work_directory: P
         file_config=FileWriterConfig(directory=str(work_directory), file_name=ERROR_LOG_FILE_NAME),
         fileout_sync_on_flush=True,
     )
-    engine = BacktestEngine(BacktestEngineConfig(shutdown_on_error=True, logging=logging))
+    engine = BacktestEngine(
+        BacktestEngineConfig(
+            shutdown_on_error=True, logging=logging, catalogs=[] if look_back_catalog is None else [look_back_catalog]
+        )
+    )
     usd = Currency.from_str("USD")
     engine.add_venue(
         venue,
@@ -115,16 +151,23 @@ def read_trades(engine: BacktestEngine) -> list[BacktestTrade]:
 
 
 def run_strategy_on_bars(
-    *, code: str, request: BacktestRequest, bars: list[Bar], work_directory: Path
+    *, code: str, request: BacktestRequest, bars: list[Bar], look_back_bars: list[Bar], work_directory: Path
 ) -> list[BacktestTrade]:
-    """Returns the trades of the strategy. Raises StrategyFailedError with the strategy error."""
-    nautilus_instrument = create_instrument(request.instrument, bars)
+    """Returns the trades of the strategy on `bars`. `request_bars` gets `look_back_bars`, the bars before the start.
+
+    Raises StrategyFailedError with the strategy error.
+    """
+    all_bars = look_back_bars + bars
+    nautilus_instrument = create_instrument(request.instrument, all_bars)
     bar_type = BarType.from_str(f"{nautilus_instrument.id}-{request.bar_period.value}-LAST-EXTERNAL")
-    volume_precision = max(count_decimal_places(bar.volume) for bar in bars)
+    volume_precision = max(count_decimal_places(bar.volume) for bar in all_bars)
     wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, volume_precision)
     nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(bars, request.bar_period))
     engine = create_engine(
-        paper_capital_usd=request.paper_capital_usd, venue=nautilus_instrument.venue, work_directory=work_directory
+        paper_capital_usd=request.paper_capital_usd,
+        venue=nautilus_instrument.venue,
+        look_back_catalog=create_look_back_catalog(look_back_bars, wrangler, request.bar_period, work_directory),
+        work_directory=work_directory,
     )
     engine.add_instrument(nautilus_instrument)
     engine.add_data(nautilus_bars)

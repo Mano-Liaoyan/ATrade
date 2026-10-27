@@ -6,6 +6,7 @@ The child gets only the backtest ID. It reads the request, the strategy version,
 import asyncio
 import tempfile
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 import psycopg
@@ -15,10 +16,21 @@ from atrade.backtest.backtest_access import describe_missing_bars
 from atrade.backtest.backtest_metrics import calculate_equity_curve, calculate_metrics
 from atrade.backtest.backtest_store import BacktestRequest, BacktestResult
 from atrade.backtest.strategy_engine_run import StrategyFailedError, run_strategy_on_bars
-from atrade.foundation.bar import Bar
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.market_data import BarRequest, read_saved_bars
 from atrade.strategy import read_strategy_version
+
+# The look-back is the warm-up of the strategy template: 3 average periods of its default 20 bars, and 1 week at
+# least (docs/architecture/backtest.md section 10.3). A strategy that asks for more gets only these bars.
+LOOK_BACK_AVERAGE_PERIOD_BARS = 20
+LOOK_BACK_AVERAGE_PERIODS = 3
+MIN_LOOK_BACK_LENGTH = timedelta(days=7)
+
+
+def find_look_back_length(bar_period: BarPeriod) -> timedelta:
+    """How long before the backtest start the saved look-back bars go, for `request_bars` in the strategy."""
+    return max(bar_period.length * LOOK_BACK_AVERAGE_PERIOD_BARS * LOOK_BACK_AVERAGE_PERIODS, MIN_LOOK_BACK_LENGTH)
 
 
 @dataclass(frozen=True)
@@ -26,6 +38,7 @@ class BacktestInputs:
     request: BacktestRequest
     code: str
     bars: list[Bar]
+    look_back_bars: list[Bar]
 
 
 async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> BacktestInputs:
@@ -48,7 +61,16 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
             instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
         ),
     )
-    return BacktestInputs(request=request, code=strategy_version.code, bars=bars)
+    start_utc = request.time_range.start_utc
+    look_back_bars = await read_saved_bars(
+        database_url=database_url,
+        bar_request=BarRequest(
+            instrument=request.instrument,
+            bar_period=request.bar_period,
+            time_range=TimeRange(start_utc=start_utc - find_look_back_length(request.bar_period), end_utc=start_utc),
+        ),
+    )
+    return BacktestInputs(request=request, code=strategy_version.code, bars=bars, look_back_bars=look_back_bars)
 
 
 @dataclass(frozen=True)
@@ -72,7 +94,11 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, work_directory: 
     request = inputs.request
     try:
         trades = run_strategy_on_bars(
-            code=inputs.code, request=request, bars=inputs.bars, work_directory=work_directory
+            code=inputs.code,
+            request=request,
+            bars=inputs.bars,
+            look_back_bars=inputs.look_back_bars,
+            work_directory=work_directory,
         )
     except StrategyFailedError as error:
         # readability-exception: the engine reports a strategy error only as an exception (G1).

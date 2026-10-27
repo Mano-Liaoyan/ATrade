@@ -100,7 +100,8 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 3. The child reads the request, the strategy version
    (`read_strategy_version()` of `strategy`), and the saved bars
    (`read_saved_bars()` of `market_data`) from PostgreSQL. It never calls
-   IBKR.
+   IBKR. It also reads the look-back bars: the saved bars of the same
+   instrument and bar period before the start (section 10.3.1).
 4. The child converts the bars to Arrow bytes (`decimal128(38, 16)` prices
    and volume, `uint64` times). `ts_event` is the bar end, so a strategy sees
    a bar only after its period. `BarDataWrangler` makes NautilusTrader bars
@@ -138,14 +139,48 @@ Limits of this stage:
   the backtest has no exchange rates. A request in another currency gets
   `422`.
 - The commission is zero.
-- `request_bars` in `on_start` gets no bars in a backtest. The engine has no
-  historical data client and writes a warning. The indicator warms up on the
-  first bars of the range. A forward test warms up on bars before its start,
-  so the first bars of a same-period backtest can differ from the forward
-  test. `tests/backtest/test_strategy_template_backtest.py` runs the strategy
-  template on 120 daily bars and expects trades. Look-back bars before the
-  range (how many, and how the engine gets them) are an open question for
-  the owner.
+- `request_bars` gets only the look-back bars of the backtest bar type
+  (section 10.3.1).
+
+### 10.3.1 Look-back bars
+
+Decision of the owner (review finding 2 of #61, option a): in a backtest,
+`request_bars` returns look-back bars from before the backtest start. A
+temporary NautilusTrader `ParquetDataCatalog` holds them. The child fills it
+from the saved bars in PostgreSQL. So a strategy warms up its indicators as
+in a forward test, and it can trade on the first bar of the range.
+
+- Look-back length: `find_look_back_length(bar_period)` in
+  `backtest/backtest_run.py`. It is the warm-up of the strategy template:
+  3 average periods of the default 20 bars, and 7 days at least
+  (`max(bar period × 60, 7 days)`). For daily bars this is 60 days. The child
+  reads the saved bars from `start_utc` minus this length to `start_utc`
+  (not included). A strategy chooses its own request start. A request that
+  starts earlier gets only these bars. When PostgreSQL has no saved bars
+  before the start, `request_bars` gets no bars and the indicator warms up on
+  the first bars of the range.
+- Mechanism (`create_look_back_catalog()` in
+  `backtest/strategy_engine_run.py`): the child writes the look-back bars to
+  a catalog in its temporary work directory (`look_back_catalog/`) and gives
+  the catalog to `BacktestEngineConfig(catalogs=...)`. The data engine
+  answers `request_bars` from the catalog.
+- The catalog says that it holds the bar type from the first to the last
+  UNIX nanosecond. If not, the data engine sends the part of the request
+  that the catalog does not hold to the venue data client. The backtest data
+  client cannot answer (`Handler not implemented ... RequestBars`), and the
+  request never gets a response. A request for another bar type (for
+  example 1-hour bars in a 1-day backtest) still gets no bars.
+- Only the bars of the range go to `engine.add_data()`. The look-back bars
+  never fill an order and never make an equity point. The equity curve and
+  the trades start at the first bar of the range.
+- The catalog has no bars of the range. A request during the run gets only
+  look-back bars, so a strategy cannot read bars from after the engine time.
+- Tests: `tests/backtest/test_strategy_template_backtest.py` (the template
+  buys on the first bar of the range with look-back bars, and does not
+  without them; it trades on 120 daily bars without look-back bars) and
+  `test_the_template_warms_up_on_saved_bars_before_the_start` in
+  `tests/backtest/test_backtest_runs.py` (a real child process reads the
+  look-back bars from PostgreSQL).
 
 ## 10.4 Metric functions
 

@@ -59,7 +59,9 @@ Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
 - The strategy template shows how to warm up indicators with `request_bars` in
   `on_start`. The warm-up length is 3 average periods of bars, and 7 days at
   least (`find_warm_up_length`). It is not a fixed 60 days, because 60 days of
-  1-minute bars need many IBKR historical data requests.
+  1-minute bars need many IBKR historical data requests. In a backtest,
+  `request_bars` gets the saved bars before the start (backtest section
+  10.3.1).
 - A new strategy starts with the template as version 1. The template is in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy.

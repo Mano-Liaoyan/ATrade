@@ -4,10 +4,13 @@ The runner of each test starts real child processes (`python -m atrade.app.backt
 the status and the result through the HTTP routes.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import httpx
 import psycopg
 import pytest
 
+from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from tests.backtest.real_runner import (
     TEST_STRATEGY_FILE,
     run_backtest_runner,
@@ -110,3 +113,35 @@ async def test_backtest_without_saved_bars_fails_with_a_clear_message(
         "PostgreSQL has no saved 1-DAY bars of BTEST / ARCA / USD from 2026-03-01T00:00:00+00:00"
         " to 2026-04-01T00:00:00+00:00. Open the bar chart of the instrument to load bars from IBKR."
     )
+
+
+@pytest.mark.anyio
+async def test_the_template_warms_up_on_saved_bars_before_the_start(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    # 59 saved bars at 50 before the start (2026-03-01) make the 20-bar average 50. The first bar of the range
+    # closes at 100, above the average, so the template buys on it. Without look-back bars the average is not ready.
+    save_test_bars(database_url)
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES ('BTEST', 'ARCA', 'USD', '1-DAY', %s, 50, 51, 49, 50, 1000)
+            """,
+            [(datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=index),) for index in range(59)],
+        )
+    backtest_id = await start_backtest(web_client, STRATEGY_TEMPLATE, strategy_name="Template")
+
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, backtest_id)
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    assert backtest["trades"][0] == {
+        "time_utc": "2026-03-03T00:00:00Z",
+        "side": "BUY",
+        "quantity_shares": "10",
+        "price_usd": "100.00",
+        "commission_usd": "0.00",
+    }
+    # The equity curve starts at the first bar of the range: look-back bars make no equity point.
+    assert backtest["equity_curve"][0]["time_utc"] == "2026-03-03T00:00:00Z"
