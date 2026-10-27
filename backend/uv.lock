@@ -65,6 +65,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "basedpyright" },
     { name = "fastapi" },
     { name = "ib-async" },
     { name = "nautilus-trader" },
@@ -78,7 +79,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "anyio" },
-    { name = "basedpyright" },
     { name = "httpx" },
     { name = "httpx-ws" },
     { name = "import-linter" },
@@ -88,6 +88,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = "==1.20.1" },
+    { name = "basedpyright", specifier = "==1.40.2" },
     { name = "fastapi", specifier = "==0.162.0" },
     { name = "ib-async", specifier = "==2.1.0" },
     { name = "nautilus-trader", specifier = "==2.0.0rc7" },
@@ -101,7 +102,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "anyio", specifier = "==4.15.1" },
-    { name = "basedpyright", specifier = "==1.40.2" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "httpx-ws", specifier = "==0.8.2" },
     { name = "import-linter", specifier = "==2.15" },

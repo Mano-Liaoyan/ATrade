@@ -11,11 +11,13 @@ is in GitHub Issues.
 ## Current state
 
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
-connection (issue #63), the strategy editor (issue #68), and the paper account
-check with the account panel (issue #74):
+connection (issue #63), instrument search (issue #64), the strategy editor
+(issue #68), code completion (issue #69), and the paper account check with the
+account panel (issue #74):
 
 - The `web` service serves the app shell, `GET /api/health`,
-  `GET /api/ibkr/gateway`, the strategy routes under `/api/strategies`, and
+  `GET /api/ibkr/gateway`, the strategy routes under `/api/strategies`, the
+  language server WebSocket `/ws/strategy-language-server`, and
   `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
@@ -33,7 +35,8 @@ check with the account panel (issue #74):
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
 - Strategies: the page `/strategies` creates a strategy from a template. The
   editor saves the code as strategy versions after the checks before save.
-  Unsaved edits stay in the browser. See
+  Unsaved edits stay in the browser. The editor shows code completion and
+  live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
 - Bars, watchlist, backtests, paper trading, and forward tests are not
   available yet.
