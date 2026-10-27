@@ -1,5 +1,5 @@
 // The comparison of two backtests: the selection rule of the list, and the HTTP client of the comparison route.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { checkComparisonSelection, compareBacktests, type Backtest } from './index';
 
 function makeBacktest(id: number, strategyId: number, strategyName: string): Backtest {

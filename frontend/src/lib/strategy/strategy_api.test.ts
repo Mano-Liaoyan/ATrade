@@ -1,5 +1,5 @@
 // Calls the strategy HTTP routes and turns each answer into a result that the editor page can show.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { createStrategy, deleteStrategy, saveStrategyVersion } from './index';
 
 const VERSION = {

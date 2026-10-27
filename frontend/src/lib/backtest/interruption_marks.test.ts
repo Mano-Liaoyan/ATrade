@@ -1,5 +1,5 @@
 // The bars that the equity chart marks grey: the bars of an interruption of a forward test.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { findInterruptedTimes } from './interruption_marks';
 
 const curve = ['03:05', '03:06', '03:07', '03:08', '03:09'].map((minute) => ({

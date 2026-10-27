@@ -1,5 +1,5 @@
 // Calls the backtest HTTP routes and turns each answer into a result that the backtest pages can show.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { changeBacktestLimits, readBacktestLimits, startBacktest, type BacktestRequest } from './index';
 
 const REQUEST: BacktestRequest = {

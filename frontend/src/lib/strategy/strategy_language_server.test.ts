@@ -1,5 +1,5 @@
 // The WebSocket transport between the editor's language server client and /ws/strategy-language-server.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { connectLanguageServerTransport, readLanguageServerUrl } from './strategy_language_server';
 
 class FakeSocket extends EventTarget {

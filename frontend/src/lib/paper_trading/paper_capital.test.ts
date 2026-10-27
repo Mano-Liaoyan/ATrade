@@ -1,5 +1,5 @@
 // The default paper capital of the backtest form, from GET /api/paper-trading/paper-capital.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { readPaperCapital } from './index';
 
 describe('readPaperCapital', () => {

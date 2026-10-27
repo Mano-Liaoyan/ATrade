@@ -38,14 +38,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          working-directory: frontend
+          cache: true
       - run: ./scripts/check frontend
 
   e2e:
@@ -66,17 +62,11 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.13.5"
-      - uses: pnpm/action-setup@v4
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          package_json_file: frontend/package.json
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-        working-directory: frontend
-      - run: pnpm exec playwright install --with-deps chromium firefox webkit msedge
+          working-directory: frontend
+          cache: true
+      - run: vp exec playwright install --with-deps chromium firefox webkit msedge
         working-directory: frontend
       - run: ./scripts/check e2e
         env:

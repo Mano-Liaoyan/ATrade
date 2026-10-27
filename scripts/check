@@ -73,20 +73,28 @@ check_backend() {
   uv run pytest
 }
 
+require_vite_plus() {
+  if ! command -v vp >/dev/null 2>&1; then
+    printf 'ERROR: install Vite+ (vp). See README.md, section Requirements.\n' >&2
+    exit 1
+  fi
+}
+
 check_frontend() {
+  require_vite_plus
   cd "$repo_root/frontend"
-  log_step "Frontend: pnpm install"
-  pnpm install --frozen-lockfile
+  log_step "Frontend: vp install"
+  vp install --frozen-lockfile
   log_step "Frontend: generated API types match src/lib/api/openapi.json"
-  pnpm check:api
+  vp run check:api
   log_step "Frontend: ESLint"
-  pnpm lint
+  vp run lint:eslint
   log_step "Frontend: svelte-check"
-  pnpm check
+  vp run check:svelte
   log_step "Frontend: Vitest"
-  pnpm test:unit
+  vp test run
   log_step "Frontend: build"
-  pnpm build
+  vp build
 }
 
 check_e2e() {
@@ -95,18 +103,19 @@ check_e2e() {
     log_step "End to end: skipped (ATRADE_PLAYWRIGHT_PROJECTS=none)"
     return
   fi
+  require_vite_plus
   cd "$repo_root/backend"
   uv sync --locked
   cd "$repo_root/frontend"
-  pnpm install --frozen-lockfile
-  pnpm build
+  vp install --frozen-lockfile
+  vp build
   local project_arguments=()
   local project
   for project in $projects; do
     project_arguments+=(--project "$project")
   done
   log_step "End to end: Playwright ($projects)"
-  pnpm exec playwright test "${project_arguments[@]}"
+  vp exec playwright test "${project_arguments[@]}"
 }
 
 case "$scope" in

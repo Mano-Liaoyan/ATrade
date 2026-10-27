@@ -1,5 +1,5 @@
 // Sends HTTP requests to the backend and turns a failed answer into a message for the user.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { BACKEND_NOT_REACHABLE, describeErrorBody, readErrorMessage, requestJson, sendRequest } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {

@@ -1,5 +1,5 @@
 // A WebSocket that connects again after a close and after a missing heartbeat, with a fake socket and fake timers.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { buildSocketUrl, openLiveSocket, type OpenSocket, type SocketEvents } from './index';
 
 class FakeSocket implements OpenSocket {

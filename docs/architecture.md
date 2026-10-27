@@ -68,6 +68,7 @@ and its revision comments.
 | Database access | psycopg 3 with plain SQL. Use `class_row` to read rows into dataclasses. No ORM. | Each query is SQL that a reader can read directly. |
 | Database migrations | Alembic. Migration files contain only SQL. No autogenerate. | The tool chain stays Python only. |
 | Python tools | uv, ruff, basedpyright (strict), import-linter. | See section 16. |
+| Frontend tools | Vite+ (`vp`, `vite-plus` 1.4.0) runs install, dev, build, and Vitest. pnpm 10 is the package manager. ESLint, not Oxlint, checks the readability rules. | One tool installs Node.js and pnpm and runs Vite and Vitest. Oxlint does not check Svelte templates, type-aware rules in `.svelte` files, or `naming-convention`. |
 | Frontend | SvelteKit 3 (`>=3.1.0`) in SPA mode (`ssr = false`, `adapter-static`), TypeScript strict, TypeScript `6.0.3`. | The official router makes one file one page. The 3.0 breaking changes cost nothing for a new project. Svelte 5 is also about 1.5 times faster than React and about 1/5 of the size ([frontend research](https://github.com/Mano-Liaoyan/ATrade/issues/45)). |
 | Frontend API types | `openapi-typescript` generates types from the OpenAPI document. Pydantic exports JSON Schema for WebSocket messages, and types come from that schema. The frontend does no runtime validation. | Data types have one definition, in the backend. |
 | Bar chart | `lightweight-charts`. | It does not depend on the framework. |
@@ -287,7 +288,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `+page.server.*`, `+layout.server.*`, `+server.*`, `hooks.server.*`,
   `*.remote.*`, and form actions. ESLint fails on these file names.
 - SvelteKit 3 reads configuration from `vite.config.ts` in `sveltekit({...})`.
-  It does not read `svelte.config.js`.
+  It does not read `svelte.config.js`. `defineConfig` comes from `vite-plus`,
+  and tests import from `vite-plus/test`. `pnpm-workspace.yaml` maps `vite`
+  to `@voidzero-dev/vite-plus-core`.
 - `#lib` replaces `$lib`. `package.json` declares it in `imports`.
   `#lib/*` maps to `./src/lib/*/index.ts`. A deep import fails at type check
   and build time.
@@ -300,10 +303,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `foundation/code_editor/`. Parts with domain meaning stay in the capability.
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
-  `openapi-typescript` writes `lib/api/index.ts`. `pnpm generate:api` runs
+  `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
   both. Both files are committed. The backend test
   `tests/app/test_openapi_document.py` fails when `openapi.json` does not
-  match the routes, and `pnpm check:api` fails when `index.ts` does not match
+  match the routes, and `vp run check:api` fails when `index.ts` does not match
   `openapi.json`. Use `components['schemas'][...]`; do not write API types by
   hand. OpenAPI does not describe WebSocket messages, so
   `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
@@ -393,8 +396,8 @@ One Docker Compose project on the user's own server runs all services:
   `docker compose --file deploy/compose.yaml --env-file .env up --build`, and
   sends its other arguments to `docker compose up`. When `.env` is not there,
   it writes a warning and uses `.env.example`.
-- The image of `web` comes from `deploy/web.Dockerfile`. A Node stage builds
-  the SPA with `adapter-static`. The Python stage installs the backend with
+- The image of `web` comes from `deploy/web.Dockerfile`. A Vite+ stage
+  (`ghcr.io/voidzero-dev/vite-plus`) builds the SPA with `adapter-static`. The Python stage installs the backend with
   `uv sync --frozen --no-dev` and copies the built files to
   `/app/frontend-build`.
 - `web` serves the built frontend from FastAPI. There is no separate web

@@ -1,5 +1,5 @@
 // The backtest form offers only watchlist instruments with saved bars of the selected bar period.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { describeSavedBars, findSavedBars, selectInstrumentsWithSavedBars, type WatchlistInstrument } from './index';
 
 const DAILY_BARS = {

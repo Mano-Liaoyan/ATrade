@@ -1,5 +1,5 @@
 // Reads GET /api/health and turns the answer into a status that the app shell shows.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { describeBackendHealth, fetchBackendHealth, type BackendHealth } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {

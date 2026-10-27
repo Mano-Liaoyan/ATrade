@@ -1,5 +1,5 @@
 // Playwright runs e2e/*.spec.ts against backend/tests/e2e_server.py, which serves the built SPA with fakes.
-// Run `pnpm build` first. ATRADE_TEST_DATABASE_URL must point to a PostgreSQL database.
+// Run `vp build` first. ATRADE_TEST_DATABASE_URL must point to a PostgreSQL database.
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
 

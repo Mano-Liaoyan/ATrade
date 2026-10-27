@@ -1,5 +1,5 @@
 // Calls GET /api/market-data/instrument-search and turns the answer into results or a message for the search panel.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { formatInstrument, searchInstruments } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {
