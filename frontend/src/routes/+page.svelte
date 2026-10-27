@@ -10,7 +10,6 @@
   import {
     addToWatchlist,
     deleteFromWatchlist,
-    formatWatchlistInstrument,
     listWatchlist,
     Watchlist,
     type WatchlistInstrument,
@@ -87,23 +86,14 @@
   }
 </script>
 
-{#snippet addToWatchlistButton(instrument: Instrument)}
-  {#if isInWatchlist(instrument)}
-    <span class="in-watchlist">In watchlist</span>
-  {:else}
-    <button
-      type="button"
-      aria-label="Add {formatWatchlistInstrument(instrument)} to the watchlist"
-      onclick={() => {
-        void addInstrument(instrument);
-      }}>Add</button
-    >
-  {/if}
-{/snippet}
-
 <h1>ATrade</h1>
 <div class="home-panels">
-  <InstrumentSearch resultAction={addToWatchlistButton} />
+  <InstrumentSearch
+    onSelect={(instrument: Instrument) => {
+      void addInstrument(instrument);
+    }}
+    marker={(instrument: Instrument) => (isInWatchlist(instrument) ? 'In watchlist' : undefined)}
+  />
   <Watchlist
     instruments={watchlistInstruments}
     isLoading={isWatchlistLoading}
@@ -121,15 +111,10 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
-    gap: 1rem;
+    gap: var(--cds-spacing-05);
   }
 
   .home-panels > :global(section) {
     flex: 1 1 22rem;
-  }
-
-  .in-watchlist {
-    color: var(--color-muted);
-    font-size: 0.875rem;
   }
 </style>

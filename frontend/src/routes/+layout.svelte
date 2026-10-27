@@ -11,6 +11,7 @@
     type BackendHealth,
   } from '#lib/foundation/backend_health';
   import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
+  import { ThemeButton } from '#lib/foundation/color_scheme';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     describeGatewayStatus,
@@ -126,6 +127,7 @@
           <Tag {...props} label="Paper" kind="blue" operational />
         {/snippet}
       </Tooltip>
+      <ThemeButton />
     </div>
   </header>
   <main class="app-main">

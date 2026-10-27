@@ -1,14 +1,17 @@
-// Public entry of foundation/color_scheme: tells a component when the light or dark color tokens change.
-// The tokens on :root follow prefers-color-scheme (src/routes/+layout.svelte). CSS takes a change at once, but a
-// canvas chart reads the colors only when it draws, so it must read them again (docs/architecture.md 13.1).
+// Public entry of foundation/color_scheme: the theme choice of the header theme button, and the watch that tells a
+// component when the light or dark color tokens change (docs/architecture.md section 13).
+// The tokens on :root follow prefers-color-scheme, and data-theme="light" or "dark" on <html> overrides it
+// (foundation/carbon/carbon.scss). CSS takes a change at once, but a canvas chart and the code editor read the colors
+// only when they draw, so they must read them again.
 
-const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
-
-/** Calls `onChange` after each change of the color scheme. Returns the function that ends the watch. */
-export function watchColorScheme(onChange: () => void): () => void {
-  const darkSchemeQuery = window.matchMedia(DARK_SCHEME_QUERY);
-  darkSchemeQuery.addEventListener('change', onChange);
-  return () => {
-    darkSchemeQuery.removeEventListener('change', onChange);
-  };
-}
+export {
+  applyThemeChoice,
+  isDarkColorScheme,
+  nextThemeChoice,
+  readThemeChoice,
+  saveThemeChoice,
+  THEME_STORAGE_KEY,
+  type ThemeChoice,
+  watchColorScheme,
+} from './theme_choice';
+export { default as ThemeButton } from './ThemeButton.svelte';

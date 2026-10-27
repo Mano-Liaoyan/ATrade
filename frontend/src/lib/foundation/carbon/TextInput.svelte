@@ -2,7 +2,7 @@
 <script lang="ts">
   import WarningFilled16 from '@carbon/icons/es/warning--filled/16.js';
   import type { HTMLInputAttributes } from 'svelte/elements';
-  import CarbonIcon from './CarbonIcon.svelte';
+  import Icon from './Icon.svelte';
   import { textInputClasses } from './carbon_state';
 
   interface Props extends Omit<HTMLInputAttributes, 'class' | 'value'> {
@@ -38,7 +38,7 @@
         bind:value
       />
       {#if invalid}
-        <CarbonIcon icon={WarningFilled16} class="cds--text-input__invalid-icon" />
+        <Icon icon={WarningFilled16} class="cds--text-input__invalid-icon" />
       {/if}
     </div>
     {#if invalid}

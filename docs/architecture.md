@@ -321,8 +321,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `label`, `items`, `value`, `onValueChange`), and `Dialog` (Carbon modal on
   Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
   `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
-  the accessible name of the dialog. `CarbonIcon` draws an icon descriptor of
-  `@carbon/icons/es/<name>/<size>.js`.
+  the accessible name of the dialog.
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
   use the components of `#lib/foundation/carbon`.
@@ -350,6 +349,20 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - Themes: `:root` has the Carbon g10 tokens (light). With
   `prefers-color-scheme: dark` and no `data-theme="light"` on `<html>`, it has
   the g100 tokens (dark). `data-theme="dark"` on `<html>` also gives g100.
+- The theme button (`ThemeButton` of `foundation/color_scheme`) is a Carbon
+  header action button in `cds--header__global` with a Carbon tooltip. A
+  click changes the theme choice: System, Light, Dark, then System again.
+  System is the default. The icon (`@carbon/icons` Screen, Light, Asleep),
+  the accessible name, and the tooltip show the current choice, for example
+  "Theme: System". Light sets `data-theme="light"` (g10 with a dark system),
+  Dark sets `data-theme="dark"` (g100 with a light system), and System
+  removes the attribute. The choice is in `localStorage` (key
+  `atrade.theme`). A small script in `src/app.html` applies the saved choice
+  before the first paint. When the storage is not available, the page starts
+  with System and the button works until the page reloads.
+- `foundation/carbon` has `Icon`: it renders an icon descriptor of
+  `@carbon/icons`, for example `@carbon/icons/es/light/20.js`.
+  `carbon_icons.d.ts` declares these modules with the type `CarbonIcon`.
 - The app shell header (`src/routes/+layout.svelte`) is the Carbon UI shell
   header in a `cds--g100` zone in all themes. It shows the product name, the
   page links (Home, Strategies, Backtests, Forward tests) with
@@ -360,6 +373,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   reads the account check from `/ws/paper-trading`. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
   navigation at all widths. Header buttons go in `cds--header__global`.
+- `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
+  Combobox). The page gives the candidates as `items` (`value`, `label`,
+  `disabled`). The list is a Bits UI `ContentStatic` in the
+  `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
+  `listLabel`. `statusText` and `invalidText` show below the field.
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -398,13 +416,28 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   delay from 1 to 10 seconds between attempts. A background tab can delay
   the timers, so when the page becomes visible (`visibilitychange`), it
   connects again at once if the last message is 25 seconds old or more, or
-  if it waits for a reconnection.
+  if it waits for a reconnection. After stop, a message of the closing
+  socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution.
 - A chart draws on a canvas and reads the color tokens only when it draws.
-  `foundation/color_scheme` has `watchColorScheme(onChange)`. Each chart
-  applies the new colors to the chart and its series after a change of
-  `prefers-color-scheme`, without a page reload and without a new chart.
+  `foundation/color_scheme` has `watchColorScheme(onChange)`. It calls
+  `onChange` after a change of `prefers-color-scheme` and after a change of
+  `data-theme` on `<html>` (the theme button). Each chart applies the new
+  colors to the chart and its series, without a page reload and without a
+  new chart. The code editor and the code diff use the same watch and
+  `isDarkColorScheme()` to change their syntax colors.
+- The bar chart reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
+  borders), `--cds-support-success` (up bars), and `--cds-support-error`
+  (down bars).
+- The instrument page (`/instruments/<exchange>/<symbol>`) shows the bar
+  periods as Carbon tabs (`Tabs` of `foundation/carbon`, on Bits UI Tabs).
+  The arrow keys, Home, and End select a bar period at once. The page
+  address keeps the bar period, and the tab keeps the focus. The tab panel
+  has the bar count, the live bar, and the chart. The bars and the live bar
+  of the page belong to one chart request, so the chart gets no data of the
+  previous bar period after a change.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".

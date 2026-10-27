@@ -7,6 +7,7 @@ import '@ibm/plex-sans/css/ibm-plex-sans-default.min.css';
 import '@ibm/plex-mono/css/ibm-plex-mono-default.min.css';
 import './carbon.scss';
 
+export { default as Tabs, type TabItem } from './Tabs.svelte';
 export { default as Tag, type TagKind } from './Tag.svelte';
 export { default as Tooltip, type TooltipAlignment } from './Tooltip.svelte';
 export { default as TooltipProvider } from './TooltipProvider.svelte';
@@ -16,3 +17,7 @@ export { default as Select, type SelectItem } from './Select.svelte';
 export { default as ContentSwitcher, type ContentSwitcherItem } from './ContentSwitcher.svelte';
 export { default as Dialog } from './Dialog.svelte';
 export type { ButtonKind, ButtonSize } from './carbon_state';
+export { default as Icon } from './Icon.svelte';
+export type { CarbonIcon, CarbonIconNode } from './carbon_icon';
+export { default as Combobox } from './Combobox.svelte';
+export type { ComboboxItem } from './combobox_classes';

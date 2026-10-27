@@ -5,7 +5,7 @@
   import Close20 from '@carbon/icons/es/close/20.js';
   import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
-  import CarbonIcon from './CarbonIcon.svelte';
+  import Icon from './Icon.svelte';
   import { buttonClasses, type ButtonKind } from './carbon_state';
 
   interface Props {
@@ -84,7 +84,7 @@
                         aria-label="Close"
                         disabled={busy}
                       >
-                        <CarbonIcon icon={Close20} class="cds--modal-close__icon" />
+                        <Icon icon={Close20} class="cds--modal-close__icon" />
                       </button>
                     {/snippet}
                   </Dialog.Close>

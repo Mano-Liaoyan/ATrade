@@ -12,7 +12,7 @@
   import Checkmark16 from '@carbon/icons/es/checkmark/16.js';
   import ChevronDown16 from '@carbon/icons/es/chevron--down/16.js';
   import { Select } from 'bits-ui';
-  import CarbonIcon from './CarbonIcon.svelte';
+  import Icon from './Icon.svelte';
   import { dropdownClasses, dropdownMenuIconClasses, dropdownMenuItemClasses } from './carbon_state';
 
   interface Props {
@@ -54,7 +54,7 @@
           <button {...props} type="button" class="cds--list-box__field">
             <span class="cds--list-box__label">{selectedLabel}</span>
             <div class={dropdownMenuIconClasses(open)}>
-              <CarbonIcon icon={ChevronDown16} />
+              <Icon icon={ChevronDown16} />
             </div>
           </button>
         {/snippet}
@@ -69,7 +69,7 @@
                     <div class="cds--list-box__menu-item__option">
                       {item.label}
                       {#if selected}
-                        <CarbonIcon icon={Checkmark16} class="cds--list-box__menu-item__selected-icon" />
+                        <Icon icon={Checkmark16} class="cds--list-box__menu-item__selected-icon" />
                       {/if}
                     </div>
                   </div>
