@@ -22,9 +22,11 @@
     onClose?: () => void;
     // More content below the subtitle, for example a list of problems.
     children?: Snippet;
+    // The accessible name of the status or alert, when the page names it.
+    label?: string;
   }
 
-  const { kind, title, subtitle, lowContrast = false, onClose, children }: Props = $props();
+  const { kind, title, subtitle, lowContrast = false, onClose, children, label }: Props = $props();
 
   function findIcon(notificationKind: NotificationKind): CarbonIconNode {
     switch (notificationKind) {
@@ -48,6 +50,7 @@
     onClose === undefined && 'cds--inline-notification--hide-close-button',
   ]}
   role={kind === 'error' || kind === 'warning' ? 'alert' : 'status'}
+  aria-label={label}
 >
   <div class="cds--inline-notification__details">
     <Icon icon={findIcon(kind)} class="cds--inline-notification__icon" />

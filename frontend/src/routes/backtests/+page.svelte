@@ -11,12 +11,23 @@
     checkComparisonSelection,
     convertDateToUtcStart,
     describeBacktestStatus,
+    findBacktestStatusKind,
     formatPercent,
     formatUsd,
     listBacktests,
     startBacktest,
     type Backtest,
   } from '#lib/backtest';
+  import {
+    Button,
+    Checkbox,
+    DataTable,
+    InlineNotification,
+    Select,
+    StatusIndicator,
+    TextInput,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { BAR_PERIODS, DEFAULT_BAR_PERIOD, type BarPeriod } from '#lib/market_data';
@@ -37,6 +48,19 @@
     type StrategyListItem,
   } from '#lib/strategy';
 
+  const BACKTEST_COLUMNS: TableColumn[] = [
+    { header: 'Select', isSelection: true },
+    { header: 'Backtest' },
+    { header: 'Strategy version' },
+    { header: 'Instrument' },
+    { header: 'Bar period' },
+    { header: 'Status' },
+    { header: 'Final equity (USD)', align: 'right' },
+    { header: 'Total return', align: 'right' },
+    { header: 'Max drawdown', align: 'right' },
+    { header: 'Trades', align: 'right' },
+  ];
+
   let strategies: StrategyListItem[] = $state([]);
   let selectedStrategy = $state<StrategyDetail | null>(null);
   let strategyId = $state('');
@@ -53,11 +77,23 @@
   const selectedSavedBars = $derived(
     selectedInstrument === undefined ? undefined : findSavedBars(selectedInstrument, barPeriod),
   );
+  const strategyItems = $derived(strategies.map((strategy) => ({ value: String(strategy.id), label: strategy.name })));
+  const versionItems = $derived(
+    selectedStrategy === null
+      ? []
+      : selectedStrategy.versions.map((version) => ({
+          value: String(version.id),
+          label: formatVersionLabel(selectedStrategy?.name ?? '', version.version_number),
+        })),
+  );
+  const instrumentItems = $derived(
+    instrumentChoices.map((instrument) => ({ value: String(instrument.id), label: formatWatchlistInstrument(instrument) })),
+  );
   let startDate = $state('');
   let endDate = $state('');
   let paperCapitalUsd = $state('');
   let backtests: Backtest[] = $state([]);
-  let errorMessage = $state('');
+  let startError = $state<{ title: string; subtitle: string } | null>(null);
   let isStarting = $state(false);
   let selectedBacktestIds: number[] = $state([]);
   const comparisonSelection = $derived(checkComparisonSelection(backtests, selectedBacktestIds));
@@ -111,15 +147,13 @@
     }
   });
 
-  async function selectStrategy(): Promise<void> {
+  async function selectStrategy(selectedId: string): Promise<void> {
+    strategyId = selectedId;
     selectedStrategy = null;
     strategyVersionId = '';
-    if (strategyId === '') {
-      return;
-    }
-    const result = await readStrategy(fetch, Number(strategyId));
+    const result = await readStrategy(fetch, Number(selectedId));
     if (result.kind === 'failed') {
-      errorMessage = result.message;
+      startError = { title: 'Strategy not read', subtitle: result.message };
       return;
     }
     selectedStrategy = result.value;
@@ -129,11 +163,13 @@
 
   async function submitBacktest(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    if (selectedInstrument === undefined) {
+    // The dropdowns are not native selects, so the form checks them itself.
+    if (strategyVersionId === '' || selectedInstrument === undefined) {
+      startError = { title: 'Backtest not started', subtitle: 'Select a strategy version and an instrument.' };
       return;
     }
     isStarting = true;
-    errorMessage = '';
+    startError = null;
     const result = await startBacktest(fetch, {
       strategy_version_id: Number(strategyVersionId),
       symbol: selectedInstrument.symbol,
@@ -146,210 +182,176 @@
     });
     isStarting = false;
     if (result.kind === 'failed') {
-      errorMessage = result.message;
+      startError = { title: 'Backtest not started', subtitle: result.message };
       return;
     }
     await goto(resolve('/backtests/[backtestId]', { backtestId: String(result.value.id) }));
   }
 </script>
 
-<h1>Backtests</h1>
+<h1 class="page-heading">Backtests</h1>
 
 <form id="start-backtest" class="backtest-form" aria-label="Start a backtest" onsubmit={submitBacktest}>
-  <!-- The select is outside its label: the name of a select inside a label would also hold the selected option. -->
-  <div class="field">
-    <label for="backtest-strategy">Strategy</label>
-    <select id="backtest-strategy" bind:value={strategyId} onchange={selectStrategy} required>
-      <option value="">Select a strategy</option>
-      {#each strategies as strategy (strategy.id)}
-        <option value={String(strategy.id)}>{strategy.name}</option>
-      {/each}
-    </select>
-  </div>
-  <div class="field">
-    <label for="backtest-strategy-version">Strategy version</label>
-    <select id="backtest-strategy-version" bind:value={strategyVersionId} required>
-      {#if selectedStrategy !== null}
-        {#each selectedStrategy.versions as version (version.id)}
-          <option value={String(version.id)}>{formatVersionLabel(selectedStrategy.name, version.version_number)}</option>
-        {/each}
-      {/if}
-    </select>
-  </div>
-  <label>
-    Bar period
-    <select bind:value={barPeriod}>
-      {#each BAR_PERIODS as period (period.value)}
-        <option value={period.value}>{period.label}</option>
-      {/each}
-    </select>
-  </label>
-  <div class="field">
-    <label for="backtest-instrument">Instrument</label>
-    <select
-      id="backtest-instrument"
-      bind:value={watchlistInstrumentId}
-      disabled={instrumentChoices.length === 0}
-      required
-    >
-      <option value="">Select an instrument</option>
-      {#each instrumentChoices as instrument (instrument.id)}
-        <option value={String(instrument.id)}>{formatWatchlistInstrument(instrument)}</option>
-      {/each}
-    </select>
-  </div>
-  <p class="form-note" role="status" aria-label="Saved bars">
+  <Select
+    label="Strategy"
+    placeholder="Select a strategy"
+    items={strategyItems}
+    value={strategyId}
+    onValueChange={(selectedId: string) => void selectStrategy(selectedId)}
+  />
+  <Select
+    label="Strategy version"
+    placeholder="Select a strategy first"
+    items={versionItems}
+    value={strategyVersionId}
+    disabled={versionItems.length === 0}
+    onValueChange={(versionId: string) => {
+      strategyVersionId = versionId;
+    }}
+  />
+  <Select
+    label="Bar period"
+    items={[...BAR_PERIODS]}
+    value={barPeriod}
+    onValueChange={(period: BarPeriod) => {
+      barPeriod = period;
+    }}
+  />
+  <Select
+    label="Instrument"
+    placeholder="Select an instrument"
+    items={instrumentItems}
+    value={watchlistInstrumentId}
+    disabled={instrumentItems.length === 0}
+    onValueChange={(instrumentId: string) => {
+      watchlistInstrumentId = instrumentId;
+    }}
+  />
+  <p class="form-note cds--form__helper-text" role="status" aria-label="Saved bars">
     {#if watchlistMessage !== ''}
       {watchlistMessage}
     {:else if instrumentChoices.length === 0}
       No watchlist instrument has saved {barPeriodLabel} bars. Add an instrument to the
-      <a href={resolve('/')}>watchlist</a> and open its bar chart: the chart saves the bars.
+      <a class="cds--link cds--link--sm" href={resolve('/')}>watchlist</a> and open its bar chart: the chart saves the bars.
     {:else if selectedSavedBars !== undefined}
       {describeSavedBars(selectedSavedBars)}
-    {:else}
-      The instruments are watchlist instruments with saved {barPeriodLabel} bars.
     {/if}
   </p>
-  <label>
-    Start date (UTC)
-    <input type="date" bind:value={startDate} required />
-  </label>
-  <label>
-    End date (UTC)
-    <input type="date" bind:value={endDate} required />
-  </label>
-  <label>
-    Paper capital (USD)
-    <input inputmode="decimal" bind:value={paperCapitalUsd} required />
-  </label>
-  <button type="submit" disabled={isStarting}>Start backtest</button>
+  <TextInput label="Start date (UTC)" type="date" bind:value={startDate} required />
+  <TextInput label="End date (UTC)" type="date" bind:value={endDate} required />
+  <TextInput label="Paper capital (USD)" inputmode="decimal" class="number" bind:value={paperCapitalUsd} required />
+  <div>
+    <Button type="submit" size="md" disabled={isStarting}>Start backtest</Button>
+  </div>
 </form>
-{#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+{#if startError !== null}
+  <InlineNotification
+    kind="error"
+    title={startError.title}
+    subtitle={startError.subtitle}
+    lowContrast
+    onClose={() => (startError = null)}
+  />
 {/if}
 
-<h2>Limits</h2>
+<h2 class="section-heading">Limits</h2>
 <BacktestLimitsForm />
 
-<h2>All backtests</h2>
+<h2 class="section-heading">All backtests</h2>
 {#if backtests.length === 0}
   <p>No backtest yet.</p>
 {:else}
   <div class="comparison-bar">
-    <button type="button" disabled={comparisonSelection.kind !== 'ready'} onclick={openComparison}>
+    <Button size="sm" disabled={comparisonSelection.kind !== 'ready'} onclick={openComparison}>
       Compare selected backtests
-    </button>
+    </Button>
     <p class="selection-message" role="status" aria-label="Comparison selection">
       {comparisonSelection.kind === 'ready' ? 'Ready to compare.' : comparisonSelection.message}
     </p>
   </div>
   <ScrollRegion label="Backtests" maxHeight="min(24rem, 50vh)">
-    <table class="backtest-list">
-      <thead>
-        <tr>
-          <th scope="col">Select</th>
-          <th scope="col">Backtest</th>
-          <th scope="col">Strategy version</th>
-          <th scope="col">Instrument</th>
-          <th scope="col">Bar period</th>
-          <th scope="col">Status</th>
-          <th scope="col">Final equity (USD)</th>
-          <th scope="col">Total return</th>
-          <th scope="col">Max drawdown</th>
-          <th scope="col">Trades</th>
-        </tr>
-      </thead>
-      <tbody>
+    <DataTable columns={BACKTEST_COLUMNS} size="sm">
+      {#snippet rows()}
         {#each backtests as backtest (backtest.id)}
           <tr>
-            <td>
-              <input
-                type="checkbox"
-                aria-label={`Select backtest #${String(backtest.id)}`}
+            <td class="cds--table-column-checkbox">
+              <Checkbox
+                label={`Select backtest #${String(backtest.id)}`}
+                hideLabel
                 checked={selectedBacktestIds.includes(backtest.id)}
-                onchange={(event) => {
-                  toggleSelection(backtest.id, event.currentTarget.checked);
+                onCheckedChange={(isSelected: boolean) => {
+                  toggleSelection(backtest.id, isSelected);
                 }}
               />
             </td>
             <th scope="row">
-              <a href={resolve('/backtests/[backtestId]', { backtestId: String(backtest.id) })}>#{backtest.id}</a>
+              <a class="cds--link" href={resolve('/backtests/[backtestId]', { backtestId: String(backtest.id) })}>#{backtest.id}</a>
             </th>
             <td>{formatVersionLabel(backtest.strategy_name, backtest.version_number)}</td>
             <td>{backtest.symbol} / {backtest.exchange} / {backtest.currency}</td>
             <td>{formatBarPeriod(backtest.bar_period)}</td>
-            <td>{describeBacktestStatus(backtest.status)}</td>
-            <td class="number">{backtest.metrics === null ? '' : formatUsd(backtest.metrics.final_equity_usd)}</td>
-            <td class="number">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.total_return_percent)}</td>
-            <td class="number">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.max_drawdown_percent)}</td>
-            <td class="number">{backtest.metrics === null ? '' : backtest.metrics.trade_count}</td>
+            <td>
+              <StatusIndicator label={describeBacktestStatus(backtest.status)} kind={findBacktestStatusKind(backtest.status)} />
+            </td>
+            <td align="right">{backtest.metrics === null ? '' : formatUsd(backtest.metrics.final_equity_usd)}</td>
+            <td align="right">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.total_return_percent)}</td>
+            <td align="right">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.max_drawdown_percent)}</td>
+            <td align="right">{backtest.metrics === null ? '' : backtest.metrics.trade_count}</td>
           </tr>
         {/each}
-      </tbody>
-    </table>
+      {/snippet}
+    </DataTable>
   </ScrollRegion>
 {/if}
 
 <style>
+  .page-heading {
+    margin-block: 0 var(--cds-spacing-06);
+    font-size: var(--cds-heading-04-font-size);
+    font-weight: var(--cds-heading-04-font-weight);
+    line-height: var(--cds-heading-04-line-height);
+    letter-spacing: var(--cds-heading-04-letter-spacing);
+  }
+
+  .section-heading {
+    margin-block: var(--cds-spacing-07) var(--cds-spacing-05);
+    font-size: var(--cds-heading-03-font-size);
+    font-weight: var(--cds-heading-03-font-weight);
+    line-height: var(--cds-heading-03-line-height);
+    letter-spacing: var(--cds-heading-03-letter-spacing);
+  }
+
   .backtest-form {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     align-items: end;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: var(--cds-spacing-05);
+    margin-block-end: var(--cds-spacing-05);
   }
 
-  .backtest-form label,
-  .backtest-form .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .error {
-    color: var(--color-warning);
+  .backtest-form :global(input.number) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
   }
 
   .form-note {
     grid-column: 1 / -1;
     margin: 0;
-    color: var(--color-muted);
   }
 
   .comparison-bar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
+    gap: var(--cds-spacing-05);
+    margin-block-end: var(--cds-spacing-03);
   }
 
   .selection-message {
     margin: 0;
-    color: var(--color-muted);
-  }
-
-  .backtest-list {
-    border-collapse: collapse;
-    inline-size: 100%;
-    font-size: 0.875rem;
-  }
-
-  .backtest-list th,
-  .backtest-list td {
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: start;
-  }
-
-  .backtest-list thead th {
-    position: sticky;
-    inset-block-start: 0;
-    background: var(--color-surface);
-  }
-
-  .backtest-list .number {
-    text-align: end;
-    font-variant-numeric: tabular-nums;
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 </style>

@@ -8,7 +8,7 @@
   interface Props extends Omit<HTMLInputAttributes, 'class' | 'value' | 'type'> {
     label: string;
     // A text input, or a native date and time input with the Carbon text input look.
-    type?: 'text' | 'datetime-local';
+    type?: 'text' | 'date' | 'datetime-local';
     value?: string;
     // The message that tells the user how to correct the value. The input is invalid when it is set.
     invalidText?: string | null;

@@ -1,6 +1,7 @@
 <!-- Equity curves on one chart: one line point at the end of each bar. Times are UNIX timestamps (UTC).
      One curve is a backtest result. Two curves are a comparison (ComparisonView). The second curve is a dashed line
-     in the accent color, so the user can tell the curves apart without color. A legend names each curve.
+     in the Carbon interactive color, so the user can tell the curves apart without color. A legend names each curve.
+     All colors are Carbon tokens of the current theme (docs/architecture.md section 13).
      Interruptions of a forward test are grey columns behind the curves, and a list names them as text.
 
      Attribution notice of lightweight-charts (Apache License 2.0):
@@ -51,8 +52,9 @@
     lineStyle: LineStyle;
   }
 
-  const FIRST_CURVE_STYLE: CurveStyle = { colorVariable: '--color-text', lineStyle: LineStyle.Solid };
-  const CURVE_STYLES: CurveStyle[] = [FIRST_CURVE_STYLE, { colorVariable: '--color-accent', lineStyle: LineStyle.Dashed }];
+  const FIRST_CURVE_STYLE: CurveStyle = { colorVariable: '--cds-text-primary', lineStyle: LineStyle.Solid };
+  const CURVE_STYLES: CurveStyle[] = [FIRST_CURVE_STYLE, { colorVariable: '--cds-interactive', lineStyle: LineStyle.Dashed }];
+  const INTERRUPTION_COLOR_VARIABLE = '--cds-layer-accent-01';
 
   let chartContainer: HTMLDivElement;
   // A series with the color token that it uses. A change of the color scheme reads each token again.
@@ -67,15 +69,17 @@
   }
 
   function readThemeOptions(): DeepPartial<ChartOptions> {
+    const gridColor = readColor('--cds-border-subtle-01');
     return {
       layout: {
-        background: { color: readColor('--color-surface') },
-        textColor: readColor('--color-text'),
+        background: { color: readColor('--cds-layer-01') },
+        textColor: readColor('--cds-text-secondary'),
+        // IBM Plex Sans from the Carbon reset.
+        fontFamily: getComputedStyle(chartContainer).fontFamily,
       },
-      grid: {
-        vertLines: { color: readColor('--color-border') },
-        horzLines: { color: readColor('--color-border') },
-      },
+      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+      rightPriceScale: { borderColor: gridColor },
+      timeScale: { borderColor: gridColor },
     };
   }
 
@@ -88,7 +92,7 @@
       return [];
     }
     const columnSeries = chart.addSeries(HistogramSeries, {
-      color: readColor('--color-border'),
+      color: readColor(INTERRUPTION_COLOR_VARIABLE),
       priceScaleId: INTERRUPTION_PRICE_SCALE_ID,
       lastValueVisible: false,
       priceLineVisible: false,
@@ -99,7 +103,7 @@
       value: INTERRUPTION_COLUMN_VALUE,
     }));
     columnSeries.setData(columns);
-    return [[columnSeries, '--color-border']];
+    return [[columnSeries, INTERRUPTION_COLOR_VARIABLE]];
   }
 
   function readCurveStyle(curveIndex: number): CurveStyle {
@@ -112,7 +116,8 @@
       autoSize: true,
       layout: { ...themeOptions.layout, attributionLogo: true },
       grid: themeOptions.grid,
-      timeScale: { timeVisible: true, secondsVisible: false },
+      rightPriceScale: themeOptions.rightPriceScale,
+      timeScale: { ...themeOptions.timeScale, timeVisible: true, secondsVisible: false },
     });
     // Added first, so the curves are drawn on top of the grey columns.
     const coloredSeries = addInterruptionColumns(chart);
@@ -171,7 +176,7 @@
     </ul>
   {/if}
   <figcaption class="chart-attribution">
-    Chart by <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
+    Chart by <a class="cds--link cds--link--sm" href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
     Lightweight Charts™
   </figcaption>
 </figure>
@@ -185,30 +190,34 @@
     position: relative;
     height: min(24rem, 50vh);
     min-height: 12rem;
-    border: 1px solid var(--color-border);
-    border-radius: 0.5rem;
     overflow: hidden;
+  }
+
+  .legend,
+  .interruptions {
+    margin: var(--cds-spacing-03) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
   }
 
   .legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
-    margin: 0.5rem 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 0.875rem;
+    gap: var(--cds-spacing-05);
   }
 
   .legend li {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: var(--cds-spacing-03);
   }
 
   .legend-line {
     display: inline-block;
-    inline-size: 1.5rem;
+    inline-size: var(--cds-spacing-07);
     border-top: 2px solid;
   }
 
@@ -216,25 +225,20 @@
     border-top-style: dashed;
   }
 
-  .interruptions {
-    margin: 0.5rem 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 0.875rem;
-  }
-
   .interruption-mark {
     display: inline-block;
-    inline-size: 0.75rem;
-    block-size: 0.75rem;
-    margin-inline-end: 0.375rem;
-    background: var(--color-border);
+    inline-size: var(--cds-spacing-04);
+    block-size: var(--cds-spacing-04);
+    margin-inline-end: var(--cds-spacing-03);
+    background: var(--cds-layer-accent-01);
     vertical-align: middle;
   }
 
   .chart-attribution {
-    margin-top: 0.25rem;
-    color: var(--color-muted);
-    font-size: 0.75rem;
+    margin-block-start: var(--cds-spacing-03);
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    letter-spacing: var(--cds-helper-text-01-letter-spacing);
+    color: var(--cds-text-secondary);
   }
 </style>

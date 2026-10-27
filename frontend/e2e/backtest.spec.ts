@@ -25,11 +25,15 @@ test('starts a backtest and sees its metrics, equity curve, and trades', async (
   await page.getByRole('link', { name: 'Backtests' }).click();
   // The e2e server paper account balance is the default paper capital.
   await expect(page.getByLabel('Paper capital (USD)')).toHaveValue('101234.50');
-  await page.getByLabel('Strategy', { exact: true }).selectOption({ label: strategyName });
-  await expect(page.getByLabel('Strategy version')).toHaveValue(/\d+/);
+  // The selects are Carbon dropdowns: the trigger is a combo box, and the choices are options.
+  await page.getByRole('combobox', { name: 'Strategy', exact: true }).click();
+  await page.getByRole('option', { name: strategyName, exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
   await expect(page.getByLabel('Symbol')).toHaveCount(0);
-  await page.getByLabel('Bar period').selectOption('1-DAY');
-  await page.getByLabel('Instrument', { exact: true }).selectOption({ label: 'AAPL / NASDAQ / USD' });
+  await page.getByRole('combobox', { name: 'Bar period' }).click();
+  await page.getByRole('option', { name: '1 day', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Instrument', exact: true }).click();
+  await page.getByRole('option', { name: 'AAPL / NASDAQ / USD', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Saved bars' })).toHaveText(
     'Saved bars start from 2023-01-02 00:00:00 UTC to 2026-01-01 00:00:00 UTC.',
   );
@@ -67,7 +71,7 @@ test('shows how to save bars when no watchlist instrument has saved bars', async
 
   await page.goto('/backtests');
 
-  await expect(page.getByLabel('Instrument', { exact: true })).toBeDisabled();
+  await expect(page.getByRole('combobox', { name: 'Instrument', exact: true })).toBeDisabled();
   const emptyState = page.getByRole('status', { name: 'Saved bars' });
   await expect(emptyState).toHaveText(
     'No watchlist instrument has saved 1 day bars. Add an instrument to the watchlist and open its bar chart: the chart saves the bars.',

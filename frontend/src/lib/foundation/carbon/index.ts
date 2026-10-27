@@ -24,4 +24,5 @@ export type { ComboboxItem } from './combobox_classes';
 export { default as DataTable, type TableColumn } from './DataTable.svelte';
 export { default as OverflowMenu, type OverflowMenuItem } from './OverflowMenu.svelte';
 export { default as InlineNotification, type NotificationKind } from './InlineNotification.svelte';
+export { default as Checkbox } from './Checkbox.svelte';
 export { default as StatusIndicator, type StatusKind } from './StatusIndicator.svelte';

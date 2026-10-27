@@ -1,6 +1,7 @@
 <!-- Carbon data table. The columns give the header row. The `rows` snippet renders the <tr> elements of <tbody>.
      A number column has align "right": its cells must also have align="right", and they use tabular numbers.
      A menu column (an overflow menu in each row) has a header that only screen readers read.
+     A selection column (a Checkbox in each row) also has a header that only screen readers read.
      A row can start with <th scope="row">: it is the row header. -->
 <script module lang="ts">
   export interface TableColumn {
@@ -8,6 +9,8 @@
     align?: 'left' | 'right';
     // The column of the row overflow menus: cells use class "cds--table-column-menu".
     isMenu?: boolean;
+    // The column of the row selection checkboxes: cells use class "cds--table-column-checkbox".
+    isSelection?: boolean;
   }
 </script>
 
@@ -32,6 +35,8 @@
           {#each columns as column (column.header)}
             {#if column.isMenu === true}
               <th scope="col" class="cds--table-column-menu"><span class="cds--visually-hidden">{column.header}</span></th>
+            {:else if column.isSelection === true}
+              <th scope="col" class="cds--table-column-checkbox"><span class="cds--visually-hidden">{column.header}</span></th>
             {:else}
               <th scope="col" align={column.align}><div class="cds--table-header-label">{column.header}</div></th>
             {/if}
