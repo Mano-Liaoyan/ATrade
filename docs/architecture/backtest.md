@@ -123,7 +123,12 @@ Limits of this stage:
 - The commission is zero.
 - `request_bars` in `on_start` gets no bars in a backtest. The engine has no
   historical data client and writes a warning. The indicator warms up on the
-  first bars of the range.
+  first bars of the range. A forward test warms up on bars before its start,
+  so the first bars of a same-period backtest can differ from the forward
+  test. `tests/backtest/test_strategy_template_backtest.py` runs the strategy
+  template on 120 daily bars and expects trades. Look-back bars before the
+  range (how many, and how the engine gets them) are an open question for
+  the owner.
 
 ## 10.4 Metric functions
 

@@ -1,6 +1,8 @@
 // Calls the forward test routes and reads /ws/forward-tests (backend/src/atrade/forward_test/http_routes.py).
 // The Web process writes only the desired state. The forward-test worker writes the status (docs/architecture.md 12.3).
 import type { components } from '#lib/api';
+import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
+import { readSocketMessage } from '#lib/foundation/live_socket';
 
 export type ForwardTest = components['schemas']['ForwardTestResponse'];
 export type ForwardTestRequest = components['schemas']['StartForwardTestRequest'];
@@ -9,7 +11,8 @@ export type ForwardTestComparison = components['schemas']['ForwardTestComparison
 export type FillComparison = components['schemas']['FillComparisonResponse'];
 export type ComparedInterruption = components['schemas']['ComparedInterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
-type ValidationError = components['schemas']['ValidationError'];
+type ForwardTestsMessage = components['schemas']['ForwardTestsMessage'];
+type SamePeriodBacktestResponse = components['schemas']['SamePeriodBacktestResponse'];
 
 export type StartResult = { kind: 'started'; forwardTest: ForwardTest } | { kind: 'failed'; message: string };
 export type StopResult = { kind: 'stop_requested' } | { kind: 'failed'; message: string };
@@ -84,65 +87,54 @@ export function canBacktestSamePeriod(forwardTest: ForwardTest): boolean {
 }
 
 export function readForwardTestsMessage(message: unknown): ForwardTest[] | null {
-  if (typeof message !== 'object' || message === null || !('type' in message) || message.type !== 'forward_tests') {
-    return null;
-  }
-  if (!('forward_tests' in message) || !Array.isArray(message.forward_tests)) {
-    return null;
-  }
-  return message.forward_tests as ForwardTest[];
+  return readSocketMessage<ForwardTestsMessage>(message, ['forward_tests'])?.forward_tests ?? null;
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
+type RequestOutcome = { kind: 'ok'; body: unknown } | { kind: 'failed'; message: string };
 
-// A refused start has {"detail": "<reason>"}. A request that does not validate has a list of field errors.
-function describeError(body: unknown, status: number): string {
-  if (typeof body !== 'object' || body === null || !('detail' in body)) {
-    return `HTTP status ${String(status)}.`;
+// A refused request has {"detail": "<reason>"}. A request that does not validate has a list of field errors.
+async function sendForwardTestRequest(
+  fetchFunction: typeof fetch,
+  path: string,
+  init: RequestInit | undefined,
+  messages: { notReachable: string; failedAction: string },
+): Promise<RequestOutcome> {
+  const response = await sendRequest(fetchFunction, path, init);
+  if (response === null) {
+    return { kind: 'failed', message: messages.notReachable };
   }
-  if (typeof body.detail === 'string') {
-    return body.detail;
+  const body = await readJsonBody(response);
+  if (!response.ok) {
+    return { kind: 'failed', message: describeErrorBody(body, response.status, messages.failedAction) };
   }
-  const firstError = Array.isArray(body.detail) ? (body.detail[0] as ValidationError | undefined) : undefined;
-  if (firstError === undefined) {
-    return `HTTP status ${String(status)}.`;
-  }
-  return `${String(firstError.loc.at(-1))}: ${firstError.msg}`;
+  return { kind: 'ok', body };
 }
 
 export async function startForwardTest(fetchFunction: typeof fetch, request: ForwardTestRequest): Promise<StartResult> {
-  let response: Response;
-  try {
-    response = await fetchFunction(FORWARD_TESTS_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-  } catch {
-    return { kind: 'failed', message: 'Backend not reachable. The forward test did not start.' };
+  const outcome = await sendForwardTestRequest(
+    fetchFunction,
+    FORWARD_TESTS_PATH,
+    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) },
+    { notReachable: 'Backend not reachable. The forward test did not start.', failedAction: 'Starting the forward test' },
+  );
+  if (outcome.kind === 'failed') {
+    return outcome;
   }
-  const body = await readJson(response);
-  if (!response.ok) {
-    return { kind: 'failed', message: describeError(body, response.status) };
-  }
-  return { kind: 'started', forwardTest: body as ForwardTest };
+  return { kind: 'started', forwardTest: outcome.body as ForwardTest };
 }
 
 export async function stopForwardTest(fetchFunction: typeof fetch, forwardTestId: number): Promise<StopResult> {
-  let response: Response;
-  try {
-    response = await fetchFunction(`${FORWARD_TESTS_PATH}/${String(forwardTestId)}/stop`, { method: 'POST' });
-  } catch {
-    return { kind: 'failed', message: 'Backend not reachable. The forward test did not get the stop request.' };
-  }
-  if (!response.ok) {
-    return { kind: 'failed', message: describeError(await readJson(response), response.status) };
+  const outcome = await sendForwardTestRequest(
+    fetchFunction,
+    `${FORWARD_TESTS_PATH}/${String(forwardTestId)}/stop`,
+    { method: 'POST' },
+    {
+      notReachable: 'Backend not reachable. The forward test did not get the stop request.',
+      failedAction: 'The stop request',
+    },
+  );
+  if (outcome.kind === 'failed') {
+    return outcome;
   }
   return { kind: 'stop_requested' };
 }
@@ -151,19 +143,16 @@ export async function startSamePeriodBacktest(
   fetchFunction: typeof fetch,
   forwardTestId: number,
 ): Promise<SamePeriodBacktestResult> {
-  let response: Response;
-  try {
-    response = await fetchFunction(`${FORWARD_TESTS_PATH}/${String(forwardTestId)}/same-period-backtests`, {
-      method: 'POST',
-    });
-  } catch {
-    return { kind: 'failed', message: 'Backend not reachable. The backtest did not start.' };
+  const outcome = await sendForwardTestRequest(
+    fetchFunction,
+    `${FORWARD_TESTS_PATH}/${String(forwardTestId)}/same-period-backtests`,
+    { method: 'POST' },
+    { notReachable: 'Backend not reachable. The backtest did not start.', failedAction: 'Starting the backtest' },
+  );
+  if (outcome.kind === 'failed') {
+    return outcome;
   }
-  const body = await readJson(response);
-  if (!response.ok) {
-    return { kind: 'failed', message: describeError(body, response.status) };
-  }
-  return { kind: 'started', backtestId: (body as { backtest_id: number }).backtest_id };
+  return { kind: 'started', backtestId: (outcome.body as SamePeriodBacktestResponse).backtest_id };
 }
 
 export async function readForwardTestComparison(
@@ -171,15 +160,14 @@ export async function readForwardTestComparison(
   forwardTestId: number,
   backtestId: number,
 ): Promise<ComparisonResult> {
-  let response: Response;
-  try {
-    response = await fetchFunction(`${FORWARD_TESTS_PATH}/${String(forwardTestId)}/comparison/${String(backtestId)}`);
-  } catch {
-    return { kind: 'failed', message: 'Backend not reachable. The comparison is not available.' };
+  const outcome = await sendForwardTestRequest(
+    fetchFunction,
+    `${FORWARD_TESTS_PATH}/${String(forwardTestId)}/comparison/${String(backtestId)}`,
+    undefined,
+    { notReachable: 'Backend not reachable. The comparison is not available.', failedAction: 'Reading the comparison' },
+  );
+  if (outcome.kind === 'failed') {
+    return outcome;
   }
-  const body = await readJson(response);
-  if (!response.ok) {
-    return { kind: 'failed', message: describeError(body, response.status) };
-  }
-  return { kind: 'ok', value: body as ForwardTestComparison };
+  return { kind: 'ok', value: outcome.body as ForwardTestComparison };
 }

@@ -1,5 +1,11 @@
 // Public entry of foundation/live_socket: a WebSocket that connects again after a close or a missing heartbeat.
 // Browsers suspend background tabs in different ways, so the reconnection is our own code (docs/architecture.md section 13).
+import type { components } from '#lib/api';
+import { readSocketMessage } from './socket_message';
+
+export { readSocketMessage } from './socket_message';
+
+type HeartbeatMessage = components['schemas']['HeartbeatMessage'];
 
 export interface SocketEvents {
   onOpen: () => void;
@@ -62,7 +68,7 @@ function watchDocumentVisible(onVisible: () => void): () => void {
 }
 
 function isHeartbeat(message: unknown): boolean {
-  return typeof message === 'object' && message !== null && 'type' in message && message.type === HEARTBEAT_MESSAGE_TYPE;
+  return readSocketMessage<HeartbeatMessage>(message, [HEARTBEAT_MESSAGE_TYPE]) !== null;
 }
 
 export function buildSocketUrl(path: string, location: { protocol: string; host: string }): string {

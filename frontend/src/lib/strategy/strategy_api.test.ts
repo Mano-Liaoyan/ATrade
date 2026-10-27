@@ -69,4 +69,12 @@ describe('deleteStrategy', () => {
 
     expect(result).toEqual({ kind: 'deleted' });
   });
+
+  it('names the HTTP status when a proxy answers without a message', async () => {
+    const proxyFetch: typeof fetch = () => Promise.resolve(new Response('Bad Gateway', { status: 502 }));
+
+    const result = await deleteStrategy(proxyFetch, 4);
+
+    expect(result).toEqual({ kind: 'failed', message: 'The strategy request failed with HTTP status 502.' });
+  });
 });

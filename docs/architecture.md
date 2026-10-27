@@ -151,7 +151,7 @@ counts from `atrade/`.
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, and the paper account check. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
-| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`. |
+| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
 
 ### 6.2 Dependency direction
@@ -301,8 +301,21 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   hand. OpenAPI does not describe WebSocket messages, so
   `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
   of each WebSocket message model to `components.schemas`. A capability
-  exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`. A
-  message schema must not have the name of a different schema.
+  exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`,
+  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`, and
+  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`. Each list has `HeartbeatMessage` of
+  `foundation/socket_push`. A message schema must not have the name of a
+  different schema. Routes declare their error bodies with `responses=`
+  (`ErrorResponse` of `foundation/error_response`), so the frontend does not
+  write error types by hand.
+- `foundation/http_request` sends the HTTP requests of the capabilities:
+  `sendRequest`, `requestJson`, `readJsonBody`, `readErrorMessage`,
+  `describeErrorBody`, `BACKEND_NOT_REACHABLE`, and the type `RequestResult`.
+  An error message is the `detail` text, the first field error of a list
+  `detail` ("<field>: <message>"), or "<action> failed with HTTP status N.".
+- `foundation/live_socket` also has `readSocketMessage`: it returns a parsed
+  socket message with its generated type when its `type` matches, else
+  `null`.
 - `foundation/scroll_region/` has `ScrollRegion`: a region that scrolls inside
   itself. It hides the native scrollbar and draws its own track and thumb
   (`role="scrollbar"`, named "<region label> scroll bar"). The thumb can be

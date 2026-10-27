@@ -1,7 +1,7 @@
 // Calls GET /api/market-data/bars. The backend picks the default range of the bar period, up to now.
 // The instrument page URL names the instrument and the bar period, so a chart link can be opened again.
 import type { components } from '#lib/api';
-import { readErrorMessage } from './http_errors';
+import { readErrorMessage, sendRequest } from '#lib/foundation/http_request';
 import type { Instrument } from './instrument_search';
 
 export type Bar = components['schemas']['BarResponse'];
@@ -28,12 +28,10 @@ export async function readBars(
   instrument: Instrument,
   barPeriod: BarPeriod,
 ): Promise<BarsResult> {
-  let response: Response;
-  try {
-    const { symbol, exchange, currency } = instrument;
-    const searchParameters = new URLSearchParams({ symbol, exchange, currency, bar_period: barPeriod });
-    response = await fetchFunction(`${BARS_PATH}?${searchParameters.toString()}`);
-  } catch {
+  const { symbol, exchange, currency } = instrument;
+  const searchParameters = new URLSearchParams({ symbol, exchange, currency, bar_period: barPeriod });
+  const response = await sendRequest(fetchFunction, `${BARS_PATH}?${searchParameters.toString()}`);
+  if (response === null) {
     return { kind: 'failed', message: 'Backend not reachable. The bars did not load.' };
   }
   if (!response.ok) {

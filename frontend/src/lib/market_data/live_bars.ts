@@ -1,13 +1,13 @@
 // Live bars of /ws/market-data: the socket path of a chart, the messages, and which live bars the chart can draw.
 // The message types come from the JSON Schema of the backend message models (docs/architecture.md section 13).
 import type { components } from '#lib/api';
+import { readSocketMessage } from '#lib/foundation/live_socket';
 import type { Bar, ChartRequest } from './bars';
 
 export type LiveBarMessage = components['schemas']['LiveBarMessage'];
 export type LiveBarErrorMessage = components['schemas']['LiveBarErrorMessage'];
 
 const LIVE_BARS_SOCKET_PATH = '/ws/market-data';
-const LIVE_BAR_MESSAGE_TYPES: readonly string[] = ['bar', 'error'];
 
 export function formatLiveBarsPath(chartRequest: ChartRequest): string {
   const { symbol, exchange, currency } = chartRequest.instrument;
@@ -17,16 +17,7 @@ export function formatLiveBarsPath(chartRequest: ChartRequest): string {
 
 /** Returns the bar or error message. The frontend trusts the backend types and checks only the message type. */
 export function readLiveBarMessage(message: unknown): LiveBarMessage | LiveBarErrorMessage | null {
-  if (
-    typeof message !== 'object' ||
-    message === null ||
-    !('type' in message) ||
-    typeof message.type !== 'string' ||
-    !LIVE_BAR_MESSAGE_TYPES.includes(message.type)
-  ) {
-    return null;
-  }
-  return message as LiveBarMessage | LiveBarErrorMessage;
+  return readSocketMessage<LiveBarMessage | LiveBarErrorMessage>(message, ['bar', 'error']);
 }
 
 /** The chart can replace its last bar or add a later bar. It cannot change an older bar. */

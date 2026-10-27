@@ -1,37 +1,12 @@
 // Reads the /ws/paper-trading account messages and describes the paper account check for the account panel.
 
-// Hand-written until the OpenAPI type generation covers WebSocket messages.
-// It matches PaperAccountMessage in backend/src/atrade/paper_trading/http_routes.py. Amounts are decimal text.
-export interface PaperAccountCheck {
-  status: 'disconnected' | 'passed' | 'failed';
-  message: string | null;
-  actual_accounts: string[];
-  expected_account: string | null;
-}
+import type { components } from '#lib/api';
+import { readSocketMessage } from '#lib/foundation/live_socket';
 
-export interface PaperAccountBalance {
-  net_liquidation_usd: string | null;
-  cash_usd: string | null;
-}
-
-export interface PaperPosition {
-  symbol: string;
-  security_type: string;
-  exchange: string;
-  currency: string;
-  quantity: string;
-  average_cost: string;
-  market_price: string;
-  market_value: string;
-  unrealized_pnl: string;
-}
-
-export interface PaperAccountMessage {
-  type: 'account';
-  check: PaperAccountCheck;
-  balance: PaperAccountBalance | null;
-  positions: PaperPosition[];
-}
+// The message models of backend/src/atrade/paper_trading/http_routes.py. Amounts are decimal text.
+export type PaperAccountMessage = components['schemas']['PaperAccountMessage'];
+export type PaperAccountCheck = components['schemas']['PaperAccountCheckMessage'];
+export type PaperPosition = components['schemas']['PositionMessage'];
 
 export const PAPER_TRADING_SOCKET_PATH = '/ws/paper-trading';
 
@@ -39,10 +14,7 @@ const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2,
 const MISSING_AMOUNT = '–';
 
 export function readPaperAccountMessage(message: unknown): PaperAccountMessage | null {
-  if (typeof message !== 'object' || message === null || !('type' in message) || message.type !== 'account') {
-    return null;
-  }
-  return message as PaperAccountMessage;
+  return readSocketMessage<PaperAccountMessage>(message, ['account']);
 }
 
 export function describePaperAccountCheck(check: PaperAccountCheck): { title: string; detail: string | null } {

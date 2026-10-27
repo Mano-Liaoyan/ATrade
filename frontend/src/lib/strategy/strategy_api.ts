@@ -1,19 +1,22 @@
 // Calls the strategy HTTP routes (backend/src/atrade/strategy/http_routes.py).
 
 import type { components } from '#lib/api';
+import {
+  BACKEND_NOT_REACHABLE,
+  readErrorMessage,
+  requestJson as requestBackendJson,
+  sendRequest,
+  type RequestResult,
+} from '#lib/foundation/http_request';
 
 export type StrategyVersionSummary = components['schemas']['StrategyVersionSummary'];
 export type StrategyDetail = components['schemas']['StrategyResponse'];
 export type StrategyListItem = components['schemas']['StrategyListItem'];
 export type StrategyVersion = components['schemas']['StrategyVersionResponse'];
 export type CodeProblem = components['schemas']['CodeProblemResponse'];
-// The strategy routes do not declare their error model. FastAPI HTTPException sends {"detail": "<message>"}.
-interface ErrorResponse {
-  detail: string;
-}
 type CodeCheckFailedResponse = components['schemas']['CodeCheckFailedResponse'];
 
-export type RequestResult<T> = { kind: 'ok'; value: T } | { kind: 'failed'; message: string };
+export type { RequestResult } from '#lib/foundation/http_request';
 
 export type SaveResult =
   | { kind: 'saved'; version: StrategyVersion; isNewVersion: boolean }
@@ -25,34 +28,11 @@ export type DeleteResult = { kind: 'deleted' } | { kind: 'failed'; message: stri
 const STRATEGIES_PATH = '/api/strategies';
 const HTTP_CREATED = 201;
 const HTTP_UNPROCESSABLE_CONTENT = 422;
-const BACKEND_NOT_REACHABLE = 'The backend is not reachable.';
+// The strategy routes answer 404 and 409 with ErrorResponse {"detail": "<message>"}.
+const FAILED_ACTION = 'The strategy request';
 
-async function sendRequest(fetchFunction: typeof fetch, path: string, init?: RequestInit): Promise<Response | null> {
-  try {
-    return await fetchFunction(path, init);
-  } catch {
-    return null;
-  }
-}
-
-async function readFailureMessage(response: Response): Promise<string> {
-  try {
-    const failure = (await response.json()) as ErrorResponse;
-    return typeof failure.detail === 'string' ? failure.detail : `Request failed with status ${String(response.status)}.`;
-  } catch {
-    return `Request failed with status ${String(response.status)}.`;
-  }
-}
-
-async function requestJson<T>(fetchFunction: typeof fetch, path: string, init?: RequestInit): Promise<RequestResult<T>> {
-  const response = await sendRequest(fetchFunction, path, init);
-  if (response === null) {
-    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
-  }
-  if (!response.ok) {
-    return { kind: 'failed', message: await readFailureMessage(response) };
-  }
-  return { kind: 'ok', value: (await response.json()) as T };
+function requestJson<T>(fetchFunction: typeof fetch, path: string, init?: RequestInit): Promise<RequestResult<T>> {
+  return requestBackendJson<T>(fetchFunction, FAILED_ACTION, path, init);
 }
 
 function createJsonRequest(method: string, body: unknown): RequestInit {
@@ -97,7 +77,7 @@ export async function saveStrategyVersion(fetchFunction: typeof fetch, strategyI
     return { kind: 'check_failed', problems: failure.problems };
   }
   if (!response.ok) {
-    return { kind: 'failed', message: await readFailureMessage(response) };
+    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
   }
   const version = (await response.json()) as StrategyVersion;
   return { kind: 'saved', version, isNewVersion: response.status === HTTP_CREATED };
@@ -109,7 +89,7 @@ export async function deleteStrategy(fetchFunction: typeof fetch, strategyId: nu
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
   }
   if (!response.ok) {
-    return { kind: 'failed', message: await readFailureMessage(response) };
+    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
   }
   return { kind: 'deleted' };
 }

@@ -169,6 +169,14 @@ describe('cancelPaperOrder', () => {
 
     expect(cancelled).toEqual({ kind: 'failed', message: 'This order belongs to forward test 42.' });
   });
+
+  it('names the HTTP status when a proxy answers without a message', async () => {
+    const proxyFetch: typeof fetch = () => Promise.resolve(new Response('Bad Gateway', { status: 502 }));
+
+    const cancelled = await cancelPaperOrder(proxyFetch, 7);
+
+    expect(cancelled).toEqual({ kind: 'failed', message: 'The cancel request failed with HTTP status 502.' });
+  });
 });
 
 describe('sendPaperOrder refused by a forward test', () => {

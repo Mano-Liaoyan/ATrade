@@ -1,6 +1,8 @@
 // Paper orders by hand: checks the order form, writes the confirmation text, and calls the order routes.
 // The order list comes from the "orders" message of /ws/paper-trading (docs/architecture/paper_trading.md).
 import type { components } from '#lib/api';
+import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
+import { readSocketMessage } from '#lib/foundation/live_socket';
 
 export type SendOrderRequest = components['schemas']['SendOrderRequest'];
 export type OpenOrder = components['schemas']['OpenOrderResponse'];
@@ -9,6 +11,8 @@ export type ManualOrder = components['schemas']['ManualOrderWithFillsResponse'];
 type OrderSide = components['schemas']['OrderSide'];
 type OrderType = components['schemas']['OrderType'];
 type TimeInForce = components['schemas']['TimeInForce'];
+type OpenOrdersMessage = components['schemas']['OpenOrdersMessage'];
+type OrderRefusedResponse = components['schemas']['OrderRefusedResponse'];
 
 // The text of the form fields, before the check.
 export interface OrderForm {
@@ -92,43 +96,36 @@ export function describeOrderSource(source: OrderSource): string {
 }
 
 export function readOpenOrdersMessage(message: unknown): OpenOrder[] | null {
-  if (typeof message !== 'object' || message === null || !('type' in message) || message.type !== 'orders') {
-    return null;
-  }
-  if (!('orders' in message) || !Array.isArray(message.orders)) {
-    return null;
-  }
-  return message.orders as OpenOrder[];
+  return readSocketMessage<OpenOrdersMessage>(message, ['orders'])?.orders ?? null;
 }
 
 export async function sendPaperOrder(fetchFunction: typeof fetch, request: SendOrderRequest): Promise<SendOrderResult> {
-  let response: Response;
-  try {
-    response = await fetchFunction(PAPER_ORDERS_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(request),
-    });
-  } catch {
+  const response = await sendRequest(fetchFunction, PAPER_ORDERS_PATH, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (response === null) {
     return { kind: 'failed', message: 'Backend not reachable. ATrade did not send the order.' };
   }
-  const body = await readJson(response);
   if (!response.ok) {
-    return { kind: 'failed', message: `ATrade did not send the order. ${describeError(body, response.status)}` };
+    const message = describeOrderError(await readJsonBody(response), response.status, 'The order request');
+    return { kind: 'failed', message: `ATrade did not send the order. ${message}` };
   }
-  const sentOrder = body as components['schemas']['ManualOrderResponse'];
+  const sentOrder = (await response.json()) as components['schemas']['ManualOrderResponse'];
   return { kind: 'sent', ibkrOrderId: sentOrder.ibkr_order_id };
 }
 
 export async function cancelPaperOrder(fetchFunction: typeof fetch, orderId: number): Promise<CancelOrderResult> {
-  let response: Response;
-  try {
-    response = await fetchFunction(`${PAPER_ORDERS_PATH}/${String(orderId)}`, { method: 'DELETE' });
-  } catch {
+  const response = await sendRequest(fetchFunction, `${PAPER_ORDERS_PATH}/${String(orderId)}`, { method: 'DELETE' });
+  if (response === null) {
     return { kind: 'failed', message: 'Backend not reachable. ATrade did not cancel the order.' };
   }
   if (!response.ok) {
-    return { kind: 'failed', message: describeError(await readJson(response), response.status) };
+    return {
+      kind: 'failed',
+      message: describeOrderError(await readJsonBody(response), response.status, 'The cancel request'),
+    };
   }
   return { kind: 'cancel_sent' };
 }
@@ -139,36 +136,25 @@ function isFilled(order: ManualOrder): boolean {
 
 /** The orders by hand with a fill from IBKR, newest first. Null when the backend does not answer. */
 export async function readFilledManualOrders(fetchFunction: typeof fetch): Promise<ManualOrder[] | null> {
-  let response: Response;
-  try {
-    response = await fetchFunction(MANUAL_ORDERS_PATH);
-  } catch {
-    return null;
-  }
-  if (!response.ok) {
+  const response = await sendRequest(fetchFunction, MANUAL_ORDERS_PATH);
+  if (response === null || !response.ok) {
     return null;
   }
   const body = (await response.json()) as components['schemas']['ManualOrderListResponse'];
   return body.manual_orders.filter(isFilled).reverse();
 }
 
-async function readJson(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return null;
-  }
+function isRefusedOrder(body: unknown): body is OrderRefusedResponse {
+  return typeof body === 'object' && body !== null && 'actual_accounts' in body && 'expected_account' in body;
 }
 
-// 403 has the actual and the expected account. 404, 409, and 502 have only {"detail": "<message>"}.
-function describeError(body: unknown, status: number): string {
-  if (typeof body !== 'object' || body === null || !('detail' in body) || typeof body.detail !== 'string') {
-    return `HTTP status ${String(status)}.`;
-  }
-  if (!('actual_accounts' in body) || !Array.isArray(body.actual_accounts) || !('expected_account' in body)) {
-    return body.detail;
+// A refused order (403) has the actual and the expected account. Other errors have only {"detail": "<message>"}.
+function describeOrderError(body: unknown, status: number, failedAction: string): string {
+  const message = describeErrorBody(body, status, failedAction);
+  if (!isRefusedOrder(body) || typeof body.detail !== 'string' || !Array.isArray(body.actual_accounts)) {
+    return message;
   }
   const actualAccounts = body.actual_accounts.length > 0 ? body.actual_accounts.join(', ') : 'none';
-  const expectedAccount = typeof body.expected_account === 'string' ? body.expected_account : 'not set';
-  return `${body.detail} Actual account: ${actualAccounts}. Expected account: ${expectedAccount}.`;
+  const expectedAccount = body.expected_account ?? 'not set';
+  return `${message} Actual account: ${actualAccounts}. Expected account: ${expectedAccount}.`;
 }

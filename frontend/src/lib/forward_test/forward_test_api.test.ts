@@ -147,6 +147,14 @@ describe('startSamePeriodBacktest', () => {
     expect(new URL(requests[0]?.url ?? '').pathname).toBe('/api/forward-tests/3/same-period-backtests');
   });
 
+  it('names the HTTP status when a proxy answers without a message', async () => {
+    const proxyFetch: typeof fetch = () => Promise.resolve(new Response('Bad Gateway', { status: 502 }));
+
+    const result = await startSamePeriodBacktest(proxyFetch, 3);
+
+    expect(result).toEqual({ kind: 'failed', message: 'Starting the backtest failed with HTTP status 502.' });
+  });
+
   it('shows why the backtest was refused', async () => {
     const detail = 'A backtest supports only USD instruments. The instrument currency is EUR.';
 
