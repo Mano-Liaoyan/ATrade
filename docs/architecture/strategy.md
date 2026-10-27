@@ -1,9 +1,9 @@
 # Strategies and strategy versions
 
-This document is part of the architecture specification
-([`docs/architecture.md`](../architecture.md)). It replaces section 9 of that
-document. Terms have the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives
-them.
+This document is section 9 of the architecture specification
+([`docs/architecture.md`](../architecture.md)). It was moved to its own file
+when the specification became longer than 1000 lines (section 18). Terms have
+the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 
 Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48),
 [Strategy editor and strategy versions](https://github.com/Mano-Liaoyan/ATrade/issues/68).
@@ -11,7 +11,7 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 The user writes strategies in the browser. A saved strategy version can run in
 a backtest at once, with no deployment.
 
-## 1. Storage
+## 9.1 Storage
 
 - PostgreSQL has two tables: `strategy` (the name) and `strategy_version`
   (code text, sha256, sequence number, time). Do not use git or a PostgreSQL
@@ -27,7 +27,7 @@ a backtest at once, with no deployment.
 - Strategy versions cannot be deleted. A strategy that no backtest or forward
   test uses can be deleted. A strategy in use cannot be deleted.
 
-### 1.1 Tables
+### 9.1.1 Tables
 
 Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
 
@@ -47,7 +47,7 @@ Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
 - A save locks the `strategy` row (`SELECT ... FOR UPDATE`). Two saves of the
   same strategy cannot get the same version number.
 
-## 2. Strategy file format
+## 9.2 Strategy file format
 
 - The file has exactly 1 `Strategy` subclass and exactly 1 `StrategyConfig`
   subclass.
@@ -62,7 +62,7 @@ Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy.
 
-## 3. Checks before save
+## 9.3 Checks before save
 
 The checks run in the Web process. They do not import the user code.
 
@@ -86,7 +86,21 @@ The checks run in the Web process. They do not import the user code.
   `{"line": 14, "message": "Syntax error: invalid syntax."}`.
 - The checks run before the comparison with the latest version.
 
-## 4. HTTP routes
+## 9.4 Code completion
+
+- basedpyright only does static analysis. It does not run user code, so it
+  needs no isolation.
+- Each editor WebSocket connection starts 1 basedpyright child process in the
+  `web` container. The process stops when the connection closes.
+
+## 9.5 Comparison
+
+- Compare only two versions of the same strategy. The user selects 2 backtest
+  results. The page shows the code diff (`@codemirror/merge`), the metric
+  table, and both equity curves on one chart.
+- For different strategies, the backtest list shows the metrics side by side.
+
+## 9.6 HTTP routes
 
 The routes are in `backend/src/atrade/strategy/http_routes.py`. The public
 entry exports `create_strategy_router(database_url=..., clock=...)`.
@@ -103,7 +117,7 @@ entry exports `create_strategy_router(database_url=..., clock=...)`.
 There is no route that changes or deletes one version. `PUT` and `DELETE` on a
 version path return `405`.
 
-## 5. Frontend
+## 9.7 Frontend
 
 - `frontend/src/lib/foundation/code_editor/` holds the `CodeEditor` Svelte
   component: CodeMirror 6 (`codemirror`, `@codemirror/lang-python`). It has
@@ -115,17 +129,3 @@ version path return `405`.
   draft of the version that the user edited.
 - Pages: `/strategies` (list and create form) and `/strategies/<id>` (editor,
   version list, save, delete).
-
-## 6. Code completion
-
-- basedpyright only does static analysis. It does not run user code, so it
-  needs no isolation.
-- Each editor WebSocket connection starts 1 basedpyright child process in the
-  `web` container. The process stops when the connection closes.
-
-## 7. Comparison
-
-- Compare only two versions of the same strategy. The user selects 2 backtest
-  results. The page shows the code diff (`@codemirror/merge`), the metric
-  table, and both equity curves on one chart.
-- For different strategies, the backtest list shows the metrics side by side.

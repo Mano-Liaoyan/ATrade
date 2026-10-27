@@ -1,4 +1,4 @@
-"""The code that a new strategy starts with (docs/architecture/strategy.md section 2).
+"""The code that a new strategy starts with (docs/architecture/strategy.md section 9.2).
 
 It shows the required file format: 1 Strategy subclass, 1 StrategyConfig subclass with a keyword-only
 __init__ (NautilusTrader 2.0 requires it), and indicator warm-up with request_bars in on_start.

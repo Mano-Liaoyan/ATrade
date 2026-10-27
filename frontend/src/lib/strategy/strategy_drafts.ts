@@ -1,4 +1,4 @@
-// Unsaved edits of a strategy version stay only in the browser storage (docs/architecture/strategy.md section 1).
+// Unsaved edits of a strategy version stay only in the browser storage (docs/architecture/strategy.md section 9.1).
 
 export interface DraftKey {
   strategyId: number;

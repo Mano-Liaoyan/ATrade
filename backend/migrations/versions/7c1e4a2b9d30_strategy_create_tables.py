@@ -30,7 +30,7 @@ def upgrade() -> None:
         UNIQUE (strategy_id, version_number)
     );
 
-    -- Strategy versions are append-only (docs/architecture/strategy.md section 1).
+    -- Strategy versions are append-only (docs/architecture/strategy.md section 9.1).
     CREATE FUNCTION strategy_version_refuse_update() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
         RAISE EXCEPTION 'strategy_version rows are append-only. Save a new version instead.';

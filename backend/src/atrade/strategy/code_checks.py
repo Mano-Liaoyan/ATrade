@@ -1,4 +1,4 @@
-"""Checks that strategy code must pass before it is saved (docs/architecture/strategy.md section 3).
+"""Checks that strategy code must pass before it is saved (docs/architecture/strategy.md section 9.3).
 
 The checks do not import or run the user code: they use ast.parse, an AST check of the class bases,
 and the ruff F rules.
