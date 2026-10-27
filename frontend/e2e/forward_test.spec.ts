@@ -4,9 +4,10 @@
 // the browser projects run at the same time, so each test starts only 1 forward test and stops it.
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// The stop takes 2 worker comparisons (stopping, then stopped) and 1 socket read, each every 2 seconds. A backtest
-// child of another test can slow the server, so the wait is longer than the default 5 seconds.
-const STOP_TIMEOUT_MILLISECONDS = 15_000;
+// A status change takes worker comparisons and socket reads, each every 2 seconds: "Running" takes 1 comparison and
+// 1 read (up to 4 seconds), "Stopped" takes 2 comparisons and 1 read. The worker and the socket run in the e2e server
+// process, and the backtest children of other tests slow it, so the waits are longer than the default 5 seconds.
+const STATUS_TIMEOUT_MILLISECONDS = 15_000;
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
@@ -23,12 +24,14 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   await createStrategy(page, strategyName);
 
   await page.getByRole('link', { name: 'Forward tests' }).click();
-  await page.getByLabel('Strategy', { exact: true }).selectOption({ label: strategyName });
-  await expect(page.getByLabel('Strategy version')).toHaveValue(/\d+/);
+  await page.getByRole('combobox', { name: 'Strategy', exact: true }).click();
+  await page.getByRole('option', { name: strategyName }).click();
+  await expect(page.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
   await expect(page.getByRole('region', { name: 'Latest backtest result' })).toHaveText('no backtest result');
   await page.getByLabel('Symbol').fill(symbol);
   await page.getByLabel('Exchange').fill('ARCA');
-  await page.getByLabel('Bar period').selectOption('1-MINUTE');
+  await page.getByRole('combobox', { name: 'Bar period' }).click();
+  await page.getByRole('option', { name: '1 minute', exact: true }).click();
   // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
   await page.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
   await page.getByRole('button', { name: 'Start forward test' }).click();
@@ -41,7 +44,7 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   // The browser sent UTC and shows the end time in its own time zone again.
   await expect(row).toContainText('2099-12-31 23:30');
   // The worker compares the states every 2 seconds and the socket pushes the change.
-  await expect(row).toContainText('Running');
+  await expect(row).toContainText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
   const forwardTestNumber = (await row.getByRole('rowheader').textContent())?.trim() ?? '';
 
   // The order form does not send a paper order by hand on the instrument of the running forward test, and says why.
@@ -56,10 +59,13 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   );
 
   await page.getByRole('link', { name: 'Forward tests' }).click();
-  await row.getByRole('button', { name: /Stop forward test/ }).click();
+  const actions = row.getByRole('button', { name: `Actions for forward test ${forwardTestNumber.replace('#', '')}` });
+  await actions.click();
+  await page.getByRole('menuitem', { name: 'Stop forward test' }).click();
 
-  await expect(row).toContainText('Stopped', { timeout: STOP_TIMEOUT_MILLISECONDS });
-  await expect(row.getByRole('button', { name: /Stop forward test/ })).toHaveCount(0);
+  await expect(row).toContainText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  // The fake child reads no start balance, so the stopped forward test has no action and no menu.
+  await expect(actions).toHaveCount(0);
 });
 
 test('the forward test list has a visible scroll track', async ({ page }) => {

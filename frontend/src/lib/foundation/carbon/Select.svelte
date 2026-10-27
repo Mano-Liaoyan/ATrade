@@ -21,7 +21,7 @@
     value: T;
     onValueChange: (value: T) => void;
     disabled?: boolean;
-    // The text of the trigger when no item is selected.
+    // The text of the trigger while no item is selected.
     placeholder?: string;
   }
 

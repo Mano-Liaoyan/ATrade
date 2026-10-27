@@ -334,6 +334,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   notification: `kind` (`success` and `info` are a status, `error` and
   `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
   `onClose` (it adds the close button "Close notification").
+- `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
+  with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
+  `neutral`; each kind has its own icon shape) and `label`. `Select` takes
+  `placeholder` (the trigger text while no item is selected). `TextInput`
+  takes `type` `datetime-local` for a native date and time input.
+- The forward test pages use Carbon: the start form uses `Select` and
+  `TextInput`, the list and the fill tables use `DataTable`, and the row
+  `OverflowMenu` has only the actions that apply ("Stop forward test",
+  "Backtest the same period"). A forward test with no action has no menu.
+  The status of a forward test is a `StatusIndicator`
+  (`findForwardTestStatusKind` of `forward_test`).
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
   use the components of `#lib/foundation/carbon`.
@@ -468,20 +479,38 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
   A `DataTable` column with `isSelection` is the column of the row
-  checkboxes. Its cells have class `cds--table-column-checkbox`. Other
-  additions: `Select` has `placeholder` (the trigger text when no item is
-  selected), `TextInput` takes `type` (default `text`, for example `date`),
-  and `InlineNotification` has `label` (the accessible name of the status or
-  alert).
+  checkboxes. Its cells have class `cds--table-column-checkbox`. `TextInput`
+  also takes `type` `date`. `InlineNotification` has `label` (the accessible
+  name of the status or alert).
 - The backtest pages use Carbon: the start form (`Select`, `TextInput`,
   `Button`), the limits form, the backtest list (`DataTable` with a selection
   column, in a `ScrollRegion`), the metrics as Carbon tiles, and the trades
-  and compared metrics as data tables. A backtest status is a Carbon tag with
-  the status word and a color (`findBacktestStatusTagKind`). The equity chart
+  and compared metrics as data tables. A backtest status is a
+  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity chart
   reads only Carbon tokens: `--cds-layer-01` (background),
   `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid),
   `--cds-text-primary` (first curve, solid), `--cds-interactive` (second
   curve, dashed), and `--cds-layer-accent-01` (interruptions).
+- The code editor and the code diff (`foundation/code_editor`) use Carbon
+  tokens: `--cds-layer-01` (background), `--cds-text-primary`,
+  `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,
+  `--cds-layer-hover-01` (active line), `--cds-highlight` (selection), and
+  `--cds-support-error` and `--cds-support-success` (removed and added
+  lines). The font is IBM Plex Mono. The syntax colors in `code_colors.ts`
+  are Carbon palette colors (70 grade in g10, 40 grade in g100). A unit test
+  checks that each has 4.5:1 contrast on `--cds-layer-01`. A live type error
+  has a wavy `--cds-support-error` underline, and its tooltip looks like a
+  low-contrast Carbon error notification. A type error does not block the
+  save.
+- The strategy pages use the components of `foundation/carbon`: the list
+  page has a `TextInput` and a `Button` for the new strategy, and the editor
+  has a `Select` for the version, the Save version button, an "Unsaved
+  changes" tag, and a danger `Dialog` that confirms Delete strategy. The save
+  result and the refused checks show as an `InlineNotification`.
+  `InlineNotification` also takes child content, for example a list of
+  problems.
+- `Button` sizes `sm` and `md` also write `cds--layout--size-<size>`: Carbon
+  v11 reads the button height from that class.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".

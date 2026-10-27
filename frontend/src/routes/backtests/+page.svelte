@@ -11,7 +11,7 @@
     checkComparisonSelection,
     convertDateToUtcStart,
     describeBacktestStatus,
-    findBacktestStatusTagKind,
+    findBacktestStatusKind,
     formatPercent,
     formatUsd,
     listBacktests,
@@ -24,7 +24,7 @@
     DataTable,
     InlineNotification,
     Select,
-    Tag,
+    StatusIndicator,
     TextInput,
     type TableColumn,
   } from '#lib/foundation/carbon';
@@ -291,7 +291,7 @@
             <td>{backtest.symbol} / {backtest.exchange} / {backtest.currency}</td>
             <td>{formatBarPeriod(backtest.bar_period)}</td>
             <td>
-              <Tag label={describeBacktestStatus(backtest.status)} kind={findBacktestStatusTagKind(backtest.status)} size="sm" />
+              <StatusIndicator label={describeBacktestStatus(backtest.status)} kind={findBacktestStatusKind(backtest.status)} />
             </td>
             <td align="right">{backtest.metrics === null ? '' : formatUsd(backtest.metrics.final_equity_usd)}</td>
             <td align="right">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.total_return_percent)}</td>

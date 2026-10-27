@@ -1,12 +1,14 @@
-<!-- Carbon text input with its label. The type is "text" unless the page gives another type, for example "date". An invalid input shows the warning icon and the message below the field. -->
+<!-- Carbon text input with its label. An invalid input shows the warning icon and the message below the field. -->
 <script lang="ts">
   import WarningFilled16 from '@carbon/icons/es/warning--filled/16.js';
   import type { HTMLInputAttributes } from 'svelte/elements';
   import Icon from './Icon.svelte';
   import { textInputClasses } from './carbon_state';
 
-  interface Props extends Omit<HTMLInputAttributes, 'class' | 'value'> {
+  interface Props extends Omit<HTMLInputAttributes, 'class' | 'value' | 'type'> {
     label: string;
+    // A text input, or a native date and time input with the Carbon text input look.
+    type?: 'text' | 'date' | 'datetime-local';
     value?: string;
     // The message that tells the user how to correct the value. The input is invalid when it is set.
     invalidText?: string | null;
@@ -15,7 +17,7 @@
   }
 
   const uid = $props.id();
-  let { label, value = $bindable(''), invalidText = null, id, type = 'text', class: className, ...restProps }: Props = $props();
+  let { label, type = 'text', value = $bindable(''), invalidText = null, id, class: className, ...restProps }: Props = $props();
 
   const invalid = $derived(invalidText !== null);
   const inputId = $derived(id ?? `text-input-${uid}`);

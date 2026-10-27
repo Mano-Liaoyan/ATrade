@@ -8,6 +8,7 @@ export {
   canStop,
   describeForwardTestStatus,
   describeInterruptionReason,
+  findForwardTestStatusKind,
   formatLocalTime,
   FORWARD_TESTS_SOCKET_PATH,
   isLiveBarPeriod,

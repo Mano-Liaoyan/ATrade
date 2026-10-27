@@ -5,6 +5,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { ComparisonView, describeBacktestStatus, isFinalStatus } from '#lib/backtest';
+  import { InlineNotification } from '#lib/foundation/carbon';
   import { FillComparisonTable, readForwardTestComparison, type ForwardTestComparison } from '#lib/forward_test';
   import { formatVersionLabel } from '#lib/strategy';
 
@@ -51,11 +52,11 @@
   }
 </script>
 
-<p><a href={resolve('/forward-tests')}>All forward tests</a></p>
+<p class="back-link"><a class="cds--link" href={resolve('/forward-tests')}>All forward tests</a></p>
 <h1>Compare forward test #{forwardTestId} with backtest #{backtestId}</h1>
 
 {#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+  <InlineNotification kind="error" title={errorMessage} lowContrast />
 {/if}
 
 {#if comparison !== null}
@@ -83,16 +84,21 @@
 {/if}
 
 <style>
-  .error {
-    color: var(--color-warning);
+  .back-link {
+    margin-block: 0 var(--cds-spacing-05);
   }
 
   .backtest-status {
-    color: var(--color-muted);
+    margin-block: 0 var(--cds-spacing-05);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    color: var(--cds-text-secondary);
   }
 
   h2 {
-    margin: 0.75rem 0 0;
-    font-size: 1.125rem;
+    margin-block: var(--cds-spacing-07) var(--cds-spacing-05);
+    font-size: var(--cds-heading-03-font-size);
+    font-weight: var(--cds-heading-03-font-weight);
+    line-height: var(--cds-heading-03-line-height);
   }
 </style>

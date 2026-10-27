@@ -1,11 +1,11 @@
 <!-- Result of one backtest: its status, the strategy error of a failed backtest, the metrics, the equity curve,
      and the trades. The metrics are Carbon tiles. The trade table scrolls inside its own region. -->
 <script lang="ts">
-  import { DataTable, Tag, type TableColumn } from '#lib/foundation/carbon';
+  import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { BacktestDetail, BacktestMetrics } from './backtest_api';
-  import { describeBacktestStatus, findBacktestStatusTagKind, formatPercent, formatUsd } from './backtest_format';
+  import { describeBacktestStatus, findBacktestStatusKind, formatPercent, formatUsd } from './backtest_format';
   import EquityChart from './EquityChart.svelte';
 
   const { backtest }: { backtest: BacktestDetail } = $props();
@@ -28,7 +28,7 @@
 
 <section class="backtest-result" aria-label="Backtest result">
   <p role="status" aria-label="Backtest status">
-    <Tag label={describeBacktestStatus(backtest.status)} kind={findBacktestStatusTagKind(backtest.status)} />
+    <StatusIndicator label={describeBacktestStatus(backtest.status)} kind={findBacktestStatusKind(backtest.status)} />
   </p>
 
   {#if backtest.status === 'failed' && backtest.error_message !== null}

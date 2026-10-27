@@ -1,6 +1,7 @@
-// Code colors of the editor and the diff, for the light and the dark color scheme. The values follow the GitHub
-// Primer syntax colors, so they match the app color tokens in src/routes/+layout.svelte (--color-surface is the
-// background). Each text color has WCAG AA contrast (4.5:1 or more) on the background (code_colors.test.ts).
+// Code colors of the editor and the diff, for the light (Carbon g10) and the dark (Carbon g100) theme. The values are
+// colors of the Carbon palette (@carbon/colors). The background is --cds-layer-01 of the theme, plain text is
+// --cds-text-primary, and comments are --cds-text-secondary. Each text color has WCAG AA contrast (4.5:1 or more) on
+// the background (code_colors.test.ts).
 export interface CodeColorScheme {
   background: string;
   text: {
@@ -16,27 +17,27 @@ export interface CodeColorScheme {
 
 export const CODE_COLORS: { light: CodeColorScheme; dark: CodeColorScheme } = {
   light: {
-    background: '#ffffff',
+    background: '#ffffff', // white: g10 layer-01
     text: {
-      plain: '#1b1f24',
-      comment: '#59636e',
-      keyword: '#cf222e',
-      string: '#0a3069',
-      number: '#0550ae',
-      function: '#6639ba',
-      type: '#953800',
+      plain: '#161616', // gray 100: g10 text-primary
+      comment: '#525252', // gray 70: g10 text-secondary
+      keyword: '#9f1853', // magenta 70
+      string: '#0e6027', // green 70
+      number: '#0043ce', // blue 70
+      function: '#6929c4', // purple 70
+      type: '#8a3800', // orange 70
     },
   },
   dark: {
-    background: '#161b22',
+    background: '#262626', // gray 90: g100 layer-01
     text: {
-      plain: '#e6edf3',
-      comment: '#8d96a0',
-      keyword: '#ff7b72',
-      string: '#a5d6ff',
-      number: '#79c0ff',
-      function: '#d2a8ff',
-      type: '#ffa657',
+      plain: '#f4f4f4', // gray 10: g100 text-primary
+      comment: '#c6c6c6', // gray 30: g100 text-secondary
+      keyword: '#ff7eb6', // magenta 40
+      string: '#42be65', // green 40
+      number: '#78a9ff', // blue 40
+      function: '#be95ff', // purple 40
+      type: '#ff832b', // orange 40
     },
   },
 };

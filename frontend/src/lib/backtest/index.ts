@@ -28,7 +28,7 @@ export {
   convertDateToUtcStart,
   convertTimeoutMinutesToSeconds,
   describeBacktestStatus,
-  findBacktestStatusTagKind,
+  findBacktestStatusKind,
   formatPercent,
   formatTimeoutMinutes,
   formatUsd,
