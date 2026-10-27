@@ -1,5 +1,4 @@
-// One CodeMirror theme for the strategy editor and the code diff. It follows the app color tokens
-// (src/routes/+layout.svelte) and the color scheme of the page (foundation/color_scheme: the header theme button and the
+// One CodeMirror theme for the strategy editor and the code diff. It follows the Carbon theme tokens (--cds-*) and the color scheme of the page (foundation/color_scheme: the header theme button and the
 // operating system), in all browsers. Without it, CodeMirror uses its light default theme: a light gutter and
 // low-contrast syntax colors on the dark page.
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
@@ -34,61 +33,89 @@ function selectSchemeExtensions(isDark: boolean): Extension {
   return [EditorView.darkTheme.of(isDark), syntaxHighlighting(isDark ? DARK_HIGHLIGHT : LIGHT_HIGHLIGHT)];
 }
 
-// The editor parts use the app CSS tokens, so they change with the page color scheme without a reconfiguration.
+// The editor parts use the Carbon theme tokens, so they change with the page color scheme without a reconfiguration.
 const editorChrome = EditorView.theme({
   '&': {
-    color: 'var(--color-text)',
-    backgroundColor: 'var(--color-surface)',
+    color: 'var(--cds-text-primary)',
+    backgroundColor: 'var(--cds-layer-01)',
   },
-  '.cm-content': { caretColor: 'var(--color-text)' },
-  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--color-text)' },
+  '.cm-scroller': { fontFamily: 'var(--cds-code-02-font-family)' },
+  '.cm-content': { caretColor: 'var(--cds-text-primary)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--cds-text-primary)' },
   '.cm-gutters': {
-    color: 'var(--color-muted)',
-    backgroundColor: 'var(--color-surface)',
-    borderRight: '1px solid var(--color-border)',
+    color: 'var(--cds-text-secondary)',
+    backgroundColor: 'var(--cds-layer-01)',
+    borderRight: '1px solid var(--cds-border-subtle-01)',
   },
-  '.cm-activeLine': { backgroundColor: 'var(--color-code-active-line)' },
-  '.cm-activeLineGutter': { color: 'var(--color-text)', backgroundColor: 'var(--color-code-active-line)' },
+  '.cm-activeLine': { backgroundColor: 'var(--cds-layer-hover-01)' },
+  '.cm-activeLineGutter': { color: 'var(--cds-text-primary)', backgroundColor: 'var(--cds-layer-hover-01)' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
-    { backgroundColor: 'var(--color-code-selection)' },
-  '.cm-selectionMatch': { backgroundColor: 'var(--color-code-selection)' },
-  '&.cm-focused .cm-matchingBracket': { backgroundColor: 'var(--color-code-selection)', outline: 'none' },
+    { backgroundColor: 'var(--cds-highlight)' },
+  '.cm-selectionMatch': { backgroundColor: 'var(--cds-highlight)' },
+  '&.cm-focused .cm-matchingBracket': { backgroundColor: 'var(--cds-highlight)', outline: 'none' },
   '.cm-foldPlaceholder': {
-    color: 'var(--color-muted)',
+    color: 'var(--cds-text-secondary)',
     backgroundColor: 'transparent',
-    border: '1px solid var(--color-border)',
+    border: '1px solid var(--cds-border-subtle-01)',
   },
   '.cm-tooltip': {
-    color: 'var(--color-text)',
-    backgroundColor: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
+    color: 'var(--cds-text-primary)',
+    backgroundColor: 'var(--cds-layer-01)',
+    border: '1px solid var(--cds-border-subtle-01)',
   },
   '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
-    color: 'var(--color-text)',
-    backgroundColor: 'var(--color-code-selection)',
+    color: 'var(--cds-text-primary)',
+    backgroundColor: 'var(--cds-highlight)',
   },
-  '.cm-panels': { color: 'var(--color-text)', backgroundColor: 'var(--color-surface)' },
-  '.cm-panels-top': { borderBottom: '1px solid var(--color-border)' },
-  '.cm-panels-bottom': { borderTop: '1px solid var(--color-border)' },
+  '.cm-panels': { color: 'var(--cds-text-primary)', backgroundColor: 'var(--cds-layer-01)' },
+  '.cm-panels-top': { borderBottom: '1px solid var(--cds-border-subtle-01)' },
+  '.cm-panels-bottom': { borderTop: '1px solid var(--cds-border-subtle-01)' },
   // Code diff (@codemirror/merge): removed lines on the first side, added lines on the second side.
-  '&.cm-merge-a .cm-changedLine, .cm-deletedChunk': { backgroundColor: 'var(--color-diff-removed-line)' },
-  '&.cm-merge-b .cm-changedLine': { backgroundColor: 'var(--color-diff-added-line)' },
+  '&.cm-merge-a .cm-changedLine, .cm-deletedChunk': { backgroundColor: 'color-mix(in srgb, var(--cds-support-error) 15%, transparent)' },
+  '&.cm-merge-b .cm-changedLine': { backgroundColor: 'color-mix(in srgb, var(--cds-support-success) 15%, transparent)' },
   '&.cm-merge-a .cm-changedText, .cm-deletedChunk .cm-deletedText': {
-    background: 'var(--color-diff-removed-text)',
+    background: 'color-mix(in srgb, var(--cds-support-error) 40%, transparent)',
     borderRadius: '2px',
   },
-  '&.cm-merge-b .cm-changedText': { background: 'var(--color-diff-added-text)', borderRadius: '2px' },
-  '&.cm-merge-a .cm-changedLineGutter, .cm-deletedLineGutter': { background: 'var(--color-diff-removed-mark)' },
-  '&.cm-merge-b .cm-changedLineGutter': { background: 'var(--color-diff-added-mark)' },
+  '&.cm-merge-b .cm-changedText': { background: 'color-mix(in srgb, var(--cds-support-success) 40%, transparent)', borderRadius: '2px' },
+  '&.cm-merge-a .cm-changedLineGutter, .cm-deletedLineGutter': { background: 'var(--cds-support-error)' },
+  '&.cm-merge-b .cm-changedLineGutter': { background: 'var(--cds-support-success)' },
   '.cm-collapsedLines': {
-    color: 'var(--color-muted)',
-    background: 'var(--color-background)',
-    borderTop: '1px dashed var(--color-border)',
-    borderBottom: '1px dashed var(--color-border)',
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-    fontSize: '0.8125rem',
+    color: 'var(--cds-text-secondary)',
+    background: 'var(--cds-background)',
+    borderTop: '1px dashed var(--cds-border-subtle-01)',
+    borderBottom: '1px dashed var(--cds-border-subtle-01)',
+    fontFamily: 'inherit',
+    fontSize: 'var(--cds-helper-text-01-font-size)',
   },
-  '.cm-collapsedLines:hover': { color: 'var(--color-text)' },
+  '.cm-collapsedLines:hover': { color: 'var(--cds-text-primary)' },
+  // Live type errors (@codemirror/lint) look like a Carbon low-contrast inline notification. They do not block the save.
+  '.cm-lintRange-error': { backgroundImage: 'none', textDecoration: 'underline wavy var(--cds-support-error)' },
+  '.cm-lintRange-warning': { backgroundImage: 'none', textDecoration: 'underline wavy var(--cds-support-warning)' },
+  '.cm-lintRange-info, .cm-lintRange-hint': { backgroundImage: 'none', textDecoration: 'underline wavy var(--cds-support-info)' },
+  '.cm-lintRange-active': { backgroundColor: 'var(--cds-highlight)' },
+  '.cm-tooltip.cm-tooltip-lint': { border: '1px solid var(--cds-border-subtle-01)' },
+  '.cm-diagnostic': {
+    padding: 'var(--cds-spacing-03) var(--cds-spacing-05)',
+    marginLeft: '0',
+    color: 'var(--cds-text-primary)',
+    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+    fontSize: 'var(--cds-body-compact-01-font-size)',
+    lineHeight: 'var(--cds-body-compact-01-line-height)',
+  },
+  '.cm-diagnostic-error': {
+    borderLeft: '3px solid var(--cds-support-error)',
+    backgroundColor: 'var(--cds-notification-background-error)',
+  },
+  '.cm-diagnostic-warning': {
+    borderLeft: '3px solid var(--cds-support-warning)',
+    backgroundColor: 'var(--cds-notification-background-warning)',
+  },
+  '.cm-diagnostic-info, .cm-diagnostic-hint': {
+    borderLeft: '3px solid var(--cds-support-info)',
+    backgroundColor: 'var(--cds-notification-background-info)',
+  },
+  '.cm-diagnosticSource': { color: 'var(--cds-text-secondary)', opacity: '1' },
 });
 
 /** The shared code theme. It reads the color scheme when the editor starts and follows later changes. */

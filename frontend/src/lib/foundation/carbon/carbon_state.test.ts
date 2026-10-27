@@ -65,11 +65,18 @@ describe('contentSwitcherButtonClasses', () => {
 describe('buttonClasses', () => {
   it('writes the kind and the size', () => {
     expect(buttonClasses({ kind: 'primary', size: 'lg' })).toEqual(['cds--btn', 'cds--btn--primary']);
-    expect(buttonClasses({ kind: 'secondary', size: 'md' })).toEqual(['cds--btn', 'cds--btn--secondary', 'cds--btn--md']);
+    // Carbon v11 reads the button height from the layout size class.
+    expect(buttonClasses({ kind: 'secondary', size: 'md' })).toEqual([
+      'cds--btn',
+      'cds--btn--secondary',
+      'cds--btn--md',
+      'cds--layout--size-md',
+    ]);
     expect(buttonClasses({ kind: 'ghost', size: 'sm', iconOnly: true })).toEqual([
       'cds--btn',
       'cds--btn--ghost',
       'cds--btn--sm',
+      'cds--layout--size-sm',
       'cds--btn--icon-only',
     ]);
   });

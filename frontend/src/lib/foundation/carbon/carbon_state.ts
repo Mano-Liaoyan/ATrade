@@ -7,8 +7,10 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 export type BitsTabState = 'active' | 'inactive';
 
 export function buttonClasses({ kind, size, iconOnly = false }: { kind: ButtonKind; size: ButtonSize; iconOnly?: boolean }): string[] {
-  // The Carbon default button size is lg: it has no size class.
-  return ['cds--btn', `cds--btn--${kind}`, ...(size === 'lg' ? [] : [`cds--btn--${size}`]), ...(iconOnly ? ['cds--btn--icon-only'] : [])];
+  // The Carbon default button size is lg: it has no size class. Carbon v11 reads the height of the other sizes from
+  // the layout size class.
+  const sizeClasses = size === 'lg' ? [] : [`cds--btn--${size}`, `cds--layout--size-${size}`];
+  return ['cds--btn', `cds--btn--${kind}`, ...sizeClasses, ...(iconOnly ? ['cds--btn--icon-only'] : [])];
 }
 
 export function textInputClasses(invalid: boolean): string[] {
