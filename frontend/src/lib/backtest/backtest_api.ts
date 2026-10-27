@@ -10,6 +10,7 @@ export type BacktestMetrics = components['schemas']['BacktestMetricsResponse'];
 export type EquityPoint = components['schemas']['EquityPointResponse'];
 export type BacktestTrade = components['schemas']['TradeResponse'];
 export type BacktestLimits = components['schemas']['BacktestLimitsBody'];
+export type BacktestComparison = components['schemas']['BacktestComparisonResponse'];
 type ValidationError = components['schemas']['ValidationError'];
 
 export type RequestResult<T> = { kind: 'ok'; value: T } | { kind: 'failed'; message: string };
@@ -88,4 +89,12 @@ export function changeBacktestLimits(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(limits),
   });
+}
+
+export function compareBacktests(
+  fetchFunction: typeof fetch,
+  firstBacktestId: number,
+  secondBacktestId: number,
+): Promise<RequestResult<BacktestComparison>> {
+  return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
 }

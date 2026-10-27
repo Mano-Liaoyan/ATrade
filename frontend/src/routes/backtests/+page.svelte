@@ -1,13 +1,16 @@
-<!-- Backtests: the form that starts a backtest, and the list of backtests. The form combines strategy versions
-     (strategy), bar periods (market_data), and the paper capital (paper_trading). -->
+<!-- Backtests: the form that starts a backtest, and the list of backtests with their metrics side by side. The form
+     combines strategy versions (strategy), bar periods (market_data), and the paper capital (paper_trading). The user
+     selects 2 backtests of the same strategy in the list to compare them (docs/architecture section 9.5). -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
     BacktestLimitsForm,
+    checkComparisonSelection,
     convertDateToUtcStart,
     describeBacktestStatus,
     formatPercent,
+    formatUsd,
     listBacktests,
     startBacktest,
     type Backtest,
@@ -37,6 +40,26 @@
   let backtests: Backtest[] = $state([]);
   let errorMessage = $state('');
   let isStarting = $state(false);
+  let selectedBacktestIds: number[] = $state([]);
+  const comparisonSelection = $derived(checkComparisonSelection(backtests, selectedBacktestIds));
+
+  function toggleSelection(backtestId: number, isSelected: boolean): void {
+    selectedBacktestIds = isSelected
+      ? [...selectedBacktestIds, backtestId]
+      : selectedBacktestIds.filter((selectedId) => selectedId !== backtestId);
+  }
+
+  async function openComparison(): Promise<void> {
+    if (comparisonSelection.kind !== 'ready') {
+      return;
+    }
+    await goto(
+      resolve('/backtests/[backtestId]/comparison/[otherBacktestId]', {
+        backtestId: String(comparisonSelection.firstBacktestId),
+        otherBacktestId: String(comparisonSelection.secondBacktestId),
+      }),
+    );
+  }
 
   $effect(() => {
     void listStrategies(fetch).then((result) => {
@@ -161,15 +184,25 @@
 {#if backtests.length === 0}
   <p>No backtest yet.</p>
 {:else}
-  <ScrollRegion label="Backtests" maxHeight="24rem">
+  <div class="comparison-bar">
+    <button type="button" disabled={comparisonSelection.kind !== 'ready'} onclick={openComparison}>
+      Compare selected backtests
+    </button>
+    <p class="selection-message" role="status" aria-label="Comparison selection">
+      {comparisonSelection.kind === 'ready' ? 'Ready to compare.' : comparisonSelection.message}
+    </p>
+  </div>
+  <ScrollRegion label="Backtests" maxHeight="min(24rem, 50vh)">
     <table class="backtest-list">
       <thead>
         <tr>
+          <th scope="col">Select</th>
           <th scope="col">Backtest</th>
           <th scope="col">Strategy version</th>
           <th scope="col">Instrument</th>
           <th scope="col">Bar period</th>
           <th scope="col">Status</th>
+          <th scope="col">Final equity (USD)</th>
           <th scope="col">Total return</th>
           <th scope="col">Max drawdown</th>
           <th scope="col">Trades</th>
@@ -178,6 +211,16 @@
       <tbody>
         {#each backtests as backtest (backtest.id)}
           <tr>
+            <td>
+              <input
+                type="checkbox"
+                aria-label={`Select backtest #${String(backtest.id)}`}
+                checked={selectedBacktestIds.includes(backtest.id)}
+                onchange={(event) => {
+                  toggleSelection(backtest.id, event.currentTarget.checked);
+                }}
+              />
+            </td>
             <th scope="row">
               <a href={resolve('/backtests/[backtestId]', { backtestId: String(backtest.id) })}>#{backtest.id}</a>
             </th>
@@ -185,6 +228,7 @@
             <td>{backtest.symbol} / {backtest.exchange} / {backtest.currency}</td>
             <td>{backtest.bar_period}</td>
             <td>{describeBacktestStatus(backtest.status)}</td>
+            <td class="number">{backtest.metrics === null ? '' : formatUsd(backtest.metrics.final_equity_usd)}</td>
             <td class="number">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.total_return_percent)}</td>
             <td class="number">{backtest.metrics === null ? '' : formatPercent(backtest.metrics.max_drawdown_percent)}</td>
             <td class="number">{backtest.metrics === null ? '' : backtest.metrics.trade_count}</td>
@@ -213,6 +257,19 @@
 
   .error {
     color: var(--color-warning);
+  }
+
+  .comparison-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .selection-message {
+    margin: 0;
+    color: var(--color-muted);
   }
 
   .backtest-list {

@@ -125,6 +125,7 @@ The checks run in the Web process. They do not import the user code.
   results. The page shows the code diff (`@codemirror/merge`), the metric
   table, and both equity curves on one chart.
 - For different strategies, the backtest list shows the metrics side by side.
+- Implementation (#72): backtest section 10.7.
 
 ## 9.6 HTTP routes
 

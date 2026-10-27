@@ -68,6 +68,7 @@
     --color-muted: #59636e;
     --color-border: #d0d7de;
     --color-warning: #9a6700;
+    --color-accent: #0969da;
     color-scheme: light dark;
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
@@ -80,6 +81,7 @@
       --color-muted: #8d96a0;
       --color-border: #30363d;
       --color-warning: #d29922;
+      --color-accent: #4493f8;
     }
   }
 

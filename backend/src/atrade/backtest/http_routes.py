@@ -99,6 +99,17 @@ class BacktestDetailResponse(BacktestResponse):
     trades: list[TradeResponse]
 
 
+class ComparedBacktestResponse(BacktestDetailResponse):
+    code: str
+
+
+class BacktestComparisonResponse(BaseModel):
+    strategy_id: int
+    strategy_name: str
+    first: ComparedBacktestResponse
+    second: ComparedBacktestResponse
+
+
 def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsResponse | None:
     if metrics is None:
         return None
@@ -176,6 +187,38 @@ class BacktestRoutes:
             rows = await backtest_store.select_backtests(connection)
         return [await self.to_backtest_response(row) for row in rows]
 
+    async def compare_backtests(self, first_backtest_id: int, second_backtest_id: int) -> BacktestComparisonResponse:
+        """Compare two backtests of the same strategy: two versions, or one version with other request fields."""
+        if first_backtest_id == second_backtest_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Select two different backtests."
+            )
+        first = await self.read_backtest(first_backtest_id)
+        second = await self.read_backtest(second_backtest_id)
+        if first.strategy_id != second.strategy_id:
+            detail = (
+                "Only backtests of the same strategy can be compared. "
+                f"These backtests use {first.strategy_name} and {second.strategy_name}."
+            )
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        return BacktestComparisonResponse(
+            strategy_id=first.strategy_id,
+            strategy_name=first.strategy_name,
+            first=await self.add_code(first),
+            second=await self.add_code(second),
+        )
+
+    async def add_code(self, backtest: BacktestDetailResponse) -> ComparedBacktestResponse:
+        strategy_version = await read_strategy_version(
+            database_url=self.database_url, strategy_version_id=backtest.strategy_version_id
+        )
+        if strategy_version is None:
+            message = (
+                f"Backtest {backtest.id} refers to strategy version {backtest.strategy_version_id}, which is missing."
+            )
+            raise RuntimeError(message)
+        return ComparedBacktestResponse(**backtest.model_dump(), code=strategy_version.code)
+
     async def read_backtest(self, backtest_id: int) -> BacktestDetailResponse:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             row = await backtest_store.select_backtest(connection, backtest_id)
@@ -221,4 +264,7 @@ def create_backtest_router(*, database_url: str, clock: Clock) -> APIRouter:
     router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
+    router.add_api_route(
+        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}", routes.compare_backtests, methods=["GET"]
+    )
     return router
