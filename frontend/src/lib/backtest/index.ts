@@ -4,6 +4,7 @@ export { default as BacktestLimitsForm } from './BacktestLimitsForm.svelte';
 export { default as BacktestResult } from './BacktestResult.svelte';
 export { default as ComparisonView, type ComparedCode, type ComparedRun } from './ComparisonView.svelte';
 export { default as EquityChart, type EquityCurve } from './EquityChart.svelte';
+export { type TimeInterval } from './interruption_marks';
 export { checkComparisonSelection, type ComparisonSelection } from './backtest_comparison';
 export {
   changeBacktestLimits,

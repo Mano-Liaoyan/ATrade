@@ -5,6 +5,7 @@ Orders on a real paper account are in test_forward_test_paper_contract.py (ibkr_
 
 import asyncio
 import socket
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -25,7 +26,7 @@ def find_closed_port() -> int:
 
 
 @pytest.mark.anyio
-async def test_the_live_node_stops_at_the_stop_request_while_it_waits_for_ib_gateway() -> None:
+async def test_the_live_node_stops_at_the_stop_request_while_it_waits_for_ib_gateway(database_url: str) -> None:
     live_node_input = LiveNodeInput(
         forward_test_id=1,
         client_id=10,
@@ -36,6 +37,8 @@ async def test_the_live_node_stops_at_the_stop_request_while_it_waits_for_ib_gat
         strategy_code=TEST_STRATEGY_FILE.read_text(),
         gateway_host="127.0.0.1",
         gateway_port=find_closed_port(),
+        database_url=database_url,
+        start_balance_usd=Decimal(100000),
     )
     stop_requested = asyncio.Event()
 

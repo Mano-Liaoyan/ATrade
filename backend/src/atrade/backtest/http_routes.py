@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_access import check_backtest_request
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -27,8 +28,6 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.strategy import read_strategy_version
 
-# A backtest has no exchange rates, so the paper capital in USD can only buy USD instruments.
-SUPPORTED_CURRENCY = "USD"
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 
 InstrumentField = Annotated[str, Field(min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)]
@@ -157,18 +156,6 @@ class BacktestRoutes:
         )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
-        if request.currency != SUPPORTED_CURRENCY:
-            detail = f"A backtest supports only USD instruments. The instrument currency is {request.currency}."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        if request.end_utc <= request.start_utc:
-            detail = "The time range must end after it starts."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        strategy_version = await read_strategy_version(
-            database_url=self.database_url, strategy_version_id=request.strategy_version_id
-        )
-        if strategy_version is None:
-            detail = f"Strategy version {request.strategy_version_id} does not exist."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         backtest_request = BacktestRequest(
             strategy_version_id=request.strategy_version_id,
             instrument=Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency),
@@ -176,6 +163,15 @@ class BacktestRoutes:
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
         )
+        refusal = check_backtest_request(backtest_request)
+        if refusal is not None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
+        strategy_version = await read_strategy_version(
+            database_url=self.database_url, strategy_version_id=request.strategy_version_id
+        )
+        if strategy_version is None:
+            detail = f"Strategy version {request.strategy_version_id} does not exist."
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             row = await backtest_store.insert_backtest(
                 connection, request=backtest_request, created_at_utc=self.clock.read_now_utc()

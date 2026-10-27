@@ -21,6 +21,7 @@ from nautilus_trader.live import LiveExecutionEngineConfig, LiveNode
 from nautilus_trader.model import BarType, InstrumentId, Symbol, TraderId, Venue
 
 from atrade.forward_test.forward_test_child import LiveNodeInput
+from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
 from atrade.strategy import load_strategy_classes
 
 IB_CLIENT_NAME = "IB"
@@ -64,10 +65,28 @@ def build_live_node(live_node_input: LiveNodeInput, instrument_id: InstrumentId)
     return builder.build()
 
 
+def create_bar_type(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> BarType:
+    return BarType.from_str(f"{instrument_id}-{live_node_input.bar_period.value}-LAST-EXTERNAL")
+
+
+def create_recorder(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> ForwardTestRecorder:
+    """The platform DataActor on the same bar type as the strategy (section 12.8)."""
+    return ForwardTestRecorder(
+        RecorderInput(
+            database_url=live_node_input.database_url,
+            forward_test_id=live_node_input.forward_test_id,
+            instrument_id=instrument_id,
+            bar_type=create_bar_type(live_node_input, instrument_id),
+            bar_period=live_node_input.bar_period,
+            start_balance_usd=live_node_input.start_balance_usd,
+        )
+    )
+
+
 def create_strategy_config(
     config_class: type[StrategyConfig], live_node_input: LiveNodeInput, instrument_id: InstrumentId
 ) -> StrategyConfig:
-    bar_type = BarType.from_str(f"{instrument_id}-{live_node_input.bar_period.value}-LAST-EXTERNAL")
+    bar_type = create_bar_type(live_node_input, instrument_id)
     # readability-exception: the user __init__ takes only its own fields (strategy.md section 9.2) and forwards the
     # other keywords to object.__init__, which refuses them. The NautilusTrader fields go to __new__ directly (E1).
     nautilus_fields: dict[str, object] = {
@@ -97,6 +116,7 @@ async def run_live_node(live_node_input: LiveNodeInput, stop_requested: asyncio.
         strategy_class, config_class = load_strategy_classes(live_node_input.strategy_code, Path(directory))
         live_node = build_live_node(live_node_input, instrument_id)
         live_node.add_strategy(strategy_class(create_strategy_config(config_class, live_node_input, instrument_id)))
+        live_node.add_actor(create_recorder(live_node_input, instrument_id))
         try:
             await wait_for_end_or_stop(live_node, stop_requested)
         finally:

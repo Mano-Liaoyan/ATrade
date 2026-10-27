@@ -7,6 +7,7 @@ The child writes only start_balance_usd and error_message. The worker reads the 
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from decimal import Decimal
 
 import psycopg
 
@@ -38,6 +39,10 @@ class LiveNodeInput:
     strategy_code: str
     gateway_host: str
     gateway_port: int
+    # The recorder DataActor writes the fills and the equity points (section 12.8).
+    database_url: str
+    # The balance at the first start. The equity of the records starts at this value.
+    start_balance_usd: Decimal
 
 
 # Runs the LiveNode until `stop_requested` is set, then stops it. It must not cancel orders or close positions.
@@ -69,7 +74,25 @@ async def write_error_message(job: ChildJob, error_message: str) -> None:
         )
 
 
-async def check_paper_account(job: ChildJob) -> str | None:
+@dataclass(frozen=True)
+class CheckedAccount:
+    account_id: str
+    # The first start balance of the forward test. A restart keeps it (section 12.1).
+    start_balance_usd: Decimal
+
+
+async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None) -> Decimal | None:
+    """Saves the balance at the first start and returns the saved value."""
+    async with await psycopg.AsyncConnection.connect(job.settings.database_url, autocommit=True) as connection:
+        if net_liquidation_usd is not None:
+            await forward_test_store.write_start_balance(
+                connection, forward_test_id=job.row.id, start_balance_usd=net_liquidation_usd
+            )
+        row = await forward_test_store.select_forward_test(connection, job.row.id)
+    return None if row is None else row.start_balance_usd
+
+
+async def check_paper_account(job: ChildJob) -> CheckedAccount | None:
     """Steps 1-3 of section 12.5. Returns the checked account, or None after it wrote the reason of the failure."""
     gateway_connection = job.open_gateway_connection(job.client_id)
     try:
@@ -84,12 +107,11 @@ async def check_paper_account(job: ChildJob) -> str | None:
         return None
     finally:
         gateway_connection.disconnect()
-    if balance is not None and balance.net_liquidation_usd is not None:
-        async with await psycopg.AsyncConnection.connect(job.settings.database_url, autocommit=True) as connection:
-            await forward_test_store.write_start_balance(
-                connection, forward_test_id=job.row.id, start_balance_usd=balance.net_liquidation_usd
-            )
-    return account_id
+    start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
+    if start_balance_usd is None:
+        await write_error_message(job, "The paper account has no NetLiquidation value in USD.")
+        return None
+    return CheckedAccount(account_id=account_id, start_balance_usd=start_balance_usd)
 
 
 async def cancel_open_orders(job: ChildJob) -> int:
@@ -107,7 +129,7 @@ async def cancel_open_orders(job: ChildJob) -> int:
     return SUCCESS_EXIT_CODE
 
 
-async def read_live_node_input(job: ChildJob, account_id: str) -> LiveNodeInput:
+async def read_live_node_input(job: ChildJob, checked_account: CheckedAccount) -> LiveNodeInput:
     strategy_version = await read_strategy_version(
         database_url=job.settings.database_url, strategy_version_id=job.row.strategy_version_id
     )
@@ -117,21 +139,23 @@ async def read_live_node_input(job: ChildJob, account_id: str) -> LiveNodeInput:
     return LiveNodeInput(
         forward_test_id=job.row.id,
         client_id=job.client_id,
-        account_id=account_id,
+        account_id=checked_account.account_id,
         order_id_tag=format_forward_test_order_tag(job.row.id),
         instrument=forward_test_store.read_instrument(job.row),
         bar_period=BarPeriod(job.row.bar_period),
         strategy_code=strategy_version.code,
         gateway_host=job.settings.ibkr_host,
         gateway_port=job.settings.ibkr_paper_port,
+        database_url=job.settings.database_url,
+        start_balance_usd=checked_account.start_balance_usd,
     )
 
 
 async def run_and_stop(job: ChildJob, run_live_node: RunLiveNode, stop_requested: asyncio.Event) -> int:
-    account_id = await check_paper_account(job)
-    if account_id is None:
+    checked_account = await check_paper_account(job)
+    if checked_account is None:
         return PAPER_CHECK_FAILED_EXIT_CODE
-    await run_live_node(await read_live_node_input(job, account_id), stop_requested)
+    await run_live_node(await read_live_node_input(job, checked_account), stop_requested)
     if not stop_requested.is_set():
         await write_error_message(job, "The LiveNode stopped without a stop request.")
         return FAILURE_EXIT_CODE

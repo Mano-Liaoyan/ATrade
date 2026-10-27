@@ -5,11 +5,16 @@ import type { components } from '#lib/api';
 export type ForwardTest = components['schemas']['ForwardTestResponse'];
 export type ForwardTestRequest = components['schemas']['StartForwardTestRequest'];
 export type ForwardTestStatus = components['schemas']['ForwardTestStatus'];
+export type ForwardTestComparison = components['schemas']['ForwardTestComparisonResponse'];
+export type FillComparison = components['schemas']['FillComparisonResponse'];
+export type Interruption = components['schemas']['InterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
 type ValidationError = components['schemas']['ValidationError'];
 
 export type StartResult = { kind: 'started'; forwardTest: ForwardTest } | { kind: 'failed'; message: string };
 export type StopResult = { kind: 'stop_requested' } | { kind: 'failed'; message: string };
+export type SamePeriodBacktestResult = { kind: 'started'; backtestId: number } | { kind: 'failed'; message: string };
+export type ComparisonResult = { kind: 'ok'; value: ForwardTestComparison } | { kind: 'failed'; message: string };
 
 export const FORWARD_TESTS_SOCKET_PATH = '/ws/forward-tests';
 const FORWARD_TESTS_PATH = '/api/forward-tests';
@@ -42,6 +47,11 @@ export function describeForwardTestStatus(status: ForwardTestStatus): string {
 /** A stop is useful while the forward test holds a client ID: then it can have open orders. */
 export function canStop(forwardTest: ForwardTest): boolean {
   return forwardTest.desired_state === 'running' && forwardTest.client_id !== null;
+}
+
+/** The same period backtest uses the start balance as its paper capital (docs/architecture/forward_test.md 12.10). */
+export function canBacktestSamePeriod(forwardTest: ForwardTest): boolean {
+  return forwardTest.start_balance_usd !== null;
 }
 
 export function readForwardTestsMessage(message: unknown): ForwardTest[] | null {
@@ -106,4 +116,41 @@ export async function stopForwardTest(fetchFunction: typeof fetch, forwardTestId
     return { kind: 'failed', message: describeError(await readJson(response), response.status) };
   }
   return { kind: 'stop_requested' };
+}
+
+export async function startSamePeriodBacktest(
+  fetchFunction: typeof fetch,
+  forwardTestId: number,
+): Promise<SamePeriodBacktestResult> {
+  let response: Response;
+  try {
+    response = await fetchFunction(`${FORWARD_TESTS_PATH}/${String(forwardTestId)}/same-period-backtests`, {
+      method: 'POST',
+    });
+  } catch {
+    return { kind: 'failed', message: 'Backend not reachable. The backtest did not start.' };
+  }
+  const body = await readJson(response);
+  if (!response.ok) {
+    return { kind: 'failed', message: describeError(body, response.status) };
+  }
+  return { kind: 'started', backtestId: (body as { backtest_id: number }).backtest_id };
+}
+
+export async function readForwardTestComparison(
+  fetchFunction: typeof fetch,
+  forwardTestId: number,
+  backtestId: number,
+): Promise<ComparisonResult> {
+  let response: Response;
+  try {
+    response = await fetchFunction(`${FORWARD_TESTS_PATH}/${String(forwardTestId)}/comparison/${String(backtestId)}`);
+  } catch {
+    return { kind: 'failed', message: 'Backend not reachable. The comparison is not available.' };
+  }
+  const body = await readJson(response);
+  if (!response.ok) {
+    return { kind: 'failed', message: describeError(body, response.status) };
+  }
+  return { kind: 'ok', value: body as ForwardTestComparison };
 }

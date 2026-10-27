@@ -1,13 +1,22 @@
-<!-- The forward tests with their actual status from /ws/forward-tests, and a stop button for each running one. -->
+<!-- The forward tests with their actual status from /ws/forward-tests, a stop button for each running one, and a
+     "Backtest the same period" button for each one with a start balance (docs/architecture/forward_test.md 12.10). -->
 <script lang="ts">
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { canStop, describeForwardTestStatus, stopForwardTest, type ForwardTest } from './forward_test_api';
+  import {
+    canBacktestSamePeriod,
+    canStop,
+    describeForwardTestStatus,
+    stopForwardTest,
+    type ForwardTest,
+  } from './forward_test_api';
 
   interface Props {
     forwardTests: ForwardTest[];
+    // The page starts the backtest and opens the comparison page.
+    onBacktestSamePeriod: (forwardTestId: number) => void;
   }
 
-  const { forwardTests }: Props = $props();
+  const { forwardTests, onBacktestSamePeriod }: Props = $props();
 
   let stoppingIds = $state<number[]>([]);
   let stopMessage = $state<string | null>(null);
@@ -41,7 +50,7 @@
           <th scope="col">Client ID</th>
           <th scope="col">Start balance (USD)</th>
           <th scope="col">Started (UTC)</th>
-          <th scope="col"><span class="visually-hidden">Action</span></th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -61,14 +70,25 @@
             <td class="number">{forwardTest.start_balance_usd ?? ''}</td>
             <td>{forwardTest.created_at_utc}</td>
             <td>
-              {#if canStop(forwardTest)}
-                <button
-                  type="button"
-                  aria-label={`Stop forward test ${String(forwardTest.id)}`}
-                  disabled={stoppingIds.includes(forwardTest.id)}
-                  onclick={() => stop(forwardTest.id)}>Stop</button
-                >
-              {/if}
+              <div class="actions">
+                {#if canStop(forwardTest)}
+                  <button
+                    type="button"
+                    aria-label={`Stop forward test ${String(forwardTest.id)}`}
+                    disabled={stoppingIds.includes(forwardTest.id)}
+                    onclick={() => stop(forwardTest.id)}>Stop</button
+                  >
+                {/if}
+                {#if canBacktestSamePeriod(forwardTest)}
+                  <button
+                    type="button"
+                    aria-label={`Backtest the same period as forward test ${String(forwardTest.id)}`}
+                    onclick={() => {
+                      onBacktestSamePeriod(forwardTest.id);
+                    }}>Backtest the same period</button
+                  >
+                {/if}
+              </div>
             </td>
           </tr>
         {/each}
@@ -115,6 +135,12 @@
   .forward-tests .number {
     text-align: end;
     font-variant-numeric: tabular-nums;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
   }
 
   .visually-hidden {

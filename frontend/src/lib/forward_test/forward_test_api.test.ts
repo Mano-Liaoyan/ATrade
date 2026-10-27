@@ -1,11 +1,14 @@
 // Forward test HTTP calls, the socket message, and the labels.
 import { describe, expect, it } from 'vitest';
 import {
+  canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
   isLiveBarPeriod,
+  readForwardTestComparison,
   readForwardTestsMessage,
   startForwardTest,
+  startSamePeriodBacktest,
   stopForwardTest,
   type ForwardTest,
   type ForwardTestRequest,
@@ -116,5 +119,52 @@ describe('labels', () => {
     expect(canStop(runningForwardTest)).toBe(true);
     expect(canStop({ ...runningForwardTest, desired_state: 'stopped' })).toBe(false);
     expect(canStop({ ...runningForwardTest, status: 'failed', client_id: null })).toBe(false);
+  });
+});
+
+describe('canBacktestSamePeriod', () => {
+  it('needs the start balance, because the backtest uses it as the paper capital', () => {
+    expect(canBacktestSamePeriod(runningForwardTest)).toBe(true);
+    expect(canBacktestSamePeriod({ ...runningForwardTest, start_balance_usd: null })).toBe(false);
+  });
+});
+
+describe('startSamePeriodBacktest', () => {
+  it('posts to the forward test and returns the new backtest ID', async () => {
+    const requests: Request[] = [];
+
+    const result = await startSamePeriodBacktest(makeFetch(201, { backtest_id: 7 }, requests), 3);
+
+    expect(result).toEqual({ kind: 'started', backtestId: 7 });
+    expect(requests[0]?.method).toBe('POST');
+    expect(new URL(requests[0]?.url ?? '').pathname).toBe('/api/forward-tests/3/same-period-backtests');
+  });
+
+  it('shows why the backtest was refused', async () => {
+    const detail = 'A backtest supports only USD instruments. The instrument currency is EUR.';
+
+    const result = await startSamePeriodBacktest(makeFetch(422, { detail }), 3);
+
+    expect(result).toEqual({ kind: 'failed', message: detail });
+  });
+});
+
+describe('readForwardTestComparison', () => {
+  it('reads the comparison of the forward test with the backtest', async () => {
+    const requests: Request[] = [];
+    const comparison = { forward_test: runningForwardTest, fills: [], interruptions: [] };
+
+    const result = await readForwardTestComparison(makeFetch(200, comparison, requests), 3, 7);
+
+    expect(result).toEqual({ kind: 'ok', value: comparison });
+    expect(new URL(requests[0]?.url ?? '').pathname).toBe('/api/forward-tests/3/comparison/7');
+  });
+
+  it('shows why the comparison is not possible', async () => {
+    const detail = 'Backtest not found.';
+
+    const result = await readForwardTestComparison(makeFetch(404, { detail }), 3, 7);
+
+    expect(result).toEqual({ kind: 'failed', message: detail });
   });
 });

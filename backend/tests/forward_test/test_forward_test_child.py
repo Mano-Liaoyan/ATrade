@@ -6,6 +6,7 @@ The IBKR connection is the fake. The function that runs the LiveNode is a fake: 
 """
 
 import asyncio
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -120,6 +121,9 @@ async def test_checks_the_paper_account_then_runs_the_live_node_with_the_same_cl
     assert live_node_input.order_id_tag == f"FT{forward_test['id']}"
     assert live_node_input.instrument.symbol == "AAPL"
     assert "class BarCountStrategy" in live_node_input.strategy_code
+    # The recorder DataActor of the LiveNode writes the records with the balance at the start (section 12.8).
+    assert live_node_input.database_url == database_url
+    assert live_node_input.start_balance_usd == Decimal("98765.40")
     # The check connection closes before the LiveNode connects with the same client ID.
     assert not live_node.was_check_connection_open_at_start
     assert opened_client_ids == [10, 10]
@@ -163,6 +167,26 @@ async def test_a_failed_paper_account_check_starts_no_live_node(
     assert listed["error_message"] == (
         "The paper account check failed: The account DU1234567 from IB Gateway is not the expected account DU7654321."
     )
+
+
+@pytest.mark.anyio
+async def test_a_paper_account_without_a_usd_balance_starts_no_live_node(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    gateway_connection.account_values = []
+    live_node = FakeLiveNode(gateway_connection)
+
+    exit_code, _ = await run_child(
+        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", gateway_connection, live_node
+    )
+
+    # The equity of the records starts at the balance, so a forward test without it cannot record (section 12.8).
+    assert exit_code == PAPER_CHECK_FAILED_EXIT_CODE
+    assert live_node.inputs == []
+    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
+    assert listed["error_message"] == "The paper account has no NetLiquidation value in USD."
 
 
 @pytest.mark.anyio

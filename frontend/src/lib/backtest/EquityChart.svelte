@@ -1,6 +1,7 @@
 <!-- Equity curves on one chart: one line point at the end of each bar. Times are UNIX timestamps (UTC).
      One curve is a backtest result. Two curves are a comparison (ComparisonView). The second curve is a dashed line
      in the accent color, so the user can tell the curves apart without color. A legend names each curve.
+     Interruptions of a forward test are grey columns behind the curves, and a list names them as text.
 
      Attribution notice of lightweight-charts (Apache License 2.0):
      TradingView Lightweight Charts™
@@ -16,11 +17,31 @@
 </script>
 
 <script lang="ts">
-  import { createChart, LineSeries, LineStyle, type LineData, type UTCTimestamp } from 'lightweight-charts';
+  import {
+    createChart,
+    HistogramSeries,
+    LineSeries,
+    LineStyle,
+    type HistogramData,
+    type IChartApi,
+    type LineData,
+    type UTCTimestamp,
+  } from 'lightweight-charts';
+  import { formatUtcTime } from '#lib/foundation/time_format';
+  import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
 
-  const { curves, label }: { curves: EquityCurve[]; label: string } = $props();
+  interface Props {
+    curves: EquityCurve[];
+    label: string;
+    interruptions?: TimeInterval[];
+  }
+
+  const { curves, label, interruptions = [] }: Props = $props();
 
   const MILLISECONDS_PER_SECOND = 1000;
+  // The grey columns fill the full chart height on their own hidden price scale.
+  const INTERRUPTION_PRICE_SCALE_ID = 'interruptions';
+  const INTERRUPTION_COLUMN_VALUE = 1;
   interface CurveStyle {
     colorVariable: string;
     lineStyle: LineStyle;
@@ -33,6 +54,32 @@
 
   function readColor(variableName: string): string {
     return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
+  }
+
+  function convertToTimestamp(timeUtc: string): UTCTimestamp {
+    return (Date.parse(timeUtc) / MILLISECONDS_PER_SECOND) as UTCTimestamp;
+  }
+
+  function addInterruptionColumns(chart: IChartApi): void {
+    const interruptedTimes = findInterruptedTimes(
+      curves.map((curve) => curve.points),
+      interruptions,
+    );
+    if (interruptedTimes.length === 0) {
+      return;
+    }
+    const columnSeries = chart.addSeries(HistogramSeries, {
+      color: readColor('--color-border'),
+      priceScaleId: INTERRUPTION_PRICE_SCALE_ID,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    chart.priceScale(INTERRUPTION_PRICE_SCALE_ID).applyOptions({ visible: false, scaleMargins: { top: 0, bottom: 0 } });
+    const columns: HistogramData<UTCTimestamp>[] = interruptedTimes.map((timeUtc) => ({
+      time: convertToTimestamp(timeUtc),
+      value: INTERRUPTION_COLUMN_VALUE,
+    }));
+    columnSeries.setData(columns);
   }
 
   function readCurveStyle(curveIndex: number): CurveStyle {
@@ -53,6 +100,8 @@
       },
       timeScale: { timeVisible: true, secondsVisible: false },
     });
+    // Added first, so the curves are drawn on top of the grey columns.
+    addInterruptionColumns(chart);
     curves.forEach((curve, curveIndex) => {
       const style = readCurveStyle(curveIndex);
       const lineSeries = chart.addSeries(LineSeries, {
@@ -61,7 +110,7 @@
         title: curve.name,
       });
       const linePoints: LineData<UTCTimestamp>[] = curve.points.map((point) => ({
-        time: (Date.parse(point.time_utc) / MILLISECONDS_PER_SECOND) as UTCTimestamp,
+        time: convertToTimestamp(point.time_utc),
         value: Number(point.equity_usd),
       }));
       lineSeries.setData(linePoints);
@@ -85,6 +134,16 @@
             style:border-color={`var(${readCurveStyle(curveIndex).colorVariable})`}
           ></span>
           {curve.name}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  {#if interruptions.length > 0}
+    <ul class="interruptions" aria-label={`${label} interruptions`}>
+      {#each interruptions as interruption (interruption.start_utc)}
+        <li>
+          <span class="interruption-mark"></span>
+          Interrupted from {formatUtcTime(interruption.start_utc)} to {formatUtcTime(interruption.end_utc)}
         </li>
       {/each}
     </ul>
@@ -133,6 +192,22 @@
 
   .legend-line.dashed {
     border-top-style: dashed;
+  }
+
+  .interruptions {
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+  }
+
+  .interruption-mark {
+    display: inline-block;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    margin-inline-end: 0.375rem;
+    background: var(--color-border);
+    vertical-align: middle;
   }
 
   .chart-attribution {

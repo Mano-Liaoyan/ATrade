@@ -18,7 +18,11 @@ from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
 from atrade.app.health_routes import create_health_router
 from atrade.backtest import BacktestRunner, create_backtest_router
-from atrade.forward_test import create_forward_test_router, find_forward_test_on_instrument
+from atrade.forward_test import (
+    create_forward_test_comparison_router,
+    create_forward_test_router,
+    find_forward_test_on_instrument,
+)
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
@@ -105,6 +109,7 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
             client_ids=range(settings.forward_test_client_id_first, settings.forward_test_client_id_last + 1),
         )
     )
+    app.include_router(create_forward_test_comparison_router(database_url=settings.database_url, clock=clock))
     instrument_lookup = InstrumentLookup(
         gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
     )

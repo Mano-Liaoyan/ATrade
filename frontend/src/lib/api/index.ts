@@ -325,6 +325,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/forward-tests/{forward_test_id}/same-period-backtests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Same Period Backtest
+         * @description A normal backtest from the forward test start to its end, or to now while it runs.
+         */
+        post: operations["start_same_period_backtest_api_forward_tests__forward_test_id__same_period_backtests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forward-tests/{forward_test_id}/comparison/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Compare With Backtest */
+        get: operations["compare_with_backtest_api_forward_tests__forward_test_id__comparison__backtest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -594,6 +631,48 @@ export interface components {
             /** Code */
             code: string;
         };
+        /** ComparedBacktestSummaryResponse */
+        ComparedBacktestSummaryResponse: {
+            /** Id */
+            id: number;
+            status: components["schemas"]["BacktestStatus"];
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: string;
+            metrics: components["schemas"]["ComparedMetricsResponse"] | null;
+        };
+        /** ComparedEquityPointResponse */
+        ComparedEquityPointResponse: {
+            /**
+             * Time Utc
+             * Format: date-time
+             */
+            time_utc: string;
+            /** Equity Usd */
+            equity_usd: string;
+        };
+        /** ComparedMetricsResponse */
+        ComparedMetricsResponse: {
+            /** Final Equity Usd */
+            final_equity_usd: string;
+            /** Total Return Percent */
+            total_return_percent: string;
+            /** Max Drawdown Percent */
+            max_drawdown_percent: string;
+            /** Trade Count */
+            trade_count: number;
+        };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
             /** Name */
@@ -615,6 +694,43 @@ export interface components {
         ErrorResponse: {
             /** Detail */
             detail: string;
+        };
+        /** FillComparisonResponse */
+        FillComparisonResponse: {
+            /**
+             * Bar End Utc
+             * Format: date-time
+             */
+            bar_end_utc: string;
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "BUY" | "SELL";
+            /** Forward Test Quantity Shares */
+            forward_test_quantity_shares: string | null;
+            /** Forward Test Price Usd */
+            forward_test_price_usd: string | null;
+            /** Backtest Quantity Shares */
+            backtest_quantity_shares: string | null;
+            /** Backtest Price Usd */
+            backtest_price_usd: string | null;
+            /** Price Difference Usd */
+            price_difference_usd: string | null;
+        };
+        /** ForwardTestComparisonResponse */
+        ForwardTestComparisonResponse: {
+            forward_test: components["schemas"]["ForwardTestResponse"];
+            backtest: components["schemas"]["ComparedBacktestSummaryResponse"];
+            forward_test_metrics: components["schemas"]["ComparedMetricsResponse"] | null;
+            /** Forward Test Equity Curve */
+            forward_test_equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            /** Backtest Equity Curve */
+            backtest_equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            /** Fills */
+            fills: components["schemas"]["FillComparisonResponse"][];
+            /** Interruptions */
+            interruptions: components["schemas"]["InterruptionResponse"][];
         };
         /** ForwardTestResponse */
         ForwardTestResponse: {
@@ -701,6 +817,19 @@ export interface components {
         InstrumentSearchResponse: {
             /** Instruments */
             instruments: components["schemas"]["InstrumentResponse"][];
+        };
+        /** InterruptionResponse */
+        InterruptionResponse: {
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
         };
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
@@ -857,6 +986,11 @@ export interface components {
         PaperCapitalResponse: {
             /** Paper Capital Usd */
             paper_capital_usd: string;
+        };
+        /** SamePeriodBacktestResponse */
+        SamePeriodBacktestResponse: {
+            /** Backtest Id */
+            backtest_id: number;
         };
         /** SaveVersionRequest */
         SaveVersionRequest: {
@@ -1870,6 +2004,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_same_period_backtest_api_forward_tests__forward_test_id__same_period_backtests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                forward_test_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SamePeriodBacktestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_with_backtest_api_forward_tests__forward_test_id__comparison__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                forward_test_id: number;
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestComparisonResponse"];
                 };
             };
             /** @description Validation Error */

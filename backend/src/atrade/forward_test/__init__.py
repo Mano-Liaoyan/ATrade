@@ -1,5 +1,6 @@
 """Public entry of forward_test: start and stop forward tests, the forward-test worker, and the child process body."""
 
+from atrade.forward_test.comparison_routes import create_forward_test_comparison_router
 from atrade.forward_test.forward_test_child import (
     IbkrAccess,
     LiveNodeInput,
@@ -7,6 +8,7 @@ from atrade.forward_test.forward_test_child import (
     RunLiveNode,
     run_forward_test_child,
 )
+from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
 from atrade.forward_test.forward_test_worker import (
     PAPER_CHECK_FAILED_EXIT_CODE,
     ChildMode,
@@ -28,12 +30,15 @@ __all__ = [
     "ChildMode",
     "ForwardTestChild",
     "ForwardTestOnInstrument",
+    "ForwardTestRecorder",
     "ForwardTestWorker",
     "IbkrAccess",
     "LiveNodeInput",
     "OpenGatewayConnection",
+    "RecorderInput",
     "RunLiveNode",
     "StartForwardTestChild",
+    "create_forward_test_comparison_router",
     "create_forward_test_router",
     "find_forward_test_on_instrument",
     "run_forward_test_child",

@@ -7,7 +7,8 @@ Environment: ATRADE_TEST_DATABASE_URL, ATRADE_E2E_FRONTEND_BUILD_DIR, ATRADE_E2E
 import asyncio
 import hashlib
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import psycopg
@@ -37,6 +38,16 @@ E2E_STOPPED_FORWARD_TEST_COUNT = 30
 # The stopped forward tests never run, so their strategy version needs no real code.
 E2E_FORWARD_TEST_STRATEGY_CODE = "# The strategy version of the stopped e2e forward tests.\n"
 FIXED_NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+# A stopped forward test with records, for the comparison with a backtest of the same period (forward_test.md 12.10).
+E2E_COMPARED_STRATEGY_NAME = "E2E compared forward test"
+E2E_COMPARED_STRATEGY_FILE = Path(__file__).parent / "backtest" / "strategies" / "buy_and_sell_by_bar_count.py"
+E2E_COMPARED_SYMBOL = "FTCMP"
+E2E_COMPARED_BAR_COUNT = 45
+E2E_COMPARED_FIRST_BAR_START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
+# Enough forward test fills to overflow the fill table, so that the e2e tests can check its scroll track.
+E2E_COMPARED_FILL_COUNT = 40
+# No equity points for these bars: the chart marks them grey as an interruption.
+E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
@@ -49,32 +60,42 @@ WATCHLIST_INSTRUMENTS = [
 ]
 
 
+def insert_strategy_version(connection: psycopg.Connection, *, name: str, code: str) -> int | None:
+    """Returns None when the strategy is already there: the e2e database is not cleared between runs."""
+    strategy_row = connection.execute(
+        """
+        INSERT INTO strategy (name, created_at_utc) VALUES (%(name)s, %(now)s)
+        ON CONFLICT (name) DO NOTHING RETURNING id
+        """,
+        {"name": name, "now": FIXED_NOW_UTC},
+    ).fetchone()
+    if strategy_row is None:
+        return None
+    version_row = connection.execute(
+        """
+        INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc)
+        VALUES (%(strategy_id)s, 1, %(code)s, %(code_sha256)s, %(now)s) RETURNING id
+        """,
+        {
+            "strategy_id": strategy_row[0],
+            "code": code,
+            "code_sha256": hashlib.sha256(code.encode()).hexdigest(),
+            "now": FIXED_NOW_UTC,
+        },
+    ).fetchone()
+    assert version_row is not None
+    return int(version_row[0])
+
+
 def add_stopped_forward_tests(database_url: str) -> None:
     """Enough stopped forward tests to overflow the forward test list, so that the e2e tests can check its scroll
     track. The e2e database is not cleared, so the rows are added only one time."""
     with psycopg.connect(database_url, autocommit=True) as connection:
-        strategy_row = connection.execute(
-            """
-            INSERT INTO strategy (name, created_at_utc) VALUES (%(name)s, %(now)s)
-            ON CONFLICT (name) DO NOTHING RETURNING id
-            """,
-            {"name": E2E_FORWARD_TEST_STRATEGY_NAME, "now": FIXED_NOW_UTC},
-        ).fetchone()
-        if strategy_row is None:
+        version_id = insert_strategy_version(
+            connection, name=E2E_FORWARD_TEST_STRATEGY_NAME, code=E2E_FORWARD_TEST_STRATEGY_CODE
+        )
+        if version_id is None:
             return
-        version_row = connection.execute(
-            """
-            INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc)
-            VALUES (%(strategy_id)s, 1, %(code)s, %(code_sha256)s, %(now)s) RETURNING id
-            """,
-            {
-                "strategy_id": strategy_row[0],
-                "code": E2E_FORWARD_TEST_STRATEGY_CODE,
-                "code_sha256": hashlib.sha256(E2E_FORWARD_TEST_STRATEGY_CODE.encode()).hexdigest(),
-                "now": FIXED_NOW_UTC,
-            },
-        ).fetchone()
-        assert version_row is not None
         for number in range(1, E2E_STOPPED_FORWARD_TEST_COUNT + 1):
             connection.execute(
                 """
@@ -83,8 +104,100 @@ def add_stopped_forward_tests(database_url: str) -> None:
                     created_at_utc, stopped_at_utc
                 ) VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-MINUTE', 'stopped', 'stopped', %(now)s, %(now)s)
                 """,
-                {"version_id": version_row[0], "symbol": f"FTS{number:02d}", "now": FIXED_NOW_UTC},
+                {"version_id": version_id, "symbol": f"FTS{number:02d}", "now": FIXED_NOW_UTC},
             )
+
+
+def make_compared_close_usd(bar_number: int) -> Decimal:
+    # Up for 10 bars, then down for 10 bars, so the bar count strategy wins and loses.
+    return Decimal(100) + Decimal(abs((bar_number + 10) % 20 - 10))
+
+
+def add_compared_bars(connection: psycopg.Connection) -> None:
+    """Saved daily bars: the backtest of the same period reads only saved bars."""
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s, 1000)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                {
+                    "symbol": E2E_COMPARED_SYMBOL,
+                    "start_utc": E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=bar_number - 1),
+                    "close": make_compared_close_usd(bar_number),
+                    "high": make_compared_close_usd(bar_number) + 1,
+                    "low": make_compared_close_usd(bar_number) - 1,
+                }
+                for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
+            ],
+        )
+
+
+def add_compared_records(connection: psycopg.Connection, forward_test_id: int) -> None:
+    """Rows like the DataActor writes them: 1 fill after each bar end and 1 equity point at each bar end."""
+    bar_ends_utc = {
+        bar_number: E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=bar_number)
+        for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
+    }
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
+                commission_usd)
+            VALUES (%(id)s, %(trade_id)s, %(time_utc)s, %(side)s, 1, %(price_usd)s, 0)
+            """,
+            [
+                {
+                    "id": forward_test_id,
+                    "trade_id": f"E2E-{bar_number}",
+                    "time_utc": bar_ends_utc[bar_number] + timedelta(seconds=1),
+                    "side": "BUY" if bar_number % 2 == 1 else "SELL",
+                    "price_usd": make_compared_close_usd(bar_number) + Decimal("0.01"),
+                }
+                for bar_number in range(1, E2E_COMPARED_FILL_COUNT + 1)
+            ],
+        )
+        cursor.executemany(
+            """
+            INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd)
+            VALUES (%(id)s, %(time_utc)s, %(equity_usd)s)
+            """,
+            [
+                {"id": forward_test_id, "time_utc": bar_end_utc, "equity_usd": Decimal(10000) + bar_number}
+                for bar_number, bar_end_utc in bar_ends_utc.items()
+                if bar_number not in E2E_COMPARED_INTERRUPTED_BAR_NUMBERS
+            ],
+        )
+
+
+def add_compared_forward_test(database_url: str) -> None:
+    """A stopped forward test with a start balance, fills, and equity points, and the saved bars of its period."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection, name=E2E_COMPARED_STRATEGY_NAME, code=E2E_COMPARED_STRATEGY_FILE.read_text()
+        )
+        if version_id is None:
+            return
+        add_compared_bars(connection)
+        forward_test_row = connection.execute(
+            """
+            INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
+                status, start_balance_usd, created_at_utc, stopped_at_utc)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', 'stopped', 'stopped', 10000, %(start_utc)s,
+                %(stopped_utc)s)
+            RETURNING id
+            """,
+            {
+                "version_id": version_id,
+                "symbol": E2E_COMPARED_SYMBOL,
+                "start_utc": E2E_COMPARED_FIRST_BAR_START_UTC,
+                "stopped_utc": E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+            },
+        ).fetchone()
+        assert forward_test_row is not None
+        add_compared_records(connection, int(forward_test_row[0]))
 
 
 async def serve_with_forward_test_worker(server: uvicorn.Server, worker: ForwardTestWorker) -> None:
@@ -102,6 +215,7 @@ def main() -> None:
     port = int(os.environ["ATRADE_E2E_PORT"])
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
+    add_compared_forward_test(database_url)
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )

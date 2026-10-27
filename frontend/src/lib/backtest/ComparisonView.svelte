@@ -22,14 +22,17 @@
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatPercent, formatUsd } from './backtest_format';
   import EquityChart from './EquityChart.svelte';
+  import type { TimeInterval } from './interruption_marks';
 
   interface Props {
     first: ComparedRun;
     second: ComparedRun;
     code?: ComparedCode | undefined;
+    // Interruptions of a forward test, marked grey on the equity chart (section 12.10).
+    interruptions?: TimeInterval[];
   }
 
-  const { first, second, code }: Props = $props();
+  const { first, second, code, interruptions = [] }: Props = $props();
 
   const METRIC_ROWS: { name: string; format: (metrics: BacktestMetrics) => string }[] = [
     { name: 'Final equity (USD)', format: (metrics) => formatUsd(metrics.final_equity_usd) },
@@ -79,6 +82,7 @@
       { name: second.label, points: second.equityCurve },
     ]}
     label="Compared equity curves"
+    {interruptions}
   />
 </section>
 

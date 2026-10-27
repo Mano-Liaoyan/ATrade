@@ -1,6 +1,8 @@
 <!-- Forward tests: the start form and the live list. The form combines strategy versions (strategy), bar periods
      (market_data), and the latest backtest metrics of the strategy version (backtest). -->
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
@@ -9,6 +11,7 @@
     isLiveBarPeriod,
     readForwardTestsMessage,
     startForwardTest,
+    startSamePeriodBacktest,
     type ForwardTest,
   } from '#lib/forward_test';
   import { BAR_PERIODS, DEFAULT_BAR_PERIOD, type BarPeriod } from '#lib/market_data';
@@ -105,6 +108,22 @@
     }
     forwardTests = [result.forwardTest, ...forwardTests.filter((item) => item.id !== result.forwardTest.id)];
   }
+
+  // A normal backtest of the same strategy version, instrument, bar type, and period (docs/architecture 12.10).
+  async function backtestSamePeriod(forwardTestId: number): Promise<void> {
+    errorMessage = '';
+    const result = await startSamePeriodBacktest(fetch, forwardTestId);
+    if (result.kind === 'failed') {
+      errorMessage = result.message;
+      return;
+    }
+    await goto(
+      resolve('/forward-tests/[forwardTestId]/comparison/[backtestId]', {
+        forwardTestId: String(forwardTestId),
+        backtestId: String(result.backtestId),
+      }),
+    );
+  }
 </script>
 
 <h1>Forward tests</h1>
@@ -180,7 +199,7 @@
 {#if !isSocketConnected}
   <p class="live-status">Live updates paused. ATrade connects again.</p>
 {/if}
-<ForwardTestList {forwardTests} />
+<ForwardTestList {forwardTests} onBacktestSamePeriod={backtestSamePeriod} />
 
 <style>
   .explanation {

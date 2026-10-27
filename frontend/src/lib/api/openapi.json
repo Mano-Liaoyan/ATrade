@@ -979,6 +979,94 @@
         }
       }
     },
+    "/api/forward-tests/{forward_test_id}/same-period-backtests": {
+      "post": {
+        "summary": "Start Same Period Backtest",
+        "description": "A normal backtest from the forward test start to its end, or to now while it runs.",
+        "operationId": "start_same_period_backtest_api_forward_tests__forward_test_id__same_period_backtests_post",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SamePeriodBacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/forward-tests/{forward_test_id}/comparison/{backtest_id}": {
+      "get": {
+        "summary": "Compare With Backtest",
+        "operationId": "compare_with_backtest_api_forward_tests__forward_test_id__comparison__backtest_id__get",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          },
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/watchlist": {
       "get": {
         "summary": "List Instruments",
@@ -1758,6 +1846,110 @@
         ],
         "title": "ComparedBacktestResponse"
       },
+      "ComparedBacktestSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BacktestStatus"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "type": "string",
+            "title": "Paper Capital Usd"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparedMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "error_message",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd",
+          "metrics"
+        ],
+        "title": "ComparedBacktestSummaryResponse"
+      },
+      "ComparedEquityPointResponse": {
+        "properties": {
+          "time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time Utc"
+          },
+          "equity_usd": {
+            "type": "string",
+            "title": "Equity Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_utc",
+          "equity_usd"
+        ],
+        "title": "ComparedEquityPointResponse"
+      },
+      "ComparedMetricsResponse": {
+        "properties": {
+          "final_equity_usd": {
+            "type": "string",
+            "title": "Final Equity Usd"
+          },
+          "total_return_percent": {
+            "type": "string",
+            "title": "Total Return Percent"
+          },
+          "max_drawdown_percent": {
+            "type": "string",
+            "title": "Max Drawdown Percent"
+          },
+          "trade_count": {
+            "type": "integer",
+            "title": "Trade Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final_equity_usd",
+          "total_return_percent",
+          "max_drawdown_percent",
+          "trade_count"
+        ],
+        "title": "ComparedMetricsResponse"
+      },
       "CreateStrategyRequest": {
         "properties": {
           "name": {
@@ -1811,6 +2003,148 @@
           "detail"
         ],
         "title": "ErrorResponse"
+      },
+      "FillComparisonResponse": {
+        "properties": {
+          "bar_end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Bar End Utc"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "title": "Side"
+          },
+          "forward_test_quantity_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Quantity Shares"
+          },
+          "forward_test_price_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Price Usd"
+          },
+          "backtest_quantity_shares": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Quantity Shares"
+          },
+          "backtest_price_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Price Usd"
+          },
+          "price_difference_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Difference Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bar_end_utc",
+          "side",
+          "forward_test_quantity_shares",
+          "forward_test_price_usd",
+          "backtest_quantity_shares",
+          "backtest_price_usd",
+          "price_difference_usd"
+        ],
+        "title": "FillComparisonResponse"
+      },
+      "ForwardTestComparisonResponse": {
+        "properties": {
+          "forward_test": {
+            "$ref": "#/components/schemas/ForwardTestResponse"
+          },
+          "backtest": {
+            "$ref": "#/components/schemas/ComparedBacktestSummaryResponse"
+          },
+          "forward_test_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparedMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forward_test_equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+            },
+            "type": "array",
+            "title": "Forward Test Equity Curve"
+          },
+          "backtest_equity_curve": {
+            "items": {
+              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+            },
+            "type": "array",
+            "title": "Backtest Equity Curve"
+          },
+          "fills": {
+            "items": {
+              "$ref": "#/components/schemas/FillComparisonResponse"
+            },
+            "type": "array",
+            "title": "Fills"
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptionResponse"
+            },
+            "type": "array",
+            "title": "Interruptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "forward_test",
+          "backtest",
+          "forward_test_metrics",
+          "forward_test_equity_curve",
+          "backtest_equity_curve",
+          "fills",
+          "interruptions"
+        ],
+        "title": "ForwardTestComparisonResponse"
       },
       "ForwardTestResponse": {
         "properties": {
@@ -2048,6 +2382,26 @@
           "instruments"
         ],
         "title": "InstrumentSearchResponse"
+      },
+      "InterruptionResponse": {
+        "properties": {
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_utc",
+          "end_utc"
+        ],
+        "title": "InterruptionResponse"
       },
       "ManualOrderListResponse": {
         "properties": {
@@ -2464,6 +2818,19 @@
         ],
         "title": "PaperCapitalResponse",
         "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
+      },
+      "SamePeriodBacktestResponse": {
+        "properties": {
+          "backtest_id": {
+            "type": "integer",
+            "title": "Backtest Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backtest_id"
+        ],
+        "title": "SamePeriodBacktestResponse"
       },
       "SaveVersionRequest": {
         "properties": {
