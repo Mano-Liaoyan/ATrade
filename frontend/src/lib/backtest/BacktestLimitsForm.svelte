@@ -1,84 +1,79 @@
 <!-- The backtest limits: the timeout in minutes and the number of backtests that run at the same time. PostgreSQL
      stores them. A change applies to the next backtest that starts. -->
 <script lang="ts">
+  import { Button, InlineNotification, TextInput } from '#lib/foundation/carbon';
   import { changeBacktestLimits, readBacktestLimits } from './backtest_api';
   import { convertTimeoutMinutesToSeconds, formatTimeoutMinutes } from './backtest_format';
 
   let timeoutMinutes = $state('');
   // The backend checks the range of the concurrency (1 to 16). The form shows its reason.
   let concurrency = $state('');
-  let statusMessage = $state('');
-  let errorMessage = $state('');
+  let timeoutError = $state<string | null>(null);
+  let result = $state<{ isError: boolean; title: string; subtitle: string } | null>(null);
   let isSaving = $state(false);
 
   $effect(() => {
-    void readBacktestLimits(fetch).then((result) => {
-      if (result.kind === 'failed') {
-        errorMessage = result.message;
+    void readBacktestLimits(fetch).then((readResult) => {
+      if (readResult.kind === 'failed') {
+        result = { isError: true, title: 'Limits not read', subtitle: readResult.message };
         return;
       }
-      timeoutMinutes = formatTimeoutMinutes(result.value.timeout_seconds);
-      concurrency = String(result.value.concurrency);
+      timeoutMinutes = formatTimeoutMinutes(readResult.value.timeout_seconds);
+      concurrency = String(readResult.value.concurrency);
     });
   });
 
   async function saveLimits(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    statusMessage = '';
-    errorMessage = '';
+    result = null;
     const timeoutSeconds = convertTimeoutMinutesToSeconds(timeoutMinutes);
     if (timeoutSeconds === null) {
-      errorMessage = 'The timeout must be a whole number of minutes above 0.';
+      timeoutError = 'The timeout must be a whole number of minutes above 0.';
       return;
     }
+    timeoutError = null;
     isSaving = true;
-    const result = await changeBacktestLimits(fetch, { timeout_seconds: timeoutSeconds, concurrency: Number(concurrency) });
+    const saveResult = await changeBacktestLimits(fetch, { timeout_seconds: timeoutSeconds, concurrency: Number(concurrency) });
     isSaving = false;
-    if (result.kind === 'failed') {
-      errorMessage = result.message;
+    if (saveResult.kind === 'failed') {
+      result = { isError: true, title: 'Limits not saved', subtitle: saveResult.message };
       return;
     }
-    timeoutMinutes = formatTimeoutMinutes(result.value.timeout_seconds);
-    concurrency = String(result.value.concurrency);
-    statusMessage = 'Saved. The limits apply to the next backtest that starts.';
+    timeoutMinutes = formatTimeoutMinutes(saveResult.value.timeout_seconds);
+    concurrency = String(saveResult.value.concurrency);
+    result = { isError: false, title: 'Limits saved', subtitle: 'They apply to the next backtest that starts.' };
   }
 </script>
 
 <form class="limits-form" aria-label="Backtest limits" onsubmit={saveLimits}>
-  <label>
-    Timeout (minutes)
-    <input inputmode="numeric" bind:value={timeoutMinutes} required />
-  </label>
-  <label>
-    Backtests at the same time
-    <input inputmode="numeric" bind:value={concurrency} required />
-  </label>
-  <button type="submit" disabled={isSaving}>Save limits</button>
+  <TextInput label="Timeout (minutes)" inputmode="numeric" class="number" invalidText={timeoutError} bind:value={timeoutMinutes} required />
+  <TextInput label="Backtests at the same time" inputmode="numeric" class="number" bind:value={concurrency} required />
+  <div>
+    <Button type="submit" size="md" disabled={isSaving}>Save limits</Button>
+  </div>
 </form>
-<p class="message" role="status" aria-label="Backtest limits status">{statusMessage}</p>
-{#if errorMessage !== ''}
-  <p class="error" role="alert">{errorMessage}</p>
+{#if result !== null}
+  <InlineNotification
+    kind={result.isError ? 'error' : 'success'}
+    label={result.isError ? undefined : 'Backtest limits status'}
+    title={result.title}
+    subtitle={result.subtitle}
+    lowContrast
+    onClose={() => (result = null)}
+  />
 {/if}
 
 <style>
   .limits-form {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     align-items: end;
-    gap: 0.75rem;
+    gap: var(--cds-spacing-05);
+    margin-block-end: var(--cds-spacing-05);
   }
 
-  .limits-form label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .message {
-    min-block-size: 1.25rem;
-  }
-
-  .error {
-    color: var(--color-warning);
+  .limits-form :global(input.number) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
   }
 </style>

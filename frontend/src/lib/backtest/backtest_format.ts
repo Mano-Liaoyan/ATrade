@@ -1,4 +1,5 @@
 // Labels and values that the backtest pages show.
+import type { TagKind } from '#lib/foundation/carbon';
 import type { BacktestStatus } from './backtest_api';
 
 const STATUS_LABELS: Record<BacktestStatus, string> = {
@@ -8,6 +9,14 @@ const STATUS_LABELS: Record<BacktestStatus, string> = {
   failed: 'Failed',
   timed_out: 'Timed out',
 };
+// The tag color of each status. The tag also shows the status word, so the color is never the only sign.
+const STATUS_TAG_KINDS: Record<BacktestStatus, TagKind> = {
+  queued: 'gray',
+  running: 'blue',
+  finished: 'green',
+  failed: 'red',
+  timed_out: 'magenta',
+};
 const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out'];
 const PERCENT_DECIMAL_PLACES = 2;
 const SECONDS_PER_MINUTE = 60;
@@ -16,6 +25,10 @@ const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2,
 
 export function describeBacktestStatus(status: BacktestStatus): string {
   return STATUS_LABELS[status];
+}
+
+export function findBacktestStatusTagKind(status: BacktestStatus): TagKind {
+  return STATUS_TAG_KINDS[status];
 }
 
 export function isFinalStatus(status: BacktestStatus): boolean {

@@ -4,10 +4,11 @@ import {
   convertDateToUtcStart,
   convertTimeoutMinutesToSeconds,
   describeBacktestStatus,
+  findBacktestStatusTagKind,
   formatPercent,
   formatTimeoutMinutes,
   isFinalStatus,
-} from './index';
+} from './backtest_format';
 
 describe('describeBacktestStatus', () => {
   it('names each status in words', () => {
@@ -16,6 +17,16 @@ describe('describeBacktestStatus', () => {
     expect(describeBacktestStatus('finished')).toBe('Finished');
     expect(describeBacktestStatus('failed')).toBe('Failed');
     expect(describeBacktestStatus('timed_out')).toBe('Timed out');
+  });
+});
+
+describe('findBacktestStatusTagKind', () => {
+  it('gives each status a tag color, so the word and the color show the status together', () => {
+    expect(findBacktestStatusTagKind('queued')).toBe('gray');
+    expect(findBacktestStatusTagKind('running')).toBe('blue');
+    expect(findBacktestStatusTagKind('finished')).toBe('green');
+    expect(findBacktestStatusTagKind('failed')).toBe('red');
+    expect(findBacktestStatusTagKind('timed_out')).toBe('magenta');
   });
 });
 

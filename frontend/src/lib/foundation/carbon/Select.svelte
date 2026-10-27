@@ -21,14 +21,16 @@
     value: T;
     onValueChange: (value: T) => void;
     disabled?: boolean;
+    // The text of the trigger when no item is selected.
+    placeholder?: string;
   }
 
   const uid = $props.id();
-  const { label, items, value, onValueChange, disabled = false }: Props = $props();
+  const { label, items, value, onValueChange, disabled = false, placeholder = '' }: Props = $props();
 
   let open = $state(false);
   const triggerId = `select-${uid}`;
-  const selectedLabel = $derived(items.find((item) => item.value === value)?.label ?? '');
+  const selectedLabel = $derived(items.find((item) => item.value === value)?.label ?? placeholder);
 </script>
 
 <div class="cds--dropdown__wrapper cds--list-box__wrapper">

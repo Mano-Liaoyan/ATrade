@@ -91,13 +91,14 @@ test('compares two versions of the same strategy and refuses different strategie
 
   const selection = page.getByRole('status', { name: 'Comparison selection' });
   const compareButton = page.getByRole('button', { name: 'Compare selected backtests' });
-  await list.getByLabel(`Select backtest #${String(firstBacktestId)}`, { exact: true }).check();
-  await list.getByLabel(`Select backtest #${String(otherBacktestId)}`, { exact: true }).check();
+  // A Carbon checkbox draws its box with its label, so the label takes the pointer: force skips that check only.
+  await list.getByLabel(`Select backtest #${String(firstBacktestId)}`, { exact: true }).check({ force: true });
+  await list.getByLabel(`Select backtest #${String(otherBacktestId)}`, { exact: true }).check({ force: true });
   await expect(selection).toHaveText(/Only backtests of the same strategy can be compared/);
   await expect(compareButton).toBeDisabled();
 
-  await list.getByLabel(`Select backtest #${String(otherBacktestId)}`, { exact: true }).uncheck();
-  await list.getByLabel(`Select backtest #${String(secondBacktestId)}`, { exact: true }).check();
+  await list.getByLabel(`Select backtest #${String(otherBacktestId)}`, { exact: true }).uncheck({ force: true });
+  await list.getByLabel(`Select backtest #${String(secondBacktestId)}`, { exact: true }).check({ force: true });
   await expect(selection).toHaveText('Ready to compare.');
   await compareButton.click();
 

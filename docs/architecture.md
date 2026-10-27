@@ -451,6 +451,23 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   has the bar count, the live bar, and the chart. The bars and the live bar
   of the page belong to one chart request, so the chart gets no data of the
   previous bar period after a change.
+- `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
+  `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
+  A `DataTable` column with `isSelection` is the column of the row
+  checkboxes. Its cells have class `cds--table-column-checkbox`. Other
+  additions: `Select` has `placeholder` (the trigger text when no item is
+  selected), `TextInput` takes `type` (default `text`, for example `date`),
+  and `InlineNotification` has `label` (the accessible name of the status or
+  alert).
+- The backtest pages use Carbon: the start form (`Select`, `TextInput`,
+  `Button`), the limits form, the backtest list (`DataTable` with a selection
+  column, in a `ScrollRegion`), the metrics as Carbon tiles, and the trades
+  and compared metrics as data tables. A backtest status is a Carbon tag with
+  the status word and a color (`findBacktestStatusTagKind`). The equity chart
+  reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid),
+  `--cds-text-primary` (first curve, solid), `--cds-interactive` (second
+  curve, dashed), and `--cds-layer-accent-01` (interruptions).
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".

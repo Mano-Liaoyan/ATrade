@@ -18,6 +18,7 @@
 </script>
 
 <script lang="ts">
+  import { Button, DataTable, InlineNotification, type TableColumn } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatPercent, formatUsd } from './backtest_format';
@@ -43,6 +44,11 @@
     { name: 'Trades', format: (metrics) => String(metrics.trade_count) },
   ];
   const NO_METRICS = 'No result';
+  const metricColumns: TableColumn[] = $derived([
+    { header: 'Metric' },
+    { header: first.label, align: 'right' },
+    { header: second.label, align: 'right' },
+  ]);
 
   function formatMetric(run: ComparedRun, format: (metrics: BacktestMetrics) => string): string {
     return run.metrics === null ? NO_METRICS : format(run.metrics);
@@ -54,19 +60,28 @@
     <h2>Code difference</h2>
     {#if code.firstCode === code.secondCode}
       <!-- Saving the same code again keeps the version, so the same code means the same strategy version. -->
-      <p class="same-code" role="status" aria-label="Code difference">Same strategy version: no code difference.</p>
-      <details bind:open={isSameCodeOpen}>
-        <summary>Show the code</summary>
-        {#if isSameCodeOpen}
-          <CodeDiff
-            firstCode={code.firstCode}
-            secondCode={code.secondCode}
-            firstLabel={first.label}
-            secondLabel={second.label}
-            collapseUnchanged={false}
-          />
-        {/if}
-      </details>
+      <InlineNotification kind="info" label="Code difference" title="Same strategy version: no code difference." lowContrast />
+      <div>
+        <Button
+          kind="ghost"
+          size="sm"
+          aria-expanded={isSameCodeOpen}
+          onclick={() => {
+            isSameCodeOpen = !isSameCodeOpen;
+          }}
+        >
+          {isSameCodeOpen ? 'Hide the code' : 'Show the code'}
+        </Button>
+      </div>
+      {#if isSameCodeOpen}
+        <CodeDiff
+          firstCode={code.firstCode}
+          secondCode={code.secondCode}
+          firstLabel={first.label}
+          secondLabel={second.label}
+          collapseUnchanged={false}
+        />
+      {/if}
     {:else}
       <CodeDiff firstCode={code.firstCode} secondCode={code.secondCode} firstLabel={first.label} secondLabel={second.label} />
     {/if}
@@ -74,24 +89,17 @@
 
   <h2>Metrics</h2>
   <ScrollRegion label="Compared metrics" maxHeight="18rem">
-    <table class="metric-table">
-      <thead>
-        <tr>
-          <th scope="col">Metric</th>
-          <th scope="col">{first.label}</th>
-          <th scope="col">{second.label}</th>
-        </tr>
-      </thead>
-      <tbody>
+    <DataTable columns={metricColumns} size="sm">
+      {#snippet rows()}
         {#each METRIC_ROWS as row (row.name)}
           <tr>
             <th scope="row">{row.name}</th>
-            <td class="number">{formatMetric(first, row.format)}</td>
-            <td class="number">{formatMetric(second, row.format)}</td>
+            <td align="right">{formatMetric(first, row.format)}</td>
+            <td align="right">{formatMetric(second, row.format)}</td>
           </tr>
         {/each}
-      </tbody>
-    </table>
+      {/snippet}
+    </DataTable>
   </ScrollRegion>
 
   <h2>Equity curves</h2>
@@ -109,53 +117,14 @@
   .comparison {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--cds-spacing-05);
   }
 
   h2 {
     margin: 0;
-    font-size: 1.125rem;
-  }
-
-  .same-code {
-    margin: 0;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-left: 3px solid var(--color-accent);
-    background: var(--color-surface);
-  }
-
-  summary {
-    cursor: pointer;
-    color: var(--color-muted);
-    font-size: 0.875rem;
-  }
-
-  details[open] summary {
-    margin-bottom: 0.5rem;
-  }
-
-  .metric-table {
-    border-collapse: collapse;
-    inline-size: 100%;
-    font-size: 0.875rem;
-  }
-
-  .metric-table th,
-  .metric-table td {
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid var(--color-border);
-    text-align: start;
-  }
-
-  .metric-table thead th {
-    position: sticky;
-    inset-block-start: 0;
-    background: var(--color-surface);
-  }
-
-  .metric-table .number {
-    text-align: end;
-    font-variant-numeric: tabular-nums;
+    font-size: var(--cds-heading-03-font-size);
+    font-weight: var(--cds-heading-03-font-weight);
+    line-height: var(--cds-heading-03-line-height);
+    letter-spacing: var(--cds-heading-03-letter-spacing);
   }
 </style>
