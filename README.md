@@ -10,23 +10,27 @@ is in GitHub Issues.
 
 ## Current state
 
-The repository holds the minimum runnable skeleton (issue #62) and the IBKR
-connection (issue #63):
+The repository holds the minimum runnable skeleton (issue #62), the IBKR
+connection (issue #63), and the strategy editor (issue #68):
 
-- The `web` service serves the app shell, `GET /api/health`, and
-  `GET /api/ibkr/gateway`.
+- The `web` service serves the app shell, `GET /api/health`,
+  `GET /api/ibkr/gateway`, and the strategy routes under `/api/strategies`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
-- The `postgres` service holds the database. It has no tables yet.
-- The home page has the instrument search (issue #64). It finds instruments by
-  symbol through IB Gateway and shows each match as symbol / exchange /
-  currency, for example `700 / SEHK / HKD`. The search needs a connected
-  IB Gateway.
-- The other capabilities (bars, watchlist, strategies, backtests, paper
-  trading, forward tests) are not available yet.
+- The `postgres` service holds the database.
+- Instrument search: the home page finds instruments by symbol through
+  IB Gateway and shows each match as symbol / exchange / currency, for
+  example `700 / SEHK / HKD`. The search needs a connected IB Gateway. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
+- Strategies: the page `/strategies` creates a strategy from a template. The
+  editor saves the code as strategy versions after the checks before save.
+  Unsaved edits stay in the browser. See
+  [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
+- Bars, watchlist, backtests, paper trading, and forward tests are not
+  available yet.
 
 ## Requirements
 

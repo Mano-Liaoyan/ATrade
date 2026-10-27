@@ -8,7 +8,8 @@ ATrade has no central project context file and no document index.
 
 - `GLOSSARY.md` holds the terms.
 - `docs/architecture.md` is the architecture specification and the
-  implementation authority.
+  implementation authority. Sections split out by capability are in
+  `docs/architecture/`.
 - `docs/adr/` holds decisions that are hard to reverse, when they exist.
 - The plan is in GitHub Issues.
 

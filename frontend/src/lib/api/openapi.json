@@ -102,10 +102,294 @@
           }
         }
       }
+    },
+    "/api/strategies": {
+      "get": {
+        "summary": "List Strategies",
+        "operationId": "list_strategies_api_strategies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StrategyListItem"
+                  },
+                  "type": "array",
+                  "title": "Response List Strategies Api Strategies Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Strategy",
+        "operationId": "create_strategy_api_strategies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStrategyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies/{strategy_id}": {
+      "get": {
+        "summary": "Read Strategy",
+        "operationId": "read_strategy_api_strategies__strategy_id__get",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Strategy",
+        "operationId": "delete_strategy_api_strategies__strategy_id__delete",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies/{strategy_id}/versions/{version_number}": {
+      "get": {
+        "summary": "Read Version",
+        "operationId": "read_version_api_strategies__strategy_id__versions__version_number__get",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          },
+          {
+            "name": "version_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/strategies/{strategy_id}/versions": {
+      "post": {
+        "summary": "Save Version",
+        "description": "Checks the code first. Then it appends a version, or returns the latest version when the code is the same.",
+        "operationId": "save_version_api_strategies__strategy_id__versions_post",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The code is the same as the latest version. No new version is made.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CodeCheckFailedResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/CodeProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems"
+        ],
+        "title": "CodeCheckFailedResponse"
+      },
+      "CodeProblemResponse": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "message"
+        ],
+        "title": "CodeProblemResponse"
+      },
+      "CreateStrategyRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateStrategyRequest"
+      },
       "ErrorResponse": {
         "properties": {
           "detail": {
@@ -229,6 +513,142 @@
           "instruments"
         ],
         "title": "InstrumentSearchResponse"
+      },
+      "SaveVersionRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "SaveVersionRequest"
+      },
+      "StrategyListItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "latest_version_number": {
+            "type": "integer",
+            "title": "Latest Version Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "latest_version_number"
+        ],
+        "title": "StrategyListItem"
+      },
+      "StrategyResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVersionSummary"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at_utc",
+          "versions"
+        ],
+        "title": "StrategyResponse"
+      },
+      "StrategyVersionResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "code_sha256": {
+            "type": "string",
+            "title": "Code Sha256"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_id",
+          "version_number",
+          "code",
+          "code_sha256",
+          "created_at_utc"
+        ],
+        "title": "StrategyVersionResponse"
+      },
+      "StrategyVersionSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "code_sha256": {
+            "type": "string",
+            "title": "Code Sha256"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_number",
+          "code_sha256",
+          "created_at_utc"
+        ],
+        "title": "StrategyVersionSummary"
       },
       "ValidationError": {
         "properties": {

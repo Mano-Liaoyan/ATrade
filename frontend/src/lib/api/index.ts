@@ -55,10 +55,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Strategies */
+        get: operations["list_strategies_api_strategies_get"];
+        put?: never;
+        /** Create Strategy */
+        post: operations["create_strategy_api_strategies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategies/{strategy_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Strategy */
+        get: operations["read_strategy_api_strategies__strategy_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Strategy */
+        delete: operations["delete_strategy_api_strategies__strategy_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategies/{strategy_id}/versions/{version_number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Version */
+        get: operations["read_version_api_strategies__strategy_id__versions__version_number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategies/{strategy_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Version
+         * @description Checks the code first. Then it appends a version, or returns the latest version when the code is the same.
+         */
+        post: operations["save_version_api_strategies__strategy_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CodeCheckFailedResponse */
+        CodeCheckFailedResponse: {
+            /** Problems */
+            problems: components["schemas"]["CodeProblemResponse"][];
+        };
+        /** CodeProblemResponse */
+        CodeProblemResponse: {
+            /** Line */
+            line: number;
+            /** Message */
+            message: string;
+        };
+        /** CreateStrategyRequest */
+        CreateStrategyRequest: {
+            /** Name */
+            name: string;
+        };
         /** ErrorResponse */
         ErrorResponse: {
             /** Detail */
@@ -112,6 +202,66 @@ export interface components {
         InstrumentSearchResponse: {
             /** Instruments */
             instruments: components["schemas"]["InstrumentResponse"][];
+        };
+        /** SaveVersionRequest */
+        SaveVersionRequest: {
+            /** Code */
+            code: string;
+        };
+        /** StrategyListItem */
+        StrategyListItem: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Latest Version Number */
+            latest_version_number: number;
+        };
+        /** StrategyResponse */
+        StrategyResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Versions */
+            versions: components["schemas"]["StrategyVersionSummary"][];
+        };
+        /** StrategyVersionResponse */
+        StrategyVersionResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Version Number */
+            version_number: number;
+            /** Code */
+            code: string;
+            /** Code Sha256 */
+            code_sha256: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+        };
+        /** StrategyVersionSummary */
+        StrategyVersionSummary: {
+            /** Id */
+            id: number;
+            /** Version Number */
+            version_number: number;
+            /** Code Sha256 */
+            code_sha256: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -220,6 +370,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_strategies_api_strategies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyListItem"][];
+                };
+            };
+        };
+    };
+    create_strategy_api_strategies_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStrategyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_strategy_api_strategies__strategy_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_strategy_api_strategies__strategy_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_version_api_strategies__strategy_id__versions__version_number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_version_api_strategies__strategy_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description The code is the same as the latest version. No new version is made. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeCheckFailedResponse"];
                 };
             };
         };
