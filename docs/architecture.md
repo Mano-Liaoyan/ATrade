@@ -301,6 +301,54 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `src/routes/` combines capabilities.
 - Generic UI with no domain meaning goes in `foundation/`, for example
   `foundation/code_editor/`. Parts with domain meaning stay in the capability.
+- The UI uses IBM Carbon Design System v11 for the look and Bits UI 2 for
+  the behavior ([#84](https://github.com/Mano-Liaoyan/ATrade/issues/84)).
+  The look comes from the official `@carbon/styles` SCSS. Bits UI gives the
+  keyboard control, the focus control, the ARIA attributes, and the
+  positioning of floating content. Do not use `carbon-components-svelte` or
+  `@carbon/web-components`.
+- `foundation/carbon` combines Carbon and Bits UI into general components,
+  for example `Tag`, `Tooltip`, and `TooltipProvider`. A component writes the
+  Carbon HTML structure and class names (`cds--*`). Carbon CSS shows a state
+  with a class, for example `cds--popover--open`, not with `data-state`. The
+  component changes the Bits UI state into the Carbon class.
+- Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
+  of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
+  use the components of `#lib/foundation/carbon`.
+- `foundation/carbon/carbon.scss` is the one global SCSS entry.
+  `foundation/carbon/index.ts` imports it, so each importer of
+  `#lib/foundation/carbon` gets the styles. The entry loads `config` (with
+  `$css--font-face: false`), `themes`, `theme`, `reset`, `zone` (only g100),
+  `layer`, `layout`, and the components that ATrade uses. `layer` and
+  `layout` are necessary: buttons, tabs, text inputs, and content switchers
+  read their sizes from them. Do not load the full Carbon `styles.css`, and
+  load the Carbon grid only when a page uses it.
+- To add a Carbon component, add
+  `@use '@carbon/styles/scss/components/<name>';` to the component list in
+  `carbon.scss`. Keep each `@use` above the theme rules: a component adds its
+  component tokens (for example `--cds-button-*`) when Sass loads it, and the
+  theme rules then write these tokens for each theme.
+- The Sass settings are in `css.preprocessorOptions.scss` of
+  `vite.config.ts`. The Carbon SCSS loads packages that are not direct
+  dependencies, for example `@carbon/themes`. pnpm keeps them in
+  `node_modules/.pnpm/node_modules`, so `loadPaths` includes that directory.
+- The fonts are IBM Plex Sans and IBM Plex Mono from the `@ibm/plex-sans`
+  and `@ibm/plex-mono` packages. `foundation/carbon/index.ts` imports their
+  CSS, and the build contains the font files. ATrade does not load fonts
+  from the IBM font server.
+- Themes: `:root` has the Carbon g10 tokens (light). With
+  `prefers-color-scheme: dark` and no `data-theme="light"` on `<html>`, it has
+  the g100 tokens (dark). `data-theme="dark"` on `<html>` also gives g100.
+- The app shell header (`src/routes/+layout.svelte`) is the Carbon UI shell
+  header in a `cds--g100` zone in all themes. It shows the product name, the
+  page links (Home, Strategies, Backtests, Forward tests) with
+  `aria-current="page"` on the current page, the backend status, the IB
+  Gateway status, the server time, and the Paper tag. The Paper tag is a
+  Carbon operational tag with a tooltip. The tooltip shows the checked paper
+  account number with its middle hidden, for example `DU****567`. The header
+  reads the account check from `/ws/paper-trading`. Carbon hides the header
+  navigation below 1056 px. ATrade is a desktop app, so it keeps the
+  navigation at all widths. Header buttons go in `cds--header__global`.
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -363,10 +411,21 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   visible scroll track and thumb. Safari can hide native scrollbars, so use
   styled tracks where reachability matters.
 - No content can be clipped or unreachable.
-- Colors come from the tokens on `:root` in `src/routes/+layout.svelte`, with
-  a light and a dark set (`prefers-color-scheme`). Do not hard-code a color in
-  a component that the dark scheme does not also cover. The page side gutter
-  is `clamp(1rem, 3vw, 2.5rem)` for the header and the main region.
+- Colors come from the Carbon tokens (`--cds-*`) of the current theme
+  (section 13). Do not hard-code a color. Extra CSS for parts that Carbon
+  does not supply uses only Carbon color tokens, spacing tokens, and type
+  tokens.
+- Parallel migration ([#84](https://github.com/Mano-Liaoyan/ATrade/issues/84)):
+  the old `--color-*` tokens on `:root` in `src/routes/+layout.svelte` point
+  to Carbon tokens, so the components that are not migrated yet follow the
+  Carbon theme. For example `--color-surface` is `--cds-layer-01` and
+  `--color-text` is `--cds-text-primary`. A migrated component uses the
+  `--cds-*` tokens directly. The layout also gives the browser margins back
+  to the headings, paragraphs, and lists in the main region, because the
+  Carbon reset removes them. The last migration step removes the `--color-*`
+  tokens and this rule.
+- A canvas chart reads a `--color-*` token with `getComputedStyle`. The
+  browser gives the Carbon value of the current theme.
 
 ## 14. Deployment and external access
 

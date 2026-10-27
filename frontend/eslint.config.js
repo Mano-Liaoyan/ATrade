@@ -29,6 +29,12 @@ const NO_RELATIVE_CROSS_FOLDER = {
   message: 'Import another folder of src/lib/ with #lib/.',
 };
 
+// F4: only src/lib/foundation/ imports bits-ui. Capabilities and routes use the components of foundation/ (#84).
+const BITS_UI_IN_FOUNDATION_ONLY = {
+  regex: '^bits-ui($|/)',
+  message: 'Import bits-ui only in src/lib/foundation/. Use the components of #lib/foundation/carbon.',
+};
+
 // B6: these words must not be a part of a name (camelCase, PascalCase or UPPER_CASE word match).
 const VAGUE_NAME =
   '^(data|info|manager|helper|utils|handle|process)([A-Z_]|$)' +
@@ -65,14 +71,23 @@ export default defineConfig(
       '@typescript-eslint/no-magic-numbers': ['error', { ignore: [-1, 0, 1] }], // E9
       'no-implicit-coercion': 'error', // E9
       '@typescript-eslint/strict-boolean-expressions': ['error', { allowNumber: false, allowString: false }], // E9
-      'no-restricted-imports': ['error', { patterns: [PUBLIC_ENTRY_ONLY] }], // F2
+      'no-restricted-imports': ['error', { patterns: [PUBLIC_ENTRY_ONLY, BITS_UI_IN_FOUNDATION_ONLY] }], // F2, F4
     },
   },
   {
     files: ['src/lib/**'],
     rules: {
       'no-restricted-imports': [
-        'error', // F2, F3. This block replaces the options above, so it repeats PUBLIC_ENTRY_ONLY.
+        'error', // F2, F3, F4. This block replaces the options above, so it repeats PUBLIC_ENTRY_ONLY.
+        { patterns: [PUBLIC_ENTRY_ONLY, FOUNDATION_ONLY, NO_RELATIVE_CROSS_FOLDER, BITS_UI_IN_FOUNDATION_ONLY] },
+      ],
+    },
+  },
+  {
+    files: ['src/lib/foundation/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error', // F2, F3. foundation/ can import bits-ui (F4).
         { patterns: [PUBLIC_ENTRY_ONLY, FOUNDATION_ONLY, NO_RELATIVE_CROSS_FOLDER] },
       ],
     },

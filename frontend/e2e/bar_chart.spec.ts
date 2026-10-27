@@ -64,10 +64,10 @@ test('the chart takes the new color scheme without a page reload', async ({ page
   await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
   const chart = page.getByRole('img', { name: 'Bar chart of 700 / SEHK / HKD, 1-HOUR bars' });
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('2160 bars');
-  // --color-surface of src/routes/+layout.svelte: #ffffff light, #161b22 dark.
+  // --color-surface of src/routes/+layout.svelte is Carbon --cds-layer-01: #ffffff in g10, #262626 in g100.
   await expect.poll(() => readChartBackground(chart)).toBe('rgb(255, 255, 255)');
 
   await page.emulateMedia({ colorScheme: 'dark' });
 
-  await expect.poll(() => readChartBackground(chart)).toBe('rgb(22, 27, 34)');
+  await expect.poll(() => readChartBackground(chart)).toBe('rgb(38, 38, 38)');
 });

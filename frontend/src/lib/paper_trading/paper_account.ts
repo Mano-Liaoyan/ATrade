@@ -35,6 +35,33 @@ export function describePaperAccountCheck(check: PaperAccountCheck): { title: st
   }
 }
 
+// The Paper tag in the header shows the account number with its middle hidden: DU1234567 becomes DU****567.
+const SHOWN_LEADING_CHARACTERS = 2;
+const SHOWN_TRAILING_CHARACTERS = 3;
+const HIDDEN_CHARACTER = '*';
+
+function hideAccountNumberMiddle(account: string): string {
+  const hiddenLength = account.length - SHOWN_LEADING_CHARACTERS - SHOWN_TRAILING_CHARACTERS;
+  if (hiddenLength < 1) {
+    return HIDDEN_CHARACTER.repeat(account.length);
+  }
+  return (
+    account.slice(0, SHOWN_LEADING_CHARACTERS) +
+    HIDDEN_CHARACTER.repeat(hiddenLength) +
+    account.slice(account.length - SHOWN_TRAILING_CHARACTERS)
+  );
+}
+
+export function describePaperAccountTag(check: PaperAccountCheck | null): string {
+  if (check === null) {
+    return 'Checking the paper account.';
+  }
+  if (check.status !== 'passed') {
+    return describePaperAccountCheck(check).title;
+  }
+  return `Paper account ${check.actual_accounts.map(hideAccountNumberMiddle).join(', ')}`;
+}
+
 export function formatAmount(amount: string | null): string {
   if (amount === null) {
     return MISSING_AMOUNT;

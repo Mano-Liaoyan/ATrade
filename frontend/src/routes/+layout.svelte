@@ -1,25 +1,52 @@
-<!-- App shell: header with the product name, the backend status, and the IB Gateway status, and the main region for each page. -->
+<!-- App shell: the Carbon UI shell header (product name, page navigation, backend status, IB Gateway status,
+     server time, and the Paper tag) and the main region for each page. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
+  import { page } from '$app/state';
   import {
     describeBackendHealth,
     fetchBackendHealth,
     SERVER_TIME_TICK_MILLISECONDS,
     type BackendHealth,
   } from '#lib/foundation/backend_health';
+  import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
+  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     describeGatewayStatus,
     fetchGatewayStatus,
     GATEWAY_STATUS_REFRESH_MILLISECONDS,
     type GatewayStatus,
   } from '#lib/ibkr';
+  import {
+    describePaperAccountTag,
+    PAPER_TRADING_SOCKET_PATH,
+    readPaperAccountMessage,
+    type PaperAccountCheck,
+  } from '#lib/paper_trading';
 
   const { children }: { children: Snippet } = $props();
 
+  const PAGE_LINKS = [
+    { label: 'Home', href: resolve('/') },
+    { label: 'Strategies', href: resolve('/strategies') },
+    { label: 'Backtests', href: resolve('/backtests') },
+    { label: 'Forward tests', href: resolve('/forward-tests') },
+  ];
+  const HOME_HREF = resolve('/');
+
   let backendHealth: BackendHealth = $state({ kind: 'checking' });
   let gatewayStatus: GatewayStatus = $state({ kind: 'checking' });
+  let paperAccountCheck: PaperAccountCheck | null = $state(null);
   let nowMilliseconds = $state(Date.now());
+
+  // A page link is current on its own page and on the pages below it. Home is current only on its own page.
+  function isCurrentPage(href: string, pathname: string): boolean {
+    if (href === HOME_HREF) {
+      return pathname === HOME_HREF;
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   $effect(() => {
     void fetchBackendHealth(fetch).then((health) => {
@@ -48,130 +75,121 @@
       clearInterval(refreshTimer);
     };
   });
+
+  // The Paper tag names the checked paper account. The account check comes from /ws/paper-trading.
+  $effect(() => {
+    return openLiveSocket({
+      url: buildSocketUrl(PAPER_TRADING_SOCKET_PATH, window.location),
+      onMessage: (message) => {
+        const accountMessage = readPaperAccountMessage(message);
+        if (accountMessage !== null) {
+          paperAccountCheck = accountMessage.check;
+        }
+      },
+      onConnectionChange: () => undefined,
+    });
+  });
 </script>
 
-<div class="app-shell">
-  <header class="app-header">
-    <span class="product-name">ATrade</span>
-    <nav class="app-navigation">
-      <a href={resolve('/')}>Home</a>
-      <a href={resolve('/strategies')}>Strategies</a>
-      <a href={resolve('/backtests')}>Backtests</a>
-      <a href={resolve('/forward-tests')}>Forward tests</a>
+<TooltipProvider>
+  <header class="cds--header cds--g100" aria-label="ATrade">
+    <a class="cds--header__name" href={HOME_HREF}>ATrade</a>
+    <nav class="cds--header__nav app-navigation" aria-label="Pages">
+      <ul class="cds--header__menu-bar">
+        {#each PAGE_LINKS as link (link.href)}
+          <li>
+            <a
+              class="cds--header__menu-item"
+              href={link.href}
+              aria-current={isCurrentPage(link.href, page.url.pathname) ? 'page' : undefined}
+            >
+              {link.label}
+            </a>
+          </li>
+        {/each}
+      </ul>
     </nav>
-    <span class="header-statuses">
-      <span class="backend-status" role="status" aria-label="Backend status">{describeBackendHealth(backendHealth, nowMilliseconds)}</span>
+    <div class="cds--header__global app-header-global">
+      <span class="app-header-status" role="status" aria-label="Backend status">
+        {describeBackendHealth(backendHealth, nowMilliseconds)}
+      </span>
       <span
-        class="gateway-status"
-        class:gateway-unreachable={gatewayStatus.kind === 'unreachable'}
+        class="app-header-status"
+        class:app-header-status--error={gatewayStatus.kind === 'unreachable'}
         role="status"
         aria-label="IB Gateway status"
       >
         {describeGatewayStatus(gatewayStatus)}
       </span>
-    </span>
+      <Tooltip text={describePaperAccountTag(paperAccountCheck)} align="bottom-end">
+        {#snippet trigger({ props })}
+          <Tag {...props} label="Paper" kind="blue" operational />
+        {/snippet}
+      </Tooltip>
+    </div>
   </header>
   <main class="app-main">
     {@render children()}
   </main>
-</div>
+</TooltipProvider>
 
 <style>
+  /* Parallel migration (#84): the --color-* tokens of the components that are not migrated yet point to the Carbon
+     tokens, so they follow the Carbon theme. #96 removes them. */
   :global(:root) {
-    --color-background: #f6f7f9;
-    --color-surface: #ffffff;
-    --color-text: #1b1f24;
-    --color-muted: #59636e;
-    --color-border: #d0d7de;
-    --color-warning: #9a6700;
-    --color-accent: #0969da;
+    --color-background: var(--cds-background);
+    --color-surface: var(--cds-layer-01);
+    --color-text: var(--cds-text-primary);
+    --color-muted: var(--cds-text-secondary);
+    --color-border: var(--cds-border-subtle-01);
+    --color-warning: var(--cds-text-error);
+    --color-accent: var(--cds-link-primary);
+    --color-scroll-track: var(--cds-layer-accent-01);
+    --color-scroll-thumb: var(--cds-icon-secondary);
     /* Code editor and code diff (src/lib/foundation/code_editor/code_theme.ts). */
-    --color-code-active-line: #eaeef280;
-    --color-code-selection: #0969da33;
-    --color-diff-removed-line: #ffebe9;
-    --color-diff-removed-text: #ff818266;
-    --color-diff-removed-mark: #cf222e;
-    --color-diff-added-line: #dafbe1;
-    --color-diff-added-text: #4ac26b66;
-    --color-diff-added-mark: #1a7f37;
-    color-scheme: light dark;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --color-code-active-line: var(--cds-layer-hover-01);
+    --color-code-selection: var(--cds-highlight);
+    --color-diff-removed-line: color-mix(in srgb, var(--cds-support-error) 15%, transparent);
+    --color-diff-removed-text: color-mix(in srgb, var(--cds-support-error) 40%, transparent);
+    --color-diff-removed-mark: var(--cds-support-error);
+    --color-diff-added-line: color-mix(in srgb, var(--cds-support-success) 15%, transparent);
+    --color-diff-added-text: color-mix(in srgb, var(--cds-support-success) 40%, transparent);
+    --color-diff-added-mark: var(--cds-support-success);
   }
 
-  @media (prefers-color-scheme: dark) {
-    :global(:root) {
-      --color-background: #0d1117;
-      --color-surface: #161b22;
-      --color-text: #e6edf3;
-      --color-muted: #8d96a0;
-      --color-border: #30363d;
-      --color-warning: #d29922;
-      --color-accent: #4493f8;
-      --color-code-active-line: #6e768126;
-      --color-code-selection: #4493f84d;
-      --color-diff-removed-line: #f8514926;
-      --color-diff-removed-text: #f8514966;
-      --color-diff-removed-mark: #f85149;
-      --color-diff-added-line: #2ea04326;
-      --color-diff-added-text: #2ea04366;
-      --color-diff-added-mark: #3fb950;
-    }
+  /* Parallel migration (#84): the Carbon reset removes all margins. The pages that are not migrated yet get the
+     browser margins back. The selector has the specificity of one class: more than the reset, less than the CSS of a
+     component (a class and the Svelte scope class). #96 removes this rule. */
+  :global(.app-main :where(h1, h2, h3, h4, p, ul, ol, dl, dd, fieldset, form)) {
+    margin-block: revert;
   }
 
-  :global(body) {
-    margin: 0;
-    background: var(--color-background);
-    color: var(--color-text);
-  }
-
-  .app-shell {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .app-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.75rem clamp(1rem, 3vw, 2.5rem);
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-surface);
-  }
-
-  .product-name {
-    font-weight: 700;
-    font-size: 1.125rem;
-  }
-
+  /* Carbon hides the header navigation below the lg breakpoint (1056px). ATrade is a desktop app and keeps it. */
   .app-navigation {
-    display: flex;
-    gap: 1rem;
-    margin-right: auto;
+    display: block;
   }
 
-  .header-statuses {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.25rem 1rem;
+  .app-header-global {
+    align-items: center;
+    gap: var(--cds-spacing-05);
+    min-inline-size: 0;
+    padding-inline: var(--cds-spacing-05);
   }
 
-  .backend-status,
-  .gateway-status {
-    color: var(--color-muted);
-    font-size: 0.875rem;
+  .app-header-status {
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    letter-spacing: var(--cds-helper-text-01-letter-spacing);
+    color: var(--cds-text-secondary);
+    font-variant-numeric: tabular-nums;
   }
 
-  .gateway-unreachable {
-    color: var(--color-warning);
-    font-weight: 600;
+  .app-header-status--error {
+    color: var(--cds-text-error);
   }
 
-  /* The side gutter grows with the window, so page content does not sit near the window edge on wide screens. */
+  /* The Carbon header is fixed at the top and is 3rem high. */
   .app-main {
-    flex: 1;
-    padding: 1.25rem clamp(1rem, 3vw, 2.5rem);
+    padding: calc(var(--cds-spacing-09) + var(--cds-spacing-06)) var(--cds-spacing-07) var(--cds-spacing-06);
   }
 </style>

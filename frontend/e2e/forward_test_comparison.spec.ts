@@ -62,6 +62,6 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await expect(page.getByRole('region', { name: 'Interruptions' }).getByRole('row')).toHaveCount(2);
   await expect(page.getByRole('img', { name: 'Forward test equity curve' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Forward test fills' })).toBeVisible();
-  await page.getByRole('link', { name: `Compare with backtest #${backtestId}` }).click();
+  await page.getByRole('link', { name: `Compare with backtest #${backtestId}`, exact: true }).click();
   await expect(page).toHaveURL(comparisonUrl);
 });
