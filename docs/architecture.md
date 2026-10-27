@@ -121,6 +121,7 @@ deploy/                # compose.yaml, web.Dockerfile
 scripts/check          # the quality gate: the same checks as CI (section 17.7)
 docs/
   architecture.md      # this document
+  architecture/        # sections moved to their own file (section 18)
   adr/                 # decisions that are hard to reverse
 start                  # Unix only: ./start run calls docker compose up
 README.md
@@ -218,39 +219,9 @@ A restart of `web` does not stop forward tests.
 
 ## 7. IBKR access
 
-Sources: [IBKR access research](https://github.com/Mano-Liaoyan/ATrade/issues/30),
-[Broker and data source research](https://github.com/Mano-Liaoyan/ATrade/issues/43),
-[ib_async compared with nautilus-ibapi](https://github.com/Mano-Liaoyan/ATrade/issues/54),
-[Can the Web process use only NautilusTrader 2.0 for IBKR](https://github.com/Mano-Liaoyan/ATrade/issues/55),
-[IB Gateway paper account check](https://github.com/Mano-Liaoyan/ATrade/issues/50).
-
-- IBKR is the only broker. Bars come from IBKR historical data first. When
-  IBKR limits block backtests, add one US data vendor (Tiingo or Massive).
-- One IB Gateway container runs and logs in to the paper account.
-- The Web process uses `ib_async` for all IBKR access:
-  - bars
-  - instrument search
-  - paper orders sent by hand, and order cancellation
-  - the order list
-  - `managedAccounts`
-  - account balance and positions
-- The Web process uses 1 fixed client ID (default `1`), set in `settings`.
-- Forward test orders go from the NautilusTrader IB execution client inside a
-  `LiveNode`. They do not go through `paper_trading`.
-- Do not use client ID 0.
-- Many client IDs can connect to one paper account Gateway at the same time.
-  `reqAllOpenOrders` reads the open orders of other client IDs.
-- One IBKR user name can have only one session. Set
-  `EXISTING_SESSION_DETECTED_ACTION: primary` on the Gateway. A login on the
-  IBKR website or phone app then competes with the Gateway session.
-- The first login of the paper account did not ask for IB Key. Do not set
-  `TWOFA_TIMEOUT_ACTION` or `RELOGIN_AFTER_TWOFA_TIMEOUT`.
-- IBC in the Gateway image does the automatic login and the daily restart.
-- Other containers connect to the paper API at `ib-gateway:4004` (socat in the
-  gnzsnz image). The Gateway API port is not published outside the Compose
-  network.
-- Do not call `ib_async.util.patchAsyncio()` or `startLoop()`. `nest_asyncio`
-  must not patch the uvicorn event loop.
+Section 7 is in [`docs/architecture/ibkr.md`](architecture/ibkr.md). It holds
+the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
+`ib-gateway` Compose service, and the contract tests.
 
 ## 8. Market data and watchlist
 
@@ -656,7 +627,8 @@ One Docker Compose project on the user's own server runs all services:
   (section 19). Its port is not published.
 - Services added later (`ib-gateway`, `forward-test`, `cloudflared`) must not
   block the local start when their credentials are missing. They fail with a
-  clear message, or they are in a Compose profile.
+  clear message, or they are in a Compose profile. `ib-gateway` is in the
+  profile `ibkr` (section 7.4).
 
 ## 15. Secrets and configuration
 
@@ -680,13 +652,18 @@ Settings that `foundation/settings` reads:
 
 | Setting | Meaning |
 |---|---|
-| `trading_mode` | `paper` or `live`. `live` stops the start in this stage. |
-| `ibkr_account_id` | Expected IBKR account number. |
-| IBKR host and paper port | Where the Web process and forward tests connect. |
-| Web client ID | Default `1`. |
-| Forward test client ID range | Default `10–13`. |
-| Local paper capital in USD | Used when IBKR is not connected. |
-| `DATABASE_URL` | PostgreSQL connection. |
+| `trading_mode` (`ATRADE_TRADING_MODE`) | `paper` or `live`. `live` stops the start in this stage. |
+| `ibkr_account_id` (`ATRADE_IBKR_ACCOUNT_ID`) | Expected IBKR account number. Empty means not configured. |
+| `ibkr_host`, `ibkr_paper_port` (`ATRADE_IBKR_HOST`, `ATRADE_IBKR_PAPER_PORT`) | Where the Web process and forward tests connect. Default `ib-gateway:4004`. |
+| `ibkr_web_client_id` (`ATRADE_IBKR_WEB_CLIENT_ID`) | Default `1`. |
+| `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
+| `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
+| `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
+
+Settings refuse client ID 0, client IDs that are multiples of 1000, a range
+that ends before it starts, and a Web client ID inside the forward test range.
+`ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` are not settings: only the
+`ib-gateway` service reads them (section 7.4).
 
 Environment variable names: `DATABASE_URL` has no prefix, because the backtest
 child process gets it by this name (section 10). All other settings use the
@@ -922,7 +899,9 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
   - `AGENTS.md`: rules for agents.
   - `GLOSSARY.md`: terms.
 - This document (`docs/architecture.md`) is the architecture specification.
-  When it is longer than 1000 lines, split it by capability.
+  When it is longer than 1000 lines, split it by capability. A moved section
+  goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
+  is in `docs/architecture/ibkr.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
 - There is no document index and no `active` or `obsolete` status.
@@ -977,6 +956,7 @@ ran them. The implementation must check them.
 | Fact | Result |
 |---|---|
 | `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Yes. On 2026-10-27, `uv lock` (uv 0.13.5) resolved `ib-async==2.1.0`, `nautilus-trader==2.0.0rc7`, and `tzdata==2025.3` for Python 3.14 (#62). |
+| `ghcr.io/gnzsnz/ib-gateway:stable` digest. | On 2026-10-27, the `stable` index was `sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581` (IB Gateway 10.50.1f) (#63). |
 | `ib_async` 2.1.0 and NautilusTrader 2.0.0rc7 import on Python 3.14. | Yes. Both packages import on CPython 3.14.9 (#62). A real IB Gateway connection is not checked. |
 
 ## 22. Points left to the implementation

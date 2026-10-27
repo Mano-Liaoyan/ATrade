@@ -10,9 +10,16 @@ is in GitHub Issues.
 
 ## Current state
 
-The repository holds the minimum runnable skeleton (issue #62):
+The repository holds the minimum runnable skeleton (issue #62) and the IBKR
+connection (issue #63):
 
-- The `web` service serves an empty app shell and `GET /api/health`.
+- The `web` service serves the app shell, `GET /api/health`, and
+  `GET /api/ibkr/gateway`.
+- The app shell header shows the backend status and the IB Gateway status.
+- The `web` service connects to IB Gateway and connects again after a lost
+  connection. It starts also when the Gateway is not reachable.
+- The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
+  in the Compose profile `ibkr`.
 - The `postgres` service holds the database. It has no tables yet.
 - No capability (market data, watchlist, strategies, backtests, paper trading,
   forward tests) is available yet.
@@ -39,6 +46,21 @@ For development and checks, also:
 
 4. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
 
+### Connect to the IBKR paper account
+
+Without IB Gateway, ATrade starts, and the header shows "IB Gateway not
+reachable". To connect:
+
+1. In `.env`, set `COMPOSE_PROFILES=ibkr`.
+2. Set `ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` to the login of the
+   IBKR paper account. Set `ATRADE_IBKR_ACCOUNT_ID` to the paper account
+   number (it starts with `DU`).
+3. Run `./start run`. The header shows "IB Gateway connected." after the
+   Gateway has logged in.
+
+A login on the IBKR website or phone app with the same user name competes
+with the Gateway session.
+
 `./start run` runs `docker compose up --build` with `deploy/compose.yaml` and
 `.env`. It sends other arguments to `docker compose up`. For example,
 `./start run -d` starts the services in the background. When `.env` is not
@@ -51,11 +73,14 @@ To stop the services:
 docker compose --file deploy/compose.yaml --env-file .env down
 ```
 
+With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
+
 ### Services
 
 | Service | Content |
 |---|---|
 | `postgres` | PostgreSQL 18. Volume `atrade-pgdata`. Not published outside the Compose network. |
+| `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
 | `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
@@ -95,7 +120,13 @@ One command runs the same checks as CI:
   `ATRADE_PLAYWRIGHT_PROJECTS="chromium firefox"`. The value `none` skips the
   end-to-end tests. Install browsers with
   `pnpm --dir frontend exec playwright install`.
-- Real IBKR tests have the pytest mark `ibkr_paper`. CI does not run them.
+- Real IBKR tests have the pytest mark `ibkr_paper`. CI does not run them,
+  and the default pytest options leave them out. Run them by hand with
+  `cd backend && uv run pytest -m ibkr_paper`. They read `.env`, and they skip
+  when `.env`, `ATRADE_IBKR_ACCOUNT_ID`, or IB Gateway is not available. The
+  Gateway port is not published, so set `ATRADE_IBKR_HOST` and
+  `ATRADE_IBKR_PAPER_PORT` to an address that you can reach, for example an
+  SSH tunnel. See `docs/architecture/ibkr.md` section 7.5.
 
 ## Development without Docker
 

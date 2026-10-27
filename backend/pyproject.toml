@@ -29,7 +29,7 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+addopts = "--strict-markers -m \"not ibkr_paper\""
 pythonpath = ["."]
 markers = [
     "ibkr_paper: runs against the real IBKR paper account. Run by hand. Skips without .env or IB Gateway.",

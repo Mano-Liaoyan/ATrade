@@ -8,6 +8,7 @@ import pytest
 from atrade.app import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
+from tests.fakes.ibkr import FakeGatewayConnection
 
 
 @pytest.mark.anyio
@@ -30,7 +31,8 @@ async def test_health_reports_unreachable_database(clock: FixedClock, frontend_b
         database_url="postgresql://atrade:wrong@127.0.0.1:1/atrade?connect_timeout=1",
         frontend_build_dir=frontend_build_dir,
     )
-    app = create_web_app(settings=settings, clock=clock)
+    gateway_connection = FakeGatewayConnection(managed_accounts=["DU1234567"])
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get("/api/health")
 

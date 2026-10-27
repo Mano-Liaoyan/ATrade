@@ -20,6 +20,23 @@ services:
     pids_limit: 2048
     restart: unless-stopped
 
+  # IB Gateway with IBC, logged in to the IBKR paper account (docs/architecture.md section 7).
+  # It is in the profile "ibkr", so ./start run works without IBKR credentials.
+  # Set COMPOSE_PROFILES=ibkr in .env to start it.
+  ib-gateway:
+    # ghcr.io/gnzsnz/ib-gateway:stable (IB Gateway 10.50.1f), pinned by digest.
+    image: ghcr.io/gnzsnz/ib-gateway:stable@sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581
+    profiles: ["ibkr"]
+    environment:
+      TWS_USERID: ${ATRADE_IBKR_USERNAME:-}
+      TWS_PASSWORD: ${ATRADE_IBKR_PASSWORD:-}
+      TRADING_MODE: paper
+      # One IBKR user name has one session. The Gateway takes the session from other logins.
+      EXISTING_SESSION_DETECTED_ACTION: primary
+    # No "ports": the API (ib-gateway:4004 for paper, through socat) stays inside the Compose network.
+    pids_limit: 2048
+    restart: unless-stopped
+
   web:
     build:
       context: ..
@@ -28,6 +45,13 @@ services:
     environment:
       DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
       ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
+      ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
+      ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
+      ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
+      ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
+      ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
+      ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+      ATRADE_LOCAL_PAPER_CAPITAL_USD: ${ATRADE_LOCAL_PAPER_CAPITAL_USD:-100000}
     depends_on:
       postgres:
         condition: service_healthy
