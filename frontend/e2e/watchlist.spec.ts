@@ -33,7 +33,7 @@ async function addThroughBackend(request: APIRequestContext, symbol: string): Pr
 }
 
 async function searchFor(page: Page, query: string): Promise<void> {
-  await page.getByLabel('Symbol').fill(query);
+  await page.getByLabel('Symbol', { exact: true }).fill(query);
   await page.getByRole('button', { name: 'Search' }).click();
 }
 

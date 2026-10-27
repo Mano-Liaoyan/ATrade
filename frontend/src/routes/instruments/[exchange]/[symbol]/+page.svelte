@@ -1,16 +1,22 @@
-<!-- Instrument page: the bar chart of one instrument and one bar period. A watchlist instrument opens here.
+<!-- Instrument page: the bar chart of one instrument and one bar period, with live bars from /ws/market-data.
+     A watchlist instrument opens here.
      URL: /instruments/<exchange>/<symbol>?currency=<currency>&bar_period=<bar period>. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     BAR_PERIODS,
     BarChart,
+    describeLiveBar,
     formatChartSearch,
     formatInstrument,
+    formatLiveBarsPath,
     readBars,
     readChartRequest,
+    readLiveBarMessage,
+    type Bar,
     type BarPeriod,
     type BarsResult,
   } from '#lib/market_data';
@@ -36,6 +42,44 @@
     return () => {
       isCurrent = false;
     };
+  });
+
+  let liveBar: Bar | null = $state(null);
+  let liveBarError: string | null = $state(null);
+  let isLiveSocketConnected = $state(false);
+
+  $effect(() => {
+    if (chartRequest === null) {
+      return;
+    }
+    liveBar = null;
+    liveBarError = null;
+    // The live socket connects again after a close, a missing heartbeat, or when a background tab comes back.
+    return openLiveSocket({
+      url: buildSocketUrl(formatLiveBarsPath(chartRequest), window.location),
+      onMessage: (message) => {
+        const liveBarMessage = readLiveBarMessage(message);
+        if (liveBarMessage?.type === 'bar') {
+          liveBar = liveBarMessage.bar;
+          liveBarError = null;
+        } else if (liveBarMessage?.type === 'error') {
+          liveBarError = liveBarMessage.detail;
+        }
+      },
+      onConnectionChange: (isConnected) => {
+        isLiveSocketConnected = isConnected;
+      },
+    });
+  });
+
+  const liveBarText = $derived.by(() => {
+    if (liveBarError !== null) {
+      return `No live bars. ${liveBarError}`;
+    }
+    if (liveBar !== null) {
+      return describeLiveBar(liveBar);
+    }
+    return isLiveSocketConnected ? 'Waiting for live bars.' : 'Connecting to live bars.';
   });
 
   function changeBarPeriod(event: Event & { currentTarget: HTMLSelectElement }): void {
@@ -79,9 +123,13 @@
     {:else if barsResult?.kind === 'loaded'}
       <span class="chart-message" role="status" aria-label="Bar count">{describeBarCount(barsResult.bars.length)}</span>
     {/if}
+    <span class="chart-message" class:chart-failed={liveBarError !== null} role="status" aria-label="Live bar"
+      >{liveBarText}</span
+    >
   </form>
   <BarChart
     bars={barsResult?.kind === 'loaded' ? barsResult.bars : []}
+    {liveBar}
     label="Bar chart of {instrumentName}, {chartRequest.barPeriod} bars"
   />
 {/if}

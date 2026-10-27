@@ -1,4 +1,5 @@
 <!-- Bar chart: draws each bar as a candlestick with lightweight-charts. Bar times are UNIX timestamps (UTC).
+     A live bar replaces the last candlestick or adds one after it (series.update), without a new fit of the view.
 
      Attribution notice of lightweight-charts (Apache License 2.0):
      TradingView Lightweight Charts™
@@ -13,13 +14,19 @@
     type ISeriesApi,
     type UTCTimestamp,
   } from 'lightweight-charts';
+  import { untrack } from 'svelte';
   import type { Bar } from './bars';
+  import { canDrawLiveBar } from './live_bars';
 
-  const { bars, label }: { bars: Bar[]; label: string } = $props();
+  const { bars, liveBar = null, label }: { bars: Bar[]; liveBar?: Bar | null; label: string } = $props();
 
   let chartContainer: HTMLDivElement;
   let chart: IChartApi | undefined = $state();
   let candlestickSeries: ISeriesApi<'Candlestick'> | undefined = $state();
+
+  function toCandlestick(bar: Bar): CandlestickData<UTCTimestamp> {
+    return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
+  }
 
   function readColor(variableName: string): string {
     return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
@@ -52,15 +59,22 @@
     if (chart === undefined || candlestickSeries === undefined) {
       return;
     }
-    const candlesticks: CandlestickData<UTCTimestamp>[] = bars.map((bar) => ({
-      time: bar.time as UTCTimestamp,
-      open: bar.open,
-      high: bar.high,
-      low: bar.low,
-      close: bar.close,
-    }));
-    candlestickSeries.setData(candlesticks);
+    candlestickSeries.setData(bars.map(toCandlestick));
     chart.timeScale().fitContent();
+    // The live bar that came before the bars is drawn again. A new live bar does not run this effect.
+    const currentLiveBar = untrack(() => liveBar);
+    if (currentLiveBar !== null && canDrawLiveBar(bars, currentLiveBar)) {
+      candlestickSeries.update(toCandlestick(currentLiveBar));
+    }
+  });
+
+  $effect(() => {
+    if (candlestickSeries === undefined || liveBar === null) {
+      return;
+    }
+    if (canDrawLiveBar(untrack(() => bars), liveBar)) {
+      candlestickSeries.update(toCandlestick(liveBar));
+    }
   });
 </script>
 

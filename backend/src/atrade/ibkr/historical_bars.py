@@ -31,6 +31,17 @@ MAX_REQUEST_DAYS = {
     BarPeriod.ONE_DAY: 364,
 }
 
+# The live bar subscription (keepUpToDate) also returns history. ATrade uses only the last bar, so the duration is short,
+# but long enough to reach the last trading day over a weekend.
+LIVE_BAR_DURATIONS = {
+    BarPeriod.ONE_MINUTE: "2 D",
+    BarPeriod.FIVE_MINUTES: "2 D",
+    BarPeriod.FIFTEEN_MINUTES: "2 D",
+    BarPeriod.THIRTY_MINUTES: "2 D",
+    BarPeriod.ONE_HOUR: "2 D",
+    BarPeriod.ONE_DAY: "1 W",
+}
+
 
 @dataclass(frozen=True)
 class HistoricalDataRequest:

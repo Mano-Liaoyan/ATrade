@@ -1,13 +1,13 @@
 """backtest: create the backtest, backtest_equity_point, and backtest_trade tables
 
 Revision ID: 9a4c2f6e1b70
-Revises: 5b2d8e7f4a61
+Revises: 5b8d2f6e1a47
 """
 
 from alembic import op
 
 revision = "9a4c2f6e1b70"
-down_revision = "5b2d8e7f4a61"
+down_revision = "5b8d2f6e1a47"
 
 
 def upgrade() -> None:

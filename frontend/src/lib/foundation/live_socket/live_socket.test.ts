@@ -26,6 +26,7 @@ class FakeSocket implements OpenSocket {
 
 function startSocket() {
   const sockets: FakeSocket[] = [];
+  const visibleListeners: (() => void)[] = [];
   const messages: unknown[] = [];
   const connectionStates: boolean[] = [];
   const stop = openLiveSocket({
@@ -37,10 +38,21 @@ function startSocket() {
       sockets.push(socket);
       return socket;
     },
+    watchPageVisible: (onVisible) => {
+      visibleListeners.push(onVisible);
+      return () => visibleListeners.splice(visibleListeners.indexOf(onVisible), 1);
+    },
     heartbeatTimeoutMilliseconds: 1000,
     reconnectDelayMilliseconds: 100,
   });
-  return { sockets, messages, connectionStates, stop };
+  // A background tab can stop the timers. The page becomes visible again with its timers not run.
+  function showPageAfter(milliseconds: number): void {
+    vi.setSystemTime(Date.now() + milliseconds);
+    for (const onVisible of [...visibleListeners]) {
+      onVisible();
+    }
+  }
+  return { sockets, messages, connectionStates, stop, showPageAfter, visibleListeners };
 }
 
 function latestSocket(sockets: FakeSocket[]): FakeSocket {
@@ -133,5 +145,45 @@ describe('buildSocketUrl', () => {
     expect(buildSocketUrl('/ws/paper-trading', { protocol: 'http:', host: '127.0.0.1:4173' })).toBe(
       'ws://127.0.0.1:4173/ws/paper-trading',
     );
+  });
+
+  it('connects again at once when a background tab becomes visible after the heartbeat timeout', () => {
+    const { sockets, showPageAfter } = startSocket();
+    const firstSocket = latestSocket(sockets);
+    firstSocket.open();
+
+    showPageAfter(5000);
+
+    expect(firstSocket.isClosed).toBe(true);
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('keeps a socket with recent messages when the page becomes visible', () => {
+    const { sockets, showPageAfter } = startSocket();
+    latestSocket(sockets).open();
+
+    showPageAfter(500);
+
+    expect(sockets).toHaveLength(1);
+    expect(latestSocket(sockets).isClosed).toBe(false);
+  });
+
+  it('stops the reconnection delay when the page becomes visible', () => {
+    const { sockets, showPageAfter } = startSocket();
+    latestSocket(sockets).close();
+    latestSocket(sockets).close();
+    expect(sockets).toHaveLength(1);
+
+    showPageAfter(0);
+
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('stops watching the page visibility after stop', () => {
+    const { stop, visibleListeners } = startSocket();
+
+    stop();
+
+    expect(visibleListeners).toHaveLength(0);
   });
 });

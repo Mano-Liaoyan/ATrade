@@ -35,3 +35,16 @@ test('a watchlist link without a bar period opens daily bars', async ({ page }) 
   await expect(page.getByLabel('Bar period')).toHaveValue('1-DAY');
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
 });
+
+test('the chart receives live bar updates over the WebSocket', async ({ page }) => {
+  await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('2160 bars');
+
+  // The fake updates the current bar (2026-01-02 03:00 UTC, open 123) a few times each second: the close moves up
+  // 0.25 for each update, from 123 to 124.75, and starts again.
+  const liveBar = page.getByRole('status', { name: 'Live bar' });
+  await expect(liveBar).toHaveText(/^Live bar 2026-01-02 03:00 UTC: close 12[34]\.\d+$/);
+  const firstText = (await liveBar.textContent()) ?? '';
+  await expect(liveBar).not.toHaveText(firstText);
+  await expect(liveBar).toHaveText(/^Live bar 2026-01-02 03:00 UTC: close 12[34]\.\d+$/);
+});

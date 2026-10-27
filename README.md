@@ -13,21 +13,28 @@ is in GitHub Issues.
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
 (issue #68), code completion (issue #69), the paper account check with the
-account panel (issue #74), and backtests (issue #70):
+account panel (issue #74), paper orders sent by hand (issue #75), and backtests
+(issue #70):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
-  language server WebSocket `/ws/strategy-language-server`, the backtest
-  routes under `/api/backtests`, `GET /api/paper-trading/paper-capital`, and
-  `/ws/paper-trading`.
+  language server WebSocket `/ws/strategy-language-server`, the paper order
+  routes under `/api/paper-trading`, the backtest routes under
+  `/api/backtests`, and `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home
   page shows the account panel: the check result, the balance, and the
   positions, updated live. When the check fails, the panel shows the actual
-  and the expected account number. ATrade sends no orders yet.
+  and the expected account number.
+- Paper orders by hand: after a passed check, the account panel sends market
+  and limit orders (DAY or GTC) to the IBKR paper account, after a
+  confirmation dialog with a `PAPER` mark. The open order list shows all open
+  orders of the account with their source ("by hand" or "forward test N").
+  Only orders by hand can be cancelled. ATrade never sends live orders. See
+  [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md).
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database.
@@ -54,6 +61,11 @@ account panel (issue #74), and backtests (issue #70):
   `GET /api/market-data/bars`. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.4.
+- Live bars: the chart gets the current bar from IBKR over the WebSocket
+  `/ws/market-data` and updates it without a page reload. The page connects
+  again after a lost connection and when a background tab becomes visible.
+  See [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.5.
 - Backtests: the page `/backtests` starts a backtest of a strategy version on
   the saved bars of one USD instrument, with paper capital from the paper
   account balance or the local setting. Each backtest runs in its own child
@@ -62,8 +74,8 @@ account panel (issue #74), and backtests (issue #70):
   bar chart of the instrument first: backtests read only bars that are in
   PostgreSQL. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
-- Live bar updates, paper orders, forward tests, the backtest limits UI, and
-  the backtest comparison are not available yet.
+- Forward tests, the backtest limits UI, and the backtest comparison are not
+  available yet.
 
 ## Requirements
 

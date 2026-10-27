@@ -1,4 +1,5 @@
-<!-- Account panel: the paper account check, the balance, and the positions, updated live from /ws/paper-trading. -->
+<!-- Account panel: the paper account check, the balance, the positions, the order form, and the open orders,
+     updated live from /ws/paper-trading. -->
 <script lang="ts">
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
@@ -9,9 +10,13 @@
     readPaperAccountMessage,
     type PaperAccountMessage,
   } from './paper_account';
+  import OpenOrderList from './OpenOrderList.svelte';
+  import { readOpenOrdersMessage, type OpenOrder } from './paper_orders';
+  import PaperOrderTicket from './PaperOrderTicket.svelte';
 
   let account = $state<PaperAccountMessage | null>(null);
   let isSocketConnected = $state(false);
+  let openOrders = $state<OpenOrder[]>([]);
 
   const checkDescription = $derived(account === null ? null : describePaperAccountCheck(account.check));
 
@@ -22,6 +27,10 @@
         const accountMessage = readPaperAccountMessage(message);
         if (accountMessage !== null) {
           account = accountMessage;
+        }
+        const ordersMessage = readOpenOrdersMessage(message);
+        if (ordersMessage !== null) {
+          openOrders = ordersMessage;
         }
       },
       onConnectionChange: (isConnected) => {
@@ -102,6 +111,14 @@
         </ScrollRegion>
       {/if}
     {/if}
+
+    {#if account.check.status === 'passed' && account.check.actual_accounts[0] !== undefined}
+      <h3>New paper order</h3>
+      <PaperOrderTicket accountId={account.check.actual_accounts[0]} />
+    {/if}
+
+    <h3>Open orders</h3>
+    <OpenOrderList orders={openOrders} />
   {/if}
 </section>
 

@@ -68,7 +68,11 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
             gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
         )
     )
-    app.include_router(create_paper_trading_router(paper_account_monitor=paper_account_monitor))
+    app.include_router(
+        create_paper_trading_router(
+            paper_account_monitor=paper_account_monitor, database_url=settings.database_url, clock=clock
+        )
+    )
     app.include_router(
         create_market_data_router(
             gateway_connection=gateway_connection,
