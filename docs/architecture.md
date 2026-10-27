@@ -476,6 +476,26 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   has the bar count, the live bar, and the chart. The bars and the live bar
   of the page belong to one chart request, so the chart gets no data of the
   previous bar period after a change.
+- The code editor and the code diff (`foundation/code_editor`) use Carbon
+  tokens: `--cds-layer-01` (background), `--cds-text-primary`,
+  `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,
+  `--cds-layer-hover-01` (active line), `--cds-highlight` (selection), and
+  `--cds-support-error` and `--cds-support-success` (removed and added
+  lines). The font is IBM Plex Mono. The syntax colors in `code_colors.ts`
+  are Carbon palette colors (70 grade in g10, 40 grade in g100). A unit test
+  checks that each has 4.5:1 contrast on `--cds-layer-01`. A live type error
+  has a wavy `--cds-support-error` underline, and its tooltip looks like a
+  low-contrast Carbon error notification. A type error does not block the
+  save.
+- The strategy pages use the components of `foundation/carbon`: the list
+  page has a `TextInput` and a `Button` for the new strategy, and the editor
+  has a `Select` for the version, the Save version button, an "Unsaved
+  changes" tag, and a danger `Dialog` that confirms Delete strategy. The save
+  result and the refused checks show as an `InlineNotification`.
+  `InlineNotification` also takes child content, for example a list of
+  problems.
+- `Button` sizes `sm` and `md` also write `cds--layout--size-<size>`: Carbon
+  v11 reads the button height from that class.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".

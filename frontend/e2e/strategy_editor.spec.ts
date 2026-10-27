@@ -38,8 +38,7 @@ test('creates a strategy that starts from the template as version 1', async ({ p
 
   await createStrategy(page, name);
 
-  await expect(page.getByLabel('Version')).toHaveValue('1');
-  await expect(page.getByLabel('Version').locator('option:checked')).toHaveText(`${name} v1`);
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v1`);
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
   await page.goto('/strategies');
   await expect(page.getByRole('link', { name: `${name} v1` })).toBeVisible();
@@ -54,7 +53,7 @@ test('saves edited code as a new version', async ({ page }, currentTest) => {
   await page.getByRole('button', { name: 'Save version' }).click();
 
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveText(`Saved as ${name} v2.`);
-  await expect(page.getByLabel('Version').locator('option:checked')).toHaveText(`${name} v2`);
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v2`);
   await expect(page.getByText('Unsaved changes')).toBeHidden();
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
 });
@@ -67,7 +66,9 @@ test('shows the line and the reason when the checks refuse the code', async ({ p
   await page.getByRole('button', { name: 'Save version' }).click();
 
   await expect(page.getByRole('alert')).toContainText('Line 13: F821 Undefined name `undefined_limit`');
-  await expect(page.getByLabel('Version').locator('option')).toHaveCount(1);
+  await page.getByRole('combobox', { name: 'Version' }).click();
+  await expect(page.getByRole('option')).toHaveText([`${name} v1`]);
+  await page.keyboard.press('Escape');
   await expect(page.getByText('Unsaved changes')).toBeVisible();
 });
 
@@ -81,4 +82,37 @@ test('keeps unsaved edits in the browser after a reload', async ({ page }, curre
 
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
   await expect(page.getByText('Unsaved changes')).toBeVisible();
+});
+
+test('opens an older version from the version list', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Open');
+  await createStrategy(page, name);
+  await replaceCode(page, VALID_CODE);
+  await page.getByRole('button', { name: 'Save version' }).click();
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v2`);
+
+  await page.getByRole('combobox', { name: 'Version' }).click();
+  await page.getByRole('option', { name: `${name} v1` }).click();
+
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v1`);
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+});
+
+test('deletes a strategy only after the confirmation', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Delete');
+  await createStrategy(page, name);
+
+  await page.getByRole('button', { name: 'Delete strategy' }).click();
+  const dialog = page.getByRole('dialog', { name: `Delete ${name}` });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+
+  await page.getByRole('button', { name: 'Delete strategy' }).click();
+  await dialog.getByRole('button', { name: 'Delete strategy' }).click();
+
+  await expect(page).toHaveURL(/\/strategies$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Strategies');
+  await expect(page.getByRole('link', { name: `${name} v1` })).toHaveCount(0);
 });

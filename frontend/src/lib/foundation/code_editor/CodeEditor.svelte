@@ -61,8 +61,8 @@
   .code-editor {
     height: 100%;
     min-height: 0;
-    border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    border: 1px solid var(--cds-border-subtle-01);
+    background: var(--cds-layer-01);
   }
 
   .code-editor :global(.cm-editor) {
@@ -73,16 +73,19 @@
   .code-editor :global(.cm-scroller) {
     overflow: auto;
     scrollbar-width: thin;
-    scrollbar-color: var(--color-muted) transparent;
+    scrollbar-color: var(--cds-icon-secondary) var(--cds-layer-accent-01);
   }
 
   .code-editor :global(.cm-scroller::-webkit-scrollbar) {
-    width: 10px;
-    height: 10px;
+    width: var(--cds-spacing-03);
+    height: var(--cds-spacing-03);
+  }
+
+  .code-editor :global(.cm-scroller::-webkit-scrollbar-track) {
+    background: var(--cds-layer-accent-01);
   }
 
   .code-editor :global(.cm-scroller::-webkit-scrollbar-thumb) {
-    border-radius: 5px;
-    background: var(--color-muted);
+    background: var(--cds-icon-secondary);
   }
 </style>

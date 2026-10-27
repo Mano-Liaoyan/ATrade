@@ -10,6 +10,7 @@
   import ErrorFilled20 from '@carbon/icons/es/error--filled/20.js';
   import InformationFilled20 from '@carbon/icons/es/information--filled/20.js';
   import WarningFilled20 from '@carbon/icons/es/warning--filled/20.js';
+  import type { Snippet } from 'svelte';
   import type { CarbonIconNode } from './carbon_icon';
   import Icon from './Icon.svelte';
 
@@ -19,9 +20,11 @@
     subtitle?: string;
     lowContrast?: boolean;
     onClose?: () => void;
+    // More content below the subtitle, for example a list of problems.
+    children?: Snippet;
   }
 
-  const { kind, title, subtitle, lowContrast = false, onClose }: Props = $props();
+  const { kind, title, subtitle, lowContrast = false, onClose, children }: Props = $props();
 
   function findIcon(notificationKind: NotificationKind): CarbonIconNode {
     switch (notificationKind) {
@@ -52,6 +55,9 @@
       <div class="cds--inline-notification__title">{title}</div>
       {#if subtitle !== undefined}
         <div class="cds--inline-notification__subtitle">{subtitle}</div>
+      {/if}
+      {#if children !== undefined}
+        <div class="cds--inline-notification__subtitle">{@render children()}</div>
       {/if}
     </div>
   </div>
