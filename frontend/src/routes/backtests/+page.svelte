@@ -155,7 +155,7 @@
 
 <h1>Backtests</h1>
 
-<form class="backtest-form" aria-label="Start a backtest" onsubmit={submitBacktest}>
+<form id="start-backtest" class="backtest-form" aria-label="Start a backtest" onsubmit={submitBacktest}>
   <!-- The select is outside its label: the name of a select inside a label would also hold the selected option. -->
   <div class="field">
     <label for="backtest-strategy">Strategy</label>

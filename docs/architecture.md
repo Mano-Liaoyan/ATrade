@@ -396,6 +396,20 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   reads the account check from `/ws/paper-trading`. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
   navigation at all widths. Header buttons go in `cds--header__global`.
+- The command palette shell is `CommandPalette` of
+  `foundation/command_palette`: a header search icon button ("Open command
+  palette") and a Carbon modal with a large Carbon search field and Carbon
+  contained lists, on Bits UI Dialog and Command. Ctrl K or Cmd K opens and
+  closes it on each page, and Escape closes it. Bits UI Command has
+  `vimBindings` off, because they take Ctrl K. The text filters the commands,
+  Arrow Up and Arrow Down move the highlight, and Enter runs the command. When
+  no command matches, the palette shows "No results". `src/routes/` gives the
+  commands (`palette_commands.ts`): go to a page, go to the instrument page of
+  a watchlist instrument, open the start form of a backtest or a forward test
+  (the form ids `start-backtest` and `start-forward-test`), and change the
+  theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
+  opens a page or a form. No command sends a paper order or starts a backtest
+  or a forward test.
 - `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
   Combobox). The page gives the candidates as `items` (`value`, `label`,
   `disabled`). The list is a Bits UI `ContentStatic` in the
