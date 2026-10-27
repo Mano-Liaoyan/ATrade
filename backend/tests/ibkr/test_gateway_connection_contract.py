@@ -14,7 +14,8 @@ import anyio
 import pytest
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
+from atrade.foundation.instrument import Instrument
+from atrade.ibkr import GatewayConnection, GatewayRequestError, IbAsyncGatewayConnection
 from tests.fakes.ibkr import FakeGatewayConnection
 
 REPOSITORY_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
@@ -89,3 +90,33 @@ async def test_reports_not_connected_after_disconnect(connection_and_account: tu
 
     assert not connection.is_connected()
     assert connection.read_managed_accounts() == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("query", "expected_instrument"),
+    [
+        ("AAPL", Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")),
+        ("700", Instrument(symbol="700", exchange="SEHK", currency="HKD")),
+    ],
+)
+async def test_finds_stocks_by_symbol_with_exchange_and_currency(
+    connection_and_account: tuple[GatewayConnection, str], query: str, expected_instrument: Instrument
+) -> None:
+    connection, _account_id = connection_and_account
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        instruments = await connection.search_instruments(query)
+        assert expected_instrument in instruments
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+
+@pytest.mark.anyio
+async def test_refuses_a_search_without_a_connection(connection_and_account: tuple[GatewayConnection, str]) -> None:
+    connection, _account_id = connection_and_account
+
+    with pytest.raises(GatewayRequestError):
+        await connection.search_instruments("AAPL")

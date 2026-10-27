@@ -17,10 +17,11 @@ const PUBLIC_ENTRY_ONLY = {
   message: 'Import the public entry: #lib/<capability> or #lib/foundation/<module>.',
 };
 
-// F3: a capability or foundation module imports only #lib/foundation/<module>. Only src/routes/ composes capabilities.
+// F3: a capability or foundation module imports only #lib/foundation/<module> and the generated API types (#lib/api).
+// Only src/routes/ composes capabilities.
 const LIB_FOLDERS = ['foundation', 'market_data', 'watchlist', 'strategy', 'backtest', 'paper_trading', 'forward_test'];
 const FOUNDATION_ONLY = {
-  regex: '^#lib/(?!foundation/)',
+  regex: '^#lib/(?!foundation/|api$)',
   message: 'A capability must not import another capability. Compose capabilities in src/routes/.',
 };
 const NO_RELATIVE_CROSS_FOLDER = {

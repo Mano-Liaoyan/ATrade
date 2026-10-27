@@ -21,8 +21,12 @@ connection (issue #63):
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database. It has no tables yet.
-- No capability (market data, watchlist, strategies, backtests, paper trading,
-  forward tests) is available yet.
+- The home page has the instrument search (issue #64). It finds instruments by
+  symbol through IB Gateway and shows each match as symbol / exchange /
+  currency, for example `700 / SEHK / HKD`. The search needs a connected
+  IB Gateway.
+- The other capabilities (bars, watchlist, strategies, backtests, paper
+  trading, forward tests) are not available yet.
 
 ## Requirements
 
@@ -108,7 +112,7 @@ One command runs the same checks as CI:
 ```sh
 ./scripts/check            # all checks
 ./scripts/check backend    # ruff, basedpyright, import-linter, file length, pytest
-./scripts/check frontend   # ESLint, svelte-check, Vitest, build
+./scripts/check frontend   # API types, ESLint, svelte-check, Vitest, build
 ./scripts/check e2e        # Playwright
 ```
 
@@ -127,6 +131,21 @@ One command runs the same checks as CI:
   Gateway port is not published, so set `ATRADE_IBKR_HOST` and
   `ATRADE_IBKR_PAPER_PORT` to an address that you can reach, for example an
   SSH tunnel. See `docs/architecture/ibkr.md` section 7.5.
+
+## Generate the API types
+
+The frontend API types come from the OpenAPI document of the backend. After a
+change to an HTTP route or to its request or response model, run:
+
+```sh
+cd frontend && pnpm generate:api
+```
+
+This writes `frontend/src/lib/api/openapi.json` and
+`frontend/src/lib/api/index.ts`. Commit both files. A backend test fails when
+`openapi.json` does not match the routes. `pnpm check:api` (in
+`./scripts/check frontend`) fails when `index.ts` does not match
+`openapi.json`.
 
 ## Development without Docker
 

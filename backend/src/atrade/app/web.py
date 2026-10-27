@@ -19,6 +19,7 @@ from atrade.app.health_routes import create_health_router
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
+from atrade.market_data import create_market_data_router
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -42,6 +43,11 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))
     app.include_router(
         create_ibkr_router(
+            gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
+        )
+    )
+    app.include_router(
+        create_market_data_router(
             gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
         )
     )

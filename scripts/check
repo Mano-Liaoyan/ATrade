@@ -76,6 +76,8 @@ check_frontend() {
   cd "$repo_root/frontend"
   log_step "Frontend: pnpm install"
   pnpm install --frozen-lockfile
+  log_step "Frontend: generated API types match src/lib/api/openapi.json"
+  pnpm check:api
   log_step "Frontend: ESLint"
   pnpm lint
   log_step "Frontend: svelte-check"
