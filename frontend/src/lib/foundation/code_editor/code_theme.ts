@@ -1,13 +1,13 @@
 // One CodeMirror theme for the strategy editor and the code diff. It follows the app color tokens
-// (src/routes/+layout.svelte) and the operating system color scheme, in all browsers. Without it, CodeMirror uses its
-// light default theme: a light gutter and low-contrast syntax colors on the dark page.
+// (src/routes/+layout.svelte) and the color scheme of the page (foundation/color_scheme: the header theme button and the
+// operating system), in all browsers. Without it, CodeMirror uses its light default theme: a light gutter and
+// low-contrast syntax colors on the dark page.
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { Compartment, type Extension } from '@codemirror/state';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { isDarkColorScheme, watchColorScheme } from '#lib/foundation/color_scheme';
 import { CODE_COLORS, type CodeColorScheme } from './code_colors';
-
-const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)';
 
 function createHighlightStyle(colors: CodeColorScheme): HighlightStyle {
   const text = colors.text;
@@ -94,17 +94,15 @@ const editorChrome = EditorView.theme({
 /** The shared code theme. It reads the color scheme when the editor starts and follows later changes. */
 export function createCodeTheme(): Extension {
   const schemeCompartment = new Compartment();
-  const schemeQuery = typeof window.matchMedia === 'function' ? window.matchMedia(DARK_SCHEME_QUERY) : null;
   const followScheme = ViewPlugin.define((view) => {
-    function applyScheme(event: MediaQueryListEvent): void {
-      view.dispatch({ effects: schemeCompartment.reconfigure(selectSchemeExtensions(event.matches)) });
-    }
-    schemeQuery?.addEventListener('change', applyScheme);
+    const endColorSchemeWatch = watchColorScheme(() => {
+      view.dispatch({ effects: schemeCompartment.reconfigure(selectSchemeExtensions(isDarkColorScheme())) });
+    });
     return {
       destroy(): void {
-        schemeQuery?.removeEventListener('change', applyScheme);
+        endColorSchemeWatch();
       },
     };
   });
-  return [editorChrome, schemeCompartment.of(selectSchemeExtensions(schemeQuery?.matches ?? false)), followScheme];
+  return [editorChrome, schemeCompartment.of(selectSchemeExtensions(isDarkColorScheme())), followScheme];
 }

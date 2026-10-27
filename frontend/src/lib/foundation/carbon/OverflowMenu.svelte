@@ -13,7 +13,7 @@
 <script lang="ts">
   import OverflowMenuVertical16 from '@carbon/icons/es/overflow-menu--vertical/16.js';
   import { DropdownMenu } from 'bits-ui';
-  import CarbonIcon from './CarbonIcon.svelte';
+  import Icon from './Icon.svelte';
 
   interface Props {
     // The accessible name of the trigger button, for example "Actions for order 418".
@@ -32,7 +32,7 @@
   <DropdownMenu.Trigger>
     {#snippet child({ props })}
       <button {...props} type="button" class={['cds--overflow-menu', `cds--layout--size-${size}`, open && 'cds--overflow-menu--open']} aria-label={label}>
-        <CarbonIcon icon={OverflowMenuVertical16} class="cds--overflow-menu__icon" />
+        <Icon icon={OverflowMenuVertical16} class="cds--overflow-menu__icon" />
       </button>
     {/snippet}
   </DropdownMenu.Trigger>

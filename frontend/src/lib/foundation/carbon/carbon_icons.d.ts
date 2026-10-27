@@ -1,11 +1,6 @@
-// @carbon/icons has no TypeScript declarations. Each module under es/<icon name>/<size>.js exports one icon
-// descriptor: the svg element, its attributes, and its child elements.
+// @carbon/icons has no TypeScript declarations. An icon module (`@carbon/icons/es/<name>/<size>.js`) exports one
+// icon descriptor. Render it with the Icon component.
 declare module '@carbon/icons/es/*' {
-  export interface CarbonIconNode {
-    elem: string;
-    attrs: Record<string, string | number>;
-    content?: CarbonIconNode[];
-  }
-  const icon: CarbonIconNode & { name: string; size: number };
+  const icon: import('./carbon_icon').CarbonIcon;
   export default icon;
 }
