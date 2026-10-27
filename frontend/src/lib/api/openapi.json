@@ -761,6 +761,60 @@
         }
       }
     },
+    "/api/backtest-limits": {
+      "get": {
+        "summary": "Read Limits",
+        "operationId": "read_limits_api_backtest_limits_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestLimitsBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change Limits",
+        "operationId": "change_limits_api_backtest_limits_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestLimitsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestLimitsBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/watchlist": {
       "get": {
         "summary": "List Instruments",
@@ -1073,6 +1127,29 @@
           "trades"
         ],
         "title": "BacktestDetailResponse"
+      },
+      "BacktestLimitsBody": {
+        "properties": {
+          "timeout_seconds": {
+            "type": "integer",
+            "maximum": 604800.0,
+            "minimum": 1.0,
+            "title": "Timeout Seconds"
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Concurrency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timeout_seconds",
+          "concurrency"
+        ],
+        "title": "BacktestLimitsBody",
+        "description": "The request and the response of the backtest limits routes."
       },
       "BacktestMetricsResponse": {
         "properties": {

@@ -13,15 +13,15 @@ is in GitHub Issues.
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
 (issue #68), code completion (issue #69), the paper account check with the
-account panel (issue #74), paper orders sent by hand (issue #75), and backtests
-(issue #70):
+account panel (issue #74), paper orders sent by hand (issue #75), backtests
+(issue #70), and the backtest isolation controls (issue #71):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
   language server WebSocket `/ws/strategy-language-server`, the paper order
   routes under `/api/paper-trading`, the backtest routes under
-  `/api/backtests`, and `/ws/paper-trading`.
+  `/api/backtests` and `/api/backtest-limits`, and `/ws/paper-trading`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
@@ -69,13 +69,17 @@ account panel (issue #74), paper orders sent by hand (issue #75), and backtests
 - Backtests: the page `/backtests` starts a backtest of a strategy version on
   the saved bars of one USD instrument, with paper capital from the paper
   account balance or the local setting. Each backtest runs in its own child
-  process of `web`, one at a time. The backtest page shows the status, the
+  process of `web`. The child has only the environment variables `PATH`,
+  `HOME`, `TZ`, and `DATABASE_URL`, runs with `nice 10`, and has
+  `oom_score_adj` 1000. The "Limits" form on `/backtests` sets the timeout
+  (default 120 minutes) and the number of backtests at the same time
+  (default 1). Other backtests wait in the queue. A backtest that runs longer
+  than the timeout stops with the status "Timed out". The backtest page shows the status, the
   strategy error, the metrics, the equity curve, and the trades. Open the
   bar chart of the instrument first: backtests read only bars that are in
   PostgreSQL. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
-- Forward tests, the backtest limits UI, and the backtest comparison are not
-  available yet.
+- Forward tests and the backtest comparison are not available yet.
 
 ## Requirements
 

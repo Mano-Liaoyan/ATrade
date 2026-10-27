@@ -252,6 +252,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backtest-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Limits */
+        get: operations["read_limits_api_backtest_limits_get"];
+        /** Change Limits */
+        put: operations["change_limits_api_backtest_limits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -351,6 +369,16 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+        };
+        /**
+         * BacktestLimitsBody
+         * @description The request and the response of the backtest limits routes.
+         */
+        BacktestLimitsBody: {
+            /** Timeout Seconds */
+            timeout_seconds: number;
+            /** Concurrency */
+            concurrency: number;
         };
         /** BacktestMetricsResponse */
         BacktestMetricsResponse: {
@@ -1421,6 +1449,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_limits_api_backtest_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+        };
+    };
+    change_limits_api_backtest_limits_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BacktestLimitsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestLimitsBody"];
                 };
             };
             /** @description Validation Error */

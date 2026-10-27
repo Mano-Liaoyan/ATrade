@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
+    BacktestLimitsForm,
     convertDateToUtcStart,
     describeBacktestStatus,
     formatPercent,
@@ -152,6 +153,9 @@
 {#if errorMessage !== ''}
   <p class="error" role="alert">{errorMessage}</p>
 {/if}
+
+<h2>Limits</h2>
+<BacktestLimitsForm />
 
 <h2>All backtests</h2>
 {#if backtests.length === 0}

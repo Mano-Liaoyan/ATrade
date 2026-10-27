@@ -9,11 +9,13 @@ export type BacktestStatus = components['schemas']['BacktestStatus'];
 export type BacktestMetrics = components['schemas']['BacktestMetricsResponse'];
 export type EquityPoint = components['schemas']['EquityPointResponse'];
 export type BacktestTrade = components['schemas']['TradeResponse'];
+export type BacktestLimits = components['schemas']['BacktestLimitsBody'];
 type ValidationError = components['schemas']['ValidationError'];
 
 export type RequestResult<T> = { kind: 'ok'; value: T } | { kind: 'failed'; message: string };
 
 const BACKTESTS_PATH = '/api/backtests';
+const BACKTEST_LIMITS_PATH = '/api/backtest-limits';
 const BACKEND_NOT_REACHABLE = 'The backend is not reachable.';
 
 async function sendRequest(fetchFunction: typeof fetch, path: string, init?: RequestInit): Promise<Response | null> {
@@ -71,4 +73,19 @@ export function listBacktests(fetchFunction: typeof fetch): Promise<RequestResul
 
 export function readBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<RequestResult<BacktestDetail>> {
   return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(backtestId)}`);
+}
+
+export function readBacktestLimits(fetchFunction: typeof fetch): Promise<RequestResult<BacktestLimits>> {
+  return requestJson(fetchFunction, BACKTEST_LIMITS_PATH);
+}
+
+export function changeBacktestLimits(
+  fetchFunction: typeof fetch,
+  limits: BacktestLimits,
+): Promise<RequestResult<BacktestLimits>> {
+  return requestJson(fetchFunction, BACKTEST_LIMITS_PATH, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(limits),
+  });
 }

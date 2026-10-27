@@ -1,6 +1,8 @@
 """The backtest queue of the Web process: starts one child process per backtest and stops it after the timeout.
 
-The queue is the "queued" rows of the backtest table, so queued backtests stay queued after a restart.
+The queue is the "queued" rows of the backtest table, so queued backtests stay queued after a restart. The runner
+reads the timeout and the concurrency from the backtest_limits table at each queue check, so a change in the UI
+applies to the next backtest that starts.
 """
 
 import asyncio
@@ -10,6 +12,7 @@ from contextlib import suppress
 import psycopg
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_limits import read_backtest_limits
 from atrade.foundation.clock import Clock
 
 QUEUE_CHECK_INTERVAL_SECONDS = 0.5
@@ -42,14 +45,10 @@ class BacktestRunner:
         database_url: str,
         clock: Clock,
         process_command: list[str],
-        timeout_seconds: float,
-        concurrency: int,
     ) -> None:
         self.database_url = database_url
         self.clock = clock
         self.process_command = process_command
-        self.timeout_seconds = timeout_seconds
-        self.concurrency = concurrency
         self.running_count = 0
 
     async def keep_running(self) -> None:
@@ -66,22 +65,23 @@ class BacktestRunner:
 
     async def start_queued_backtests(self, task_group: asyncio.TaskGroup) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            while self.running_count < self.concurrency:
+            limits = await read_backtest_limits(connection)
+            while self.running_count < limits.concurrency:
                 backtest_id = await backtest_store.start_next_queued_backtest(
                     connection, started_at_utc=self.clock.read_now_utc()
                 )
                 if backtest_id is None:
                     return
                 self.running_count += 1
-                task_group.create_task(self.run_child(backtest_id))
+                task_group.create_task(self.run_child(backtest_id, timeout_seconds=limits.timeout_seconds))
 
-    async def run_child(self, backtest_id: int) -> None:
+    async def run_child(self, backtest_id: int, *, timeout_seconds: int) -> None:
         try:
-            await self.run_child_until_end(backtest_id)
+            await self.run_child_until_end(backtest_id, timeout_seconds=timeout_seconds)
         finally:
             self.running_count -= 1
 
-    async def run_child_until_end(self, backtest_id: int) -> None:
+    async def run_child_until_end(self, backtest_id: int, *, timeout_seconds: int) -> None:
         process = await asyncio.create_subprocess_exec(
             *self.process_command,
             str(backtest_id),
@@ -89,7 +89,7 @@ class BacktestRunner:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            _, error_output = await asyncio.wait_for(process.communicate(), timeout=self.timeout_seconds)
+            _, error_output = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
         except TimeoutError:
             # readability-exception: asyncio reports the timeout only as an exception (G1).
             await self.stop_child(process)

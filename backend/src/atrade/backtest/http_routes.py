@@ -1,4 +1,5 @@
-"""HTTP routes of the backtest capability: start a backtest, list backtests, and read one backtest with its results.
+"""HTTP routes of the backtest capability: start a backtest, list backtests, read one backtest with its results,
+and read or change the backtest limits (timeout and concurrency).
 
 A new backtest waits in the queue. The backtest runner of the Web process starts it (backtest_runner.py).
 """
@@ -12,6 +13,13 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_limits import (
+    MAX_CONCURRENCY,
+    MAX_TIMEOUT_SECONDS,
+    BacktestLimits,
+    read_backtest_limits,
+    save_backtest_limits,
+)
 from atrade.backtest.backtest_metrics import BacktestMetrics
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
 from atrade.foundation.bar import BarPeriod, TimeRange
@@ -36,6 +44,13 @@ class StartBacktestRequest(BaseModel):
     end_utc: AwareDatetime
     # Required, with no default: a backtest never starts with an unknown amount (docs/architecture.md section 10).
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
+
+
+class BacktestLimitsBody(BaseModel):
+    """The request and the response of the backtest limits routes."""
+
+    timeout_seconds: Annotated[int, Field(ge=1, le=MAX_TIMEOUT_SECONDS)]
+    concurrency: Annotated[int, Field(ge=1, le=MAX_CONCURRENCY)]
 
 
 class BacktestMetricsResponse(BaseModel):
@@ -186,11 +201,24 @@ class BacktestRoutes:
             ],
         )
 
+    async def read_limits(self) -> BacktestLimitsBody:
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            limits = await read_backtest_limits(connection)
+        return BacktestLimitsBody(timeout_seconds=limits.timeout_seconds, concurrency=limits.concurrency)
+
+    async def change_limits(self, request: BacktestLimitsBody) -> BacktestLimitsBody:
+        limits = BacktestLimits(timeout_seconds=request.timeout_seconds, concurrency=request.concurrency)
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            await save_backtest_limits(connection, limits)
+        return request
+
 
 def create_backtest_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = BacktestRoutes(database_url=database_url, clock=clock)
-    router = APIRouter(prefix="/api/backtests")
-    router.add_api_route("", routes.start_backtest, methods=["POST"], status_code=status.HTTP_201_CREATED)
-    router.add_api_route("", routes.list_backtests, methods=["GET"])
-    router.add_api_route("/{backtest_id}", routes.read_backtest, methods=["GET"])
+    router = APIRouter(prefix="/api")
+    router.add_api_route("/backtests", routes.start_backtest, methods=["POST"], status_code=status.HTTP_201_CREATED)
+    router.add_api_route("/backtests", routes.list_backtests, methods=["GET"])
+    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"])
+    router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
+    router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
     return router

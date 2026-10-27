@@ -7,7 +7,8 @@ the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 
 Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/ATrade/issues/48),
 [Module division](https://github.com/Mano-Liaoyan/ATrade/issues/38),
-[Run a backtest and see the result](https://github.com/Mano-Liaoyan/ATrade/issues/70).
+[Run a backtest and see the result](https://github.com/Mano-Liaoyan/ATrade/issues/70),
+[Backtest isolation controls](https://github.com/Mano-Liaoyan/ATrade/issues/71).
 
 ## 10.1 Decisions
 
@@ -36,10 +37,23 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 | Network | No network isolation. The child must connect to PostgreSQL. |
 | File system | The container root file system is read-only. Only `/tmp` is writable. |
 
-Status of #70: the timeout, the concurrency, and the environment allow list
-are in place. The timeout (120 minutes) and the concurrency (1) are
-constants in `app/web.py`. Issue #71 stores them in PostgreSQL, adds the UI,
-`oom_score_adj`, and `nice 10`.
+Implementation of the controls:
+
+- The timeout and the concurrency are the backtest limits. The table
+  `backtest_limits` holds at most one row. Without a row, the defaults apply
+  (`backtest/backtest_limits.py`). `PUT /api/backtest-limits` writes the row
+  (section 10.5). The timeout is from 1 second to 7 days. The concurrency is
+  from 1 to 16.
+- The runner reads the limits at each queue check (10.3 step 2). A change
+  applies to the next backtest that starts. A running backtest keeps the
+  timeout that it started with.
+- The child (`app/backtest_process.py`) writes 1000 to
+  `/proc/self/oom_score_adj` and calls `os.nice(10)` before it imports the
+  strategy. Any process can make its own priority lower, so this needs no
+  privilege.
+- The memory limit of the `web` container is `ATRADE_WEB_MEMORY_LIMIT`
+  (default `4g`). Tests cannot check the out-of-memory order. Section 17.8
+  has the manual check.
 
 ## 10.2 Tables
 
@@ -50,6 +64,7 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 | `backtest` | `id`, `strategy_version_id` (not null, foreign key to `strategy_version` with no `ON DELETE` action), `symbol`, `exchange`, `currency`, `bar_period`, `start_utc`, `end_utc`, `paper_capital_usd` (above 0), `status`, `error_message`, `created_at_utc`, `started_at_utc`, `ended_at_utc`, and the metrics `final_equity_usd`, `total_return_percent`, `max_drawdown_percent`, `trade_count` (null until the backtest finishes) |
 | `backtest_equity_point` | `backtest_id`, `time_utc`, `equity_usd`. Primary key `(backtest_id, time_utc)`. |
 | `backtest_trade` | `id`, `backtest_id`, `time_utc`, `side` (`BUY` or `SELL`), `quantity_shares`, `price_usd`, `commission_usd` |
+| `backtest_limits` | `single_row` (primary key, always true), `timeout_seconds` (above 0), `concurrency` (above 0). Migration `3e7a1c5d9b71_backtest_create_backtest_limits.py`. |
 
 - `status` is one of `queued`, `running`, `finished`, `failed`, `timed_out`.
 - Because of the `strategy_version_id` foreign key, a strategy that a
@@ -61,7 +76,8 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 
 1. `POST /api/backtests` checks the request and adds a `queued` row.
 2. The backtest runner of the Web process (`backtest/backtest_runner.py`)
-   checks the queue every 0.5 seconds. While fewer backtests run than the
+   checks the queue every 0.5 seconds. It reads the backtest limits from
+   `backtest_limits`. While fewer backtests run than the
    concurrency, it sets the oldest queued backtest to `running` and starts
    `python -m atrade.app.backtest_process <backtest ID>`. The queue is the
    table, so queued backtests stay queued after a restart.
@@ -121,8 +137,8 @@ use the same functions for the comparison (section 12.10).
 | `calculate_metrics(*, paper_capital_usd, equity_curve, trade_count)` | `BacktestMetrics`: `final_equity_usd`, `total_return_percent`, `max_drawdown_percent` (the largest fall from a peak, as a percent of the peak; the paper capital is the first peak), and `trade_count`. Percents have 2 decimal places. |
 
 The public entry also exports `create_backtest_router(*, database_url,
-clock)`, `BacktestRunner(*, database_url, clock, process_command,
-timeout_seconds, concurrency)` with `keep_running()`, and
+clock)`, `BacktestRunner(*, database_url, clock, process_command)` with
+`keep_running()`, and
 `run_backtest(*, database_url, backtest_id, clock)` for the child.
 
 ## 10.5 HTTP routes
@@ -131,6 +147,8 @@ timeout_seconds, concurrency)` with `keep_running()`, and
 |---|---|
 | `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the currency is not USD, or the strategy version does not exist. |
 | `GET /api/backtests` | `200` with all backtests, the newest first. |
+| `GET /api/backtest-limits` | `200` with `{"timeout_seconds", "concurrency"}`. The defaults are `7200` and `1`. |
+| `PUT /api/backtest-limits` | Body `{"timeout_seconds", "concurrency"}`. `200` with the saved limits. `422` when `timeout_seconds` is not from 1 to 604800 or `concurrency` is not from 1 to 16. |
 | `GET /api/backtests/{backtest_id}` | `200` with the backtest, `equity_curve` (`[{"time_utc", "equity_usd"}]`), and `trades`. `404` when the backtest does not exist. |
 
 A backtest has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`,
@@ -150,10 +168,22 @@ the backtest finishes). Money values and percents are decimal strings.
   strategy versions (`#lib/strategy`), the bar periods (`#lib/market_data`),
   and the default paper capital (`readPaperCapital()` of
   `#lib/paper_trading`). Dates are days in UTC.
+- `/backtests` also has the "Limits" form (`BacktestLimitsForm`). It shows
+  the timeout in minutes (`formatTimeoutMinutes`) and takes only whole
+  minutes (`convertTimeoutMinutesToSeconds`). The client functions are
+  `readBacktestLimits` and `changeBacktestLimits`.
 - `/backtests/<id>` shows the request and the result. It reads the backtest
   each second until the status is final.
 - Tests: `backend/tests/backtest/` (HTTP routes, metric functions, and real
   child processes on the bar file `bars/btest_arca_usd_1_day.csv` with the
   test strategy `strategies/buy_and_sell_by_bar_count.py`; the tests assert
-  exact results), `frontend/src/lib/backtest/*.test.ts`, and
-  `e2e/backtest.spec.ts`.
+  exact results), `frontend/src/lib/backtest/*.test.ts`,
+  `e2e/backtest.spec.ts`, and `e2e/backtest_limits.spec.ts`.
+- Isolation tests (`backend/tests/backtest/test_backtest_isolation.py`) use
+  the test strategy `strategies/write_process_facts.py`. It writes its
+  environment, `oom_score_adj`, niceness, and process ID to a log file. The
+  tests assert: a strategy that loops forever in `on_bar` with a 2 second
+  timeout gets "timed out" and its process ended; the log has no IBKR
+  variable; `oom_score_adj` is 1000 and the niceness is 10 more than the
+  niceness of the test process; with concurrency 1 the second backtest waits
+  in the queue; with concurrency 2 two backtests run at the same time.

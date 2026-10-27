@@ -30,10 +30,6 @@ from atrade.watchlist import create_watchlist_router
 LISTEN_HOST = "0.0.0.0"
 LISTEN_PORT = 8000
 
-# Defaults of docs/architecture.md section 10. Issue #71 stores them in PostgreSQL and lets the user change them.
-BACKTEST_TIMEOUT_SECONDS = 120 * 60
-BACKTEST_CONCURRENCY = 1
-
 logger = logging.getLogger("atrade.web")
 
 
@@ -43,8 +39,6 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
         database_url=settings.database_url,
         clock=clock,
         process_command=BACKTEST_PROCESS_COMMAND,
-        timeout_seconds=BACKTEST_TIMEOUT_SECONDS,
-        concurrency=BACKTEST_CONCURRENCY,
     )
 
     @asynccontextmanager
