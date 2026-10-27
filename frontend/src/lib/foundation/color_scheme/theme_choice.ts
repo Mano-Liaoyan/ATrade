@@ -57,6 +57,18 @@ export function applyThemeChoice(choice: ThemeChoice): void {
   }
 }
 
+/** Applies the theme choice on <html> and saves it. The theme button and the command palette use it. */
+export function selectThemeChoice(choice: ThemeChoice): void {
+  applyThemeChoice(choice);
+  saveThemeChoice(choice);
+}
+
+/** The theme choice that is on <html> now: Light, Dark, or System when there is no data-theme attribute. */
+export function readAppliedThemeChoice(): ThemeChoice {
+  const theme = document.documentElement.getAttribute(THEME_ATTRIBUTE);
+  return theme === 'light' || theme === 'dark' ? theme : 'system';
+}
+
 /** True when the page shows the dark tokens now: the Dark choice, or the System choice with a dark system. */
 export function isDarkColorScheme(): boolean {
   const theme = document.documentElement.getAttribute(THEME_ATTRIBUTE);

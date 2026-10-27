@@ -6,7 +6,14 @@
   import Screen20 from '@carbon/icons/es/screen/20.js';
   import { mergeProps } from 'bits-ui';
   import { Icon, Tooltip, type CarbonIcon } from '#lib/foundation/carbon';
-  import { applyThemeChoice, nextThemeChoice, readThemeChoice, saveThemeChoice, type ThemeChoice } from './theme_choice';
+  import {
+    nextThemeChoice,
+    readAppliedThemeChoice,
+    readThemeChoice,
+    selectThemeChoice,
+    type ThemeChoice,
+    watchColorScheme,
+  } from './theme_choice';
 
   const CHOICE_ICONS: Record<ThemeChoice, CarbonIcon> = { system: Screen20, light: Light20, dark: Asleep20 };
   const CHOICE_NAMES: Record<ThemeChoice, string> = { system: 'System', light: 'Light', dark: 'Dark' };
@@ -17,9 +24,15 @@
 
   function changeTheme(): void {
     choice = nextThemeChoice(choice);
-    applyThemeChoice(choice);
-    saveThemeChoice(choice);
+    selectThemeChoice(choice);
   }
+
+  // The command palette can also change the theme. The button then shows the choice on <html>.
+  $effect(() =>
+    watchColorScheme(() => {
+      choice = readAppliedThemeChoice();
+    }),
+  );
 </script>
 
 <Tooltip text={label} align="bottom-end">
