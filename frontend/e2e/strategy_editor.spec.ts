@@ -33,6 +33,43 @@ async function replaceCode(page: Page, code: string): Promise<void> {
   await page.keyboard.insertText(code);
 }
 
+// The color of one screen pixel. The screenshot is decoded in the page, so the test needs no image library.
+async function readPixel(page: Page, x: number, y: number): Promise<string> {
+  const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } });
+  return page.evaluate(async (base64) => {
+    const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob());
+    const context = new OffscreenCanvas(1, 1).getContext('2d');
+    context?.drawImage(image, 0, 0);
+    return (context?.getImageData(0, 0, 1, 1).data ?? []).join(',');
+  }, png.toString('base64'));
+}
+
+// A drag selects text on the line of the cursor. The line highlight of the cursor line must not hide the selection.
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`shows a mouse selection on the cursor line in the ${colorScheme} theme`, async ({ page }, currentTest) => {
+    await page.emulateMedia({ colorScheme });
+    await createStrategy(page, createUniqueName(currentTest, 'Select'));
+    const line = page
+      .getByRole('textbox', { name: 'Strategy code' })
+      .locator('.cm-line', { hasText: 'class MovingAverageStrategy(Strategy):' });
+    await line.scrollIntoViewIfNeeded();
+    const box = await line.boundingBox();
+    if (box === null) {
+      throw new Error('The class line is not visible.');
+    }
+    const centerY = box.y + box.height / 2;
+
+    await page.mouse.move(box.x + 2, centerY);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 120, centerY, { steps: 5 });
+    await page.mouse.up();
+
+    // Above the letters, the selected part of the line and the part after the text have different colors.
+    const topY = box.y + 1;
+    expect(await readPixel(page, box.x + 60, topY)).not.toBe(await readPixel(page, box.x + box.width - 4, topY));
+  });
+}
+
 test('creates a strategy that starts from the template as version 1', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Create');
 

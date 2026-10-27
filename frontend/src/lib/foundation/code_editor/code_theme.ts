@@ -48,6 +48,8 @@ const editorChrome = EditorView.theme({
     borderRight: '1px solid var(--cds-border-subtle-01)',
   },
   '.cm-activeLine': { backgroundColor: 'var(--cds-layer-hover-01)' },
+  // CodeMirror draws the selection in a layer below the lines. The opaque line highlight would hide it.
+  '&.atrade-has-selection .cm-activeLine': { backgroundColor: 'transparent' },
   '.cm-activeLineGutter': { color: 'var(--cds-text-primary)', backgroundColor: 'var(--cds-layer-hover-01)' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection':
     { backgroundColor: 'var(--cds-highlight)' },
@@ -117,6 +119,13 @@ const editorChrome = EditorView.theme({
   '.cm-diagnosticSource': { color: 'var(--cds-text-secondary)', opacity: '1' },
 });
 
+// The editor has the class atrade-has-selection while the main selection is not empty. The theme then removes the
+// cursor line highlight, so the selection shows on that line too.
+const markSelection = EditorView.editorAttributes.compute(
+  ['selection'],
+  (state): Record<string, string> => (state.selection.main.empty ? {} : { class: 'atrade-has-selection' }),
+);
+
 /** The shared code theme. It reads the color scheme when the editor starts and follows later changes. */
 export function createCodeTheme(): Extension {
   const schemeCompartment = new Compartment();
@@ -130,5 +139,5 @@ export function createCodeTheme(): Extension {
       },
     };
   });
-  return [editorChrome, schemeCompartment.of(selectSchemeExtensions(isDarkColorScheme())), followScheme];
+  return [editorChrome, markSelection, schemeCompartment.of(selectSchemeExtensions(isDarkColorScheme())), followScheme];
 }
