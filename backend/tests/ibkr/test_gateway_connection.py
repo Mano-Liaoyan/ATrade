@@ -2,10 +2,13 @@
 
 import logging
 import socket
+from datetime import UTC, datetime
 
 import anyio
 import pytest
 
+from atrade.foundation.bar import BarPeriod, TimeRange
+from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayRequestError, IbAsyncGatewayConnection
 
 LOCAL_HOST = "127.0.0.1"
@@ -42,6 +45,17 @@ async def test_reports_a_failed_instrument_search_without_a_connection() -> None
 
     with pytest.raises(GatewayRequestError, match="Not connected"):
         await connection.search_instruments("AAPL")
+
+
+@pytest.mark.anyio
+async def test_reports_failed_historical_bars_without_a_connection() -> None:
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=find_closed_local_port(), client_id=1)
+    time_range = TimeRange(datetime(2026, 3, 2, tzinfo=UTC), datetime(2026, 3, 3, tzinfo=UTC))
+
+    with pytest.raises(GatewayRequestError, match="Not connected"):
+        await connection.read_historical_bars(
+            Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD"), BarPeriod.ONE_HOUR, time_range
+        )
 
 
 def test_refuses_client_id_0() -> None:

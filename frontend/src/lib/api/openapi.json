@@ -103,6 +103,135 @@
         }
       }
     },
+    "/api/market-data/bars": {
+      "get": {
+        "summary": "Read Bars",
+        "description": "Returns the complete bars that start in the range, oldest first. Only missing ranges go to IBKR.",
+        "operationId": "read_bars_api_market_data_bars_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Exchange"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "pattern": "\\S",
+              "title": "Currency"
+            }
+          },
+          {
+            "name": "bar_period",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/BarPeriod"
+            }
+          },
+          {
+            "name": "start_utc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Utc"
+            }
+          },
+          {
+            "name": "end_utc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Utc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarsResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies": {
       "get": {
         "summary": "List Strategies",
@@ -341,6 +470,74 @@
   },
   "components": {
     "schemas": {
+      "BarPeriod": {
+        "type": "string",
+        "enum": [
+          "1-MINUTE",
+          "5-MINUTE",
+          "15-MINUTE",
+          "30-MINUTE",
+          "1-HOUR",
+          "1-DAY"
+        ],
+        "title": "BarPeriod",
+        "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format."
+      },
+      "BarResponse": {
+        "properties": {
+          "time": {
+            "type": "integer",
+            "title": "Time"
+          },
+          "open": {
+            "type": "number",
+            "title": "Open"
+          },
+          "high": {
+            "type": "number",
+            "title": "High"
+          },
+          "low": {
+            "type": "number",
+            "title": "Low"
+          },
+          "close": {
+            "type": "number",
+            "title": "Close"
+          },
+          "volume": {
+            "type": "number",
+            "title": "Volume"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "title": "BarResponse",
+        "description": "`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings."
+      },
+      "BarsResponse": {
+        "properties": {
+          "bars": {
+            "items": {
+              "$ref": "#/components/schemas/BarResponse"
+            },
+            "type": "array",
+            "title": "Bars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bars"
+        ],
+        "title": "BarsResponse"
+      },
       "CodeCheckFailedResponse": {
         "properties": {
           "problems": {

@@ -6,17 +6,28 @@ event loop of the caller, for example the uvicorn loop.
 
 import asyncio
 import logging
+from datetime import datetime
 from typing import Protocol
 
-from ib_async import IB, ContractDescription, RequestError
+from ib_async import IB, BarData, Contract, ContractDescription, RequestError
 
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import require_usable_client_id
+from atrade.ibkr.historical_bars import BAR_SIZE_SETTINGS, keep_bars_in_chunk, plan_historical_data_requests
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
+SMART_ROUTING = "SMART"
+HISTORICAL_DATA_TIMEOUT_SECONDS = 60.0
+# IBKR refuses 6 or more historical data requests for the same contract within 2 seconds (pacing violation).
+HISTORICAL_DATA_REQUEST_INTERVAL_SECONDS = 0.5
+# reqHistoricalData answers error 162 with this text when the range has no bars, for example a holiday.
+NO_DATA_MESSAGE = "query returned no data"
+# formatDate=2: intraday bar times come as UNIX seconds, so ib_async returns UTC datetimes.
+UTC_FORMAT_DATE = 2
 
 logger = logging.getLogger("atrade.ibkr")
 
@@ -35,6 +46,10 @@ class GatewayConnection(Protocol):
     def read_managed_accounts(self) -> list[str]: ...
 
     async def search_instruments(self, query: str) -> list[Instrument]: ...
+
+    async def read_historical_bars(
+        self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+    ) -> list[Bar]: ...
 
     def disconnect(self) -> None: ...
 
@@ -60,6 +75,8 @@ class IbAsyncGatewayConnection:
         self.client_id = client_id
         self.retry_seconds = retry_seconds
         self.ib = IB()
+        # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
+        self.ib.RaiseRequestErrors = True
 
     async def keep_connected(self) -> None:
         """Connects, and connects again after each lost connection. Runs until the caller cancels it."""
@@ -104,6 +121,58 @@ class IbAsyncGatewayConnection:
             message = "IB Gateway did not answer the instrument search in time."
             raise GatewayRequestError(message)
         return read_stock_instruments(contract_descriptions)
+
+    async def read_historical_bars(
+        self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+    ) -> list[Bar]:
+        """Reads the TRADES bars of regular trading hours that start in the range, oldest first.
+
+        https://interactivebrokers.github.io/tws-api/historical_bars.html
+        """
+        contract = Contract(
+            secType=STOCK_SECURITY_TYPE,
+            symbol=instrument.symbol,
+            exchange=SMART_ROUTING,
+            primaryExchange=instrument.exchange,
+            currency=instrument.currency,
+        )
+        bars: list[Bar] = []
+        for request_index, request in enumerate(plan_historical_data_requests(time_range, bar_period)):
+            if request_index > 0:
+                await asyncio.sleep(HISTORICAL_DATA_REQUEST_INTERVAL_SECONDS)
+            bars_data = await self.request_historical_data(
+                contract, request.chunk.end_utc, request.duration, bar_period
+            )
+            bars.extend(keep_bars_in_chunk(bars_data, request.chunk))
+        return bars
+
+    async def request_historical_data(
+        self, contract: Contract, end_utc: datetime, duration: str, bar_period: BarPeriod
+    ) -> list[BarData]:
+        loop = asyncio.get_running_loop()
+        started_at = loop.time()
+        try:
+            bars_data = await self.ib.reqHistoricalDataAsync(
+                contract,
+                endDateTime=end_utc,
+                durationStr=duration,
+                barSizeSetting=BAR_SIZE_SETTINGS[bar_period],
+                whatToShow="TRADES",
+                useRTH=True,
+                formatDate=UTC_FORMAT_DATE,
+                timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
+            )
+        except RequestError as error:
+            if NO_DATA_MESSAGE in error.message:
+                return []
+            raise GatewayRequestError(str(error)) from error
+        except ConnectionError as error:
+            raise GatewayRequestError(str(error)) from error
+        # After a timeout, ib_async cancels the request and returns an empty list. Do not save that as "no bars".
+        if not bars_data and loop.time() - started_at >= HISTORICAL_DATA_TIMEOUT_SECONDS:
+            message = "IB Gateway did not answer the historical data request in time."
+            raise GatewayRequestError(message)
+        return list(bars_data)
 
     def disconnect(self) -> None:
         self.ib.disconnect()
