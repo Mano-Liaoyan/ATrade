@@ -74,6 +74,36 @@ The domain docs are `GLOSSARY.md` and `docs/architecture.md`. ADRs go under `doc
 - Set `ATRADE_PLAYWRIGHT_PROJECTS` to the Playwright browsers that are
   installed, for example `"chromium firefox"`. CI runs all 4 projects.
 
+## Frontend Design Rules
+
+Apply these rules to every UI change in `frontend/`. The migration to Carbon
+and Bits UI is issue #84. Before it is merged, apply the layout, copy, and
+state rules to the current CSS.
+
+- **Avoid unnecessary secondary labels and descriptions. Let the layout do
+  the explaining.** This rule has the highest priority. A heading is a name
+  only. Add a subtitle, a helper sentence, or a label above a heading only
+  when it gives data that the user needs to act.
+- Look: use the official Carbon v11 styles from `@carbon/styles`. Write the
+  Carbon HTML structure and class names of the component. Write extra CSS
+  only for parts that Carbon does not supply, and use only Carbon tokens,
+  spacing, and type styles in it.
+- Behavior: use Bits UI for selects, comboboxes, dialogs, tabs, menus,
+  tooltips, and the command palette. Import `bits-ui` only in
+  `src/lib/foundation/`.
+- Themes: the user selects the theme with one icon button in the header. The
+  icon shows the current selection: Light, Dark, or System (the default). A
+  click changes to the next selection. Light uses Carbon g10, Dark uses g100,
+  and System follows `prefers-color-scheme`. The header is a `cds--g100` zone
+  in all themes.
+- Type: IBM Plex Sans and IBM Plex Mono. Number columns use tabular numbers
+  and right alignment.
+- Surfaces: keep them flat. Use Carbon tiles, data tables, and dividers, one
+  surface level deep. Color comes from Carbon tokens only.
+- Copy: use the terms in `GLOSSARY.md`. A button says what it does, for
+  example "Send paper order". A disabled control says why it is disabled.
+- State: show a status with an icon or a word together with its color.
+
 ## Guardrails
 
 - Keep the `./start run` contract: it runs `docker compose up` with
