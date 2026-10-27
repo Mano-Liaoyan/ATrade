@@ -11,10 +11,12 @@ is in GitHub Issues.
 ## Current state
 
 The repository holds the minimum runnable skeleton (issue #62), the IBKR
-connection (issue #63), and the strategy editor (issue #68):
+connection (issue #63), the strategy editor (issue #68), and code completion
+(issue #69):
 
 - The `web` service serves the app shell, `GET /api/health`,
-  `GET /api/ibkr/gateway`, and the strategy routes under `/api/strategies`.
+  `GET /api/ibkr/gateway`, the strategy routes under `/api/strategies`, and the
+  language server WebSocket `/ws/strategy-language-server`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
@@ -23,7 +25,8 @@ connection (issue #63), and the strategy editor (issue #68):
 - The `postgres` service holds the database.
 - Strategies: the page `/strategies` creates a strategy from a template. The
   editor saves the code as strategy versions after the checks before save.
-  Unsaved edits stay in the browser. See
+  Unsaved edits stay in the browser. The editor shows code completion and
+  live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
 - Market data, watchlist, backtests, paper trading, and forward tests are not
   available yet.

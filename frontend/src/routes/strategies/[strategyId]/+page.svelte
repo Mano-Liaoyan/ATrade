@@ -6,6 +6,7 @@
   import { CodeEditor } from '#lib/foundation/code_editor';
   import {
     clearDraft,
+    connectStrategyLanguageServer,
     deleteStrategy,
     formatVersionLabel,
     readDraft,
@@ -27,6 +28,12 @@
   let saveMessage = $state('');
   let errorMessage = $state('');
   let isSaving = $state(false);
+
+  // Code completion and live type errors. Type errors do not block the save.
+  const languageServer = connectStrategyLanguageServer(window.location);
+  $effect(() => () => {
+    languageServer.disconnect();
+  });
 
   const hasUnsavedChanges = $derived(openVersion !== null && editorCode !== openVersion.code);
 
@@ -155,7 +162,12 @@
 
   {#if openVersion !== null}
     <div class="editor-region">
-      <CodeEditor code={editorCode} label="Strategy code" onCodeChange={changeCode} />
+      <CodeEditor
+        code={editorCode}
+        label="Strategy code"
+        onCodeChange={changeCode}
+        extensions={[languageServer.editorExtension]}
+      />
     </div>
   {/if}
 {/if}

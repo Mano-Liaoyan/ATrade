@@ -92,6 +92,32 @@ The checks run in the Web process. They do not import the user code.
   needs no isolation.
 - Each editor WebSocket connection starts 1 basedpyright child process in the
   `web` container. The process stops when the connection closes.
+- The route is `/ws/strategy-language-server`, in
+  `backend/src/atrade/strategy/language_server.py`. The public entry exports
+  `create_strategy_language_server_router()` and
+  `STRATEGY_LANGUAGE_SERVER_PATH`.
+- Each WebSocket text message is 1 Language Server Protocol JSON message,
+  without the `Content-Length` header. The route adds the header for the child
+  process and removes it from the answers. A message that is not JSON closes
+  the connection with code `1003`.
+- The child process is Node.js with `basedpyright/langserver.index.js
+  --stdio`. The route starts Node.js directly, so there is no extra Python
+  process. `basedpyright` (and with it `nodejs-wheel-binaries`) is a runtime
+  dependency of the backend. On close, the route sends `SIGTERM`, waits 5
+  seconds, then sends `SIGKILL`.
+- The route sets the basedpyright settings, not the browser. It adds the
+  `workspace.configuration` capability to the `initialize` request and answers
+  the `workspace/configuration` requests itself:
+  - `python.pythonPath` is the Python of the Web process. This environment has
+    NautilusTrader 2.0, so basedpyright resolves `Strategy`.
+  - `typeCheckingMode` is `standard`. Strategy code is user code, so the
+    strict rules of the ATrade code do not apply.
+- The browser client is `@codemirror/lsp-client` with
+  `languageServerExtensions()` (completion, hover, signature help, live
+  diagnostics). The file URI is `file:///atrade/strategy.py`. The file does not
+  exist on the server. The request timeout is 15 seconds.
+- The editor works without completion when the connection fails. Type errors
+  do not block the save (section 9.3).
 
 ## 9.5 Comparison
 
@@ -122,8 +148,11 @@ version path return `405`.
 - `frontend/src/lib/foundation/code_editor/` holds the `CodeEditor` Svelte
   component: CodeMirror 6 (`codemirror`, `@codemirror/lang-python`). It has
   no domain meaning. Its scroll region has a styled scrollbar.
+- `CodeEditor` takes more CodeMirror extensions in its `extensions` property.
+  The editor page passes the language server extension.
 - `frontend/src/lib/strategy/` holds the HTTP client of the strategy routes,
-  the version label (`formatVersionLabel`), and the drafts in `localStorage`.
+  the version label (`formatVersionLabel`), the drafts in `localStorage`, and
+  the language server connection (`connectStrategyLanguageServer`).
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
   draft of the version that the user edited.

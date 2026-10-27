@@ -19,7 +19,7 @@ from atrade.app.health_routes import create_health_router
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
-from atrade.strategy import create_strategy_router
+from atrade.strategy import create_strategy_language_server_router, create_strategy_router
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -47,6 +47,7 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
         )
     )
     app.include_router(create_strategy_router(database_url=settings.database_url, clock=clock))
+    app.include_router(create_strategy_language_server_router())
     # The frontend router matches every path, so it is mounted last.
     app.include_router(create_frontend_router(settings.frontend_build_dir))
     return app

@@ -1,15 +1,18 @@
 <!-- Python code editor: CodeMirror 6 with @codemirror/lang-python. It has no domain meaning (docs/architecture.md section 13). -->
 <script lang="ts">
   import { python } from '@codemirror/lang-python';
+  import type { Extension } from '@codemirror/state';
   import { EditorView, basicSetup } from 'codemirror';
 
   interface Props {
     code: string;
     label: string;
     onCodeChange: (code: string) => void;
+    /** More CodeMirror extensions, for example a language server client. The editor reads them once. */
+    extensions?: Extension[];
   }
 
-  const { code, label, onCodeChange }: Props = $props();
+  const { code, label, onCodeChange, extensions = [] }: Props = $props();
 
   let container: HTMLDivElement;
   let view: EditorView | null = $state.raw(null);
@@ -21,6 +24,7 @@
       extensions: [
         basicSetup,
         python(),
+        ...extensions,
         EditorView.contentAttributes.of({ 'aria-label': label }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
