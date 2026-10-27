@@ -1,17 +1,40 @@
 #!/usr/bin/env bash
+# The only start command of ATrade (Unix, or Windows through WSL).
+#   ./start run [docker compose up options]   builds and starts all services
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-command_name="${1:-}"
+compose_file="$repo_root/deploy/compose.yaml"
 
 usage() {
-  printf 'Usage: ./start run\n' >&2
+  printf 'Usage: ./start run [docker compose up options, for example -d]\n' >&2
 }
 
+select_env_file() {
+  if [[ -f "$repo_root/.env" ]]; then
+    printf '%s\n' "$repo_root/.env"
+    return
+  fi
+  printf 'WARNING: .env not found. Using the placeholder values in .env.example.\n' >&2
+  printf 'WARNING: Copy .env.example to .env and set real values before you use ATrade.\n' >&2
+  printf '%s\n' "$repo_root/.env.example"
+}
+
+run_compose() {
+  if ! command -v docker >/dev/null 2>&1; then
+    printf 'ERROR: docker is not installed or not on PATH. ATrade runs with Docker Compose.\n' >&2
+    exit 1
+  fi
+  local env_file
+  env_file="$(select_env_file)"
+  exec docker compose --file "$compose_file" --env-file "$env_file" up --build "$@"
+}
+
+command_name="${1:-}"
 case "$command_name" in
   run)
     shift
-    exec "$repo_root/scripts/start.run.sh" "$@"
+    run_compose "$@"
     ;;
   "")
     usage

@@ -1,0 +1,12 @@
+# Build context for deploy/web.Dockerfile is the repository root.
+.git
+.env
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+frontend/build
+frontend/.svelte-kit
+frontend/test-results
+frontend/playwright-report

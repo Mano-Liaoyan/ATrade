@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# The single quality gate: the same checks as CI (.github/workflows/ci.yml).
+#   ./scripts/check [all|backend|frontend|e2e]   default: all
+# Environment:
+#   ATRADE_TEST_DATABASE_URL    PostgreSQL for pytest and Playwright. When it is not set, this script
+#                               starts a temporary postgres:18.3 container with Docker and removes it at exit.
+#   ATRADE_PLAYWRIGHT_PROJECTS  Space-separated Playwright projects. Default: "chromium firefox webkit msedge".
+#                               Set it to the browsers installed on this machine, for example "chromium firefox".
+#                               "none" skips the end-to-end tests.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+scope="${1:-all}"
+postgres_image="postgres:18.3"
+postgres_container=""
+
+log_step() {
+  printf '\n==> %s\n' "$1"
+}
+
+remove_postgres_container() {
+  if [[ -n "$postgres_container" ]]; then
+    docker rm --force "$postgres_container" >/dev/null 2>&1 || true
+  fi
+}
+trap remove_postgres_container EXIT
+
+start_test_database() {
+  if [[ -n "${ATRADE_TEST_DATABASE_URL:-}" ]]; then
+    return
+  fi
+  if ! command -v docker >/dev/null 2>&1; then
+    printf 'ERROR: set ATRADE_TEST_DATABASE_URL or install Docker. The tests need a real PostgreSQL.\n' >&2
+    exit 1
+  fi
+  log_step "Start temporary PostgreSQL ($postgres_image)"
+  postgres_container="atrade-check-$$"
+  docker run --detach --name "$postgres_container" --pids-limit 2048 \
+    --env POSTGRES_USER=atrade --env POSTGRES_PASSWORD=atrade --env POSTGRES_DB=atrade \
+    --publish 127.0.0.1::5432 "$postgres_image" >/dev/null
+  local attempt
+  for attempt in $(seq 1 60); do
+    if docker exec "$postgres_container" pg_isready --host=127.0.0.1 --username=atrade >/dev/null 2>&1; then
+      break
+    fi
+    if [[ "$attempt" == 60 ]]; then
+      printf 'ERROR: PostgreSQL did not start.\n' >&2
+      docker logs "$postgres_container" >&2
+      exit 1
+    fi
+    sleep 1
+  done
+  local host_port
+  host_port="$(docker port "$postgres_container" 5432/tcp | head -n 1 | sed 's/.*://')"
+  export ATRADE_TEST_DATABASE_URL="postgresql://atrade:atrade@127.0.0.1:$host_port/atrade"
+}
+
+check_backend() {
+  cd "$repo_root/backend"
+  log_step "Backend: uv sync"
+  uv sync --locked
+  log_step "Backend: ruff"
+  uv run ruff check
+  uv run ruff format --check
+  log_step "Backend: basedpyright"
+  uv run basedpyright
+  log_step "Backend: import-linter"
+  uv run lint-imports
+  log_step "Backend: file length (A4, at most 1000 lines)"
+  find src tests migrations -name '*.py' -exec awk 'FNR == 1001 { print FILENAME ": more than 1000 lines (A4)"; failed = 1; nextfile } END { exit failed }' {} +
+  log_step "Backend: pytest"
+  uv run pytest
+}
+
+check_frontend() {
+  cd "$repo_root/frontend"
+  log_step "Frontend: pnpm install"
+  pnpm install --frozen-lockfile
+  log_step "Frontend: ESLint"
+  pnpm lint
+  log_step "Frontend: svelte-check"
+  pnpm check
+  log_step "Frontend: Vitest"
+  pnpm test:unit
+  log_step "Frontend: build"
+  pnpm build
+}
+
+check_e2e() {
+  local projects="${ATRADE_PLAYWRIGHT_PROJECTS:-chromium firefox webkit msedge}"
+  if [[ "$projects" == "none" ]]; then
+    log_step "End to end: skipped (ATRADE_PLAYWRIGHT_PROJECTS=none)"
+    return
+  fi
+  cd "$repo_root/backend"
+  uv sync --locked
+  cd "$repo_root/frontend"
+  pnpm install --frozen-lockfile
+  pnpm build
+  local project_arguments=()
+  local project
+  for project in $projects; do
+    project_arguments+=(--project "$project")
+  done
+  log_step "End to end: Playwright ($projects)"
+  pnpm exec playwright test "${project_arguments[@]}"
+}
+
+case "$scope" in
+  all)
+    start_test_database
+    check_backend
+    check_frontend
+    check_e2e
+    ;;
+  backend)
+    start_test_database
+    check_backend
+    ;;
+  frontend)
+    check_frontend
+    ;;
+  e2e)
+    start_test_database
+    check_e2e
+    ;;
+  *)
+    printf 'Usage: ./scripts/check [all|backend|frontend|e2e]\n' >&2
+    exit 1
+    ;;
+esac
+
+log_step "All checks passed ($scope)"

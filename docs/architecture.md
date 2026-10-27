@@ -117,7 +117,8 @@ frontend/
   src/lib/             # one directory per capability, plus foundation/
   src/routes/          # pages, the only place that combines capabilities
   e2e/                 # Playwright tests
-deploy/                # Docker Compose and service configuration
+deploy/                # compose.yaml, web.Dockerfile
+scripts/check          # the quality gate: the same checks as CI (section 17.7)
 docs/
   architecture.md      # this document
   adr/                 # decisions that are hard to reverse
@@ -128,9 +129,10 @@ GLOSSARY.md
 .env.example
 ```
 
-The first implementation PR deletes the old code and the old documents. This
-includes the .NET code, `workers/`, the old `frontend/`, `start.cmd`,
-`start.ps1`, `PLAN.md`, and `docs/INDEX.md`. Git history keeps the old content.
+The first implementation PR (#62) deleted the old code and the old documents.
+This included the .NET code, `workers/`, the old `frontend/`, `start.cmd`,
+`start.ps1`, `PLAN.md`, `docs/INDEX.md`, and the old Windows workflow. Git
+history keeps the old content.
 
 ## 6. Backend modules
 
@@ -204,6 +206,15 @@ app           -> all modules
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. |
 
 A restart of `web` does not stop forward tests.
+
+### 6.5 Web app routes outside the capabilities
+
+`app/` owns two routers that belong to no capability:
+
+| Route | Behavior |
+|---|---|
+| `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
+| `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
 
 ## 7. IBKR access
 
@@ -618,6 +629,35 @@ One Docker Compose project on the user's own server runs all services:
 - The Cloudflare cost is 0 USD per month (Zero Trust Free plan).
 - `./start run` calls `docker compose up`. It is the only start command.
 
+### 14.1 Compose file and the `web` service
+
+- The Compose file is `deploy/compose.yaml`. `./start run` runs
+  `docker compose --file deploy/compose.yaml --env-file .env up --build`, and
+  sends its other arguments to `docker compose up`. When `.env` is not there,
+  it writes a warning and uses `.env.example`.
+- The image of `web` comes from `deploy/web.Dockerfile`. A Node stage builds
+  the SPA with `adapter-static`. The Python stage installs the backend with
+  `uv sync --frozen --no-dev` and copies the built files to
+  `/app/frontend-build`.
+- `web` serves the built frontend from FastAPI. There is no separate web
+  server. A catch-all route in `app/frontend_files.py` returns the requested
+  file when it exists in the build directory. For every other path it returns
+  the SPA fallback page `200.html`. Paths under `/api/` and `/ws/` never get
+  the fallback page: they return `404`. A path that resolves outside the build
+  directory gets the fallback page, never the file.
+- At start, `web` runs the Alembic migrations, then starts uvicorn with
+  1 worker on port 8000. Compose publishes it on
+  `127.0.0.1:${ATRADE_WEB_PORT}` only.
+- `web` has `read_only: true`, a `tmpfs` on `/tmp`, and
+  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`). `0` turns the memory
+  limit off. Use `0` only on a host that cannot set memory limits, for example
+  rootless Podman without the memory cgroup controller.
+- `postgres` uses the image `postgres:18.3` and the new volume `atrade-pgdata`
+  (section 19). Its port is not published.
+- Services added later (`ib-gateway`, `forward-test`, `cloudflared`) must not
+  block the local start when their credentials are missing. They fail with a
+  clear message, or they are in a Compose profile.
+
 ## 15. Secrets and configuration
 
 Sources: [Secret management research (Enpass first)](https://github.com/Mano-Liaoyan/ATrade/issues/35),
@@ -647,6 +687,14 @@ Settings that `foundation/settings` reads:
 | Forward test client ID range | Default `10–13`. |
 | Local paper capital in USD | Used when IBKR is not connected. |
 | `DATABASE_URL` | PostgreSQL connection. |
+
+Environment variable names: `DATABASE_URL` has no prefix, because the backtest
+child process gets it by this name (section 10). All other settings use the
+prefix `ATRADE_`, for example `ATRADE_TRADING_MODE`. `foundation/settings`
+also reads `ATRADE_FRONTEND_BUILD_DIR` (default `/app/frontend-build`, the
+path in the `web` image). Compose builds `DATABASE_URL` from
+`ATRADE_POSTGRES_PASSWORD`. The ticket that first uses a setting adds it to
+`foundation/settings` and to `.env.example`.
 
 The backtest timeout and concurrency are not in `settings`. PostgreSQL stores
 them (section 10).
@@ -856,6 +904,14 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Frontend: ESLint, `svelte-check`, Vitest.
 - End to end: Playwright with 4 projects.
 - Not in CI: `ibkr_paper`.
+- `.github/workflows/ci.yml` runs `./scripts/check backend`,
+  `./scripts/check frontend`, and `./scripts/check e2e` as 3 jobs. The backend
+  and end-to-end jobs use a `postgres:18.3` service container. Local runs use
+  the same script. Without `ATRADE_TEST_DATABASE_URL`, the script starts a
+  temporary PostgreSQL container.
+- Backend formatting: `ruff format --check` with line length 120.
+- The test PostgreSQL fixture runs the migrations one time per session and
+  truncates all tables except `alembic_version` before each test.
 
 ## 18. Documentation rules
 
@@ -905,8 +961,6 @@ ran them. The implementation must check them.
 
 | Fact | How to check |
 |---|---|
-| `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Run `uv lock` in the first implementation PR. |
-| `ib_async` 2.1.0 runs on Python 3.14. | Run the backend tests. |
 | `ib_async` 2.1.0 limits `tzdata` to `<2026.0`. A later dependency can conflict with it ([ib_async#209](https://github.com/ib-api-reloaded/ib_async/issues/209)). | Watch `uv lock` on each upgrade. Upgrade to `ib_async` 3.0.0 after its release. |
 | The NautilusTrader 2.0 forward test behavior in section 12 (reconciliation, `orderRef`, reconnection, `DataActor` cache reads). | The `ibkr_paper` contract tests in section 17.4. |
 | `reqExecutions` and `reqCompletedOrders` read filled orders of other client IDs. | The contract test in section 17.4. |
@@ -918,6 +972,13 @@ ran them. The implementation must check them.
 | Start time of a backtest child process (estimated 1 to 3 seconds). | Measure it in phase 1. |
 | Editor input latency and completion latency in the browser. | Measure them in phase 1. |
 
+### 21.1 Facts checked
+
+| Fact | Result |
+|---|---|
+| `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Yes. On 2026-10-27, `uv lock` (uv 0.13.5) resolved `ib-async==2.1.0`, `nautilus-trader==2.0.0rc7`, and `tzdata==2025.3` for Python 3.14 (#62). |
+| `ib_async` 2.1.0 and NautilusTrader 2.0.0rc7 import on Python 3.14. | Yes. Both packages import on CPython 3.14.9 (#62). A real IB Gateway connection is not checked. |
+
 ## 22. Points left to the implementation
 
 The decisions do not name these details. The implementation picks the simplest
@@ -927,7 +988,6 @@ option and records it in this document.
   (section 12.6). The dependency list in section 6.2 has no `forward_test ->
   ibkr` edge. Either `paper_trading` exports the cancel function, or the edge
   is added. The change must update section 6.2.
-- How `web` serves the built frontend files (for example FastAPI static files).
 - How a forward test child passes its own `ib_async` connection to
   `require_paper_account()` (section 12.5).
 - These names are choices of this document, not decisions of a ticket. The

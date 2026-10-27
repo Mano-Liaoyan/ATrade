@@ -1,0 +1,45 @@
+# The ATrade Docker Compose project. `./start run` runs `docker compose up` with this file.
+# Variables come from the .env file in the repository root. .env.example lists them.
+name: atrade
+
+services:
+  postgres:
+    image: postgres:18.3
+    environment:
+      POSTGRES_DB: atrade
+      POSTGRES_USER: atrade
+      POSTGRES_PASSWORD: ${ATRADE_POSTGRES_PASSWORD:?Set ATRADE_POSTGRES_PASSWORD in .env}
+    volumes:
+      # A new volume. The old volume atrade-postgres-data is not used, and no data is migrated.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=atrade", "--dbname=atrade"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    pids_limit: 2048
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: atrade-web:local
+    environment:
+      DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
+      ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${ATRADE_WEB_PORT:-8000}:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-4g}
+    pids_limit: 2048
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    name: atrade-pgdata

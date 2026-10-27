@@ -1,324 +1,126 @@
----
-status: active
-owner: maintainer
-updated: 2026-05-21
-summary: Human-facing overview of the current ATrade application, run contract, and active implementation direction.
-see_also:
-  - PLAN.md
-  - docs/INDEX.md
-  - scripts/README.md
-  - docs/architecture/overview.md
-  - docs/design/atrade-terminal-ui.md
-  - docs/architecture/modules.md
-  - docs/architecture/provider-abstractions.md
-  - docs/architecture/analysis-engines.md
-  - docs/architecture/paper-trading-workspace.md
----
-
 # ATrade
 
-ATrade is a personal swing and position trading platform built as a modular
-monolith with .NET 10, Next.js, and Aspire 13.2.
+ATrade is a personal trading platform for one user. It finds instruments,
+shows bar charts, tests strategies on history and on live market data, and
+sends paper orders to the IBKR paper account.
 
-The repository currently contains a runnable local stack for architecture
-deepening across the provider-backed paper-trading workspace.
+The architecture specification is [`docs/architecture.md`](docs/architecture.md).
+Terms have the meaning that [`GLOSSARY.md`](GLOSSARY.md) gives them. The plan
+is in GitHub Issues.
 
-## Current Stack
+## Current state
 
-- Backend: `.NET 10`
-- Frontend: `Next.js`
-- Local orchestrator: `Aspire 13.2`
-- Infrastructure: `Postgres`, `TimescaleDB`, `Redis`, `NATS`
-- Broker/data direction: provider-neutral contracts with `IBKR` through the local `voyz/ibeam:latest` runtime contract, IBKR/iBeam-backed market data, and a paper-capital source that prefers authenticated IBKR paper balances before local fallback capital
-- Analysis/backtesting direction: provider-neutral `ATrade.Analysis` contracts with `ATrade.Analysis.Lean` as the first optional analysis provider when the official LEAN runtime is configured locally, plus provider-neutral saved backtest run contracts in `ATrade.Backtesting` backed by Postgres history, paper-capital snapshots, an API-hosted async runner, safe SignalR job updates, built-in strategy validation, rich simulated result envelopes, and buy-and-hold benchmarks
+The repository holds the minimum runnable skeleton (issue #62):
 
-## Run Contract
+- The `web` service serves an empty app shell and `GET /api/health`.
+- The `postgres` service holds the database. It has no tables yet.
+- No capability (market data, watchlist, strategies, backtests, paper trading,
+  forward tests) is available yet.
 
-The repository-wide startup contract is the repo-local `start` shim:
+## Requirements
 
-- Unix-like: `./start run`
-- Windows PowerShell: `./start.ps1 run`
-- Windows Command Prompt: `./start.cmd run`
+- Unix, or Windows through WSL. There is no native Windows start script.
+- Docker with Docker Compose v2.
 
-All variants start Compose infrastructure first, then delegate to the Aspire
-AppHost for the API, worker, and frontend. Infrastructure containers stay out of
-the default Aspire dashboard and remain running after AppHost exits. Local bind-port overrides,
-including the optional fixed Aspire dashboard UI port
-(`ATRADE_ASPIRE_DASHBOARD_HTTP_PORT`, default `0` for ephemeral loopback) and
-AppHost Postgres/TimescaleDB data-volume/password overrides, are kept in ignored
-`.env` and documented in `scripts/README.md`. The .NET hosts resolve the local
-runtime contract through `ATrade.ServiceDefaults`, which overlays
-`.env.template`, ignored `.env`, and process environment values while keeping
-credential-bearing values classified for Aspire secret-parameter handoff.
+For development and checks, also:
 
-## Current Runtime Surface
+- [uv](https://docs.astral.sh/uv/) 0.13. uv installs Python 3.14.
+- Node.js 24 and pnpm 10.
 
-The current runnable slice includes:
+## Run ATrade
 
-- `src/ATrade.AppHost` — Aspire graph for the API, IBKR worker, and Next.js
-  frontend while default infrastructure is Compose-managed Postgres,
-  TimescaleDB, Redis, and NATS. In Compose mode, AppHost injects localhost
-  connection strings that target the Compose-created `atrade` role, primary
-  Postgres database `atrade`, and TimescaleDB database `atrade_marketdata`.
-  Compose keeps the primary `postgres` data directory in
-  `ATRADE_POSTGRES_DATA_VOLUME` (default `atrade-postgres-data`) plus a stable
-  local-dev `ATRADE_POSTGRES_PASSWORD` secret parameter so workspace preferences
-  and local paper-capital fallback values survive full local AppHost reboots;
-  the `timescaledb` data directory uses `ATRADE_TIMESCALEDB_DATA_VOLUME` (default
-  `atrade-timescaledb-data`) plus a stable local-dev
-  `ATRADE_TIMESCALEDB_PASSWORD` secret parameter so fresh market-data cache rows
-  survive full local AppHost reboots; the local iBeam Client Portal URL is HTTPS on the configured host gateway port,
-  mapped to the container's internal Client Portal port `5000`, and the
-  container receives a repo-local non-secret iBeam inputs mount so Client Portal
-  accepts loopback/private Docker bridge callers used by Aspire.
-- `src/ATrade.Brokers` — provider-neutral broker status, identity, account-mode, and capability contracts.
-- `src/ATrade.Accounts` — bootstrap-safe account overview plus the effective paper-capital contract, Postgres-backed local paper-capital fallback, and IBKR-first capital-source selection for future backtests.
-- `src/ATrade.Api` — browser-facing backend with:
-  - `GET /health`
-  - `GET /api/accounts/overview`
-  - `GET /api/accounts/paper-capital`
-  - `PUT /api/accounts/local-paper-capital`
-  - `GET /api/broker/ibkr/status`
-  - `POST /api/orders/simulate`
-  - `GET /api/market-data/trending`
-  - `GET /api/market-data/search`
-  - `GET /api/market-data/{symbol}/candles`
-  - `GET /api/market-data/{symbol}/indicators`
-  - `GET /api/analysis/engines`
-  - `POST /api/analysis/run`
-  - `POST /api/backtests`
-  - `GET /api/backtests`
-  - `GET /api/backtests/{id}`
-  - `POST /api/backtests/{id}/cancel`
-  - `POST /api/backtests/{id}/retry`
-  - `/hubs/backtests`
-  - `GET /api/workspace/watchlist`
-  - `PUT /api/workspace/watchlist`
-  - `POST /api/workspace/watchlist`
-  - `DELETE /api/workspace/watchlist/pins/{instrumentKey}`
-  - `DELETE /api/workspace/watchlist/{symbol}`
-  - `/hubs/market-data`
-- `src/ATrade.MarketData.Ibkr` — IBKR/iBeam Client Portal market-data provider for contract search/detail lookup, scanner/trending-equivalent results, snapshots, historical bars, and safe unavailable states projected from the shared IBKR/iBeam readiness module.
-- `src/ATrade.MarketData.Timescale` — provider-neutral TimescaleDB persistence and cache-aside for OHLCV candles and scanner/trending snapshots, with configurable freshness for browser-facing market-data endpoints.
-- `src/ATrade.Analysis` — provider-neutral analysis engine contracts, registry, normalized request/result payloads including rich backtest details, engine/source metadata, and explicit no-engine fallback behavior.
-- `src/ATrade.Analysis.Lean` — optional LEAN analysis provider that generates analysis-only LEAN workspaces from ATrade OHLCV bars, invokes the configured official LEAN CLI or AppHost-managed Docker runtime, and returns provider-neutral signals/metrics/backtest summaries, equity curves, simulated trades, benchmarks, and accounting details without order routing.
-- `src/ATrade.Backtesting` — provider-neutral saved backtest run module with single-symbol/built-in-strategy and parameter request validation, optional analysis engine ids, paper-capital source snapshots, cost/slippage/benchmark settings, Postgres saved-run history, an API-hosted async runner with startup recovery, server-side market-data/analysis execution, rich completed result envelopes, best-effort cancellation, `/hubs/backtests` SignalR updates, and persistence/broadcast redaction for secrets, account identifiers, gateway URLs, LEAN workspace paths, direct bars, custom code, and order-routing fields.
-- `src/ATrade.Workspaces` — Postgres-backed workspace preference module for exact provider/market watchlist pins with stable `instrumentKey` / `pinKey` metadata, including IBKR search-result pins.
-- `workers/ATrade.Ibkr.Worker` — safe paper-session/readiness monitoring shell for disabled, credentials-missing, configured-iBeam, connecting, authenticated, degraded, error, and rejected-live states.
-- `frontend/` — Next.js ATrade paper-trading workspace with enabled/disabled module registry and rail, purpose-matched rail icons, local icon-first rail collapse behavior, canonical enabled routes (`/`, `/search`, `/watchlist`, `/chart`, `/analysis`, `/backtest`, `/status`, `/help`), canonical symbol routes (`/chart/{symbol}`, `/analysis/{symbol}`, `/backtest/{symbol}`), visible-disabled routes (`/news`, `/portfolio`, `/research`, `/screener`, `/econ`, `/ai`, `/node`, `/orders`), direct module/workflow navigation without the retired `/symbols/{symbol}` route, a rail-first full-bleed single-primary workspace layout with no app-level brand header, visible global safety strip, shell context/monitor/footer chrome, or page-level vertical scrolling, a single compact top-right SignalR/status indicator that appears immediately from local client/cache/read state and refines through ATrade.Api health/hub checks, an original black/graphite/amber institutional terminal palette with red/green market states, purpose-built Home/Search/Watchlist modules (Home dashboard with provider/API status, paper safety, quick actions, compact truthful context; Search-first bounded ranked stock discovery; Watchlist-first backend saved-stock pins), reusable compact-filtered market-monitor primitives with visible internal vertical and horizontal table scrollbars for wide exact-identity/action columns, a full-viewport desktop shell guarded for latest stable Safari, Firefox, Chrome, and Edge with visible internal/custom rail/workspace/panel/module scroll affordances, visibly sized chart/indicator/analysis/backtest workspaces with SignalR-to-HTTP fallback, provider diagnostics, backend-saved exact watchlists, a `/chart` Stored stocks selector that defaults to the first stored watchlist instrument when available, exact chart/analysis/backtest handoff, provider-neutral analysis states, and an enabled BACKTEST module for paper-capital-backed saved runs, live status, history/detail, completed-run comparison with metrics and persisted strategy/buy-and-hold equity overlays, cancel, and retry.
+1. Copy `.env.example` to `.env`.
+2. Replace the placeholder values in `.env`. Do not commit `.env`.
+3. Start all services:
 
-Current market data is served through `ATrade.Api` using a Timescale-first
-cache-aside path over the `ATrade.MarketData.Ibkr` provider behind
-`ATrade.MarketData` contracts. `ATrade.MarketData.ExactInstrumentIdentity` owns
-backend normalization/key encoding for provider, provider symbol id, symbol,
-exchange, currency, and asset class; `ATrade.MarketData.ChartRangePresets` owns
-chart lookback ranges from now (`1min`, `5mins`, `1h`, `6h`, `1D`, `1m`, `6m`,
-`1y`, `5y`, and `all` / All time); search, trending, candle, indicator,
-latest-update, Timescale cache, and watchlist flows carry exact identity where
-provider metadata is available while keeping legacy symbol-only HTTP paths
-compatible. When the local iBeam/Gateway runtime is
-configured with the HTTPS Client Portal URL (`https://127.0.0.1:<gateway-port>`),
-the AppHost-mounted iBeam inputs config allows the local/private Docker bridge
-source addresses that published-port requests use, and iBeam is authenticated
-through ignored `.env` values, API endpoints return IBKR scanner, snapshot, and
-historical bar data with source metadata. `ATRADE_MARKET_DATA_CACHE_FRESHNESS_MINUTES`
-(default `30`) controls whether TimescaleDB rows for trending snapshots,
-candles, and indicator candle inputs are fresh enough to serve directly as
-`timescale-cache:{originalSource}` responses for the requested normalized chart
-range; because the AppHost TimescaleDB data directory is volume-backed, those
-fresh rows can survive a full local
-AppHost reboot and be served without another IBKR/iBeam provider call. Missing or
-stale rows refresh from IBKR/iBeam, persist the provider response to TimescaleDB,
-and return the provider response. If a safe refresh fails because the provider is
-rate-limited, temporarily unavailable, unavailable, not configured, or needs
-authentication, a compatible stale candle series can still render through
-`ATrade.Api`, but the payload carries `sourceStatus.freshness = "stale"`, the
-refresh error, and a visible frontend stale-cache label; stale content is never
-promoted to a fresh success. When no usable cache exists, the API and frontend
-surface distinct retry-friendly `provider-rate-limited`,
-`provider-service-unavailable`, `provider-not-configured`,
-`provider-unavailable`, `authentication-required`, and
-`market-data-storage-unavailable` states instead of falling back to production
-mocks or synthetic bars. Pinned instruments are backend-owned
-workspace preferences persisted in the volume-backed Compose-managed Postgres
-database through `ATrade.Workspaces` and surfaced to the frontend through
-`/api/workspace/watchlist` with stable `instrumentKey` / `pinKey` identity; they
-survive full local AppHost stop/start cycles when the same Postgres data volume
-and stable password are reused. Browser `localStorage` is only a
-non-authoritative symbol-only cache / one-time manual migration source. The
-`/chart` route loads backend-owned stored stocks through the watchlist workflow,
-shows a Stored stocks selector/list, and automatically charts the first saved
-watchlist instrument when available; when no backend/cached stored stock can load,
-it shows explicit Search/Watchlist links instead of substituting a demo symbol.
-Users can search IBKR/iBeam stocks through
-`/api/market-data/search`, see explicit provider/market/exchange/currency/asset
-class metadata with local market badges, open result chart pages that preserve
-provider-neutral exact identity in query state when available and render a visible `CandlestickChart`
-when provider candles exist (empty/provider-unavailable states remain explicit
-with no synthetic bars), and pin exact provider-market
-metadata (`provider`, provider symbol id, name, exchange, currency, and asset
-class, with IBKR `conid` only as provider metadata) into the backend watchlist without a production
-hard-coded symbol catalog. Analysis engine discovery/run contracts are available through
-`/api/analysis/engines` and `/api/analysis/run`. With no provider selected they
-return explicit `analysis-engine-not-configured` metadata with no fake signals;
-when ignored local `.env` sets `ATRADE_ANALYSIS_ENGINE=Lean`, the API registers
-`ATrade.Analysis.Lean`, runs LEAN over market-data-provider candles, and returns
-provider-neutral signals/metrics/backtest summaries and rich backtest details.
-With
-`ATRADE_LEAN_RUNTIME_MODE=docker`, Compose starts the `lean-engine` profile
-service, bind-mounts the generated workspace root, and AppHost passes the safe
-managed-container metadata to the API so execution uses `docker exec` against
-that service. Missing LEAN runtime, missing managed container metadata,
-unavailable Docker/image/container, non-zero exits, or timeouts surface as safe
-`analysis-engine-unavailable` responses without fake signals.
+   ```sh
+   ./start run
+   ```
 
-Paper-capital selection is available through `GET /api/accounts/paper-capital`
-and `PUT /api/accounts/local-paper-capital`. The effective-capital payload uses
-`source = "ibkr-paper-balance"` only when the configured paper iBeam session is
-authenticated and a positive Client Portal account-summary balance is available;
-it otherwise falls back to the Postgres-backed local paper ledger, or reports
-`source = "unavailable"` with safe messages when neither source exists. Saved
-backtest APIs (`POST /api/backtests`, `GET /api/backtests`,
-`GET /api/backtests/{id}`, cancel, and retry) create single-symbol runs,
-snapshot that effective capital/source, persist run history in Postgres, and
-block creation when no positive capital source exists. The API-hosted runner
-claims queued rows, marks interrupted running rows failed on restart, fetches
-candles server-side through `IMarketDataService`, invokes the configured
-analysis engine through `IAnalysisEngineRegistry`, persists safe completed or
-failed result/error envelopes, supports best-effort running cancellation, and
-broadcasts safe updates on `/hubs/backtests`. Saved backtest requests are limited
-to the built-in `sma-crossover`, `rsi-mean-reversion`, and `breakout` strategies
-with server-validated parameters, cost/slippage inputs, and optional
-buy-and-hold benchmarks; completed results include summary metrics, equity
-curves, simulated trades/signals, benchmark data, accounting inputs, and
-engine/source metadata. Browser payloads, logs, docs,
-and tests must not expose IBKR account identifiers, credentials, gateway URLs,
-LEAN workspace paths, raw process command lines, tokens, cookies, session
-details, direct browser bars, custom strategy code, or order-routing fields. The
-frontend BACKTEST rail module consumes those contracts through
-`frontend/lib/backtestClient.ts` and `terminalBacktestWorkflow`: users can review
-or set local paper capital, create a single-symbol built-in strategy run, watch
-SignalR status, inspect saved history/detail with summary/benchmark/trades/
-signals/source metadata, select only completed runs with persisted result/equity
-data for side-by-side comparison, review comparison metrics/source/capital
-metadata, and overlay persisted strategy equity curves plus buy-and-hold
-benchmark curves. Users can cancel queued/running jobs and retry failed/cancelled
-runs as new saved runs without exposing export controls, optimization, order
-controls, fake results, direct provider/runtime/database access, or account
-identifiers.
+4. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
 
-## Implementation Direction
+`./start run` runs `docker compose up --build` with `deploy/compose.yaml` and
+`.env`. It sends other arguments to `docker compose up`. For example,
+`./start run -d` starts the services in the background. When `.env` is not
+there, `./start run` writes a warning and uses the placeholder values in
+`.env.example`.
 
-The completed frontend polish, routing, page-purpose, and backtesting MVP work
-now covers the active design spec, shadcn/Tailwind/Radix UI foundation,
-module/workflow shell, dense market monitor, chart/analysis workspaces, final
-no-command cutover, simplified rail-first full-bleed workspace, compact filters,
-visible stock chart rendering, original black/graphite/amber terminal palette,
-purpose-matched collapsible rail icons, visible market-monitor table scrollbars,
-paper-capital source selection, first-class saved backtest domain/API contracts,
-async runner/SignalR updates, built-in strategy/rich result expansion, the
-enabled terminal BACKTEST workspace, completed-run comparison with persisted
-strategy/benchmark equity overlays, desktop route/visibility guardrails,
-canonical enabled/disabled/symbol routes without a `/symbols/{symbol}` alias,
-`/chart` Stored stocks defaults, purpose-built Home/Search/Watchlist page
-compositions, and a consolidated route/visibility/chart-default/page-purpose
-regression net.
-Follow-up frontend work should build on module rail navigation plus explicit
-workflow actions rather than the retired old shell/list route wrappers, a command
-system, cyan/blue-gradient-dominant styling, or the removed app-level, context,
-monitor, footer, and top-safety chrome.
+To stop the services:
 
-Future frontend work should build on the verified route matrix,
-`/symbols/{symbol}` removal, desktop scroll-ownership guardrails, `/chart`
-Stored stocks behavior, and distinct Home/Search/Watchlist page purposes.
-
-## Repository Map
-
-```text
-ATrade/
-├── README.md             # This overview
-├── PLAN.md               # Current implementation plan
-├── docs/                 # Indexed active documentation
-├── scripts/              # Startup and local environment contracts
-├── src/                  # .NET 10 backend modules and AppHost
-├── workers/              # Long-running worker processes
-└── frontend/             # Next.js application
+```sh
+docker compose --file deploy/compose.yaml --env-file .env down
 ```
 
-## Documentation Rules
+### Services
 
-- Use `docs/INDEX.md` as the documentation discovery layer.
-- Only documents marked `active` are implementation authority.
-- `docs/design/atrade-terminal-ui.md` defines the active clean-room ATrade paper workspace UI target for the frontend reconstruction queue.
-- `docs/architecture/provider-abstractions.md`, `docs/architecture/analysis-engines.md`, and `docs/architecture/paper-trading-workspace.md` define the provider seams, analysis engine contract, and paper-trading workspace contract.
-- Durable code or runtime changes must update the relevant active docs in the same change.
-- Frontend desktop behavior must stay consistent across latest stable Safari, Firefox, Chrome, and Edge: if page-level scrolling is disabled, all rail/workspace/panel/table/module overflow must remain reachable through visible internal/custom scroll affordances. Mobile optimization is not in scope for the current frontend UX batch beyond preserving existing fallbacks.
-- Secrets, IBKR credentials, account identifiers, tokens, and session cookies must stay out of git and belong only in ignored local `.env` files.
-- No change may introduce real order placement or live-trading behavior unless a future update explicitly changes the safety contract and docs.
+| Service | Content |
+|---|---|
+| `postgres` | PostgreSQL 18. Volume `atrade-pgdata`. Not published outside the Compose network. |
+| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. |
 
-## Solution File Contract
+At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
+`live`, `web` does not start and writes the reason.
 
-`ATrade.slnx` is the authoritative solution file for repo-level .NET build,
-test, and solution-list commands:
+Rootless Podman without the memory cgroup controller cannot set a memory
+limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` in `.env`.
 
-```bash
-dotnet test ATrade.slnx --nologo --verbosity minimal
-dotnet build ATrade.slnx --nologo --verbosity minimal
+### Old data
+
+The rewrite migrates no old data. The new database uses the new volume
+`atrade-pgdata`. The old PostgreSQL volume and the old containers are not
+used. To remove them, do these steps by hand. This deletes the old data
+permanently.
+
+```sh
+docker volume ls | grep -i atrade      # find the old volumes, for example atrade-postgres-data
+docker volume rm <old volume name>
 ```
 
-The legacy `ATrade.sln` remains temporarily as a non-authoritative compatibility
-artifact for tools that have not adopted `.slnx`; active scripts, tests, and
-docs should prefer `ATrade.slnx`.
+## Check the code
 
-## Verification Entry Points
+One command runs the same checks as CI:
 
-Common verification scripts live under `tests/`:
+```sh
+./scripts/check            # all checks
+./scripts/check backend    # ruff, basedpyright, import-linter, file length, pytest
+./scripts/check frontend   # ESLint, svelte-check, Vitest, build
+./scripts/check e2e        # Playwright
+```
 
-- `tests/start-contract/start-wrapper-tests.sh`
-- `tests/compose/compose-infra-contract-tests.sh`
-- `tests/apphost/api-bootstrap-tests.sh`
-- `tests/apphost/accounts-feature-bootstrap-tests.sh`
-- `tests/apphost/ibkr-paper-safety-tests.sh`
-- `tests/apphost/ibeam-runtime-contract-tests.sh`
-- `tests/apphost/ibkr-market-data-provider-tests.sh`
-- `tests/apphost/ibkr-symbol-search-tests.sh`
-- `tests/apphost/market-data-feature-tests.sh`
-- `tests/apphost/provider-abstraction-contract-tests.sh`
-- `tests/apphost/analysis-engine-contract-tests.sh`
-- `tests/apphost/lean-analysis-engine-tests.sh`
-- `tests/apphost/postgres-watchlist-persistence-tests.sh`
-- `tests/apphost/paper-capital-source-tests.sh`
-- `tests/apphost/backtesting-api-contract-tests.sh`
-- `tests/apphost/backtesting-runner-signalr-tests.sh`
-- `tests/apphost/backtesting-strategy-result-tests.sh`
-- `tests/apphost/frontend-nextjs-bootstrap-tests.sh`
-- `tests/apphost/frontend-terminal-cutover-tests.sh`
-- `tests/apphost/frontend-terminal-ui-stack-tests.sh`
-- `tests/apphost/frontend-terminal-theme-refactor-tests.sh`
-- `tests/apphost/frontend-module-rail-icons-collapse-tests.sh`
-- `tests/apphost/frontend-terminal-layout-visibility-tests.sh`
-- `tests/apphost/frontend-chart-watchlist-default-tests.sh`
-- `tests/apphost/frontend-chart-range-preset-tests.sh`
-- `tests/apphost/frontend-stock-chart-visibility-tests.sh`
-- `tests/apphost/frontend-terminal-chart-analysis-tests.sh`
-- `tests/apphost/frontend-terminal-route-architecture-tests.sh`
-- `tests/apphost/frontend-terminal-regression-suite-tests.sh`
-- `tests/apphost/frontend-terminal-backtest-workspace-tests.sh`
-- `tests/apphost/frontend-terminal-backtest-comparison-tests.sh`
-- `tests/apphost/frontend-symbol-search-exploration-tests.sh`
-- `tests/apphost/frontend-terminal-market-monitor-tests.sh`
-- `tests/apphost/frontend-purpose-built-home-search-watchlist-tests.sh`
-- `tests/apphost/frontend-market-monitor-scrollbar-tests.sh`
-- `tests/apphost/frontend-no-command-shell-tests.sh`
-- `tests/apphost/frontend-simplified-workspace-layout-tests.sh`
-- `tests/apphost/frontend-top-chrome-filter-density-tests.sh`
-- `tests/apphost/frontend-terminal-shell-ui-tests.sh`
-- `tests/apphost/frontend-trading-workspace-tests.sh`
-- `tests/apphost/frontend-workspace-workflow-module-tests.sh`
+- The tests need a real PostgreSQL. When `ATRADE_TEST_DATABASE_URL` is not
+  set, `./scripts/check` starts a temporary `postgres:18.3` container and
+  removes it at exit.
+- Playwright runs 4 projects: chromium, firefox, webkit, msedge. Set
+  `ATRADE_PLAYWRIGHT_PROJECTS` to the browsers on your machine, for example
+  `ATRADE_PLAYWRIGHT_PROJECTS="chromium firefox"`. The value `none` skips the
+  end-to-end tests. Install browsers with
+  `pnpm --dir frontend exec playwright install`.
+- Real IBKR tests have the pytest mark `ibkr_paper`. CI does not run them.
 
-GitHub issues and pull requests should list any additional targeted verification
-commands they require.
+## Development without Docker
+
+```sh
+cd backend && uv sync
+DATABASE_URL=postgresql://... ATRADE_FRONTEND_BUILD_DIR=../frontend/build uv run python -m atrade.app.web
+cd frontend && pnpm install && pnpm dev    # sends /api and /ws to 127.0.0.1:8000
+```
+
+## Repository layout
+
+```
+backend/
+  src/atrade/        # one directory per capability, plus app/ and foundation/
+  tests/             # one directory per capability; fakes/; e2e_server.py
+  migrations/        # Alembic, SQL only
+frontend/
+  src/lib/           # one directory per capability, plus foundation/
+  src/routes/        # pages
+  e2e/               # Playwright tests
+deploy/              # compose.yaml, web.Dockerfile
+scripts/check        # the quality gate
+start                # ./start run
+```
 
 ## License
 
-MIT License — see `LICENSE`.
+See [LICENSE](LICENSE).

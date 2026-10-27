@@ -1,0 +1,141 @@
+[project]
+name = "atrade"
+version = "0.1.0"
+description = "ATrade backend: HTTP API, WebSocket, backtests, and forward tests."
+requires-python = "==3.14.*"
+dependencies = [
+    "alembic==1.20.1",
+    "fastapi==0.162.0",
+    "ib-async==2.1.0",
+    "nautilus-trader==2.0.0rc7",
+    "psycopg[binary]==3.3.6",
+    "pydantic-settings==2.16.1",
+    "uvicorn==0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "anyio==4.15.1",
+    "basedpyright==1.40.2",
+    "httpx==0.28.1",
+    "import-linter==2.15",
+    "pytest==9.1.1",
+    "ruff==0.17.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+pythonpath = ["."]
+markers = [
+    "ibkr_paper: runs against the real IBKR paper account. Run by hand. Skips without .env or IB Gateway.",
+]
+
+# Readability-rule tools (#36, #51), copied from branch
+# task/readability-linter-config (commit d8a3374). "src" and "tests" are both
+# checked (#39).
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# PLR1702 is a preview rule. explicit-preview-rules turns on only the
+# preview rules that are listed here, not all preview rules.
+preview = true
+explicit-preview-rules = true
+extend-select = [
+    "C901",    # A1 cyclomatic complexity
+    "PLR1702", # A2 nesting depth
+    "PLR0913", # A3 arguments
+    "PLR0917", # A3 positional arguments
+    "PLR0915", # A4 statements per function
+    "ERA001",  # D4 commented-out code
+    "TD003",   # D5 TODO without issue link
+    "PLR2004", # E9 magic numbers in comparisons
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-nested-blocks = 4
+max-args = 5
+max-positional-args = 5
+max-statements = 50
+
+[tool.ruff.lint.per-file-ignores]
+# A test asserts concrete numbers (#39): `assert len(bars) == 3` is clearer
+# than a constant that is used one time.
+"tests/**" = ["PLR2004"]
+
+[tool.basedpyright]
+include = ["src", "tests", "migrations"]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+
+# F3, F7: capabilities depend one way (#38). A module in a layer can import
+# lower layers only. Modules in the same layer ("|") must not import each other.
+[tool.importlinter]
+root_package = "atrade"
+
+[[tool.importlinter.contracts]]
+name = "Capabilities depend one way"
+type = "layers"
+layers = [
+    "atrade.app",
+    "atrade.forward_test",
+    "atrade.backtest | atrade.paper_trading | atrade.watchlist",
+    "atrade.strategy | atrade.market_data",
+    "atrade.ibkr",
+    "atrade.foundation",
+]
+
+# F2: only the capability itself can import its internal modules. Other
+# modules import the public entry (the package __init__.py) only.
+[[tool.importlinter.contracts]]
+name = "market_data internals are private"
+type = "protected"
+protected_modules = ["atrade.market_data.*"]
+allowed_importers = ["atrade.market_data"]
+
+[[tool.importlinter.contracts]]
+name = "watchlist internals are private"
+type = "protected"
+protected_modules = ["atrade.watchlist.*"]
+allowed_importers = ["atrade.watchlist"]
+
+[[tool.importlinter.contracts]]
+name = "strategy internals are private"
+type = "protected"
+protected_modules = ["atrade.strategy.*"]
+allowed_importers = ["atrade.strategy"]
+
+[[tool.importlinter.contracts]]
+name = "backtest internals are private"
+type = "protected"
+protected_modules = ["atrade.backtest.*"]
+allowed_importers = ["atrade.backtest"]
+
+[[tool.importlinter.contracts]]
+name = "paper_trading internals are private"
+type = "protected"
+protected_modules = ["atrade.paper_trading.*"]
+allowed_importers = ["atrade.paper_trading"]
+
+[[tool.importlinter.contracts]]
+name = "forward_test internals are private"
+type = "protected"
+protected_modules = ["atrade.forward_test.*"]
+allowed_importers = ["atrade.forward_test"]
+
+[[tool.importlinter.contracts]]
+name = "ibkr internals are private"
+type = "protected"
+protected_modules = ["atrade.ibkr.*"]
+allowed_importers = ["atrade.ibkr"]
