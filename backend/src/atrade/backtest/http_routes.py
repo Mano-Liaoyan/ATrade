@@ -6,7 +6,7 @@ A new backtest waits in the queue. The backtest runner of the Web process starts
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import psycopg
 from fastapi import APIRouter, HTTPException, status
@@ -25,6 +25,7 @@ from atrade.backtest.backtest_metrics import BacktestMetrics
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
+from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
 from atrade.strategy import read_strategy_version
 
@@ -255,12 +256,23 @@ class BacktestRoutes:
 def create_backtest_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = BacktestRoutes(database_url=database_url, clock=clock)
     router = APIRouter(prefix="/api")
-    router.add_api_route("/backtests", routes.start_backtest, methods=["POST"], status_code=status.HTTP_201_CREATED)
+    refused: dict[int | str, dict[str, Any]] = {status.HTTP_422_UNPROCESSABLE_CONTENT: REFUSED_OR_NOT_VALID_RESPONSE}
+    not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
+    router.add_api_route(
+        "/backtests",
+        routes.start_backtest,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        responses=refused,
+    )
     router.add_api_route("/backtests", routes.list_backtests, methods=["GET"])
-    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"])
+    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"], responses=not_found)
     router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
     router.add_api_route(
-        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}", routes.compare_backtests, methods=["GET"]
+        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}",
+        routes.compare_backtests,
+        methods=["GET"],
+        responses={**refused, **not_found},
     )
     return router

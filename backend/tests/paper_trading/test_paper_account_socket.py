@@ -17,7 +17,7 @@ import pytest
 from httpx_ws import AsyncWebSocketSession, aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
 
-from atrade.app import create_web_app
+from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (

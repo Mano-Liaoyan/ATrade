@@ -16,7 +16,7 @@ import pytest
 from httpx_ws import AsyncWebSocketSession, WebSocketDisconnect, aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
 
-from atrade.app import create_web_app
+from atrade.app.web import create_web_app
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings

@@ -8,11 +8,11 @@ after a fixed time without messages, so that the browser can see a dead connecti
 from decimal import Decimal
 from typing import Any, Literal
 
-import anyio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, WebSocket, status
 from pydantic import BaseModel
 
 from atrade.foundation.clock import Clock
+from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
 from atrade.ibkr import GatewayRequestError, PortfolioPosition
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor, fetch_paper_capital_usd
 from atrade.paper_trading.paper_orders import (
@@ -27,10 +27,8 @@ from atrade.paper_trading.paper_orders import (
 )
 
 PUSH_INTERVAL_SECONDS = 0.25
-HEARTBEAT_INTERVAL_SECONDS = 10.0
 # Each refresh is one reqAllOpenOrders request to IB Gateway, so the order list refreshes less often.
 ORDER_REFRESH_INTERVAL_SECONDS = 1.0
-HEARTBEAT_MESSAGE = '{"type":"heartbeat"}'
 
 
 class PaperAccountCheckMessage(BaseModel):
@@ -67,6 +65,10 @@ class PaperAccountMessage(BaseModel):
     check: PaperAccountCheckMessage
     balance: PaperAccountBalanceMessage | None
     positions: list[PositionMessage]
+
+
+# The messages of /ws/paper-trading. The OpenAPI document adds their JSON Schema for the frontend types.
+PAPER_TRADING_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [PaperAccountMessage, OpenOrdersMessage, HeartbeatMessage]
 
 
 class PaperCapitalResponse(BaseModel):
@@ -109,51 +111,27 @@ def build_account_message(paper_account_monitor: PaperAccountMonitor) -> PaperAc
     )
 
 
-async def read_orders_text(paper_account_monitor: PaperAccountMonitor, last_orders_text: str) -> str:
-    """The orders message. Keeps the last message when IB Gateway does not answer, and tries again later."""
+async def read_orders_message(paper_account_monitor: PaperAccountMonitor) -> OpenOrdersMessage | None:
+    """The orders message, or None when IB Gateway does not answer. The socket then tries again later."""
     try:
         orders = await read_open_orders_of_checked_account(paper_account_monitor)
     except GatewayRequestError:
-        return last_orders_text
-    return OpenOrdersMessage(orders=orders).model_dump_json()
+        return None
+    return OpenOrdersMessage(orders=orders)
 
 
 async def push_account_changes(websocket: WebSocket, paper_account_monitor: PaperAccountMonitor) -> None:
-    last_sent_account_text = ""
-    last_sent_orders_text = ""
-    seconds_since_last_message = 0.0
+    sender = ChangedMessageSender(websocket)
     seconds_since_order_refresh = ORDER_REFRESH_INTERVAL_SECONDS
     while True:
-        sent_message = False
-        account_text = build_account_message(paper_account_monitor).model_dump_json()
-        if account_text != last_sent_account_text:
-            await websocket.send_text(account_text)
-            last_sent_account_text = account_text
-            sent_message = True
+        await sender.send_if_changed(build_account_message(paper_account_monitor))
         if seconds_since_order_refresh >= ORDER_REFRESH_INTERVAL_SECONDS:
             seconds_since_order_refresh = 0.0
-            orders_text = await read_orders_text(paper_account_monitor, last_sent_orders_text)
-            if orders_text != last_sent_orders_text:
-                await websocket.send_text(orders_text)
-                last_sent_orders_text = orders_text
-                sent_message = True
-        if sent_message:
-            seconds_since_last_message = 0.0
-        elif seconds_since_last_message >= HEARTBEAT_INTERVAL_SECONDS:
-            await websocket.send_text(HEARTBEAT_MESSAGE)
-            seconds_since_last_message = 0.0
-        await anyio.sleep(PUSH_INTERVAL_SECONDS)
-        seconds_since_last_message += PUSH_INTERVAL_SECONDS
+            orders_message = await read_orders_message(paper_account_monitor)
+            if orders_message is not None:
+                await sender.send_if_changed(orders_message)
+        await sender.wait(PUSH_INTERVAL_SECONDS)
         seconds_since_order_refresh += PUSH_INTERVAL_SECONDS
-
-
-async def wait_for_disconnect(websocket: WebSocket) -> None:
-    # The browser sends nothing that the server needs. Reading the socket shows when the browser leaves.
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        return
 
 
 def add_order_routes(router: APIRouter, routes: PaperOrderRoutes) -> None:
@@ -213,10 +191,6 @@ def create_paper_trading_router(
 
     @router.websocket("/ws/paper-trading")
     async def stream_paper_account(websocket: WebSocket) -> None:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
-        await websocket.accept()
-        async with anyio.create_task_group() as task_group:
-            task_group.start_soon(push_account_changes, websocket, paper_account_monitor)
-            await wait_for_disconnect(websocket)
-            task_group.cancel_scope.cancel()
+        await serve_until_disconnect(websocket, lambda: push_account_changes(websocket, paper_account_monitor))
 
     return router

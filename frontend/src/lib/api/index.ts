@@ -1242,6 +1242,72 @@ export interface components {
             type: "bar";
             bar: components["schemas"]["BarResponse"];
         };
+        /** OpenOrdersMessage */
+        OpenOrdersMessage: {
+            /**
+             * Type
+             * @default orders
+             * @constant
+             */
+            type: "orders";
+            /** Orders */
+            orders: components["schemas"]["OpenOrderResponse"][];
+        };
+        /** PaperAccountBalanceMessage */
+        PaperAccountBalanceMessage: {
+            /** Net Liquidation Usd */
+            net_liquidation_usd: string | null;
+            /** Cash Usd */
+            cash_usd: string | null;
+        };
+        /** PaperAccountCheckMessage */
+        PaperAccountCheckMessage: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disconnected" | "passed" | "failed";
+            /** Message */
+            message: string | null;
+            /** Actual Accounts */
+            actual_accounts: string[];
+            /** Expected Account */
+            expected_account: string | null;
+        };
+        /** PaperAccountMessage */
+        PaperAccountMessage: {
+            /**
+             * Type
+             * @default account
+             * @constant
+             */
+            type: "account";
+            check: components["schemas"]["PaperAccountCheckMessage"];
+            balance: components["schemas"]["PaperAccountBalanceMessage"] | null;
+            /** Positions */
+            positions: components["schemas"]["PositionMessage"][];
+        };
+        /** PositionMessage */
+        PositionMessage: {
+            /** Symbol */
+            symbol: string;
+            /** Security Type */
+            security_type: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Quantity */
+            quantity: string;
+            /** Average Cost */
+            average_cost: string;
+            /** Market Price */
+            market_price: string;
+            /** Market Value */
+            market_value: string;
+            /** Unrealized Pnl */
+            unrealized_pnl: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1632,6 +1698,15 @@ export interface operations {
                     "application/json": components["schemas"]["StrategyResponse"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1663,6 +1738,15 @@ export interface operations {
                     "application/json": components["schemas"]["StrategyResponse"];
                 };
             };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1691,6 +1775,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -1722,6 +1824,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1766,6 +1877,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Unprocessable Content */
@@ -1821,13 +1941,13 @@ export interface operations {
                     "application/json": components["schemas"]["BacktestResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -1850,6 +1970,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1937,13 +2066,22 @@ export interface operations {
                     "application/json": components["schemas"]["BacktestComparisonResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

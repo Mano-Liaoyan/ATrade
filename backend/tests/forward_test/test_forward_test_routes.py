@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 import pytest
 
-from atrade.app import create_web_app
+from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection

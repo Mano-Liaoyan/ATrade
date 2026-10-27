@@ -20,6 +20,7 @@ from atrade.foundation.clock import SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import IbAsyncGatewayConnection
 from atrade.market_data import MARKET_DATA_SOCKET_MESSAGE_MODELS
+from atrade.paper_trading import PAPER_TRADING_SOCKET_MESSAGE_MODELS
 
 # The document needs only the routes. The app does not start, so it opens no database or Gateway connection.
 UNUSED_DATABASE_URL = "postgresql://unused/atrade"
@@ -27,7 +28,15 @@ UNUSED_GATEWAY_HOST = "127.0.0.1"
 UNUSED_GATEWAY_PORT = 4004
 UNUSED_CLIENT_ID = 1
 SCHEMA_REF_TEMPLATE = "#/components/schemas/{model}"
-SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [*MARKET_DATA_SOCKET_MESSAGE_MODELS, *FORWARD_TEST_SOCKET_MESSAGE_MODELS]
+# One list per /ws/ route. Each list has HeartbeatMessage; add_socket_message_schemas adds it once.
+SOCKET_MESSAGE_MODEL_LISTS: list[list[type[BaseModel]]] = [
+    MARKET_DATA_SOCKET_MESSAGE_MODELS,
+    FORWARD_TEST_SOCKET_MESSAGE_MODELS,
+    PAPER_TRADING_SOCKET_MESSAGE_MODELS,
+]
+SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = list(
+    dict.fromkeys(model for models in SOCKET_MESSAGE_MODEL_LISTS for model in models)
+)
 
 
 def add_socket_message_schemas(document: dict[str, Any], models: list[type[BaseModel]]) -> None:

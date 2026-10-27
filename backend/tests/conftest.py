@@ -13,7 +13,8 @@ import psycopg
 import pytest
 from psycopg import sql
 
-from atrade.app import create_web_app, upgrade_database
+from atrade.app.database_migrations import upgrade_database
+from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection

@@ -5,7 +5,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from atrade.app import create_web_app
+from atrade.app.web import create_web_app
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock

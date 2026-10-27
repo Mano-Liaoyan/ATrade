@@ -9,16 +9,16 @@ from contextlib import aclosing
 from typing import Annotated, Literal
 
 import anyio
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Query, WebSocket, status
 from pydantic import BaseModel
 
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.instrument import Instrument
+from atrade.foundation.socket_push import HEARTBEAT_INTERVAL_SECONDS, HeartbeatMessage, wait_for_disconnect
 from atrade.ibkr import GatewayConnection, GatewayRequestError
 from atrade.market_data.bar_models import BarResponse, InstrumentField, to_bar_response
 
 MARKET_DATA_SOCKET_PATH = "/ws/market-data"
-HEARTBEAT_INTERVAL_SECONDS = 10.0
 HEARTBEAT_CHECK_SECONDS = 1.0
 
 
@@ -41,10 +41,6 @@ class LiveBarMessage(BaseModel):
 class LiveBarErrorMessage(BaseModel):
     type: Literal["error"] = "error"
     detail: str
-
-
-class HeartbeatMessage(BaseModel):
-    type: Literal["heartbeat"] = "heartbeat"
 
 
 # The frontend types of these messages come from their JSON Schema (app/openapi_document.py).
@@ -70,15 +66,6 @@ class LiveBarSender:
             self.seconds_since_last_message += HEARTBEAT_CHECK_SECONDS
             if self.seconds_since_last_message >= HEARTBEAT_INTERVAL_SECONDS:
                 await self.send(HeartbeatMessage())
-
-
-async def wait_for_disconnect(websocket: WebSocket) -> None:
-    # The browser sends nothing that the server needs. Reading the socket shows when the browser leaves.
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        return
 
 
 def create_live_bar_router(*, gateway_connection: GatewayConnection, host: str, port: int) -> APIRouter:

@@ -484,6 +484,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -523,6 +533,16 @@
               }
             }
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -552,6 +572,26 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "422": {
             "description": "Validation Error",
@@ -600,6 +640,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -661,6 +711,16 @@
               }
             }
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -720,11 +780,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -757,6 +817,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -862,14 +932,24 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           }
         }
       }
@@ -2682,36 +2762,36 @@
       "OpenOrderResponse": {
         "properties": {
           "order_id": {
-            "type": "integer",
-            "title": "Order Id"
+            "title": "Order Id",
+            "type": "integer"
           },
           "account": {
-            "type": "string",
-            "title": "Account"
+            "title": "Account",
+            "type": "string"
           },
           "symbol": {
-            "type": "string",
-            "title": "Symbol"
+            "title": "Symbol",
+            "type": "string"
           },
           "exchange": {
-            "type": "string",
-            "title": "Exchange"
+            "title": "Exchange",
+            "type": "string"
           },
           "currency": {
-            "type": "string",
-            "title": "Currency"
+            "title": "Currency",
+            "type": "string"
           },
           "side": {
-            "type": "string",
-            "title": "Side"
+            "title": "Side",
+            "type": "string"
           },
           "quantity": {
-            "type": "string",
-            "title": "Quantity"
+            "title": "Quantity",
+            "type": "string"
           },
           "order_type": {
-            "type": "string",
-            "title": "Order Type"
+            "title": "Order Type",
+            "type": "string"
           },
           "limit_price": {
             "anyOf": [
@@ -2725,26 +2805,25 @@
             "title": "Limit Price"
           },
           "time_in_force": {
-            "type": "string",
-            "title": "Time In Force"
+            "title": "Time In Force",
+            "type": "string"
           },
           "status": {
-            "type": "string",
-            "title": "Status"
+            "title": "Status",
+            "type": "string"
           },
           "filled_quantity": {
-            "type": "string",
-            "title": "Filled Quantity"
+            "title": "Filled Quantity",
+            "type": "string"
           },
           "source": {
             "$ref": "#/components/schemas/OrderSourceResponse"
           },
           "can_cancel": {
-            "type": "boolean",
-            "title": "Can Cancel"
+            "title": "Can Cancel",
+            "type": "boolean"
           }
         },
-        "type": "object",
         "required": [
           "order_id",
           "account",
@@ -2761,7 +2840,8 @@
           "source",
           "can_cancel"
         ],
-        "title": "OpenOrderResponse"
+        "title": "OpenOrderResponse",
+        "type": "object"
       },
       "OrderBlockedResponse": {
         "properties": {
@@ -2839,12 +2919,12 @@
       "OrderSourceResponse": {
         "properties": {
           "kind": {
-            "type": "string",
             "enum": [
               "by_hand",
               "forward_test"
             ],
-            "title": "Kind"
+            "title": "Kind",
+            "type": "string"
           },
           "forward_test_id": {
             "anyOf": [
@@ -2858,12 +2938,12 @@
             "title": "Forward Test Id"
           }
         },
-        "type": "object",
         "required": [
           "kind",
           "forward_test_id"
         ],
-        "title": "OrderSourceResponse"
+        "title": "OrderSourceResponse",
+        "type": "object"
       },
       "OrderType": {
         "type": "string",
@@ -3455,6 +3535,200 @@
           "bar"
         ],
         "title": "LiveBarMessage",
+        "type": "object"
+      },
+      "OpenOrdersMessage": {
+        "properties": {
+          "type": {
+            "const": "orders",
+            "default": "orders",
+            "title": "Type",
+            "type": "string"
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/OpenOrderResponse"
+            },
+            "title": "Orders",
+            "type": "array"
+          }
+        },
+        "required": [
+          "orders"
+        ],
+        "title": "OpenOrdersMessage",
+        "type": "object"
+      },
+      "PaperAccountBalanceMessage": {
+        "properties": {
+          "net_liquidation_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Liquidation Usd"
+          },
+          "cash_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Usd"
+          }
+        },
+        "required": [
+          "net_liquidation_usd",
+          "cash_usd"
+        ],
+        "title": "PaperAccountBalanceMessage",
+        "type": "object"
+      },
+      "PaperAccountCheckMessage": {
+        "properties": {
+          "status": {
+            "enum": [
+              "disconnected",
+              "passed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "actual_accounts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actual Accounts",
+            "type": "array"
+          },
+          "expected_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Account"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "actual_accounts",
+          "expected_account"
+        ],
+        "title": "PaperAccountCheckMessage",
+        "type": "object"
+      },
+      "PaperAccountMessage": {
+        "properties": {
+          "type": {
+            "const": "account",
+            "default": "account",
+            "title": "Type",
+            "type": "string"
+          },
+          "check": {
+            "$ref": "#/components/schemas/PaperAccountCheckMessage"
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaperAccountBalanceMessage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PositionMessage"
+            },
+            "title": "Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "check",
+          "balance",
+          "positions"
+        ],
+        "title": "PaperAccountMessage",
+        "type": "object"
+      },
+      "PositionMessage": {
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "security_type": {
+            "title": "Security Type",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "average_cost": {
+            "title": "Average Cost",
+            "type": "string"
+          },
+          "market_price": {
+            "title": "Market Price",
+            "type": "string"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "title": "Unrealized Pnl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "security_type",
+          "exchange",
+          "currency",
+          "quantity",
+          "average_cost",
+          "market_price",
+          "market_value",
+          "unrealized_pnl"
+        ],
+        "title": "PositionMessage",
         "type": "object"
       }
     }

@@ -9,12 +9,19 @@ import logging
 import signal
 import sys
 
+from pydantic import TypeAdapter
+
 from atrade.forward_test import ChildMode, IbkrAccess, run_forward_test_child, run_live_node
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
 
 FORWARD_TEST_PROCESS_COMMAND = [sys.executable, "-m", "atrade.app.forward_test_process"]
-CHILD_MODES: dict[str, ChildMode] = {"run": "run", "cancel_orders": "cancel_orders"}
+CHILD_MODE_ADAPTER: TypeAdapter[ChildMode] = TypeAdapter(ChildMode)
+
+
+def read_child_mode(text: str) -> ChildMode:
+    """The child mode of the command line. A different text raises pydantic.ValidationError."""
+    return CHILD_MODE_ADAPTER.validate_python(text)
 
 
 async def run_child(settings: Settings, forward_test_id: int, mode: ChildMode) -> int:
@@ -36,7 +43,7 @@ async def run_child(settings: Settings, forward_test_id: int, mode: ChildMode) -
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     forward_test_id = int(sys.argv[1])
-    mode = CHILD_MODES[sys.argv[2]]
+    mode = read_child_mode(sys.argv[2])
     settings = Settings()  # pyright: ignore[reportCallIssue] readability-exception: pydantic-settings fills required fields from the environment.
     sys.exit(asyncio.run(run_child(settings, forward_test_id, mode)))
 

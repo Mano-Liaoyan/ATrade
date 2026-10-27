@@ -13,7 +13,14 @@ from nautilus_trader.indicators import SimpleMovingAverage
 from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Quantity
 from nautilus_trader.trading import Strategy
 
-WARM_UP_DAYS = 60
+# The warm-up asks for 3 average periods of bars, and for 1 week at least, so that nights, weekends,
+# and holidays do not leave the indicator without bars. A long warm-up of short bars means many IBKR requests.
+WARM_UP_AVERAGE_PERIODS = 3
+MIN_WARM_UP_LENGTH = timedelta(days=7)
+
+
+def find_warm_up_length(bar_type: BarType, average_period: int) -> timedelta:
+    return max(bar_type.spec.timedelta * average_period * WARM_UP_AVERAGE_PERIODS, MIN_WARM_UP_LENGTH)
 
 
 class MovingAverageConfig(StrategyConfig):
@@ -45,7 +52,8 @@ class MovingAverageStrategy(Strategy):
     def on_start(self) -> None:
         self.register_indicator_for_bars(self.settings.bar_type, self.average)
         # Warm up the indicator with historical bars before live bars arrive.
-        warm_up_start = self.clock.utc_now() - timedelta(days=WARM_UP_DAYS)
+        warm_up_length = find_warm_up_length(self.settings.bar_type, self.settings.average_period)
+        warm_up_start = self.clock.utc_now() - warm_up_length
         self.request_bars(self.settings.bar_type, start=warm_up_start)
         self.subscribe_bars(self.settings.bar_type)
 

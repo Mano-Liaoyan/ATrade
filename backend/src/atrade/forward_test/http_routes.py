@@ -9,9 +9,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-import anyio
 import psycopg
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, HTTPException, WebSocket, status
 from fastapi.responses import JSONResponse
 from pydantic import AwareDatetime, BaseModel, StringConstraints, field_validator
 
@@ -28,12 +27,11 @@ from atrade.forward_test.forward_test_store import (
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
+from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
 from atrade.strategy import read_strategy_version
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 STATE_READ_INTERVAL_SECONDS = 2.0
-HEARTBEAT_INTERVAL_SECONDS = 10.0
-HEARTBEAT_MESSAGE = '{"type":"heartbeat"}'
 
 # The bar periods of IB live bars (section 12.1). Every period that ATrade offers (BarPeriod) is in the list.
 # https://interactivebrokers.github.io/tws-api/historical_bars.html#hd_barsize
@@ -104,7 +102,7 @@ class ForwardTestsMessage(BaseModel):
 
 
 # The messages of /ws/forward-tests. The OpenAPI document adds their JSON Schema for the frontend types.
-FORWARD_TEST_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [ForwardTestsMessage]
+FORWARD_TEST_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [ForwardTestsMessage, HeartbeatMessage]
 
 
 async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> ForwardTestResponse:
@@ -236,28 +234,10 @@ class ForwardTestRoutes:
 
 
 async def push_forward_test_changes(websocket: WebSocket, database_url: str) -> None:
-    last_sent_text = ""
-    seconds_since_last_message = 0.0
+    sender = ChangedMessageSender(websocket)
     while True:
-        message_text = ForwardTestsMessage(forward_tests=await list_forward_tests(database_url)).model_dump_json()
-        if message_text != last_sent_text:
-            await websocket.send_text(message_text)
-            last_sent_text = message_text
-            seconds_since_last_message = 0.0
-        elif seconds_since_last_message >= HEARTBEAT_INTERVAL_SECONDS:
-            await websocket.send_text(HEARTBEAT_MESSAGE)
-            seconds_since_last_message = 0.0
-        await anyio.sleep(STATE_READ_INTERVAL_SECONDS)
-        seconds_since_last_message += STATE_READ_INTERVAL_SECONDS
-
-
-async def wait_for_disconnect(websocket: WebSocket) -> None:
-    # The browser sends nothing that the server needs. Reading the socket shows when the browser leaves.
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        return
+        await sender.send_if_changed(ForwardTestsMessage(forward_tests=await list_forward_tests(database_url)))
+        await sender.wait(STATE_READ_INTERVAL_SECONDS)
 
 
 def create_forward_test_router(*, database_url: str, clock: Clock, client_ids: range) -> APIRouter:
@@ -282,10 +262,6 @@ def create_forward_test_router(*, database_url: str, clock: Clock, client_ids: r
 
     @router.websocket("/ws/forward-tests")
     async def stream_forward_tests(websocket: WebSocket) -> None:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
-        await websocket.accept()
-        async with anyio.create_task_group() as task_group:
-            task_group.start_soon(push_forward_test_changes, websocket, database_url)
-            await wait_for_disconnect(websocket)
-            task_group.cancel_scope.cancel()
+        await serve_until_disconnect(websocket, lambda: push_forward_test_changes(websocket, database_url))
 
     return router

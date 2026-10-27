@@ -8,7 +8,6 @@ import os
 import sys
 from pathlib import Path
 
-from atrade.backtest import run_backtest
 from atrade.foundation.clock import SystemClock
 
 BACKTEST_PROCESS_COMMAND = [sys.executable, "-m", "atrade.app.backtest_process"]
@@ -29,6 +28,9 @@ def lower_own_priority() -> None:
 
 def main() -> None:
     lower_own_priority()
+    # NautilusTrader and pyarrow load after the priority change, so their import also runs with the lower priority.
+    from atrade.backtest import run_backtest
+
     backtest_id = int(sys.argv[1])
     run_backtest(database_url=os.environ["DATABASE_URL"], backtest_id=backtest_id, clock=SystemClock())
 

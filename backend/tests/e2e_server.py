@@ -14,7 +14,8 @@ from pathlib import Path
 import psycopg
 import uvicorn
 
-from atrade.app import create_web_app, upgrade_database
+from atrade.app.database_migrations import upgrade_database
+from atrade.app.web import create_web_app
 from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings

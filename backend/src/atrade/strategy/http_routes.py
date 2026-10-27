@@ -1,7 +1,7 @@
 """HTTP routes of the strategy capability: create, list, open, save, and delete strategies and strategy versions."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 import psycopg
 from fastapi import APIRouter, HTTPException, Response, status
@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, StringConstraints
 
 from atrade.foundation.clock import Clock
+from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.strategy import strategy_store
 from atrade.strategy.code_checks import check_strategy_code
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
@@ -179,13 +180,26 @@ class StrategyRoutes:
 def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = StrategyRoutes(database_url=database_url, clock=clock)
     router = APIRouter(prefix="/api/strategies")
-    router.add_api_route("", routes.create_strategy, methods=["POST"], status_code=status.HTTP_201_CREATED)
-    router.add_api_route("", routes.list_strategies, methods=["GET"])
-    router.add_api_route("/{strategy_id}", routes.read_strategy, methods=["GET"])
+    not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
     router.add_api_route(
-        "/{strategy_id}", routes.delete_strategy, methods=["DELETE"], status_code=status.HTTP_204_NO_CONTENT
+        "",
+        routes.create_strategy,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        responses={status.HTTP_409_CONFLICT: ERROR_RESPONSE},
     )
-    router.add_api_route("/{strategy_id}/versions/{version_number}", routes.read_version, methods=["GET"])
+    router.add_api_route("", routes.list_strategies, methods=["GET"])
+    router.add_api_route("/{strategy_id}", routes.read_strategy, methods=["GET"], responses=not_found)
+    router.add_api_route(
+        "/{strategy_id}",
+        routes.delete_strategy,
+        methods=["DELETE"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={**not_found, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
+    )
+    router.add_api_route(
+        "/{strategy_id}/versions/{version_number}", routes.read_version, methods=["GET"], responses=not_found
+    )
     router.add_api_route(
         "/{strategy_id}/versions",
         routes.save_version,
@@ -197,6 +211,7 @@ def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
                 "model": StrategyVersionResponse,
                 "description": "The code is the same as the latest version. No new version is made.",
             },
+            **not_found,
             status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": CodeCheckFailedResponse},
         },
     )
