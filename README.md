@@ -14,15 +14,16 @@ The repository holds the minimum runnable skeleton (issue #62), the IBKR
 connection (issue #63), instrument search (issue #64), the strategy editor
 (issue #68), code completion (issue #69), the paper account check with the
 account panel (issue #74), paper orders sent by hand (issue #75), backtests
-(issue #70), and the start and stop of forward tests (issue #76):
+(issue #70), the backtest comparison (issue #72), the backtest isolation
+controls (issue #71), and the start and stop of forward tests (issue #76):
 
 - The `web` service serves the app shell, `GET /api/health`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
   language server WebSocket `/ws/strategy-language-server`, the paper order
   routes under `/api/paper-trading`, the backtest routes under
-  `/api/backtests`, the forward test routes under `/api/forward-tests`,
-  `/ws/paper-trading`, and `/ws/forward-tests`.
+  `/api/backtests` and `/api/backtest-limits`, the forward test routes under
+  `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
 - The app shell header shows the backend status and the IB Gateway status.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
@@ -73,11 +74,22 @@ account panel (issue #74), paper orders sent by hand (issue #75), backtests
 - Backtests: the page `/backtests` starts a backtest of a strategy version on
   the saved bars of one USD instrument, with paper capital from the paper
   account balance or the local setting. Each backtest runs in its own child
-  process of `web`, one at a time. The backtest page shows the status, the
+  process of `web`. The child has only the environment variables `PATH`,
+  `HOME`, `TZ`, and `DATABASE_URL`, runs with `nice 10`, and has
+  `oom_score_adj` 1000. The "Limits" form on `/backtests` sets the timeout
+  (default 120 minutes) and the number of backtests at the same time
+  (default 1). Other backtests wait in the queue. A backtest that runs longer
+  than the timeout stops with the status "Timed out". The backtest page shows the status, the
   strategy error, the metrics, the equity curve, and the trades. Open the
   bar chart of the instrument first: backtests read only bars that are in
   PostgreSQL. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
+- Backtest comparison: the list on `/backtests` shows the metrics of all
+  backtests side by side. Select 2 backtests of the same strategy and click
+  "Compare selected backtests". The comparison page shows the code diff, the
+  metric table, and both equity curves on one chart. ATrade refuses 2
+  backtests of different strategies. See
+  [`docs/architecture/backtest.md`](docs/architecture/backtest.md) section 10.7.
 - Forward tests: the page `/forward-tests` starts a forward test of a
   strategy version on one instrument and one IB live bar period, and shows
   the metrics of the latest backtest of that version. The `forward-test`
@@ -88,9 +100,8 @@ account panel (issue #74), paper orders sent by hand (issue #75), backtests
   forward test per instrument, 4 at the same time. A restart of `web` does
   not stop forward tests. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
-- The automatic recovery of forward tests, the forward test end time, the
-  forward test records and comparison, the backtest limits UI, and the
-  backtest comparison are not available yet.
+- The automatic recovery of forward tests, the forward test end time, and
+  the forward test records and comparison are not available yet.
 
 ## Requirements
 

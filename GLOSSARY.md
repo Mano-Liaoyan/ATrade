@@ -39,6 +39,12 @@ _Avoid_: revision, snapshot, commit
 A test of a strategy on historical bars. No order goes to a broker.
 _Avoid_: simulation, historical run
 
+**Backtest limits**:
+The timeout of one backtest and the number of backtests that run at the same
+time (the concurrency). The user changes them in the UI. Other backtests wait
+in the queue.
+_Avoid_: backtest settings, quota
+
 **Trade**:
 One fill of an order in a backtest or a forward test: the time, the side, the
 quantity, and the price.

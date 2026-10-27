@@ -1,13 +1,13 @@
 """forward_test: create the forward_test table
 
 Revision ID: 3e7a1c5d9b76
-Revises: 9a4c2f6e1b70
+Revises: 3e7a1c5d9b71
 """
 
 from alembic import op
 
 revision = "3e7a1c5d9b76"
-down_revision = "9a4c2f6e1b70"
+down_revision = "3e7a1c5d9b71"
 
 
 def upgrade() -> None:

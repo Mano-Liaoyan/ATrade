@@ -1,6 +1,6 @@
 // Calls the backtest HTTP routes and turns each answer into a result that the backtest pages can show.
 import { describe, expect, it } from 'vitest';
-import { startBacktest, type BacktestRequest } from './index';
+import { changeBacktestLimits, readBacktestLimits, startBacktest, type BacktestRequest } from './index';
 
 const REQUEST: BacktestRequest = {
   strategy_version_id: 7,
@@ -51,5 +51,34 @@ describe('startBacktest', () => {
     const result = await startBacktest(failingFetch, REQUEST);
 
     expect(result).toEqual({ kind: 'failed', message: 'The backend is not reachable.' });
+  });
+});
+
+describe('backtest limits', () => {
+  it('reads the timeout and the concurrency', async () => {
+    const limitsFetch: typeof fetch = (path) => {
+      expect(path).toBe('/api/backtest-limits');
+      return Promise.resolve(new Response(JSON.stringify({ timeout_seconds: 7200, concurrency: 1 }), { status: 200 }));
+    };
+
+    const result = await readBacktestLimits(limitsFetch);
+
+    expect(result).toEqual({ kind: 'ok', value: { timeout_seconds: 7200, concurrency: 1 } });
+  });
+
+  it('sends the changed limits with PUT', async () => {
+    let sentMethod = '';
+    let sentBody = '';
+    const recordingFetch: typeof fetch = (_path, init) => {
+      sentMethod = init?.method ?? '';
+      sentBody = typeof init?.body === 'string' ? init.body : '';
+      return Promise.resolve(new Response(sentBody, { status: 200 }));
+    };
+
+    const result = await changeBacktestLimits(recordingFetch, { timeout_seconds: 600, concurrency: 2 });
+
+    expect(sentMethod).toBe('PUT');
+    expect(JSON.parse(sentBody)).toEqual({ timeout_seconds: 600, concurrency: 2 });
+    expect(result).toEqual({ kind: 'ok', value: { timeout_seconds: 600, concurrency: 2 } });
   });
 });

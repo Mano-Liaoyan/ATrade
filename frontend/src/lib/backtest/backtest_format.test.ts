@@ -1,6 +1,13 @@
 // Labels and values that the backtest pages show.
 import { describe, expect, it } from 'vitest';
-import { convertDateToUtcStart, describeBacktestStatus, formatPercent, isFinalStatus } from './index';
+import {
+  convertDateToUtcStart,
+  convertTimeoutMinutesToSeconds,
+  describeBacktestStatus,
+  formatPercent,
+  formatTimeoutMinutes,
+  isFinalStatus,
+} from './index';
 
 describe('describeBacktestStatus', () => {
   it('names each status in words', () => {
@@ -33,5 +40,26 @@ describe('formatPercent', () => {
     expect(formatPercent('1.6')).toBe('+1.60 %');
     expect(formatPercent('-1.02')).toBe('-1.02 %');
     expect(formatPercent('0')).toBe('0.00 %');
+  });
+});
+
+describe('formatTimeoutMinutes', () => {
+  it('shows the stored timeout in minutes', () => {
+    expect(formatTimeoutMinutes(7200)).toBe('120');
+    expect(formatTimeoutMinutes(90)).toBe('1.5');
+  });
+});
+
+describe('convertTimeoutMinutesToSeconds', () => {
+  it('converts whole minutes to seconds', () => {
+    expect(convertTimeoutMinutesToSeconds('120')).toBe(7200);
+    expect(convertTimeoutMinutesToSeconds(' 5 ')).toBe(300);
+  });
+
+  it('is null for a value that is not a whole number of minutes above 0', () => {
+    expect(convertTimeoutMinutesToSeconds('0')).toBeNull();
+    expect(convertTimeoutMinutesToSeconds('1.5')).toBeNull();
+    expect(convertTimeoutMinutesToSeconds('')).toBeNull();
+    expect(convertTimeoutMinutesToSeconds('ten')).toBeNull();
   });
 });

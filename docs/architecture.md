@@ -655,6 +655,28 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - The test PostgreSQL fixture runs the migrations one time per session and
   truncates all tables except `alembic_version` before each test.
 
+### 17.8 Release checklist
+
+Do these checks by hand before each release. Tests cannot do them.
+
+1. Real Safari (section 17.5): open each page. Each scroll region must
+   scroll and show its scroll bar.
+2. Backtest memory limit (section 10.1). The kernel must stop the backtest
+   child before the Web process when memory is low:
+   1. In `.env`, set `ATRADE_WEB_MEMORY_LIMIT=1g`. Run `./start run -d`.
+   2. Save a strategy that keeps memory in `on_bar`, for example
+      `self.blocks.append(bytearray(100_000_000))`. Start a backtest of it on
+      saved bars.
+   3. While the backtest runs, run
+      `docker compose --file deploy/compose.yaml --env-file .env exec web sh -c 'for p in /proc/[0-9]*; do echo "$p $(cat $p/oom_score_adj) $(cut -d" " -f19 $p/stat) $(tr "\0" " " < $p/cmdline)"; done'`.
+      The `atrade.app.backtest_process` line must show `oom_score_adj` 1000
+      and niceness 10.
+   4. Wait until the backtest ends. Its status must be "Failed" with exit
+      code -9. The header must still show the backend status, and
+      `GET /api/health` must answer: the Web process did not stop.
+   5. Set `ATRADE_WEB_MEMORY_LIMIT` back to its earlier value. Run
+      `./start run -d` again.
+
 ## 18. Documentation rules
 
 Source: [Documentation rules for the new project](https://github.com/Mano-Liaoyan/ATrade/issues/57).

@@ -10,6 +10,8 @@ const STATUS_LABELS: Record<BacktestStatus, string> = {
 };
 const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out'];
 const PERCENT_DECIMAL_PLACES = 2;
+const SECONDS_PER_MINUTE = 60;
+const WHOLE_NUMBER_PATTERN = /^\d+$/;
 const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function describeBacktestStatus(status: BacktestStatus): string {
@@ -33,4 +35,22 @@ export function formatPercent(percent: string): string {
 
 export function formatUsd(amount: string): string {
   return AMOUNT_FORMAT.format(Number(amount));
+}
+
+// The backend stores the timeout in seconds. The UI shows and takes it in minutes.
+export function formatTimeoutMinutes(timeoutSeconds: number): string {
+  return String(timeoutSeconds / SECONDS_PER_MINUTE);
+}
+
+// Returns null when the text is not a whole number of minutes above 0.
+export function convertTimeoutMinutesToSeconds(minutesText: string): number | null {
+  const trimmedText = minutesText.trim();
+  if (!WHOLE_NUMBER_PATTERN.test(trimmedText)) {
+    return null;
+  }
+  const minutes = Number(trimmedText);
+  if (minutes === 0) {
+    return null;
+  }
+  return minutes * SECONDS_PER_MINUTE;
 }

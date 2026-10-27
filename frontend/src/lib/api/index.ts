@@ -252,6 +252,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backtest-limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Limits */
+        get: operations["read_limits_api_backtest_limits_get"];
+        /** Change Limits */
+        put: operations["change_limits_api_backtest_limits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{first_backtest_id}/comparison/{second_backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Backtests
+         * @description Compare two backtests of the same strategy: two versions, or one version with other request fields.
+         */
+        get: operations["compare_backtests_api_backtests__first_backtest_id__comparison__second_backtest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forward-tests": {
         parameters: {
             query?: never;
@@ -338,6 +376,15 @@ export interface components {
             /** Currency */
             currency: string;
         };
+        /** BacktestComparisonResponse */
+        BacktestComparisonResponse: {
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            first: components["schemas"]["ComparedBacktestResponse"];
+            second: components["schemas"]["ComparedBacktestResponse"];
+        };
         /** BacktestDetailResponse */
         BacktestDetailResponse: {
             /** Id */
@@ -386,6 +433,16 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+        };
+        /**
+         * BacktestLimitsBody
+         * @description The request and the response of the backtest limits routes.
+         */
+        BacktestLimitsBody: {
+            /** Timeout Seconds */
+            timeout_seconds: number;
+            /** Concurrency */
+            concurrency: number;
         };
         /** BacktestMetricsResponse */
         BacktestMetricsResponse: {
@@ -485,6 +542,57 @@ export interface components {
             line: number;
             /** Message */
             message: string;
+        };
+        /** ComparedBacktestResponse */
+        ComparedBacktestResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: string;
+            status: components["schemas"]["BacktestStatus"];
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Started At Utc */
+            started_at_utc: string | null;
+            /** Ended At Utc */
+            ended_at_utc: string | null;
+            metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Equity Curve */
+            equity_curve: components["schemas"]["EquityPointResponse"][];
+            /** Trades */
+            trades: components["schemas"]["TradeResponse"][];
+            /** Code */
+            code: string;
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -1584,6 +1692,91 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_limits_api_backtest_limits_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+        };
+    };
+    change_limits_api_backtest_limits_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BacktestLimitsBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_backtests_api_backtests__first_backtest_id__comparison__second_backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                first_backtest_id: number;
+                second_backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestComparisonResponse"];
                 };
             };
             /** @description Validation Error */
