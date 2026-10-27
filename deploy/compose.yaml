@@ -10,7 +10,9 @@ services:
       POSTGRES_USER: atrade
       POSTGRES_PASSWORD: ${ATRADE_POSTGRES_PASSWORD:?Set ATRADE_POSTGRES_PASSWORD in .env}
     volumes:
-      # A new volume. The old volume atrade-postgres-data is not used, and no data is migrated.
+      # A new volume. The volumes of the old stack (atrade_postgres_data and others) and the volume atrade-pgdata
+      # of earlier test starts are not used, and no data is migrated. PostgreSQL keeps the password of the first
+      # start in this volume.
       - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD", "pg_isready", "--username=atrade", "--dbname=atrade"]
@@ -33,6 +35,10 @@ services:
       TRADING_MODE: paper
       # One IBKR user name has one session. The Gateway takes the session from other logins.
       EXISTING_SESSION_DETECTED_ACTION: primary
+      # IBC restarts the Gateway each day at this time, without a new login (docs/architecture/ibkr.md 7.4).
+      # Format "hh:mm AM" or "hh:mm PM", in TIME_ZONE.
+      AUTO_RESTART_TIME: ${ATRADE_IBKR_AUTO_RESTART_TIME:-11:45 PM}
+      TIME_ZONE: ${ATRADE_IBKR_TIME_ZONE:-America/New_York}
     # No "ports": the API (ib-gateway:4004 for paper, through socat) stays inside the Compose network.
     pids_limit: 2048
     restart: unless-stopped
@@ -99,4 +105,5 @@ services:
 
 volumes:
   pgdata:
-    name: atrade-pgdata
+    # backend/src/atrade/app/web.py names this volume when PostgreSQL refuses the password.
+    name: atrade-postgres18-data

@@ -129,6 +129,11 @@ make sure that the `ib-gateway` service runs and is logged in.
 - `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`.
   `TWS_USERID` and `TWS_PASSWORD` come from `ATRADE_IBKR_USERNAME` and
   `ATRADE_IBKR_PASSWORD`. Only `ib-gateway` gets these values.
+- IBC restarts the Gateway each day at `AUTO_RESTART_TIME`, in `TIME_ZONE`,
+  without a new login. They come from `ATRADE_IBKR_AUTO_RESTART_TIME` (default
+  `11:45 PM`) and `ATRADE_IBKR_TIME_ZONE` (default `America/New_York`). Keep
+  the time before the daily IBKR server reset. Without the restart, the
+  Gateway can log off each day, and forward tests wait for IB Gateway.
 - The service has no `ports`. The API stays inside the Compose network.
 - The service is in the Compose profile `ibkr`. `./start run` without the
   profile starts `postgres` and `web` only, so the local start does not need

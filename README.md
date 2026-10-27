@@ -122,15 +122,43 @@ For development and checks, also:
 
 ## Run ATrade
 
-1. Copy `.env.example` to `.env`.
-2. Replace the placeholder values in `.env`. Do not commit `.env`.
-3. Start all services:
+### First start
+
+1. If a `.env` from the old ATrade stack is in the repository root (it has
+   variables such as `ATRADE_API_HTTP_PORT` or
+   `ATRADE_IBKR_PAPER_ACCOUNT_ID`), move it to a different name, for example
+   `.env.old-stack`. The rewrite does not read these variables.
+2. Copy `.env.example` to `.env`.
+3. Replace the placeholder values in `.env`. Do not commit `.env`. Set
+   `ATRADE_POSTGRES_PASSWORD` to a new password (letters, digits, and `-`
+   only). PostgreSQL keeps this password in its volume at the first start.
+4. On rootless Podman without the memory cgroup controller, set
+   `ATRADE_WEB_MEMORY_LIMIT=0`.
+5. Start all services:
 
    ```sh
-   ./start run
+   ./start run -d --wait
    ```
 
-4. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
+6. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
+   `GET /api/health` returns `"status": "ok"`.
+
+`./start run` stops with a message when `ATRADE_POSTGRES_PASSWORD` is not
+set, and writes a warning for each variable of the old stack.
+
+When `web` stops with "PostgreSQL refused the password", the volume
+`atrade-postgres18-data` has the password of an earlier start. Set that
+password again in `.env`. If the volume has no data that you need, you can
+remove it by hand (this deletes the data permanently):
+`docker compose --file deploy/compose.yaml --env-file .env down`, then
+`docker volume rm atrade-postgres18-data`.
+
+Compose shows a warning about orphan containers when containers of the old
+stack (`atrade-nats-1`, `atrade-ibeam-1`, and others) are in the Compose
+project `atrade`. The warning does not stop the start. To remove these old
+containers once (volumes stay):
+`docker compose -p atrade down --remove-orphans`, before the first start of
+the rewrite.
 
 ### Connect to the IBKR paper account
 
@@ -140,7 +168,9 @@ reachable". To connect:
 1. In `.env`, set `COMPOSE_PROFILES=ibkr`.
 2. Set `ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` to the login of the
    IBKR paper account. Set `ATRADE_IBKR_ACCOUNT_ID` to the paper account
-   number (it starts with `DU`).
+   number (it starts with `DU`). IBC restarts the Gateway each day at
+   `ATRADE_IBKR_AUTO_RESTART_TIME` in `ATRADE_IBKR_TIME_ZONE` (default
+   `11:45 PM`, `America/New_York`).
 3. Run `./start run`. The header shows "IB Gateway connected." after the
    Gateway has logged in. The account panel shows "Paper account DU...
    checked." when the paper account check passes.
@@ -166,7 +196,7 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 
 | Service | Content |
 |---|---|
-| `postgres` | PostgreSQL 18. Volume `atrade-pgdata`. Not published outside the Compose network. |
+| `postgres` | PostgreSQL 18. Volume `atrade-postgres18-data`. Not published outside the Compose network. |
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
 | `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
 | `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
@@ -180,8 +210,9 @@ limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` in `.env`.
 ### Old data
 
 The rewrite migrates no old data. The new database uses the new volume
-`atrade-pgdata`. The old PostgreSQL volume and the old containers are not
-used. To remove them, do these steps by hand. This deletes the old data
+`atrade-postgres18-data`. The old PostgreSQL volumes (for example
+`atrade_postgres_data`, and `atrade-pgdata` of earlier test starts) and the
+old containers are not used. ATrade does not delete or change them. To remove them, do these steps by hand. This deletes the old data
 permanently.
 
 ```sh

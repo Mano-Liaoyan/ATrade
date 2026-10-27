@@ -376,8 +376,16 @@ One Docker Compose project on the user's own server runs all services:
   `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`). `0` turns the memory
   limit off. Use `0` only on a host that cannot set memory limits, for example
   rootless Podman without the memory cgroup controller.
-- `postgres` uses the image `postgres:18.3` and the new volume `atrade-pgdata`
-  (section 19). Its port is not published.
+- `postgres` uses the image `postgres:18.3` and the new volume
+  `atrade-postgres18-data` (section 19). Its port is not published.
+  PostgreSQL keeps the password of the first start in the volume. When
+  PostgreSQL refuses the password, `web` writes one line that names the
+  volume and stops (`check_database_password` in `app/web.py`).
+- Before Compose starts, `./start run` checks the env file. It stops with a
+  message when `ATRADE_POSTGRES_PASSWORD` is not set in the env file or in the
+  process environment. It writes a warning for each variable of the old stack
+  (for example `ATRADE_API_HTTP_PORT`, `ATRADE_IBKR_PAPER_ACCOUNT_ID`). The
+  test is `backend/tests/app/test_start_script.py`.
 - Services added later (`ib-gateway`, `forward-test`, `cloudflared`) must not
   block the local start when their credentials are missing. They fail with a
   clear message, or they are in a Compose profile. `ib-gateway` is in the
@@ -422,8 +430,9 @@ Settings that `foundation/settings` reads:
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
 that ends before it starts, and a Web client ID inside the forward test range.
-`ATRADE_IBKR_USERNAME` and `ATRADE_IBKR_PASSWORD` are not settings: only the
-`ib-gateway` service reads them (section 7.4).
+`ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`,
+`ATRADE_IBKR_AUTO_RESTART_TIME`, and `ATRADE_IBKR_TIME_ZONE` are not settings:
+only the `ib-gateway` service reads them (section 7.4).
 
 Environment variable names: `DATABASE_URL` has no prefix, because the backtest
 child process gets it by this name (section 10). All other settings use the
@@ -718,6 +727,9 @@ Source: [Old data migration](https://github.com/Mano-Liaoyan/ATrade/issues/58).
   tables.
 - The user adds the watchlist again in the new UI. The new system has no
   migration code.
+- The rewrite uses the volume `atrade-postgres18-data`. It does not use the
+  volume `atrade-pgdata` of earlier test starts. ATrade never deletes or
+  changes a volume. The user removes old volumes by hand.
 
 ## 20. Implementation phases
 

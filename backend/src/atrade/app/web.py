@@ -9,6 +9,7 @@ import sys
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 
+import psycopg
 import uvicorn
 from fastapi import FastAPI
 from pydantic import ValidationError
@@ -35,6 +36,10 @@ from atrade.watchlist import create_watchlist_router
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
 LISTEN_PORT = 8000
+# The Compose volume of PostgreSQL (deploy/compose.yaml). The start message names it.
+POSTGRES_VOLUME_NAME = "atrade-postgres18-data"
+PASSWORD_REFUSED_TEXT = "password authentication failed"
+DATABASE_CHECK_TIMEOUT_SECONDS = 10
 
 logger = logging.getLogger("atrade.web")
 
@@ -121,12 +126,31 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
     return app
 
 
+def check_database_password(database_url: str) -> str | None:
+    """The reason when PostgreSQL refuses the password, else None. Other connection errors stop in the migrations."""
+    try:
+        with psycopg.connect(database_url, connect_timeout=DATABASE_CHECK_TIMEOUT_SECONDS):
+            return None
+    except psycopg.OperationalError as error:
+        if PASSWORD_REFUSED_TEXT not in str(error):
+            return None
+    return (
+        "PostgreSQL refused the password in ATRADE_POSTGRES_PASSWORD. PostgreSQL keeps the password of the first "
+        f"start in its volume ({POSTGRES_VOLUME_NAME}), and a changed ATRADE_POSTGRES_PASSWORD does not change it. "
+        "Set the first password again in .env, or see README.md section 'First start'."
+    )
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     try:
         settings = Settings()  # pyright: ignore[reportCallIssue] readability-exception: pydantic-settings fills required fields from the environment.
     except ValidationError as error:
         logger.error("ATrade does not start. The settings are not valid:\n%s", error)
+        sys.exit(1)
+    refusal = check_database_password(settings.database_url)
+    if refusal is not None:
+        logger.error("ATrade does not start. %s", refusal)
         sys.exit(1)
     upgrade_database(settings.database_url)
     gateway_connection = IbAsyncGatewayConnection(
