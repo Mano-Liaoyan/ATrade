@@ -143,6 +143,8 @@ The checks run in the Web process. They do not import the user code.
   exist on the server. The request timeout is 15 seconds.
 - The editor works without completion when the connection fails. Type errors
   do not block the save (section 9.3).
+- Tab accepts the selected completion. When no completion list is open, Tab
+  indents. Escape and then Tab or Shift+Tab moves the focus out of the editor.
 
 ## 9.5 Comparison
 

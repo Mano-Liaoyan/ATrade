@@ -64,6 +64,23 @@ test('shows the members of the NautilusTrader Strategy class as completions', as
   expect(languageServerConsoleMessages).toEqual([]);
 });
 
+test('Tab accepts the selected completion and keeps the focus in the editor', async ({ page }, currentTest) => {
+  await openNewStrategy(page, createUniqueName(currentTest, 'Tab completion'));
+  const editor = page.getByRole('textbox', { name: 'Strategy code' });
+
+  await replaceCode(page, STRATEGY_CODE);
+  await page.keyboard.press('Control+Space');
+  await expect(page.getByRole('option', { name: 'subscribe_bars', exact: true })).toBeVisible({
+    timeout: LANGUAGE_SERVER_TIMEOUT_MILLISECONDS,
+  });
+  const selectedName = await page.getByRole('option', { selected: true }).getAttribute('aria-label') ??
+    (await page.getByRole('option', { selected: true }).locator('.cm-completionLabel').innerText());
+  await page.keyboard.press('Tab');
+
+  await expect(editor).toContainText(`self.${selectedName}`);
+  await expect(editor).toBeFocused();
+});
+
 test('shows type errors live and still saves the code', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Type error');
   await openNewStrategy(page, name);

@@ -1,7 +1,10 @@
 <!-- Python code editor: CodeMirror 6 with @codemirror/lang-python. It has no domain meaning (docs/architecture.md section 13). -->
 <script lang="ts">
+  import { acceptCompletion } from '@codemirror/autocomplete';
+  import { indentWithTab } from '@codemirror/commands';
   import { python } from '@codemirror/lang-python';
-  import type { Extension } from '@codemirror/state';
+  import { Prec, type Extension } from '@codemirror/state';
+  import { keymap } from '@codemirror/view';
   import { EditorView, basicSetup } from 'codemirror';
   import { createCodeTheme } from './code_theme';
 
@@ -23,6 +26,8 @@
       parent: container,
       doc: '',
       extensions: [
+        // Tab accepts the selected completion, or else indents. Escape and then Tab moves the focus out of the editor.
+        Prec.high(keymap.of([{ key: 'Tab', run: acceptCompletion }, indentWithTab])),
         basicSetup,
         python(),
         createCodeTheme(),

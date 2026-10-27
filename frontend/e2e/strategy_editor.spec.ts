@@ -70,6 +70,25 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+// Tab indents in the editor. Escape and then Tab or Shift+Tab moves the focus out of the editor, so keyboard users
+// can leave it. The editor is the last control of the page, so the test leaves it backwards.
+test('Tab indents the code, and Escape then Shift+Tab leaves the editor', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Tab'));
+  const editor = page.getByRole('textbox', { name: 'Strategy code' });
+  await replaceCode(page, 'x = 1');
+  await page.keyboard.press('Home');
+
+  await page.keyboard.press('Tab');
+
+  await expect(editor).toBeFocused();
+  await expect(editor).toHaveText('    x = 1');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Shift+Tab');
+  await expect(editor).not.toBeFocused();
+  await expect(editor).toHaveText('    x = 1');
+});
+
 test('creates a strategy that starts from the template as version 1', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Create');
 
