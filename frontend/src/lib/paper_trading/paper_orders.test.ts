@@ -1,5 +1,5 @@
 // Paper orders by hand: the order form check, the confirmation text, the order source, and the HTTP calls.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import {
   cancelPaperOrder,
   describeOrderSource,

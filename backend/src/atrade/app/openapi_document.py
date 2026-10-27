@@ -3,7 +3,7 @@
 OpenAPI does not describe WebSocket messages. The JSON Schema of each WebSocket message model is added to
 `components.schemas`, so the frontend gets those types from the same file.
 
-Run `pnpm generate:api` in `frontend/`. It calls `python -m atrade.app.openapi_document <output file>`.
+Run `vp run generate:api` in `frontend/`. It calls `python -m atrade.app.openapi_document <output file>`.
 """
 
 import json

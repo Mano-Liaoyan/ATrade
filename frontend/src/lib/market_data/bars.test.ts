@@ -1,5 +1,5 @@
 // Calls GET /api/market-data/bars and reads the chart instrument and bar period from the instrument page URL.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { formatChartSearch, readBars, readChartRequest } from './index';
 
 const TENCENT = { symbol: '700', exchange: 'SEHK', currency: 'HKD' };

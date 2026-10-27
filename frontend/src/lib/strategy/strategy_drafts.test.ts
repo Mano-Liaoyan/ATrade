@@ -1,5 +1,5 @@
 // Unsaved edits stay in the browser storage, one draft for each strategy version, until the user saves.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { clearDraft, formatVersionLabel, readDraft, writeDraft } from './index';
 
 function createMemoryStorage(): Storage {

@@ -1,5 +1,5 @@
 // Reads GET /api/ibkr/gateway and turns the answer into the IB Gateway status that the app shell shows.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { describeGatewayStatus, fetchGatewayStatus } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {

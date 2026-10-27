@@ -1,5 +1,5 @@
 // Computes the size and position of the app scroll thumb, and the scroll position for a dragged thumb.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { computeScrollThumb, computeScrollTopForThumbTop } from './index';
 
 describe('computeScrollThumb', () => {

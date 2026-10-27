@@ -125,7 +125,10 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
 For development and checks, also:
 
 - [uv](https://docs.astral.sh/uv/) 0.13. uv installs Python 3.14.
-- Node.js 24 and pnpm 10.
+- [Vite+](https://viteplus.dev/) 1.4 (`vp`). Install it with
+  `curl -fsSL https://vite.plus | bash`. `vp` installs Node.js 24 (from
+  `frontend/.node-version`) and pnpm 10 (from `packageManager` in
+  `frontend/package.json`).
 
 ## Run ATrade
 
@@ -245,7 +248,7 @@ One command runs the same checks as CI:
   `ATRADE_PLAYWRIGHT_PROJECTS` to the browsers on your machine, for example
   `ATRADE_PLAYWRIGHT_PROJECTS="chromium firefox"`. The value `none` skips the
   end-to-end tests. Install browsers with
-  `pnpm --dir frontend exec playwright install`. The Playwright backend
+  `cd frontend && vp exec playwright install`. The Playwright backend
   listens on port 4173. Set `ATRADE_E2E_PORT` to use a different port, for
   example when 2 checkouts run the checks at the same time.
 - Real IBKR tests have the pytest mark `ibkr_paper`. CI does not run them,
@@ -262,12 +265,12 @@ The frontend API types come from the OpenAPI document of the backend. After a
 change to an HTTP route or to its request or response model, run:
 
 ```sh
-cd frontend && pnpm generate:api
+cd frontend && vp run generate:api
 ```
 
 This writes `frontend/src/lib/api/openapi.json` and
 `frontend/src/lib/api/index.ts`. Commit both files. A backend test fails when
-`openapi.json` does not match the routes. `pnpm check:api` (in
+`openapi.json` does not match the routes. `vp run check:api` (in
 `./scripts/check frontend`) fails when `index.ts` does not match
 `openapi.json`.
 
@@ -276,8 +279,13 @@ This writes `frontend/src/lib/api/openapi.json` and
 ```sh
 cd backend && uv sync
 DATABASE_URL=postgresql://... ATRADE_FRONTEND_BUILD_DIR=../frontend/build uv run python -m atrade.app.web
-cd frontend && pnpm install && pnpm dev    # sends /api and /ws to 127.0.0.1:8000
+cd frontend && vp install && vp dev    # sends /api and /ws to 127.0.0.1:8000
 ```
+
+In `frontend/`, `vp dev`, `vp build`, and `vp test` run Vite and Vitest.
+`vp run lint:eslint` runs ESLint and `vp run check:svelte` runs
+`svelte-check`. Do not use `vp lint`, `vp fmt`, or `vp check`: ATrade does not
+use Oxlint or Oxfmt.
 
 ## Repository layout
 

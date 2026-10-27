@@ -1,5 +1,5 @@
 // Turns /ws/paper-trading messages into the text of the account panel.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import {
   describeBalanceCurrency,
   describePaperAccountCheck,

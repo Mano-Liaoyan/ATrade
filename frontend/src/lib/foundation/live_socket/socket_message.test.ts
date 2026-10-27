@@ -1,5 +1,5 @@
 // Reads a message of a live socket as the generated message type when its type matches.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import type { components } from '#lib/api';
 import { readSocketMessage } from './index';
 

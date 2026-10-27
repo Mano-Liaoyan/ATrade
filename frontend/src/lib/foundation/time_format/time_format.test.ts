@@ -1,5 +1,5 @@
 // A UTC time from the backend as text.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { formatUtcTime } from './index';
 
 describe('formatUtcTime', () => {

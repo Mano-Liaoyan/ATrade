@@ -1,5 +1,5 @@
 // Reads the /ws/market-data messages and decides which live bars the chart can draw.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { canDrawLiveBar, describeLiveBar, formatLiveBarsPath, readLiveBarMessage } from './index';
 
 const TENCENT = { symbol: '700', exchange: 'SEHK', currency: 'HKD' };

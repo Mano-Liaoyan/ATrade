@@ -10,12 +10,13 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Node and SvelteKit
+# Node, Vite+, and SvelteKit
 node_modules/
 frontend/build/
 frontend/.svelte-kit/
 frontend/test-results/
 frontend/playwright-report/
+frontend/.vitest/
 *.tsbuildinfo
 
 # Editors and agent worktrees

@@ -1,5 +1,5 @@
 // Calls the watchlist routes and turns each answer into a value, or into a message for the watchlist panel.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vite-plus/test';
 import { addToWatchlist, deleteFromWatchlist, listWatchlist } from './index';
 
 const TENCENT = { id: 7, symbol: '700', exchange: 'SEHK', currency: 'HKD', added_at_utc: '2026-01-02T03:04:05Z', saved_bars: [] };

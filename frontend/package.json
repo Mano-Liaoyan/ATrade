@@ -8,11 +8,8 @@
   },
   "scripts": {
     "prepare": "svelte-kit sync",
-    "dev": "vite dev",
-    "build": "vite build",
-    "check": "svelte-kit sync && svelte-check --fail-on-warnings",
-    "lint": "svelte-kit sync && eslint .",
-    "test:unit": "vitest run",
+    "check:svelte": "svelte-kit sync && svelte-check --fail-on-warnings",
+    "lint:eslint": "svelte-kit sync && eslint .",
     "test:e2e": "playwright test",
     "generate:api": "uv run --directory ../backend python -m atrade.app.openapi_document ../frontend/src/lib/api/openapi.json && openapi-typescript src/lib/api/openapi.json --output src/lib/api/index.ts",
     "check:api": "openapi-typescript src/lib/api/openapi.json --output src/lib/api/index.ts --check"
@@ -41,7 +38,7 @@
     "svelte-check": "4.7.7",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
-    "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   }
 }

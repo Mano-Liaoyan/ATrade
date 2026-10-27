@@ -13,7 +13,7 @@ COMMITTED_OPENAPI_DOCUMENT = Path(__file__).resolve().parents[3] / "frontend" / 
 def test_committed_openapi_document_matches_the_routes() -> None:
     committed_document = COMMITTED_OPENAPI_DOCUMENT.read_text()
 
-    assert committed_document == build_openapi_document(), "Run `pnpm generate:api` in frontend/."
+    assert committed_document == build_openapi_document(), "Run `vp run generate:api` in frontend/."
 
 
 def test_document_has_the_json_schema_of_the_websocket_messages() -> None:
