@@ -95,7 +95,8 @@ async def has_saved_bars(*, database_url: str, bar_request: BarRequest) -> bool:
         )
 
 
-async def read_saved_bar_coverage(*, database_url: str, instrument: Instrument) -> list[SavedBarCoverage]:
-    """The bar periods of `instrument` that have saved bars, with the first and the last saved bar. No IBKR call."""
+async def read_saved_bar_coverage(*, database_url: str, instruments: list[Instrument]) -> list[list[SavedBarCoverage]]:
+    """For each instrument, the bar periods with saved bars and the first and the last saved bar. One query, no IBKR
+    call."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        return await bar_store.select_saved_bar_coverage(connection, instrument)
+        return await bar_store.select_saved_bar_coverage(connection, instruments)

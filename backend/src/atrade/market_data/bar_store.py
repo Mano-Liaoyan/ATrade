@@ -21,9 +21,10 @@ class SavedBarCoverage:
 
 @dataclass(frozen=True)
 class SavedBarCoverageRow:
+    instrument_position: int
     bar_period: str
-    first_start_utc: datetime | None
-    last_start_utc: datetime | None
+    first_start_utc: datetime
+    last_start_utc: datetime
 
 
 @dataclass(frozen=True)
@@ -87,38 +88,48 @@ async def has_bars(
 
 
 async def select_saved_bar_coverage(
-    connection: psycopg.AsyncConnection, instrument: Instrument
-) -> list[SavedBarCoverage]:
-    """Returns the bar periods that have saved bars, in the order of BarPeriod. min() and max() use the primary key."""
+    connection: psycopg.AsyncConnection, instruments: list[Instrument]
+) -> list[list[SavedBarCoverage]]:
+    """Returns, for each instrument, the bar periods that have saved bars, in the order of BarPeriod.
+
+    One query for all instruments. min() and max() of each instrument and bar period use the primary key.
+    """
     async with connection.cursor(row_factory=class_row(SavedBarCoverageRow)) as cursor:
         await cursor.execute(
             """
-            SELECT
-                period.bar_period,
-                (SELECT min(bar.start_utc) FROM bar
-                    WHERE bar.symbol = %(symbol)s AND bar.exchange = %(exchange)s AND bar.currency = %(currency)s
-                        AND bar.bar_period = period.bar_period) AS first_start_utc,
-                (SELECT max(bar.start_utc) FROM bar
-                    WHERE bar.symbol = %(symbol)s AND bar.exchange = %(exchange)s AND bar.currency = %(currency)s
-                        AND bar.bar_period = period.bar_period) AS last_start_utc
-            FROM unnest(%(bar_periods)s::text[]) WITH ORDINALITY AS period (bar_period, position)
-            ORDER BY period.position
+            SELECT instrument.position AS instrument_position, period.bar_period,
+                coverage.first_start_utc, coverage.last_start_utc
+            FROM unnest(%(symbols)s::text[], %(exchanges)s::text[], %(currencies)s::text[])
+                    WITH ORDINALITY AS instrument (symbol, exchange, currency, position)
+                CROSS JOIN unnest(%(bar_periods)s::text[]) WITH ORDINALITY AS period (bar_period, position)
+                CROSS JOIN LATERAL (
+                    SELECT min(bar.start_utc) AS first_start_utc, max(bar.start_utc) AS last_start_utc
+                    FROM bar
+                    WHERE bar.symbol = instrument.symbol AND bar.exchange = instrument.exchange
+                        AND bar.currency = instrument.currency AND bar.bar_period = period.bar_period
+                ) AS coverage
+            WHERE coverage.first_start_utc IS NOT NULL
+            ORDER BY instrument.position, period.position
             """,
             {
-                "symbol": instrument.symbol,
-                "exchange": instrument.exchange,
-                "currency": instrument.currency,
+                "symbols": [instrument.symbol for instrument in instruments],
+                "exchanges": [instrument.exchange for instrument in instruments],
+                "currencies": [instrument.currency for instrument in instruments],
                 "bar_periods": [bar_period.value for bar_period in BarPeriod],
             },
         )
         rows = await cursor.fetchall()
-    return [
-        SavedBarCoverage(
-            bar_period=BarPeriod(row.bar_period), first_start_utc=row.first_start_utc, last_start_utc=row.last_start_utc
+    coverage: list[list[SavedBarCoverage]] = [[] for _ in instruments]
+    for row in rows:
+        # WITH ORDINALITY counts from 1.
+        coverage[row.instrument_position - 1].append(
+            SavedBarCoverage(
+                bar_period=BarPeriod(row.bar_period),
+                first_start_utc=row.first_start_utc,
+                last_start_utc=row.last_start_utc,
+            )
         )
-        for row in rows
-        if row.first_start_utc is not None and row.last_start_utc is not None
-    ]
+    return coverage
 
 
 async def select_saved_ranges(

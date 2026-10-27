@@ -60,24 +60,29 @@ class WatchlistErrorResponse(BaseModel):
     detail: str
 
 
-async def to_instrument_response(
-    database_url: str, record: watchlist_store.WatchlistInstrumentRecord
-) -> WatchlistInstrumentResponse:
-    instrument = Instrument(symbol=record.symbol, exchange=record.exchange, currency=record.currency)
-    coverage = await read_saved_bar_coverage(database_url=database_url, instrument=instrument)
-    return WatchlistInstrumentResponse(
-        id=record.id,
-        symbol=record.symbol,
-        exchange=record.exchange,
-        currency=record.currency,
-        added_at_utc=record.added_at_utc,
-        saved_bars=[
-            SavedBarsResponse(
-                bar_period=item.bar_period, first_start_utc=item.first_start_utc, last_start_utc=item.last_start_utc
-            )
-            for item in coverage
-        ],
-    )
+async def to_instrument_responses(
+    database_url: str, records: list[watchlist_store.WatchlistInstrumentRecord]
+) -> list[WatchlistInstrumentResponse]:
+    instruments = [
+        Instrument(symbol=record.symbol, exchange=record.exchange, currency=record.currency) for record in records
+    ]
+    coverage = await read_saved_bar_coverage(database_url=database_url, instruments=instruments)
+    return [
+        WatchlistInstrumentResponse(
+            id=record.id,
+            symbol=record.symbol,
+            exchange=record.exchange,
+            currency=record.currency,
+            added_at_utc=record.added_at_utc,
+            saved_bars=[
+                SavedBarsResponse(
+                    bar_period=item.bar_period, first_start_utc=item.first_start_utc, last_start_utc=item.last_start_utc
+                )
+                for item in instrument_coverage
+            ],
+        )
+        for record, instrument_coverage in zip(records, coverage, strict=True)
+    ]
 
 
 class WatchlistRoutes:
@@ -110,14 +115,13 @@ class WatchlistRoutes:
             await connection.commit()
         if record is None:
             raise HTTPException(status.HTTP_409_CONFLICT, detail="This instrument is already in the watchlist.")
-        return await to_instrument_response(self.database_url, record)
+        [response] = await to_instrument_responses(self.database_url, [record])
+        return response
 
     async def list_instruments(self) -> WatchlistResponse:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             records = await watchlist_store.select_instruments(connection)
-        return WatchlistResponse(
-            instruments=[await to_instrument_response(self.database_url, record) for record in records]
-        )
+        return WatchlistResponse(instruments=await to_instrument_responses(self.database_url, records))
 
     async def delete_instrument(self, watchlist_instrument_id: int) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:

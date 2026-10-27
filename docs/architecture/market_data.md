@@ -74,8 +74,9 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
 - `watchlist` exports `create_watchlist_router(database_url, clock,
   instrument_lookup)`. `watchlist` imports `market_data` and `foundation`
   only. An import-linter contract forbids a direct import of `ibkr`.
-- `market_data` exports `read_saved_bar_coverage(database_url, instrument)`
-  (`SavedBarCoverage`: bar period, first and last bar start) and
+- `market_data` exports `read_saved_bar_coverage(database_url, instruments)`
+  (one query; for each instrument a list of `SavedBarCoverage`: bar period,
+  first and last bar start) and
   `has_saved_bars(database_url, bar_request)`. Both read PostgreSQL only.
   The watchlist routes add `saved_bars` to each instrument with the first.
   The backtest start route uses the second (`docs/architecture/backtest.md`

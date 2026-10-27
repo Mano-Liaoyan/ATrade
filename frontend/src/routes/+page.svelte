@@ -20,7 +20,10 @@
   $effect(() => {
     void listWatchlist(fetch).then((listResult) => {
       if (listResult.kind === 'ok') {
-        watchlistInstruments = listResult.value;
+        // Keep an instrument that the user added while the list loaded: the list can be older than the add.
+        const listedIds = new Set(listResult.value.map((listed) => listed.id));
+        const addedMeanwhile = watchlistInstruments.filter((added) => !listedIds.has(added.id));
+        watchlistInstruments = [...listResult.value, ...addedMeanwhile];
       } else {
         watchlistMessage = listResult.message;
       }
