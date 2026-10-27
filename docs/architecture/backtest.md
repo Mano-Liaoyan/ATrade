@@ -17,7 +17,8 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
   type, the time range, and `paper_capital_usd`. `paper_capital_usd` is
   required.
 - `paper_trading` exports `fetch_paper_capital_usd()`. It returns the paper
-  account balance (`NetLiquidation` in USD) after a passed paper account check.
+  account balance (`NetLiquidation` converted to USD, section 11.9) after a
+  passed paper account check.
   Otherwise it returns the local value from `settings` (section 11.5). The
   frontend uses it to fill in the backtest form.
 - Each backtest runs in its own child process (`app/backtest_process.py`),

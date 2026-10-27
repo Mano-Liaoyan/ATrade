@@ -121,7 +121,8 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         try:
             await gateway_connection.connect()
             account_id = require_paper_account(settings=job.settings, gateway_connection=gateway_connection)
-            balance = PaperAccountMonitor(settings=job.settings, gateway_connection=gateway_connection).read_balance()
+            monitor = PaperAccountMonitor(settings=job.settings, gateway_connection=gateway_connection)
+            balance = await monitor.read_balance()
         except GatewayRequestError as error:
             logger.warning("Forward test %s: IB Gateway is not reachable: %s", job.row.id, error)
             return GATEWAY_UNREACHABLE_EXIT_CODE
@@ -141,7 +142,9 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
     start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
     if start_balance_usd is None:
         # The equity of the records starts at the balance (section 12.8). This child sent no order.
-        await write_error_message(job, "The paper account has no NetLiquidation value in USD.")
+        reason = None if balance is None else balance.message
+        message = "The paper account has no NetLiquidation value in USD."
+        await write_error_message(job, message if reason is None else f"{message} {reason}")
         return PAPER_CHECK_FAILED_EXIT_CODE
     return CheckedAccount(account_id=account_id, start_balance_usd=start_balance_usd)
 

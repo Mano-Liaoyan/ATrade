@@ -3593,6 +3593,7 @@
         "type": "object"
       },
       "PaperAccountBalanceMessage": {
+        "description": "The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).",
         "properties": {
           "net_liquidation_usd": {
             "anyOf": [
@@ -3615,11 +3616,88 @@
               }
             ],
             "title": "Cash Usd"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "net_liquidation_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Liquidation Base"
+          },
+          "cash_base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Base"
+          },
+          "usd_per_base_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd Per Base Unit"
+          },
+          "exchange_rate_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "base_currency_is_usd",
+                  "account",
+                  "ibkr_forex"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange Rate Source"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
           }
         },
         "required": [
           "net_liquidation_usd",
-          "cash_usd"
+          "cash_usd",
+          "base_currency",
+          "net_liquidation_base",
+          "cash_base",
+          "usd_per_base_unit",
+          "exchange_rate_source",
+          "message"
         ],
         "title": "PaperAccountBalanceMessage",
         "type": "object"

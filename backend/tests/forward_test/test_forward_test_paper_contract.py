@@ -10,6 +10,7 @@ and IB Gateway at ATRADE_IBKR_HOST:ATRADE_IBKR_PAPER_PORT (an SSH tunnel, see te
 import asyncio
 import hashlib
 import socket
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import anyio
@@ -92,6 +93,18 @@ def paper_settings(database_url: str) -> Settings:
     )
 
 
+@pytest.fixture
+async def web_connection(paper_settings: Settings) -> AsyncIterator[GatewayConnection]:
+    """The connection of the Web side, which reads the open orders of all client IDs."""
+    connection = IbAsyncGatewayConnection(
+        host=paper_settings.ibkr_host, port=paper_settings.ibkr_paper_port, client_id=WEB_SIDE_CLIENT_ID
+    )
+    await connection.connect()
+    yield connection
+    # A failed test leaves its connection open. IB Gateway then refuses the client ID in the next test (error 326).
+    connection.disconnect()
+
+
 def insert_forward_test(database_url: str) -> int:
     """The rows that the start route writes, with client ID 10 and the far limit order strategy."""
     with psycopg.connect(database_url, autocommit=True) as connection:
@@ -143,13 +156,9 @@ async def wait_for_forward_test_orders(
 @pytest.mark.anyio
 @pytest.mark.ibkr_paper
 async def test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it(
-    paper_settings: Settings,
+    paper_settings: Settings, web_connection: GatewayConnection
 ) -> None:
     forward_test_id = insert_forward_test(paper_settings.database_url)
-    web_connection = IbAsyncGatewayConnection(
-        host=paper_settings.ibkr_host, port=paper_settings.ibkr_paper_port, client_id=WEB_SIDE_CLIENT_ID
-    )
-    await web_connection.connect()
     stop_requested = asyncio.Event()
 
     def open_gateway_connection(client_id: int) -> GatewayConnection:
@@ -172,7 +181,6 @@ async def test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_can
         stop_requested.set()
     exit_code = await asyncio.wait_for(child_task, CHILD_STOP_WAIT_SECONDS)
     orders_after_stop = await wait_for_forward_test_orders(web_connection, forward_test_id, is_open=False)
-    web_connection.disconnect()
 
     assert exit_code == 0
     assert [(order.client_id, order.instrument.symbol, order.limit_price) for order in open_orders] == [(10, "AAPL", 1)]
@@ -198,7 +206,7 @@ async def compare_until(worker: ForwardTestWorker, database_url: str, forward_te
 @pytest.mark.anyio
 @pytest.mark.ibkr_paper
 async def test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_cancels_the_old_order(
-    paper_settings: Settings, monkeypatch: pytest.MonkeyPatch
+    paper_settings: Settings, web_connection: GatewayConnection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The child processes read the settings from the environment, like in the forward-test service.
     monkeypatch.setenv("DATABASE_URL", paper_settings.database_url)
@@ -206,10 +214,6 @@ async def test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_canc
     monkeypatch.setenv("ATRADE_IBKR_HOST", paper_settings.ibkr_host)
     monkeypatch.setenv("ATRADE_IBKR_PAPER_PORT", str(paper_settings.ibkr_paper_port))
     forward_test_id = insert_forward_test(paper_settings.database_url)
-    web_connection = IbAsyncGatewayConnection(
-        host=paper_settings.ibkr_host, port=paper_settings.ibkr_paper_port, client_id=WEB_SIDE_CLIENT_ID
-    )
-    await web_connection.connect()
     processes: list[ForwardTestProcess] = []
 
     async def start_child(forward_test_id: int, mode: ChildMode) -> ForwardTestProcess:
@@ -242,7 +246,6 @@ async def test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_canc
             )
         await compare_until(worker, paper_settings.database_url, forward_test_id, "stopped")
     orders_after_stop = await wait_for_forward_test_orders(web_connection, forward_test_id, is_open=False)
-    web_connection.disconnect()
 
     assert len(processes) == 2
     assert orders_after_stop == []

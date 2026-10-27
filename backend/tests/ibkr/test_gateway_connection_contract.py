@@ -8,6 +8,7 @@ The case skips when `.env`, the account ID, or the Gateway is not available.
 """
 
 import socket
+from collections.abc import Iterator
 from contextlib import aclosing
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -50,12 +51,14 @@ def can_open_tcp_connection(host: str, port: int) -> bool:
 
 
 @pytest.fixture(params=["fake", pytest.param("ibkr_paper", marks=pytest.mark.ibkr_paper)])
-def connection_and_account(request: pytest.FixtureRequest) -> tuple[GatewayConnection, str]:
+def connection_and_account(request: pytest.FixtureRequest) -> Iterator[tuple[GatewayConnection, str]]:
     if request.param == "fake":
         fake = FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID])
         fake.account_values = make_balance_values(FAKE_ACCOUNT_ID, net_liquidation_usd="100000.00", cash_usd="99000")
+        fake.exchange_rates = {("EUR", "USD"): Decimal("1.1139"), ("JPY", "USD"): Decimal("0.0066")}
         fake.portfolio = [make_stock_position(FAKE_ACCOUNT_ID, symbol="AAPL", quantity="10", market_price="100")]
-        return fake, FAKE_ACCOUNT_ID
+        yield fake, FAKE_ACCOUNT_ID
+        return
     if not REPOSITORY_ENV_FILE.exists():
         pytest.skip(f"{REPOSITORY_ENV_FILE} does not exist.")
     settings = PaperAccountTestSettings()
@@ -66,7 +69,9 @@ def connection_and_account(request: pytest.FixtureRequest) -> tuple[GatewayConne
     connection = IbAsyncGatewayConnection(
         host=settings.ibkr_host, port=settings.ibkr_paper_port, client_id=CONTRACT_TEST_CLIENT_ID
     )
-    return connection, settings.ibkr_account_id
+    yield connection, settings.ibkr_account_id
+    # A failed test leaves its connection open. IB Gateway then refuses the client ID in the next test (error 326).
+    connection.disconnect()
 
 
 async def wait_until_connected(connection: GatewayConnection) -> None:
@@ -152,14 +157,15 @@ async def test_reads_the_balance_and_the_positions_of_the_paper_account(
         with anyio.fail_after(CONNECT_WAIT_SECONDS):
             while not connection.read_account_values():
                 await anyio.sleep(0.05)
+        # IBKR sends NetLiquidation in the base currency of the account: EUR for the paper account of the owner.
         net_liquidation_values = [
-            Decimal(value.value)
+            value
             for value in connection.read_account_values()
-            if value.account == account_id and value.tag == "NetLiquidation" and value.currency == "USD"
+            if value.account == account_id and value.tag == "NetLiquidation" and value.currency not in ("", "BASE")
         ]
         positions = connection.read_portfolio()
-        assert len(net_liquidation_values) == 1
-        assert net_liquidation_values[0] > 0
+        assert len(net_liquidation_values) >= 1
+        assert all(Decimal(value.value) > 0 for value in net_liquidation_values)
         assert all(position.account == account_id for position in positions)
         assert all(position.quantity != 0 for position in positions)
         task_group.cancel_scope.cancel()
@@ -167,6 +173,27 @@ async def test_reads_the_balance_and_the_positions_of_the_paper_account(
 
     assert connection.read_account_values() == []
     assert connection.read_portfolio() == []
+
+
+@pytest.mark.anyio
+async def test_reads_the_forex_rate_for_the_paper_account_balance(
+    connection_and_account: tuple[GatewayConnection, str],
+) -> None:
+    connection, _account_id = connection_and_account
+
+    async with anyio.create_task_group() as task_group:
+        task_group.start_soon(connection.keep_connected)
+        await wait_until_connected(connection)
+        eur_usd = await connection.read_exchange_rate("EUR", "USD")
+        # IBKR lists USD.JPY, not JPY.USD: the inverse direction gives the same rate as 1 / USD.JPY.
+        jpy_usd = await connection.read_exchange_rate("JPY", "USD")
+        assert Decimal("0.5") < eur_usd < Decimal(2)
+        assert Decimal("0.001") < jpy_usd < Decimal("0.02")
+        task_group.cancel_scope.cancel()
+    connection.disconnect()
+
+    with pytest.raises(GatewayRequestError):
+        await connection.read_exchange_rate("EUR", "USD")
 
 
 @pytest.mark.anyio

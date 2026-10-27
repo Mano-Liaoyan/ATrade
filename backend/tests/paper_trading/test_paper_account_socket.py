@@ -8,6 +8,7 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ from httpx_ws.transport import ASGIWebSocketTransport
 
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
+from atrade.ibkr import AccountValue
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     FakeGatewayConnection,
@@ -89,7 +91,16 @@ async def test_pushes_balance_and_positions_after_a_passed_check(frontend_build_
         "actual_accounts": [ACCOUNT_ID],
         "expected_account": ACCOUNT_ID,
     }
-    assert account["balance"] == {"net_liquidation_usd": "101234.50", "cash_usd": "25000.00"}
+    assert account["balance"] == {
+        "net_liquidation_usd": "101234.50",
+        "cash_usd": "25000.00",
+        "base_currency": "USD",
+        "net_liquidation_base": "101234.50",
+        "cash_base": "25000.00",
+        "usd_per_base_unit": "1",
+        "exchange_rate_source": "base_currency_is_usd",
+        "message": None,
+    }
     assert account["positions"] == [
         {
             "symbol": "AAPL",
@@ -222,7 +233,31 @@ async def test_pushes_a_balance_change(frontend_build_dir: Path) -> None:
         gateway_connection.account_values = make_balance_values(ACCOUNT_ID, net_liquidation_usd="90", cash_usd="80")
         changed = await receive_account(socket)
 
-    assert changed["balance"] == {"net_liquidation_usd": "90", "cash_usd": "80"}
+    assert changed["balance"]["net_liquidation_usd"] == "90"
+    assert changed["balance"]["cash_usd"] == "80"
+
+
+@pytest.mark.anyio
+async def test_pushes_a_eur_balance_in_usd_with_the_base_currency_and_the_rate(frontend_build_dir: Path) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    gateway_connection.account_values = [
+        AccountValue(account=ACCOUNT_ID, tag="NetLiquidation", value="1000.00", currency="EUR"),
+        AccountValue(account=ACCOUNT_ID, tag="TotalCashValue", value="500.00", currency="EUR"),
+    ]
+    gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
+
+    account = await read_first_account(make_settings(frontend_build_dir), gateway_connection)
+
+    assert account["balance"] == {
+        "net_liquidation_usd": "1113.90",
+        "cash_usd": "556.95",
+        "base_currency": "EUR",
+        "net_liquidation_base": "1000.00",
+        "cash_base": "500.00",
+        "usd_per_base_unit": "1.1139",
+        "exchange_rate_source": "ibkr_forex",
+        "message": None,
+    }
 
 
 @pytest.mark.anyio

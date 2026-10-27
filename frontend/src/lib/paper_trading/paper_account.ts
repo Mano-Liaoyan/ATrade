@@ -7,6 +7,7 @@ import { readSocketMessage } from '#lib/foundation/live_socket';
 export type PaperAccountMessage = components['schemas']['PaperAccountMessage'];
 export type PaperAccountCheck = components['schemas']['PaperAccountCheckMessage'];
 export type PaperPosition = components['schemas']['PositionMessage'];
+export type PaperAccountBalance = components['schemas']['PaperAccountBalanceMessage'];
 
 export const PAPER_TRADING_SOCKET_PATH = '/ws/paper-trading';
 
@@ -39,4 +40,21 @@ export function formatAmount(amount: string | null): string {
     return MISSING_AMOUNT;
   }
   return AMOUNT_FORMAT.format(Number(amount));
+}
+
+// ATrade keeps money in USD. The panel names the base currency and the rate that converted the balance (section 11.9).
+export function describeBalanceCurrency(balance: PaperAccountBalance): string {
+  const baseCurrency = balance.base_currency;
+  const rate = balance.usd_per_base_unit;
+  if (baseCurrency === null || rate === null) {
+    return balance.message ?? 'IBKR sent no balance.';
+  }
+  switch (balance.exchange_rate_source) {
+    case 'ibkr_forex':
+      return `Base currency ${baseCurrency}. Converted to USD with the IBKR ${baseCurrency}.USD rate: 1 ${baseCurrency} = ${rate} USD.`;
+    case 'account':
+      return `Base currency ${baseCurrency}. Converted to USD with the exchange rate of the IBKR account: 1 ${baseCurrency} = ${rate} USD.`;
+    default:
+      return `Base currency ${baseCurrency}.`;
+  }
 }

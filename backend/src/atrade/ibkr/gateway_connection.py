@@ -8,9 +8,10 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from decimal import Decimal
 from typing import Protocol
 
-from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Order, RequestError, Trade
+from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Forex, Order, RequestError, Trade
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -47,6 +48,9 @@ HISTORICAL_DATA_REQUEST_INTERVAL_SECONDS = 0.5
 NO_DATA_MESSAGE = "query returned no data"
 # formatDate=2: intraday bar times come as UNIX seconds, so ib_async returns UTC datetimes.
 UTC_FORMAT_DATE = 2
+# The forex market closes on the weekend. 1 week of hourly bars always has a last bar.
+EXCHANGE_RATE_DURATION = "1 W"
+EXCHANGE_RATE_BAR_SIZE = "1 hour"
 # While no live bar update comes, the live bar stream checks the connection this often.
 LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
 
@@ -79,6 +83,13 @@ class GatewayConnection(Protocol):
     def read_portfolio(self) -> list[PortfolioPosition]: ...
 
     async def search_instruments(self, query: str) -> list[Instrument]: ...
+
+    async def read_exchange_rate(self, currency: str, quote_currency: str) -> Decimal:
+        """The IBKR forex rate: `quote_currency` units for 1 `currency` unit, for example 1.11 USD for 1 EUR.
+
+        Raises GatewayRequestError when IBKR has no rate or does not answer (section 7.2).
+        """
+        ...
 
     async def place_order(self, request: OrderRequest) -> int:
         """Sends the order and returns its IBKR order ID. Raises GatewayRequestError without a connection."""
@@ -148,6 +159,9 @@ class IbAsyncGatewayConnection:
         self.client_id = client_id
         self.retry_seconds = retry_seconds
         self.connection_number = 0
+        # ib_async reports the API as ready before connectAsync has read the accounts, the open orders and the
+        # balance. ATrade reports "connected" only after that startup synchronization.
+        self.synchronized = False
         self.ib = IB()
         # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
         self.open_orders_lock = asyncio.Lock()
@@ -162,6 +176,7 @@ class IbAsyncGatewayConnection:
             await asyncio.sleep(self.retry_seconds)
 
     async def try_to_connect(self) -> None:
+        self.synchronized = False
         try:
             await self.ib.connectAsync(self.host, self.port, clientId=self.client_id, timeout=CONNECT_TIMEOUT_SECONDS)
         except (OSError, TimeoutError) as error:
@@ -173,11 +188,12 @@ class IbAsyncGatewayConnection:
                 self.retry_seconds,
             )
             return
+        self.synchronized = True
         self.connection_number += 1
         logger.info("Connected to IB Gateway at %s:%s with client ID %s.", self.host, self.port, self.client_id)
 
     def is_connected(self) -> bool:
-        return self.ib.isConnected()
+        return self.synchronized and self.ib.isConnected()
 
     def read_port(self) -> int:
         return self.port
@@ -214,6 +230,48 @@ class IbAsyncGatewayConnection:
             message = "IB Gateway did not answer the instrument search in time."
             raise GatewayRequestError(message)
         return read_stock_instruments(contract_descriptions)
+
+    async def read_exchange_rate(self, currency: str, quote_currency: str) -> Decimal:
+        """The close of the last hourly MIDPOINT bar of the IDEALPRO pair. IBKR lists each pair in one direction
+        only, for example EUR.USD and USD.JPY, so the other direction gives the inverse rate.
+
+        https://interactivebrokers.github.io/tws-api/historical_bars.html
+        """
+        self.require_connection()
+        for pair, is_inverse in ((currency + quote_currency, False), (quote_currency + currency, True)):
+            try:
+                contracts = await self.ib.qualifyContractsAsync(Forex(pair))
+            except ConnectionError, RequestError:
+                continue
+            contract = contracts[0] if contracts else None
+            # qualifyContractsAsync gives None or a list of candidates when the pair does not exist in one form.
+            if not isinstance(contract, Contract) or not contract.conId:
+                continue
+            close = await self.request_last_midpoint(contract)
+            if close is not None and close > 0:
+                return Decimal(1) / close if is_inverse else close
+        message = f"IBKR has no {currency} to {quote_currency} exchange rate."
+        raise GatewayRequestError(message)
+
+    async def request_last_midpoint(self, contract: Contract) -> Decimal | None:
+        try:
+            bars_data = await self.ib.reqHistoricalDataAsync(
+                contract,
+                endDateTime="",
+                durationStr=EXCHANGE_RATE_DURATION,
+                barSizeSetting=EXCHANGE_RATE_BAR_SIZE,
+                whatToShow="MIDPOINT",
+                useRTH=False,
+                formatDate=UTC_FORMAT_DATE,
+                timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
+            )
+        except (ConnectionError, RequestError) as error:
+            message = f"IB Gateway did not return the {contract.localSymbol or contract.symbol} rate: {error}"
+            raise GatewayRequestError(message) from error
+        if not bars_data:
+            return None
+        # str() first, so that the Decimal has the short form of the float, for example 1.1139.
+        return Decimal(str(bars_data[-1].close))
 
     def require_connection(self) -> None:
         if not self.ib.isConnected():
@@ -381,4 +439,5 @@ class IbAsyncGatewayConnection:
             raise GatewayRequestError(str(error)) from error
 
     def disconnect(self) -> None:
+        self.synchronized = False
         self.ib.disconnect()

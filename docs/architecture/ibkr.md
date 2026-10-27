@@ -48,7 +48,7 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
 | `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
@@ -61,6 +61,10 @@ The public entry `atrade.ibkr` exports:
   not there, it tries to connect. It then waits `retry_seconds` (default 10)
   and checks again. A lost connection thus comes back without a restart. A
   failed attempt writes a warning with the Gateway address to the log.
+- `is_connected()` is true only after `connectAsync` has ended. ib_async
+  reports the API as ready before its startup synchronization reads the
+  managed accounts, the open orders, and the account values. Before that end,
+  the connection number and `NetLiquidation` are not there yet.
 - `read_connection_number()` counts the successful connections. A new
   number tells `paper_trading` to run the paper account check again
   (section 11.5).
@@ -77,8 +81,9 @@ The public entry `atrade.ibkr` exports:
   the same functions. Its data stays in memory. Tests set
   `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
-  `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, and `executions`
-  directly. Each change of `connected` from false to true gives a new
+  `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, `executions`,
+  `exchange_rates`, and `exchange_rate_error_message` directly. It records each rate request in
+  `exchange_rate_requests`. Each change of `connected` from false to true gives a new
   connection number. Its orders get the client ID `1` and order IDs from
   1001. `make_forward_test_order(...)` makes an open order of another client
   ID with a forward test `orderRef`.
@@ -106,6 +111,14 @@ The public entry `atrade.ibkr` exports:
   `price`). `paper_trading` uses it for the fills of orders by hand.
 - The order functions raise `GatewayRequestError` when the connection is
   not there.
+- `read_exchange_rate(currency, quote_currency)` returns the IBKR forex
+  rate: `quote_currency` units for 1 `currency` unit, for example 1.11 USD
+  for 1 EUR. It reads the close of the last 1 hour `MIDPOINT` bar of 1 week
+  (`useRTH=False`) of the IDEALPRO pair, so the forex weekend also has a
+  rate. IBKR lists each pair in one direction only (`EUR.USD`, `USD.JPY`),
+  so the other direction gives `1 / rate`. It raises `GatewayRequestError`
+  without a connection or without a rate. `paper_trading` uses it for a
+  paper account with a base currency that is not USD (section 11.9).
 - `search_instruments(query)` is the instrument search of
   [`docs/architecture/market_data.md`](market_data.md) section 8.2.
 - `read_historical_bars(...)` and `stream_live_bars(...)` are the bars and
@@ -126,7 +139,17 @@ make sure that the `ib-gateway` service runs and is logged in.
 
 - Image: `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by the digest of the
   multi-platform index (IB Gateway 10.50.1f on 2026-10-27).
-- `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`.
+- `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`,
+  `READ_ONLY_API: "no"`. Without `READ_ONLY_API`, IBC keeps the Gateway
+  default, a read-only API. Then IBKR refuses each order with warning 321
+  ("The API interface is currently in Read-Only mode"). It also refuses
+  `reqOpenOrders` and `reqCompletedOrders` with warning 321, and ib_async
+  waits for an answer that does not come. Each ib_async connection then waits
+  for the connection timeout (10 seconds), and `read_own_open_orders()`
+  raises `GatewayRequestError`. `reqAllOpenOrders` still answers. Checked on
+  2026-10-27. After a change of this
+  value, recreate the service: `docker compose --file deploy/compose.yaml
+  --env-file .env up -d ib-gateway`.
   `TWS_USERID` and `TWS_PASSWORD` come from `ATRADE_IBKR_USERNAME` and
   `ATRADE_IBKR_PASSWORD`. Only `ib-gateway` gets these values.
 - IBC restarts the Gateway each day at `AUTO_RESTART_TIME`, in `TIME_ZONE`,
@@ -166,7 +189,27 @@ make sure that the `ib-gateway` service runs and is logged in.
   port is not published, so set these 2 variables to an address that the
   test machine can reach, for example an SSH tunnel to the server.
 - The assertions cover the connection, `managedAccounts` (exactly the paper
-  account), the `NetLiquidation` balance in USD, and the positions of the
-  account.
+  account), a positive `NetLiquidation` in the base currency of the account
+  (not `BASE`), the positions of the account, and `read_exchange_rate()` for
+  `EUR`/`USD` and for `JPY`/`USD` (the inverse direction of `USD.JPY`).
+  Run only the read-only balance cases with
+  `uv run pytest -m ibkr_paper -k "balance_and_the_positions or forex_rate"`.
+  A broader `-k` filter can select the order cases.
 - The real case uses client ID `99`. It does not compete with the Web client
-  ID or the forward test range.
+  ID or the forward test range. The fixture disconnects after each test, so
+  a failed test does not block the client ID for the next test (error 326).
+- To run the real case on the server without a tunnel, run it in a one-off
+  container on the Compose network `atrade_default` (for example
+  `python:3.14-slim` with `backend/` mounted, `uv sync`, then
+  `uv run pytest -m ibkr_paper`). Set `ATRADE_IBKR_HOST=ib-gateway`. The
+  forward test case also needs `ATRADE_TEST_DATABASE_URL` with a test
+  database: the test empties all tables. Do not use the database of the
+  running stack.
+- Results on 2026-10-27 (IB Gateway 10.50.1f, ib_async 2.1.0, server version
+  178): the connection, `managedAccounts`, the instrument search, the
+  historical bars, the live bars, and the refusals without a connection pass.
+  The order cases fail while the Gateway API is read-only (section 7.4). The
+  paper account has the base currency EUR: IBKR sends `NetLiquidation` and
+  `TotalCashValue` only in EUR, and `$LEDGER-ExchangeRate` only for `BASE`
+  and `EUR` (both `1.00`), because the ledger has no USD. The balance case
+  and the forex rate case pass: `EUR.USD` gives a rate (section 11.9).
