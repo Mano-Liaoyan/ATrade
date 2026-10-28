@@ -252,7 +252,9 @@ the server, for example `/srv/atrade`.
 1. On the server, as the deploy user (a user that can run `docker`), clone
    the repository to `<checkout>`:
    `git clone https://github.com/Mano-Liaoyan/ATrade.git <checkout>`.
-2. Copy `.env` to `<checkout>/.env` with `scp` and run `chmod 600 .env`. In
+2. Copy `.env` to `<checkout>/.env`. The deploy user has no password, so
+   copy the file with `scp` to your own account first, then run
+   `sudo install -o <deploy user> -g <deploy user> -m 600 <file> <checkout>/.env`. In
    `.env`, set `ATRADE_WEB_BIND_ADDRESS` to the LAN address of the server.
 3. In the firewall of the server, let only the NPM host connect to
    `ATRADE_WEB_PORT`.
@@ -262,37 +264,60 @@ the server, for example `/srv/atrade`.
    content of `atrade-deploy.pub` at the end. The key can then only run the
    deploy script:
    `restrict,command="<checkout>/scripts/deploy" ssh-ed25519 AAAA... atrade-deploy`
-5. In GitHub, open Settings > Environments and make the environment
+5. In Tailscale (the server is in your tailnet):
+   1. Access controls: add the tag and a grant that lets the tag connect only
+      to the SSH port of the server. Replace `<server Tailscale IP>`:
+
+      ```json
+      "tagOwners": { "tag:atrade-deploy": ["autogroup:admin"] },
+      "grants": [
+        { "src": ["tag:atrade-deploy"], "dst": ["<server Tailscale IP>"], "ip": ["tcp:22"] }
+      ]
+      ```
+
+      When the policy also has an allow-all rule, `tag:atrade-deploy` gets
+      more access than this grant. Remove the allow-all rule or limit it to
+      your own devices.
+   2. Settings > Trust credentials: add an OpenID Connect credential.
+      Issuer: GitHub. Subject: `repo:Mano-Liaoyan/ATrade:environment:production`.
+      Scope: `auth_keys` (write) with the tag `tag:atrade-deploy`. Keep the
+      client ID and the audience.
+   3. On the server, the SSH connection must go to OpenSSH. Tailscale SSH
+      does not read `authorized_keys`. When `tailscale debug prefs` shows
+      `"RunSSH": true`, run `sudo tailscale set --ssh=false`.
+6. In GitHub, open Settings > Environments and make the environment
    `production`. Set its deployment branches to `main` only. Add these
    environment secrets:
 
    | Secret | Value |
    |---|---|
-   | `ATRADE_DEPLOY_HOST` | Address of the server that GitHub runners can reach with SSH. |
-   | `ATRADE_DEPLOY_PORT` | SSH port of the server. |
+   | `ATRADE_TAILSCALE_CLIENT_ID` | Client ID of the Tailscale trust credential. |
+   | `ATRADE_TAILSCALE_AUDIENCE` | Audience of the Tailscale trust credential. |
+   | `ATRADE_DEPLOY_HOST` | Tailscale IP address of the server. |
+   | `ATRADE_DEPLOY_PORT` | SSH port of the server, normally `22`. |
    | `ATRADE_DEPLOY_USER` | The deploy user. |
    | `ATRADE_DEPLOY_SSH_KEY` | Content of the private key `atrade-deploy`. |
-   | `ATRADE_DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -p <port> <host>`. Check the fingerprint against the server. |
+   | `ATRADE_DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -p <port> <server Tailscale IP>`, run from a device in your tailnet. Check the fingerprint against the server. |
 
    Then delete the private key file from your machine.
-6. In NPM, add a proxy host for the Web host name: scheme `http`, forward
+7. In NPM, add a proxy host for the Web host name: scheme `http`, forward
    host the LAN address of the server, forward port `ATRADE_WEB_PORT`.
    Turn on "Websockets Support". Use an SSL certificate that Cloudflare
    accepts in Full (strict) mode, for example a Cloudflare Origin
    Certificate.
-7. In the firewall of the NPM host, let only the
+8. In the firewall of the NPM host, let only the
    [Cloudflare IP ranges](https://www.cloudflare.com/ips/) connect to port
    443.
-8. In Cloudflare, proxy the DNS record of the Web host name (orange cloud).
+9. In Cloudflare, proxy the DNS record of the Web host name (orange cloud).
    Set SSL/TLS to Full (strict).
-9. In Cloudflare Zero Trust:
+10. In Cloudflare Zero Trust:
    1. Settings > Authentication: add the GitHub identity provider. Log in to
       GitHub with a passkey.
    2. Access > Applications: add a self-hosted application for the Web host
       name. Session duration: 1 month. Identity provider: GitHub only.
    3. Add one Allow policy with the rule "Emails" set to your email address.
       Add no other policy. Access then denies all other users.
-10. Run the workflow "Deploy" by hand (Actions > Deploy > Run workflow on
+11. Run the workflow "Deploy" by hand (Actions > Deploy > Run workflow on
     `main`). Open the Web host name. Cloudflare Access asks for the GitHub
     login. After the login, ATrade opens, and the header shows the backend
     status (WebSocket checks: the bar chart updates, and code completion

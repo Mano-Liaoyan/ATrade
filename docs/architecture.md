@@ -76,7 +76,7 @@ and its revision comments.
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
-| Deployment | User's own server, one Docker Compose project, Cloudflare proxy and Cloudflare Access, Nginx Proxy Manager, GitHub Actions deployment through SSH. | See section 14. |
+| Deployment | User's own server, one Docker Compose project, Cloudflare proxy and Cloudflare Access, Nginx Proxy Manager, GitHub Actions deployment through Tailscale and SSH. | See section 14. |
 | Effect-TS | Not used. | Its HTTP and SQL modules are unstable, it has no Svelte binding, and its style conflicts with the readability rules ([Effect-TS evaluation](https://github.com/Mano-Liaoyan/ATrade/issues/47)). |
 
 ### 4.1 NautilusTrader 2.0
@@ -913,11 +913,22 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other LAN host) ->
   `main` of this repository, and when started by hand on `main`. One
   deployment runs at a time.
 - The job uses the GitHub environment `production`. Its deployment branch
-  rule allows only `main`. Its secrets are `ATRADE_DEPLOY_HOST`,
+  rule allows only `main`. Its secrets are `ATRADE_TAILSCALE_CLIENT_ID` and
+  `ATRADE_TAILSCALE_AUDIENCE` (a Tailscale federated identity),
+  `ATRADE_DEPLOY_HOST` (the Tailscale address of the server),
   `ATRADE_DEPLOY_PORT`, `ATRADE_DEPLOY_USER`, `ATRADE_DEPLOY_SSH_KEY` (a
   private key that is used only for deployment), and
   `ATRADE_DEPLOY_KNOWN_HOSTS` (the host key line of the server).
-- The runner connects to the server with SSH and sends only the commit SHA.
+- The runner joins the user's tailnet with `tailscale/github-action` and
+  workload identity federation: GitHub gives the job an OIDC token, and
+  Tailscale accepts only the subject
+  `repo:Mano-Liaoyan/ATrade:environment:production`. GitHub stores no
+  Tailscale secret that works alone. The node is ephemeral and has the tag
+  `tag:atrade-deploy`. The tailnet policy lets this tag connect only to
+  `tcp:22` of the server. The server has no public SSH port.
+- The runner connects to the server with OpenSSH through Tailscale, not with
+  Tailscale SSH, because Tailscale SSH does not read `authorized_keys`. It
+  sends only the commit SHA.
   In `authorized_keys` on the server, the deploy key has
   `restrict,command="<checkout>/scripts/deploy"`. The key can run nothing
   else.

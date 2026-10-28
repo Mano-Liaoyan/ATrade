@@ -1,6 +1,7 @@
 # Deploys main to the user's server after CI passes (docs/architecture.md section 14.2).
-# The runner connects with SSH. The deploy key on the server can only run scripts/deploy, which accepts
-# only commits of origin/main. The server builds the images with ./start run. .env stays on the server.
+# The runner joins the user's tailnet for the duration of the job, then connects to the server with SSH
+# through Tailscale. The server has no public SSH port. The deploy key on the server can only run
+# scripts/deploy, which accepts only commits of origin/main. The server builds the images with ./start run. .env stays on the server.
 name: Deploy
 
 on:
@@ -12,6 +13,8 @@ on:
 
 permissions:
   contents: read
+  # Tailscale workload identity federation: the job gets a GitHub OIDC token instead of a Tailscale secret.
+  id-token: write
 
 # One deployment at a time. A new deployment waits until the current one ends.
 concurrency:
@@ -33,6 +36,16 @@ jobs:
     # The server builds the web image. A build without cache takes approximately 10 minutes.
     timeout-minutes: 30
     steps:
+      # The node is ephemeral and has the tag tag:atrade-deploy. The tailnet policy lets this tag connect
+      # only to the SSH port of the server.
+      - name: Join the tailnet
+        # v4.2.0
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd
+        with:
+          oauth-client-id: ${{ secrets.ATRADE_TAILSCALE_CLIENT_ID }}
+          audience: ${{ secrets.ATRADE_TAILSCALE_AUDIENCE }}
+          tags: tag:atrade-deploy
+          ping: ${{ secrets.ATRADE_DEPLOY_HOST }}
       - name: Deploy the commit on the server
         env:
           SSH_KEY: ${{ secrets.ATRADE_DEPLOY_SSH_KEY }}
