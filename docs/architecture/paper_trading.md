@@ -194,26 +194,23 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 - The page uses `PaperAccountFeed` (`foundation/live_socket` for
   reconnection and heartbeat) and `foundation/scroll_region` for the tables
   (section 13). The tables have 32px rows.
-- After a passed check, the "Paper order" column of the instrument page shows
-  the paper order form (`PaperOrderTicket.svelte`, Carbon components of
-  `foundation/carbon`): side
-  (content switcher Buy / Sell), symbol, exchange, currency, quantity, order
-  type (select Limit / Market), limit price (limit orders only), and time in
-  force (select DAY / GTC). "Review order" checks the form and opens the
-  Carbon modal. The modal label is the paper account number, and the modal
-  title is the full order, for example "Buy 50 AAPL". The body has the
-  `PAPER` mark, the instrument, the order type, and the price. Only "Send
-  paper order" in the modal sends the order. "Cancel", the close button, a
-  click outside, and Escape send nothing. Focus stays in the modal while it is
-  open, and goes back to "Review order" when it closes.
+- The "Paper order" column of the instrument page has the paper order panel
+  (`InstrumentOrderPanel.svelte`, section 13): the order is for the instrument
+  of the page. "Review buy order" or "Review sell order" opens the Carbon
+  modal. The modal label is the paper account number, and the modal title is
+  the full order, for example "Buy 50 AAPL". The body has the `PAPER` mark,
+  the instrument, the order type, and the price. Only "Send paper order" in
+  the modal sends the order. "Cancel", the close button, a click outside, and
+  Escape send nothing. Focus stays in the modal while it is open, and goes
+  back to the review button when it closes.
 - The instrument page reads `/ws/forward-tests`
-  (`ForwardTestsOnInstrumentsFeed`) and gives the form the forward tests that hold a client ID
-  (`listForwardTestsOnInstruments` of `forward_test`, type
-  `BlockingForwardTest` of `paper_trading`). When the symbol and exchange of
-  the form match one of them, "Review order" is disabled and the form says
-  why, for example "Forward test 3 (Trend v2) trades AAPL / NASDAQ. Stop the
-  forward test to send an order by hand." (`findOrderBlock`). The backend
-  still refuses the order with `409` (section 11.3).
+  (`ForwardTestsOnInstrumentsFeed`) and gives the panel the forward tests that
+  hold a client ID (`listForwardTestsOnInstruments` of `forward_test`, type
+  `BlockingForwardTest` of `paper_trading`). When the instrument matches one
+  of them, the review button is disabled and the panel says why, for example
+  "Forward test 3 (Trend v2) trades AAPL / NASDAQ. Stop the forward test to
+  send an order by hand." (`findInstrumentOrderBlock`). The backend still
+  refuses the order with `409` (section 11.3).
 - The open order list (`OpenOrderList.svelte`) comes from the "orders"
   message. It shows the source of each order ("by hand" or "forward test
   42"). Each row has an overflow menu "Actions for order N". Its cancel item
