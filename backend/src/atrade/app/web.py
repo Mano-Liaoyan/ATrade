@@ -14,6 +14,7 @@ import uvicorn
 from fastapi import FastAPI
 from pydantic import ValidationError
 
+from atrade.app.access_session_routes import create_access_session_router
 from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
@@ -82,6 +83,7 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))
+    app.include_router(create_access_session_router())
     app.include_router(
         create_ibkr_router(
             gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port

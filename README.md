@@ -18,6 +18,7 @@ account panel (issue #74), paper orders sent by hand (issue #75), backtests
 controls (issue #71), and the start and stop of forward tests (issue #76):
 
 - The `web` service serves the app shell, `GET /api/health`,
+  `GET /api/access-session`,
   `GET /api/ibkr/gateway`, the instrument search, the watchlist routes under
   `/api/watchlist`, the strategy routes under `/api/strategies`, the
   language server WebSocket `/ws/strategy-language-server`, the paper order
@@ -25,7 +26,8 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
 - The app shell header shows the backend status, the IB Gateway status, the
-  server time, and the Paper tag of the checked paper account.
+  server time, and the Paper tag of the checked paper account. Behind
+  Cloudflare Access, it also has a Log out link.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home

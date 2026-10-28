@@ -314,3 +314,22 @@ test('the command palette changes the theme, and the theme button shows the new 
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 22, 22)');
   await expect(page.getByRole('banner').getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
 });
+
+// Cloudflare Access adds the header Cf-Access-Jwt-Assertion to each request. Only then the header has a Log out link.
+test('the Log out link goes to the Cloudflare Access logout URL behind Cloudflare Access', async ({ page }) => {
+  await page.setExtraHTTPHeaders({ 'Cf-Access-Jwt-Assertion': 'header.payload.signature' });
+  await page.goto('/');
+
+  const logOutLink = page.getByRole('banner').getByRole('link', { name: 'Log out' });
+  await expect(logOutLink).toHaveAttribute('href', '/cdn-cgi/access/logout');
+  await logOutLink.focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Log out');
+});
+
+test('the header has no Log out link without Cloudflare Access', async ({ page }) => {
+  await page.goto('/');
+
+  const header = page.getByRole('banner');
+  await expect(header.getByRole('button', { name: 'Theme: System' })).toBeVisible();
+  await expect(header.getByRole('link', { name: 'Log out' })).toHaveCount(0);
+});
