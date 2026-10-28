@@ -33,11 +33,25 @@ async function replaceCode(page: Page, code: string): Promise<void> {
   await page.keyboard.insertText(code);
 }
 
+// In WebKit, a screenshot sometimes does not finish. The next screenshot then usually finishes, so the test tries again.
+const SCREENSHOT_ATTEMPTS = 3;
+const SCREENSHOT_TIMEOUT_MILLISECONDS = 3_000;
+
 // The color of one screen pixel. The screenshot is decoded in the page, so the test needs no image library.
-// caret: 'initial' is necessary: in WebKit, the default caret hiding can stop a screenshot until the test times out.
+// caret: 'initial' is necessary: in WebKit, the default caret hiding stops many screenshots.
 // CodeMirror draws its own cursor, and the test reads no pixel at the cursor.
 async function readPixel(page: Page, x: number, y: number): Promise<string> {
-  const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 }, caret: 'initial' });
+  const clip = { x: Math.round(x), y: Math.round(y), width: 1, height: 1 };
+  let png: Buffer | undefined;
+  for (let attempt = 1; png === undefined; attempt += 1) {
+    try {
+      png = await page.screenshot({ clip, caret: 'initial', timeout: SCREENSHOT_TIMEOUT_MILLISECONDS });
+    } catch (error) {
+      if (attempt === SCREENSHOT_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
   return page.evaluate(async (base64) => {
     const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob());
     const context = new OffscreenCanvas(1, 1).getContext('2d');
