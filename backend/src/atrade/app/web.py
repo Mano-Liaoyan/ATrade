@@ -29,7 +29,7 @@ from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
-from atrade.market_data import InstrumentLookup, create_market_data_router
+from atrade.market_data import ExchangeRateReader, InstrumentLookup, create_market_data_router
 from atrade.paper_trading import BlockingForwardTest, PaperAccountMonitor, create_paper_trading_router
 from atrade.strategy import create_strategy_language_server_router, create_strategy_router
 from atrade.watchlist import create_watchlist_router
@@ -108,7 +108,14 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
     )
     app.include_router(create_strategy_router(database_url=settings.database_url, clock=clock))
     app.include_router(create_strategy_language_server_router())
-    app.include_router(create_backtest_router(database_url=settings.database_url, clock=clock))
+    exchange_rate_reader = ExchangeRateReader(
+        database_url=settings.database_url, clock=clock, gateway_connection=gateway_connection
+    )
+    app.include_router(
+        create_backtest_router(
+            database_url=settings.database_url, clock=clock, exchange_rate_reader=exchange_rate_reader
+        )
+    )
     app.include_router(
         create_forward_test_router(
             database_url=settings.database_url,

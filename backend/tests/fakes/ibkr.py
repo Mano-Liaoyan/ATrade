@@ -2,9 +2,10 @@
 
 Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
 `instruments`, `search_error_message`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
-`cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`,
+`cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`, `daily_exchange_rates`,
 `live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
-`historical_bar_requests`, `exchange_rate_requests`, `live_bar_subscriptions`, and `active_live_bar_stream_count`.
+`historical_bar_requests`, `exchange_rate_requests`, `daily_exchange_rate_requests`, `live_bar_subscriptions`, and
+`active_live_bar_stream_count`.
 No mock library is used (section 17.3).
 """
 
@@ -17,7 +18,15 @@ import anyio
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import AccountValue, Execution, GatewayRequestError, OpenOrder, OrderRequest, PortfolioPosition
+from atrade.ibkr import (
+    AccountValue,
+    DailyExchangeRate,
+    Execution,
+    GatewayRequestError,
+    OpenOrder,
+    OrderRequest,
+    PortfolioPosition,
+)
 
 # The fake checks the reachable flag this often. A short wait keeps the e2e server from using a full CPU.
 CHECK_INTERVAL_SECONDS = 0.05
@@ -55,6 +64,13 @@ LIVE_VOLUME_STEP = Decimal(10)
 class HistoricalBarRequest:
     instrument: Instrument
     bar_period: BarPeriod
+    time_range: TimeRange
+
+
+@dataclass(frozen=True)
+class DailyExchangeRateRequest:
+    currency: str
+    quote_currency: str
     time_range: TimeRange
 
 
@@ -122,6 +138,11 @@ class FakeGatewayConnection:
         self.exchange_rate_error_message: str | None = None
         # Each call of read_exchange_rate, in order.
         self.exchange_rate_requests: list[tuple[str, str]] = []
+        # The daily IBKR forex rates: (currency, quote currency) -> the rate of each day. The forex market of the fake
+        # never closes, so each day in the range has a rate.
+        self.daily_exchange_rates: dict[tuple[str, str], Decimal] = {}
+        # Each call of read_daily_exchange_rates, in order. Tests assert that only missing ranges reach IBKR.
+        self.daily_exchange_rate_requests: list[DailyExchangeRateRequest] = []
         self.connection_number = 0
         self._connected = False
 
@@ -286,6 +307,24 @@ class FakeGatewayConnection:
             message = f"IBKR has no {currency} to {quote_currency} exchange rate."
             raise GatewayRequestError(message)
         return rate
+
+    async def read_daily_exchange_rates(
+        self, currency: str, quote_currency: str, time_range: TimeRange
+    ) -> list[DailyExchangeRate]:
+        if not self.connected:
+            message = "ATrade is not connected to IB Gateway."
+            raise GatewayRequestError(message)
+        self.daily_exchange_rate_requests.append(DailyExchangeRateRequest(currency, quote_currency, time_range))
+        rate = self.daily_exchange_rates.get((currency, quote_currency))
+        if rate is None:
+            message = f"IBKR has no {currency} to {quote_currency} exchange rate."
+            raise GatewayRequestError(message)
+        rates: list[DailyExchangeRate] = []
+        day_start_utc = ceil_to_bar_start(time_range.start_utc, BarPeriod.ONE_DAY)
+        while day_start_utc < time_range.end_utc:
+            rates.append(DailyExchangeRate(day_start_utc=day_start_utc, rate=rate))
+            day_start_utc += BarPeriod.ONE_DAY.length
+        return rates
 
     def disconnect(self) -> None:
         self.connected = False

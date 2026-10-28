@@ -12,9 +12,6 @@ from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, Equ
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
 from atrade.market_data import BarRequest, has_saved_bars
 
-# A backtest has no exchange rates, so the paper capital in USD can only buy USD instruments.
-SUPPORTED_CURRENCY = "USD"
-
 
 @dataclass(frozen=True)
 class BacktestOutcome:
@@ -31,9 +28,6 @@ class BacktestOutcome:
 
 def check_backtest_request(request: BacktestRequest) -> str | None:
     """Returns why a backtest cannot run with this request, or None."""
-    currency = request.instrument.currency
-    if currency != SUPPORTED_CURRENCY:
-        return f"A backtest supports only USD instruments. The instrument currency is {currency}."
     if request.time_range.end_utc <= request.time_range.start_utc:
         return "The time range must end after it starts."
     return None

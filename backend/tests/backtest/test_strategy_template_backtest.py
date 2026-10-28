@@ -10,7 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from atrade.backtest.backtest_store import BacktestRequest
-from atrade.backtest.strategy_engine_run import run_strategy_on_bars
+from atrade.backtest.strategy_engine_run import StrategyRun, run_strategy_on_bars
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
@@ -22,6 +22,7 @@ WAVE_PERIOD_BARS = 40
 # The template average period is 20 bars. 60 daily look-back bars are its warm-up of 3 average periods.
 LOOK_BACK_BAR_COUNT = 60
 RANGE_BAR_COUNT = 10
+PAPER_CAPITAL_USD = Decimal(100000)
 
 
 def make_bar(start_utc: datetime, close: Decimal) -> Bar:
@@ -44,17 +45,20 @@ def make_request(start_utc: datetime, bar_count: int) -> BacktestRequest:
         instrument=Instrument(symbol="WAVE", exchange="ARCA", currency="USD"),
         bar_period=BarPeriod.ONE_DAY,
         time_range=TimeRange(start_utc=start_utc, end_utc=start_utc + timedelta(days=bar_count)),
-        paper_capital_usd=Decimal(100000),
+        paper_capital_usd=PAPER_CAPITAL_USD,
     )
 
 
 def test_the_template_trades_when_the_range_has_more_bars_than_the_average_period(tmp_path: Path) -> None:
     trades = run_strategy_on_bars(
-        code=STRATEGY_TEMPLATE,
-        request=make_request(FIRST_BAR_UTC, BAR_COUNT),
-        bars=make_wave_bars(),
-        look_back_bars=[],
-        work_directory=tmp_path,
+        StrategyRun(
+            code=STRATEGY_TEMPLATE,
+            request=make_request(FIRST_BAR_UTC, BAR_COUNT),
+            starting_cash=PAPER_CAPITAL_USD,
+            bars=make_wave_bars(),
+            look_back_bars=[],
+        ),
+        tmp_path,
     )
 
     assert len(trades) >= 4
@@ -68,11 +72,14 @@ def test_the_template_trades_on_the_first_bar_because_look_back_bars_warm_up_the
     bars = [make_bar(start_utc + timedelta(days=index), Decimal(110)) for index in range(RANGE_BAR_COUNT)]
 
     trades = run_strategy_on_bars(
-        code=STRATEGY_TEMPLATE,
-        request=make_request(start_utc, RANGE_BAR_COUNT),
-        bars=bars,
-        look_back_bars=look_back_bars,
-        work_directory=tmp_path,
+        StrategyRun(
+            code=STRATEGY_TEMPLATE,
+            request=make_request(start_utc, RANGE_BAR_COUNT),
+            starting_cash=PAPER_CAPITAL_USD,
+            bars=bars,
+            look_back_bars=look_back_bars,
+        ),
+        tmp_path,
     )
 
     # The order fills at the close of the first bar of the range, at its end. No trade is before the start.
@@ -86,11 +93,14 @@ def test_without_look_back_bars_the_template_does_not_trade_on_the_first_bars(tm
     bars = [make_bar(start_utc + timedelta(days=index), Decimal(110)) for index in range(RANGE_BAR_COUNT)]
 
     trades = run_strategy_on_bars(
-        code=STRATEGY_TEMPLATE,
-        request=make_request(start_utc, RANGE_BAR_COUNT),
-        bars=bars,
-        look_back_bars=[],
-        work_directory=tmp_path,
+        StrategyRun(
+            code=STRATEGY_TEMPLATE,
+            request=make_request(start_utc, RANGE_BAR_COUNT),
+            starting_cash=PAPER_CAPITAL_USD,
+            bars=bars,
+            look_back_bars=[],
+        ),
+        tmp_path,
     )
 
     assert trades == []

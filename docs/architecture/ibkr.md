@@ -48,7 +48,7 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
 | `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
@@ -82,8 +82,9 @@ The public entry `atrade.ibkr` exports:
   `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
   `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, `executions`,
-  `exchange_rates`, and `exchange_rate_error_message` directly. It records each rate request in
-  `exchange_rate_requests`. Each change of `connected` from false to true gives a new
+  `exchange_rates`, `exchange_rate_error_message`, and `daily_exchange_rates` (one rate for each
+  day of the range) directly. It records each rate request in `exchange_rate_requests`, and each
+  daily rate request in `daily_exchange_rate_requests`. Each change of `connected` from false to true gives a new
   connection number. Its orders get the client ID `1` and order IDs from
   1001. `make_forward_test_order(...)` makes an open order of another client
   ID with a forward test `orderRef`.
@@ -119,6 +120,14 @@ The public entry `atrade.ibkr` exports:
   so the other direction gives `1 / rate`. It raises `GatewayRequestError`
   without a connection or without a rate. `paper_trading` uses it for a
   paper account with a base currency that is not USD (section 11.9).
+- `read_daily_exchange_rates(currency, quote_currency, time_range)` returns
+  a `DailyExchangeRate` (`day_start_utc`, `rate`) for each daily `MIDPOINT`
+  bar (`useRTH=False`) of the IDEALPRO pair that starts in the range, oldest
+  first. The pair direction and the inverse are the same as in
+  `read_exchange_rate()`. The paging is the paging of the 1 day bars
+  ([`market_data.md`](market_data.md) section 8.4). A day without forex
+  trading has no rate. `market_data` uses it for the backtest exchange
+  rates (section 8.6 of `market_data.md`).
 - `search_instruments(query)` is the instrument search of
   [`docs/architecture/market_data.md`](market_data.md) section 8.2.
 - `read_historical_bars(...)` and `stream_live_bars(...)` are the bars and

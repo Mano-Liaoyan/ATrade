@@ -5,6 +5,7 @@ code is user code (docs/architecture.md section 10).
 """
 
 import traceback
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -106,7 +107,8 @@ def write_look_back_catalog(
 
 def create_engine(
     *,
-    paper_capital_usd: Decimal,
+    starting_cash: Decimal,
+    currency: str,
     venue: Venue,
     work_directory: Path,
     look_back_catalog: DataCatalogConfig | None = None,
@@ -124,15 +126,16 @@ def create_engine(
             shutdown_on_error=True, logging=logging, catalogs=[] if look_back_catalog is None else [look_back_catalog]
         )
     )
-    usd = Currency.from_str("USD")
+    # The account is in the instrument currency, so the engine needs no exchange rates (section 10.8).
+    account_currency = Currency.from_str(currency)
     engine.add_venue(
         venue,
         OmsType.NETTING,
         AccountType.CASH,
-        [Money.from_str(f"{paper_capital_usd} USD")],
-        base_currency=usd,
+        [Money.from_str(f"{starting_cash} {currency}")],
+        base_currency=account_currency,
         # The backtest has no commission model yet. NautilusTrader 2.0 requires an explicit fee model.
-        fee_model=FixedFeeModel(Money(0, usd)),
+        fee_model=FixedFeeModel(Money(0, account_currency)),
     )
     return engine
 
@@ -162,29 +165,46 @@ def read_trades(engine: BacktestEngine) -> list[BacktestTrade]:
     return sorted(trades, key=lambda trade: trade.time_utc)
 
 
-def run_strategy_on_bars(
-    *, code: str, request: BacktestRequest, bars: list[Bar], look_back_bars: list[Bar], work_directory: Path
-) -> list[BacktestTrade]:
-    """Returns the trades of the strategy on `bars`. `request_bars` gets `look_back_bars`, the bars before the start.
+def read_currency_precision(currency: str) -> int:
+    """The decimal places of a cash amount in the currency, for example 2 for HKD."""
+    return Currency.from_str(currency).precision
+
+
+@dataclass(frozen=True)
+class StrategyRun:
+    """The inputs of one engine run. The account starts with `starting_cash` in the instrument currency."""
+
+    code: str
+    request: BacktestRequest
+    starting_cash: Decimal
+    bars: list[Bar]
+    # The bars before the start, for `request_bars`.
+    look_back_bars: list[Bar]
+
+
+def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[BacktestTrade]:
+    """Returns the trades of the strategy on `run.bars`, in the instrument currency.
 
     Raises StrategyFailedError with the strategy error.
     """
-    all_bars = look_back_bars + bars
+    request = run.request
+    all_bars = run.look_back_bars + run.bars
     nautilus_instrument = create_instrument(request.instrument, all_bars)
     bar_type = BarType.from_str(f"{nautilus_instrument.id}-{request.bar_period.value}-LAST-EXTERNAL")
     volume_precision = max(count_decimal_places(bar.volume) for bar in all_bars)
     wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, volume_precision)
-    nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(bars, request.bar_period))
+    nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(run.bars, request.bar_period))
     engine = create_engine(
-        paper_capital_usd=request.paper_capital_usd,
+        starting_cash=run.starting_cash,
+        currency=request.instrument.currency,
         venue=nautilus_instrument.venue,
-        look_back_catalog=create_look_back_catalog(look_back_bars, wrangler, request.bar_period, work_directory),
+        look_back_catalog=create_look_back_catalog(run.look_back_bars, wrangler, request.bar_period, work_directory),
         work_directory=work_directory,
     )
     engine.add_instrument(nautilus_instrument)
     engine.add_data(nautilus_bars)
     try:
-        strategy_class, config_class = load_strategy_classes(code, work_directory)
+        strategy_class, config_class = load_strategy_classes(run.code, work_directory)
         # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
         # them (docs/architecture/strategy.md section 9.2).
         config = config_class(instrument_id=nautilus_instrument.id, bar_type=bar_type)  # pyright: ignore[reportCallIssue]

@@ -129,7 +129,7 @@ class ForwardTestRecorder(DataActor):
         new_fills = self.read_new_fills()
         self.fills.update((fill.trade_id, fill) for fill in new_fills)
         [equity_point] = calculate_equity_curve(
-            paper_capital_usd=self.recorder_input.start_balance_usd,
+            start_cash=self.recorder_input.start_balance_usd,
             bars=[converted_bar],
             bar_period=self.recorder_input.bar_period,
             trades=[fill.trade for fill in self.fills.values()],

@@ -61,17 +61,6 @@ async def test_rejects_backtest_of_a_missing_strategy_version(web_client: httpx.
 
 
 @pytest.mark.anyio
-async def test_rejects_backtest_of_an_instrument_that_is_not_in_usd(web_client: httpx.AsyncClient) -> None:
-    saved = await save_test_strategy_version(web_client)
-    request = {**make_backtest_request(saved["strategy_version_id"]), "currency": "HKD"}
-
-    response = await web_client.post("/api/backtests", json=request)
-
-    assert response.status_code == 422
-    assert response.json() == {"detail": "A backtest supports only USD instruments. The instrument currency is HKD."}
-
-
-@pytest.mark.anyio
 async def test_rejects_backtest_with_a_time_range_that_ends_before_it_starts(web_client: httpx.AsyncClient) -> None:
     saved = await save_test_strategy_version(web_client)
     request = {**make_backtest_request(saved["strategy_version_id"]), "end_utc": "2026-02-01T00:00:00Z"}

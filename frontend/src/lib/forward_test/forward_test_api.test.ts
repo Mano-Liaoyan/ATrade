@@ -170,7 +170,8 @@ describe('startSamePeriodBacktest', () => {
   });
 
   it('shows why the backtest was refused', async () => {
-    const detail = 'A backtest supports only USD instruments. The instrument currency is EUR.';
+    const detail =
+      'A same-period backtest supports only USD instruments, because a forward test has no exchange rates. The instrument currency is EUR.';
 
     const result = await startSamePeriodBacktest(makeFetch(422, { detail }), 3);
 

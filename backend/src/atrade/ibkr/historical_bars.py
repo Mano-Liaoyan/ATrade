@@ -44,6 +44,28 @@ LIVE_BAR_DURATIONS = {
 
 
 @dataclass(frozen=True)
+class HistoricalDataKind:
+    """The `whatToShow` and `useRTH` values of a reqHistoricalData call."""
+
+    what_to_show: str
+    use_regular_trading_hours: bool
+
+
+# Stock bars: trades of the regular trading hours.
+STOCK_TRADES = HistoricalDataKind(what_to_show="TRADES", use_regular_trading_hours=True)
+# Forex rates: the midpoint of all hours, so a rate exists for each forex trading day.
+FOREX_MIDPOINT = HistoricalDataKind(what_to_show="MIDPOINT", use_regular_trading_hours=False)
+
+
+@dataclass(frozen=True)
+class DailyExchangeRate:
+    """The close of one daily MIDPOINT bar of an IBKR forex pair: `rate` quote currency units for 1 currency unit."""
+
+    day_start_utc: datetime
+    rate: Decimal
+
+
+@dataclass(frozen=True)
 class HistoricalDataRequest:
     """One reqHistoricalData call. It reads `duration` back from `chunk.end_utc`. Only bars in `chunk` are kept."""
 
@@ -91,3 +113,9 @@ def to_bar(bar_data: BarData) -> Bar:
 def keep_bars_in_chunk(bars_data: list[BarData], chunk: TimeRange) -> list[Bar]:
     bars = [to_bar(bar_data) for bar_data in bars_data]
     return [bar for bar in bars if chunk.start_utc <= bar.start_utc < chunk.end_utc]
+
+
+def to_daily_exchange_rate(bar: Bar, *, is_inverse: bool) -> DailyExchangeRate:
+    """IBKR lists each pair in one direction only. The other direction is 1 / close."""
+    rate = Decimal(1) / bar.close if is_inverse else bar.close
+    return DailyExchangeRate(day_start_utc=bar.start_utc, rate=rate)

@@ -255,3 +255,39 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
 - Tests: `tests/market_data/test_live_bar_socket.py` (through the WebSocket
   route with the fake), the contract test (section 7.5), the Vitest tests of
   `live_socket` and `live_bars`, and the last test of `e2e/bar_chart.spec.ts`.
+
+## 8.6 Daily exchange rates
+
+Source: [Backtests of instruments that are not in USD](https://github.com/Mano-Liaoyan/ATrade/issues/80).
+A backtest of an instrument that is not in USD converts its results with
+these rates ([`backtest.md`](backtest.md) section 10.8).
+
+- Tables (migration `6c3e9a1f2b80`):
+  - `exchange_rate`: primary key `(currency, day_start_utc)`,
+    `usd_per_unit` (`numeric`, above 0): the USD for 1 currency unit at the
+    close of the day.
+  - `exchange_rate_saved_range`: the time ranges that ATrade read from IBKR
+    for one currency. A range can have no rates, for example a weekend. The
+    store joins ranges that overlap or touch, as for `bar_saved_range`.
+- `ExchangeRateReader(*, database_url, clock, gateway_connection)` of the
+  public entry has `save_daily_rates(currency, time_range)`. It widens the
+  range to whole days and cuts it at the start of yesterday
+  (`PUBLICATION_DELAY`): the rate of a day is complete only at its close,
+  and IBKR can publish it some hours later. A day without a rate in a saved
+  range is not read again, so the delay keeps a late rate from a permanent
+  gap. It reads the saved
+  ranges, asks IBKR (`read_daily_exchange_rates(currency, "USD", ...)`,
+  [`ibkr.md`](ibkr.md) section 7.2) only for the missing parts, and saves
+  the rates and the range in one transaction for each part. One lock for
+  each currency lets only one fill of that currency run at a time. Without
+  a connection, or when IBKR does not answer, it raises
+  `ExchangeRatesNotReadError` with the reason for the user. Saved rates need
+  no IB Gateway.
+- `read_saved_exchange_rates(*, database_url, currency, time_range)` of the
+  public entry returns the saved rates of the days that start in the range
+  (`SavedExchangeRate`: `day_start_utc`, `usd_per_unit`), oldest first. It
+  never calls IBKR. The backtest child uses it.
+- The Web app makes one `ExchangeRateReader` and gives it to
+  `create_backtest_router`. This stage has no HTTP route for the rates.
+- Tests: `tests/backtest/test_backtest_exchange_rates.py` (through
+  `POST /api/backtests` with the IBKR fake).

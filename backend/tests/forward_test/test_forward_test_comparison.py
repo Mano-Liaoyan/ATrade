@@ -192,7 +192,10 @@ async def test_the_same_period_backtest_is_refused_for_an_instrument_that_is_not
     response = await start_same_period_backtest(web_client, forward_test["id"])
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "A backtest supports only USD instruments. The instrument currency is EUR."
+    assert response.json()["detail"] == (
+        "A same-period backtest supports only USD instruments, because a forward test has no exchange rates."
+        " The instrument currency is EUR."
+    )
 
 
 @pytest.mark.anyio

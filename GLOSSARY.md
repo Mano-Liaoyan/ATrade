@@ -16,6 +16,12 @@ instrument in one time period. In Chinese, write K 线. A chart can show a bar
 as a candlestick, but the data is always a bar.
 _Avoid_: candle
 
+**Exchange rate**:
+The USD value of 1 unit of another currency at the close of one day. It is
+the IBKR forex rate. In Chinese, write 汇率. A backtest of an instrument that
+is not in USD uses it.
+_Avoid_: FX price, conversion factor
+
 **Watchlist**:
 The list of instruments that the user saves. In Chinese, write 自选股.
 _Avoid_: favorites, pins

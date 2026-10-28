@@ -16,7 +16,8 @@ PERCENT_STEP = Decimal("0.01")
 
 @dataclass(frozen=True)
 class BacktestTrade:
-    """One fill of an order. Prices and commissions are in USD, because a backtest trades only USD instruments."""
+    """One fill of an order. A backtest converts the prices and commissions of an instrument that is not in USD to USD
+    at the fill time (docs/architecture/backtest.md section 10.8)."""
 
     time_utc: datetime
     side: Literal["BUY", "SELL"]
@@ -42,11 +43,14 @@ class BacktestMetrics:
 
 
 def calculate_equity_curve(
-    *, paper_capital_usd: Decimal, bars: list[Bar], bar_period: BarPeriod, trades: list[BacktestTrade]
+    *, start_cash: Decimal, bars: list[Bar], bar_period: BarPeriod, trades: list[BacktestTrade]
 ) -> list[EquityPoint]:
-    """Returns one point at the end of each bar. A trade counts in the first point at or after its time."""
+    """Returns one point at the end of each bar. A trade counts in the first point at or after its time.
+
+    `start_cash`, the trade prices, and the bar prices must be in one currency. The points are in that currency.
+    """
     sorted_trades = sorted(trades, key=lambda trade: trade.time_utc)
-    cash_usd = paper_capital_usd
+    cash = start_cash
     position_shares = Decimal(0)
     next_trade_index = 0
     equity_curve: list[EquityPoint] = []
@@ -55,10 +59,10 @@ def calculate_equity_curve(
         while next_trade_index < len(sorted_trades) and sorted_trades[next_trade_index].time_utc <= bar_end_utc:
             trade = sorted_trades[next_trade_index]
             signed_shares = trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
-            cash_usd -= signed_shares * trade.price_usd + trade.commission_usd
+            cash -= signed_shares * trade.price_usd + trade.commission_usd
             position_shares += signed_shares
             next_trade_index += 1
-        equity_curve.append(EquityPoint(time_utc=bar_end_utc, equity_usd=cash_usd + position_shares * bar.close))
+        equity_curve.append(EquityPoint(time_utc=bar_end_utc, equity_usd=cash + position_shares * bar.close))
     return equity_curve
 
 

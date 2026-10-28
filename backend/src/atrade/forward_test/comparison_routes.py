@@ -105,6 +105,18 @@ class ForwardTestComparisonResponse(BaseModel):
     interruptions: list[ComparedInterruptionResponse]
 
 
+def check_comparison_currency(request: BacktestRequest) -> str | None:
+    """A forward test has no exchange rates: its equity and fills are in the instrument currency. A backtest of
+    another currency converts to USD, so the two would not compare (docs/architecture/forward_test.md 12.10)."""
+    currency = request.instrument.currency
+    if currency == "USD":
+        return None
+    return (
+        "A same-period backtest supports only USD instruments, because a forward test has no exchange rates."
+        f" The instrument currency is {currency}."
+    )
+
+
 def to_metrics_response(metrics: BacktestMetrics | None) -> ComparedMetricsResponse | None:
     if metrics is None:
         return None
@@ -214,7 +226,7 @@ class ComparisonRoutes:
             time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
             paper_capital_usd=row.start_balance_usd,
         )
-        refusal = check_backtest_request(request)
+        refusal = check_backtest_request(request) or check_comparison_currency(request)
         if refusal is not None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
         backtest_id = await queue_backtest(database_url=self.database_url, request=request, created_at_utc=now_utc)

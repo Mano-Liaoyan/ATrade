@@ -1,5 +1,5 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, saved bars, received
-bars to save, and live bars."""
+bars to save, live bars, and daily exchange rates in USD."""
 
 from atrade.market_data.bar_reading import (
     BarRequest,
@@ -10,6 +10,12 @@ from atrade.market_data.bar_reading import (
     save_received_bars_blocking,
 )
 from atrade.market_data.bar_store import SavedBarCoverage
+from atrade.market_data.exchange_rate_reading import (
+    ExchangeRateReader,
+    ExchangeRatesNotReadError,
+    read_saved_exchange_rates,
+)
+from atrade.market_data.exchange_rate_store import SavedExchangeRate
 from atrade.market_data.http_routes import create_market_data_router
 from atrade.market_data.instrument_lookup import (
     GatewayNotReachableError,
@@ -22,15 +28,19 @@ from atrade.market_data.live_bar_socket import MARKET_DATA_SOCKET_MESSAGE_MODELS
 __all__ = [
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
     "BarRequest",
+    "ExchangeRateReader",
+    "ExchangeRatesNotReadError",
     "GatewayNotReachableError",
     "InstrumentLookup",
     "InstrumentLookupError",
     "InstrumentLookupFailedError",
     "SavedBarCoverage",
+    "SavedExchangeRate",
     "create_market_data_router",
     "has_saved_bars",
     "read_saved_bar_coverage",
     "read_saved_bars",
+    "read_saved_exchange_rates",
     "save_received_bars",
     "save_received_bars_blocking",
 ]

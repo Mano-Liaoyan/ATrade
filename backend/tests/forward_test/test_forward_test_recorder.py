@@ -95,7 +95,7 @@ def run_engine_with_recorder(
     wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, 0)
     nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(bars, DAY_BAR_PERIOD))
     engine = create_engine(
-        paper_capital_usd=START_BALANCE_USD, venue=nautilus_instrument.venue, work_directory=work_directory
+        starting_cash=START_BALANCE_USD, currency="USD", venue=nautilus_instrument.venue, work_directory=work_directory
     )
     engine.add_instrument(nautilus_instrument)
     engine.add_data(nautilus_bars)

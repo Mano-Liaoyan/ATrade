@@ -262,8 +262,11 @@ Implementation (#77):
     backtest ID in `forward_test_same_period_backtest`, so the forward test
     page links to the comparison with each backtest of the same period. The period starts at
     `created_at_utc` and ends at `stopped_at_utc`, or now. The paper capital
-    is `start_balance_usd`. `422` without a start balance, and for each
-    refusal of `check_backtest_request` (not USD, an empty period). The
+    is `start_balance_usd`. `422` without a start balance, for each
+    refusal of `check_backtest_request` (an empty period), and for an
+    instrument that is not in USD: a forward test has no exchange rates, so
+    its values are in the instrument currency and would not compare with a
+    backtest in USD (`backtest.md` section 10.8). The
     backtest reads only saved bars: without saved bars of the period it
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads

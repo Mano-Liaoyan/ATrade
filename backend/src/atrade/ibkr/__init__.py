@@ -5,11 +5,13 @@ Protocol details only.
 
 from atrade.ibkr.account_data import AccountValue, PortfolioPosition
 from atrade.ibkr.gateway_connection import GatewayConnection, GatewayRequestError, IbAsyncGatewayConnection
+from atrade.ibkr.historical_bars import DailyExchangeRate
 from atrade.ibkr.http_routes import create_ibkr_router
 from atrade.ibkr.orders import Execution, OpenOrder, OrderRequest, OrderSide, OrderType, TimeInForce
 
 __all__ = [
     "AccountValue",
+    "DailyExchangeRate",
     "Execution",
     "GatewayConnection",
     "GatewayRequestError",

@@ -19,10 +19,15 @@ from atrade.foundation.settings import require_usable_client_id
 from atrade.ibkr.account_data import AccountValue, PortfolioPosition, convert_account_value, convert_portfolio_item
 from atrade.ibkr.historical_bars import (
     BAR_SIZE_SETTINGS,
+    FOREX_MIDPOINT,
     LIVE_BAR_DURATIONS,
+    STOCK_TRADES,
+    DailyExchangeRate,
+    HistoricalDataKind,
     keep_bars_in_chunk,
     plan_historical_data_requests,
     to_bar,
+    to_daily_exchange_rate,
 )
 from atrade.ibkr.orders import (
     Execution,
@@ -88,6 +93,14 @@ class GatewayConnection(Protocol):
         """The IBKR forex rate: `quote_currency` units for 1 `currency` unit, for example 1.11 USD for 1 EUR.
 
         Raises GatewayRequestError when IBKR has no rate or does not answer (section 7.2).
+        """
+        ...
+
+    async def read_daily_exchange_rates(
+        self, currency: str, quote_currency: str, time_range: TimeRange
+    ) -> list[DailyExchangeRate]:
+        """The daily IBKR forex rates of the days that start in the range, oldest first. A day without forex trading,
+        for example a Saturday, has no rate. Raises GatewayRequestError when IBKR has no such pair or does not answer.
         """
         ...
 
@@ -232,12 +245,47 @@ class IbAsyncGatewayConnection:
         return read_stock_instruments(contract_descriptions)
 
     async def read_exchange_rate(self, currency: str, quote_currency: str) -> Decimal:
-        """The close of the last hourly MIDPOINT bar of the IDEALPRO pair. IBKR lists each pair in one direction
-        only, for example EUR.USD and USD.JPY, so the other direction gives the inverse rate.
+        """The close of the last hourly MIDPOINT bar of the IDEALPRO pair.
 
         https://interactivebrokers.github.io/tws-api/historical_bars.html
         """
         self.require_connection()
+        contract, is_inverse = await self.find_forex_pair(currency, quote_currency)
+        close = await self.request_last_midpoint(contract)
+        if close is None or close <= 0:
+            message = f"IBKR has no {currency} to {quote_currency} exchange rate."
+            raise GatewayRequestError(message)
+        return Decimal(1) / close if is_inverse else close
+
+    async def read_daily_exchange_rates(
+        self, currency: str, quote_currency: str, time_range: TimeRange
+    ) -> list[DailyExchangeRate]:
+        """The closes of the daily MIDPOINT bars of the IDEALPRO pair, all hours (useRTH=False), in the pages of
+        `plan_historical_data_requests`."""
+        self.require_connection()
+        contract, is_inverse = await self.find_forex_pair(currency, quote_currency)
+        rates: list[DailyExchangeRate] = []
+        for request_index, request in enumerate(plan_historical_data_requests(time_range, BarPeriod.ONE_DAY)):
+            if request_index > 0:
+                await asyncio.sleep(HISTORICAL_DATA_REQUEST_INTERVAL_SECONDS)
+            bars_data = await self.request_historical_data(
+                contract,
+                request.chunk.end_utc,
+                request.duration,
+                BarPeriod.ONE_DAY,
+                FOREX_MIDPOINT,
+            )
+            rates.extend(
+                to_daily_exchange_rate(bar, is_inverse=is_inverse)
+                for bar in keep_bars_in_chunk(bars_data, request.chunk)
+                if bar.close > 0
+            )
+        return rates
+
+    async def find_forex_pair(self, currency: str, quote_currency: str) -> tuple[Contract, bool]:
+        """The IDEALPRO contract of the pair, and True when IBKR lists it in the other direction. IBKR lists each pair
+        in one direction only, for example EUR.USD and USD.JPY, so the other direction gives the inverse rate.
+        """
         for pair, is_inverse in ((currency + quote_currency, False), (quote_currency + currency, True)):
             try:
                 contracts = await self.ib.qualifyContractsAsync(Forex(pair))
@@ -245,11 +293,8 @@ class IbAsyncGatewayConnection:
                 continue
             contract = contracts[0] if contracts else None
             # qualifyContractsAsync gives None or a list of candidates when the pair does not exist in one form.
-            if not isinstance(contract, Contract) or not contract.conId:
-                continue
-            close = await self.request_last_midpoint(contract)
-            if close is not None and close > 0:
-                return Decimal(1) / close if is_inverse else close
+            if isinstance(contract, Contract) and contract.conId:
+                return contract, is_inverse
         message = f"IBKR has no {currency} to {quote_currency} exchange rate."
         raise GatewayRequestError(message)
 
@@ -361,7 +406,12 @@ class IbAsyncGatewayConnection:
         return bars
 
     async def request_historical_data(
-        self, contract: Contract, end_utc: datetime, duration: str, bar_period: BarPeriod
+        self,
+        contract: Contract,
+        end_utc: datetime,
+        duration: str,
+        bar_period: BarPeriod,
+        kind: HistoricalDataKind = STOCK_TRADES,
     ) -> list[BarData]:
         loop = asyncio.get_running_loop()
         started_at = loop.time()
@@ -371,8 +421,8 @@ class IbAsyncGatewayConnection:
                 endDateTime=end_utc,
                 durationStr=duration,
                 barSizeSetting=BAR_SIZE_SETTINGS[bar_period],
-                whatToShow="TRADES",
-                useRTH=True,
+                whatToShow=kind.what_to_show,
+                useRTH=kind.use_regular_trading_hours,
                 formatDate=UTC_FORMAT_DATE,
                 timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
             )

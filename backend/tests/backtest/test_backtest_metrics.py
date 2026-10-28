@@ -39,7 +39,7 @@ def test_equity_curve_has_one_point_at_the_end_of_each_bar() -> None:
     ]
 
     equity_curve = calculate_equity_curve(
-        paper_capital_usd=Decimal(10000), bars=bars, bar_period=BarPeriod.ONE_DAY, trades=trades
+        start_cash=Decimal(10000), bars=bars, bar_period=BarPeriod.ONE_DAY, trades=trades
     )
 
     assert equity_curve == [

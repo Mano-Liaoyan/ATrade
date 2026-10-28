@@ -9,13 +9,17 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 [Module division](https://github.com/Mano-Liaoyan/ATrade/issues/38),
 [Run a backtest and see the result](https://github.com/Mano-Liaoyan/ATrade/issues/70),
 [Backtest list and version comparison](https://github.com/Mano-Liaoyan/ATrade/issues/72),
-[Backtest isolation controls](https://github.com/Mano-Liaoyan/ATrade/issues/71).
+[Backtest isolation controls](https://github.com/Mano-Liaoyan/ATrade/issues/71),
+[Backtests of instruments that are not in USD](https://github.com/Mano-Liaoyan/ATrade/issues/80).
 
 ## 10.1 Decisions
 
 - A backtest request contains the strategy version, the instrument, the bar
   type, the time range, and `paper_capital_usd`. `paper_capital_usd` is
   required.
+- The paper capital, the equity curve, the trades, and the metrics are in
+  USD for all instruments. A backtest of an instrument that is not in USD
+  converts with daily exchange rates (section 10.8).
 - `paper_trading` exports `fetch_paper_capital_usd()`. It returns the paper
   account balance (`NetLiquidation` converted to USD, section 11.9) after a
   passed paper account check.
@@ -96,7 +100,8 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 ## 10.3 Run flow
 
 1. `POST /api/backtests` checks the request, checks that saved bars exist in
-   the range (section 10.1), and adds a `queued` row.
+   the range (section 10.1), saves the missing daily exchange rates of an
+   instrument that is not in USD (section 10.8), and adds a `queued` row.
 2. The backtest runner of the Web process (`backtest/backtest_runner.py`)
    checks the queue every 0.5 seconds. It reads the backtest limits from
    `backtest_limits`. While fewer backtests run than the
@@ -107,7 +112,8 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
    (`read_strategy_version()` of `strategy`), and the saved bars
    (`read_saved_bars()` of `market_data`) from PostgreSQL. It never calls
    IBKR. It also reads the look-back bars: the saved bars of the same
-   instrument and bar period before the start (section 10.3.1).
+   instrument and bar period before the start (section 10.3.1), and for an
+   instrument that is not in USD the saved exchange rates (section 10.8).
 4. The child converts the bars to Arrow bytes (`decimal128(38, 16)` prices
    and volume, `uint64` times). `ts_event` is the bar end, so a strategy sees
    a bar only after its period. `BarDataWrangler` makes NautilusTrader bars
@@ -116,8 +122,9 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
    under `/tmp`, so that tracebacks show the line numbers. It makes the
    strategy configuration with `instrument_id` and `bar_type`
    (`<symbol>.<exchange>-<bar period>-LAST-EXTERNAL`), and runs the engine:
-   one `Equity` instrument, a `CASH` account in USD with the paper capital,
-   `NETTING` positions, and a zero commission (`FixedFeeModel`).
+   one `Equity` instrument, a `CASH` account in the instrument currency with
+   the paper capital in that currency (section 10.8), `NETTING` positions,
+   and a zero commission (`FixedFeeModel`).
 6. The child calculates the equity curve and the metrics with the metric
    functions (section 10.4), and writes them, the trades, and the status
    `finished` in one transaction.
@@ -136,14 +143,13 @@ Failures that the user sees in `error_message`:
   chart of the instrument, which loads the bars from IBKR. The start route
   refuses such a request first. The child checks again, because it reads the
   bars after the request is queued.
+- No saved exchange rate before the start of an instrument that is not in
+  USD (section 10.8). The start route refuses such a request first.
 - A Web restart during a run: the runner sets the `running` backtests to
   `failed` at start, because their children ended with the old process.
 
 Limits of this stage:
 
-- A backtest supports only USD instruments. The paper capital is in USD and
-  the backtest has no exchange rates. A request in another currency gets
-  `422`.
 - The commission is zero.
 - `request_bars` gets only the look-back bars of the backtest bar type
   (section 10.3.1).
@@ -200,12 +206,12 @@ use the same functions for the comparison (section 12.10).
 |---|---|
 | `BacktestTrade` | One fill: `time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`. |
 | `EquityPoint` | `time_utc`, `equity_usd`. |
-| `calculate_equity_curve(*, paper_capital_usd, bars, bar_period, trades)` | One point at the end of each bar: the cash plus the position at the bar close price. A trade counts in the first point at or after its time. |
+| `calculate_equity_curve(*, start_cash, bars, bar_period, trades)` | One point at the end of each bar: the cash plus the position at the bar close price. A trade counts in the first point at or after its time. `start_cash`, the trades, and the bars are in one currency, and the points are in that currency. |
 | `calculate_metrics(*, paper_capital_usd, equity_curve, trade_count)` | `BacktestMetrics`: `final_equity_usd`, `total_return_percent`, `max_drawdown_percent` (the largest fall from a peak, as a percent of the peak; the paper capital is the first peak), and `trade_count`. Percents have 2 decimal places. |
 
 For other capabilities (#78), the public entry exports
 `BacktestRequest`, `BacktestStatus`, `check_backtest_request(request)` (the
-reason why the request cannot run, or `None`: not USD, an empty time range;
+reason why the request cannot run, or `None`: an empty time range;
 `POST /api/backtests` uses it too), `queue_backtest(*, database_url,
 request, created_at_utc)` (returns the ID of a queued backtest), and
 `read_backtest_outcome(*, database_url, backtest_id)` (`BacktestOutcome`:
@@ -213,7 +219,7 @@ the request, status, error message, metrics, equity curve, and trades, or
 `None`). They are in `backtest_access.py`.
 
 The public entry also exports `create_backtest_router(*, database_url,
-clock)`, `BacktestRunner(*, database_url, clock, process_command)` with
+clock, exchange_rate_reader)`, `BacktestRunner(*, database_url, clock, process_command)` with
 `keep_running()`, and
 `run_backtest(*, database_url, backtest_id, clock)` for the child.
 
@@ -221,7 +227,7 @@ clock)`, `BacktestRunner(*, database_url, clock, process_command)` with
 
 | Route | Behavior |
 |---|---|
-| `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the currency is not USD, the strategy version does not exist, or PostgreSQL has no saved bar of the instrument and bar period in the range (section 10.1). |
+| `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the strategy version does not exist, PostgreSQL has no saved bar of the instrument and bar period in the range (section 10.1), or the daily exchange rates of an instrument that is not in USD cannot be saved (section 10.8). |
 | `GET /api/backtests` | `200` with all backtests, the newest first. |
 | `GET /api/backtest-limits` | `200` with `{"timeout_seconds", "concurrency"}`. The defaults are `7200` and `1`. |
 | `PUT /api/backtest-limits` | Body `{"timeout_seconds", "concurrency"}`. `200` with the saved limits. `422` when `timeout_seconds` is not from 1 to 604800 or `concurrency` is not from 1 to 16. |
@@ -357,3 +363,54 @@ section 9.5.
   tab shows the status "Same strategy version: no code difference." in place
   of the diff. A closed "Show the code" disclosure shows the full code
   without collapsed lines.
+
+## 10.8 Instruments that are not in USD
+
+Source: [#80](https://github.com/Mano-Liaoyan/ATrade/issues/80). Decisions
+of the owner on 2026-10-28:
+
+- The exchange rates are the daily IBKR forex rates. `market_data` saves
+  them in PostgreSQL ([`market_data.md`](market_data.md) section 8.6). The
+  child reads only saved rates and never calls IBKR.
+- At the start, the backtest converts all paper capital to the instrument
+  currency. The engine account is in the instrument currency, so the
+  strategy sees its cash in that currency. The cash and the position both
+  change in USD value when the rate changes.
+
+Rules:
+
+- The rate at a time is the rate of the last day that ended at or before
+  that time. A day rate is the close of the day, so a time inside a day
+  uses the day before. Thus a backtest never uses a rate from the future.
+- `POST /api/backtests` calls `save_exchange_rates()`
+  (`backtest/backtest_exchange_rates.py`). It saves the missing rates from 7
+  days before the start (`EXCHANGE_RATE_LOOK_BACK`) to the end. The 7 days
+  give the start a rate over a weekend or a holiday of the forex market.
+  When rates are missing and ATrade is not connected to IB Gateway, or IBKR
+  does not return them, the route refuses the request (`422`, no row). The
+  message names the currency, the range in UTC, and the reason. Saved rates
+  need no IB Gateway.
+- When no saved rate is before the start, the route refuses the request
+  ("There is no saved HKD to USD exchange rate of a day in the 7 days before
+  ..."). The child fails with the same message.
+- The child:
+  1. Converts the paper capital to the instrument currency at the start
+     rate, with the decimal places of the currency (2 for HKD).
+  2. Runs the engine with this cash. The trades are in the instrument
+     currency.
+  3. Calculates the equity curve in the instrument currency with
+     `calculate_equity_curve`, then multiplies each point by the rate at its
+     time (2 decimal places).
+  4. Converts each trade price (4 decimal places) and commission (2 decimal
+     places) with the rate at its fill time.
+  5. Calculates the metrics in USD from `paper_capital_usd`. So a change of
+     the rate is in the total return and the drawdown.
+- A USD instrument needs no rates. Its run does not change.
+- A same-period backtest of a forward test stays USD only, because a
+  forward test has no exchange rates ([`forward_test.md`](forward_test.md)
+  section 12.10).
+- Tests: `tests/backtest/test_backtest_exchange_rates.py` (the route saves
+  the rates from the IBKR fake, uses saved rates without IB Gateway, refuses
+  without rates; a real child process converts an HKD backtest with two
+  rates, and the test asserts the exact USD trades, equity curve, and
+  metrics).

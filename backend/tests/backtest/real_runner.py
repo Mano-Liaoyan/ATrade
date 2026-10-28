@@ -25,15 +25,16 @@ WAIT_STEP_SECONDS = 0.2
 MAX_WAIT_SECONDS = 60
 
 
-def save_test_bars(database_url: str) -> None:
+def save_test_bars(database_url: str, *, exchange: str = "ARCA", currency: str = "USD") -> None:
+    """Saves the bars of the bar file as BTEST bars of the exchange and the currency."""
     with TEST_BAR_FILE.open() as bar_file:
-        bar_rows = list(csv.DictReader(bar_file))
+        bar_rows = [{**row, "exchange": exchange, "currency": currency} for row in csv.DictReader(bar_file)]
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
             INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
-            VALUES ('BTEST', 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(open)s, %(high)s, %(low)s, %(close)s,
-                %(volume)s)
+            VALUES ('BTEST', %(exchange)s, %(currency)s, '1-DAY', %(start_utc)s, %(open)s, %(high)s, %(low)s,
+                %(close)s, %(volume)s)
             """,
             bar_rows,
         )

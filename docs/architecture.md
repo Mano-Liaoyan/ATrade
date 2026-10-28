@@ -146,7 +146,7 @@ counts from `atrade/`.
 
 | Module | Responsibility |
 |---|---|
-| `market_data/` | Search instruments. Read bars from IBKR and save them in PostgreSQL. Push live market data. |
+| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Push live market data. |
 | `watchlist/` | Add, delete, and list watchlist instruments. |
 | `strategy/` | Save, check, and compare strategies and strategy versions. |
 | `backtest/` | Run backtests. Save and read backtest results. Provide the metric functions. |
@@ -247,8 +247,9 @@ the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
 
 Section 8 is in [`docs/architecture/market_data.md`](architecture/market_data.md).
 It holds the bar storage decisions, the watchlist decisions, the
-instrument search (`GET /api/market-data/instrument-search`), and the
-watchlist routes (`/api/watchlist`).
+instrument search (`GET /api/market-data/instrument-search`), the
+watchlist routes (`/api/watchlist`), and the daily exchange rates of
+backtests.
 
 ## 9. Strategies and strategy versions
 
@@ -1310,6 +1311,7 @@ ran them. The implementation must check them.
 | `ib_async` 2.1.0 limits `tzdata` to `<2026.0`. A later dependency can conflict with it ([ib_async#209](https://github.com/ib-api-reloaded/ib_async/issues/209)). | Watch `uv lock` on each upgrade. Upgrade to `ib_async` 3.0.0 after its release. |
 | The NautilusTrader 2.0 forward test behavior in section 12 (reconciliation, `orderRef`, reconnection, `DataActor` cache reads). | The `ibkr_paper` contract tests in section 17.4. |
 | `reqExecutions` and `reqCompletedOrders` read filled orders of other client IDs. | The contract test in section 17.4. |
+| Daily `MIDPOINT` bars (`useRTH=False`, `formatDate=2`) of an IDEALPRO pair come as dates, one for each forex trading day (`read_daily_exchange_rates`, `docs/architecture/ibkr.md` section 7.2). Only the fake was used. | Start a backtest of an HKD instrument with IB Gateway connected, and read the `exchange_rate` rows. |
 | The Gateway needs IB Key after the daily automatic restart. | Watch the phone after the first `AUTO_RESTART_TIME`. |
 | The paper Gateway needs a manual login or approval each week. | Watch the first week of operation. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |

@@ -7,15 +7,30 @@ import asyncio
 import tempfile
 from dataclasses import dataclass
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import psycopg
 
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_access import describe_missing_bars
+from atrade.backtest.backtest_exchange_rates import (
+    USD,
+    DailyExchangeRates,
+    convert_equity_curve_to_usd,
+    convert_paper_capital,
+    convert_trades_to_usd,
+    describe_missing_start_rate,
+    read_daily_exchange_rates,
+)
 from atrade.backtest.backtest_metrics import calculate_equity_curve, calculate_metrics
 from atrade.backtest.backtest_store import BacktestRequest, BacktestResult
-from atrade.backtest.strategy_engine_run import StrategyFailedError, run_strategy_on_bars
+from atrade.backtest.strategy_engine_run import (
+    StrategyFailedError,
+    StrategyRun,
+    read_currency_precision,
+    run_strategy_on_bars,
+)
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.market_data import BarRequest, read_saved_bars
@@ -39,6 +54,8 @@ class BacktestInputs:
     code: str
     bars: list[Bar]
     look_back_bars: list[Bar]
+    # None for a USD instrument.
+    exchange_rates: DailyExchangeRates | None
 
 
 async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> BacktestInputs:
@@ -70,7 +87,18 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
             time_range=TimeRange(start_utc=start_utc - find_look_back_length(request.bar_period), end_utc=start_utc),
         ),
     )
-    return BacktestInputs(request=request, code=strategy_version.code, bars=bars, look_back_bars=look_back_bars)
+    exchange_rates = (
+        None
+        if request.instrument.currency == USD
+        else await read_daily_exchange_rates(database_url=database_url, request=request)
+    )
+    return BacktestInputs(
+        request=request,
+        code=strategy_version.code,
+        bars=bars,
+        look_back_bars=look_back_bars,
+        exchange_rates=exchange_rates,
+    )
 
 
 @dataclass(frozen=True)
@@ -90,23 +118,29 @@ async def save_failure(job: BacktestJob, error_message: str) -> None:
         )
 
 
-async def save_result(job: BacktestJob, inputs: BacktestInputs, work_directory: Path) -> None:
+async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: Decimal, work_directory: Path) -> None:
+    """Runs the strategy with `starting_cash` in the instrument currency and saves the result in USD."""
     request = inputs.request
     try:
-        trades = run_strategy_on_bars(
+        run = StrategyRun(
             code=inputs.code,
             request=request,
+            starting_cash=starting_cash,
             bars=inputs.bars,
             look_back_bars=inputs.look_back_bars,
-            work_directory=work_directory,
         )
+        trades = run_strategy_on_bars(run, work_directory)
     except StrategyFailedError as error:
         # readability-exception: the engine reports a strategy error only as an exception (G1).
         await save_failure(job, str(error))
         return
+    # In the instrument currency, like the trades.
     equity_curve = calculate_equity_curve(
-        paper_capital_usd=request.paper_capital_usd, bars=inputs.bars, bar_period=request.bar_period, trades=trades
+        start_cash=starting_cash, bars=inputs.bars, bar_period=request.bar_period, trades=trades
     )
+    if inputs.exchange_rates is not None:
+        equity_curve = convert_equity_curve_to_usd(inputs.exchange_rates, equity_curve)
+        trades = convert_trades_to_usd(inputs.exchange_rates, trades)
     metrics = calculate_metrics(
         paper_capital_usd=request.paper_capital_usd, equity_curve=equity_curve, trade_count=len(trades)
     )
@@ -119,14 +153,31 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, work_directory: 
         )
 
 
+def find_starting_cash(inputs: BacktestInputs) -> Decimal | None:
+    """The paper capital in the instrument currency, or None without a rate at the start (section 10.8)."""
+    request = inputs.request
+    if inputs.exchange_rates is None:
+        return request.paper_capital_usd
+    usd_per_unit = inputs.exchange_rates.find_usd_per_unit(request.time_range.start_utc)
+    if usd_per_unit is None:
+        return None
+    return convert_paper_capital(
+        request.paper_capital_usd, usd_per_unit, read_currency_precision(request.instrument.currency)
+    )
+
+
 async def run_backtest_steps(job: BacktestJob) -> None:
     inputs = await read_backtest_inputs(database_url=job.database_url, backtest_id=job.backtest_id)
     if not inputs.bars:
         await save_failure(job, describe_missing_bars(inputs.request))
         return
+    starting_cash = find_starting_cash(inputs)
+    if starting_cash is None:
+        await save_failure(job, describe_missing_start_rate(inputs.request))
+        return
     # The strategy file and the error log go to /tmp, the only writable path in the web container.
     with tempfile.TemporaryDirectory(prefix=f"atrade-backtest-{job.backtest_id}-") as work_directory:
-        await save_result(job, inputs, Path(work_directory))
+        await save_result(job, inputs, starting_cash, Path(work_directory))
 
 
 def run_backtest(*, database_url: str, backtest_id: int, clock: Clock) -> None:
