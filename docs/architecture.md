@@ -542,9 +542,14 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the Minimize and Maximize icon buttons ("Minimize panel", "Maximize
     panel", "Restore panel"). A double-click on an empty part of the header
     line toggles Maximize. A tab of a panel that shows only its header line
-    opens the panel again. With a `statusBar` snippet, a minimized panel is a
-    24px status bar (like the VS Code panel), and a control in it calls
-    `onRestore`.
+    opens the panel again. With a `statusBar` snippet, the panel works like
+    the VS Code panel: a 24px status bar is always at its bottom, a panel
+    that shows only its header line shows only the status bar, and a click
+    on the selected tab minimizes the panel. Status bar controls have the
+    class `atrade-status-bar__item`. A `PanelSpec` with `startsMinimized` is
+    minimized in the default layout. `PanelSplit` exports `openPanel(id)`
+    (through `bind:this`): it opens a panel that shows only its header line
+    or its status bar.
   - `PanelHeader` (`end` snippet): the 32px header line with the class
     `atrade-panel-header`. `Splitter` (`label`, `controls`, `value`, `min`,
     `max`, `onValueChange`): a `role="separator"` (WAI-ARIA window splitter)
@@ -723,10 +728,21 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A backtest
   of the strategy that ends opens in its tab. While the forward test socket is
   not connected, `LiveUpdatesNotification` shows under the toolbar. The editor panel has the file
-  tab `strategy.py` and the `CodeEditor`. The save result and the refused
-  checks show as an `InlineNotification` in the editor panel.
-  `InlineNotification` also takes child content, for example a list of
-  problems.
+  tab `strategy.py` and the `CodeEditor`. Below the two panels is the
+  "Problems and output" panel (ticket
+  [#107](https://github.com/Mano-Liaoyan/ATrade/issues/107)), always the
+  last panel of the split. By default it is minimized to its 24px status
+  bar: the error count and the warning count (each with its icon; the code
+  checks give no severity, so each code problem is an error) open the
+  Problems tab, and "Output" opens the Output tab. A click on the selected
+  tab or the Minimize button minimizes the panel again; the panel also
+  maximizes and restores. A save that the checks refuse opens Problems.
+  Problems lists the code problems of the last save (line and message); a
+  click on a problem puts the cursor on its line (`CodeEditor`
+  `revealLine`). Output lists the save results, the backtests that start
+  and end, the forward tests that start or get a stop request, and the
+  errors of these actions, each line with its UTC time. Each tab scrolls in
+  its own `ScrollRegion` ("Code problems", "Output").
 - `Button` sizes `sm` and `md` also write `cds--layout--size-<size>`: Carbon
   v11 reads the button height from that class.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`

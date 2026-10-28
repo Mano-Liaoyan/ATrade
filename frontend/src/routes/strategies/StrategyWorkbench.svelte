@@ -6,9 +6,15 @@
      Run backtest and Start forward test open the dialogs of the backtest page and the forward test page with the
      open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
      and Logs. A backtest that ends opens in its tab. The editor panel has the file tab and the code editor. Unsaved
-     edits stay in localStorage (drafts of the strategy capability). -->
+     edits stay in localStorage (drafts of the strategy capability).
+     Below the two panels is the problems and output panel (ticket #107, like the VS Code panel). It starts minimized
+     to its 24px status bar: the error and warning counts open the Problems tab, "Output" opens the Output tab. A click
+     on the selected tab minimizes it again. A save that the code checks refuse opens Problems; a click on a problem goes
+     to its line in the editor. Output lists the events and errors of saves, backtests, and forward tests. -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
+  import ErrorFilled16 from '@carbon/icons/es/error--filled/16.js';
+  import WarningAltFilled16 from '@carbon/icons/es/warning--alt--filled/16.js';
   import ArrowDown16 from '@carbon/icons/es/arrow--down/16.js';
   import ArrowUp16 from '@carbon/icons/es/arrow--up/16.js';
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
@@ -20,17 +26,9 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
-  import {
-    Dialog,
-    IconButton,
-    InlineNotification,
-    Select,
-    TextInput,
-    type NotificationMessage,
-  } from '#lib/foundation/carbon';
+  import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
-  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText } from '#lib/foundation/value_format';
   import {
     Panel,
@@ -63,9 +61,13 @@
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
   import StrategyList from './StrategyList.svelte';
+  import StrategyOutput from './StrategyOutput.svelte';
   import StrategyResults from './StrategyResults.svelte';
   import {
     createBacktestTab,
+    createOutputLine,
+    describeBacktestEvent,
+    describeProblemCounts,
     describeShortcut,
     describeSwapButton,
     findFinishedBacktest,
@@ -79,6 +81,7 @@
     resolveResultTab,
     selectStrategyBacktests,
     swapPaneOrder,
+    type OutputTab,
     type PaneOrder,
     type ResultSelection,
     type ResultTab,
@@ -101,14 +104,17 @@
   let openVersion = $state<StrategyVersion | null>(null);
   let editorCode = $state('');
   let problems: CodeProblem[] = $state([]);
-  let saveMessage = $state<NotificationMessage | null>(null);
+  let outputLines: string[] = $state([]);
+  let outputTab = $state<OutputTab>('problems');
+  // The exported functions of the panel split and the code editor (bind:this).
+  let panelSplit: { openPanel: (id: string) => void } | undefined = $state();
+  let codeEditor: { revealLine: (line: number) => void } | undefined = $state();
   let isSaving = $state(false);
   let backtests: Backtest[] = $state([]);
   // A new value reads the backtest list again, for example after a new backtest starts.
   let backtestReadCount = $state(0);
   let selection = $state<ResultSelection>({ tab: null, backtestId: null });
   let paneOrder = $state<PaneOrder>(readPaneOrder(readStoredLayout(PANE_ORDER_STORAGE_KEY)));
-  let forwardTestMessage = $state<NotificationMessage | null>(null);
   let isStoppingForwardTest = $state(false);
   let isNewStrategyDialogOpen = $state(false);
   let newStrategyName = $state('');
@@ -147,6 +153,7 @@
   const openVersionKey = $derived<StrategyVersionKey | null>(
     openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id },
   );
+  const problemCounts = $derived(describeProblemCounts(problems));
   const swapButton = $derived(describeSwapButton(paneOrder));
   const panels = $derived(listWorkbenchPanels(paneOrder));
   const isDialogOpen = $derived(
@@ -183,6 +190,7 @@
       const finished = findFinishedBacktest(backtests, result.value, activeStrategyId);
       if (finished !== null) {
         selection = { tab: createBacktestTab(finished.id), backtestId: finished.id };
+        writeOutput(describeBacktestEvent(finished));
       }
       backtests = result.value;
       if (result.value.some((item) => !isFinalStatus(item.status))) {
@@ -202,7 +210,6 @@
     strategy = null;
     openVersion = null;
     problems = [];
-    saveMessage = null;
     selection = { tab: null, backtestId: null };
     if (id !== null) {
       void loadStrategy(id, null);
@@ -212,7 +219,7 @@
   async function loadStrategy(id: number, versionNumberToOpen: number | null): Promise<void> {
     const result = await readStrategy(fetch, id);
     if (result.kind === 'failed') {
-      saveMessage = { kind: 'error', title: 'Strategy not read', subtitle: result.message };
+      writeOutput(`Strategy not read: ${result.message}`);
       return;
     }
     strategy = result.value;
@@ -225,7 +232,7 @@
   async function openStrategyVersion(id: number, versionNumber: number): Promise<void> {
     const result = await readStrategyVersion(fetch, id, versionNumber);
     if (result.kind === 'failed') {
-      saveMessage = { kind: 'error', title: 'Version not read', subtitle: result.message };
+      writeOutput(`Version not read: ${result.message}`);
       return;
     }
     const draft = readDraft(localStorage, { strategyId: id, versionNumber });
@@ -257,24 +264,36 @@
     isSaving = true;
     const result = await saveStrategyVersion(fetch, id, editorCode);
     isSaving = false;
-    saveMessage = null;
     problems = [];
     if (result.kind === 'check_failed') {
       problems = result.problems;
+      openOutput('problems');
+      writeOutput(`Not saved: ${String(result.problems.length)} problems.`);
       return;
     }
     if (result.kind === 'failed') {
-      saveMessage = { kind: 'error', title: 'Version not saved', subtitle: result.message };
+      writeOutput(`Version not saved: ${result.message}`);
       return;
     }
     clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
     const label = formatVersionLabel(name, result.version.version_number);
     await loadStrategy(id, result.version.version_number);
     listReadCount += 1;
-    saveMessage = {
-      kind: 'success',
-      title: result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`,
-    };
+    writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
+  }
+
+  function writeOutput(text: string): void {
+    outputLines = [...outputLines, createOutputLine(new Date(), text)];
+  }
+
+  // A status bar control or a refused save: the panel opens above the status bar at the tab.
+  function openOutput(tab: OutputTab): void {
+    outputTab = tab;
+    panelSplit?.openPanel('output');
+  }
+
+  function revealProblem(problem: CodeProblem): void {
+    codeEditor?.revealLine(problem.line);
   }
 
   function swapPanels(): void {
@@ -297,14 +316,14 @@
       return;
     }
     isStoppingForwardTest = true;
-    forwardTestMessage = null;
     const forwardTestId = runningForwardTest.id;
     const result = await stopForwardTest(fetch, forwardTestId);
     isStoppingForwardTest = false;
     if (result.kind === 'failed') {
-      forwardTestMessage = { kind: 'error', title: 'Forward test not stopped', subtitle: result.message };
+      writeOutput(`Forward test #${String(forwardTestId)} not stopped: ${result.message}`);
       return;
     }
+    writeOutput(`Forward test #${String(forwardTestId)} stop requested.`);
     // The socket pushes the list again later. The button shows the stop request at once.
     forwardTestFeed.forwardTests = forwardTestFeed.forwardTests.map((item) =>
       item.id === forwardTestId ? { ...item, desired_state: 'stopped' } : item,
@@ -362,7 +381,7 @@
     isDeleting = false;
     isDeleteDialogOpen = false;
     if (result.kind === 'failed') {
-      saveMessage = { kind: 'error', title: 'Strategy not deleted', subtitle: result.message };
+      writeOutput(`Strategy not deleted: ${result.message}`);
       return;
     }
     listReadCount += 1;
@@ -405,7 +424,6 @@
             items={versionItems}
             value={String(openVersion?.version_number ?? '')}
             onValueChange={(versionNumber: string) => {
-              saveMessage = null;
               void openStrategyVersion(shownStrategy.id, Number(versionNumber));
             }}
           />
@@ -475,11 +493,8 @@
         {/snippet}
       </PanelHeader>
       <LiveUpdatesNotification isConnected={forwardTestFeed.isConnected} />
-      {#if forwardTestMessage !== null}
-        <InlineNotification {...forwardTestMessage} lowContrast onClose={() => (forwardTestMessage = null)} />
-      {/if}
 
-      <PanelSplit storageKey="atrade.strategy-page.panel-split" {panels}>
+      <PanelSplit storageKey="atrade.strategy-page.panel-split" {panels} bind:this={panelSplit}>
         {#snippet panel(id, state)}
           {#if id === 'results'}
             <Panel
@@ -495,31 +510,17 @@
             >
               <StrategyResults backtest={shownBacktest} tab={shownResult.tab} />
             </Panel>
-          {:else}
+          {:else if id === 'editor'}
             <Panel
               {...state}
               label="Editor"
               tabs={{ label: 'Files', items: FILE_TABS, value: 'strategy', onValueChange: () => {} }}
             >
-              {#if saveMessage !== null}
-                <InlineNotification {...saveMessage} lowContrast onClose={() => (saveMessage = null)} />
-              {/if}
-              {#if problems.length > 0}
-                <!-- A long list scrolls in itself, so the editor below it stays in view. -->
-                <InlineNotification kind="error" lowContrast title="The code was not saved. Fix these problems:">
-                  <ScrollRegion label="Code problems" maxHeight="var(--cds-spacing-13)">
-                    <ul class="problem-list">
-                      {#each problems as problem, index (index)}
-                        <li>Line {problem.line}: {problem.message}</li>
-                      {/each}
-                    </ul>
-                  </ScrollRegion>
-                </InlineNotification>
-              {/if}
               {#if openVersion !== null}
                 <div class="editor">
                   {#key shownStrategy.id}
                     <CodeEditor
+                      bind:this={codeEditor}
                       code={editorCode}
                       label="Strategy code"
                       onCodeChange={changeCode}
@@ -528,6 +529,46 @@
                   {/key}
                 </div>
               {/if}
+            </Panel>
+          {:else}
+            <Panel
+              {...state}
+              label="Problems and output"
+              tabs={{
+                label: 'Problems and output',
+                items: [
+                  { value: 'problems', label: `Problems ${String(problemCounts.errors)}` },
+                  { value: 'output', label: 'Output' },
+                ],
+                value: outputTab,
+                onValueChange: (value: string) => {
+                  outputTab = value === 'output' ? 'output' : 'problems';
+                },
+              }}
+            >
+              {#snippet statusBar()}
+                <button
+                  type="button"
+                  class="atrade-status-bar__item"
+                  aria-label={problemCounts.label}
+                  onclick={() => {
+                    openOutput('problems');
+                  }}
+                >
+                  <span class="status-count status-count--error"><Icon icon={ErrorFilled16} />{problemCounts.errors}</span>
+                  <span class="status-count status-count--warning"><Icon icon={WarningAltFilled16} />{problemCounts.warnings}</span>
+                </button>
+                <button
+                  type="button"
+                  class="atrade-status-bar__item"
+                  onclick={() => {
+                    openOutput('output');
+                  }}
+                >
+                  Output
+                </button>
+              {/snippet}
+              <StrategyOutput tab={outputTab} {problems} {outputLines} onProblemClick={revealProblem} />
             </Panel>
           {/if}
         {/snippet}
@@ -584,6 +625,7 @@
     // The new backtest opens in its tab at once; it shows its status until it ends.
     selection = { tab: createBacktestTab(started.id), backtestId: started.id };
     backtestReadCount += 1;
+    writeOutput(describeBacktestEvent(started));
   }}
 />
 
@@ -594,6 +636,7 @@
   }}
   strategyVersion={openVersionKey}
   onStarted={(forwardTest: ForwardTest) => {
+    writeOutput(`Forward test #${String(forwardTest.id)} started.`);
     // The socket pushes the list again later. The button shows the running forward test at once.
     forwardTestFeed.forwardTests = [forwardTest, ...forwardTestFeed.forwardTests.filter((item) => item.id !== forwardTest.id)];
   }}
@@ -640,10 +683,19 @@
     border: 0;
   }
 
-  .problem-list {
-    margin-block: var(--cds-spacing-02) 0;
-    padding-inline-start: var(--cds-spacing-05);
-    list-style: disc;
+  .status-count {
+    display: inline-flex;
+    gap: var(--cds-spacing-02);
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .status-count--error :global(svg) {
+    fill: var(--cds-support-error);
+  }
+
+  .status-count--warning :global(svg) {
+    fill: var(--cds-support-warning);
   }
 
   .new-strategy-form {

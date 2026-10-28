@@ -12,6 +12,7 @@ export {
   findPanelSize,
   isPanelHeaderOnly,
   listPanelRows,
+  openPanel,
   readPanelSplitLayout,
   restorePanelSplit,
   togglePanelSize,

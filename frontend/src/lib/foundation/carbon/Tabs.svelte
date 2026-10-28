@@ -4,7 +4,8 @@
      the selected tab changes, so a chart in it is not created again.
      `size` "sm" gives the 32px tab line of a workbench panel. `lineEnd` puts content (for example the panel buttons)
      at the end of the tab line, in a line with the class `lineClass`. `itemLabel` renders the text of a tab, for
-     example a name with a ChangeText; without it, the tab shows its `label`. -->
+     example a name with a ChangeText; without it, the tab shows its `label`. `onSelectedTabClick` runs when the user
+     clicks the tab that was already selected (or presses Enter or Space on it), for example to minimize a panel. -->
 <script module lang="ts">
   export interface TabItem {
     value: string;
@@ -29,6 +30,7 @@
     panelClass?: string;
     panel?: Snippet;
     itemLabel?: Snippet<[TabItem]>;
+    onSelectedTabClick?: (value: string) => void;
   }
 
   const {
@@ -43,7 +45,30 @@
     panelClass,
     panel,
     itemLabel,
+    onSelectedTabClick,
   }: Props = $props();
+
+  // The selected tab when the press starts. Bits UI selects a tab on focus, so at the click the pressed tab is always
+  // selected.
+  let selectedAtPress: string | null = null;
+
+  function notePress(): void {
+    selectedAtPress = value;
+  }
+
+  function notePressKey(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      selectedAtPress = value;
+    }
+  }
+
+  function clickTab(itemValue: string): void {
+    const wasSelected = selectedAtPress === itemValue;
+    selectedAtPress = null;
+    if (wasSelected) {
+      onSelectedTabClick?.(itemValue);
+    }
+  }
 </script>
 
 {#snippet tabList()}
@@ -53,6 +78,11 @@
         <Tabs.Trigger
           value={item.value}
           class={['cds--tabs__nav-item', 'cds--tabs__nav-link', item.value === value && 'cds--tabs__nav-item--selected']}
+          onpointerdown={notePress}
+          onkeydown={notePressKey}
+          onclick={() => {
+            clickTab(item.value);
+          }}
         >
           <div class="cds--tabs__nav-item-label-wrapper">
             <span class="cds--tabs__nav-item-label">

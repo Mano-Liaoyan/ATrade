@@ -127,7 +127,9 @@ _Avoid_: dashboard, layout
 **Panel**:
 A region of a workbench with a 32px header line (a name or tabs) and a body.
 The user can minimize a panel (only its header line, or a 24px status bar,
-stays) or maximize it (it gets all the height). In Chinese, write 面板.
+stays) or maximize it (it gets all the height). A panel with a status bar
+(the strategy page "Problems and output" panel) always shows the status bar
+at its bottom. In Chinese, write 面板.
 _Avoid_: pane, card, widget
 
 **Side column**:

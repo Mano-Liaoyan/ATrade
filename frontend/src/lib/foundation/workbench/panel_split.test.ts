@@ -6,6 +6,7 @@ import {
   findPanelSize,
   isPanelHeaderOnly,
   listPanelRows,
+  openPanel,
   readPanelSplitLayout,
   restorePanelSplit,
   togglePanelSize,
@@ -25,6 +26,35 @@ const THREE: PanelSpec[] = [
 describe('createPanelSplitLayout', () => {
   it('opens all panels with their default heights', () => {
     expect(createPanelSplitLayout(THREE)).toEqual({ maximized: null, minimized: [], pixels: { editor: 300, output: 160 } });
+  });
+});
+
+describe('a panel that starts minimized', () => {
+  const WITH_OUTPUT: PanelSpec[] = [
+    { id: 'results', minPixels: 160 },
+    { id: 'output', minPixels: 96, defaultPixels: 240, startsMinimized: true },
+  ];
+
+  it('is minimized in the default layout and when no layout is stored', () => {
+    expect(createPanelSplitLayout(WITH_OUTPUT).minimized).toEqual(['output']);
+    expect(readPanelSplitLayout(null, WITH_OUTPUT).minimized).toEqual(['output']);
+  });
+
+  it('stays open when the stored layout opened it', () => {
+    expect(readPanelSplitLayout({ maximized: null, minimized: [], pixels: {} }, WITH_OUTPUT).minimized).toEqual([]);
+  });
+});
+
+describe('openPanel', () => {
+  it('opens a minimized panel and keeps the other sizes', () => {
+    const layout = { maximized: null, minimized: ['editor', 'output'], pixels: {} };
+
+    expect(openPanel(layout, 'output')).toEqual({ maximized: null, minimized: ['editor'], pixels: {} });
+  });
+
+  it('ends the maximize of another panel, and keeps a maximized panel maximized', () => {
+    expect(openPanel({ maximized: 'results', minimized: [], pixels: {} }, 'output').maximized).toBeNull();
+    expect(openPanel({ maximized: 'output', minimized: [], pixels: {} }, 'output').maximized).toBe('output');
   });
 });
 

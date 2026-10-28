@@ -9,13 +9,15 @@
 
 /**
  * A panel of a PanelSplit. The first panel has no `defaultPixels`: it fills the rest of the height. `splitterLabel`
- * names the splitter above the panel (not used for the first panel).
+ * names the splitter above the panel (not used for the first panel). `startsMinimized` minimizes the panel in the
+ * default layout, for example a panel with a status bar.
  */
 export interface PanelSpec {
   id: string;
   minPixels: number;
   defaultPixels?: number;
   splitterLabel?: string;
+  startsMinimized?: boolean;
 }
 
 /** The size of one panel, for its Minimize and Maximize buttons. */
@@ -44,7 +46,8 @@ export function createPanelSplitLayout(specs: readonly PanelSpec[]): PanelSplitL
       pixels[spec.id] = spec.defaultPixels;
     }
   }
-  return { maximized: null, minimized: [], pixels };
+  const minimized = specs.filter((spec) => spec.startsMinimized === true).map((spec) => spec.id);
+  return { maximized: null, minimized: minimized.length >= specs.length ? minimized.slice(0, -1) : minimized, pixels };
 }
 
 export function isPanelHeaderOnly(layout: PanelSplitLayout, id: string): boolean {
@@ -79,6 +82,17 @@ export function togglePanelSize(
     return layout;
   }
   return { ...layout, maximized: null, minimized };
+}
+
+/**
+ * Opens a panel that shows only its header line (or its status bar): it is no longer minimized, and another panel is
+ * no longer maximized. An open panel keeps its size.
+ */
+export function openPanel(layout: PanelSplitLayout, id: string): PanelSplitLayout {
+  if (!isPanelHeaderOnly(layout, id)) {
+    return layout;
+  }
+  return { ...layout, maximized: null, minimized: layout.minimized.filter((minimizedId) => minimizedId !== id) };
 }
 
 /** Escape restores a maximized panel. A minimized panel stays minimized. */

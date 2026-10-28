@@ -1,5 +1,5 @@
-// Strategy workbench (#106): the results panel and the editor panel with the swap button, the panel buttons, and the
-// toolbar icon buttons with their shortcuts. A backtest that ends opens in a new result tab. The e2e database is not
+// Strategy workbench (#106, #107): the results panel and the editor panel with the swap button, the panel buttons, the
+// problems and output panel with its status bar, and the toolbar icon buttons with their shortcuts. A backtest that ends opens in a new result tab. The e2e database is not
 // cleared between tests and browser projects, so each strategy name is unique.
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 
@@ -40,6 +40,12 @@ async function expectNoPageScroll(page: Page): Promise<void> {
     clientHeight: document.documentElement.clientHeight,
   }));
   expect(sizes.scrollHeight).toBeLessThanOrEqual(sizes.clientHeight);
+}
+
+// The status bar "Output" opens the Output tab of the problems and output panel.
+async function expectOutputLine(page: Page, text: string): Promise<void> {
+  await page.getByRole('button', { name: 'Output', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Output', exact: true }).getByRole('listitem').last()).toContainText(text);
 }
 
 test('swaps the results and the editor, keeps the order after a reload, and sizes each panel', async ({ page }, currentTest) => {
@@ -91,9 +97,9 @@ test('names the shortcut of each toolbar button, and Ctrl S saves from the edito
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
   await page.keyboard.press(`${modifier}+s`);
 
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveText(`Saved as ${name} v2.`);
   await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
   await expect(code).toBeFocused();
+  await expectOutputLine(page, `Saved as ${name} v2.`);
 });
 
 test('runs a backtest from the toolbar and opens its result in a new tab', async ({ page, request }, currentTest) => {
@@ -214,8 +220,8 @@ test('starts a forward test from the toolbar and stops it with the same button',
   await expect(page.getByRole('button', { name: 'Start forward test', exact: true })).toBeVisible();
 });
 
-// Many refused lines scroll in their own region, so the editor below the list stays in view.
-test('a long list of code problems scrolls in itself above the editor', async ({ page }, currentTest) => {
+// Many refused lines scroll in their own region of the Problems tab, so the editor above stays in view.
+test('a long list of code problems scrolls in itself below the editor', async ({ page }, currentTest) => {
   await createStrategy(page, createUniqueName(currentTest, 'Problems'));
   const code = page.getByRole('textbox', { name: 'Strategy code' });
   await code.click();
@@ -224,8 +230,48 @@ test('a long list of code problems scrolls in itself above the editor', async ({
   await page.keyboard.insertText(undefinedNames.join('\n'));
   await page.getByRole('button', { name: 'Save version' }).click();
 
-  await expect(page.getByRole('alert')).toContainText('Line 1:');
+  await expect(page.getByRole('region', { name: 'Code problems' })).toContainText('Line 1');
   await expect(page.getByRole('scrollbar', { name: 'Code problems scroll bar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Problems: \d+ errors, 0 warnings$/ })).toBeVisible();
   await expect(code).toBeInViewport();
+  await expectNoPageScroll(page);
+});
+
+// Problems / Output (#107): the panel is minimized to a 24px status bar at the bottom of the main area. The status bar
+// opens a tab; a click on the selected tab or the Minimize button minimizes the panel again.
+test('opens problems and output from the 24px status bar and minimizes them again', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Status bar'));
+  const outputPanel = page.getByRole('region', { name: 'Problems and output' });
+  const statusBar = outputPanel.locator('.atrade-status-bar');
+  const editor = page.getByRole('region', { name: 'Editor' });
+  await expect(outputPanel.getByRole('tab')).toHaveCount(0);
+  expect((await outputPanel.boundingBox())?.height).toBe(24);
+  expect((await statusBar.boundingBox())?.height).toBe(24);
+  expect(await readTop(editor)).toBeLessThan(await readTop(outputPanel));
+
+  await statusBar.getByRole('button', { name: 'Output', exact: true }).click();
+  await expect(outputPanel.getByRole('tab', { name: 'Output' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('separator', { name: 'Resize the problems and output' })).toBeVisible();
+  await expect(statusBar).toBeVisible();
+  await outputPanel.getByRole('tab', { name: 'Output' }).click();
+  await expect(outputPanel.getByRole('tab')).toHaveCount(0);
+
+  await statusBar.getByRole('button', { name: 'Problems: 0 errors, 0 warnings' }).click();
+  await expect(outputPanel.getByRole('tab', { name: 'Problems 0' })).toHaveAttribute('aria-selected', 'true');
+  await outputPanel.getByRole('tab', { name: 'Output' }).click();
+  await expect(outputPanel.getByRole('tab', { name: 'Output' })).toHaveAttribute('aria-selected', 'true');
+
+  // The open panel maximizes and restores like the other panels.
+  await outputPanel.getByRole('button', { name: 'Maximize panel' }).click();
+  await expect(page.getByRole('separator')).toHaveCount(0);
+  await expect(editor.getByRole('textbox', { name: 'Strategy code' })).toBeHidden();
+  await outputPanel.getByRole('button', { name: 'Restore panel' }).click();
+  await expect(editor.getByRole('textbox', { name: 'Strategy code' })).toBeVisible();
+
+  await outputPanel.getByRole('button', { name: 'Minimize panel' }).click();
+  await expect(outputPanel.getByRole('tab')).toHaveCount(0);
+  expect((await outputPanel.boundingBox())?.height).toBe(24);
+  await page.reload();
+  await expect(outputPanel.getByRole('tab')).toHaveCount(0);
   await expectNoPageScroll(page);
 });
