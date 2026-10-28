@@ -3,7 +3,8 @@
      panel; spread the state on a Panel. While a panel is maximized, no splitter shows.
      Escape restores a maximized panel of the split that has the focus. Inside nested splits, the innermost maximized
      split restores first. With the focus outside all splits, Escape restores this split. The browser keeps the layout
-     under `storageKey`. -->
+     under `storageKey`. `openPanel(id)` (through `bind:this`) opens a panel that shows only its header line or its
+     status bar, for example when the page has a message for that panel. -->
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
   import type { PanelState } from './Panel.svelte';
@@ -12,6 +13,7 @@
     findPanelSize,
     isPanelHeaderOnly,
     listPanelRows,
+    openPanel as openPanelInLayout,
     readPanelSplitLayout,
     restorePanelSplit,
     togglePanelSize,
@@ -66,6 +68,11 @@
         layout = { ...layout, maximized: null, minimized: layout.minimized.filter((minimizedId) => minimizedId !== id) };
       },
     };
+  }
+
+  /** Opens a panel that shows only its header line or its status bar. */
+  export function openPanel(id: string): void {
+    layout = openPanelInLayout(layout, id);
   }
 
   function findPanel(id: string): PanelSpec | undefined {

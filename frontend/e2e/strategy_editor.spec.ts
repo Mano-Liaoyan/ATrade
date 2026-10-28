@@ -113,6 +113,12 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
 // Tab indents in the editor. Escape and then Tab or Shift+Tab moves the focus out of the editor, so keyboard users
 // can leave it. The editor is the last control of the page, so the test leaves it backwards.
+// The status bar "Output" opens the Output tab of the problems and output panel.
+async function expectOutputLine(page: Page, text: string): Promise<void> {
+  await page.getByRole('button', { name: 'Output', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Output', exact: true }).getByRole('listitem').last()).toContainText(text);
+}
+
 test('Tab indents the code, and Escape then Shift+Tab leaves the editor', async ({ page }, currentTest) => {
   await createStrategy(page, createUniqueName(currentTest, 'Tab'));
   const editor = page.getByRole('textbox', { name: 'Strategy code' });
@@ -151,7 +157,7 @@ test('saves edited code as a new version', async ({ page }, currentTest) => {
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
   await page.getByRole('button', { name: 'Save version' }).click();
 
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveText(`Saved as ${name} v2.`);
+  await expectOutputLine(page, `Saved as ${name} v2.`);
   await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
   await expect(page.getByRole('button', { name: 'Save version', exact: true })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Strategies' }).getByRole('row', { name: new RegExp(name) })).toContainText(
@@ -167,7 +173,15 @@ test('shows the line and the reason when the checks refuse the code', async ({ p
   await replaceCode(page, `${VALID_CODE}\nlimit = undefined_limit\n`);
   await page.getByRole('button', { name: 'Save version' }).click();
 
-  await expect(page.getByRole('alert')).toContainText('Line 13: F821 Undefined name `undefined_limit`');
+  // The refused save opens the Problems tab. A click on a problem puts the cursor on its line in the editor.
+  const problems = page.getByRole('region', { name: 'Code problems' });
+  await expect(page.getByRole('tab', { name: 'Problems 1' })).toHaveAttribute('aria-selected', 'true');
+  const problem = problems.getByRole('button').filter({ hasText: 'Line 13' });
+  await expect(problem).toContainText('F821 Undefined name `undefined_limit`');
+  await problem.click();
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toBeFocused();
+  await expect(page.locator('.cm-activeLine')).toHaveText('limit = undefined_limit');
+  await expectOutputLine(page, 'Not saved: 1 problems.');
   await page.getByRole('combobox', { name: 'Version' }).click();
   await expect(page.getByRole('option')).toHaveText(['v1']);
   await page.keyboard.press('Escape');

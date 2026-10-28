@@ -1,4 +1,6 @@
-<!-- Python code editor: CodeMirror 6 with @codemirror/lang-python. It has no domain meaning (docs/architecture.md section 13). -->
+<!-- Python code editor: CodeMirror 6 with @codemirror/lang-python. It has no domain meaning (docs/architecture.md section 13).
+     `revealLine(line)` (through `bind:this`) puts the cursor at the start of a line, scrolls it into view, and focuses
+     the editor, for example from a list of code problems. -->
 <script lang="ts">
   import { acceptCompletion } from '@codemirror/autocomplete';
   import { indentWithTab } from '@codemirror/commands';
@@ -46,6 +48,17 @@
       view = null;
     };
   });
+
+  /** Puts the cursor at the start of a line (1 is the first line), scrolls the line into view, and focuses the editor. */
+  export function revealLine(line: number): void {
+    if (view === null) {
+      return;
+    }
+    const lineNumber = Math.min(Math.max(1, Math.trunc(line)), view.state.doc.lines);
+    const position = view.state.doc.line(lineNumber).from;
+    view.dispatch({ selection: { anchor: position }, effects: EditorView.scrollIntoView(position, { y: 'center' }) });
+    view.focus();
+  }
 
   // The page sets new code when the user opens another version. The editor keeps its cursor when the code is the same.
   $effect(() => {

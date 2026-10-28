@@ -1,13 +1,15 @@
-// The state of the strategy workbench (spec #99, ticket #106): the order of the results panel and the editor panel,
-// the result tabs (one for each backtest of the strategy, then Trades, Orders, and Logs), the backtest that opens when
-// it ends, and the toolbar shortcuts.
+// The state of the strategy workbench (spec #99, tickets #106 and #107): the order of the results panel and the editor
+// panel, the problems and output panel below them, the result tabs (one for each backtest of the strategy, then Trades,
+// Orders, and Logs), the backtest that opens when it ends, the output lines, and the toolbar shortcuts.
 import { formatPercent, isFinalStatus, type Backtest } from '#lib/backtest';
 import type { ForwardTest } from '#lib/forward_test';
 import type { PanelSpec } from '#lib/foundation/workbench';
+import type { CodeProblem } from '#lib/strategy';
 
 export type PaneOrder = 'results-on-top' | 'editor-on-top';
 export type ResultTab = `backtest-${string}` | 'trades' | 'orders' | 'logs';
 export type WorkbenchShortcut = 'save' | 'backtest' | 'forward-test';
+export type OutputTab = 'problems' | 'output';
 
 export interface ResultTabItem {
   value: ResultTab;
@@ -62,11 +64,40 @@ export function swapPaneOrder(order: PaneOrder): PaneOrder {
   return order === 'results-on-top' ? 'editor-on-top' : 'results-on-top';
 }
 
-/** The panels from top to bottom. Each panel has a height, because the swap can make each one the lower panel. */
+const OUTPUT_PANEL: PanelSpec = {
+  id: 'output',
+  minPixels: 96,
+  defaultPixels: 240,
+  splitterLabel: 'Resize the problems and output',
+  startsMinimized: true,
+};
+
+/**
+ * The panels from top to bottom. The results and the editor each have a height, because the swap can make each one the
+ * lower panel. The problems and output panel is always at the bottom; minimized, it is the 24px status bar.
+ */
 export function listWorkbenchPanels(order: PaneOrder): PanelSpec[] {
   const results: PanelSpec = { id: 'results', minPixels: 160, defaultPixels: 320, splitterLabel: SPLITTER_LABEL };
   const editor: PanelSpec = { id: 'editor', minPixels: 128, defaultPixels: 320, splitterLabel: SPLITTER_LABEL };
-  return order === 'results-on-top' ? [results, editor] : [editor, results];
+  return order === 'results-on-top' ? [results, editor, OUTPUT_PANEL] : [editor, results, OUTPUT_PANEL];
+}
+
+/** The counts of the status bar. The code checks give no severity, so each code problem is an error. */
+export function describeProblemCounts(problems: readonly CodeProblem[]): { errors: number; warnings: number; label: string } {
+  const errors = problems.length;
+  const warnings = 0;
+  return { errors, warnings, label: `Problems: ${String(errors)} errors, ${String(warnings)} warnings` };
+}
+
+/** A line of the Output tab: the UTC time (HH:MM:SS), then the text. */
+export function createOutputLine(time: Date, text: string): string {
+  return `${time.toISOString().slice('YYYY-MM-DDT'.length, 'YYYY-MM-DDTHH:MM:SS'.length)}  ${text}`;
+}
+
+/** The Output text of a backtest that starts or ends. A failed backtest gives its error message. */
+export function describeBacktestEvent(backtest: Pick<Backtest, 'id' | 'status' | 'error_message'>): string {
+  const name = `Backtest #${String(backtest.id)} ${backtest.status.replaceAll('_', ' ')}`;
+  return backtest.error_message === null || backtest.error_message === '' ? `${name}.` : `${name}: ${backtest.error_message}`;
 }
 
 /** The swap button: its arrow points to the place that the editor moves to. */

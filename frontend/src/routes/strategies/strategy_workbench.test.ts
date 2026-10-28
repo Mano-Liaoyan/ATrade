@@ -8,6 +8,9 @@ import type { Backtest } from '#lib/backtest';
 import type { ForwardTest } from '#lib/forward_test';
 import {
   EDITOR_SHORTCUT_KEYS,
+  createOutputLine,
+  describeBacktestEvent,
+  describeProblemCounts,
   describeShortcut,
   describeSwapButton,
   findFinishedBacktest,
@@ -25,6 +28,7 @@ function createBacktest(id: number, strategyId: number, status: Backtest['status
     id,
     strategy_id: strategyId,
     status,
+    error_message: null,
     metrics:
       totalReturn === undefined
         ? null
@@ -42,17 +46,56 @@ describe('readPaneOrder', () => {
 
 describe('swapPaneOrder and listWorkbenchPanels', () => {
   it('lists the results over the editor, and the swap puts the editor on top', () => {
-    expect(listWorkbenchPanels('results-on-top').map((panel) => panel.id)).toEqual(['results', 'editor']);
+    expect(listWorkbenchPanels('results-on-top').map((panel) => panel.id)).toEqual(['results', 'editor', 'output']);
     expect(swapPaneOrder('results-on-top')).toBe('editor-on-top');
-    expect(listWorkbenchPanels('editor-on-top').map((panel) => panel.id)).toEqual(['editor', 'results']);
+    expect(listWorkbenchPanels('editor-on-top').map((panel) => panel.id)).toEqual(['editor', 'results', 'output']);
     expect(swapPaneOrder('editor-on-top')).toBe('results-on-top');
   });
 
   it('gives both panels a height, so each one can be the lower panel', () => {
-    for (const panel of listWorkbenchPanels('results-on-top')) {
+    for (const panel of listWorkbenchPanels('results-on-top').slice(0, 2)) {
       expect(panel.defaultPixels).toBeGreaterThan(0);
       expect(panel.splitterLabel).toBe('Resize the results and the editor');
     }
+  });
+
+  it('puts the problems and output panel at the bottom, minimized to its status bar by default', () => {
+    expect(listWorkbenchPanels('editor-on-top').at(-1)).toEqual({
+      id: 'output',
+      minPixels: 96,
+      defaultPixels: 240,
+      splitterLabel: 'Resize the problems and output',
+      startsMinimized: true,
+    });
+  });
+});
+
+describe('describeProblemCounts', () => {
+  it('counts all code problems as errors, because the checks give no severity', () => {
+    const problems = [
+      { line: 1, message: 'F821 Undefined name `a`' },
+      { line: 4, message: 'F821 Undefined name `b`' },
+    ];
+
+    expect(describeProblemCounts(problems)).toEqual({ errors: 2, warnings: 0, label: 'Problems: 2 errors, 0 warnings' });
+    expect(describeProblemCounts([]).label).toBe('Problems: 0 errors, 0 warnings');
+  });
+});
+
+describe('createOutputLine', () => {
+  it('starts the line with the UTC time', () => {
+    expect(createOutputLine(new Date('2026-10-28T05:04:03.250Z'), 'Saved as Trend v2.')).toBe('05:04:03  Saved as Trend v2.');
+  });
+});
+
+describe('describeBacktestEvent', () => {
+  it('names the backtest and its status', () => {
+    expect(describeBacktestEvent(createBacktest(14, 3, 'queued'))).toBe('Backtest #14 queued.');
+    expect(describeBacktestEvent(createBacktest(14, 3, 'finished', '1'))).toBe('Backtest #14 finished.');
+    expect(describeBacktestEvent(createBacktest(14, 3, 'timed_out'))).toBe('Backtest #14 timed out.');
+    expect(describeBacktestEvent({ ...createBacktest(14, 3, 'failed'), error_message: 'No bars' })).toBe(
+      'Backtest #14 failed: No bars',
+    );
   });
 });
 
