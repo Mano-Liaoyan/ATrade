@@ -18,7 +18,7 @@ export { default as ContentSwitcher, type ContentSwitcherItem } from './ContentS
 export { default as Dialog } from './Dialog.svelte';
 export type { ButtonKind, ButtonSize } from './carbon_state';
 export { default as Icon } from './Icon.svelte';
-export { default as IconButton } from './IconButton.svelte';
+export { default as IconButton, type IconTone } from './IconButton.svelte';
 export type { CarbonIcon, CarbonIconNode } from './carbon_icon';
 export { default as Combobox } from './Combobox.svelte';
 export type { ComboboxItem } from './combobox_classes';

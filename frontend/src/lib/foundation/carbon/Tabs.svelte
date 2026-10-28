@@ -3,7 +3,8 @@
      The `panel` snippet is the one tab panel. It shows the content of the selected tab and stays in the page when
      the selected tab changes, so a chart in it is not created again.
      `size` "sm" gives the 32px tab line of a workbench panel. `lineEnd` puts content (for example the panel buttons)
-     at the end of the tab line, in a line with the class `lineClass`. -->
+     at the end of the tab line, in a line with the class `lineClass`. `itemLabel` renders the text of a tab, for
+     example a name with a ChangeText; without it, the tab shows its `label`. -->
 <script module lang="ts">
   export interface TabItem {
     value: string;
@@ -27,6 +28,7 @@
     lineClass?: string;
     panelClass?: string;
     panel?: Snippet;
+    itemLabel?: Snippet<[TabItem]>;
   }
 
   const {
@@ -40,6 +42,7 @@
     lineClass,
     panelClass,
     panel,
+    itemLabel,
   }: Props = $props();
 </script>
 
@@ -52,7 +55,9 @@
           class={['cds--tabs__nav-item', 'cds--tabs__nav-link', item.value === value && 'cds--tabs__nav-item--selected']}
         >
           <div class="cds--tabs__nav-item-label-wrapper">
-            <span class="cds--tabs__nav-item-label">{item.label}</span>
+            <span class="cds--tabs__nav-item-label">
+              {#if itemLabel === undefined}{item.label}{:else}{@render itemLabel(item)}{/if}
+            </span>
           </div>
         </Tabs.Trigger>
       {/each}

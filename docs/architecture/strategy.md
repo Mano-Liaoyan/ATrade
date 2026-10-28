@@ -198,5 +198,7 @@ returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
   draft of the version that the user edited.
-- Pages: `/strategies` (list and create form) and `/strategies/<id>` (editor,
-  version list, save, delete).
+- Pages: `/strategies/<id>` is the strategy workbench (list, new strategy,
+  editor, version list, save, delete, Run backtest, Start forward test, and
+  the backtest results; docs/architecture.md section 13). `/strategies` shows
+  the first strategy of the list.

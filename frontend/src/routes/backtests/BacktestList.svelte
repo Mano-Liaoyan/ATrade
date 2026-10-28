@@ -233,8 +233,9 @@
   }
 
   /* The open backtest: the Carbon selected row color and an interactive bar at the start of the row. */
-  .backtest-row--open > :global(td),
-  .backtest-row--open > :global(th) {
+  /* Two classes: the DataTable body header cells (th) have a transparent background with a higher specificity. */
+  .backtest-row.backtest-row--open > :global(td),
+  .backtest-row.backtest-row--open > :global(th) {
     background: var(--cds-layer-selected-01);
     color: var(--cds-text-primary);
   }

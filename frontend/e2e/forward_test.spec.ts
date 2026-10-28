@@ -11,6 +11,7 @@ const STATUS_TIMEOUT_MILLISECONDS = 15_000;
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(strategyName);
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
@@ -23,7 +24,7 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   const symbol = `FT${currentTest.project.name.slice(0, 2).toUpperCase()}${uniqueNumber}`;
   await createStrategy(page, strategyName);
 
-  await page.getByRole('link', { name: 'Forward tests' }).click();
+  await page.getByRole('link', { name: 'Forward tests', exact: true }).click();
   await page.getByRole('combobox', { name: 'Strategy', exact: true }).click();
   await page.getByRole('option', { name: strategyName }).click();
   await expect(page.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
@@ -58,7 +59,7 @@ test('starts a forward test, sees it running in the list, and stops it', async (
     `Forward test ${forwardTestNumber.replace('#', '')} (${strategyName} v1) trades ${symbol} / ARCA. Stop the forward test to send an order by hand.`,
   );
 
-  await page.getByRole('link', { name: 'Forward tests' }).click();
+  await page.getByRole('link', { name: 'Forward tests', exact: true }).click();
   const actions = row.getByRole('button', { name: `Actions for forward test ${forwardTestNumber.replace('#', '')}` });
   await actions.click();
   await page.getByRole('menuitem', { name: 'Stop forward test' }).click();

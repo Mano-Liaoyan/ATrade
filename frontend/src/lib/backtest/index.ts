@@ -2,6 +2,7 @@
 // chart (for the backtest page, and later for the strategy and forward test pages), the comparison view (also for
 // forward tests), and the value formats.
 export { default as BacktestLimitsForm } from './BacktestLimitsForm.svelte';
+export { default as BacktestTradeTable } from './BacktestTradeTable.svelte';
 export { default as ComparisonView, type ComparedCode, type ComparedRun } from './ComparisonView.svelte';
 export { default as EquityChart, type EquityCurve } from './EquityChart.svelte';
 export { default as EquityDrawdownChart, type DrawdownCurve } from './EquityDrawdownChart.svelte';
