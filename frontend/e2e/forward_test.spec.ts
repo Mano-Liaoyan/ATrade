@@ -79,7 +79,8 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await ticket.getByLabel('Order symbol').fill(symbol);
   await ticket.getByLabel('Exchange').fill('ARCA');
   const reviewButton = ticket.getByRole('button', { name: 'Review order' });
-  await expect(reviewButton).toBeDisabled();
+  // The home page reads the running forward tests from its own /ws/forward-tests socket.
+  await expect(reviewButton).toBeDisabled({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   await expect(reviewButton).toHaveAccessibleDescription(
     `Forward test ${forwardTestId} (${strategyName} v1) trades ${symbol} / ARCA. Stop the forward test to send an order by hand.`,
   );
