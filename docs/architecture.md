@@ -353,11 +353,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `neutral`; each kind has its own icon shape) and `label`. `Select` takes
   `placeholder` (the trigger text while no item is selected). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
-- The forward test pages use Carbon: the start form uses `Select` and
-  `TextInput`, the list and the fill tables use `DataTable`, and the row
-  `OverflowMenu` has only the actions that apply ("Stop forward test",
-  "Backtest the same period"). A forward test with no action has no menu.
-  The status of a forward test is a `StatusIndicator`
+- The forward test page (`/forward-tests/<id>`, spec #99, ticket
+  [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
+  with the structure of the backtest page: the "Forward tests" `SideColumn`
+  with the live list (`ForwardTestList` of `forward_test`, 32px rows) and the
+  "New forward test" dialog (form id `start-forward-test`); the forward test
+  panel (header line with the status, the red "Stop forward test" icon button
+  while the forward test can stop, and the "Backtest the same period" icon
+  button; `KeyMetricRow`; `EquityDrawdownChart` with the interruptions) over
+  the Fills / Comparison / Logs panel. `/forward-tests` opens the newest
+  forward test. The status of a forward test is a `StatusIndicator`
   (`findForwardTestStatusKind` of `forward_test`).
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
@@ -421,7 +426,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   commands (`palette_commands.ts`): go to a page, go to the instrument page of
   a watchlist instrument, open the start form of a backtest or a forward test
   (the form ids `start-backtest` and `start-forward-test`; the backtest page
-  opens its "New backtest" dialog for `#start-backtest`), and change the
+  opens its "New backtest" dialog for `#start-backtest`, and the forward test
+  page opens its "New forward test" dialog for `#start-forward-test`), and change the
   theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
   opens a page or a form. No command sends a paper order or starts a backtest
   or a forward test. The layout reads the watchlist each time the palette

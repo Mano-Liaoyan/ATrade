@@ -1,169 +1,149 @@
-<!-- The forward tests with their actual status from /ws/forward-tests. The row menu stops a running forward test and
-     starts a backtest of the same period for one with a start balance (docs/architecture/forward_test.md 12.10). -->
+<!-- The forward test list of the forward test workbench (the body of the "Forward tests" side column): 32px rows with
+     the number, the strategy version, the instrument symbol, and the actual status (icon and word) from
+     /ws/forward-tests. The open forward test has the Carbon selected row color. A click on a row opens its forward
+     test. Stop and "Backtest the same period" are in the header line of the open forward test. -->
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import {
-    DataTable,
-    InlineNotification,
-    OverflowMenu,
-    StatusIndicator,
-    type OverflowMenuItem,
-    type TableColumn,
-  } from '#lib/foundation/carbon';
+  import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { formatUtcTime } from '#lib/foundation/time_format';
-  import { formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
-  import {
-    canBacktestSamePeriod,
-    canStop,
-    describeForwardTestStatus,
-    findForwardTestStatusKind,
-    formatLocalTime,
-    showsCrashCount,
-    stopForwardTest,
-    type ForwardTest,
-  } from './forward_test_api';
+  import { describeForwardTestStatus, findForwardTestStatusKind, type ForwardTest } from './forward_test_api';
 
   interface Props {
     forwardTests: ForwardTest[];
-    // The page starts the backtest and opens the comparison page.
-    onBacktestSamePeriod: (forwardTestId: number) => void;
+    openForwardTestId: number | null;
   }
 
-  const { forwardTests, onBacktestSamePeriod }: Props = $props();
+  const { forwardTests, openForwardTestId }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
-    { header: 'Forward test' },
-    { header: 'Strategy version' },
+    { header: '#', align: 'right' },
+    { header: 'Strategy' },
     { header: 'Instrument' },
-    { header: 'Bar period' },
     { header: 'Status' },
-    { header: 'Client ID', align: 'right' },
-    { header: 'Start balance (USD)', align: 'right' },
-    { header: 'Started' },
-    { header: 'End time (local)' },
-    { header: 'Actions', isMenu: true },
   ];
 
-  let stoppingIds = $state<number[]>([]);
-  let stopFailure = $state<{ forwardTestId: number; message: string } | null>(null);
-
-  async function stop(forwardTestId: number): Promise<void> {
-    stopFailure = null;
-    stoppingIds = [...stoppingIds, forwardTestId];
-    const result = await stopForwardTest(fetch, forwardTestId);
-    if (result.kind === 'failed') {
-      stoppingIds = stoppingIds.filter((stoppingId) => stoppingId !== forwardTestId);
-      stopFailure = { forwardTestId, message: result.message };
-    }
+  function forwardTestHref(id: number): string {
+    return resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(id) });
   }
 
-  // Only the actions that apply to the forward test. A forward test without an action has no menu.
-  function makeMenuItems(forwardTest: ForwardTest): OverflowMenuItem[] {
-    const items: OverflowMenuItem[] = [];
-    if (canStop(forwardTest)) {
-      const isStopping = stoppingIds.includes(forwardTest.id);
-      items.push({
-        label: isStopping ? 'Stop requested' : 'Stop forward test',
-        disabled: isStopping,
-        danger: true,
-        onSelect: () => void stop(forwardTest.id),
-      });
+  function openRow(event: MouseEvent, id: number): void {
+    // The link in the row does its own action.
+    if (event.target instanceof Element && event.target.closest('a') !== null) {
+      return;
     }
-    if (canBacktestSamePeriod(forwardTest)) {
-      items.push({
-        label: 'Backtest the same period',
-        onSelect: () => {
-          onBacktestSamePeriod(forwardTest.id);
-        },
-      });
-    }
-    return items;
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- forwardTestHref resolves the path.
+    void goto(forwardTestHref(id));
   }
 </script>
 
-<div class="forward-test-list">
-  {#if stopFailure !== null}
-    <InlineNotification
-      kind="error"
-      title={`Forward test ${String(stopFailure.forwardTestId)} not stopped`}
-      subtitle={stopFailure.message}
-      lowContrast
-      onClose={() => (stopFailure = null)}
-    />
-  {/if}
-  {#if forwardTests.length === 0}
-    <p>No forward test yet.</p>
-  {:else}
-    <ScrollRegion label="Forward tests" maxHeight="24rem">
-      <DataTable columns={COLUMNS} size="sm">
-        {#snippet rows()}
-          {#each forwardTests as forwardTest (forwardTest.id)}
-            {@const menuItems = makeMenuItems(forwardTest)}
-            <tr>
-              <th scope="row">
-                <a class="cds--link" href={resolve('/forward-tests/[forwardTestId]', { forwardTestId: String(forwardTest.id) })}
-                  >#{forwardTest.id}</a
-                >
-              </th>
-              <td>{forwardTest.strategy_name} v{forwardTest.version_number}</td>
-              <td>{forwardTest.symbol} / {forwardTest.exchange} / {forwardTest.currency}</td>
-              <td>{formatBarPeriod(forwardTest.bar_period)}</td>
-              <td>
-                <StatusIndicator
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                  label={describeForwardTestStatus(forwardTest.status)}
-                />
-                {#if showsCrashCount(forwardTest)}
-                  <span class="note">Crashes in a row: {forwardTest.crash_count} of 3</span>
-                {/if}
-                {#if forwardTest.error_message !== null}
-                  <span class="note error">{forwardTest.error_message}</span>
-                {/if}
-              </td>
-              <td align="right">{forwardTest.client_id ?? ''}</td>
-              <td align="right">
-                {forwardTest.start_balance_usd === null ? '' : formatAmount(forwardTest.start_balance_usd)}
-              </td>
-              <td>{formatUtcTime(forwardTest.created_at_utc)}</td>
-              <td>{formatLocalTime(forwardTest.end_time_utc)}</td>
-              <td class="cds--table-column-menu">
-                {#if menuItems.length > 0}
-                  <OverflowMenu label={`Actions for forward test ${String(forwardTest.id)}`} items={menuItems} size="sm" />
-                {/if}
-              </td>
-            </tr>
-          {/each}
-        {/snippet}
-      </DataTable>
-    </ScrollRegion>
-  {/if}
+<div class="list">
+  <ScrollRegion label="Forward test list" fill>
+    <DataTable columns={COLUMNS} size="sm">
+      {#snippet rows()}
+        {#each forwardTests as forwardTest (forwardTest.id)}
+          {@const versionLabel = `${forwardTest.strategy_name} v${String(forwardTest.version_number)}`}
+          <tr
+            class={['forward-test-row', forwardTest.id === openForwardTestId && 'forward-test-row--open']}
+            onclick={(event) => {
+              openRow(event, forwardTest.id);
+            }}
+          >
+            <th scope="row" align="right">
+              <a
+                class="row-link"
+                href={resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) })}
+                aria-current={forwardTest.id === openForwardTestId ? 'page' : undefined}>#{forwardTest.id}</a
+              >
+            </th>
+            <td><span class="strategy-name" title={versionLabel}>{versionLabel}</span></td>
+            <td>{forwardTest.symbol}</td>
+            <td>
+              <StatusIndicator
+                kind={findForwardTestStatusKind(forwardTest.status)}
+                label={describeForwardTestStatus(forwardTest.status)}
+              />
+            </td>
+          </tr>
+        {/each}
+      {/snippet}
+    </DataTable>
+  </ScrollRegion>
 </div>
 
 <style>
-  .forward-test-list {
+  .list {
     display: flex;
+    flex: 1;
     flex-direction: column;
-    gap: var(--cds-spacing-03);
+    min-block-size: 0;
   }
 
-  p {
-    margin: 0;
+  .list :global(thead th) {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
   }
 
-  /* A long value can break anywhere. A column name breaks only between words. */
-  .forward-test-list :global(td) {
-    overflow-wrap: anywhere;
+  /* Fixed column widths: the table never is wider than the column. Long text ends with an ellipsis. */
+  .list :global(table) {
+    table-layout: fixed;
   }
 
-  .note {
+  .list :global(th:nth-child(1)) {
+    inline-size: calc(var(--cds-spacing-09) + var(--cds-spacing-05));
+  }
+
+  .list :global(th:nth-child(3)) {
+    inline-size: var(--cds-spacing-12);
+  }
+
+  .list :global(th:nth-child(4)) {
+    inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-09));
+  }
+
+  .list :global(td),
+  .list :global(th) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The inline-flex status keeps the 32px row height (no baseline gap under it). */
+  .list :global(td > .status-indicator) {
+    vertical-align: middle;
+  }
+
+  .forward-test-row {
+    cursor: pointer;
+  }
+
+  /* A long strategy name ends with an ellipsis, so the status stays in the column. */
+  .strategy-name {
     display: block;
-    font-size: var(--cds-helper-text-01-font-size);
-    line-height: var(--cds-helper-text-01-line-height);
-    color: var(--cds-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .error {
-    color: var(--cds-text-error);
+  .row-link {
+    color: inherit;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+  }
+
+  .row-link:focus-visible {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
+
+  /* The open forward test: the Carbon selected row color and an interactive bar at the start of the row. */
+  .forward-test-row--open > :global(td),
+  .forward-test-row--open > :global(th) {
+    background: var(--cds-layer-selected-01);
+    color: var(--cds-text-primary);
+  }
+
+  .forward-test-row--open > :global(th:first-child) {
+    box-shadow: inset 3px 0 0 var(--cds-border-interactive);
   }
 </style>

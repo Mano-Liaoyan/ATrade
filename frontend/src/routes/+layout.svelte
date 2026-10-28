@@ -35,7 +35,7 @@
     { label: 'Home', href: resolve('/') },
     { label: 'Strategies', href: resolve('/strategies') },
     { label: 'Backtests', href: resolve('/backtests/[[backtestId]]', {}) },
-    { label: 'Forward tests', href: resolve('/forward-tests') },
+    { label: 'Forward tests', href: resolve('/forward-tests/[[forwardTestId]]', {}) },
   ];
   const HOME_HREF = resolve('/');
 
