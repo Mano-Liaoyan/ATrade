@@ -1,5 +1,8 @@
 <!-- One backtest: its request and its result. The page reads the backtest again until its status is final. -->
 <script lang="ts">
+  // PROTOTYPE (#99): the workbench variant replaces this page; ?variant=current shows the page below.
+  import { readPrototypeVariant } from '#lib/foundation/prototype_switcher';
+  import BacktestWorkbenchPrototype from '../BacktestWorkbenchPrototype.svelte';
   import { InlineNotification } from '#lib/foundation/carbon';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatBarPeriod } from '#lib/foundation/value_format';
@@ -44,7 +47,11 @@
       clearTimeout(timer);
     };
   });
+
+  const prototypeVariant = $derived(readPrototypeVariant(new URLSearchParams(page.url.search)));
 </script>
+
+{#if prototypeVariant === 'current'}
 
 <p class="page-back"><a class="cds--link" href={resolve('/backtests')}>All backtests</a></p>
 <h1>Backtest #{backtestId}</h1>
@@ -78,6 +85,9 @@
   </dl>
 
   <BacktestResult {backtest} />
+{/if}
+{:else}
+  <BacktestWorkbenchPrototype {backtestId} />
 {/if}
 
 <style>

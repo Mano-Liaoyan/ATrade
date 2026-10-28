@@ -27,6 +27,7 @@
     type PaperAccountCheck,
   } from '#lib/paper_trading';
   import { listWatchlist, type WatchlistInstrument } from '#lib/watchlist';
+  import { PrototypeSwitcher, readPrototypeVariant } from '#lib/foundation/prototype_switcher';
   import { createPaletteCommandGroups } from './palette_commands';
 
   const { children }: { children: Snippet } = $props();
@@ -38,6 +39,13 @@
     { label: 'Forward tests', href: resolve('/forward-tests') },
   ];
   const HOME_HREF = resolve('/');
+
+  // PROTOTYPE (#99): the prototyped pages fill the window below the header and do not scroll as a page.
+  const PROTOTYPED_PREFIXES = ['/instruments/', '/backtests', '/strategies'];
+  const isWorkbench = $derived(
+    readPrototypeVariant(page.url.searchParams) === 'workbench' &&
+      PROTOTYPED_PREFIXES.some((prefix) => page.url.pathname.startsWith(prefix)),
+  );
 
   let backendHealth: BackendHealth = $state({ kind: 'checking' });
   let gatewayStatus: GatewayStatus = $state({ kind: 'checking' });
@@ -148,9 +156,12 @@
       <ThemeButton />
     </div>
   </header>
-  <main class="app-main">
+  <main class="app-main" class:app-main--workbench={isWorkbench}>
     {@render children()}
   </main>
+  {#if PROTOTYPED_PREFIXES.some((prefix) => page.url.pathname.startsWith(prefix))}
+    <PrototypeSwitcher />
+  {/if}
 </TooltipProvider>
 
 <style>
@@ -179,7 +190,7 @@
   }
 
   /* The page heading of each page. */
-  .app-main :global(h1) {
+  .app-main:not(.app-main--workbench) :global(h1) {
     margin-block: 0 var(--cds-spacing-06);
     font-size: var(--cds-heading-04-font-size);
     font-weight: var(--cds-heading-04-font-weight);
@@ -190,5 +201,13 @@
   /* The Carbon header is fixed at the top and is 3rem high. */
   .app-main {
     padding: calc(var(--cds-spacing-09) + var(--cds-spacing-06)) var(--cds-spacing-07) var(--cds-spacing-06);
+  }
+
+  /* PROTOTYPE (#99): a workbench page is exactly the window height below the header. Its regions scroll. */
+  .app-main--workbench {
+    box-sizing: border-box;
+    block-size: 100vh;
+    padding: var(--cds-spacing-09) 0 0;
+    overflow: hidden;
   }
 </style>

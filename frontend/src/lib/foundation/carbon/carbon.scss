@@ -41,6 +41,8 @@
 @use '@carbon/styles/scss/components/combo-box';
 @use '@carbon/styles/scss/components/contained-list';
 @use '@carbon/styles/scss/components/data-table';
+// PROTOTYPE (#99): the table toolbar and batch actions.
+@use '@carbon/styles/scss/components/data-table/action';
 @use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/tile';

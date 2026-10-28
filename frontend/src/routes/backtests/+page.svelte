@@ -4,6 +4,10 @@
      instruments with saved bars of the selected bar period (docs/architecture/backtest.md section 10.6). The user
      selects 2 backtests of the same strategy in the list to compare them (docs/architecture section 9.5). -->
 <script lang="ts">
+  // PROTOTYPE (#99): the workbench variant replaces this page; ?variant=current shows the page below.
+  import { page } from '$app/state';
+  import { readPrototypeVariant } from '#lib/foundation/prototype_switcher';
+  import BacktestWorkbenchPrototype from './BacktestWorkbenchPrototype.svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
@@ -188,7 +192,11 @@
     }
     await goto(resolve('/backtests/[backtestId]', { backtestId: String(result.value.id) }));
   }
+
+  const prototypeVariant = $derived(readPrototypeVariant(new URLSearchParams(page.url.search)));
 </script>
+
+{#if prototypeVariant === 'current'}
 
 <h1>Backtests</h1>
 
@@ -301,6 +309,9 @@
       {/snippet}
     </DataTable>
   </ScrollRegion>
+{/if}
+{:else}
+  <BacktestWorkbenchPrototype backtestId={null} />
 {/if}
 
 <style>

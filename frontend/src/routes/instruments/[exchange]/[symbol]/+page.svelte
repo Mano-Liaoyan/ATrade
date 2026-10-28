@@ -7,6 +7,7 @@
   import { page } from '$app/state';
   import { Tabs } from '#lib/foundation/carbon';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { readPrototypeVariant } from '#lib/foundation/prototype_switcher';
   import {
     BAR_PERIODS,
     BarChart,
@@ -21,6 +22,10 @@
     type BarPeriod,
     type BarsResult,
   } from '#lib/market_data';
+  import InstrumentWorkbenchPrototype from './InstrumentWorkbenchPrototype.svelte';
+
+  // PROTOTYPE (#99), throwaway: "current" shows the PR #98 page, "workbench" the 3-column workbench.
+  const prototypeVariant = $derived(readPrototypeVariant(new URLSearchParams(page.url.search)));
 
   const chartRequest = $derived(readChartRequest(page.params, page.url.searchParams));
 
@@ -117,6 +122,17 @@
   }
 </script>
 
+{#if prototypeVariant === 'workbench' && chartRequest !== null}
+  <InstrumentWorkbenchPrototype
+    {chartRequest}
+    bars={chartBars}
+    {liveBar}
+    {isLoading}
+    barsError={barsResult?.kind === 'failed' ? barsResult.message : null}
+    {liveBarError}
+    onBarPeriodChange={changeBarPeriod}
+  />
+{:else}
 {#if chartRequest === null}
   <h1>Instrument not found</h1>
 {:else}
@@ -143,6 +159,7 @@
   </Tabs>
 {/if}
 <p class="instrument-back"><a class="cds--link" href={resolve('/')}>Back to the watchlist</a></p>
+{/if}
 
 <style>
   .chart-status {
