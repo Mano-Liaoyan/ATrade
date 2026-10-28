@@ -837,7 +837,7 @@ External access (#73). The user's existing network already has these parts.
 ATrade adds no Compose service for them:
 
 ```
-browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other LAN host) -> web (server LAN address:ATRADE_WEB_PORT)
+browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tailscale -> web (server Tailscale IP:ATRADE_WEB_PORT)
 ```
 
 - The DNS record of the Web host name is proxied by Cloudflare. The SSL/TLS
@@ -846,16 +846,20 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other LAN host) ->
   only the user's email address. The login method is the GitHub identity
   provider. The user logs in to GitHub with a passkey. The session duration
   is 1 month. Cloudflare Access has no passkey login of its own.
-- Nginx Proxy Manager (NPM) runs on a different LAN host. One proxy host
-  sends the Web host name to `http://<server LAN address>:<ATRADE_WEB_PORT>`
+- Nginx Proxy Manager (NPM) runs on a different host in the user's tailnet.
+  One proxy host sends the Web host name to
+  `http://<server Tailscale IP>:<ATRADE_WEB_PORT>`
   with WebSocket support on (market data, the language server).
 - Only Cloudflare can connect to NPM: the firewall of the NPM host lets only
   the Cloudflare IP ranges connect to port 443. Without this rule, a request to
   the IP address of the NPM host bypasses Cloudflare Access.
-- On the server, `ATRADE_WEB_BIND_ADDRESS` is the LAN address of the server.
-  The firewall of the server lets only the NPM host connect to
-  `ATRADE_WEB_PORT`. The default `127.0.0.1` keeps a development machine
-  closed.
+- On the server, `ATRADE_WEB_BIND_ADDRESS` is the Tailscale IP address of
+  the server. Only devices in the tailnet can connect to it, and the tailnet
+  policy decides which ones. A host firewall does not do this job: Docker
+  publishes ports with its own packet filter rules, which firewalld does not
+  check. The server sets `net.ipv4.ip_nonlocal_bind = 1`, so Docker can bind
+  the address also before Tailscale is up after a restart. The default
+  `127.0.0.1` keeps a development machine closed.
 - Only the Web host name is published. The Gateway port and the PostgreSQL
   port are not published.
 - The Cloudflare cost is 0 USD per month (Zero Trust Free plan).

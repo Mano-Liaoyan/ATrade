@@ -243,8 +243,8 @@ docker volume rm <old volume name>
 GitHub Actions deploys each commit of `main` after CI passes
 (`.github/workflows/deploy.yml`). The server builds the images with
 `./start run`. The path from the internet is Cloudflare, then Cloudflare
-Access, then Nginx Proxy Manager (NPM) on another LAN host, then `web` on the
-server. See `docs/architecture.md` section 14.
+Access, then Nginx Proxy Manager (NPM) on another host, then `web` on the
+server through Tailscale. See `docs/architecture.md` section 14.
 
 Do these steps one time. `<checkout>` is the path of the ATrade checkout on
 the server, for example `/srv/atrade`.
@@ -255,9 +255,12 @@ the server, for example `/srv/atrade`.
 2. Copy `.env` to `<checkout>/.env`. The deploy user has no password, so
    copy the file with `scp` to your own account first, then run
    `sudo install -o <deploy user> -g <deploy user> -m 600 <file> <checkout>/.env`. In
-   `.env`, set `ATRADE_WEB_BIND_ADDRESS` to the LAN address of the server.
-3. In the firewall of the server, let only the NPM host connect to
-   `ATRADE_WEB_PORT`.
+   `.env`, set `ATRADE_WEB_BIND_ADDRESS` to the Tailscale IP address of the
+   server.
+3. Let Docker bind the Tailscale address also before Tailscale is up after a
+   restart of the server. Without this setting, `web` does not start after a
+   restart:
+   `echo 'net.ipv4.ip_nonlocal_bind = 1' | sudo tee /etc/sysctl.d/90-nonlocal-bind.conf && sudo sysctl --system`.
 4. Make a deploy key on your machine:
    `ssh-keygen -t ed25519 -N '' -C atrade-deploy -f atrade-deploy`.
    Add this line to `~/.ssh/authorized_keys` of the deploy user, with the
@@ -301,7 +304,10 @@ the server, for example `/srv/atrade`.
 
    Then delete the private key file from your machine.
 7. In NPM, add a proxy host for the Web host name: scheme `http`, forward
-   host the LAN address of the server, forward port `ATRADE_WEB_PORT`.
+   host the Tailscale IP address of the server, forward port
+   `ATRADE_WEB_PORT`. The tailnet policy must let the NPM host connect to
+   this port, and must not let tagged devices other than the NPM host
+   connect to it.
    Turn on "Websockets Support". Use an SSL certificate that Cloudflare
    accepts in Full (strict) mode, for example a Cloudflare Origin
    Certificate.
