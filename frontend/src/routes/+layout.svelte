@@ -34,7 +34,7 @@
   const PAGE_LINKS = [
     { label: 'Home', href: resolve('/') },
     { label: 'Strategies', href: resolve('/strategies') },
-    { label: 'Backtests', href: resolve('/backtests') },
+    { label: 'Backtests', href: resolve('/backtests/[[backtestId]]', {}) },
     { label: 'Forward tests', href: resolve('/forward-tests') },
   ];
   const HOME_HREF = resolve('/');

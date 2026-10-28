@@ -10,10 +10,13 @@
     icon: Pick<CarbonIconNode, 'attrs' | 'content'>;
     /** The side of the tooltip. A button at the right end of a line uses bottom-end, so the tooltip stays in the window. */
     align?: 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'right';
+    /** A disabled button stays focusable and keeps its tooltip, so `label` must say why, for example
+     "Start forward test: not available for 1 day bars". A click does nothing. */
+    disabled?: boolean;
     onclick: () => void;
   }
 
-  const { label, icon, align = 'bottom', onclick }: Props = $props();
+  const { label, icon, align = 'bottom', disabled = false, onclick }: Props = $props();
 </script>
 
 <Tooltip text={label} {align}>
@@ -21,9 +24,17 @@
     <button
       {...props}
       type="button"
-      class="cds--btn cds--btn--ghost cds--btn--sm cds--layout--size-sm cds--btn--icon-only atrade-icon-button"
+      class={[
+        'cds--btn cds--btn--ghost cds--btn--sm cds--layout--size-sm cds--btn--icon-only atrade-icon-button',
+        disabled && 'cds--btn--disabled',
+      ]}
       aria-label={label}
-      {onclick}
+      aria-disabled={disabled ? 'true' : undefined}
+      onclick={() => {
+        if (!disabled) {
+          onclick();
+        }
+      }}
     >
       <Icon {icon} class="cds--btn__icon" />
     </button>

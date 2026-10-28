@@ -2,7 +2,7 @@
      the Collapse button, and its body fills the rest of the height. A collapsed column is a 32px wide rail with the
      Open button, like TradingView. The body stays in the page while the column is collapsed, so a form keeps its
      values. The browser keeps the choice under `storageKey`. The button names use the lower-case `label`, for
-     example "Collapse watchlist" and "Open watchlist". -->
+     example "Collapse watchlist" and "Open watchlist". `actions` adds icon buttons before the Collapse button. -->
 <script lang="ts">
   import RightPanelClose16 from '@carbon/icons/es/right-panel--close/16.js';
   import RightPanelOpen16 from '@carbon/icons/es/right-panel--open/16.js';
@@ -20,10 +20,12 @@
     storageKey: string;
     /** The width of the open column. */
     width?: string;
+    /** Icon buttons of the column (IconButton) in its header line, before the Collapse button. */
+    actions?: Snippet;
     children: Snippet;
   }
 
-  const { label, side, storageKey, width = '17.5rem', children }: Props = $props();
+  const { label, side, storageKey, width = '17.5rem', actions, children }: Props = $props();
 
   // The layout of the first render: a change of storageKey does not apply to a column that shows.
   let isCollapsed = $state(untrack(() => readSideColumnLayout(readStoredLayout(storageKey)).isCollapsed));
@@ -53,6 +55,7 @@
     <PanelHeader>
       <h2>{label}</h2>
       {#snippet end()}
+        {@render actions?.()}
         <IconButton
           label={`Collapse ${name}`}
           icon={isStart ? SidePanelClose16 : RightPanelClose16}

@@ -1,6 +1,6 @@
-// Backtest comparison: the list shows metrics side by side, refuses a selection of different strategies, and compares
-// two versions of the same strategy (code diff, metric table, both equity curves on one chart). The list scrolls
-// inside its own region with a visible track.
+// Backtest comparison: the backtest list refuses a selection of different strategies in its batch action bar, and
+// compares two versions of the same strategy (code diff, metric table, both equity curves on one chart). The list
+// scrolls inside its own region with a visible track.
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
@@ -59,7 +59,8 @@ async function waitUntilFinished(request: APIRequestContext, backtestId: number)
 
 test('compares two versions of the same strategy and refuses different strategies', async ({ page, request }, currentTest) => {
   test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
-  await page.setViewportSize({ width: 1280, height: 640 });
+  // A low window, so that the backtest list overflows its region.
+  await page.setViewportSize({ width: 1280, height: 400 });
   // The chart saves the daily bars from 2023-01-02 to 2026-01-01 in PostgreSQL. Backtests read only saved bars.
   await page.goto('/instruments/NASDAQ/AAPL?currency=USD&bar_period=1-DAY');
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
@@ -82,24 +83,25 @@ test('compares two versions of the same strategy and refuses different strategie
   await waitUntilFinished(request, firstBacktestId);
   await waitUntilFinished(request, secondBacktestId);
 
-  await page.goto('/backtests');
-  const list = page.getByRole('region', { name: 'Backtests' });
-  const track = page.getByRole('scrollbar', { name: 'Backtests scroll bar' });
-  await expect(list.getByRole('columnheader', { name: 'Final equity (USD)' })).toBeVisible();
+  await page.goto(`/backtests/${String(firstBacktestId)}`);
+  const list = page.getByRole('complementary', { name: 'Backtests' });
+  const track = page.getByRole('scrollbar', { name: 'Backtest list scroll bar' });
+  await expect(list.getByRole('columnheader', { name: 'Return' })).toBeVisible();
   await expect(track).toBeVisible();
   await expect(track.locator('.scroll-thumb')).toBeVisible();
 
-  const selection = page.getByRole('status', { name: 'Comparison selection' });
-  const compareButton = page.getByRole('button', { name: 'Compare selected backtests' });
+  // The Carbon batch action bar shows when 2 rows are checked.
+  const selection = list.getByRole('status', { name: 'Comparison selection' });
   await list.getByRole('checkbox', { name: `Select backtest #${String(firstBacktestId)}`, exact: true }).check();
+  await expect(selection).toHaveCount(0);
   await list.getByRole('checkbox', { name: `Select backtest #${String(otherBacktestId)}`, exact: true }).check();
-  await expect(selection).toHaveText(/Only backtests of the same strategy can be compared/);
-  await expect(compareButton).toBeDisabled();
+  await expect(selection).toHaveText('Only backtests of the same strategy can be compared');
+  await expect(list.getByRole('button', { name: 'Compare', exact: true })).toBeDisabled();
 
   await list.getByRole('checkbox', { name: `Select backtest #${String(otherBacktestId)}`, exact: true }).uncheck();
   await list.getByRole('checkbox', { name: `Select backtest #${String(secondBacktestId)}`, exact: true }).check();
-  await expect(selection).toHaveText('Ready to compare.');
-  await compareButton.click();
+  await expect(selection).toHaveText('2 backtests selected');
+  await list.getByRole('link', { name: 'Compare', exact: true }).click();
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
     `Compare backtests #${String(firstBacktestId)} and #${String(secondBacktestId)}`,
