@@ -23,6 +23,10 @@
     invalidText?: string;
     // More content after the label of a candidate, for example a tag.
     itemContent?: Snippet<[ComboboxItem]>;
+    // The label is for screen readers only, for example in a side column that names the field with its header.
+    hideLabel?: boolean;
+    // `sm` is the 32px field of the workbench lines (it writes cds--layout--size-sm).
+    size?: 'sm';
   }
 
   const {
@@ -36,6 +40,8 @@
     statusText,
     invalidText,
     itemContent,
+    hideLabel = false,
+    size,
   }: Props = $props();
 
   const inputId = $props.id();
@@ -85,8 +91,8 @@
   }
 </script>
 
-<div class="cds--list-box__wrapper">
-  <label class="cds--label" for={inputId}>{label}</label>
+<div class={['cds--list-box__wrapper', size !== undefined && `cds--layout--size-${size}`]}>
+  <label class={['cds--label', hideLabel && 'cds--visually-hidden']} for={inputId}>{label}</label>
   <Combobox.Root type="single" bind:open bind:value onValueChange={confirmValue} inputValue={text} {items}>
     <div
       class={toComboboxClasses({ open, hasItems: items.length > 0, invalid: invalidText !== undefined })}
