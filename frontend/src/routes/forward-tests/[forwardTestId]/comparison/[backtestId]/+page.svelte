@@ -52,7 +52,7 @@
   }
 </script>
 
-<p class="back-link"><a class="cds--link" href={resolve('/forward-tests')}>All forward tests</a></p>
+<p class="back-link"><a class="cds--link" href={resolve('/forward-tests/[[forwardTestId]]', {})}>All forward tests</a></p>
 <h1>Compare forward test #{forwardTestId} with backtest #{backtestId}</h1>
 
 {#if errorMessage !== ''}

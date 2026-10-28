@@ -194,7 +194,7 @@
       forwardTestMessage = result.message;
       return;
     }
-    await goto(resolve('/forward-tests/[forwardTestId]', { forwardTestId: String(result.forwardTest.id) }));
+    await goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(result.forwardTest.id) }));
   }
 
   function describeForwardTestButton(detail: BacktestDetail): string {

@@ -3,7 +3,8 @@
      Left: the "Strategies" side column with the "New strategy" button. Center: the toolbar line (strategy name, version,
      and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
      splitter between them. The swap button puts the editor on top or at the bottom; the browser keeps the choice.
-     The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
+     Run backtest and Start forward test open the dialogs of the backtest page and the forward test page with the
+     open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
      and Logs. A backtest that ends opens in its tab. The editor panel has the file tab and the code editor. Unsaved
      edits stay in localStorage (drafts of the strategy capability). -->
 <script lang="ts">
@@ -58,7 +59,7 @@
     type StrategyVersion,
   } from '#lib/strategy';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
-  import StartForwardTestDialog from './StartForwardTestDialog.svelte';
+  import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
   import StrategyList from './StrategyList.svelte';
   import StrategyResults from './StrategyResults.svelte';
   import {
@@ -143,9 +144,6 @@
       value: String(version.version_number),
       label: `v${String(version.version_number)}`,
     })),
-  );
-  const openVersionLabel = $derived(
-    strategy === null || openVersion === null ? '' : formatVersionLabel(strategy.name, openVersion.version_number),
   );
   const swapButton = $derived(describeSwapButton(paneOrder));
   const panels = $derived(listWorkbenchPanels(paneOrder));
@@ -587,11 +585,10 @@
 
 <StartForwardTestDialog
   open={isForwardTestDialogOpen}
-  title={`Start forward test of ${openVersionLabel}`}
-  strategyVersionId={openVersion?.id ?? null}
   onOpenChange={(open: boolean) => {
     isForwardTestDialogOpen = open;
   }}
+  strategyVersion={openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id }}
   onStarted={(forwardTest: ForwardTest) => {
     // The socket pushes the list again later. The button shows the running forward test at once.
     forwardTestFeed.forwardTests = [forwardTest, ...forwardTestFeed.forwardTests.filter((item) => item.id !== forwardTest.id)];

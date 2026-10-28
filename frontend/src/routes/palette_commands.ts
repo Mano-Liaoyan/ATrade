@@ -9,7 +9,7 @@ import { createInstrumentHref } from './instrument_href';
 
 /** The id of the start form in the New backtest dialog. The palette opens the dialog and puts the focus in it. */
 export const START_BACKTEST_FORM_ID = 'start-backtest';
-/** The id of the start form on the forward tests page. */
+/** The id of the start form in the New forward test dialog. The palette opens the dialog and puts the focus in it. */
 export const START_FORWARD_TEST_FORM_ID = 'start-forward-test';
 
 const FORM_FIELDS = 'input, select, textarea, button';
@@ -73,14 +73,14 @@ export function createPaletteCommandGroups(watchlistInstruments: WatchlistInstru
         goToPage('Home', resolve('/')),
         goToPage('Strategies', resolve('/strategies')),
         goToPage('Backtests', resolve('/backtests/[[backtestId]]', {})),
-        goToPage('Forward tests', resolve('/forward-tests')),
+        goToPage('Forward tests', resolve('/forward-tests/[[forwardTestId]]', {})),
       ],
     },
     {
       heading: 'Forms',
       commands: [
         openForm('Open the backtest form', resolve('/backtests/[[backtestId]]', {}), START_BACKTEST_FORM_ID),
-        openForm('Open the forward test form', resolve('/forward-tests'), START_FORWARD_TEST_FORM_ID),
+        openForm('Open the forward test form', resolve('/forward-tests/[[forwardTestId]]', {}), START_FORWARD_TEST_FORM_ID),
       ],
     },
   ];

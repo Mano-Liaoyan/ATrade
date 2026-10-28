@@ -181,6 +181,10 @@ test('starts a forward test from the toolbar and stops it with the same button',
     interruptions: [],
   };
   await page.route('**/api/forward-tests', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
     startRequests.push(route.request().postDataJSON());
     sendForwardTests([forwardTest]);
     await route.fulfill({ status: 201, json: forwardTest });
@@ -191,7 +195,9 @@ test('starts a forward test from the toolbar and stops it with the same button',
   });
 
   await page.keyboard.press(`${await readShortcutModifier(page)}+Shift+F`);
-  const dialog = page.getByRole('dialog', { name: `Start forward test of ${name} v1` });
+  const dialog = page.getByRole('dialog', { name: 'New forward test' });
+  // The dialog has the open strategy version.
+  await expect(dialog.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${name} v1`);
   await dialog.getByLabel('Symbol').fill('swt');
   await dialog.getByLabel('Exchange').fill('arca');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
@@ -199,7 +205,7 @@ test('starts a forward test from the toolbar and stops it with the same button',
   await dialog.getByRole('button', { name: 'Start forward test' }).click();
   await expect(dialog).toHaveCount(0);
   expect(startRequests).toEqual([
-    expect.objectContaining({ symbol: 'SWT', exchange: 'ARCA', currency: 'USD', bar_period: '1-MINUTE', end_time_utc: null }),
+    expect.objectContaining({ strategy_version_id: expect.any(Number), symbol: 'SWT', exchange: 'ARCA', currency: 'USD', bar_period: '1-MINUTE', end_time_utc: null }),
   ]);
 
   const stopButton = page.getByRole('button', { name: 'Stop forward test', exact: true });

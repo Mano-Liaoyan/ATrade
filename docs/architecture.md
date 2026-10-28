@@ -353,11 +353,19 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `neutral`; each kind has its own icon shape) and `label`. `Select` takes
   `placeholder` (the trigger text while no item is selected). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
-- The forward test pages use Carbon: the start form uses `Select` and
-  `TextInput`, the list and the fill tables use `DataTable`, and the row
-  `OverflowMenu` has only the actions that apply ("Stop forward test",
-  "Backtest the same period"). A forward test with no action has no menu.
-  The status of a forward test is a `StatusIndicator`
+- The forward test page (`/forward-tests/<id>`, spec #99, ticket
+  [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
+  with the structure of the backtest page: the "Forward tests" `SideColumn`
+  with the live list (`routes/forward-tests/ForwardTestList.svelte`, 32px
+  rows, from `ForwardTestsOnInstrumentsFeed.forwardTests`) and the
+  "New forward test" dialog (form id `start-forward-test`); the forward test
+  panel (header line with the status, the red "Stop forward test" icon button
+  while the forward test can stop, and the "Backtest the same period" icon
+  button; `KeyMetricRow`; `EquityDrawdownChart`, which lists the
+  interruptions under the chart and marks grey the recorded bar ends inside
+  one) over
+  the Fills / Comparison / Logs panel. `/forward-tests` opens the newest
+  forward test. The status of a forward test is a `StatusIndicator`
   (`findForwardTestStatusKind` of `forward_test`).
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
@@ -421,7 +429,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   commands (`palette_commands.ts`): go to a page, go to the instrument page of
   a watchlist instrument, open the start form of a backtest or a forward test
   (the form ids `start-backtest` and `start-forward-test`; the backtest page
-  opens its "New backtest" dialog for `#start-backtest`), and change the
+  opens its "New backtest" dialog for `#start-backtest`, and the forward test
+  page opens its "New forward test" dialog for `#start-forward-test`), and change the
   theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
   opens a page or a form. No command sends a paper order or starts a backtest
   or a forward test. The layout reads the watchlist each time the palette
@@ -590,9 +599,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   The side column is the landmark; its content has no landmark with the same
   name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
-  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
-  same paper account feed; the strategy page reads `forwardTests`, the full
-  list). While a socket is not connected, the panel and
+  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
+  `/ws/forward-tests` feed: `forwardTests`, `onInstruments`, `isConnected`;
+  the forward test page uses it for its list and the strategy page for
+  its Stop forward test button; the home page uses the
+  same paper account feed). While a socket is not connected, the panel and
   the column show `LiveUpdatesNotification`.
 - The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))
   is the account overview workbench. The left `SideColumn` "Watchlist"
@@ -683,8 +694,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   forward test, also in the editor: the editor and its language server
   client use none of these keys (a unit test checks it). Run backtest opens
   the "New backtest" dialog of the backtest page with the open strategy
-  version; Start forward test opens a dialog with the instrument, the live
-  bar period, and the end time. Below the toolbar, a `PanelSplit` has the
+  version; Start forward test opens the "New forward test" dialog of the
+  forward test page with the open strategy version. Below the toolbar, a `PanelSplit` has the
   results panel and the editor panel. The results are on top by default; the
   swap button changes the order, and the browser keeps it
   (`atrade.strategy-page.pane-order`). The results panel has one tab for each
