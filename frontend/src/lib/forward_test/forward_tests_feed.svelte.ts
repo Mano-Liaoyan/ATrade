@@ -10,9 +10,10 @@ import {
 } from './forward_test_api';
 
 export class ForwardTestsOnInstrumentsFeed {
-  /** All forward tests of the last socket message. */
+  /** All forward tests of the last socket message, or of a page change (for example a stop request) after it. */
   forwardTests = $state<ForwardTest[]>([]);
-  onInstruments = $state<{ label: string; symbol: string; exchange: string }[]>([]);
+  /** Follows forwardTests, so that the two fields agree also after a page writes forwardTests. */
+  readonly onInstruments = $derived(listForwardTestsOnInstruments(this.forwardTests));
   isConnected = $state(false);
 
   /** Opens the socket. Returns the stop function, for the return value of an $effect. */
@@ -23,7 +24,6 @@ export class ForwardTestsOnInstrumentsFeed {
         const forwardTests = readForwardTestsMessage(message);
         if (forwardTests !== null) {
           this.forwardTests = forwardTests;
-          this.onInstruments = listForwardTestsOnInstruments(forwardTests);
         }
       },
       onConnectionChange: (isConnected) => {

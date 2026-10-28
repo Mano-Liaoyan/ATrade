@@ -1,13 +1,13 @@
 <!-- Instrument page: a workbench (foundation/workbench, #102) that fills the window below the header.
      Left: the watchlist column. Center: the chart panel (name, last price, change, the bar period switcher, and the
-     bar chart with live bars from /ws/market-data) over the paper account panel (positions, open orders, and filled
+     bar chart with live bars from /ws/market-data) over the paper order panel (positions, open orders, and filled
      orders of today from /ws/paper-trading). Right: the paper order column (InstrumentOrderPanel, IBKR Desktop layout) for the instrument of the page. A watchlist instrument opens here.
      URL: /instruments/<exchange>/<symbol>?currency=<currency>&bar_period=<bar period>. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { ContentSwitcher } from '#lib/foundation/carbon';
+  import { ContentSwitcher, StatusIndicator } from '#lib/foundation/carbon';
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -234,9 +234,9 @@
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
               {:else if barsResult?.kind === 'failed'}
-                <p class="chart-message chart-message--error" role="alert">{barsResult.message}</p>
+                <p class="chart-message" role="alert"><StatusIndicator kind="error" label={barsResult.message} /></p>
               {:else if liveBarErrorText !== null}
-                <p class="chart-message chart-message--error" role="alert">{liveBarErrorText}</p>
+                <p class="chart-message" role="alert"><StatusIndicator kind="error" label={liveBarErrorText} /></p>
               {/if}
             </div>
           </Panel>
@@ -325,10 +325,6 @@
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     color: var(--cds-text-secondary);
-  }
-
-  .chart-message--error {
-    color: var(--cds-text-error);
   }
 
   .account-table {

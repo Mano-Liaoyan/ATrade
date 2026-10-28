@@ -22,7 +22,9 @@
     { header: 'Difference (USD)', align: 'right' },
   ];
 
-  // Prices keep all their decimal places: a difference of less than one cent matters for a fill.
+  // Prices keep all their decimal places: a difference of less than one cent matters for a fill. So this column does
+  // not use formatSignedNumber (2 decimal places); it adds the same "+" to a positive difference. A price difference is
+  // not a gain or a loss, so it has no up or down icon.
   function formatDifference(amount: string | null): string {
     if (amount === null) {
       return NO_FILL;

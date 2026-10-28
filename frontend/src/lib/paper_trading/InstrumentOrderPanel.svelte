@@ -193,7 +193,7 @@
         <p id={blockReasonId} class="message"><StatusIndicator kind={blockReason.kind} label={blockReason.text} /></p>
       {/if}
       {#if formMessage !== null}
-        <p class="message message--error" role="alert">{formMessage}</p>
+        <p class="message" role="alert"><StatusIndicator kind="error" label={formMessage} /></p>
       {/if}
       {#if resultMessage !== null}
         <InlineNotification {...resultMessage} lowContrast onClose={() => (resultMessage = null)} />
@@ -295,10 +295,6 @@
     line-height: var(--cds-body-compact-01-line-height);
     letter-spacing: var(--cds-body-compact-01-letter-spacing);
     color: var(--cds-text-secondary);
-  }
-
-  .message--error {
-    color: var(--cds-text-error);
   }
 
   .confirmation {
