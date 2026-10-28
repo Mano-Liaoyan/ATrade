@@ -121,7 +121,7 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
 
   const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
-  await expect(heading.getByRole('link', { name: COMPARED_STRATEGY_LABEL })).toBeVisible();
+  await expect(heading.getByRole('link', { name: COMPARED_STRATEGY_LABEL })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: 'FTCMP', exact: true })).toHaveAttribute('href', '/instruments/ARCA/FTCMP?currency=USD');
   await expect(heading).toContainText('1 day');
   await expect(chartPanel.getByRole('status', { name: 'Forward test status' })).toHaveText('Stopped');

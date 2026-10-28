@@ -718,7 +718,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     failed read shows its message (`onFailure`, or the failed result in
     `onResult`), and the loop reads again after the interval.
   - Table column names stay on one line. The instrument page has a narrow
-    account panel, so its `PositionTable` and `OpenOrderList` have `compact`:
+    order panel, so its `PositionTable` and `OpenOrderList` have `compact`:
     no Currency and Market price columns, and no Type and Filled columns. The
     symbol cell of both tables shows the exchange in the helper color.
   - Percents have 2 decimal places, also the win rate ("66.67 %").
@@ -738,7 +738,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - The strategy page (`/strategies/<id>`, spec #99, ticket
   [#106](https://github.com/Mano-Liaoyan/ATrade/issues/106)) is a workbench
   like the QuantConnect editor. `/strategies` shows the first strategy of the
-  list. The "Strategies" `SideColumn` lists the strategies (32px rows: name
+  list. `/strategies/<id>/versions/<n>` opens version n (strategy section
+  9.7). The "Strategies" `SideColumn` lists the strategies (32px rows: name
   and latest version) and has the "New strategy" button (a `Dialog` with the
   name). The toolbar line (`PanelHeader`) has the strategy name, the version
   (`Select` size `sm`), and icon buttons with the state in the icon shape

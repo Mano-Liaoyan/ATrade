@@ -1,5 +1,6 @@
 <!-- Strategy page: a workbench (foundation/workbench, spec #99, ticket #106) like the QuantConnect editor. URL:
-     /strategies/<id>; /strategies opens the first strategy of the list.
+     /strategies/<id> opens the latest version; /strategies/<id>/versions/<n> opens version n, and then the address
+     follows the open version; /strategies opens the first strategy of the list.
      Left: the "Strategies" side column with the "New strategy" button. Center: the toolbar line (strategy name, version,
      and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
      splitter between them. The swap button puts the editor on top or at the bottom; the browser keeps the choice.
@@ -23,7 +24,9 @@
   import Save16 from '@carbon/icons/es/save/16.js';
   import StopFilledAlt16 from '@carbon/icons/es/stop--filled--alt/16.js';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
+  import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
   import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
@@ -90,7 +93,11 @@
     type WorkbenchShortcut,
   } from './strategy_workbench';
 
-  const { strategyId }: { strategyId: number | null } = $props();
+  // versionNumber comes from the version address /strategies/<id>/versions/<n>. Without it, the latest version opens.
+  const {
+    strategyId,
+    versionNumber: addressVersionNumber = null,
+  }: { strategyId: number | null; versionNumber?: number | null } = $props();
 
   // The backend refuses a longer name.
   const STRATEGY_NAME_MAX_LENGTH = 100;
@@ -223,7 +230,11 @@
     problems = [];
     selection = { tab: null, backtestId: null };
     if (id !== null) {
-      void loadStrategy(id, null);
+      // The address gives the first version only. A later version change writes the address (openStrategyVersion).
+      void loadStrategy(
+        id,
+        untrack(() => addressVersionNumber),
+      );
     }
   });
 
@@ -252,6 +263,17 @@
     openVersion = result.value;
     editorCode = draft ?? result.value.code;
     problems = [];
+    // On a version address, the address names the open version, so that a reload opens it again. The shallow route
+    // change keeps the workbench state.
+    if (addressVersionNumber !== null) {
+      const href = resolve('/strategies/[strategyId]/versions/[versionNumber]', {
+        strategyId: String(id),
+        versionNumber: String(versionNumber),
+      });
+      if (page.url.pathname !== href) {
+        await goto(href, { state: page.state, shallow: true, replace: true });
+      }
+    }
   }
 
   function changeCode(code: string): void {

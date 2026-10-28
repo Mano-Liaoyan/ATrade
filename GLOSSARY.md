@@ -130,7 +130,9 @@ The user can minimize a panel (only its header line, or a 24px status bar,
 stays) or maximize it (it gets all the height). A panel with a status bar
 (the strategy page "Problems and output" panel) always shows the status bar
 at its bottom. In Chinese, write 面板.
-_Avoid_: pane, card, widget
+_Avoid_: pane, card, widget (in user copy; code and docs can name a part of
+a chart a pane, for example the drawdown pane, and keep the storage key
+`pane-order`)
 
 **Side column**:
 A column at the left or right side of a workbench, for example the watchlist

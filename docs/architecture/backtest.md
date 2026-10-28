@@ -265,7 +265,7 @@ the backtest finishes). Money values and percents are decimal strings.
     icon buttons and the backtest list (section 10.7).
   - The `PanelSplit` has the backtest panel and the "Backtest tables" panel.
     The backtest panel header line has the number, the strategy version (a
-    link to the strategy page), the instrument symbol (a link to the
+    link to that version on the strategy page), the instrument symbol (a link to the
     instrument page), the bar period, the status, and the "Start forward
     test" icon button. The button starts a forward test of the same strategy
     version, instrument, and bar period and opens it. For a bar period that

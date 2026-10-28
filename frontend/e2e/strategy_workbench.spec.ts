@@ -310,3 +310,30 @@ test('a strategy that is not read shows the error in the main area, where no pan
   await expect(page.getByRole('main').getByRole('alert')).toContainText('Strategy not read');
   await expect(page.getByRole('region', { name: 'Results' })).toHaveCount(0);
 });
+
+// A strategy link names one version ("<name> vN") and opens that version, also when the strategy has a later version.
+test('the version address opens that version, not the latest one', async ({ page, request }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Version address');
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const strategy = (await (await request.post('/api/strategies', { data: { name } })).json()) as { id: number };
+  const strategyPath = `/api/strategies/${String(strategy.id)}`;
+  const firstVersion = (await (await request.get(`${strategyPath}/versions/1`)).json()) as { code: string };
+  await request.post(`${strategyPath}/versions`, {
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+    data: { code: `${firstVersion.code}\n# Version 2.\n` },
+  });
+
+  await page.goto(`/strategies/${String(strategy.id)}/versions/1`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v1');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).not.toContainText('# Version 2.');
+
+  // Another version in the toolbar changes the address to that version, so that a reload opens it again.
+  await page.getByRole('combobox', { name: 'Version' }).click();
+  await page.getByRole('option', { name: 'v2' }).click();
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('# Version 2.');
+  await expect(page).toHaveURL(`/strategies/${String(strategy.id)}/versions/2`);
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
+});
