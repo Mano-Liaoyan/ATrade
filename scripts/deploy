@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Deploys one commit of main on the server (docs/architecture.md section 14.2).
+#   scripts/deploy <commit SHA>
+# The deploy workflow (.github/workflows/deploy.yml) calls this script through SSH. The authorized_keys line
+# of the deploy key makes it the forced command, so the key can do nothing else. The SHA then comes in
+# SSH_ORIGINAL_COMMAND.
+set -euo pipefail
+
+# Bash reads a script while it runs it, and git checkout below replaces this file.
+# The function makes Bash read all of the script before the checkout.
+main() {
+  local repo_root commit
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  commit="${1:-${SSH_ORIGINAL_COMMAND:-}}"
+
+  if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+    printf 'ERROR: Give the full 40-character SHA of a commit on main. Got: "%s"\n' "$commit" >&2
+    exit 2
+  fi
+  if [[ ! -f "$repo_root/.env" ]]; then
+    printf 'ERROR: %s/.env not found. Copy .env to the server before the first deployment.\n' "$repo_root" >&2
+    exit 1
+  fi
+
+  cd "$repo_root"
+  git fetch --quiet origin main
+  if ! git merge-base --is-ancestor "$commit" origin/main; then
+    printf 'ERROR: Commit %s is not on origin/main. Only commits of main are deployed.\n' "$commit" >&2
+    exit 1
+  fi
+  git checkout --quiet --detach "$commit"
+  printf 'Deploying %s\n' "$(git log -1 --format='%h %s')"
+  # --wait: Compose waits until the services are running and their health checks pass.
+  exec ./start run --detach --wait
+}
+
+main "$@"
+exit

@@ -216,7 +216,7 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 |---|---|
 | `postgres` | PostgreSQL 18. Volume `atrade-postgres18-data`. Not published outside the Compose network. |
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
-| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
+| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default `127.0.0.1:8000`). Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
 | `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
@@ -237,6 +237,69 @@ permanently.
 docker volume ls | grep -i atrade      # find the old volumes, for example atrade-postgres-data
 docker volume rm <old volume name>
 ```
+
+## Deploy to the server
+
+GitHub Actions deploys each commit of `main` after CI passes
+(`.github/workflows/deploy.yml`). The server builds the images with
+`./start run`. The path from the internet is Cloudflare, then Cloudflare
+Access, then Nginx Proxy Manager (NPM) on another LAN host, then `web` on the
+server. See `docs/architecture.md` section 14.
+
+Do these steps one time. `<checkout>` is the path of the ATrade checkout on
+the server, for example `/srv/atrade`.
+
+1. On the server, as the deploy user (a user that can run `docker`), clone
+   the repository to `<checkout>`:
+   `git clone https://github.com/Mano-Liaoyan/ATrade.git <checkout>`.
+2. Copy `.env` to `<checkout>/.env` with `scp` and run `chmod 600 .env`. In
+   `.env`, set `ATRADE_WEB_BIND_ADDRESS` to the LAN address of the server.
+3. In the firewall of the server, let only the NPM host connect to
+   `ATRADE_WEB_PORT`.
+4. Make a deploy key on your machine:
+   `ssh-keygen -t ed25519 -N '' -C atrade-deploy -f atrade-deploy`.
+   Add this line to `~/.ssh/authorized_keys` of the deploy user, with the
+   content of `atrade-deploy.pub` at the end. The key can then only run the
+   deploy script:
+   `restrict,command="<checkout>/scripts/deploy" ssh-ed25519 AAAA... atrade-deploy`
+5. In GitHub, open Settings > Environments and make the environment
+   `production`. Set its deployment branches to `main` only. Add these
+   environment secrets:
+
+   | Secret | Value |
+   |---|---|
+   | `ATRADE_DEPLOY_HOST` | Address of the server that GitHub runners can reach with SSH. |
+   | `ATRADE_DEPLOY_PORT` | SSH port of the server. |
+   | `ATRADE_DEPLOY_USER` | The deploy user. |
+   | `ATRADE_DEPLOY_SSH_KEY` | Content of the private key `atrade-deploy`. |
+   | `ATRADE_DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -p <port> <host>`. Check the fingerprint against the server. |
+
+   Then delete the private key file from your machine.
+6. In NPM, add a proxy host for the Web host name: scheme `http`, forward
+   host the LAN address of the server, forward port `ATRADE_WEB_PORT`.
+   Turn on "Websockets Support". Use an SSL certificate that Cloudflare
+   accepts in Full (strict) mode, for example a Cloudflare Origin
+   Certificate.
+7. In the firewall of the NPM host, let only the
+   [Cloudflare IP ranges](https://www.cloudflare.com/ips/) connect to port
+   443.
+8. In Cloudflare, proxy the DNS record of the Web host name (orange cloud).
+   Set SSL/TLS to Full (strict).
+9. In Cloudflare Zero Trust:
+   1. Settings > Authentication: add the GitHub identity provider. Log in to
+      GitHub with a passkey.
+   2. Access > Applications: add a self-hosted application for the Web host
+      name. Session duration: 1 month. Identity provider: GitHub only.
+   3. Add one Allow policy with the rule "Emails" set to your email address.
+      Add no other policy. Access then denies all other users.
+10. Run the workflow "Deploy" by hand (Actions > Deploy > Run workflow on
+    `main`). Open the Web host name. Cloudflare Access asks for the GitHub
+    login. After the login, ATrade opens, and the header shows the backend
+    status (WebSocket checks: the bar chart updates, and code completion
+    works).
+
+Each later push to `main` deploys after CI passes. To deploy by hand on the
+server: `<checkout>/scripts/deploy <full commit SHA>`.
 
 ## Check the code
 
@@ -308,6 +371,7 @@ frontend/
   e2e/               # Playwright tests
 deploy/              # compose.yaml, web.Dockerfile
 scripts/check        # the quality gate
+scripts/deploy       # deploys one commit of main on the server
 start                # ./start run
 ```
 
