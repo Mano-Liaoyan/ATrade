@@ -1,0 +1,450 @@
+<!-- Backtest page: a workbench (foundation/workbench, spec #99) with the backtest list and the open backtest on one
+     page, like QuantConnect. URL: /backtests/<id>; /backtests opens the newest backtest.
+     Left: the "Backtests" side column (BacktestList) with the "New backtest" and "Backtest limits" buttons. Center:
+     the panel of the open backtest (header line: number, strategy version, instrument, bar period, status, and the
+     "Start forward test" button; then the key metric row and the equity and drawdown curves on one time axis) over the
+     Trades / Orders / Logs panel. The API has no orders, so Orders is an empty state. Logs shows the strategy error.
+     The list reads again while a backtest in it is queued or running; the open backtest reads again until its status
+     is final. The address #start-backtest (command palette) opens the New backtest dialog. -->
+<script lang="ts">
+  import Add16 from '@carbon/icons/es/add/16.js';
+  import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
+  import Settings16 from '@carbon/icons/es/settings/16.js';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
+  import { navigating, page } from '$app/state';
+  import {
+    BacktestLimitsForm,
+    describeBacktestStatus,
+    EquityDrawdownChart,
+    findBacktestStatusKind,
+    formatUsd,
+    isFinalStatus,
+    KeyMetricRow,
+    listBacktests,
+    readBacktest,
+    type Backtest,
+    type BacktestDetail,
+  } from '#lib/backtest';
+  import {
+    DataTable,
+    Dialog,
+    IconButton,
+    InlineNotification,
+    StatusIndicator,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
+  import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { formatUtcTime } from '#lib/foundation/time_format';
+  import { formatBarPeriod } from '#lib/foundation/value_format';
+  import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
+  import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
+  import { formatVersionLabel } from '#lib/strategy';
+  import { createInstrumentHref } from '../../instrument_href';
+  import { START_BACKTEST_FORM_ID } from '../../palette_commands';
+  import BacktestList from '../BacktestList.svelte';
+  import StartBacktestDialog from '../StartBacktestDialog.svelte';
+
+  // A backtest of a few years of daily bars ends in seconds. One read each second is enough.
+  const STATUS_CHECK_INTERVAL_MILLISECONDS = 1000;
+  const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
+  const START_BACKTEST_HASH = `#${START_BACKTEST_FORM_ID}`;
+
+  const PANELS: PanelSpec[] = [
+    { id: 'chart', minPixels: 160 },
+    { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
+  ];
+  const TRADE_COLUMNS: TableColumn[] = [
+    { header: '#', align: 'right' },
+    { header: 'Time' },
+    { header: 'Side' },
+    { header: 'Quantity', align: 'right' },
+    { header: 'Price (USD)', align: 'right' },
+    { header: 'Commission (USD)', align: 'right' },
+  ];
+  type BacktestTable = 'trades' | 'orders' | 'logs';
+  const TABLE_TABS: { value: BacktestTable; label: string }[] = [
+    { value: 'trades', label: 'Trades' },
+    { value: 'orders', label: 'Orders' },
+    { value: 'logs', label: 'Logs' },
+  ];
+
+  const routeBacktestId = $derived(page.params['backtestId']);
+  const backtestId = $derived(routeBacktestId === undefined ? null : Number(routeBacktestId));
+
+  let backtests: Backtest[] = $state([]);
+  let isListRead = $state(false);
+  let listMessage = $state('');
+  // A new value reads the list again, for example after a new backtest starts.
+  let listReadCount = $state(0);
+  let backtest = $state<BacktestDetail | null>(null);
+  let detailMessage = $state('');
+  let selectedTable: BacktestTable = $state('trades');
+  let isStartDialogOpen = $state(false);
+  let isLimitsDialogOpen = $state(false);
+  let forwardTestMessage = $state('');
+  let isStartingForwardTest = $state(false);
+
+  const shownBacktest = $derived(backtest !== null && backtest.id === backtestId ? backtest : null);
+  // A forward test runs on live bars: the bar period of the backtest must be a live bar period.
+  const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
+
+  $effect(() => {
+    const readNumber = listReadCount;
+    let isActive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function readList(): Promise<void> {
+      const result = await listBacktests(fetch);
+      // A newer read replaced this one.
+      if (!isActive || readNumber !== listReadCount) {
+        return;
+      }
+      isListRead = true;
+      if (result.kind === 'failed') {
+        listMessage = result.message;
+        return;
+      }
+      listMessage = '';
+      backtests = result.value;
+      if (result.value.some((item) => !isFinalStatus(item.status))) {
+        timer = setTimeout(() => void readList(), LIST_CHECK_INTERVAL_MILLISECONDS);
+      }
+    }
+
+    void readList();
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+    };
+  });
+
+  // /backtests opens the newest backtest. The same page component stays, so an open dialog stays open. A navigation
+  // that runs (for example a click on a header link) wins.
+  $effect(() => {
+    if (navigating.to !== null) {
+      return;
+    }
+    const newest = backtests.reduce<Backtest | undefined>(
+      (found, item) => (found === undefined || item.id > found.id ? item : found),
+      undefined,
+    );
+    if (backtestId === null && newest !== undefined) {
+      void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(newest.id) }), {
+        replace: true,
+        reset: false,
+      });
+    }
+  });
+
+  // The open backtest reads again until its status is final.
+  $effect(() => {
+    if (backtestId === null) {
+      return;
+    }
+    let isActive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const id = backtestId;
+    forwardTestMessage = '';
+
+    async function readUntilFinal(): Promise<void> {
+      const result = await readBacktest(fetch, id);
+      if (!isActive) {
+        return;
+      }
+      if (result.kind === 'failed') {
+        detailMessage = result.message;
+      } else {
+        detailMessage = '';
+        backtest = result.value;
+        if (isFinalStatus(result.value.status)) {
+          return;
+        }
+      }
+      timer = setTimeout(() => void readUntilFinal(), STATUS_CHECK_INTERVAL_MILLISECONDS);
+    }
+
+    void readUntilFinal();
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+    };
+  });
+
+  // The command palette goes to #start-backtest.
+  $effect(() => {
+    if (page.url.hash === START_BACKTEST_HASH) {
+      isStartDialogOpen = true;
+    }
+  });
+
+  function changeStartDialog(open: boolean): void {
+    isStartDialogOpen = open;
+    if (!open && page.url.hash === START_BACKTEST_HASH) {
+      // Without the hash, the palette can open the dialog again.
+      // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path, without its hash.
+      void goto(page.url.pathname + page.url.search, { replace: true, reset: false });
+    }
+  }
+
+  function openStartedBacktest(started: Backtest): void {
+    listReadCount += 1;
+    void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(started.id) }));
+  }
+
+  async function startForwardTestFromBacktest(detail: BacktestDetail): Promise<void> {
+    if (isStartingForwardTest) {
+      return;
+    }
+    isStartingForwardTest = true;
+    forwardTestMessage = '';
+    const result = await startForwardTest(fetch, {
+      strategy_version_id: detail.strategy_version_id,
+      symbol: detail.symbol,
+      exchange: detail.exchange,
+      currency: detail.currency,
+      bar_period: detail.bar_period,
+    });
+    isStartingForwardTest = false;
+    if (result.kind === 'failed') {
+      forwardTestMessage = result.message;
+      return;
+    }
+    await goto(resolve('/forward-tests/[forwardTestId]', { forwardTestId: String(result.forwardTest.id) }));
+  }
+
+  function describeForwardTestButton(detail: BacktestDetail): string {
+    if (!hasLiveBarPeriod) {
+      return `Start forward test: not available for ${formatBarPeriod(detail.bar_period)} bars`;
+    }
+    return isStartingForwardTest ? 'Starting forward test…' : 'Start forward test';
+  }
+</script>
+
+<Workbench>
+  <SideColumn label="Backtests" side="start" width="36rem" storageKey="atrade.backtest-page.list-column">
+    {#snippet actions()}
+      <IconButton
+        label="New backtest"
+        icon={Add16}
+        onclick={() => {
+          isStartDialogOpen = true;
+        }}
+      />
+      <IconButton
+        label="Backtest limits"
+        icon={Settings16}
+        onclick={() => {
+          isLimitsDialogOpen = true;
+        }}
+      />
+    {/snippet}
+    <BacktestList {backtests} errorMessage={listMessage} openBacktestId={backtestId} />
+  </SideColumn>
+
+  {#if shownBacktest === null}
+    <div class="empty-main">
+      {#if detailMessage !== ''}
+        <InlineNotification kind="error" title="Backtest not read" subtitle={detailMessage} lowContrast />
+      {:else if isListRead && backtests.length === 0 && listMessage === ''}
+        <p class="empty-word">No backtests</p>
+      {/if}
+    </div>
+  {:else}
+    {@const detail = shownBacktest}
+    <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
+      {#snippet panel(id, state)}
+        {#if id === 'chart'}
+          <Panel {...state} label={`Backtest #${String(detail.id)}`}>
+            {#snippet header()}
+              <h1 class="run-title">
+                <span class="run-number">#{detail.id}</span>
+                <a class="cds--link" href={resolve('/strategies/[strategyId]', { strategyId: String(detail.strategy_id) })}
+                  >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
+                >
+                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                <a class="cds--link" href={createInstrumentHref(detail)}>{detail.symbol}</a>
+                <span class="run-period">{formatBarPeriod(detail.bar_period)}</span>
+              </h1>
+              <span class="run-status" role="status" aria-label="Backtest status">
+                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
+              </span>
+              <span class="run-actions">
+                <IconButton
+                  label={describeForwardTestButton(detail)}
+                  icon={ConnectionSignal16}
+                  disabled={!hasLiveBarPeriod || isStartingForwardTest}
+                  onclick={() => void startForwardTestFromBacktest(detail)}
+                />
+              </span>
+            {/snippet}
+            {#if forwardTestMessage !== ''}
+              <InlineNotification
+                kind="error"
+                title="Forward test not started"
+                subtitle={forwardTestMessage}
+                lowContrast
+                onClose={() => {
+                  forwardTestMessage = '';
+                }}
+              />
+            {/if}
+            {#if detail.metrics === null}
+              <div class="state-area">
+                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
+              </div>
+            {:else}
+              <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} trades={detail.trades} />
+              <div class="chart">
+                <EquityDrawdownChart
+                  curves={[{ name: 'Equity', points: detail.equity_curve, startCapitalUsd: detail.paper_capital_usd }]}
+                  label="Equity and drawdown"
+                  fill
+                />
+              </div>
+            {/if}
+          </Panel>
+        {:else}
+          <Panel
+            {...state}
+            label="Backtest tables"
+            tabs={{
+              label: 'Backtest tables',
+              items: TABLE_TABS,
+              value: selectedTable,
+              onValueChange: (value: string) => {
+                selectedTable = value as BacktestTable;
+              },
+            }}
+          >
+            {#if selectedTable === 'trades'}
+              {#if detail.trades.length === 0}
+                <p class="empty-word">No trades</p>
+              {:else}
+                <ScrollRegion label="Trades" fill>
+                  <DataTable columns={TRADE_COLUMNS} size="sm">
+                    {#snippet rows()}
+                      {#each detail.trades as trade, tradeIndex (tradeIndex)}
+                        <tr>
+                          <th scope="row" align="right">{tradeIndex + 1}</th>
+                          <td>{formatUtcTime(trade.time_utc)}</td>
+                          <td>{trade.side}</td>
+                          <td align="right">{trade.quantity_shares}</td>
+                          <td align="right">{formatUsd(trade.price_usd)}</td>
+                          <td align="right">{formatUsd(trade.commission_usd)}</td>
+                        </tr>
+                      {/each}
+                    {/snippet}
+                  </DataTable>
+                </ScrollRegion>
+              {/if}
+            {:else if selectedTable === 'orders'}
+              <p class="empty-word">No orders</p>
+            {:else if detail.error_message === null}
+              <p class="empty-word">No logs</p>
+            {:else}
+              <ScrollRegion label="Logs" fill>
+                <pre class="log-text">{detail.error_message}</pre>
+              </ScrollRegion>
+            {/if}
+          </Panel>
+        {/if}
+      {/snippet}
+    </PanelSplit>
+  {/if}
+</Workbench>
+
+<StartBacktestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedBacktest} />
+
+<Dialog
+  open={isLimitsDialogOpen}
+  onOpenChange={(open: boolean) => {
+    isLimitsDialogOpen = open;
+  }}
+  title="Backtest limits"
+>
+  {#if isLimitsDialogOpen}
+    <BacktestLimitsForm />
+  {/if}
+</Dialog>
+
+<style>
+  .empty-main {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .run-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--cds-spacing-04);
+  }
+
+  /* One type size in the heading: Carbon links set their own size. */
+  .run-title > :global(*) {
+    font: inherit;
+    letter-spacing: inherit;
+  }
+
+  .run-number {
+    font-variant-numeric: tabular-nums;
+    color: var(--cds-text-secondary);
+  }
+
+  .run-period {
+    color: var(--cds-text-secondary);
+  }
+
+  .run-status {
+    flex: none;
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    white-space: nowrap;
+  }
+
+  .run-actions {
+    display: flex;
+    flex: none;
+    margin-inline-start: auto;
+  }
+
+  /* Start forward test is a blue signal icon (spec #99 toolbar rule); the disabled button has the Carbon disabled color. */
+  .run-actions :global(.atrade-icon-button:not(.cds--btn--disabled) svg) {
+    fill: var(--cds-icon-interactive);
+  }
+
+  .state-area {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--cds-heading-compact-02-font-size);
+    line-height: var(--cds-heading-compact-02-line-height);
+  }
+
+  /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */
+  .chart {
+    position: relative;
+    flex: 1;
+    min-block-size: 0;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+  }
+
+  .empty-word {
+    margin: 0;
+    padding: var(--cds-spacing-05);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    color: var(--cds-text-secondary);
+  }
+
+  .log-text {
+    margin: 0;
+    padding: var(--cds-spacing-05);
+    color: var(--cds-text-error);
+    font-family: var(--cds-code-01-font-family);
+    font-size: var(--cds-code-01-font-size);
+    line-height: var(--cds-code-01-line-height);
+    white-space: pre-wrap;
+  }
+</style>

@@ -21,7 +21,7 @@
   import { Button, DataTable, InlineNotification, type TableColumn } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { formatPercent, formatUsd } from './backtest_format';
+  import { formatMaxDrawdown, formatPercent, formatUsd } from './backtest_format';
   import EquityChart from './EquityChart.svelte';
   import type { TimeInterval } from './interruption_marks';
 
@@ -40,7 +40,7 @@
   const METRIC_ROWS: { name: string; format: (metrics: BacktestMetrics) => string }[] = [
     { name: 'Final equity (USD)', format: (metrics) => formatUsd(metrics.final_equity_usd) },
     { name: 'Total return', format: (metrics) => formatPercent(metrics.total_return_percent) },
-    { name: 'Max drawdown', format: (metrics) => formatPercent(metrics.max_drawdown_percent) },
+    { name: 'Max drawdown', format: (metrics) => formatMaxDrawdown(metrics.max_drawdown_percent).text },
     { name: 'Trades', format: (metrics) => String(metrics.trade_count) },
   ];
   const NO_METRICS = 'No result';

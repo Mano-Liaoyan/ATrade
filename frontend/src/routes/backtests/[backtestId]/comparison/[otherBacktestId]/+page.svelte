@@ -39,7 +39,7 @@
   }
 </script>
 
-<p class="page-back"><a class="cds--link" href={resolve('/backtests')}>All backtests</a></p>
+<p class="page-back"><a class="cds--link" href={resolve('/backtests/[[backtestId]]', {})}>All backtests</a></p>
 <h1>Compare backtests #{firstBacktestId} and #{secondBacktestId}</h1>
 
 {#if errorMessage !== ''}

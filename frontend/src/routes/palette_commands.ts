@@ -7,7 +7,7 @@ import type { PaletteCommand, PaletteCommandGroup } from '#lib/foundation/comman
 import { formatWatchlistInstrument, type WatchlistInstrument } from '#lib/watchlist';
 import { createInstrumentHref } from './instrument_href';
 
-/** The id of the start form on the backtests page. The palette goes to it and puts the focus in it. */
+/** The id of the start form in the New backtest dialog. The palette opens the dialog and puts the focus in it. */
 export const START_BACKTEST_FORM_ID = 'start-backtest';
 /** The id of the start form on the forward tests page. */
 export const START_FORWARD_TEST_FORM_ID = 'start-forward-test';
@@ -72,14 +72,14 @@ export function createPaletteCommandGroups(watchlistInstruments: WatchlistInstru
       commands: [
         goToPage('Home', resolve('/')),
         goToPage('Strategies', resolve('/strategies')),
-        goToPage('Backtests', resolve('/backtests')),
+        goToPage('Backtests', resolve('/backtests/[[backtestId]]', {})),
         goToPage('Forward tests', resolve('/forward-tests')),
       ],
     },
     {
       heading: 'Forms',
       commands: [
-        openForm('Open the backtest form', resolve('/backtests'), START_BACKTEST_FORM_ID),
+        openForm('Open the backtest form', resolve('/backtests/[[backtestId]]', {}), START_BACKTEST_FORM_ID),
         openForm('Open the forward test form', resolve('/forward-tests'), START_FORWARD_TEST_FORM_ID),
       ],
     },

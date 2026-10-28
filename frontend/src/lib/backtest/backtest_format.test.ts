@@ -5,6 +5,7 @@ import {
   convertTimeoutMinutesToSeconds,
   describeBacktestStatus,
   findBacktestStatusKind,
+  formatMaxDrawdown,
   formatPercent,
   formatTimeoutMinutes,
   isFinalStatus,
@@ -52,6 +53,11 @@ describe('formatPercent', () => {
     expect(formatPercent('-1.02')).toBe('-1.02 %');
     expect(formatPercent('0')).toBe('0.00 %');
   });
+
+  it('uses the one sign rule of all pages, with thousands separators', () => {
+    expect(formatPercent('1234.5')).toBe('+1,234.50 %');
+    expect(formatPercent('-0')).toBe('0.00 %');
+  });
 });
 
 describe('formatTimeoutMinutes', () => {
@@ -72,5 +78,17 @@ describe('convertTimeoutMinutesToSeconds', () => {
     expect(convertTimeoutMinutesToSeconds('1.5')).toBeNull();
     expect(convertTimeoutMinutesToSeconds('')).toBeNull();
     expect(convertTimeoutMinutesToSeconds('ten')).toBeNull();
+  });
+});
+
+describe('formatMaxDrawdown', () => {
+  it('shows the max drawdown of the API (a positive percent) as a negative percent on all pages', () => {
+    expect(formatMaxDrawdown('37.71')).toEqual({ text: '-37.71 %', change: -37.71 });
+    expect(formatMaxDrawdown('1234.5')).toEqual({ text: '-1,234.50 %', change: -1234.5 });
+  });
+
+  it('shows a max drawdown of 0 without a sign and without a direction', () => {
+    expect(formatMaxDrawdown('0')).toEqual({ text: '0.00 %', change: 0 });
+    expect(Object.is(formatMaxDrawdown('0.00').change, -0)).toBe(false);
   });
 });
