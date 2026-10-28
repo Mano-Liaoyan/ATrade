@@ -12,37 +12,51 @@ export interface OrderInstrument {
 
 const START_LIMIT_PRICE_DECIMALS = 2;
 
+/** A StatusIndicator kind: the paper account is not read yet, a warning, or an error. */
+export type InstrumentOrderBlockKind = 'in-progress' | 'warning' | 'error';
+
+export interface InstrumentOrderBlock {
+  kind: InstrumentOrderBlockKind;
+  text: string;
+}
+
+// The status kinds of a paper account check that did not pass, as in findPaperAccountCheckKind.
+const FAILED_CHECK_KINDS: Record<'disconnected' | 'failed', InstrumentOrderBlockKind> = {
+  disconnected: 'warning',
+  failed: 'error',
+};
+
 /**
- * Why the order panel cannot send an order, or null. The paper account check must pass, and no forward test can trade
- * the instrument (docs/architecture.md section 12.2). The backend checks both again.
+ * Why the order panel cannot send an order, as a status, or null. The paper account check must pass, and no forward
+ * test can trade the instrument (docs/architecture.md section 12.2). The backend checks both again.
  */
 export function findInstrumentOrderBlock(
   account: PaperAccountMessage | null,
   instrument: OrderInstrument,
   blockingForwardTests: readonly BlockingForwardTest[],
-): string | null {
+): InstrumentOrderBlock | null {
   if (account === null) {
-    return 'Reading the paper account.';
+    return { kind: 'in-progress', text: 'Reading the paper account.' };
   }
-  if (account.check.status !== 'passed' || account.check.actual_accounts[0] === undefined) {
-    return describePaperAccountCheck(account.check).title;
+  const { check } = account;
+  if (check.status !== 'passed') {
+    return { kind: FAILED_CHECK_KINDS[check.status], text: describePaperAccountCheck(check).title };
   }
-  return findOrderBlock({ ...instrument, ...EMPTY_ORDER_FIELDS }, blockingForwardTests);
+  if (check.actual_accounts[0] === undefined) {
+    return { kind: 'error', text: describePaperAccountCheck(check).title };
+  }
+  const forwardTestBlock = findOrderBlock(instrument, blockingForwardTests);
+  return forwardTestBlock === null ? null : { kind: 'warning', text: forwardTestBlock };
 }
 
-const EMPTY_ORDER_FIELDS: Omit<OrderForm, keyof OrderInstrument> = {
-  side: 'BUY',
-  quantity: '',
-  orderType: 'LMT',
-  limitPrice: '',
-  timeInForce: 'DAY',
-};
-
-/** The position of the instrument in the paper account, or null. */
+/** The position of the instrument (symbol, exchange, and currency) in the paper account, or null. */
 export function findInstrumentPosition(account: PaperAccountMessage | null, instrument: OrderInstrument): PaperPosition | null {
   return (
     account?.positions.find(
-      (position) => position.symbol === instrument.symbol && position.exchange === instrument.exchange,
+      (position) =>
+        position.symbol === instrument.symbol &&
+        position.exchange === instrument.exchange &&
+        position.currency === instrument.currency,
     ) ?? null
   );
 }

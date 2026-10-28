@@ -28,24 +28,31 @@ const PASSED = { status: 'passed', message: null, actual_accounts: ['DU1234567']
 
 describe('findInstrumentOrderBlock', () => {
   it('blocks the order while the paper account is not read', () => {
-    expect(findInstrumentOrderBlock(null, AAPL, [])).toBe('Reading the paper account.');
+    expect(findInstrumentOrderBlock(null, AAPL, [])).toEqual({ kind: 'in-progress', text: 'Reading the paper account.' });
   });
 
   it('blocks the order when IB Gateway is not connected', () => {
     const account = makeAccount({ status: 'disconnected', message: null, actual_accounts: [], expected_account: null });
-    expect(findInstrumentOrderBlock(account, AAPL, [])).toBe('Paper account not checked. IB Gateway is not connected.');
+    expect(findInstrumentOrderBlock(account, AAPL, [])).toEqual({
+      kind: 'warning',
+      text: 'Paper account not checked. IB Gateway is not connected.',
+    });
   });
 
   it('blocks the order when the paper account check failed', () => {
     const account = makeAccount({ status: 'failed', message: 'Wrong account.', actual_accounts: ['U1'], expected_account: 'DU1' });
-    expect(findInstrumentOrderBlock(account, AAPL, [])).toBe('Paper account check failed. ATrade sends no orders.');
+    expect(findInstrumentOrderBlock(account, AAPL, [])).toEqual({
+      kind: 'error',
+      text: 'Paper account check failed. ATrade sends no orders.',
+    });
   });
 
   it('blocks the order when a forward test trades the instrument', () => {
     const blocking = [{ label: 'Forward test 7 (Bar count v1)', symbol: 'AAPL', exchange: 'NASDAQ' }];
-    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL, blocking)).toBe(
-      'Forward test 7 (Bar count v1) trades AAPL / NASDAQ. Stop the forward test to send an order by hand.',
-    );
+    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL, blocking)).toEqual({
+      kind: 'warning',
+      text: 'Forward test 7 (Bar count v1) trades AAPL / NASDAQ. Stop the forward test to send an order by hand.',
+    });
   });
 
   it('lets the order go when the check passed and no forward test trades the instrument', () => {
@@ -62,6 +69,7 @@ describe('findInstrumentPosition', () => {
 
   it('gives null without a position or without the account', () => {
     expect(findInstrumentPosition(makeAccount(PASSED, [makePosition('AAPL', 'ARCA', '1')]), AAPL)).toBeNull();
+    expect(findInstrumentPosition(makeAccount(PASSED, [makePosition('AAPL', 'NASDAQ', '1')]), { ...AAPL, currency: 'EUR' })).toBeNull();
     expect(findInstrumentPosition(null, AAPL)).toBeNull();
   });
 });

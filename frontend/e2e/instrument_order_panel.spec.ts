@@ -7,8 +7,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 const PAGE_PATH = '/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR';
 const CHART_NAME = 'Bar chart of 700 / SEHK / HKD, 1-HOUR bars';
 
-function orderPanel(page: Page): Locator {
-  return page.getByRole('form', { name: 'Paper order' });
+function orderPanel(page: Page, symbol = '700'): Locator {
+  return page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
 }
 
 function keyNumber(panel: Locator, name: string): Locator {
@@ -46,7 +46,7 @@ test('the order panel is for the instrument of the page and starts with the last
 
 test('the order panel shows the position of the instrument', async ({ page }) => {
   await page.goto('/instruments/NASDAQ/TEST01?currency=USD');
-  const panel = orderPanel(page);
+  const panel = orderPanel(page, 'TEST01');
 
   await expect(keyNumber(panel, 'Position')).toHaveText('10');
   await expect(keyNumber(panel, 'Average cost')).toHaveText('100.00');
@@ -96,4 +96,23 @@ test('the chart rescales when the order column collapses and opens', async ({ pa
   await page.getByRole('button', { name: 'Open paper order' }).click();
   await expect(orderPanel(page)).toBeVisible();
   await expect.poll(readWidth).toBeLessThan(firstWidth + 1);
+});
+
+test('a failed paper account check disables the button and says why', async ({ page }) => {
+  // The page gets a failed paper account check from a fake /ws/paper-trading socket.
+  await page.routeWebSocket(/\/ws\/paper-trading$/, (socket) => {
+    socket.send(
+      JSON.stringify({
+        type: 'account',
+        check: { status: 'failed', message: 'Wrong account.', actual_accounts: ['U1'], expected_account: 'DU1234567' },
+        balance: null,
+        positions: [],
+      }),
+    );
+  });
+  await openWorkbench(page);
+
+  const button = orderPanel(page).getByRole('button', { name: 'Review buy order' });
+  await expect(button).toBeDisabled();
+  await expect(button).toHaveAccessibleDescription('Paper account check failed. ATrade sends no orders.');
 });

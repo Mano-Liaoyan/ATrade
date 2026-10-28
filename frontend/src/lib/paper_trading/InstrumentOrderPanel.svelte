@@ -4,7 +4,17 @@
      price. A confirmation dialog with the PAPER mark comes before each order. A failed paper account check or a forward
      test on the instrument disables the button, and the panel says why. ATrade sends paper orders only. -->
 <script lang="ts">
-  import { Button, ContentSwitcher, Dialog, InlineNotification, Select, Tag, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
+  import {
+    Button,
+    ContentSwitcher,
+    Dialog,
+    InlineNotification,
+    Select,
+    StatusIndicator,
+    Tag,
+    TextInput,
+    type NotificationMessage,
+  } from '#lib/foundation/carbon';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatPrice, formatSignedNumber } from '#lib/foundation/value_format';
@@ -85,10 +95,14 @@
     }
   });
 
-  const accountId = $derived(account?.check.status === 'passed' ? (account.check.actual_accounts[0] ?? null) : null);
   const blockReason = $derived(findInstrumentOrderBlock(account, instrument, blockingForwardTests));
+  // The paper account that passed the check. The backend checks it again before it sends the order.
+  const accountId = $derived(account?.check.status === 'passed' ? (account.check.actual_accounts[0] ?? null) : null);
   const position = $derived(findInstrumentPosition(account, instrument));
-  const unrealizedPnl = $derived(position === null ? null : Number(position.unrealized_pnl));
+  const unrealizedPnl = $derived.by(() => {
+    const pnl = position === null ? Number.NaN : Number(position.unrealized_pnl);
+    return Number.isFinite(pnl) ? pnl : null;
+  });
   const orderValue = $derived(computeOrderValue(form, lastPrice));
   const isBuy = $derived(form.side === 'BUY');
 
@@ -123,8 +137,7 @@
   }
 </script>
 
-<ScrollRegion label="Paper order form" fill stretchContent>
-  <form class="order-panel" aria-label="Paper order" onsubmit={reviewOrder}>
+<form class="order-panel" aria-label={`Paper order of ${instrument.symbol}`} onsubmit={reviewOrder}>
     <div class="fields">
       <LiveUpdatesNotification {isConnected} />
       <ContentSwitcher
@@ -149,8 +162,6 @@
       <div class="field-pair">
         {#if form.orderType === 'LMT'}
           <TextInput label="Limit price" name="limit_price" inputmode="decimal" class="number" bind:value={form.limitPrice} />
-        {:else}
-          <div></div>
         {/if}
         <Select
           label="Time in force"
@@ -163,6 +174,7 @@
       </div>
     </div>
 
+    <ScrollRegion label="Order and account numbers" fill>
     <dl class="key-numbers">
       <div>
         <dt>Order value</dt>
@@ -189,10 +201,11 @@
         <dd>{formatAmount(account?.balance?.net_liquidation_usd ?? null)}</dd>
       </div>
     </dl>
+    </ScrollRegion>
 
     <div class="submit">
       {#if blockReason !== null}
-        <p id={blockReasonId} class="message">{blockReason}</p>
+        <p id={blockReasonId} class="message"><StatusIndicator kind={blockReason.kind} label={blockReason.text} /></p>
       {/if}
       {#if formMessage !== null}
         <p class="message message--error" role="alert">{formMessage}</p>
@@ -211,8 +224,7 @@
         {isBuy ? 'Review buy order' : 'Review sell order'}
       </Button>
     </div>
-  </form>
-</ScrollRegion>
+</form>
 
 {#if reviewedRequest !== null && accountId !== null}
   <Dialog
@@ -243,12 +255,18 @@
 {/if}
 
 <style>
-  /* The fields at the top and the button at the bottom. The numbers take the space between them. When the column is
-     too low, the whole panel scrolls in its scroll region. */
+  /* The fields at the top and the button at the bottom stay in view. The numbers take the space between them and
+     scroll in their own scroll region. */
   .order-panel {
-    display: flex;
+    display: grid;
     flex: 1;
-    flex-direction: column;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-block-size: 0;
+  }
+
+  /* Time in force stays in the second column also when a market order has no limit price. */
+  .field-pair > :global(:last-child) {
+    grid-column: 2;
   }
 
   .fields {
@@ -270,14 +288,16 @@
     text-align: end;
   }
 
+  .order-panel > :global(.scroll-region) {
+    border-block-start: 1px solid var(--cds-border-subtle-01);
+  }
+
   .key-numbers {
     display: grid;
-    flex: 1;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
     margin: 0;
     padding: 0 var(--cds-spacing-05);
-    border-block-start: 1px solid var(--cds-border-subtle-01);
   }
 
   .key-numbers div {

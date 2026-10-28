@@ -568,12 +568,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   the full-width button "Review buy order" (primary) or "Review sell order"
   (danger). The button opens the confirmation dialog with the PAPER tag and
   "Send paper order". A paper account check that did not pass, or a running
-  forward test on the instrument, disables the button, and the text above it
-  says why (`findInstrumentOrderBlock`). A sent order shows in the Open orders
-  tab from `/ws/paper-trading`. When the column is too low, the whole panel
-  scrolls in one `ScrollRegion` (`stretchContent` keeps the button at the
-  bottom of a high column). The side column is the landmark; its content has
-  no landmark with the same name. The page reads the paper account with `PaperAccountFeed`
+  forward test on the instrument, disables the button, and the status above it
+  says why with a `StatusIndicator` (`findInstrumentOrderBlock`). A sent order
+  shows in the Open orders tab from `/ws/paper-trading`. The fields and the
+  button stay in view; only the numbers scroll, in their own `ScrollRegion`.
+  The side column is the landmark; its content has no landmark with the same
+  name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
   same feeds). While a socket is not connected, the panel and the column
