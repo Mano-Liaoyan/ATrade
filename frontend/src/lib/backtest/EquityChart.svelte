@@ -3,11 +3,7 @@
      in the Carbon interactive color, so the user can tell the curves apart without color. A legend names each curve.
      All colors are Carbon tokens of the current theme (docs/architecture.md section 13).
      Interruptions of a forward test are grey columns behind the curves, and a list names them as text.
-
-     Attribution notice of lightweight-charts (Apache License 2.0):
-     TradingView Lightweight Charts™
-     Copyright (c) 2025 TradingView, Inc. https://www.tradingview.com/
-     The chart shows the TradingView attribution logo, and the text under the chart links to TradingView. -->
+     ChartFrame (foundation/chart_frame) gives the canvas container and the TradingView attribution. -->
 <script module lang="ts">
   import type { EquityPoint } from './backtest_api';
 
@@ -23,14 +19,13 @@
     HistogramSeries,
     LineSeries,
     LineStyle,
-    type ChartOptions,
-    type DeepPartial,
     type HistogramData,
     type IChartApi,
     type ISeriesApi,
     type LineData,
     type UTCTimestamp,
   } from 'lightweight-charts';
+  import { ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
@@ -56,31 +51,12 @@
   const CURVE_STYLES: CurveStyle[] = [FIRST_CURVE_STYLE, { colorVariable: '--cds-interactive', lineStyle: LineStyle.Dashed }];
   const INTERRUPTION_COLOR_VARIABLE = '--cds-layer-accent-01';
 
-  let chartContainer: HTMLDivElement;
+  let chartContainer: HTMLDivElement | undefined = $state();
   // A series with the color token that it uses. A change of the color scheme reads each token again.
   type ColoredSeries = [ISeriesApi<'Line'> | ISeriesApi<'Histogram'>, string];
 
-  function readColor(variableName: string): string {
-    return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
-  }
-
   function convertToTimestamp(timeUtc: string): UTCTimestamp {
     return (Date.parse(timeUtc) / MILLISECONDS_PER_SECOND) as UTCTimestamp;
-  }
-
-  function readThemeOptions(): DeepPartial<ChartOptions> {
-    const gridColor = readColor('--cds-border-subtle-01');
-    return {
-      layout: {
-        background: { color: readColor('--cds-layer-01') },
-        textColor: readColor('--cds-text-secondary'),
-        // IBM Plex Sans from the Carbon reset.
-        fontFamily: getComputedStyle(chartContainer).fontFamily,
-      },
-      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
-      rightPriceScale: { borderColor: gridColor },
-      timeScale: { borderColor: gridColor },
-    };
   }
 
   function addInterruptionColumns(chart: IChartApi): ColoredSeries[] {
@@ -92,7 +68,7 @@
       return [];
     }
     const columnSeries = chart.addSeries(HistogramSeries, {
-      color: readColor(INTERRUPTION_COLOR_VARIABLE),
+      color: readChartColor(chartContainer, INTERRUPTION_COLOR_VARIABLE),
       priceScaleId: INTERRUPTION_PRICE_SCALE_ID,
       lastValueVisible: false,
       priceLineVisible: false,
@@ -111,7 +87,10 @@
   }
 
   $effect(() => {
-    const themeOptions = readThemeOptions();
+    if (chartContainer === undefined) {
+      return;
+    }
+    const themeOptions = readChartThemeOptions(chartContainer);
     const chart = createChart(chartContainer, {
       autoSize: true,
       layout: { ...themeOptions.layout, attributionLogo: true },
@@ -124,7 +103,7 @@
     curves.forEach((curve, curveIndex) => {
       const style = readCurveStyle(curveIndex);
       const lineSeries = chart.addSeries(LineSeries, {
-        color: readColor(style.colorVariable),
+        color: readChartColor(chartContainer, style.colorVariable),
         lineStyle: style.lineStyle,
         title: curve.name,
       });
@@ -137,9 +116,9 @@
     });
     chart.timeScale().fitContent();
     const endColorSchemeWatch = watchColorScheme(() => {
-      chart.applyOptions(readThemeOptions());
+      chart.applyOptions(readChartThemeOptions(chartContainer));
       for (const [series, colorVariable] of coloredSeries) {
-        series.applyOptions({ color: readColor(colorVariable) });
+        series.applyOptions({ color: readChartColor(chartContainer, colorVariable) });
       }
     });
     return () => {
@@ -149,8 +128,7 @@
   });
 </script>
 
-<figure class="equity-chart">
-  <div class="chart-canvas" role="img" aria-label={label} bind:this={chartContainer}></div>
+<ChartFrame {label} height="min(24rem, 50vh)" minHeight="12rem" bind:canvas={chartContainer}>
   {#if curves.length > 1}
     <ul class="legend" aria-label={`${label} legend`}>
       {#each curves as curve, curveIndex (curveIndex)}
@@ -175,24 +153,9 @@
       {/each}
     </ul>
   {/if}
-  <figcaption class="chart-attribution">
-    Chart by <a class="cds--link cds--link--sm" href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
-    Lightweight Charts™
-  </figcaption>
-</figure>
+</ChartFrame>
 
 <style>
-  .equity-chart {
-    margin: 0;
-  }
-
-  .chart-canvas {
-    position: relative;
-    height: min(24rem, 50vh);
-    min-height: 12rem;
-    overflow: hidden;
-  }
-
   .legend,
   .interruptions {
     margin: var(--cds-spacing-03) 0 0;
@@ -232,13 +195,5 @@
     margin-inline-end: var(--cds-spacing-03);
     background: var(--cds-layer-accent-01);
     vertical-align: middle;
-  }
-
-  .chart-attribution {
-    margin-block-start: var(--cds-spacing-03);
-    font-size: var(--cds-helper-text-01-font-size);
-    line-height: var(--cds-helper-text-01-line-height);
-    letter-spacing: var(--cds-helper-text-01-letter-spacing);
-    color: var(--cds-text-secondary);
   }
 </style>

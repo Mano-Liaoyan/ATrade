@@ -1,28 +1,20 @@
 <!-- Account panel: the paper account check, the balance, the positions, the order form, and the open orders,
      updated live from /ws/paper-trading. -->
 <script lang="ts">
-  import { DataTable, StatusIndicator, Tag, type TableColumn } from '#lib/foundation/carbon';
-  import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
-  import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { StatusIndicator, Tag } from '#lib/foundation/carbon';
+  import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import {
     describeBalanceCurrency,
     describePaperAccountCheck,
     findPaperAccountCheckKind,
     formatAmount,
-    PAPER_TRADING_SOCKET_PATH,
-    readPaperAccountMessage,
-    type PaperAccountMessage,
   } from './paper_account';
   import FilledManualOrderList from './FilledManualOrderList.svelte';
   import OpenOrderList from './OpenOrderList.svelte';
-  import {
-    readFilledManualOrders,
-    readOpenOrdersMessage,
-    type BlockingForwardTest,
-    type ManualOrder,
-    type OpenOrder,
-  } from './paper_orders';
+  import { PaperAccountFeed } from './paper_account_feed.svelte';
+  import type { BlockingForwardTest } from './paper_orders';
   import PaperOrderTicket from './PaperOrderTicket.svelte';
+  import PositionTable from './PositionTable.svelte';
 
   interface Props {
     // The forward tests that block orders by hand on their instruments.
@@ -31,62 +23,22 @@
 
   const { blockingForwardTests = [] }: Props = $props();
 
-  const POSITION_COLUMNS: TableColumn[] = [
-    { header: 'Symbol' },
-    { header: 'Exchange' },
-    { header: 'Currency' },
-    { header: 'Quantity', align: 'right' },
-    { header: 'Average cost', align: 'right' },
-    { header: 'Market price', align: 'right' },
-    { header: 'Market value', align: 'right' },
-    { header: 'Unrealized P&L', align: 'right' },
-  ];
+  const feed = new PaperAccountFeed();
+  $effect(() => feed.start(fetch, window.location));
 
-  let account = $state<PaperAccountMessage | null>(null);
-  let isSocketConnected = $state(false);
-  let openOrders = $state<OpenOrder[]>([]);
-  let filledManualOrders = $state<ManualOrder[]>([]);
-
-  // A fill changes the open orders, and the server sends the orders message only after a change.
-  async function refreshFilledManualOrders(): Promise<void> {
-    const orders = await readFilledManualOrders(fetch);
-    if (orders !== null) {
-      filledManualOrders = orders;
-    }
-  }
-
-  const checkDescription = $derived(account === null ? null : describePaperAccountCheck(account.check));
-
-  $effect(() => {
-    return openLiveSocket({
-      url: buildSocketUrl(PAPER_TRADING_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const accountMessage = readPaperAccountMessage(message);
-        if (accountMessage !== null) {
-          account = accountMessage;
-        }
-        const ordersMessage = readOpenOrdersMessage(message);
-        if (ordersMessage !== null) {
-          openOrders = ordersMessage;
-          void refreshFilledManualOrders();
-        }
-      },
-      onConnectionChange: (isConnected) => {
-        isSocketConnected = isConnected;
-      },
-    });
-  });
+  const checkDescription = $derived(feed.account === null ? null : describePaperAccountCheck(feed.account.check));
 </script>
 
 <section class="account-panel" aria-labelledby="account-panel-title">
   <h2 id="account-panel-title">Paper account <Tag label="PAPER" kind="red" size="sm" /></h2>
-  <LiveUpdatesNotification isConnected={isSocketConnected} />
+  <LiveUpdatesNotification isConnected={feed.isConnected} />
 
-  {#if account === null || checkDescription === null}
+  {#if feed.account === null || checkDescription === null}
     <p role="status" aria-label="Paper account check">
       <StatusIndicator kind="in-progress" label="Reading the paper account." />
     </p>
   {:else}
+    {@const account = feed.account}
     <div role="status" aria-label="Paper account check">
       <StatusIndicator kind={findPaperAccountCheckKind(account.check.status)} label={checkDescription.title} />
       {#if checkDescription.detail !== null}
@@ -121,29 +73,7 @@
       </p>
 
       <h3>Positions</h3>
-      {#if account.positions.length === 0}
-        <p>No positions.</p>
-      {:else}
-        {@const positions = account.positions}
-        <ScrollRegion label="Positions" maxHeight="18rem">
-          <DataTable columns={POSITION_COLUMNS} size="sm">
-            {#snippet rows()}
-              {#each positions as position (`${position.symbol}-${position.exchange}-${position.security_type}`)}
-                <tr>
-                  <th scope="row">{position.symbol}</th>
-                  <td>{position.exchange}</td>
-                  <td>{position.currency}</td>
-                  <td align="right">{position.quantity}</td>
-                  <td align="right">{formatAmount(position.average_cost)}</td>
-                  <td align="right">{formatAmount(position.market_price)}</td>
-                  <td align="right">{formatAmount(position.market_value)}</td>
-                  <td align="right">{formatAmount(position.unrealized_pnl)}</td>
-                </tr>
-              {/each}
-            {/snippet}
-          </DataTable>
-        </ScrollRegion>
-      {/if}
+      <PositionTable positions={account.positions} />
     {/if}
 
     {#if account.check.status === 'passed' && account.check.actual_accounts[0] !== undefined}
@@ -152,10 +82,10 @@
     {/if}
 
     <h3>Open orders</h3>
-    <OpenOrderList orders={openOrders} />
+    <OpenOrderList orders={feed.openOrders} />
 
     <h3>Filled orders by hand</h3>
-    <FilledManualOrderList orders={filledManualOrders} />
+    <FilledManualOrderList orders={feed.filledOrders} />
   {/if}
 </section>
 

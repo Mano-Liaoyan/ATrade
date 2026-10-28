@@ -24,6 +24,34 @@ export function formatBarPeriod(barPeriod: string): string {
   return step === '1' ? `${step} ${name}` : `${step} ${name}s`;
 }
 
+const SIGNED_FORMAT = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'exceptZero',
+});
+/** The text of a missing value in a table or on a price line. */
+export const MISSING_VALUE = '–';
+
+/** Up, down, or flat: ChangeText shows each with its own icon and color. */
+export type ChangeDirection = 'up' | 'down' | 'flat';
+
+/** 1.256 gives "+1.26", -1234.5 gives "-1,234.50", 0 gives "0.00". All pages show a change with this sign rule. */
+export function formatSignedNumber(value: number | null): string {
+  return value === null ? MISSING_VALUE : SIGNED_FORMAT.format(value);
+}
+
+/** 1234.5 gives "1,234.50". */
+export function formatPrice(price: number | null): string {
+  return price === null ? MISSING_VALUE : AMOUNT_FORMAT.format(price);
+}
+
+export function findChangeDirection(change: number | null): ChangeDirection {
+  if (change === null || change === 0) {
+    return 'flat';
+  }
+  return change > 0 ? 'up' : 'down';
+}
+
 /** "98765.4" gives "98,765.40". The column or the text names the currency. */
 export function formatAmount(amount: string): string {
   return AMOUNT_FORMAT.format(Number(amount));

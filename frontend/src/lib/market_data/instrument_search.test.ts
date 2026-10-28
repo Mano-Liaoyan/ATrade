@@ -1,6 +1,6 @@
 // Calls GET /api/market-data/instrument-search and turns the answer into results or a message for the search panel.
 import { describe, expect, it } from 'vite-plus/test';
-import { formatInstrument, searchInstruments } from './index';
+import { formatInstrument, isSameInstrument, searchInstruments } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {
   return () => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -68,5 +68,15 @@ describe('searchInstruments', () => {
 describe('formatInstrument', () => {
   it('writes symbol, exchange, and currency', () => {
     expect(formatInstrument({ symbol: '700', exchange: 'SEHK', currency: 'HKD' })).toBe('700 / SEHK / HKD');
+  });
+});
+
+describe('isSameInstrument', () => {
+  it('compares the symbol, the exchange, and the currency', () => {
+    const instrument = { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' };
+
+    expect(isSameInstrument(instrument, { ...instrument })).toBe(true);
+    expect(isSameInstrument(instrument, { ...instrument, exchange: 'ARCA' })).toBe(false);
+    expect(isSameInstrument(instrument, { ...instrument, currency: 'EUR' })).toBe(false);
   });
 });

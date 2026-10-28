@@ -318,7 +318,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `ref`), `TextInput` (`label`, bindable `value`, `invalidText`), `Select`
   (Carbon dropdown on Bits UI Select: `label`, `items`, `value`,
   `onValueChange`), `ContentSwitcher` (on Bits UI Tabs without panels:
-  `label`, `items`, `value`, `onValueChange`), and `Dialog` (Carbon modal on
+  `label`, `items` with an optional `accessibleLabel` for a short name,
+  `value`, `onValueChange`, `size`; size `sm` and `lg` also write
+  `cds--layout--size-<size>`), and `Dialog` (Carbon modal on
   Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
   `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
   the accessible name of the dialog.
@@ -460,7 +462,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   dragged, a click on the track scrolls one page, and the track takes Arrow,
   Page Up, Page Down, Home, and End keys. Use it for each region that can
   overflow (section 13.1).
-  The track and the thumb use Carbon tokens.
+  The track and the thumb use Carbon tokens. With `fill` (no `maxHeight`), the
+  region takes the full height of its parent, for example a workbench panel.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -471,7 +474,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   if it waits for a reconnection. After stop, a message of the closing
   socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
-  TradingView attribution.
+  TradingView attribution. Each chart uses `ChartFrame` of
+  `foundation/chart_frame`: the canvas container (`role="img"`, `label`,
+  bindable `canvas`) and the one attribution line under it ("Chart by
+  TradingView Lightweight Charts™"), so all charts show the same attribution.
+  With `fill`, the frame fills the height of its parent, and the chart
+  (`autoSize`) follows each size change of its container, for example after a
+  side column collapses. Without `fill`, `height` and `minHeight` set the
+  canvas height. `readChartThemeOptions(container)` and
+  `readChartColor(container, token)` of `foundation/chart_frame` read the
+  Carbon tokens for each chart.
 - A chart draws on a canvas and reads the color tokens only when it draws.
   `foundation/color_scheme` has `watchColorScheme(onChange)`. It calls
   `onChange` after a change of `prefers-color-scheme` and after a change of
@@ -483,13 +495,77 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
   borders), `--cds-support-success` (up bars), and `--cds-support-error`
   (down bars).
-- The instrument page (`/instruments/<exchange>/<symbol>`) shows the bar
-  periods as Carbon tabs (`Tabs` of `foundation/carbon`, on Bits UI Tabs).
-  The arrow keys, Home, and End select a bar period at once. The page
-  address keeps the bar period, and the tab keeps the focus. The tab panel
-  has the bar count, the live bar, and the chart. The bars and the live bar
-  of the page belong to one chart request, so the chart gets no data of the
-  previous bar period after a change.
+- Workbench pages (spec [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99),
+  [#102](https://github.com/Mano-Liaoyan/ATrade/issues/102)) fill the window
+  below the header and do not scroll as a page. Each region that can overflow
+  scrolls in itself (`ScrollRegion`). `foundation/workbench` has the shared
+  parts, and each workbench page uses them, so all pages have the same header
+  lines, buttons, and splitter:
+  - `Workbench`: the frame, a row of side columns and panels. When the main
+    region has a workbench (`.atrade-workbench`), the app shell gives it the
+    window height below the header (`:has()`), without padding.
+  - `SideColumn` (`label`, `side` `start` or `end`, `storageKey`, `width`,
+    default 17.5rem): a 32px header line with the name and the Collapse
+    button ("Collapse <label>"). A collapsed column is a 32px wide rail with
+    the Open button ("Open <label>"). The body stays in the page while the
+    column is collapsed, so a form keeps its values.
+  - `PanelSplit` (`storageKey`, `panels`, and the snippet `panel(id,
+    state)`): 2 or more stacked panels. Each `PanelSpec` has `id`,
+    `minPixels`, `defaultPixels` (not for the first panel), and
+    `splitterLabel` (the name of the splitter above it). The first open panel
+    fills the rest of the height; each other open panel has its own height.
+    A `Splitter` shows between 2 open panels while no panel is maximized. The
+    snippet gets a `PanelState` (`size`, `headerOnly`, `onToggleMinimized`,
+    `onToggleMaximized`, `onRestore`) to spread on a `Panel`. Several panels
+    can be minimized, but one panel stays open. One panel at a time is
+    maximized, and the other panels show only their header lines. A second
+    click on the same button restores the panel. Escape restores a maximized
+    panel of the split that has the focus (the innermost split first), or of
+    each split when the focus is outside all splits. `panel_split.ts` has the
+    state as functions with unit tests.
+  - `Panel` (`label`, `PanelState`, and `tabs` or a `header` snippet): a
+    region with a 32px header line and a body that fills the rest. The header
+    line has Carbon tabs (size `sm`) or other content, and at its right end
+    the Minimize and Maximize icon buttons ("Minimize panel", "Maximize
+    panel", "Restore panel"). A double-click on an empty part of the header
+    line toggles Maximize. A tab of a panel that shows only its header line
+    opens the panel again. With a `statusBar` snippet, a minimized panel is a
+    24px status bar (like the VS Code panel), and a control in it calls
+    `onRestore`.
+  - `PanelHeader` (`end` snippet): the 32px header line with the class
+    `atrade-panel-header`. `Splitter` (`label`, `controls`, `value`, `min`,
+    `max`, `onValueChange`): a `role="separator"` (WAI-ARIA window splitter)
+    with `aria-controls` on the panel below it; its value is the height of
+    that panel, Arrow Up and Arrow Down move it 16px, Home gives the panel its
+    minimum height, and End its maximum height.
+  - The browser keeps each layout in `localStorage` (`readStoredLayout`,
+    `writeStoredLayout`). Blocked storage gives the default layout.
+- `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
+  tooltip that gives the action name. `Tabs` takes `size` (`sm` gives the 32px
+  tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
+  `panelClass`.
+- The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
+  The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
+  rows: symbol, last price, and change from the previous close (from the
+  daily bars). A row opens its instrument page with the same bar period. The
+  center `PanelSplit` has the chart panel and the "Paper account" panel. The
+  chart panel header line has the instrument name, the last price, the change
+  from the previous close, and the bar periods as a Carbon `sm` content
+  switcher with short names (1m, 5m, 15m, 30m, 1h, 1D). The arrow keys, Home,
+  and End select a bar period at once. The page address keeps the bar period,
+  and the switcher keeps the focus. The bar chart fills the rest of the panel.
+  The bar count and the live bar are status text for screen readers. The bars
+  and the live bar of the page belong to one chart request, so the chart gets
+  no data of the previous bar period after a change. The "Paper account"
+  panel has the tabs Positions, Open orders, and Filled today, with 32px
+  rows. The right `SideColumn` "Paper order" has the paper order form of the
+  instrument (`PaperOrderTicket` with `instrument`) after a passed account
+  check. The side column is the landmark; its content has no landmark with
+  the same name. The page reads the paper account with `PaperAccountFeed`
+  of `paper_trading` and the running forward tests with
+  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
+  same feeds). While a socket is not connected, the panel and the column
+  show `LiveUpdatesNotification`.
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
   The native checkbox is transparent and covers the label, so a pointer
@@ -531,6 +607,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   v11 reads the button height from that class.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
+  `formatPrice` (1234.5 as "1,234.50") and `formatSignedNumber` (the one sign
+  rule for a change: "+1.26", "-1,234.50", "0.00") show "–" for a missing
+  value. `ChangeText` (`value`, `text`, `label`) shows each up or down change
+  on all pages: the text with an arrow icon and `--cds-support-success` (up)
+  or `--cds-support-error` (down), so the color is never the only sign.
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
 - The app shell header shows the server time and updates it every second:
   the `time_utc` of `GET /api/health` plus the browser time since the answer
