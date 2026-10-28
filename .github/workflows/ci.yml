@@ -46,6 +46,8 @@ jobs:
 
   e2e:
     runs-on: ubuntu-24.04
+    # A normal e2e job takes 10 to 16 minutes. A hang fails the job, so it does not run for hours.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18.3
@@ -69,6 +71,8 @@ jobs:
       - run: vp exec playwright install --with-deps chromium firefox webkit msedge
         working-directory: frontend
       - run: ./scripts/check e2e
+        # The step stops before the job does, so the artifact step below still runs.
+        timeout-minutes: 25
         env:
           ATRADE_PLAYWRIGHT_PROJECTS: chromium firefox webkit msedge
       - uses: actions/upload-artifact@v4
