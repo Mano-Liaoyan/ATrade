@@ -304,6 +304,27 @@ async def select_interruptions(
         return await cursor.fetchall()
 
 
+async def select_interruptions_of_forward_tests(
+    connection: psycopg.AsyncConnection, forward_test_ids: list[int]
+) -> dict[int, list[ForwardTestInterruption]]:
+    """The interruptions of each forward test in one query. A forward test without interruptions has an empty list."""
+    interruptions: dict[int, list[ForwardTestInterruption]] = {
+        forward_test_id: [] for forward_test_id in forward_test_ids
+    }
+    cursor = await connection.execute(
+        """
+        SELECT forward_test_id, reason, started_at_utc, ended_at_utc FROM forward_test_interruption
+        WHERE forward_test_id = ANY(%(ids)s) ORDER BY forward_test_id, started_at_utc, id
+        """,
+        {"ids": forward_test_ids},
+    )
+    for forward_test_id, reason, started_at_utc, ended_at_utc in await cursor.fetchall():
+        interruptions[forward_test_id].append(
+            ForwardTestInterruption(reason=reason, started_at_utc=started_at_utc, ended_at_utc=ended_at_utc)
+        )
+    return interruptions
+
+
 async def write_waiting_for_gateway(
     connection: psycopg.AsyncConnection, *, forward_test_id: int, started_at_utc: datetime
 ) -> None:
