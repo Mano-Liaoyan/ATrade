@@ -74,8 +74,8 @@ async function expectComparisonWorkbench(page: Page, chartPanel: Locator, labels
     await expect(row.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
   }
   await expect(chartPanel.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  const legend = chartPanel.getByRole('list', { name: 'Equity and drawdown legend' });
-  await expect(legend.getByRole('listitem')).toHaveText([firstLabel, secondLabel]);
+  // The name lines with the curve line styles name the curves: the chart has no second legend.
+  await expect(chartPanel.getByRole('list', { name: 'Equity and drawdown legend' })).toHaveCount(0);
 
   const tables = page.getByRole('region', { name: 'Comparison tables' });
   await expect(tables.getByRole('tab', { name: 'Code difference' })).toHaveAttribute('aria-selected', 'true');

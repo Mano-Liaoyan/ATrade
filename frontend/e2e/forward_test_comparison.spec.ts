@@ -57,7 +57,7 @@ test('backtests the same period and compares the metrics, the equity curves, and
   const metrics = page.getByRole('region', { name: 'Compared metrics' });
   await expectComparedMetrics(metrics, forwardTestId);
   await expect(page.getByRole('img', { name: 'Equity and drawdown' })).toBeVisible();
-  await expect(page.getByRole('list', { name: 'Equity and drawdown legend' }).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByRole('list', { name: 'Equity and drawdown legend' })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Equity and drawdown interruptions' }).getByRole('listitem')).toHaveText([
     'Interrupted from 2026-03-21 01:00:00 UTC to 2026-03-24 01:00:00 UTC',
   ]);

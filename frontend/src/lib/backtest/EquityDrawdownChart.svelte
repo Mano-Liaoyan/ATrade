@@ -4,7 +4,8 @@
      drawdown metric (formatMaxDrawdown). It is for the backtest page and, later, for the forward test page and the
      comparison pages:
      - `curves`: one curve, or 2 curves of a comparison. The second curve is dashed in the Carbon interactive color, and a
-       legend names the curves (ChartLegend).
+       legend names the curves (ChartLegend). `showsLegend={false}` hides the legend when the page names the curves
+       with their line styles itself (ComparedKeyMetrics).
      - `interruptions`: grey columns behind the equity curves and a list under the chart (forward tests).
      - New points of the same curves (a live forward test) do not reset the zoom. The chart fits all points only when it
        gets other curves (another name or another first time).
@@ -46,9 +47,10 @@
     label: string;
     interruptions?: readonly TimeInterval[];
     fill?: boolean;
+    showsLegend?: boolean;
   }
 
-  const { curves, label, interruptions = [], fill = false }: Props = $props();
+  const { curves, label, interruptions = [], fill = false, showsLegend = true }: Props = $props();
 
   const EQUITY_PANE_STRETCH = 3;
   const DRAWDOWN_PANE_STRETCH = 1;
@@ -230,5 +232,5 @@
 </script>
 
 <ChartFrame {label} {fill} bind:canvas={chartContainer}>
-  <ChartLegend {label} curveNames={curves.map((curve) => curve.name)} {interruptions} />
+  <ChartLegend {label} curveNames={showsLegend ? curves.map((curve) => curve.name) : []} {interruptions} />
 </ChartFrame>

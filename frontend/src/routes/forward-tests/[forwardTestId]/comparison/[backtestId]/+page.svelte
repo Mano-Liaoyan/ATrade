@@ -180,6 +180,7 @@
               <EquityDrawdownChart
                 curves={comparedCurves}
                 label="Equity and drawdown"
+                showsLegend={false}
                 interruptions={compared.interruptions}
                 fill
               />

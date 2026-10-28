@@ -268,9 +268,14 @@ Implementation (#77):
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
     `GET /api/forward-tests/{id}/comparison/{backtest_id}` every 2 seconds
-    until the backtest has a final status. It shows the backtest status, the
-    `ComparisonView` of `#lib/backtest` (no code diff: the same strategy
-    version), and the fill table.
+    until the backtest has a final status, with the forward test fills and
+    the backtest trades (for the win rates). It is a workbench (spec #99,
+    #109): the "Forward tests" side column, the comparison panel (header
+    line with the backtest status, `ComparedKeyMetrics` and
+    `EquityDrawdownChart` of `#lib/backtest`; no code diff: the same strategy
+    version) over the Fills / Logs panel (the fill table, and the backtest
+    error). The win rate of the forward test counts only the fills in the
+    backtest period.
   - Metrics: `calculate_metrics` with `start_balance_usd`, the recorded
     equity points, and the number of recorded fills.
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
@@ -283,7 +288,7 @@ Implementation (#77):
     be one row later than the live fill.
   - Grey marks: the interruptions of `forward_test_interruption` (section
     12.7, #77). An interruption that still lasts ends at the stop, or now.
-    `EquityChart` draws a grey column (a `HistogramSeries` on a hidden price
+    `EquityDrawdownChart` draws a grey column (a `HistogramSeries` on a hidden price
     scale, below the curves) at each bar end after the interruption start
     up to its end, and lists each interruption as text under the chart.
 

@@ -1,7 +1,7 @@
 <!-- The key metrics of 2 compared tests (backtests or a forward test and a backtest), one KeyMetricRow for each test, so
-     the same metrics stand in the same columns (spec #99). The name of each test starts its line: a link to the test
-     with the line style of its curve in the equity and drawdown chart (readCurveStyle). The region is
-     "Compared metrics"; each row is "Metrics of <name>". -->
+     the same metrics stand in the same columns with the full width of the backtest page row (spec #99). A line with the
+     name of the test is above its row: a link to the test with the line style of its curve in the equity and drawdown
+     chart (readCurveStyle). The region is "Compared metrics"; each row is "Metrics of <name>". -->
 <script lang="ts">
   import { LineStyle } from 'lightweight-charts';
   import { readCurveStyle } from './chart_series';
@@ -13,7 +13,7 @@
 
 <section class="compared-metrics" aria-label="Compared metrics">
   {#each tests as test, testIndex (test.href)}
-    <div class="cds--tile test-name">
+    <div class="test-name">
       <span
         class="curve-line"
         class:dashed={readCurveStyle(testIndex).lineStyle === LineStyle.Dashed}
@@ -34,22 +34,19 @@
 </section>
 
 <style>
-  /* The name column has one width for both lines, so the tiles of both rows stand in the same columns. */
   .compared-metrics {
-    display: grid;
+    display: flex;
     flex: none;
-    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
-    background: var(--cds-border-subtle-01);
-    column-gap: 1px;
+    flex-direction: column;
   }
 
   .test-name {
     display: flex;
     align-items: center;
     gap: var(--cds-spacing-03);
-    min-block-size: 0;
     min-inline-size: 0;
-    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+    padding: var(--cds-spacing-02) var(--cds-spacing-05);
+    background: var(--cds-layer-01);
     border-block-end: 1px solid var(--cds-border-subtle-01);
   }
 
