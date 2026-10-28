@@ -73,4 +73,37 @@ describe('readKeyMetrics', () => {
 
     expect(tiles[3]?.text).toBe('0.0 %');
   });
+
+  it('gives the same names with dashes for a test without a result', () => {
+    const tiles = readKeyMetrics({ metrics: null, startCapitalUsd: '100000', trades: [] });
+
+    expect(tiles).toEqual([
+      { name: 'Total return', text: '–' },
+      { name: 'Net profit (USD)', text: '–' },
+      { name: 'Max drawdown', text: '–' },
+      { name: 'Win rate', text: '–' },
+      { name: 'Trades', text: '–' },
+      { name: 'Final equity (USD)', text: '–' },
+    ]);
+  });
+
+  it('counts only the trades in the period', () => {
+    const trades = [
+      { ...trade('BUY', '1', '100', '0'), time_utc: '2024-01-01T00:00:00Z' },
+      { ...trade('SELL', '1', '90', '0'), time_utc: '2024-01-02T00:00:00Z' },
+      { ...trade('BUY', '1', '100', '0'), time_utc: '2024-01-03T00:00:00Z' },
+      { ...trade('SELL', '1', '110', '0'), time_utc: '2024-01-04T00:00:00Z' },
+      { ...trade('BUY', '1', '100', '0'), time_utc: '2024-01-05T00:00:00Z' },
+      { ...trade('SELL', '1', '90', '0'), time_utc: '2024-01-06T00:00:00Z' },
+    ];
+
+    const tiles = readKeyMetrics({
+      metrics: METRICS,
+      startCapitalUsd: '100000',
+      trades,
+      period: { start_utc: '2024-01-03T00:00:00Z', end_utc: '2024-01-04T00:00:00Z' },
+    });
+
+    expect(tiles[3]?.text).toBe('100.0 %');
+  });
 });

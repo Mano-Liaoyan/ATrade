@@ -1,6 +1,6 @@
 <!-- Read-only side-by-side diff of two Python texts: @codemirror/merge. It has no domain meaning (docs/architecture.md
      section 13). Long unchanged parts are collapsed and long lines wrap. The diff scrolls inside a ScrollRegion, which
-     draws its own track in all browsers (section 13.1). -->
+     draws its own track in all browsers (section 13.1). With `fill`, it fills its parent (a workbench panel). -->
 <script lang="ts">
   import { MergeView } from '@codemirror/merge';
   import { python } from '@codemirror/lang-python';
@@ -16,9 +16,11 @@
     secondLabel: string;
     /** Collapse long unchanged parts. Turn it off to show all code, for example when both sides are the same. */
     collapseUnchanged?: boolean;
+    /** Fill the height of the parent (a workbench panel) and scroll in it, instead of a maximum height. */
+    fill?: boolean;
   }
 
-  const { firstCode, secondCode, firstLabel, secondLabel, collapseUnchanged = true }: Props = $props();
+  const { firstCode, secondCode, firstLabel, secondLabel, collapseUnchanged = true, fill = false }: Props = $props();
 
   let container: HTMLDivElement;
 
@@ -50,20 +52,34 @@
   });
 </script>
 
-<div class="code-diff">
+<div class={['code-diff', fill && 'code-diff--fill']}>
   <div class="diff-labels" aria-hidden="true">
     <span>{firstLabel}</span>
     <span>{secondLabel}</span>
   </div>
-  <ScrollRegion label="Code difference" maxHeight="min(32rem, 60vh)">
-    <div class="diff-view" bind:this={container}></div>
-  </ScrollRegion>
+  <div class="diff-body">
+    <ScrollRegion label="Code difference" maxHeight="min(32rem, 60vh)" {fill}>
+      <div class="diff-view" bind:this={container}></div>
+    </ScrollRegion>
+  </div>
 </div>
 
 <style>
   .code-diff {
     border: 1px solid var(--cds-border-subtle-01);
     background: var(--cds-layer-01);
+  }
+
+  .code-diff--fill {
+    display: flex;
+    flex-direction: column;
+    block-size: 100%;
+    border: 0;
+  }
+
+  .code-diff--fill .diff-body {
+    flex: 1;
+    min-block-size: 0;
   }
 
   .diff-labels {

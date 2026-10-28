@@ -338,26 +338,22 @@ section 9.5.
   differ in the instrument, the period, or the paper capital. Their code diff
   is empty.
 - The page `/backtests/<id>/comparison/<other id>` reads
-  `compareBacktests()` and shows `ComparisonView`. The backtest with the
-  lower ID is first.
-- `ComparisonView` (`frontend/src/lib/backtest/ComparisonView.svelte`) is the
-  comparison view for backtests and forward tests (section 12.10). Its
-  properties:
-
-  | Property | Type | Meaning |
-  |---|---|---|
-  | `first`, `second` | `ComparedRun`: `{label, metrics, equityCurve}` | `metrics` is `BacktestMetrics` or `null` (shown as "No result"). `equityCurve` is a list of `EquityPoint`. |
-  | `code` | `ComparedCode`: `{firstCode, secondCode}`, optional | Shows the code diff. Leave it out when both runs use the same strategy version. |
-
-  It shows the code diff (`CodeDiff` of `#lib/foundation/code_editor`,
-  read-only `@codemirror/merge` with wrapped lines, unchanged lines collapsed
-  to the changed parts and 3 lines around them, in a `ScrollRegion` named
-  "Code difference"), the metric table (in a `ScrollRegion` named "Compared
-  metrics"), and both equity curves on one chart.
-- When `firstCode` and `secondCode` are the same (two backtests of the same
-  strategy version), the view shows the status "Same strategy version: no code
-  difference." in place of the diff. A closed "Show the code" disclosure shows
-  the full code without collapsed lines.
-- `EquityChart` takes `curves: [{name, points}]`. The first curve is a solid
-  line in `--cds-text-primary`, the second a dashed line in `--cds-interactive`. With
-  more than one curve, a legend names each curve.
+  `compareBacktests()` and shows a workbench (spec #99, #109): the
+  "Backtests" side column (both compared rows marked), the comparison panel
+  over the "Comparison tables" panel. The backtest with the lower ID is
+  first.
+- The comparison panel shows `ComparedKeyMetrics` of `#lib/backtest` (region
+  "Compared metrics": one `KeyMetricRow` "Metrics of <name>" for each
+  backtest, the same metrics and formats as the backtest page, and a line
+  above it with the curve line style and a link to the backtest) and
+  `EquityDrawdownChart` with both equity and drawdown curves on one time
+  axis. The first curve is a solid line in `--cds-text-primary`, the second a
+  dashed line in `--cds-interactive`.
+- The Code difference tab shows the code diff (`CodeDiff` of
+  `#lib/foundation/code_editor` with `fill`, read-only `@codemirror/merge`
+  with wrapped lines, unchanged lines collapsed to the changed parts and 3
+  lines around them, in a `ScrollRegion` named "Code difference").
+- When both backtests have the same code (the same strategy version), the
+  tab shows the status "Same strategy version: no code difference." in place
+  of the diff. A closed "Show the code" disclosure shows the full code
+  without collapsed lines.

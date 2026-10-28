@@ -1,6 +1,6 @@
 <!-- The fills of a forward test and of the backtest of the same period, one row for each bar and side
      (docs/architecture/forward_test.md section 12.10). A fill belongs to the last bar that ended before it.
-     The difference is the forward test price minus the backtest price. The table scrolls inside its own region. -->
+     The difference is the forward test price minus the backtest price. The table fills its parent (a workbench panel) and scrolls inside its own region. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
   import { formatUtcTime } from '#lib/foundation/time_format';
@@ -32,9 +32,9 @@
 </script>
 
 {#if fills.length === 0}
-  <p>No fill on either side.</p>
+  <p class="empty-word">No fills</p>
 {:else}
-  <ScrollRegion label="Compared fills" maxHeight="min(20rem, 45vh)">
+  <ScrollRegion label="Compared fills" fill>
     <div class="fill-comparison">
       <DataTable columns={COLUMNS} size="sm">
         {#snippet rows()}
@@ -56,8 +56,12 @@
 {/if}
 
 <style>
-  p {
+  .empty-word {
     margin: 0;
+    padding: var(--cds-spacing-05);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    color: var(--cds-text-secondary);
   }
 
   /* A long value can break anywhere. A column name breaks only between words. */
