@@ -1,15 +1,14 @@
 <!-- Instrument page: a workbench (foundation/workbench, #102) that fills the window below the header.
      Left: the watchlist column. Center: the chart panel (name, last price, change, the bar period switcher, and the
      bar chart with live bars from /ws/market-data) over the paper account panel (positions, open orders, and filled
-     orders of today from /ws/paper-trading). Right: the paper order column. A watchlist instrument opens here.
+     orders of today from /ws/paper-trading). Right: the paper order column (InstrumentOrderPanel, IBKR Desktop layout) for the instrument of the page. A watchlist instrument opens here.
      URL: /instruments/<exchange>/<symbol>?currency=<currency>&bar_period=<bar period>. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { ContentSwitcher, StatusIndicator } from '#lib/foundation/carbon';
+  import { ContentSwitcher } from '#lib/foundation/carbon';
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
-  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { ForwardTestsOnInstrumentsFeed } from '#lib/forward_test';
@@ -30,15 +29,7 @@
     type BarsResult,
     type DayQuote,
   } from '#lib/market_data';
-  import {
-    describePaperAccountCheck,
-    FilledManualOrderList,
-    findPaperAccountCheckKind,
-    OpenOrderList,
-    PaperAccountFeed,
-    PaperOrderTicket,
-    PositionTable,
-  } from '#lib/paper_trading';
+  import { FilledManualOrderList, InstrumentOrderPanel, OpenOrderList, PaperAccountFeed, PositionTable } from '#lib/paper_trading';
   import InstrumentWatchlist from './InstrumentWatchlist.svelte';
 
   const chartRequest = $derived(readChartRequest(page.params, page.url.searchParams));
@@ -282,25 +273,13 @@
     </PanelSplit>
 
     <SideColumn label="Paper order" side="end" width="20rem" storageKey="atrade.instrument-page.order-column">
-      <ScrollRegion label="Paper order form" fill>
-        <div class="order-column">
-          <LiveUpdatesNotification isConnected={accountFeed.isConnected && forwardTestsFeed.isConnected} />
-          {#if account === null}
-            <StatusIndicator kind="in-progress" label="Reading the paper account." />
-          {:else if account.check.status === 'passed' && account.check.actual_accounts[0] !== undefined}
-            <PaperOrderTicket
-              accountId={account.check.actual_accounts[0]}
-              blockingForwardTests={forwardTestsFeed.onInstruments}
-              instrument={chartRequest.instrument}
-            />
-          {:else}
-            <StatusIndicator
-              kind={findPaperAccountCheckKind(account.check.status)}
-              label={describePaperAccountCheck(account.check).title}
-            />
-          {/if}
-        </div>
-      </ScrollRegion>
+      <InstrumentOrderPanel
+        isConnected={accountFeed.isConnected && forwardTestsFeed.isConnected}
+        instrument={chartRequest.instrument}
+        {lastPrice}
+        {account}
+        blockingForwardTests={forwardTestsFeed.onInstruments}
+      />
     </SideColumn>
   </Workbench>
 {/if}
@@ -366,12 +345,5 @@
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     color: var(--cds-text-secondary);
-  }
-
-  .order-column {
-    display: flex;
-    flex-direction: column;
-    gap: var(--cds-spacing-05);
-    padding: var(--cds-spacing-05);
   }
 </style>

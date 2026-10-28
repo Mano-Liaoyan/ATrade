@@ -1,6 +1,7 @@
 <!-- A region that scrolls inside itself, with an app-owned track and thumb. Safari can hide native scrollbars, so the
      region hides them in all browsers and draws its own (docs/architecture.md section 13.1).
-     With `fill`, the region takes the full height of its parent (a workbench panel) and scrolls in it. -->
+     With `fill`, the region takes the full height of its parent (a workbench panel) and scrolls in it.
+     With `stretchContent`, the content is at least as high as the viewport, so it can put a control at the bottom. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { computeScrollThumb, computeScrollTopForThumbTop, type ScrollThumb } from './scroll_thumb';
@@ -10,10 +11,12 @@
     /** The maximum height of the viewport. Not used with `fill`. */
     maxHeight?: string;
     fill?: boolean;
+    /** The content is at least as high as the viewport. */
+    stretchContent?: boolean;
     children: Snippet;
   }
 
-  const { label, maxHeight, fill = false, children }: Props = $props();
+  const { label, maxHeight, fill = false, stretchContent = false, children }: Props = $props();
 
   // One arrow key press scrolls this far, like a mouse wheel step.
   const ARROW_KEY_STEP_PIXELS = 40;
@@ -114,7 +117,7 @@
     bind:this={viewport}
     onscroll={measureScroll}
   >
-    <div bind:this={content}>
+    <div class={['scroll-content', stretchContent && 'scroll-content--stretch']} bind:this={content}>
       {@render children()}
     </div>
   </div>
@@ -161,6 +164,13 @@
     min-width: 0;
     overflow-y: auto;
     scrollbar-width: none;
+  }
+
+  .scroll-content--stretch {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    min-block-size: 100%;
   }
 
   .scroll-viewport::-webkit-scrollbar {

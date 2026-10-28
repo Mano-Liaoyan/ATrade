@@ -1,8 +1,9 @@
 // Public entry of paper_trading: the account panel with the paper account check, the balance, the positions,
 // the paper order form, the open orders, and the paper capital for the backtest form. The workbench of the instrument
-// page uses the order form and the tables on their own.
+// page uses the tables on their own and the instrument order panel (IBKR Desktop layout).
 export { default as PaperAccountPanel } from './PaperAccountPanel.svelte';
 export { default as PaperOrderTicket } from './PaperOrderTicket.svelte';
+export { default as InstrumentOrderPanel } from './InstrumentOrderPanel.svelte';
 export { default as PositionTable } from './PositionTable.svelte';
 export { default as OpenOrderList } from './OpenOrderList.svelte';
 export { default as FilledManualOrderList } from './FilledManualOrderList.svelte';
