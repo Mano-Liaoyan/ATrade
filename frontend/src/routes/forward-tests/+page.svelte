@@ -3,7 +3,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
+  import { formatMaxDrawdown, formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
   import { Button, InlineNotification, Select, TextInput, type NotificationMessage, type SelectItem } from '#lib/foundation/carbon';
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { formatBarPeriod } from '#lib/foundation/value_format';
@@ -202,7 +202,7 @@
       <p>
         Latest backtest #{latestBacktest.id} ({latestBacktest.symbol}, {formatBarPeriod(latestBacktest.bar_period)}): total
         return {formatPercent(latestBacktest.metrics.total_return_percent)}, max drawdown
-        {formatPercent(latestBacktest.metrics.max_drawdown_percent)}, {latestBacktest.metrics.trade_count} trades, final
+        {formatMaxDrawdown(latestBacktest.metrics.max_drawdown_percent).text}, {latestBacktest.metrics.trade_count} trades, final
         equity {formatUsd(latestBacktest.metrics.final_equity_usd)} USD.
       </p>
     {/if}

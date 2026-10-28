@@ -86,6 +86,8 @@
   let isStartingForwardTest = $state(false);
 
   const shownBacktest = $derived(backtest !== null && backtest.id === backtestId ? backtest : null);
+  // A forward test runs on live bars: the bar period of the backtest must be a live bar period.
+  const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
 
   $effect(() => {
     const readNumber = listReadCount;
@@ -212,7 +214,7 @@
   }
 
   function describeForwardTestButton(detail: BacktestDetail): string {
-    if (!isLiveBarPeriod(detail.bar_period)) {
+    if (!hasLiveBarPeriod) {
       return `Start forward test: not available for ${formatBarPeriod(detail.bar_period)} bars`;
     }
     return isStartingForwardTest ? 'Starting forward test…' : 'Start forward test';
@@ -271,7 +273,7 @@
                 <IconButton
                   label={describeForwardTestButton(detail)}
                   icon={ConnectionSignal16}
-                  disabled={!isLiveBarPeriod(detail.bar_period) || isStartingForwardTest}
+                  disabled={!hasLiveBarPeriod || isStartingForwardTest}
                   onclick={() => void startForwardTestFromBacktest(detail)}
                 />
               </span>
@@ -295,8 +297,7 @@
               <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} trades={detail.trades} />
               <div class="chart">
                 <EquityDrawdownChart
-                  points={detail.equity_curve}
-                  startCapitalUsd={detail.paper_capital_usd}
+                  curves={[{ name: 'Equity', points: detail.equity_curve, startCapitalUsd: detail.paper_capital_usd }]}
                   label="Equity and drawdown"
                   fill
                 />

@@ -46,6 +46,16 @@ export function formatPercent(percent: string): string {
   return `${formatSignedNumber(Number(percent))} %`;
 }
 
+/**
+ * The one sign rule of the max drawdown on all pages (spec #99): the API gives a positive percent ("37.71"), the pages
+ * show a loss as a negative percent ("-37.71 %"). `change` is the signed number for ChangeText or MetricTile; 0 stays 0.
+ */
+export function formatMaxDrawdown(maxDrawdownPercent: string): { text: string; change: number } {
+  const drawdown = Number(maxDrawdownPercent);
+  const change = drawdown === 0 ? 0 : -drawdown;
+  return { text: formatPercent(String(change)), change };
+}
+
 export function formatUsd(amount: string): string {
   return AMOUNT_FORMAT.format(Number(amount));
 }

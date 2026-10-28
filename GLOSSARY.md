@@ -61,6 +61,19 @@ functions. All pages show the same key metrics in the same order, and show
 the max drawdown as a negative percent.
 _Avoid_: statistic, KPI
 
+**Round trip**:
+The trades of a test from a position of 0 back to a position of 0.
+_Avoid_: closed trade
+
+**Win rate**:
+The share of round trips with a profit after commissions.
+_Avoid_: hit rate
+
+**Net profit**:
+The final equity of a test minus its start capital (the paper capital of a
+backtest, or the start balance of a forward test).
+_Avoid_: PnL
+
 **Forward test**:
 A test of a strategy that runs automatically on live market data and sends
 orders to a paper account.

@@ -12,7 +12,10 @@ function isInInterval(timeMilliseconds: number, interval: TimeInterval): boolean
 }
 
 /** The bar ends of the curves after an interruption start, up to and with its end. Sorted, each one time. */
-export function findInterruptedTimes(curves: EquityPoint[][], interruptions: TimeInterval[]): string[] {
+export function findInterruptedTimes(
+  curves: readonly (readonly Pick<EquityPoint, 'time_utc'>[])[],
+  interruptions: readonly TimeInterval[],
+): string[] {
   const timesByMilliseconds = new Map<number, string>();
   for (const point of curves.flat()) {
     const timeMilliseconds = Date.parse(point.time_utc);

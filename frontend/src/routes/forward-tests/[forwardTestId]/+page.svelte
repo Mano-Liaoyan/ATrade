@@ -5,7 +5,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { describeBacktestStatus, EquityChart, formatPercent, formatUsd, type TimeInterval } from '#lib/backtest';
+  import { describeBacktestStatus, EquityChart, formatMaxDrawdown, formatPercent, formatUsd, type TimeInterval } from '#lib/backtest';
   import { Button, DataTable, InlineNotification, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
@@ -186,7 +186,7 @@
       </div>
       <div>
         <dt>Max drawdown</dt>
-        <dd class="number">{formatPercent(detail.metrics.max_drawdown_percent)}</dd>
+        <dd class="number">{formatMaxDrawdown(detail.metrics.max_drawdown_percent).text}</dd>
       </div>
       <div>
         <dt>Trades</dt>

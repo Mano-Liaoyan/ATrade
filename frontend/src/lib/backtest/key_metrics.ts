@@ -3,7 +3,7 @@
 // The API has no win rate: it comes from the trades here. The API has no Sharpe ratio, so the row has none.
 import { formatSignedNumber, MISSING_VALUE } from '#lib/foundation/value_format';
 import type { BacktestMetrics } from './backtest_api';
-import { formatPercent, formatUsd } from './backtest_format';
+import { formatMaxDrawdown, formatPercent, formatUsd } from './backtest_format';
 
 /** A trade or a fill: backtest trades and forward test fills have these fields. */
 export interface TestTrade {
@@ -58,13 +58,10 @@ function computeWinRate(trades: readonly TestTrade[]): string {
 export function readKeyMetrics({ metrics, startCapitalUsd, trades }: KeyMetricInput): KeyMetric[] {
   const totalReturn = Number(metrics.total_return_percent);
   const netProfit = startCapitalUsd === null ? null : Number(metrics.final_equity_usd) - Number(startCapitalUsd);
-  // A max drawdown of 0 stays 0, not -0, so the tile shows no sign and no direction.
-  const drawdown = Number(metrics.max_drawdown_percent);
-  const maxDrawdown = drawdown === 0 ? 0 : -drawdown;
   return [
     { name: 'Total return', text: formatPercent(metrics.total_return_percent), change: totalReturn },
     { name: 'Net profit (USD)', text: formatSignedNumber(netProfit), change: netProfit },
-    { name: 'Max drawdown', text: formatPercent(String(maxDrawdown)), change: maxDrawdown },
+    { name: 'Max drawdown', ...formatMaxDrawdown(metrics.max_drawdown_percent) },
     { name: 'Win rate', text: computeWinRate(trades) },
     { name: 'Trades', text: String(metrics.trade_count) },
     { name: 'Final equity (USD)', text: formatUsd(metrics.final_equity_usd) },

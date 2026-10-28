@@ -1,6 +1,7 @@
 <!-- One metric as a Carbon tile in a MetricRow: the name and the value. With `change`, the value is a ChangeText: its
      sign gives the direction, shown with an arrow icon and the Carbon support color, so the color is never the only
-     sign (AGENTS.md, State). The value is right-aligned with tabular numbers. -->
+     sign (AGENTS.md, State). The value is right-aligned with tabular numbers. A value that does not fit ends with an
+     ellipsis, and its title gives the full value. -->
 <script lang="ts">
   import { ChangeText } from '#lib/foundation/value_format';
 
@@ -16,8 +17,8 @@
 </script>
 
 <div class="cds--tile metric-tile">
-  <dt>{name}</dt>
-  <dd>
+  <dt title={name}>{name}</dt>
+  <dd title={text}>
     {#if change === undefined}
       {text}
     {:else}
@@ -43,9 +44,11 @@
     white-space: nowrap;
   }
 
+  /* A narrow tile clips the value with an ellipsis; the title gives the full value. */
   dd {
-    display: flex;
-    justify-content: flex-end;
+    overflow: hidden;
+    text-align: end;
+    text-overflow: ellipsis;
     margin: var(--cds-spacing-02) 0 0;
     font-size: var(--cds-heading-compact-02-font-size);
     font-weight: var(--cds-heading-compact-02-font-weight);

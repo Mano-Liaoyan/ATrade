@@ -249,11 +249,15 @@ the backtest finishes). Money values and percents are decimal strings.
     rate comes from the trades: the share of round trips (from position 0
     back to 0) with a profit after commissions; "–" without a round trip. The
     API has no Sharpe ratio, so the row has none.
-  - `EquityDrawdownChart` (`points`, `startCapitalUsd`, `label`, `fill`): the
-    equity curve and, under it, the drawdown curve (`computeDrawdownCurve()`,
-    a negative percent from the highest equity so far, which starts at the
-    start capital) on one `lightweight-charts` chart with 2 panes. The panes
-    share one time scale, so both curves zoom and scroll together.
+  - `EquityDrawdownChart` (`curves`, `label`, `interruptions`, `fill`): the
+    equity curves and, under them, the drawdown curves
+    (`computeDrawdownCurve()`, a negative percent from the highest equity so
+    far, which starts at the start capital) on one `lightweight-charts` chart
+    with 2 panes. The panes share one time scale, so the curves zoom and
+    scroll together. The drawdown axis is a percent. Only other curves fit the
+    time scale again, so new live points keep the zoom of the user.
+  - `formatMaxDrawdown()`: the one max drawdown format of all pages (the
+    comparison view and the forward test pages too).
 - `/backtests/<id>` is the backtest workbench (`routes/backtests/[[backtestId]]`),
   one page for the list and the open backtest. `/backtests` opens the newest
   backtest. The page is a `Workbench` (docs/architecture.md section 13):

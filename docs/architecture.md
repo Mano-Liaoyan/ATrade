@@ -616,7 +616,18 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   key metrics of a backtest or a forward test use `KeyMetricRow` of
   `backtest`: one set, one order, and one sign rule (the max drawdown is a
   negative percent). `formatPercent` of `backtest` uses the sign rule of
-  `formatSignedNumber`.
+  `formatSignedNumber`. Rules for each page that shows a metric:
+  `formatMaxDrawdown` of `backtest` gives the max drawdown text (a negative
+  percent, "0.00 %" for 0) and the signed number; a tile gives that number as
+  `change`, so the max drawdown shows with `ChangeText` (down arrow and
+  `--cds-support-error`). Total return and net profit also are `change`
+  values. Other metrics have no direction.
+- `EquityDrawdownChart` of `backtest` (`curves`, `label`, `interruptions`,
+  `fill`) is the one equity and drawdown chart. Each curve (`DrawdownCurve`:
+  `name`, `points`, `startCapitalUsd`) has an equity line and a drawdown
+  curve; the second curve is dashed (`readCurveStyle`), and `ChartLegend`
+  names the curves and lists the interruptions (grey columns). The drawdown
+  axis is a percent. New points of the same curves do not reset the zoom.
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,
   `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,
