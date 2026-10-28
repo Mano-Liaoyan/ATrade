@@ -35,6 +35,7 @@ function createUniqueName(currentTest: TestInfo, title: string): string {
 
 async function openNewStrategy(page: Page, name: string): Promise<void> {
   await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(name);
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);

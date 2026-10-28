@@ -16,5 +16,12 @@ export {
   type StrategyVersion,
   type StrategyVersionSummary,
 } from './strategy_api';
-export { clearDraft, formatVersionLabel, readDraft, writeDraft, type DraftKey } from './strategy_drafts';
+export {
+  clearDraft,
+  formatVersionLabel,
+  readDraft,
+  writeDraft,
+  type DraftKey,
+  type StrategyVersionKey,
+} from './strategy_drafts';
 export { connectStrategyLanguageServer, type LanguageServerConnection } from './strategy_language_server';

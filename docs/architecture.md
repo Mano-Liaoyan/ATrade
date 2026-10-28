@@ -556,7 +556,15 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
   tooltip that gives the action name. A disabled `IconButton` has
   `aria-disabled` and stays focusable, so its tooltip and its `label` say why
-  it is disabled. `SideColumn` takes an `actions` snippet: icon buttons in its
+  it is disabled. A toolbar button can also take `shortcut` (shown in the
+  tooltip after the label, and `aria-keyshortcuts`), `tone` (`neutral`,
+  `interactive`, `success`, `warning`, `error`: the icon gets
+  `--cds-icon-secondary`, `--cds-icon-interactive`, or the support color),
+  `marked` (a `--cds-icon-interactive` dot on the icon), and `busy` (the
+  icon turns; use it with `disabled`). The icon shape changes with each
+  state, so the color is never the only sign. `Select` takes `size` (`sm`)
+  and `hideLabel`. `Tabs` (and `Panel` `tabs`) take `itemLabel`, a snippet
+  that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
   header line before the Collapse button. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
   `panelClass`.
@@ -593,7 +601,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
   `/ws/forward-tests` feed: `forwardTests`, `onInstruments`, `isConnected`;
-  the forward test page uses it for its list; the home page uses the
+  the forward test page uses it for its list and the strategy page for
+  its Stop forward test button; the home page uses the
   same paper account feed). While a socket is not connected, the panel and
   the column show `LiveUpdatesNotification`.
 - The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))
@@ -687,11 +696,35 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   has a wavy `--cds-support-error` underline, and its tooltip looks like a
   low-contrast Carbon error notification. A type error does not block the
   save.
-- The strategy pages use the components of `foundation/carbon`: the list
-  page has a `TextInput` and a `Button` for the new strategy, and the editor
-  has a `Select` for the version, the Save version button, an "Unsaved
-  changes" tag, and a danger `Dialog` that confirms Delete strategy. The save
-  result and the refused checks show as an `InlineNotification`.
+- The strategy page (`/strategies/<id>`, spec #99, ticket
+  [#106](https://github.com/Mano-Liaoyan/ATrade/issues/106)) is a workbench
+  like the QuantConnect editor. `/strategies` shows the first strategy of the
+  list. The "Strategies" `SideColumn` lists the strategies (32px rows: name
+  and latest version) and has the "New strategy" button (a `Dialog` with the
+  name). The toolbar line (`PanelHeader`) has the strategy name, the version
+  (`Select` size `sm`), and icon buttons with the state in the icon shape
+  and color: Delete strategy (danger `Dialog`), the swap button (an arrow to
+  the place that the editor moves to), Save version (a blue dot for unsaved
+  changes), Start forward test (blue signal; a red stop square "Stop forward
+  test" while a forward test of the strategy runs), and Run backtest (green
+  triangle; a turning yellow icon "Backtest is running", not clickable, while
+  a backtest of the strategy is queued or running). Ctrl S, Ctrl B, and Ctrl
+  Shift F (Cmd on macOS) run Save version, Run backtest, and Start or Stop
+  forward test, also in the editor: the editor and its language server
+  client use none of these keys (a unit test checks it). Run backtest opens
+  the "New backtest" dialog of the backtest page with the open strategy
+  version; Start forward test opens the "New forward test" dialog of the
+  forward test page with the open strategy version. Below the toolbar, a `PanelSplit` has the
+  results panel and the editor panel. The results are on top by default; the
+  swap button changes the order, and the browser keeps it
+  (`atrade.strategy-page.pane-order`). The results panel has one tab for each
+  backtest of the strategy (number and total return as `ChangeText`, the
+  newest first), then Trades, Orders, and Logs of the last selected backtest.
+  A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A backtest
+  of the strategy that ends opens in its tab. While the forward test socket is
+  not connected, `LiveUpdatesNotification` shows under the toolbar. The editor panel has the file
+  tab `strategy.py` and the `CodeEditor`. The save result and the refused
+  checks show as an `InlineNotification` in the editor panel.
   `InlineNotification` also takes child content, for example a list of
   problems.
 - `Button` sizes `sm` and `md` also write `cds--layout--size-<size>`: Carbon

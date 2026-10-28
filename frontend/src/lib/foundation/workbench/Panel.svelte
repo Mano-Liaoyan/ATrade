@@ -6,6 +6,7 @@
      With `statusBar`, a minimized panel is a 24px status bar instead (like the VS Code panel): the snippet gives its
      content, and a control in it can call `onRestore` of the PanelState to open the panel again. -->
 <script module lang="ts">
+  import type { Snippet } from 'svelte';
   import type { PanelSize } from './panel_split';
 
   /** The state that PanelSplit gives to each of its panels. Spread it on the Panel. */
@@ -22,6 +23,8 @@
     items: readonly { value: string; label: string }[];
     value: string;
     onValueChange: (value: string) => void;
+    /** The text of a tab (Tabs `itemLabel`), for example a name with a ChangeText. */
+    itemLabel?: Snippet<[{ value: string; label: string }]>;
   }
 </script>
 
@@ -29,7 +32,6 @@
   import Maximize16 from '@carbon/icons/es/maximize/16.js';
   import Minimize16 from '@carbon/icons/es/minimize/16.js';
   import Subtract16 from '@carbon/icons/es/subtract/16.js';
-  import type { Snippet } from 'svelte';
   import { IconButton, Tabs } from '#lib/foundation/carbon';
   import { isEmptyHeaderPart } from './header_target';
   import PanelHeader from './PanelHeader.svelte';
@@ -104,6 +106,7 @@
       items={tabs.items}
       value={tabs.value}
       onValueChange={selectTab}
+      itemLabel={tabs.itemLabel}
       size="sm"
       lineClass="atrade-panel-header"
       lineEnd={panelButtons}

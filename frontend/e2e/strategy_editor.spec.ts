@@ -21,6 +21,7 @@ function createUniqueName(currentTest: TestInfo, title: string): string {
 
 async function createStrategy(page: Page, name: string): Promise<void> {
   await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(name);
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
@@ -75,12 +76,21 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // selection with a click after the text, and drags again until the check passes. This is the same in all browsers.
     await expect(async () => {
       await line.scrollIntoViewIfNeeded();
+      // The line is wider than the editor panel, so the scroll can also move the editor to the right. The drag starts
+      // at the start of the line, so the editor shows the start of the lines.
+      const scroller = page.locator('.cm-scroller');
+      await scroller.evaluate((element) => {
+        element.scrollLeft = 0;
+      });
       const box = await line.boundingBox();
-      if (box === null) {
+      const scrollerBox = await scroller.boundingBox();
+      if (box === null || scrollerBox === null) {
         throw new Error('The class line is not visible.');
       }
+      // A point after the text, inside the visible part of the line (left of the editor scroll bar).
+      const afterTextX = Math.min(box.x + box.width, scrollerBox.x + scrollerBox.width) - 16;
       const centerY = box.y + box.height / 2;
-      await page.mouse.click(box.x + box.width - 4, centerY);
+      await page.mouse.click(afterTextX, centerY);
       await page.mouse.move(box.x + 2, centerY);
       await page.mouse.down();
       await page.mouse.move(box.x + 120, centerY, { steps: 5 });
@@ -95,7 +105,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
       }
       const topY = Math.ceil(selection.y) + 1;
       expect(await readPixel(page, selection.x + selection.width / 2, topY)).not.toBe(
-        await readPixel(page, box.x + box.width - 4, topY),
+        await readPixel(page, afterTextX, topY),
       );
     }).toPass();
   });
@@ -125,10 +135,12 @@ test('creates a strategy that starts from the template as version 1', async ({ p
 
   await createStrategy(page, name);
 
-  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v1`);
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v1');
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
-  await page.goto('/strategies');
-  await expect(page.getByRole('link', { name: `${name} v1` })).toBeVisible();
+  // The open strategy is the current row of the list, with its latest version.
+  const list = page.getByRole('complementary', { name: 'Strategies' });
+  await expect(list.getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(list.getByRole('row', { name: new RegExp(name) })).toContainText('v1');
 });
 
 test('saves edited code as a new version', async ({ page }, currentTest) => {
@@ -136,12 +148,15 @@ test('saves edited code as a new version', async ({ page }, currentTest) => {
   await createStrategy(page, name);
 
   await replaceCode(page, VALID_CODE);
-  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
   await page.getByRole('button', { name: 'Save version' }).click();
 
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveText(`Saved as ${name} v2.`);
-  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v2`);
-  await expect(page.getByText('Unsaved changes')).toBeHidden();
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
+  await expect(page.getByRole('button', { name: 'Save version', exact: true })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Strategies' }).getByRole('row', { name: new RegExp(name) })).toContainText(
+    'v2',
+  );
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
 });
 
@@ -154,9 +169,9 @@ test('shows the line and the reason when the checks refuse the code', async ({ p
 
   await expect(page.getByRole('alert')).toContainText('Line 13: F821 Undefined name `undefined_limit`');
   await page.getByRole('combobox', { name: 'Version' }).click();
-  await expect(page.getByRole('option')).toHaveText([`${name} v1`]);
+  await expect(page.getByRole('option')).toHaveText(['v1']);
   await page.keyboard.press('Escape');
-  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
 });
 
 test('keeps unsaved edits in the browser after a reload', async ({ page }, currentTest) => {
@@ -164,11 +179,11 @@ test('keeps unsaved edits in the browser after a reload', async ({ page }, curre
   await createStrategy(page, name);
 
   await replaceCode(page, VALID_CODE);
-  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
   await page.reload();
 
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
-  await expect(page.getByText('Unsaved changes')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
 });
 
 test('opens an older version from the version list', async ({ page }, currentTest) => {
@@ -176,12 +191,12 @@ test('opens an older version from the version list', async ({ page }, currentTes
   await createStrategy(page, name);
   await replaceCode(page, VALID_CODE);
   await page.getByRole('button', { name: 'Save version' }).click();
-  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v2`);
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
 
   await page.getByRole('combobox', { name: 'Version' }).click();
-  await page.getByRole('option', { name: `${name} v1` }).click();
+  await page.getByRole('option', { name: 'v1' }).click();
 
-  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText(`${name} v1`);
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v1');
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
 });
 
@@ -200,6 +215,6 @@ test('deletes a strategy only after the confirmation', async ({ page }, currentT
   await dialog.getByRole('button', { name: 'Delete strategy' }).click();
 
   await expect(page).toHaveURL(/\/strategies$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Strategies');
-  await expect(page.getByRole('link', { name: `${name} v1` })).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(name);
+  await expect(page.getByRole('complementary', { name: 'Strategies' }).getByRole('link', { name, exact: true })).toHaveCount(0);
 });

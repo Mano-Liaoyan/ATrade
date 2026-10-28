@@ -11,6 +11,7 @@ const STATUS_TIMEOUT_MILLISECONDS = 15_000;
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(strategyName);
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
@@ -33,7 +34,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   const symbol = `FT${currentTest.project.name.slice(0, 2).toUpperCase()}${uniqueNumber}`;
   await createStrategy(page, strategyName);
 
-  await page.getByRole('link', { name: 'Forward tests' }).click();
+  await page.getByRole('link', { name: 'Forward tests', exact: true }).click();
   await page.getByRole('button', { name: 'New forward test' }).click();
   const dialog = page.getByRole('dialog', { name: 'New forward test' });
   await dialog.getByRole('combobox', { name: 'Strategy', exact: true }).click();

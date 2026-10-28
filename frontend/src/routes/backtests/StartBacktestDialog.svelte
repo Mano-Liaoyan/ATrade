@@ -2,7 +2,8 @@
      versions (strategy), bar periods (market_data), watchlist instruments with saved bars (watchlist), and the paper
      capital (paper_trading). A backtest reads only saved bars, so the form offers only instruments with saved bars of
      the selected bar period (docs/architecture/backtest.md section 10.6). The form id is START_BACKTEST_FORM_ID: the
-     command palette opens the dialog with it. -->
+     command palette opens the dialog with it. With `strategyVersion`, each open selects that strategy version, for
+     example the open version of the strategy page (Run backtest). -->
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { convertDateToUtcStart, startBacktest, type Backtest } from '#lib/backtest';
@@ -15,6 +16,7 @@
     readStrategy,
     type StrategyDetail,
     type StrategyListItem,
+    type StrategyVersionKey,
   } from '#lib/strategy';
   import {
     describeSavedBars,
@@ -30,9 +32,10 @@
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onStarted: (backtest: Backtest) => void;
+    strategyVersion?: StrategyVersionKey | null;
   }
 
-  const { open, onOpenChange, onStarted }: Props = $props();
+  const { open, onOpenChange, onStarted, strategyVersion = null }: Props = $props();
 
   let strategies: StrategyListItem[] = $state([]);
   let selectedStrategy = $state<StrategyDetail | null>(null);
@@ -76,6 +79,9 @@
       return;
     }
     startError = null;
+    if (strategyVersion !== null) {
+      void selectStrategy(String(strategyVersion.strategyId), String(strategyVersion.versionId));
+    }
     void listStrategies(fetch).then((result) => {
       if (result.kind === 'ok') {
         strategies = result.value;
@@ -103,7 +109,8 @@
     }
   });
 
-  async function selectStrategy(selectedId: string): Promise<void> {
+  // Without a version id, the latest version of the strategy is selected.
+  async function selectStrategy(selectedId: string, versionId: string | null = null): Promise<void> {
     strategyId = selectedId;
     selectedStrategy = null;
     strategyVersionId = '';
@@ -114,7 +121,7 @@
     }
     selectedStrategy = result.value;
     const latestVersion = result.value.versions.at(-1);
-    strategyVersionId = latestVersion === undefined ? '' : String(latestVersion.id);
+    strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
   }
 
   async function submitBacktest(event: SubmitEvent): Promise<void> {

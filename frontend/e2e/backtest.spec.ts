@@ -70,6 +70,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   // The e2e database is not cleared between tests and browser projects, so the strategy name is unique.
   const strategyName = `Backtest ${currentTest.project.name} ${String(Date.now())}`;
   await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(strategyName);
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);

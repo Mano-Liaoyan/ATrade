@@ -1,6 +1,7 @@
 <!-- Carbon dropdown on Bits UI Select. The keyboard opens it (Enter, Space, arrow keys), the arrow keys move the
      highlight, Enter selects, and Escape closes it. The open, highlighted, and selected states of Bits UI become the
-     Carbon classes (carbon_state.ts). -->
+     Carbon classes (carbon_state.ts). `size` "sm" gives the 32px field of a toolbar line, and `hideLabel` keeps the
+     label only for screen readers when the layout names the field. -->
 <script module lang="ts">
   export interface SelectItem<T extends string> {
     value: T;
@@ -23,10 +24,21 @@
     disabled?: boolean;
     // The text of the trigger while no item is selected.
     placeholder?: string;
+    size?: 'sm' | 'md';
+    hideLabel?: boolean;
   }
 
   const uid = $props.id();
-  const { label, items, value, onValueChange, disabled = false, placeholder = '' }: Props = $props();
+  const {
+    label,
+    items,
+    value,
+    onValueChange,
+    disabled = false,
+    placeholder = '',
+    size = 'md',
+    hideLabel = false,
+  }: Props = $props();
 
   let open = $state(false);
   const triggerId = `select-${uid}`;
@@ -34,7 +46,7 @@
 </script>
 
 <div class="cds--dropdown__wrapper cds--list-box__wrapper">
-  <label for={triggerId} class="cds--label">{label}</label>
+  <label for={triggerId} class={['cds--label', hideLabel && 'cds--visually-hidden']}>{label}</label>
   <Select.Root
     type="single"
     bind:open
@@ -50,7 +62,7 @@
       }
     }
   >
-    <div class={dropdownClasses({ open, disabled })}>
+    <div class={[...dropdownClasses({ open, disabled }), size === 'sm' && 'cds--dropdown--sm cds--list-box--sm']}>
       <Select.Trigger id={triggerId}>
         {#snippet child({ props })}
           <button {...props} type="button" class="cds--list-box__field">

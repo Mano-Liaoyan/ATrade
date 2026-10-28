@@ -2,6 +2,7 @@
 // chart (for the backtest, strategy, forward test, and comparison pages), the compared key metrics of the comparison
 // pages, and the value formats.
 export { default as BacktestLimitsForm } from './BacktestLimitsForm.svelte';
+export { default as BacktestTradeTable } from './BacktestTradeTable.svelte';
 export { default as ComparedKeyMetrics } from './ComparedKeyMetrics.svelte';
 export { default as EquityDrawdownChart, type DrawdownCurve } from './EquityDrawdownChart.svelte';
 export { default as KeyMetricRow } from './KeyMetricRow.svelte';

@@ -15,10 +15,10 @@
   import { navigating, page } from '$app/state';
   import {
     BacktestLimitsForm,
+    BacktestTradeTable,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
-    formatUsd,
     isFinalStatus,
     KeyMetricRow,
     listBacktests,
@@ -26,16 +26,8 @@
     type Backtest,
     type BacktestDetail,
   } from '#lib/backtest';
-  import {
-    DataTable,
-    Dialog,
-    IconButton,
-    InlineNotification,
-    StatusIndicator,
-    type TableColumn,
-  } from '#lib/foundation/carbon';
+  import { Dialog, IconButton, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
@@ -53,14 +45,6 @@
   const PANELS: PanelSpec[] = [
     { id: 'chart', minPixels: 160 },
     { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
-  ];
-  const TRADE_COLUMNS: TableColumn[] = [
-    { header: '#', align: 'right' },
-    { header: 'Time' },
-    { header: 'Side' },
-    { header: 'Quantity', align: 'right' },
-    { header: 'Price (USD)', align: 'right' },
-    { header: 'Commission (USD)', align: 'right' },
   ];
   type BacktestTable = 'trades' | 'orders' | 'logs';
   const TABLE_TABS: { value: BacktestTable; label: string }[] = [
@@ -273,6 +257,7 @@
                 <IconButton
                   label={describeForwardTestButton(detail)}
                   icon={ConnectionSignal16}
+                  tone="interactive"
                   disabled={!hasLiveBarPeriod || isStartingForwardTest}
                   onclick={() => void startForwardTestFromBacktest(detail)}
                 />
@@ -318,26 +303,7 @@
             }}
           >
             {#if selectedTable === 'trades'}
-              {#if detail.trades.length === 0}
-                <p class="empty-word">No trades</p>
-              {:else}
-                <ScrollRegion label="Trades" fill>
-                  <DataTable columns={TRADE_COLUMNS} size="sm">
-                    {#snippet rows()}
-                      {#each detail.trades as trade, tradeIndex (tradeIndex)}
-                        <tr>
-                          <th scope="row" align="right">{tradeIndex + 1}</th>
-                          <td>{formatUtcTime(trade.time_utc)}</td>
-                          <td>{trade.side}</td>
-                          <td align="right">{trade.quantity_shares}</td>
-                          <td align="right">{formatUsd(trade.price_usd)}</td>
-                          <td align="right">{formatUsd(trade.commission_usd)}</td>
-                        </tr>
-                      {/each}
-                    {/snippet}
-                  </DataTable>
-                </ScrollRegion>
-              {/if}
+              <BacktestTradeTable trades={detail.trades} />
             {:else if selectedTable === 'orders'}
               <p class="empty-word">No orders</p>
             {:else if detail.error_message === null}
@@ -406,11 +372,6 @@
     display: flex;
     flex: none;
     margin-inline-start: auto;
-  }
-
-  /* Start forward test is a blue signal icon (spec #99 toolbar rule); the disabled button has the Carbon disabled color. */
-  .run-actions :global(.atrade-icon-button:not(.cds--btn--disabled) svg) {
-    fill: var(--cds-icon-interactive);
   }
 
   .state-area {

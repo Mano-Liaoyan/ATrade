@@ -1,7 +1,8 @@
 <!-- The "New forward test" dialog of the forward test workbench: the form that starts a forward test. The form combines
      strategy versions (strategy), the IB live bar periods (market_data), and the metrics of the latest finished
      backtest of the selected strategy version (backtest; docs/architecture/forward_test.md 12.16). The form id is
-     START_FORWARD_TEST_FORM_ID: the command palette opens the dialog with it. -->
+     START_FORWARD_TEST_FORM_ID: the command palette opens the dialog with it. With `strategyVersion`, each open selects
+     that strategy version, for example the open version of the strategy page (Start forward test). -->
 <script lang="ts">
   import { formatMaxDrawdown, formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
   import { Dialog, InlineNotification, Select, TextInput, type NotificationMessage, type SelectItem } from '#lib/foundation/carbon';
@@ -14,6 +15,7 @@
     readStrategy,
     type StrategyDetail,
     type StrategyListItem,
+    type StrategyVersionKey,
   } from '#lib/strategy';
   import { START_FORWARD_TEST_FORM_ID } from '../palette_commands';
 
@@ -21,9 +23,10 @@
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onStarted: (forwardTest: ForwardTest) => void;
+    strategyVersion?: StrategyVersionKey | null;
   }
 
-  const { open, onOpenChange, onStarted }: Props = $props();
+  const { open, onOpenChange, onStarted, strategyVersion = null }: Props = $props();
 
   const liveBarPeriods = BAR_PERIODS.filter((period) => isLiveBarPeriod(period.value));
   // The longest symbol, exchange, and currency that the API takes.
@@ -69,6 +72,9 @@
       return;
     }
     startError = null;
+    if (strategyVersion !== null) {
+      void selectStrategy(String(strategyVersion.strategyId), String(strategyVersion.versionId));
+    }
     void listStrategies(fetch).then((result) => {
       if (result.kind === 'ok') {
         strategies = result.value;
@@ -81,7 +87,8 @@
     });
   });
 
-  async function selectStrategy(selectedId: string): Promise<void> {
+  // Without a version id, the latest version of the strategy is selected.
+  async function selectStrategy(selectedId: string, versionId: string | null = null): Promise<void> {
     strategyId = selectedId;
     selectedStrategy = null;
     strategyVersionId = '';
@@ -92,7 +99,7 @@
     }
     selectedStrategy = result.value;
     const latestVersion = result.value.versions.at(-1);
-    strategyVersionId = latestVersion === undefined ? '' : String(latestVersion.id);
+    strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
   }
 
   async function submitForwardTest(event: SubmitEvent): Promise<void> {
