@@ -8,11 +8,11 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { ContentSwitcher, StatusIndicator } from '#lib/foundation/carbon';
-  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
+  import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
-  import { Panel, PanelSplit, SideColumn, Workbench } from '#lib/foundation/workbench';
-  import { FORWARD_TESTS_SOCKET_PATH, listForwardTestsOnInstruments, readForwardTestsMessage } from '#lib/forward_test';
+  import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
+  import { ForwardTestsOnInstrumentsFeed } from '#lib/forward_test';
   import {
     BAR_PERIODS,
     BarChart,
@@ -35,16 +35,9 @@
     FilledManualOrderList,
     findPaperAccountCheckKind,
     OpenOrderList,
-    PAPER_TRADING_SOCKET_PATH,
+    PaperAccountFeed,
     PaperOrderTicket,
     PositionTable,
-    readFilledManualOrders,
-    readOpenOrdersMessage,
-    readPaperAccountMessage,
-    type BlockingForwardTest,
-    type ManualOrder,
-    type OpenOrder,
-    type PaperAccountMessage,
   } from '#lib/paper_trading';
   import InstrumentWatchlist from './InstrumentWatchlist.svelte';
 
@@ -112,9 +105,10 @@
     });
   });
 
+  const liveBarErrorText = $derived(liveBarError === null ? null : `No live bars. ${liveBarError}`);
   const liveBarText = $derived.by(() => {
-    if (liveBarError !== null) {
-      return `No live bars. ${liveBarError}`;
+    if (liveBarErrorText !== null) {
+      return liveBarErrorText;
     }
     if (liveBar !== null) {
       return describeLiveBar(liveBar);
@@ -143,60 +137,25 @@
   const shownDayQuote = $derived(dayQuote?.instrumentKey === instrumentKey ? dayQuote.quote : null);
   const lastPrice = $derived(liveBar?.close ?? shownDayQuote?.last ?? chartBars.at(-1)?.close ?? null);
 
-  // The paper account: the account check, the positions, the open orders, and the filled orders by hand of today.
-  let account = $state<PaperAccountMessage | null>(null);
-  let openOrders = $state<OpenOrder[]>([]);
-  let filledOrders = $state<ManualOrder[]>([]);
+  // The paper account and the running forward tests (they block paper orders by hand on their instruments).
+  const accountFeed = new PaperAccountFeed();
+  $effect(() => accountFeed.start(fetch, window.location));
+  const forwardTestsFeed = new ForwardTestsOnInstrumentsFeed();
+  $effect(() => forwardTestsFeed.start(window.location));
+  const account = $derived(accountFeed.account);
 
-  // A fill changes the open orders, and the server sends the orders message only after a change.
-  async function refreshFilledOrders(): Promise<void> {
-    const orders = await readFilledManualOrders(fetch);
-    if (orders !== null) {
-      filledOrders = orders;
-    }
-  }
-
-  $effect(() => {
-    void refreshFilledOrders();
-    return openLiveSocket({
-      url: buildSocketUrl(PAPER_TRADING_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const accountMessage = readPaperAccountMessage(message);
-        if (accountMessage !== null) {
-          account = accountMessage;
-        }
-        const ordersMessage = readOpenOrdersMessage(message);
-        if (ordersMessage !== null) {
-          openOrders = ordersMessage;
-          void refreshFilledOrders();
-        }
-      },
-      onConnectionChange: () => undefined,
-    });
-  });
-
-  // The running forward tests block paper orders by hand on their instruments.
-  let blockingForwardTests: BlockingForwardTest[] = $state([]);
-  $effect(() => {
-    return openLiveSocket({
-      url: buildSocketUrl(FORWARD_TESTS_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const forwardTests = readForwardTestsMessage(message);
-        if (forwardTests !== null) {
-          blockingForwardTests = listForwardTestsOnInstruments(forwardTests);
-        }
-      },
-      onConnectionChange: () => undefined,
-    });
-  });
+  const PANELS: PanelSpec[] = [
+    { id: 'chart', minPixels: 160 },
+    { id: 'account', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the paper account' },
+  ];
 
   type AccountTable = 'positions' | 'open-orders' | 'filled-today';
   let accountTable: AccountTable = $state('positions');
   const accountTabItems = $derived.by(() => {
     const counts: Record<AccountTable, number> = {
       positions: account?.positions.length ?? 0,
-      'open-orders': openOrders.length,
-      'filled-today': filledOrders.length,
+      'open-orders': accountFeed.openOrders.length,
+      'filled-today': accountFeed.filledOrders.length,
     };
     const tabs: { value: AccountTable; label: string }[] = [
       { value: 'positions', label: 'Positions' },
@@ -209,7 +168,11 @@
     }));
   });
 
-  const barPeriodItems = BAR_PERIODS.map((period) => ({ value: period.value, label: period.shortLabel }));
+  const barPeriodItems = BAR_PERIODS.map((period) => ({
+    value: period.value,
+    label: period.shortLabel,
+    accessibleLabel: period.label,
+  }));
 
   function changeBarPeriod(barPeriod: BarPeriod): void {
     if (chartRequest === null) {
@@ -240,91 +203,94 @@
       <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} />
     </SideColumn>
 
-    <PanelSplit storageKey="atrade.instrument-page.panels" splitterLabel="Resize the chart and the paper account">
-      {#snippet first(panel)}
-        <Panel {...panel} label={instrumentName}>
-          {#snippet header()}
-            <h1>{instrumentName}</h1>
-            <span class="last-price" aria-label="Last price">{formatPrice(lastPrice)}</span>
-            {#if shownDayQuote !== null}
-              <ChangeText
-                value={shownDayQuote.change}
-                text={formatDayChange(shownDayQuote)}
-                label="Change from the previous close"
-              />
-            {/if}
-            <div class="bar-periods">
-              <ContentSwitcher
-                label="Bar period"
-                size="sm"
-                items={barPeriodItems}
-                value={chartRequest.barPeriod}
-                onValueChange={changeBarPeriod}
-              />
-            </div>
-          {/snippet}
-          <div class="chart">
-            <div class="cds--visually-hidden">
-              {#if barsResult?.kind === 'loaded'}
-                <span role="status" aria-label="Bar count">{describeBarCount(barsResult.bars.length)}</span>
+    <PanelSplit storageKey="atrade.instrument-page.panel-split" panels={PANELS}>
+      {#snippet panel(id, state)}
+        {#if id === 'chart'}
+          <Panel {...state} label={instrumentName}>
+            {#snippet header()}
+              <h1>{instrumentName}</h1>
+              <span class="last-price" aria-label="Last price">{formatPrice(lastPrice)}</span>
+              {#if shownDayQuote !== null}
+                <ChangeText
+                  value={shownDayQuote.change}
+                  text={formatDayChange(shownDayQuote)}
+                  label="Change from the previous close"
+                />
               {/if}
-              <span role="status" aria-label="Live bar">{liveBarText}</span>
+              <div class="bar-periods">
+                <ContentSwitcher
+                  label="Bar period"
+                  size="sm"
+                  items={barPeriodItems}
+                  value={chartRequest.barPeriod}
+                  onValueChange={changeBarPeriod}
+                />
+              </div>
+            {/snippet}
+            <div class="chart">
+              <div class="cds--visually-hidden">
+                {#if barsResult?.kind === 'loaded'}
+                  <span role="status" aria-label="Bar count">{describeBarCount(barsResult.bars.length)}</span>
+                {/if}
+                <span role="status" aria-label="Live bar">{liveBarText}</span>
+              </div>
+              <BarChart
+                bars={chartBars}
+                {liveBar}
+                fill
+                label="Bar chart of {instrumentName}, {chartRequest.barPeriod} bars"
+              />
+              {#if isLoading}
+                <p class="chart-message" role="status">Loading bars.</p>
+              {:else if barsResult?.kind === 'failed'}
+                <p class="chart-message chart-message--error" role="alert">{barsResult.message}</p>
+              {:else if liveBarErrorText !== null}
+                <p class="chart-message chart-message--error" role="alert">{liveBarErrorText}</p>
+              {/if}
             </div>
-            <BarChart
-              bars={chartBars}
-              {liveBar}
-              fill
-              label="Bar chart of {instrumentName}, {chartRequest.barPeriod} bars"
-            />
-            {#if isLoading}
-              <p class="chart-message" role="status">Loading bars.</p>
-            {:else if barsResult?.kind === 'failed'}
-              <p class="chart-message chart-message--error" role="alert">{barsResult.message}</p>
-            {:else if liveBarError !== null}
-              <p class="chart-message chart-message--error" role="alert">No live bars. {liveBarError}</p>
-            {/if}
-          </div>
-        </Panel>
-      {/snippet}
-      {#snippet second(panel)}
-        <Panel
-          {...panel}
-          label="Paper account"
-          tabs={{
-            label: 'Paper account',
-            items: accountTabItems,
-            value: accountTable,
-            onValueChange: (value: string) => {
-              accountTable = value as AccountTable;
-            },
-          }}
-        >
-          <div class="account-table">
-            {#if accountTable === 'positions'}
-              {#if account === null}
-                <p role="status">Reading the paper account.</p>
+          </Panel>
+        {:else}
+          <Panel
+            {...state}
+            label="Paper account"
+            tabs={{
+              label: 'Paper account',
+              items: accountTabItems,
+              value: accountTable,
+              onValueChange: (value: string) => {
+                accountTable = value as AccountTable;
+              },
+            }}
+          >
+            <div class="account-table">
+              <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
+              {#if accountTable === 'positions'}
+                {#if account === null}
+                  <p role="status">Reading the paper account.</p>
+                {:else}
+                  <PositionTable positions={account.positions} fill />
+                {/if}
+              {:else if accountTable === 'open-orders'}
+                <OpenOrderList orders={accountFeed.openOrders} fill />
               {:else}
-                <PositionTable positions={account.positions} fill />
+                <FilledManualOrderList orders={accountFeed.filledOrders} fill />
               {/if}
-            {:else if accountTable === 'open-orders'}
-              <OpenOrderList orders={openOrders} fill />
-            {:else}
-              <FilledManualOrderList orders={filledOrders} fill />
-            {/if}
-          </div>
-        </Panel>
+            </div>
+          </Panel>
+        {/if}
       {/snippet}
     </PanelSplit>
 
     <SideColumn label="Paper order" side="end" width="20rem" storageKey="atrade.instrument-page.order-column">
       <ScrollRegion label="Paper order form" fill>
         <div class="order-column">
+          <LiveUpdatesNotification isConnected={accountFeed.isConnected && forwardTestsFeed.isConnected} />
           {#if account === null}
             <StatusIndicator kind="in-progress" label="Reading the paper account." />
           {:else if account.check.status === 'passed' && account.check.actual_accounts[0] !== undefined}
             <PaperOrderTicket
               accountId={account.check.actual_accounts[0]}
-              {blockingForwardTests}
+              blockingForwardTests={forwardTestsFeed.onInstruments}
               instrument={chartRequest.instrument}
             />
           {:else}
@@ -393,7 +359,8 @@
     min-block-size: 0;
   }
 
-  .account-table :global(p) {
+  .account-table > :global(p),
+  .account-table > :global(.open-orders > p) {
     margin: 0;
     padding: var(--cds-spacing-05);
     font-size: var(--cds-body-compact-01-font-size);

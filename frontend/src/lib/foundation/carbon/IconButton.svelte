@@ -10,11 +10,10 @@
     icon: Pick<CarbonIconNode, 'attrs' | 'content'>;
     /** The side of the tooltip. A button at the right end of a line uses bottom-end, so the tooltip stays in the window. */
     align?: 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'right';
-    disabled?: boolean;
     onclick: () => void;
   }
 
-  const { label, icon, align = 'bottom', disabled = false, onclick }: Props = $props();
+  const { label, icon, align = 'bottom', onclick }: Props = $props();
 </script>
 
 <Tooltip text={label} {align}>
@@ -24,7 +23,6 @@
       type="button"
       class="cds--btn cds--btn--ghost cds--btn--sm cds--layout--size-sm cds--btn--icon-only atrade-icon-button"
       aria-label={label}
-      {disabled}
       {onclick}
     >
       <Icon {icon} class="cds--btn__icon" />

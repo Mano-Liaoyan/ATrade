@@ -25,3 +25,8 @@ export async function searchInstruments(fetchFunction: typeof fetch, query: stri
 export function formatInstrument(instrument: Instrument): string {
   return `${instrument.symbol} / ${instrument.exchange} / ${instrument.currency}`;
 }
+
+/** The symbol, the exchange, and the currency identify an instrument (GLOSSARY.md). */
+export function isSameInstrument(first: Instrument, second: Instrument): boolean {
+  return formatInstrument(first) === formatInstrument(second);
+}

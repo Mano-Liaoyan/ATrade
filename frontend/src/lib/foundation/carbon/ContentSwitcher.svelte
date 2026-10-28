@@ -4,6 +4,8 @@
   export interface ContentSwitcherItem<T extends string> {
     value: T;
     label: string;
+    /** The accessible name when the visible label is a short name, for example "1 hour" for "1h". */
+    accessibleLabel?: string;
   }
 </script>
 
@@ -51,6 +53,7 @@
               <button
                 {...triggerProps}
                 type="button"
+                aria-label={item.accessibleLabel}
                 class={contentSwitcherButtonClasses(triggerProps['data-state'] as BitsTabState)}
               >
                 <span class="cds--content-switcher__label">{item.label}</span>

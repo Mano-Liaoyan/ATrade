@@ -1,113 +1,128 @@
-<!-- Two stacked workbench panels with the splitter between them. The `first` and `second` snippets get the PanelState
-     of their panel; spread it on a Panel. One panel at a time can be minimized or maximized (panel_split.ts). While a
-     panel is minimized or maximized, the splitter is hidden. Escape restores a maximized panel. The browser keeps the
-     layout (the mode and the height of the second panel) under `storageKey`. -->
+<!-- Stacked workbench panels with a splitter between 2 open panels (panel_split.ts). `panels` lists the panels from top
+     to bottom; the first one fills the rest of the height. The `panel` snippet gets the id and the PanelState of each
+     panel; spread the state on a Panel. While a panel is maximized, no splitter shows.
+     Escape restores a maximized panel of the split that has the focus. Inside nested splits, the innermost maximized
+     split restores first. With the focus outside all splits, Escape restores this split. The browser keeps the layout
+     under `storageKey`. -->
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
   import type { PanelState } from './Panel.svelte';
   import {
-    clampSecondPanelPixels,
+    findPanelPixelRange,
     findPanelSize,
-    formatPanelRows,
     isPanelHeaderOnly,
+    listPanelRows,
     readPanelSplitLayout,
     restorePanelSplit,
     togglePanelSize,
-    type PanelPosition,
+    type PanelSpec,
+    type PanelSplitLayout,
   } from './panel_split';
   import Splitter from './Splitter.svelte';
   import { readStoredLayout, writeStoredLayout } from './stored_layout';
 
   interface Props {
     storageKey: string;
-    /** The accessible name of the splitter, for example "Resize the chart and the paper account". */
-    splitterLabel: string;
-    defaultSecondPixels?: number;
-    minFirstPixels?: number;
-    minSecondPixels?: number;
-    first: Snippet<[PanelState]>;
-    second: Snippet<[PanelState]>;
+    panels: readonly PanelSpec[];
+    panel: Snippet<[string, PanelState]>;
   }
 
-  // Default sizes in pixels: the second panel shows about 6 table rows, and each panel keeps its header line and
-  // some content.
-  const DEFAULT_SECOND_PIXELS = 240;
-  const DEFAULT_MIN_FIRST_PIXELS = 160;
-  const DEFAULT_MIN_SECOND_PIXELS = 96;
+  const { storageKey, panels, panel }: Props = $props();
 
-  const {
-    storageKey,
-    splitterLabel,
-    defaultSecondPixels = DEFAULT_SECOND_PIXELS,
-    minFirstPixels = DEFAULT_MIN_FIRST_PIXELS,
-    minSecondPixels = DEFAULT_MIN_SECOND_PIXELS,
-    first,
-    second,
-  }: Props = $props();
-
+  const uid = $props.id();
   // The layout of the first render: a change of storageKey does not apply to a panel split that shows.
-  const layout = $state(
-    untrack(() =>
-      readPanelSplitLayout(readStoredLayout(storageKey), { mode: 'split', secondPixels: defaultSecondPixels }),
-    ),
-  );
+  let layout: PanelSplitLayout = $state(untrack(() => readPanelSplitLayout(readStoredLayout(storageKey), panels)));
   $effect(() => {
-    writeStoredLayout(storageKey, { mode: layout.mode, secondPixels: layout.secondPixels });
+    writeStoredLayout(storageKey, layout);
   });
 
   let totalPixels = $state(0);
-  const limits = $derived({ totalPixels, minFirstPixels, minSecondPixels });
-  const maxSecondPixels = $derived(Math.max(minSecondPixels, totalPixels - minFirstPixels));
-  const shownSecondPixels = $derived(
-    totalPixels > 0 ? clampSecondPanelPixels(layout.secondPixels, limits) : layout.secondPixels,
-  );
+  const rows = $derived(listPanelRows(layout, panels, shownPixels()));
 
-  function createPanelState(position: PanelPosition): PanelState {
+  // The heights inside the limits of the current area height.
+  function shownPixels(): Record<string, number> {
+    if (totalPixels === 0) {
+      return layout.pixels;
+    }
+    const pixels: Record<string, number> = {};
+    for (const [id, value] of Object.entries(layout.pixels)) {
+      const range = findPanelPixelRange(layout, panels, id, totalPixels);
+      pixels[id] = Math.min(Math.max(value, range.min), range.max);
+    }
+    return pixels;
+  }
+
+  function createPanelState(id: string): PanelState {
     return {
-      size: findPanelSize(layout.mode, position),
-      headerOnly: isPanelHeaderOnly(layout.mode, position),
+      size: findPanelSize(layout, id),
+      headerOnly: isPanelHeaderOnly(layout, id),
       onToggleMinimized: () => {
-        layout.mode = togglePanelSize(layout.mode, position, 'minimized');
+        layout = togglePanelSize(layout, panels, id, 'minimized');
       },
       onToggleMaximized: () => {
-        layout.mode = togglePanelSize(layout.mode, position, 'maximized');
+        layout = togglePanelSize(layout, panels, id, 'maximized');
       },
       onRestore: () => {
-        layout.mode = 'split';
+        layout = { ...layout, maximized: null, minimized: layout.minimized.filter((minimizedId) => minimizedId !== id) };
       },
     };
   }
 
+  function findPanel(id: string): PanelSpec | undefined {
+    return panels.find((candidate) => candidate.id === id);
+  }
+
   // A dialog, a menu, or a list box uses Escape first.
-  function restoreOnEscape(event: KeyboardEvent): void {
+  function isEscapeForSplit(event: KeyboardEvent): boolean {
     const isInPopup =
       event.target instanceof Element && event.target.closest('[role="dialog"], [role="menu"], [role="listbox"]') !== null;
-    if (event.key === 'Escape' && !event.defaultPrevented && !isInPopup) {
-      layout.mode = restorePanelSplit(layout.mode);
+    return event.key === 'Escape' && !event.defaultPrevented && !isInPopup && layout.maximized !== null;
+  }
+
+  // The focus is in this split: the innermost maximized split restores, and its parent splits do not.
+  function restoreOnEscapeInSplit(event: KeyboardEvent): void {
+    if (isEscapeForSplit(event)) {
+      event.preventDefault();
+      layout = restorePanelSplit(layout);
+    }
+  }
+
+  // The focus is outside all splits, for example on the page after a reload.
+  function restoreOnEscapeOutside(event: KeyboardEvent): void {
+    const isInSplit = event.target instanceof Element && event.target.closest('.panel-split') !== null;
+    if (!isInSplit && isEscapeForSplit(event)) {
+      layout = restorePanelSplit(layout);
     }
   }
 </script>
 
-<svelte:window onkeydown={restoreOnEscape} />
+<svelte:window onkeydown={restoreOnEscapeOutside} />
 
+<!-- The keydown handler only restores a maximized panel with Escape. The panels have their own controls. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="panel-split"
-  style:grid-template-rows={formatPanelRows(layout.mode, shownSecondPixels)}
+  style:grid-template-rows={rows.map((row) => (row.kind === 'panel' ? row.track : 'auto')).join(' ')}
   bind:clientHeight={totalPixels}
+  onkeydown={restoreOnEscapeInSplit}
 >
-  <div class="panel-slot">{@render first(createPanelState('first'))}</div>
-  {#if layout.mode === 'split'}
-    <Splitter
-      label={splitterLabel}
-      value={shownSecondPixels}
-      min={minSecondPixels}
-      max={maxSecondPixels}
-      onValueChange={(value: number) => {
-        layout.secondPixels = value;
-      }}
-    />
-  {/if}
-  <div class="panel-slot">{@render second(createPanelState('second'))}</div>
+  {#each rows as row (`${row.kind}-${row.id}`)}
+    {#if row.kind === 'panel'}
+      <div class="panel-slot" id={`${uid}-${row.id}`}>{@render panel(row.id, createPanelState(row.id))}</div>
+    {:else}
+      {@const range = findPanelPixelRange(layout, panels, row.id, totalPixels)}
+      <Splitter
+        label={findPanel(row.id)?.splitterLabel ?? row.id}
+        controls={`${uid}-${row.id}`}
+        value={shownPixels()[row.id] ?? range.min}
+        min={range.min}
+        max={range.max}
+        onValueChange={(value: number) => {
+          layout = { ...layout, pixels: { ...layout.pixels, [row.id]: value } };
+        }}
+      />
+    {/if}
+  {/each}
 </div>
 
 <style>

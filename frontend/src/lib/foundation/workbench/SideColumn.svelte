@@ -8,10 +8,10 @@
   import RightPanelOpen16 from '@carbon/icons/es/right-panel--open/16.js';
   import SidePanelClose16 from '@carbon/icons/es/side-panel--close/16.js';
   import SidePanelOpen16 from '@carbon/icons/es/side-panel--open/16.js';
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { IconButton } from '#lib/foundation/carbon';
   import PanelHeader from './PanelHeader.svelte';
-  import { readStoredLayout, writeStoredLayout } from './stored_layout';
+  import { readSideColumnLayout, readStoredLayout, writeStoredLayout } from './stored_layout';
 
   interface Props {
     /** The name of the column: its heading and its accessible name. */
@@ -25,12 +25,8 @@
 
   const { label, side, storageKey, width = '17.5rem', children }: Props = $props();
 
-  function readIsCollapsed(): boolean {
-    const stored = readStoredLayout(storageKey);
-    return typeof stored === 'object' && stored !== null && (stored as { isCollapsed?: unknown }).isCollapsed === true;
-  }
-
-  let isCollapsed = $state(readIsCollapsed());
+  // The layout of the first render: a change of storageKey does not apply to a column that shows.
+  let isCollapsed = $state(untrack(() => readSideColumnLayout(readStoredLayout(storageKey)).isCollapsed));
   $effect(() => {
     writeStoredLayout(storageKey, { isCollapsed });
   });

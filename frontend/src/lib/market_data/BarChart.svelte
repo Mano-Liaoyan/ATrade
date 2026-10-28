@@ -8,14 +8,13 @@
     createChart,
     type CandlestickData,
     type CandlestickStyleOptions,
-    type ChartOptions,
     type DeepPartial,
     type IChartApi,
     type ISeriesApi,
     type UTCTimestamp,
   } from 'lightweight-charts';
   import { untrack } from 'svelte';
-  import { ChartFrame } from '#lib/foundation/chart_frame';
+  import { ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import type { Bar } from './bars';
   import { canDrawLiveBar } from './live_bars';
@@ -37,34 +36,9 @@
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
   }
 
-  function readContainerStyle(): CSSStyleDeclaration {
-    return getComputedStyle(chartContainer ?? document.documentElement);
-  }
-
-  function readColor(variableName: string): string {
-    return readContainerStyle().getPropertyValue(variableName).trim();
-  }
-
-  // The chart colors are Carbon tokens of the current theme (g10 or g100).
-  // A change of the theme applies them again, without a new chart.
-  function readThemeOptions(): DeepPartial<ChartOptions> {
-    const gridColor = readColor('--cds-border-subtle-01');
-    return {
-      layout: {
-        background: { color: readColor('--cds-layer-01') },
-        textColor: readColor('--cds-text-secondary'),
-        // IBM Plex Sans from the Carbon reset.
-        fontFamily: readContainerStyle().fontFamily,
-      },
-      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
-      rightPriceScale: { borderColor: gridColor },
-      timeScale: { borderColor: gridColor },
-    };
-  }
-
   function readCandlestickOptions(): DeepPartial<CandlestickStyleOptions> {
-    const upColor = readColor('--cds-support-success');
-    const downColor = readColor('--cds-support-error');
+    const upColor = readChartColor(chartContainer, '--cds-support-success');
+    const downColor = readChartColor(chartContainer, '--cds-support-error');
     return { upColor, downColor, borderUpColor: upColor, borderDownColor: downColor, wickUpColor: upColor, wickDownColor: downColor };
   }
 
@@ -72,7 +46,7 @@
     if (chartContainer === undefined) {
       return;
     }
-    const themeOptions = readThemeOptions();
+    const themeOptions = readChartThemeOptions(chartContainer);
     const createdChart = createChart(chartContainer, {
       autoSize: true,
       layout: { ...themeOptions.layout, attributionLogo: true },
@@ -84,7 +58,7 @@
     candlestickSeries = createdSeries;
     chart = createdChart;
     const endColorSchemeWatch = watchColorScheme(() => {
-      createdChart.applyOptions(readThemeOptions());
+      createdChart.applyOptions(readChartThemeOptions(chartContainer));
       createdSeries.applyOptions(readCandlestickOptions());
     });
     return () => {

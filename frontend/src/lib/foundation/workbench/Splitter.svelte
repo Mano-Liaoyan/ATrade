@@ -1,18 +1,20 @@
-<!-- The splitter between two stacked panels (WAI-ARIA window splitter pattern). Its value is the height of the second
-     panel in pixels. A pointer drag moves it. With the focus, Arrow Up and Arrow Down move it 16px, Home makes the
-     second panel as tall as it can be, and End as small as it can be. -->
+<!-- The splitter above a panel (WAI-ARIA window splitter pattern). Its value is the height of that panel (`controls`
+     is its element id) in pixels. A pointer drag moves it. With the focus, Arrow Up and Arrow Down move it 16px, Home
+     gives the panel its minimum height, and End its maximum height. -->
 <script lang="ts">
   import { findSplitterDragValue, findSplitterKeyValue, type SplitterDrag } from './splitter';
 
   interface Props {
     label: string;
+    /** The id of the panel element that the splitter resizes. */
+    controls: string;
     value: number;
     min: number;
     max: number;
     onValueChange: (value: number) => void;
   }
 
-  const { label, value, min, max, onValueChange }: Props = $props();
+  const { label, controls, value, min, max, onValueChange }: Props = $props();
 
   const KEY_STEP_PIXELS = 16;
 
@@ -52,6 +54,7 @@
   role="separator"
   tabindex="0"
   aria-label={label}
+  aria-controls={controls}
   aria-orientation="horizontal"
   aria-valuemin={min}
   aria-valuemax={max}

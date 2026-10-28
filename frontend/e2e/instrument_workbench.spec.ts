@@ -55,7 +55,7 @@ test('the chart rescales when the watchlist collapses and opens, and the browser
 
   await page.getByRole('button', { name: 'Collapse watchlist' }).click();
 
-  await expect(page.getByRole('navigation', { name: 'Watchlist' })).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Watchlist table' })).toBeHidden();
   await expect.poll(async () => (await readBox(chart)).width).toBeGreaterThan(firstWidth + 100);
   await expect.poll(() => chart.locator('canvas').first().evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(
     firstWidth + 100,
@@ -66,7 +66,7 @@ test('the chart rescales when the watchlist collapses and opens, and the browser
 
   await page.getByRole('button', { name: 'Open watchlist' }).click();
 
-  await expect(page.getByRole('navigation', { name: 'Watchlist' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Watchlist table' })).toBeVisible();
   await expect.poll(async () => Math.round((await readBox(chart)).width)).toBe(Math.round(firstWidth));
 });
 
@@ -105,6 +105,18 @@ test('a maximized panel restores with Escape, and the browser keeps the panel la
   await expect(accountPanel(page).getByRole('button', { name: 'Maximize panel' })).toBeVisible();
 });
 
+test('Escape restores the maximized panel while the focus is in the panels', async ({ page }) => {
+  await openWorkbench(page);
+
+  // The Maximize button keeps the focus.
+  await chartPanel(page).getByRole('button', { name: 'Maximize panel' }).click();
+  await expect(chartPanel(page).getByRole('button', { name: 'Restore panel' })).toBeFocused();
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByRole('separator', { name: 'Resize the chart and the paper account' })).toBeVisible();
+  await expect(chartPanel(page).getByRole('button', { name: 'Maximize panel' })).toBeVisible();
+});
+
 test('a double-click on the empty part of a header line maximizes the panel', async ({ page }) => {
   await openWorkbench(page);
   const header = page.getByRole('tablist', { name: 'Paper account' }).locator('xpath=ancestor::*[contains(@class, "panel-header")][1]');
@@ -133,6 +145,13 @@ test('the splitter changes the panel heights with the arrow keys', async ({ page
 
   await expect(splitter).toHaveAttribute('aria-valuenow', String(firstValue + 32));
   await expect.poll(async () => Math.round((await readBox(accountPanel(page))).height)).toBe(Math.round(firstHeight + 32));
+
+  // Home gives the paper account panel its minimum height, End its maximum height.
+  await page.keyboard.press('Home');
+  await expect(splitter).toHaveAttribute('aria-valuenow', '96');
+  await page.keyboard.press('End');
+  await expect(splitter).toHaveAttribute('aria-valuenow', (await splitter.getAttribute('aria-valuemax')) ?? '');
+  await expect(splitter).toHaveAttribute('aria-controls', /.+/);
 });
 
 test('a watchlist instrument opens its page with the same bar period', async ({ page, request }) => {
@@ -142,11 +161,11 @@ test('a watchlist instrument opens its page with the same bar period', async ({ 
   expect([201, 409]).toContain(response.status());
   await openWorkbench(page);
 
-  await page.getByRole('navigation', { name: 'Watchlist' }).getByRole('link', { name: 'AAPL', exact: true }).click();
+  await page.getByRole('complementary', { name: 'Watchlist' }).getByRole('link', { name: 'AAPL', exact: true }).click();
 
   await expect(page).toHaveURL('/instruments/NASDAQ/AAPL?currency=USD&bar_period=1-HOUR');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('AAPL / NASDAQ / USD');
-  await expect(page.getByRole('tablist', { name: 'Bar period' }).getByRole('tab', { name: '1h', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('tablist', { name: 'Bar period' }).getByRole('tab', { name: '1 hour', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );

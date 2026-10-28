@@ -19,15 +19,13 @@
     HistogramSeries,
     LineSeries,
     LineStyle,
-    type ChartOptions,
-    type DeepPartial,
     type HistogramData,
     type IChartApi,
     type ISeriesApi,
     type LineData,
     type UTCTimestamp,
   } from 'lightweight-charts';
-  import { ChartFrame } from '#lib/foundation/chart_frame';
+  import { ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
@@ -57,31 +55,8 @@
   // A series with the color token that it uses. A change of the color scheme reads each token again.
   type ColoredSeries = [ISeriesApi<'Line'> | ISeriesApi<'Histogram'>, string];
 
-  function readContainerStyle(): CSSStyleDeclaration {
-    return getComputedStyle(chartContainer ?? document.documentElement);
-  }
-
-  function readColor(variableName: string): string {
-    return readContainerStyle().getPropertyValue(variableName).trim();
-  }
-
   function convertToTimestamp(timeUtc: string): UTCTimestamp {
     return (Date.parse(timeUtc) / MILLISECONDS_PER_SECOND) as UTCTimestamp;
-  }
-
-  function readThemeOptions(): DeepPartial<ChartOptions> {
-    const gridColor = readColor('--cds-border-subtle-01');
-    return {
-      layout: {
-        background: { color: readColor('--cds-layer-01') },
-        textColor: readColor('--cds-text-secondary'),
-        // IBM Plex Sans from the Carbon reset.
-        fontFamily: readContainerStyle().fontFamily,
-      },
-      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
-      rightPriceScale: { borderColor: gridColor },
-      timeScale: { borderColor: gridColor },
-    };
   }
 
   function addInterruptionColumns(chart: IChartApi): ColoredSeries[] {
@@ -93,7 +68,7 @@
       return [];
     }
     const columnSeries = chart.addSeries(HistogramSeries, {
-      color: readColor(INTERRUPTION_COLOR_VARIABLE),
+      color: readChartColor(chartContainer, INTERRUPTION_COLOR_VARIABLE),
       priceScaleId: INTERRUPTION_PRICE_SCALE_ID,
       lastValueVisible: false,
       priceLineVisible: false,
@@ -115,7 +90,7 @@
     if (chartContainer === undefined) {
       return;
     }
-    const themeOptions = readThemeOptions();
+    const themeOptions = readChartThemeOptions(chartContainer);
     const chart = createChart(chartContainer, {
       autoSize: true,
       layout: { ...themeOptions.layout, attributionLogo: true },
@@ -128,7 +103,7 @@
     curves.forEach((curve, curveIndex) => {
       const style = readCurveStyle(curveIndex);
       const lineSeries = chart.addSeries(LineSeries, {
-        color: readColor(style.colorVariable),
+        color: readChartColor(chartContainer, style.colorVariable),
         lineStyle: style.lineStyle,
         title: curve.name,
       });
@@ -141,9 +116,9 @@
     });
     chart.timeScale().fitContent();
     const endColorSchemeWatch = watchColorScheme(() => {
-      chart.applyOptions(readThemeOptions());
+      chart.applyOptions(readChartThemeOptions(chartContainer));
       for (const [series, colorVariable] of coloredSeries) {
-        series.applyOptions({ color: readColor(colorVariable) });
+        series.applyOptions({ color: readChartColor(chartContainer, colorVariable) });
       }
     });
     return () => {

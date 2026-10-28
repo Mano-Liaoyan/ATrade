@@ -1,12 +1,13 @@
 <!-- The watchlist column of the instrument workbench: 32px rows with the symbol, the last price, and the change from
      the previous close (from the daily bars of each instrument). A row opens its instrument page with the same bar
-     period. The open instrument is the selected row. -->
+     period. The open instrument is the selected row. The side column around it is the "Watchlist" landmark, so this
+     part has no landmark of its own. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatPrice, formatSignedNumber, MISSING_VALUE } from '#lib/foundation/value_format';
-  import { readBars, readDayQuote, type BarPeriod, type DayQuote, type Instrument } from '#lib/market_data';
+  import { isSameInstrument, readBars, readDayQuote, type BarPeriod, type DayQuote, type Instrument } from '#lib/market_data';
   import { listWatchlist, type WatchlistInstrument } from '#lib/watchlist';
   import { createInstrumentHref } from '../../../instrument_href';
 
@@ -52,11 +53,7 @@
   });
 
   function isOpen(watchlistInstrument: WatchlistInstrument): boolean {
-    return (
-      watchlistInstrument.symbol === instrument.symbol &&
-      watchlistInstrument.exchange === instrument.exchange &&
-      watchlistInstrument.currency === instrument.currency
-    );
+    return isSameInstrument(watchlistInstrument, instrument);
   }
 
   function formatChangePercent(quote: DayQuote | null | undefined): string {
@@ -81,7 +78,7 @@
   }
 </script>
 
-<nav class="watchlist" aria-label="Watchlist">
+<div class="watchlist">
   {#if failedMessage !== null}
     <p class="message message--error" role="alert">{failedMessage}</p>
   {:else if instruments === null}
@@ -90,7 +87,7 @@
     <p class="message">No instruments in the watchlist.</p>
   {:else}
     {@const watchlistInstruments = instruments}
-    <ScrollRegion label="Watchlist" fill>
+    <ScrollRegion label="Watchlist table" fill>
       <DataTable columns={COLUMNS} size="sm">
         {#snippet rows()}
           {#each watchlistInstruments as watchlistInstrument (watchlistInstrument.id)}
@@ -113,7 +110,7 @@
       </DataTable>
     </ScrollRegion>
   {/if}
-</nav>
+</div>
 
 <style>
   .watchlist {

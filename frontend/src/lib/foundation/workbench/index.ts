@@ -7,19 +7,20 @@ export { default as Panel, type PanelState, type PanelTabs } from './Panel.svelt
 export { default as PanelHeader } from './PanelHeader.svelte';
 export { default as Splitter } from './Splitter.svelte';
 export {
-  clampSecondPanelPixels,
+  createPanelSplitLayout,
+  findPanelPixelRange,
   findPanelSize,
-  formatPanelRows,
   isPanelHeaderOnly,
+  listPanelRows,
   readPanelSplitLayout,
   restorePanelSplit,
   togglePanelSize,
-  type PanelPosition,
+  type PanelRow,
   type PanelSize,
+  type PanelSpec,
   type PanelSplitLayout,
-  type PanelSplitLimits,
-  type PanelSplitMode,
+  type PixelRange,
 } from './panel_split';
 export { findSplitterDragValue, findSplitterKeyValue, type SplitterDrag, type SplitterKeyRange, type SplitterRange } from './splitter';
-export { readStoredLayout, writeStoredLayout } from './stored_layout';
+export { readSideColumnLayout, readStoredLayout, writeStoredLayout, type SideColumnLayout } from './stored_layout';
 export { isEmptyHeaderPart } from './header_target';

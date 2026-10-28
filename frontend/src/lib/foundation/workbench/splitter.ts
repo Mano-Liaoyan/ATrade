@@ -1,5 +1,6 @@
-// The splitter between two stacked panels (Splitter.svelte). Its value is the height of the second panel in pixels,
-// so Arrow Up and a pointer move up make the second panel taller (WAI-ARIA window splitter pattern).
+// The splitter above a panel (Splitter.svelte). Its value is the height of that panel (the primary pane of the
+// WAI-ARIA window splitter pattern) in pixels, so Arrow Up and a pointer move up make the panel taller. Home gives the
+// panel its minimum height and End its maximum height.
 
 export interface SplitterRange {
   min: number;
@@ -25,8 +26,8 @@ export function findSplitterKeyValue(key: string, range: SplitterKeyRange): numb
   const valueByKey: Record<string, number> = {
     ArrowUp: range.value + range.step,
     ArrowDown: range.value - range.step,
-    Home: range.max,
-    End: range.min,
+    Home: range.min,
+    End: range.max,
   };
   const value = valueByKey[key];
   return value === undefined ? null : clamp(value, range);

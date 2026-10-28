@@ -10,9 +10,9 @@ describe('findSplitterKeyValue', () => {
     expect(findSplitterKeyValue('ArrowDown', range)).toBe(224);
   });
 
-  it('moves to the maximum with Home and to the minimum with End', () => {
-    expect(findSplitterKeyValue('Home', range)).toBe(640);
-    expect(findSplitterKeyValue('End', range)).toBe(96);
+  it('gives the controlled panel its minimum with Home and its maximum with End (WAI-ARIA window splitter)', () => {
+    expect(findSplitterKeyValue('Home', range)).toBe(96);
+    expect(findSplitterKeyValue('End', range)).toBe(640);
   });
 
   it('stays in the range', () => {

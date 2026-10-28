@@ -23,6 +23,7 @@ export {
 } from './live_bars';
 export {
   formatInstrument,
+  isSameInstrument,
   searchInstruments,
   type Instrument,
   type InstrumentSearchResult,

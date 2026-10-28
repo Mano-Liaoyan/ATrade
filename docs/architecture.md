@@ -318,8 +318,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `ref`), `TextInput` (`label`, bindable `value`, `invalidText`), `Select`
   (Carbon dropdown on Bits UI Select: `label`, `items`, `value`,
   `onValueChange`), `ContentSwitcher` (on Bits UI Tabs without panels:
-  `label`, `items`, `value`, `onValueChange`, `size`; size `sm` and `lg` also
-  write `cds--layout--size-<size>`), and `Dialog` (Carbon modal on
+  `label`, `items` with an optional `accessibleLabel` for a short name,
+  `value`, `onValueChange`, `size`; size `sm` and `lg` also write
+  `cds--layout--size-<size>`), and `Dialog` (Carbon modal on
   Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
   `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
   the accessible name of the dialog.
@@ -480,7 +481,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   With `fill`, the frame fills the height of its parent, and the chart
   (`autoSize`) follows each size change of its container, for example after a
   side column collapses. Without `fill`, `height` and `minHeight` set the
-  canvas height.
+  canvas height. `readChartThemeOptions(container)` and
+  `readChartColor(container, token)` of `foundation/chart_frame` read the
+  Carbon tokens for each chart.
 - A chart draws on a canvas and reads the color tokens only when it draws.
   `foundation/color_scheme` has `watchColorScheme(onChange)`. It calls
   `onChange` after a change of `prefers-color-scheme` and after a change of
@@ -506,15 +509,19 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     button ("Collapse <label>"). A collapsed column is a 32px wide rail with
     the Open button ("Open <label>"). The body stays in the page while the
     column is collapsed, so a form keeps its values.
-  - `PanelSplit` (`storageKey`, `splitterLabel`, `defaultSecondPixels`,
-    `minFirstPixels`, `minSecondPixels`, and the snippets `first` and
-    `second`): 2 stacked panels with a `Splitter` between them. Each snippet
-    gets a `PanelState` (`size`, `headerOnly`, `onToggleMinimized`,
-    `onToggleMaximized`, `onRestore`) to spread on a `Panel`. One panel at a
-    time is minimized (only its header line shows) or maximized (the other
-    panel shows only its header line). A second click on the same button,
-    and Escape for a maximized panel, restore the split. While a panel is
-    minimized or maximized, the splitter is hidden. `panel_split.ts` has the
+  - `PanelSplit` (`storageKey`, `panels`, and the snippet `panel(id,
+    state)`): 2 or more stacked panels. Each `PanelSpec` has `id`,
+    `minPixels`, `defaultPixels` (not for the first panel), and
+    `splitterLabel` (the name of the splitter above it). The first open panel
+    fills the rest of the height; each other open panel has its own height.
+    A `Splitter` shows between 2 open panels while no panel is maximized. The
+    snippet gets a `PanelState` (`size`, `headerOnly`, `onToggleMinimized`,
+    `onToggleMaximized`, `onRestore`) to spread on a `Panel`. Several panels
+    can be minimized, but one panel stays open. One panel at a time is
+    maximized, and the other panels show only their header lines. A second
+    click on the same button restores the panel. Escape restores a maximized
+    panel of the split that has the focus (the innermost split first), or of
+    each split when the focus is outside all splits. `panel_split.ts` has the
     state as functions with unit tests.
   - `Panel` (`label`, `PanelState`, and `tabs` or a `header` snippet): a
     region with a 32px header line and a body that fills the rest. The header
@@ -522,16 +529,18 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the Minimize and Maximize icon buttons ("Minimize panel", "Maximize
     panel", "Restore panel"). A double-click on an empty part of the header
     line toggles Maximize. A tab of a panel that shows only its header line
-    opens the panel again.
+    opens the panel again. With a `statusBar` snippet, a minimized panel is a
+    24px status bar (like the VS Code panel), and a control in it calls
+    `onRestore`.
   - `PanelHeader` (`end` snippet): the 32px header line with the class
-    `atrade-panel-header`. `Splitter` (`label`, `value`, `min`, `max`,
-    `onValueChange`): a `role="separator"`; its value is the height of the
-    second panel, Arrow Up and Arrow Down move it 16px, Home and End move it
-    to the maximum and the minimum.
+    `atrade-panel-header`. `Splitter` (`label`, `controls`, `value`, `min`,
+    `max`, `onValueChange`): a `role="separator"` (WAI-ARIA window splitter)
+    with `aria-controls` on the panel below it; its value is the height of
+    that panel, Arrow Up and Arrow Down move it 16px, Home gives the panel its
+    minimum height, and End its maximum height.
   - The browser keeps each layout in `localStorage` (`readStoredLayout`,
     `writeStoredLayout`). Blocked storage gives the default layout.
-- `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`,
-  `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
+- `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
   tooltip that gives the action name. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
   `panelClass`.
@@ -551,7 +560,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   panel has the tabs Positions, Open orders, and Filled today, with 32px
   rows. The right `SideColumn` "Paper order" has the paper order form of the
   instrument (`PaperOrderTicket` with `instrument`) after a passed account
-  check.
+  check. The side column is the landmark; its content has no landmark with
+  the same name. The page reads the paper account with `PaperAccountFeed`
+  of `paper_trading` and the running forward tests with
+  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
+  same feeds). While a socket is not connected, the panel and the column
+  show `LiveUpdatesNotification`.
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
   The native checkbox is transparent and covers the label, so a pointer

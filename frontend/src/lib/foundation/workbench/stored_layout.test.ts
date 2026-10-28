@@ -1,6 +1,6 @@
 // The browser keeps the layout of each workbench part in localStorage. Blocked storage does not stop the page.
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
-import { readStoredLayout, writeStoredLayout } from './index';
+import { readSideColumnLayout, readStoredLayout, writeStoredLayout } from './index';
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -24,6 +24,14 @@ function createMemoryStorage(): Storage {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('readSideColumnLayout', () => {
+  it('reads a collapsed column and opens the column for a missing or a damaged value', () => {
+    expect(readSideColumnLayout({ isCollapsed: true })).toEqual({ isCollapsed: true });
+    expect(readSideColumnLayout(null)).toEqual({ isCollapsed: false });
+    expect(readSideColumnLayout({ isCollapsed: 'yes' })).toEqual({ isCollapsed: false });
+  });
 });
 
 describe('readStoredLayout and writeStoredLayout', () => {

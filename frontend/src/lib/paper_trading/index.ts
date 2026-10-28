@@ -6,6 +6,7 @@ export { default as PaperOrderTicket } from './PaperOrderTicket.svelte';
 export { default as PositionTable } from './PositionTable.svelte';
 export { default as OpenOrderList } from './OpenOrderList.svelte';
 export { default as FilledManualOrderList } from './FilledManualOrderList.svelte';
+export { PaperAccountFeed } from './paper_account_feed.svelte';
 export { describePaperAccountCheck, describePaperAccountTag, findPaperAccountCheckKind, formatAmount, readPaperAccountMessage, PAPER_TRADING_SOCKET_PATH } from './paper_account';
 export type { PaperAccountCheck, PaperAccountMessage, PaperPosition } from './paper_account';
 export { readPaperCapital } from './paper_capital';

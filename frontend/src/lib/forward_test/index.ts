@@ -3,6 +3,7 @@
 export { default as FillComparisonTable } from './FillComparisonTable.svelte';
 export { default as ForwardTestFillTable } from './ForwardTestFillTable.svelte';
 export { default as ForwardTestList } from './ForwardTestList.svelte';
+export { ForwardTestsOnInstrumentsFeed } from './forward_tests_feed.svelte';
 export {
   canBacktestSamePeriod,
   canStop,

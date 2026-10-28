@@ -10,6 +10,16 @@ export function readStoredLayout(key: string): unknown {
   }
 }
 
+export interface SideColumnLayout {
+  isCollapsed: boolean;
+}
+
+/** The stored layout of a SideColumn. A missing or damaged value gives an open column. */
+export function readSideColumnLayout(stored: unknown): SideColumnLayout {
+  const isCollapsed = typeof stored === 'object' && stored !== null && Reflect.get(stored, 'isCollapsed') === true;
+  return { isCollapsed };
+}
+
 export function writeStoredLayout(key: string, layout: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(layout));

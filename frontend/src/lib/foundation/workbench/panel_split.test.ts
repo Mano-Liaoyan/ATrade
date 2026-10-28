@@ -1,92 +1,148 @@
-// The state of two stacked workbench panels: minimize, maximize, restore, the splitter size, and the stored layout.
+// The state of stacked workbench panels: minimize, maximize, restore, the splitters, and the stored layout.
 import { describe, expect, it } from 'vite-plus/test';
 import {
-  clampSecondPanelPixels,
+  createPanelSplitLayout,
+  findPanelPixelRange,
   findPanelSize,
-  formatPanelRows,
   isPanelHeaderOnly,
+  listPanelRows,
   readPanelSplitLayout,
   restorePanelSplit,
   togglePanelSize,
+  type PanelSpec,
 } from './index';
 
-describe('togglePanelSize', () => {
-  it('minimizes a panel and restores it with a second click', () => {
-    const minimized = togglePanelSize('split', 'second', 'minimized');
+const TWO: PanelSpec[] = [
+  { id: 'chart', minPixels: 160 },
+  { id: 'account', minPixels: 96, defaultPixels: 240 },
+];
+const THREE: PanelSpec[] = [
+  { id: 'results', minPixels: 160 },
+  { id: 'editor', minPixels: 160, defaultPixels: 300 },
+  { id: 'output', minPixels: 96, defaultPixels: 160 },
+];
 
-    expect(minimized).toBe('second-minimized');
-    expect(togglePanelSize(minimized, 'second', 'minimized')).toBe('split');
-  });
-
-  it('maximizes the other panel at once when one panel is minimized', () => {
-    expect(togglePanelSize('second-minimized', 'first', 'maximized')).toBe('first-maximized');
+describe('createPanelSplitLayout', () => {
+  it('opens all panels with their default heights', () => {
+    expect(createPanelSplitLayout(THREE)).toEqual({ maximized: null, minimized: [], pixels: { editor: 300, output: 160 } });
   });
 });
 
-describe('findPanelSize and isPanelHeaderOnly', () => {
-  it('shows only the header line of a minimized panel', () => {
-    expect(findPanelSize('first-minimized', 'first')).toBe('minimized');
-    expect(isPanelHeaderOnly('first-minimized', 'first')).toBe(true);
-    expect(isPanelHeaderOnly('first-minimized', 'second')).toBe(false);
+describe('togglePanelSize', () => {
+  it('minimizes a panel and restores it with a second click', () => {
+    const minimized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'account', 'minimized');
+
+    expect(findPanelSize(minimized, 'account')).toBe('minimized');
+    expect(findPanelSize(togglePanelSize(minimized, TWO, 'account', 'minimized'), 'account')).toBe('normal');
   });
 
-  it('shows only the header line of the other panel when a panel is maximized', () => {
-    expect(findPanelSize('second-maximized', 'second')).toBe('maximized');
-    expect(findPanelSize('second-maximized', 'first')).toBe('normal');
-    expect(isPanelHeaderOnly('second-maximized', 'first')).toBe(true);
-    expect(isPanelHeaderOnly('second-maximized', 'second')).toBe(false);
+  it('maximizes a panel and restores the others, also a minimized one', () => {
+    const minimized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'account', 'minimized');
+    const maximized = togglePanelSize(minimized, TWO, 'chart', 'maximized');
+
+    expect(findPanelSize(maximized, 'chart')).toBe('maximized');
+    expect(findPanelSize(maximized, 'account')).toBe('normal');
+    expect(findPanelSize(togglePanelSize(maximized, TWO, 'chart', 'maximized'), 'chart')).toBe('normal');
+  });
+
+  it('keeps one panel open: the last open panel does not minimize', () => {
+    const minimized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'account', 'minimized');
+
+    expect(togglePanelSize(minimized, TWO, 'chart', 'minimized')).toEqual(minimized);
+  });
+
+  it('minimizes 2 of 3 panels', () => {
+    let layout = togglePanelSize(createPanelSplitLayout(THREE), THREE, 'results', 'minimized');
+    layout = togglePanelSize(layout, THREE, 'output', 'minimized');
+
+    expect(layout.minimized).toEqual(['results', 'output']);
+  });
+});
+
+describe('isPanelHeaderOnly', () => {
+  it('shows only the header of a minimized panel and of the panels beside a maximized panel', () => {
+    const minimized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'chart', 'minimized');
+    const maximized = togglePanelSize(createPanelSplitLayout(THREE), THREE, 'editor', 'maximized');
+
+    expect(isPanelHeaderOnly(minimized, 'chart')).toBe(true);
+    expect(isPanelHeaderOnly(minimized, 'account')).toBe(false);
+    expect(['results', 'editor', 'output'].map((id) => isPanelHeaderOnly(maximized, id))).toEqual([true, false, true]);
   });
 });
 
 describe('restorePanelSplit', () => {
   it('restores a maximized panel and keeps a minimized panel', () => {
-    expect(restorePanelSplit('first-maximized')).toBe('split');
-    expect(restorePanelSplit('first-minimized')).toBe('first-minimized');
+    const maximized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'chart', 'maximized');
+    const minimized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'chart', 'minimized');
+
+    expect(restorePanelSplit(maximized).maximized).toBeNull();
+    expect(restorePanelSplit(minimized)).toEqual(minimized);
   });
 });
 
-describe('formatPanelRows', () => {
-  it('gives the second panel its height in the split, with a row for the splitter', () => {
-    expect(formatPanelRows('split', 240)).toBe('minmax(0, 1fr) auto 240px');
+describe('listPanelRows', () => {
+  it('gives the first panel the rest of the height and puts a splitter before each panel with a height', () => {
+    const rows = listPanelRows(createPanelSplitLayout(THREE), THREE);
+
+    expect(rows).toEqual([
+      { kind: 'panel', id: 'results', track: 'minmax(0, 1fr)' },
+      { kind: 'splitter', id: 'editor' },
+      { kind: 'panel', id: 'editor', track: '300px' },
+      { kind: 'splitter', id: 'output' },
+      { kind: 'panel', id: 'output', track: '160px' },
+    ]);
   });
 
-  it('gives all the height to the panel that is not header only', () => {
-    expect(formatPanelRows('first-maximized', 240)).toBe('minmax(0, 1fr) auto');
-    expect(formatPanelRows('second-minimized', 240)).toBe('minmax(0, 1fr) auto');
-    expect(formatPanelRows('first-minimized', 240)).toBe('auto minmax(0, 1fr)');
-    expect(formatPanelRows('second-maximized', 240)).toBe('auto minmax(0, 1fr)');
+  it('gives the rest of the height to the first open panel and hides the splitters beside a minimized panel', () => {
+    const layout = togglePanelSize(createPanelSplitLayout(THREE), THREE, 'results', 'minimized');
+
+    expect(listPanelRows(layout, THREE)).toEqual([
+      { kind: 'panel', id: 'results', track: 'auto' },
+      { kind: 'panel', id: 'editor', track: 'minmax(0, 1fr)' },
+      { kind: 'splitter', id: 'output' },
+      { kind: 'panel', id: 'output', track: '160px' },
+    ]);
+  });
+
+  it('has no splitter while a panel is maximized', () => {
+    const layout = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'account', 'maximized');
+
+    expect(listPanelRows(layout, TWO)).toEqual([
+      { kind: 'panel', id: 'chart', track: 'auto' },
+      { kind: 'panel', id: 'account', track: 'minmax(0, 1fr)' },
+    ]);
   });
 });
 
-describe('clampSecondPanelPixels', () => {
-  const limits = { totalPixels: 800, minFirstPixels: 160, minSecondPixels: 96 };
+describe('findPanelPixelRange', () => {
+  const layout = createPanelSplitLayout(THREE);
 
-  it('keeps a size between the limits', () => {
-    expect(clampSecondPanelPixels(300, limits)).toBe(300);
+  it('keeps the minimum of the panel and leaves the minimum of the fill panel and the other heights', () => {
+    expect(findPanelPixelRange(layout, THREE, 'output', 1000)).toEqual({ min: 96, max: 1000 - 160 - 300 });
   });
 
-  it('keeps the minimum height of each panel', () => {
-    expect(clampSecondPanelPixels(10, limits)).toBe(96);
-    expect(clampSecondPanelPixels(790, limits)).toBe(640);
-  });
-
-  it('keeps the minimum of the second panel when the area is too small for both', () => {
-    expect(clampSecondPanelPixels(300, { ...limits, totalPixels: 200 })).toBe(96);
+  it('gives the minimum as the maximum when the area is too small', () => {
+    expect(findPanelPixelRange(layout, THREE, 'output', 300)).toEqual({ min: 96, max: 96 });
   });
 });
 
 describe('readPanelSplitLayout', () => {
-  const defaults = { mode: 'split' as const, secondPixels: 240 };
-
   it('reads a stored layout', () => {
-    expect(readPanelSplitLayout({ mode: 'first-maximized', secondPixels: 300 }, defaults)).toEqual({
-      mode: 'first-maximized',
-      secondPixels: 300,
-    });
+    const stored = { maximized: 'chart', minimized: [], pixels: { account: 300 } };
+
+    expect(readPanelSplitLayout(stored, TWO)).toEqual(stored);
   });
 
-  it('uses the defaults for a missing or a damaged value', () => {
-    expect(readPanelSplitLayout(null, defaults)).toEqual(defaults);
-    expect(readPanelSplitLayout({ mode: 'sideways', secondPixels: 'x' }, defaults)).toEqual(defaults);
+  it('uses the defaults for a missing or a damaged value and for unknown panels', () => {
+    expect(readPanelSplitLayout(null, TWO)).toEqual(createPanelSplitLayout(TWO));
+    expect(readPanelSplitLayout({ maximized: 'sideways', minimized: ['x'], pixels: { account: 'x' } }, TWO)).toEqual(
+      createPanelSplitLayout(TWO),
+    );
+  });
+
+  it('opens a panel when the stored layout minimizes all panels', () => {
+    expect(readPanelSplitLayout({ maximized: null, minimized: ['chart', 'account'], pixels: {} }, TWO).minimized).toEqual([
+      'chart',
+    ]);
   });
 });

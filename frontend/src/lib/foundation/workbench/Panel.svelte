@@ -2,7 +2,9 @@
      either Carbon tabs (`tabs`) or other content (`header`, for example a price line), and at its right end the
      Minimize and Maximize buttons. A double-click on an empty part of the header line toggles Maximize. The
      Maximize button is the keyboard way to do the same. PanelSplit gives the size and the toggles (`PanelState`).
-     The panel is a region named by `label`. When it shows only its header line, the body is hidden. -->
+     The panel is a region named by `label`. When it shows only its header line, the body is hidden.
+     With `statusBar`, a minimized panel is a 24px status bar instead (like the VS Code panel): the snippet gives its
+     content, and a control in it can call `onRestore` of the PanelState to open the panel again. -->
 <script module lang="ts">
   import type { PanelSize } from './panel_split';
 
@@ -36,11 +38,22 @@
     label: string;
     tabs?: PanelTabs;
     header?: Snippet;
+    statusBar?: Snippet;
     children: Snippet;
   }
 
-  const { label, size, headerOnly, onToggleMinimized, onToggleMaximized, onRestore, tabs, header, children }: Props =
-    $props();
+  const {
+    label,
+    size,
+    headerOnly,
+    onToggleMinimized,
+    onToggleMaximized,
+    onRestore,
+    tabs,
+    header,
+    statusBar,
+    children,
+  }: Props = $props();
 
   // A double-click on an empty part of the header line. Svelte has no event for a part of a child component, so
   // the panel listens and checks that the target is in its header line.
@@ -83,7 +96,9 @@
 {/snippet}
 
 <section class={['panel', headerOnly && 'panel--header-only']} aria-label={label} {@attach toggleMaximizedOnHeader}>
-  {#if tabs !== undefined}
+  {#if statusBar !== undefined && size === 'minimized'}
+    <div class="atrade-status-bar">{@render statusBar()}</div>
+  {:else if tabs !== undefined}
     <Tabs
       label={tabs.label}
       items={tabs.items}
@@ -134,5 +149,20 @@
 
   .panel--header-only :global(.panel-body) {
     display: none;
+  }
+
+  /* The 24px status bar of a minimized panel with `statusBar`. */
+  .atrade-status-bar {
+    display: flex;
+    grid-row: 1 / -1;
+    align-items: center;
+    gap: var(--cds-spacing-05);
+    box-sizing: border-box;
+    block-size: var(--cds-spacing-06);
+    padding-inline: var(--cds-spacing-05);
+    box-shadow: inset 0 1px 0 var(--cds-border-subtle-01);
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    letter-spacing: var(--cds-helper-text-01-letter-spacing);
   }
 </style>

@@ -2,25 +2,17 @@
      updated live from /ws/paper-trading. -->
 <script lang="ts">
   import { StatusIndicator, Tag } from '#lib/foundation/carbon';
-  import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
+  import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import {
     describeBalanceCurrency,
     describePaperAccountCheck,
     findPaperAccountCheckKind,
     formatAmount,
-    PAPER_TRADING_SOCKET_PATH,
-    readPaperAccountMessage,
-    type PaperAccountMessage,
   } from './paper_account';
   import FilledManualOrderList from './FilledManualOrderList.svelte';
   import OpenOrderList from './OpenOrderList.svelte';
-  import {
-    readFilledManualOrders,
-    readOpenOrdersMessage,
-    type BlockingForwardTest,
-    type ManualOrder,
-    type OpenOrder,
-  } from './paper_orders';
+  import { PaperAccountFeed } from './paper_account_feed.svelte';
+  import type { BlockingForwardTest } from './paper_orders';
   import PaperOrderTicket from './PaperOrderTicket.svelte';
   import PositionTable from './PositionTable.svelte';
 
@@ -31,51 +23,22 @@
 
   const { blockingForwardTests = [] }: Props = $props();
 
-  let account = $state<PaperAccountMessage | null>(null);
-  let isSocketConnected = $state(false);
-  let openOrders = $state<OpenOrder[]>([]);
-  let filledManualOrders = $state<ManualOrder[]>([]);
+  const feed = new PaperAccountFeed();
+  $effect(() => feed.start(fetch, window.location));
 
-  // A fill changes the open orders, and the server sends the orders message only after a change.
-  async function refreshFilledManualOrders(): Promise<void> {
-    const orders = await readFilledManualOrders(fetch);
-    if (orders !== null) {
-      filledManualOrders = orders;
-    }
-  }
-
-  const checkDescription = $derived(account === null ? null : describePaperAccountCheck(account.check));
-
-  $effect(() => {
-    return openLiveSocket({
-      url: buildSocketUrl(PAPER_TRADING_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const accountMessage = readPaperAccountMessage(message);
-        if (accountMessage !== null) {
-          account = accountMessage;
-        }
-        const ordersMessage = readOpenOrdersMessage(message);
-        if (ordersMessage !== null) {
-          openOrders = ordersMessage;
-          void refreshFilledManualOrders();
-        }
-      },
-      onConnectionChange: (isConnected) => {
-        isSocketConnected = isConnected;
-      },
-    });
-  });
+  const checkDescription = $derived(feed.account === null ? null : describePaperAccountCheck(feed.account.check));
 </script>
 
 <section class="account-panel" aria-labelledby="account-panel-title">
   <h2 id="account-panel-title">Paper account <Tag label="PAPER" kind="red" size="sm" /></h2>
-  <LiveUpdatesNotification isConnected={isSocketConnected} />
+  <LiveUpdatesNotification isConnected={feed.isConnected} />
 
-  {#if account === null || checkDescription === null}
+  {#if feed.account === null || checkDescription === null}
     <p role="status" aria-label="Paper account check">
       <StatusIndicator kind="in-progress" label="Reading the paper account." />
     </p>
   {:else}
+    {@const account = feed.account}
     <div role="status" aria-label="Paper account check">
       <StatusIndicator kind={findPaperAccountCheckKind(account.check.status)} label={checkDescription.title} />
       {#if checkDescription.detail !== null}
@@ -119,10 +82,10 @@
     {/if}
 
     <h3>Open orders</h3>
-    <OpenOrderList orders={openOrders} />
+    <OpenOrderList orders={feed.openOrders} />
 
     <h3>Filled orders by hand</h3>
-    <FilledManualOrderList orders={filledManualOrders} />
+    <FilledManualOrderList orders={feed.filledOrders} />
   {/if}
 </section>
 
