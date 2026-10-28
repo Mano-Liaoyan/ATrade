@@ -265,7 +265,8 @@ test('the command palette goes to each page and has no command that sends an ord
   await palette.getByRole('option', { name: 'Go to Forward tests' }).click();
 
   await expect(palette).toBeHidden();
-  await expect(page).toHaveURL('/forward-tests');
+  // /forward-tests opens the newest forward test.
+  await expect(page).toHaveURL(/\/forward-tests(\/\d+)?$/);
 });
 
 test('the command palette opens the instrument page of a watchlist instrument', async ({ page, request }) => {
@@ -297,7 +298,8 @@ test('the command palette opens the backtest form and the forward test form', as
   palette = await openCommandPaletteWithKeys(page);
   await palette.getByRole('option', { name: 'Open the forward test form' }).click();
 
-  await expect(page).toHaveURL('/forward-tests#start-forward-test');
+  // The forward test page opens the New forward test dialog, and the focus goes in its form.
+  await expect(page.getByRole('dialog', { name: 'New forward test' })).toBeVisible();
   await expect(page.getByRole('form', { name: 'Start a forward test' }).locator(':focus')).toHaveCount(1);
 });
 
