@@ -880,7 +880,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   file when it exists in the build directory. For every other path it returns
   the SPA fallback page `200.html`. Paths under `/api/` and `/ws/` never get
   the fallback page: they return `404`. A path that resolves outside the build
-  directory gets the fallback page, never the file.
+  directory gets the fallback page, never the file. Each frontend file
+  response has `Cache-Control: no-transform`, so Cloudflare does not inject
+  its Web Analytics script into the pages.
 - At start, `web` runs the Alembic migrations, then starts uvicorn with
   1 worker on port 8000. Compose publishes it on
   `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default
