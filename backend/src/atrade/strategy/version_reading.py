@@ -18,6 +18,12 @@ class StrategyVersion:
 
 
 async def read_strategy_version(*, database_url: str, strategy_version_id: int) -> StrategyVersion | None:
+    versions = await read_strategy_versions(database_url=database_url, strategy_version_ids=[strategy_version_id])
+    return versions.get(strategy_version_id)
+
+
+async def read_strategy_versions(*, database_url: str, strategy_version_ids: list[int]) -> dict[int, StrategyVersion]:
+    """The strategy versions by ID, with one connection and one query. A missing ID is not in the result."""
     async with (
         await psycopg.AsyncConnection.connect(database_url) as connection,
         connection.cursor(row_factory=class_row(StrategyVersion)) as cursor,
@@ -28,8 +34,8 @@ async def read_strategy_version(*, database_url: str, strategy_version_id: int) 
                 strategy_version.version_number, strategy_version.code
             FROM strategy_version
             JOIN strategy ON strategy.id = strategy_version.strategy_id
-            WHERE strategy_version.id = %(strategy_version_id)s
+            WHERE strategy_version.id = ANY(%(strategy_version_ids)s)
             """,
-            {"strategy_version_id": strategy_version_id},
+            {"strategy_version_ids": strategy_version_ids},
         )
-        return await cursor.fetchone()
+        return {version.id: version for version in await cursor.fetchall()}

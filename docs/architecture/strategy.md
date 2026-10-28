@@ -176,7 +176,10 @@ The public entry also exports `read_strategy_version(*, database_url,
 strategy_version_id)` for the capabilities that run strategy versions. It
 returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
 `version_number`, `code`), or `None` when the version does not exist
-(backtest, section 10).
+(backtest, section 10). `read_strategy_versions(*, database_url,
+strategy_version_ids)` reads many versions with one connection and returns
+them by ID. A missing ID is not in the result. The forward test list uses it
+(section 12.13).
 
 ## 9.7 Frontend
 
