@@ -19,6 +19,22 @@ async function openForwardTest(page: Page, row: Locator): Promise<string> {
   return forwardTestId;
 }
 
+/** In the lowest chart panel (the splitter at its maximum), the compared metrics scroll in their own region with a
+ * visible track, so the last metric row stays reachable. */
+async function expectMetricsReachableInLowPanel(page: Page): Promise<void> {
+  const splitter = page.getByRole('separator', { name: 'Resize the chart and the tables' });
+  await splitter.focus();
+  await page.keyboard.press('End');
+  await expect(splitter).toHaveAttribute('aria-valuenow', (await splitter.getAttribute('aria-valuemax')) ?? '');
+  const metricsTrack = page.getByRole('scrollbar', { name: 'Compared metrics scroll bar' });
+  const lastMetricRow = page.getByRole('region', { name: 'Compared metrics' }).locator('dl').last();
+  await expect(metricsTrack).toBeVisible();
+  await expect(lastMetricRow).not.toBeInViewport({ ratio: 1 });
+  await metricsTrack.focus();
+  await page.keyboard.press('End');
+  await expect(lastMetricRow).toBeInViewport({ ratio: 1 });
+}
+
 /** Checks the key metric rows of the forward test and of the backtest of the same period. */
 async function expectComparedMetrics(metrics: Locator, forwardTestId: string): Promise<void> {
   // One key metric row for each test, with the metrics of the forward test page in the same order.
@@ -86,6 +102,7 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await expect(metrics).toBeHidden();
   await page.keyboard.press('Escape');
   await expect(metrics).toBeVisible();
+  await expectMetricsReachableInLowPanel(page);
 
   // The forward test page links to the comparison with this backtest in its Comparison tab.
   const comparisonUrl = page.url();

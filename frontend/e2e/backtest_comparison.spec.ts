@@ -60,6 +60,22 @@ async function waitUntilFinished(request: APIRequestContext, backtestId: number)
     .toBe('finished');
 }
 
+/** In the lowest chart panel (the splitter at its maximum), the compared metrics scroll in their own region with a
+ * visible track, so the last metric row stays reachable. */
+async function expectMetricsReachableInLowPanel(page: Page): Promise<void> {
+  const splitter = page.getByRole('separator', { name: 'Resize the chart and the tables' });
+  await splitter.focus();
+  await page.keyboard.press('End');
+  await expect(splitter).toHaveAttribute('aria-valuenow', (await splitter.getAttribute('aria-valuemax')) ?? '');
+  const metricsTrack = page.getByRole('scrollbar', { name: 'Compared metrics scroll bar' });
+  const lastMetricRow = page.getByRole('region', { name: 'Compared metrics' }).locator('dl').last();
+  await expect(metricsTrack).toBeVisible();
+  await expect(lastMetricRow).not.toBeInViewport({ ratio: 1 });
+  await metricsTrack.focus();
+  await page.keyboard.press('End');
+  await expect(lastMetricRow).toBeInViewport({ ratio: 1 });
+}
+
 /** Checks the comparison workbench of 2 backtests with these names: the key metric rows, the chart, the code
  * difference, and the panel controls. */
 async function expectComparisonWorkbench(page: Page, chartPanel: Locator, labels: string[]): Promise<void> {
@@ -96,6 +112,7 @@ async function expectComparisonWorkbench(page: Page, chartPanel: Locator, labels
   await expect(metrics).toBeHidden();
   await chartPanel.getByRole('button', { name: 'Restore panel' }).click();
   await expect(metrics).toBeVisible();
+  await expectMetricsReachableInLowPanel(page);
 }
 
 test('compares two versions of the same strategy and refuses different strategies', async ({ page, request }, currentTest) => {
@@ -148,7 +165,9 @@ test('compares two versions of the same strategy and refuses different strategie
 
   const title = `Compare backtests #${String(firstBacktestId)} and #${String(secondBacktestId)}`;
   const chartPanel = page.getByRole('region', { name: title, exact: true });
-  await expect(chartPanel.getByRole('heading', { level: 1 })).toHaveText(new RegExp(`^\\s*${title}\\s*Compared ${suffix}\\s*$`));
+  await expect(chartPanel.getByRole('heading', { level: 1 })).toHaveText(
+    new RegExp(`^\\s*${title}\\s*Compared ${suffix}\\s*AAPL\\s*1 day\\s*$`),
+  );
   // Both compared rows of the side column have the open row color.
   await expect(list.getByRole('row', { name: new RegExp(`#${String(firstBacktestId)} `) })).toHaveClass(/backtest-row--open/);
   await expect(list.getByRole('row', { name: new RegExp(`#${String(secondBacktestId)} `) })).toHaveClass(/backtest-row--open/);
