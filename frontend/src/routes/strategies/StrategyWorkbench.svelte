@@ -30,6 +30,7 @@
   } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
+  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText } from '#lib/foundation/value_format';
   import {
     Panel,
@@ -57,6 +58,7 @@
     type StrategyDetail,
     type StrategyListItem,
     type StrategyVersion,
+    type StrategyVersionKey,
   } from '#lib/strategy';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
@@ -67,6 +69,7 @@
     describeShortcut,
     describeSwapButton,
     findFinishedBacktest,
+    findRunningForwardTest,
     isMacPlatform,
     listResultTabs,
     listWorkbenchPanels,
@@ -133,17 +136,16 @@
   const runningBacktest = $derived(
     selectStrategyBacktests(backtests, activeStrategyId).find((backtest) => !isFinalStatus(backtest.status)) ?? null,
   );
-  const runningForwardTest = $derived(
-    forwardTestFeed.forwardTests
-      .filter((forwardTest) => forwardTest.strategy_id === activeStrategyId && forwardTest.desired_state === 'running')
-      .reduce<{ id: number } | null>((newest, forwardTest) => (newest === null || forwardTest.id > newest.id ? forwardTest : newest), null),
-  );
+  const runningForwardTest = $derived(findRunningForwardTest(forwardTestFeed.forwardTests, activeStrategyId));
   const hasUnsavedChanges = $derived(openVersion !== null && editorCode !== openVersion.code);
   const versionItems = $derived(
     (strategy?.versions ?? []).map((version) => ({
       value: String(version.version_number),
       label: `v${String(version.version_number)}`,
     })),
+  );
+  const openVersionKey = $derived<StrategyVersionKey | null>(
+    openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id },
   );
   const swapButton = $derived(describeSwapButton(paneOrder));
   const panels = $derived(listWorkbenchPanels(paneOrder));
@@ -327,11 +329,8 @@
 
   function selectResultTab(value: string): void {
     const tab = value as ResultTab;
-    const backtestTab = resultTabs.find((item) => item.value === tab && item.value.startsWith('backtest-'));
-    selection = {
-      tab,
-      backtestId: backtestTab === undefined ? shownResult.backtestId : Number(tab.slice('backtest-'.length)),
-    };
+    const backtestId = resultTabs.find((item) => item.value === tab)?.backtestId ?? null;
+    selection = { tab, backtestId: backtestId ?? shownResult.backtestId };
   }
 
   function openNewStrategyDialog(): void {
@@ -506,12 +505,15 @@
                 <InlineNotification {...saveMessage} lowContrast onClose={() => (saveMessage = null)} />
               {/if}
               {#if problems.length > 0}
+                <!-- A long list scrolls in itself, so the editor below it stays in view. -->
                 <InlineNotification kind="error" lowContrast title="The code was not saved. Fix these problems:">
-                  <ul class="problem-list">
-                    {#each problems as problem, index (index)}
-                      <li>Line {problem.line}: {problem.message}</li>
-                    {/each}
-                  </ul>
+                  <ScrollRegion label="Code problems" maxHeight="var(--cds-spacing-13)">
+                    <ul class="problem-list">
+                      {#each problems as problem, index (index)}
+                        <li>Line {problem.line}: {problem.message}</li>
+                      {/each}
+                    </ul>
+                  </ScrollRegion>
                 </InlineNotification>
               {/if}
               {#if openVersion !== null}
@@ -577,8 +579,10 @@
   onOpenChange={(open: boolean) => {
     isBacktestDialogOpen = open;
   }}
-  strategyVersion={openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id }}
-  onStarted={() => {
+  strategyVersion={openVersionKey}
+  onStarted={(started: Backtest) => {
+    // The new backtest opens in its tab at once; it shows its status until it ends.
+    selection = { tab: createBacktestTab(started.id), backtestId: started.id };
     backtestReadCount += 1;
   }}
 />
@@ -588,7 +592,7 @@
   onOpenChange={(open: boolean) => {
     isForwardTestDialogOpen = open;
   }}
-  strategyVersion={openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id }}
+  strategyVersion={openVersionKey}
   onStarted={(forwardTest: ForwardTest) => {
     // The socket pushes the list again later. The button shows the running forward test at once.
     forwardTestFeed.forwardTests = [forwardTest, ...forwardTestFeed.forwardTests.filter((item) => item.id !== forwardTest.id)];

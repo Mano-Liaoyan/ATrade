@@ -78,23 +78,23 @@
 <style>
   /* A tone gives the icon its token. Carbon paints the icon (and its paths) of a ghost icon-only button with
      --cds-icon-primary, so the tone sets that token on the button. A disabled button keeps the Carbon disabled color. */
-  .atrade-icon-button--neutral {
+  .atrade-icon-button--neutral:not(.cds--btn--disabled) {
     --cds-icon-primary: var(--cds-icon-secondary);
   }
 
-  .atrade-icon-button--interactive {
+  .atrade-icon-button--interactive:not(.cds--btn--disabled) {
     --cds-icon-primary: var(--cds-icon-interactive);
   }
 
-  .atrade-icon-button--success {
+  .atrade-icon-button--success:not(.cds--btn--disabled) {
     --cds-icon-primary: var(--cds-support-success);
   }
 
-  .atrade-icon-button--warning {
+  .atrade-icon-button--warning:not(.cds--btn--disabled) {
     --cds-icon-primary: var(--cds-support-warning);
   }
 
-  .atrade-icon-button--error {
+  .atrade-icon-button--error:not(.cds--btn--disabled) {
     --cds-icon-primary: var(--cds-support-error);
   }
 

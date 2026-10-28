@@ -2,6 +2,7 @@
 // the result tabs (one for each backtest of the strategy, then Trades, Orders, and Logs), the backtest that opens when
 // it ends, and the toolbar shortcuts.
 import { formatPercent, isFinalStatus, type Backtest } from '#lib/backtest';
+import type { ForwardTest } from '#lib/forward_test';
 import type { PanelSpec } from '#lib/foundation/workbench';
 
 export type PaneOrder = 'results-on-top' | 'editor-on-top';
@@ -13,6 +14,8 @@ export interface ResultTabItem {
   /** The full text of the tab: the name and the total return. */
   label: string;
   name: string;
+  /** The backtest of a backtest tab; null for Trades, Orders, and Logs. */
+  backtestId: number | null;
   /** The total return of a finished backtest, for ChangeText. */
   change: number | null;
   changeText: string;
@@ -27,9 +30,9 @@ export interface ResultSelection {
 export const PANE_ORDER_STORAGE_KEY = 'atrade.strategy-page.pane-order';
 const SPLITTER_LABEL = 'Resize the results and the editor';
 const TABLE_TABS: ResultTabItem[] = [
-  { value: 'trades', label: 'Trades', name: 'Trades', change: null, changeText: '' },
-  { value: 'orders', label: 'Orders', name: 'Orders', change: null, changeText: '' },
-  { value: 'logs', label: 'Logs', name: 'Logs', change: null, changeText: '' },
+  { value: 'trades', label: 'Trades', name: 'Trades', backtestId: null, change: null, changeText: '' },
+  { value: 'orders', label: 'Orders', name: 'Orders', backtestId: null, change: null, changeText: '' },
+  { value: 'logs', label: 'Logs', name: 'Logs', backtestId: null, change: null, changeText: '' },
 ];
 
 /** The toolbar shortcuts as CodeMirror key names. The editor and its language server client use none of them. */
@@ -86,13 +89,14 @@ export function listResultTabs(backtests: readonly Backtest[], strategyId: numbe
   const backtestTabs = selectStrategyBacktests(backtests, strategyId).map((backtest): ResultTabItem => {
     const name = `Backtest #${String(backtest.id)}`;
     if (backtest.metrics === null) {
-      return { value: createBacktestTab(backtest.id), label: name, name, change: null, changeText: '' };
+      return { value: createBacktestTab(backtest.id), label: name, name, backtestId: backtest.id, change: null, changeText: '' };
     }
     const changeText = formatPercent(backtest.metrics.total_return_percent);
     return {
       value: createBacktestTab(backtest.id),
       label: `${name} ${changeText}`,
       name,
+      backtestId: backtest.id,
       change: Number(backtest.metrics.total_return_percent),
       changeText,
     };
@@ -131,6 +135,13 @@ export function findFinishedBacktest(
     next.find((backtest) => backtest.strategy_id === strategyId && isFinalStatus(backtest.status) && wasRunning.has(backtest.id)) ??
     null
   );
+}
+
+/** The newest forward test of the strategy with the desired state running: the Stop forward test button stops it. */
+export function findRunningForwardTest(forwardTests: readonly ForwardTest[], strategyId: number | null): ForwardTest | null {
+  return forwardTests
+    .filter((forwardTest) => forwardTest.strategy_id === strategyId && forwardTest.desired_state === 'running')
+    .reduce<ForwardTest | null>((newest, forwardTest) => (newest === null || forwardTest.id > newest.id ? forwardTest : newest), null);
 }
 
 /** Ctrl (Cmd on macOS) with S, B, or Shift F. Alt and other keys are not a shortcut. */

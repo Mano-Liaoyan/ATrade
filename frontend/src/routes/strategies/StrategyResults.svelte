@@ -28,15 +28,17 @@
   let detail = $state<BacktestDetail | null>(null);
   let detailMessage = $state('');
 
-  // A text key, so the polled list (new objects each time) does not read the same detail again.
-  const backtestKey = $derived(backtest === null ? '' : `${String(backtest.id)}:${backtest.status}`);
+  // Plain values, so the polled list (new objects each time) does not read the same detail again.
+  const backtestId = $derived(backtest?.id ?? null);
+  const backtestStatus = $derived(backtest?.status ?? null);
   const shownDetail = $derived(detail !== null && detail.id === backtest?.id ? detail : null);
 
   $effect(() => {
-    if (backtestKey === '') {
+    const id = backtestId;
+    // A new status (for example finished) reads the detail again.
+    if (id === null || backtestStatus === null) {
       return;
     }
-    const id = Number(backtestKey.split(':')[0]);
     let isActive = true;
     void readBacktest(fetch, id).then((result) => {
       if (!isActive) {

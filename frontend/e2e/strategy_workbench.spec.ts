@@ -213,3 +213,19 @@ test('starts a forward test from the toolbar and stops it with the same button',
   await stopButton.click();
   await expect(page.getByRole('button', { name: 'Start forward test', exact: true })).toBeVisible();
 });
+
+// Many refused lines scroll in their own region, so the editor below the list stays in view.
+test('a long list of code problems scrolls in itself above the editor', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Problems'));
+  const code = page.getByRole('textbox', { name: 'Strategy code' });
+  await code.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  const undefinedNames = Array.from({ length: 30 }, (_, index) => `value_${String(index)} = missing_${String(index)}`);
+  await page.keyboard.insertText(undefinedNames.join('\n'));
+  await page.getByRole('button', { name: 'Save version' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Line 1:');
+  await expect(page.getByRole('scrollbar', { name: 'Code problems scroll bar' })).toBeVisible();
+  await expect(code).toBeInViewport();
+  await expectNoPageScroll(page);
+});

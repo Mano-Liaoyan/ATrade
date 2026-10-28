@@ -23,6 +23,12 @@ export function clearDraft(storage: Storage, key: DraftKey): void {
   storage.removeItem(createStorageKey(key));
 }
 
+/** One version of one strategy, for example the open version that a start dialog selects. */
+export interface StrategyVersionKey {
+  strategyId: number;
+  versionId: number;
+}
+
 export function formatVersionLabel(strategyName: string, versionNumber: number): string {
   return `${strategyName} v${String(versionNumber)}`;
 }

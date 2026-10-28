@@ -16,6 +16,7 @@
     readStrategy,
     type StrategyDetail,
     type StrategyListItem,
+    type StrategyVersionKey,
   } from '#lib/strategy';
   import {
     describeSavedBars,
@@ -31,7 +32,7 @@
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onStarted: (backtest: Backtest) => void;
-    strategyVersion?: { strategyId: number; versionId: number } | null;
+    strategyVersion?: StrategyVersionKey | null;
   }
 
   const { open, onOpenChange, onStarted, strategyVersion = null }: Props = $props();

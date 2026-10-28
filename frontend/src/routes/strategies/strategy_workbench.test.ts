@@ -5,11 +5,13 @@ import { keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { describe, expect, it } from 'vite-plus/test';
 import type { Backtest } from '#lib/backtest';
+import type { ForwardTest } from '#lib/forward_test';
 import {
   EDITOR_SHORTCUT_KEYS,
   describeShortcut,
   describeSwapButton,
   findFinishedBacktest,
+  findRunningForwardTest,
   listResultTabs,
   listWorkbenchPanels,
   readPaneOrder,
@@ -70,11 +72,11 @@ describe('listResultTabs', () => {
     ];
 
     expect(listResultTabs(backtests, 3)).toEqual([
-      { value: 'backtest-14', label: 'Backtest #14', name: 'Backtest #14', change: null, changeText: '' },
-      { value: 'backtest-13', label: 'Backtest #13 -2.50 %', name: 'Backtest #13', change: -2.5, changeText: '-2.50 %' },
-      { value: 'trades', label: 'Trades', name: 'Trades', change: null, changeText: '' },
-      { value: 'orders', label: 'Orders', name: 'Orders', change: null, changeText: '' },
-      { value: 'logs', label: 'Logs', name: 'Logs', change: null, changeText: '' },
+      { value: 'backtest-14', label: 'Backtest #14', name: 'Backtest #14', backtestId: 14, change: null, changeText: '' },
+      { value: 'backtest-13', label: 'Backtest #13 -2.50 %', name: 'Backtest #13', backtestId: 13, change: -2.5, changeText: '-2.50 %' },
+      { value: 'trades', label: 'Trades', name: 'Trades', backtestId: null, change: null, changeText: '' },
+      { value: 'orders', label: 'Orders', name: 'Orders', backtestId: null, change: null, changeText: '' },
+      { value: 'logs', label: 'Logs', name: 'Logs', backtestId: null, change: null, changeText: '' },
     ]);
   });
 });
@@ -138,6 +140,24 @@ function listEditorKeys(isMac: boolean): string[] {
     .filter((key) => key !== undefined)
     .map((key) => normalizeKey(key, isMac));
 }
+
+describe('findRunningForwardTest', () => {
+  function createForwardTest(id: number, strategyId: number, desiredState: ForwardTest['desired_state']): ForwardTest {
+    return { id, strategy_id: strategyId, desired_state: desiredState } as ForwardTest;
+  }
+
+  it('finds the newest running forward test of the strategy', () => {
+    const forwardTests = [
+      createForwardTest(5, 3, 'running'),
+      createForwardTest(8, 3, 'running'),
+      createForwardTest(9, 4, 'running'),
+      createForwardTest(10, 3, 'stopped'),
+    ];
+
+    expect(findRunningForwardTest(forwardTests, 3)?.id).toBe(8);
+    expect(findRunningForwardTest([createForwardTest(10, 3, 'stopped')], 3)).toBeNull();
+  });
+});
 
 describe('readWorkbenchShortcut', () => {
   const noKeys = { ctrlKey: false, metaKey: false, shiftKey: false, altKey: false };

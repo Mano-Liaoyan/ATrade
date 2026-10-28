@@ -10,7 +10,7 @@
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import Compare16 from '@carbon/icons/es/compare/16.js';
-  import StopFilled16 from '@carbon/icons/es/stop--filled/16.js';
+  import StopFilledAlt16 from '@carbon/icons/es/stop--filled--alt/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { navigating, page } from '$app/state';
@@ -279,14 +279,13 @@
               {/if}
               <span class="run-actions">
                 {#if canStop(forwardTest)}
-                  <span class="stop-action">
-                    <IconButton
-                      label={describeStopButton(forwardTest)}
-                      icon={StopFilled16}
-                      disabled={stoppingId === forwardTest.id}
-                      onclick={() => void stop(forwardTest)}
-                    />
-                  </span>
+                  <IconButton
+                    label={describeStopButton(forwardTest)}
+                    icon={StopFilledAlt16}
+                    tone="error"
+                    disabled={stoppingId === forwardTest.id}
+                    onclick={() => void stop(forwardTest)}
+                  />
                 {/if}
                 <IconButton
                   label={describeBacktestButton(forwardTest)}
@@ -452,12 +451,6 @@
     display: flex;
     flex: none;
     margin-inline-start: auto;
-  }
-
-  /* Stop is a red stop square (spec #99 toolbar rule): Carbon paints the icon of a ghost icon button with
-     --cds-icon-primary. A disabled button keeps the Carbon disabled color. */
-  .stop-action :global(.atrade-icon-button:not(.cds--btn--disabled)) {
-    --cds-icon-primary: var(--cds-support-error);
   }
 
   .state-area {
