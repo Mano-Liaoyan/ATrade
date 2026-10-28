@@ -76,7 +76,7 @@ and its revision comments.
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
-| Deployment | User's own server, one Docker Compose project, Cloudflare Tunnel and Cloudflare Access. | See section 14. |
+| Deployment | User's own server, one Docker Compose project, Cloudflare proxy and Cloudflare Access, Nginx Proxy Manager, GitHub Actions deployment through Tailscale and SSH. | See section 14. |
 | Effect-TS | Not used. | Its HTTP and SQL modules are unstable, it has no Svelte binding, and its style conflicts with the readability rules ([Effect-TS evaluation](https://github.com/Mano-Liaoyan/ATrade/issues/47)). |
 
 ### 4.1 NautilusTrader 2.0
@@ -120,6 +120,7 @@ frontend/
   e2e/                 # Playwright tests
 deploy/                # compose.yaml, web.Dockerfile
 scripts/check          # the quality gate: the same checks as CI (section 17.7)
+scripts/deploy         # deploys one commit of main on the server (section 14.2)
 docs/
   architecture.md      # this document
   architecture/        # sections moved to their own file (section 18)
@@ -820,7 +821,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 
 ## 14. Deployment and external access
 
-Source: [Deployment platform and external protection research](https://github.com/Mano-Liaoyan/ATrade/issues/33).
+Sources: [Deployment platform and external protection research](https://github.com/Mano-Liaoyan/ATrade/issues/33),
+[External access through Cloudflare](https://github.com/Mano-Liaoyan/ATrade/issues/73).
 
 One Docker Compose project on the user's own server runs all services:
 
@@ -830,13 +832,36 @@ One Docker Compose project on the user's own server runs all services:
 | `ib-gateway` | `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest, `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`. |
 | `web` | `app/web.py`, backtest child processes, basedpyright processes. Memory limit, read-only root file system, writable `/tmp`. |
 | `forward-test` | `app/forward_test_worker.py` and the forward test child processes. |
-| `cloudflared` | Cloudflare Tunnel. |
 
-- `cloudflared` makes only outbound connections. The server can close all
-  inbound ports. The tunnel supports WebSocket.
-- Only the Web host name is published. The Gateway port is not published.
+External access (#73). The user's existing network already has these parts.
+ATrade adds no Compose service for them:
+
+```
+browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tailscale -> web (server Tailscale IP:ATRADE_WEB_PORT)
+```
+
+- The DNS record of the Web host name is proxied by Cloudflare. The SSL/TLS
+  mode is Full (strict).
 - Cloudflare Access denies all access by default. One Allow policy includes
-  only the user's email address. Login uses One-time PIN.
+  only the user's email address. The login method is the GitHub identity
+  provider. The user logs in to GitHub with a passkey. The session duration
+  is 1 month. Cloudflare Access has no passkey login of its own.
+- Nginx Proxy Manager (NPM) runs on a different host in the user's tailnet.
+  One proxy host sends the Web host name to
+  `http://<server Tailscale IP>:<ATRADE_WEB_PORT>`
+  with WebSocket support on (market data, the language server).
+- Only Cloudflare can connect to NPM: the firewall of the NPM host lets only
+  the Cloudflare IP ranges connect to port 443. Without this rule, a request to
+  the IP address of the NPM host bypasses Cloudflare Access.
+- On the server, `ATRADE_WEB_BIND_ADDRESS` is the Tailscale IP address of
+  the server. Only devices in the tailnet can connect to it, and the tailnet
+  policy decides which ones. A host firewall does not do this job: Docker
+  publishes ports with its own packet filter rules, which firewalld does not
+  check. The server sets `net.ipv4.ip_nonlocal_bind = 1`, so Docker can bind
+  the address also before Tailscale is up after a restart. The default
+  `127.0.0.1` keeps a development machine closed.
+- Only the Web host name is published. The Gateway port and the PostgreSQL
+  port are not published.
 - The Cloudflare cost is 0 USD per month (Zero Trust Free plan).
 - `./start run` calls `docker compose up`. It is the only start command.
 
@@ -858,7 +883,8 @@ One Docker Compose project on the user's own server runs all services:
   directory gets the fallback page, never the file.
 - At start, `web` runs the Alembic migrations, then starts uvicorn with
   1 worker on port 8000. Compose publishes it on
-  `127.0.0.1:${ATRADE_WEB_PORT}` only.
+  `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default
+  `127.0.0.1:8000`).
 - `web` has `read_only: true`, a `tmpfs` on `/tmp`, and
   `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`). `0` turns the memory
   limit off. Use `0` only on a host that cannot set memory limits, for example
@@ -873,7 +899,7 @@ One Docker Compose project on the user's own server runs all services:
   process environment. It writes a warning for each variable of the old stack
   (for example `ATRADE_API_HTTP_PORT`, `ATRADE_IBKR_PAPER_ACCOUNT_ID`). The
   test is `backend/tests/app/test_start_script.py`.
-- Services added later (`ib-gateway`, `forward-test`, `cloudflared`) must not
+- Services added later (`ib-gateway`, `forward-test`) must not
   block the local start when their credentials are missing. They fail with a
   clear message, or they are in a Compose profile. `ib-gateway` is in the
   profile `ibkr` (section 7.4).
@@ -884,6 +910,41 @@ One Docker Compose project on the user's own server runs all services:
   health check of `web` passes, because `web` runs the migrations. It starts
   also without IB Gateway: a forward test start then fails with the reason
   in its `error_message` (#76).
+
+### 14.2 Deployment from GitHub Actions
+
+- `.github/workflows/deploy.yml` runs after a successful CI run of a push to
+  `main` of this repository, and when started by hand on `main`. One
+  deployment runs at a time.
+- The job uses the GitHub environment `production`. Its deployment branch
+  rule allows only `main`. Its secrets are `ATRADE_TAILSCALE_CLIENT_ID` and
+  `ATRADE_TAILSCALE_AUDIENCE` (a Tailscale federated identity),
+  `ATRADE_DEPLOY_HOST` (the Tailscale address of the server),
+  `ATRADE_DEPLOY_PORT`, `ATRADE_DEPLOY_USER`, `ATRADE_DEPLOY_SSH_KEY` (a
+  private key that is used only for deployment), and
+  `ATRADE_DEPLOY_KNOWN_HOSTS` (the host key line of the server).
+- The runner joins the user's tailnet with `tailscale/github-action` and
+  workload identity federation: GitHub gives the job an OIDC token, and
+  Tailscale accepts only the subject
+  `repo:Mano-Liaoyan/ATrade:environment:production`. GitHub stores no
+  Tailscale secret that works alone. The node is ephemeral and has the tag
+  `tag:atrade-deploy`. The tailnet policy lets this tag connect only to
+  `tcp:22` of the server. The server has no public SSH port.
+- The runner connects to the server with OpenSSH through Tailscale, not with
+  Tailscale SSH, because Tailscale SSH does not read `authorized_keys`. It
+  sends only the commit SHA.
+  In `authorized_keys` on the server, the deploy key has
+  `restrict,command="<checkout>/scripts/deploy"`. The key can run nothing
+  else.
+- `scripts/deploy` accepts only a full SHA of a commit on `origin/main`. It
+  stops when `.env` is not there. It checks out the commit (detached HEAD),
+  then runs `./start run --detach --wait`. The server builds the images. The
+  build is the production build: `vp build` for the SPA, `uv sync --no-dev`,
+  and uvicorn with 1 worker. The test is
+  `backend/tests/app/test_deploy_script.py`.
+- `.env` stays on the server (section 15). GitHub has no ATrade secrets.
+- A deployment recreates `web` and `forward-test` when their image changes.
+  The worker restarts the running forward tests (section 12.7).
 
 ## 15. Secrets and configuration
 
@@ -1255,7 +1316,7 @@ ran them. The implementation must check them.
 | `ib_async` 2.1.0 (client protocol 178 at most) connects to IB Gateway 10.50.1f. | Yes. On 2026-10-27 the Gateway reported server version 178. The `ibkr_paper` contract cases for the connection, `managedAccounts` (exactly 1 `DU` account), the instrument search (`AAPL`, `700` on SEHK), historical bars (1 minute and 1 day), and the refusals without a connection pass. ib_async reports the API as ready before its startup synchronization ends, so `is_connected()` now waits for the end of `connectAsync` (section 7.2). |
 | Live bars with keepUpToDate (`stream_live_bars`, 1 minute and 1 day) on a real Gateway. | Yes. On Tuesday 2026-10-27 at about 10:00 UTC, outside the US trading hours, the first `AAPL` bar came within 60 seconds for both periods (contract test `test_streams_the_current_live_bar`). |
 | `NetLiquidation` in USD on the paper account of the owner. | No. On 2026-10-27 the paper account had the base currency EUR, and the owner cannot change it. IBKR sent `NetLiquidation` and `TotalCashValue` only in EUR, and `$LEDGER-ExchangeRate` only for `BASE` and `EUR` (`1.00`): no USD ledger, so no USD rate from the account. Decided: ATrade converts the balance to USD (section 11.9 of `paper_trading.md`) with the account `ExchangeRate` for USD when IBKR sends it, else with the IBKR forex rate (`read_exchange_rate`, last 1 hour `MIDPOINT` bar of IDEALPRO `EUR.USD`). Checked on 2026-10-27 against the real Gateway with read-only queries: `PaperAccountMonitor.read_balance()` returned base currency EUR, rate source `ibkr_forex`, and a USD net liquidation; the `ibkr_paper` cases `test_reads_the_balance_and_the_positions_of_the_paper_account` and `test_reads_the_forex_rate_for_the_paper_account_balance` pass. The account `ExchangeRate` path is checked only with the fake. |
-| Editor input latency and completion latency in the browser. | On 2026-10-27, Playwright 1.64.1 (headless Chromium and Firefox) against `tests.e2e_server` on the same machine, basedpyright 1.40.2 (#69). Input latency (key press to the next painted frame, 50 keys): Chromium median 9.8 ms, p95 16.6 ms; Firefox median 3.0 ms, p95 6.0 ms. Completion latency (Ctrl+Space to the visible list for `self.subscribe_ba` in a `Strategy` subclass): first request after the page opens 782 ms (Chromium) and 808 ms (Firefox); next 10 requests 74 to 76 ms (Chromium) and 81 to 86 ms (Firefox). Not measured through the Cloudflare tunnel. |
+| Editor input latency and completion latency in the browser. | On 2026-10-27, Playwright 1.64.1 (headless Chromium and Firefox) against `tests.e2e_server` on the same machine, basedpyright 1.40.2 (#69). Input latency (key press to the next painted frame, 50 keys): Chromium median 9.8 ms, p95 16.6 ms; Firefox median 3.0 ms, p95 6.0 ms. Completion latency (Ctrl+Space to the visible list for `self.subscribe_ba` in a `Strategy` subclass): first request after the page opens 782 ms (Chromium) and 808 ms (Firefox); next 10 requests 74 to 76 ms (Chromium) and 81 to 86 ms (Firefox). Not measured through Cloudflare. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1277,6 +1338,6 @@ option and records it in this document.
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
-  - the Compose service names `postgres`, `ib-gateway`, `web`, `cloudflared`
+  - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`
   - the path `backend/migrations/`
   - the default Web client ID `1`

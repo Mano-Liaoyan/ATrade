@@ -216,7 +216,7 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 |---|---|
 | `postgres` | PostgreSQL 18. Volume `atrade-postgres18-data`. Not published outside the Compose network. |
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
-| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `127.0.0.1:${ATRADE_WEB_PORT}`. Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
+| `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default `127.0.0.1:8000`). Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
 | `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
@@ -237,6 +237,100 @@ permanently.
 docker volume ls | grep -i atrade      # find the old volumes, for example atrade-postgres-data
 docker volume rm <old volume name>
 ```
+
+## Deploy to the server
+
+GitHub Actions deploys each commit of `main` after CI passes
+(`.github/workflows/deploy.yml`). The server builds the images with
+`./start run`. The path from the internet is Cloudflare, then Cloudflare
+Access, then Nginx Proxy Manager (NPM) on another host, then `web` on the
+server through Tailscale. See `docs/architecture.md` section 14.
+
+Do these steps one time. `<checkout>` is the path of the ATrade checkout on
+the server, for example `/srv/atrade`.
+
+1. On the server, as the deploy user (a user that can run `docker`), clone
+   the repository to `<checkout>`:
+   `git clone https://github.com/Mano-Liaoyan/ATrade.git <checkout>`.
+2. Copy `.env` to `<checkout>/.env`. The deploy user has no password, so
+   copy the file with `scp` to your own account first, then run
+   `sudo install -o <deploy user> -g <deploy user> -m 600 <file> <checkout>/.env`. In
+   `.env`, set `ATRADE_WEB_BIND_ADDRESS` to the Tailscale IP address of the
+   server.
+3. Let Docker bind the Tailscale address also before Tailscale is up after a
+   restart of the server. Without this setting, `web` does not start after a
+   restart:
+   `echo 'net.ipv4.ip_nonlocal_bind = 1' | sudo tee /etc/sysctl.d/90-nonlocal-bind.conf && sudo sysctl --system`.
+4. Make a deploy key on your machine:
+   `ssh-keygen -t ed25519 -N '' -C atrade-deploy -f atrade-deploy`.
+   Add this line to `~/.ssh/authorized_keys` of the deploy user, with the
+   content of `atrade-deploy.pub` at the end. The key can then only run the
+   deploy script:
+   `restrict,command="<checkout>/scripts/deploy" ssh-ed25519 AAAA... atrade-deploy`
+5. In Tailscale (the server is in your tailnet):
+   1. Access controls: add the tag and a grant that lets the tag connect only
+      to the SSH port of the server. Replace `<server Tailscale IP>`:
+
+      ```json
+      "tagOwners": { "tag:atrade-deploy": ["autogroup:admin"] },
+      "grants": [
+        { "src": ["tag:atrade-deploy"], "dst": ["<server Tailscale IP>"], "ip": ["tcp:22"] }
+      ]
+      ```
+
+      When the policy also has an allow-all rule, `tag:atrade-deploy` gets
+      more access than this grant. Remove the allow-all rule or limit it to
+      your own devices.
+   2. Settings > Trust credentials: add an OpenID Connect credential.
+      Issuer: GitHub. Subject: `repo:Mano-Liaoyan/ATrade:environment:production`.
+      Scope: `auth_keys` (write) with the tag `tag:atrade-deploy`. Keep the
+      client ID and the audience.
+   3. On the server, the SSH connection must go to OpenSSH. Tailscale SSH
+      does not read `authorized_keys`. When `tailscale debug prefs` shows
+      `"RunSSH": true`, run `sudo tailscale set --ssh=false`.
+6. In GitHub, open Settings > Environments and make the environment
+   `production`. Set its deployment branches to `main` only. Add these
+   environment secrets:
+
+   | Secret | Value |
+   |---|---|
+   | `ATRADE_TAILSCALE_CLIENT_ID` | Client ID of the Tailscale trust credential. |
+   | `ATRADE_TAILSCALE_AUDIENCE` | Audience of the Tailscale trust credential. |
+   | `ATRADE_DEPLOY_HOST` | Tailscale IP address of the server. |
+   | `ATRADE_DEPLOY_PORT` | SSH port of the server, normally `22`. |
+   | `ATRADE_DEPLOY_USER` | The deploy user. |
+   | `ATRADE_DEPLOY_SSH_KEY` | Content of the private key `atrade-deploy`. |
+   | `ATRADE_DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -p <port> <server Tailscale IP>`, run from a device in your tailnet. Check the fingerprint against the server. |
+
+   Then delete the private key file from your machine.
+7. In NPM, add a proxy host for the Web host name: scheme `http`, forward
+   host the Tailscale IP address of the server, forward port
+   `ATRADE_WEB_PORT`. The tailnet policy must let the NPM host connect to
+   this port, and must not let tagged devices other than the NPM host
+   connect to it.
+   Turn on "Websockets Support". Use an SSL certificate that Cloudflare
+   accepts in Full (strict) mode, for example a Cloudflare Origin
+   Certificate.
+8. In the firewall of the NPM host, let only the
+   [Cloudflare IP ranges](https://www.cloudflare.com/ips/) connect to port
+   443.
+9. In Cloudflare, proxy the DNS record of the Web host name (orange cloud).
+   Set SSL/TLS to Full (strict).
+10. In Cloudflare Zero Trust:
+   1. Settings > Authentication: add the GitHub identity provider. Log in to
+      GitHub with a passkey.
+   2. Access > Applications: add a self-hosted application for the Web host
+      name. Session duration: 1 month. Identity provider: GitHub only.
+   3. Add one Allow policy with the rule "Emails" set to your email address.
+      Add no other policy. Access then denies all other users.
+11. Run the workflow "Deploy" by hand (Actions > Deploy > Run workflow on
+    `main`). Open the Web host name. Cloudflare Access asks for the GitHub
+    login. After the login, ATrade opens, and the header shows the backend
+    status (WebSocket checks: the bar chart updates, and code completion
+    works).
+
+Each later push to `main` deploys after CI passes. To deploy by hand on the
+server: `<checkout>/scripts/deploy <full commit SHA>`.
 
 ## Check the code
 
@@ -308,6 +402,7 @@ frontend/
   e2e/               # Playwright tests
 deploy/              # compose.yaml, web.Dockerfile
 scripts/check        # the quality gate
+scripts/deploy       # deploys one commit of main on the server
 start                # ./start run
 ```
 

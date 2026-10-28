@@ -1,0 +1,64 @@
+# Deploys main to the user's server after CI passes (docs/architecture.md section 14.2).
+# The runner joins the user's tailnet for the duration of the job, then connects to the server with SSH
+# through Tailscale. The server has no public SSH port. The deploy key on the server can only run
+# scripts/deploy, which accepts only commits of origin/main. The server builds the images with ./start run. .env stays on the server.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Tailscale workload identity federation: the job gets a GitHub OIDC token instead of a Tailscale secret.
+  id-token: write
+
+# One deployment at a time. A new deployment waits until the current one ends.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # workflow_run: only a CI run of a push to main of this repository. A pull request from a fork branch
+    # with the name "main" also matches the branches filter above.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    # The secrets are in the environment "production". Its deployment branch rule allows only main.
+    environment: production
+    # The server builds the web image. A build without cache takes approximately 10 minutes.
+    timeout-minutes: 30
+    steps:
+      # The node is ephemeral and has the tag tag:atrade-deploy. The tailnet policy lets this tag connect
+      # only to the SSH port of the server.
+      - name: Join the tailnet
+        # v4.2.0
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd
+        with:
+          oauth-client-id: ${{ secrets.ATRADE_TAILSCALE_CLIENT_ID }}
+          audience: ${{ secrets.ATRADE_TAILSCALE_AUDIENCE }}
+          tags: tag:atrade-deploy
+          ping: ${{ secrets.ATRADE_DEPLOY_HOST }}
+      - name: Deploy the commit on the server
+        env:
+          SSH_KEY: ${{ secrets.ATRADE_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.ATRADE_DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.ATRADE_DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.ATRADE_DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.ATRADE_DEPLOY_USER }}
+          COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -p "${DEPLOY_PORT:-22}" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=30 \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$COMMIT"
