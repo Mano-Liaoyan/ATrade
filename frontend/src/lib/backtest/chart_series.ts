@@ -1,6 +1,6 @@
-// The parts that the equity chart (EquityChart) and the equity and drawdown chart (EquityDrawdownChart) share: the time
-// of a chart point and the line style of each curve. The second curve is a dashed line in another color, so the user can
-// tell the curves apart without color.
+// The parts that the equity and drawdown chart (EquityDrawdownChart), its legend, and the compared key metrics
+// (ComparedKeyMetrics) share: the time of a chart point and the line style of each curve. The second curve is a dashed
+// line in another color, so the user can tell the curves apart without color.
 import { LineStyle, type UTCTimestamp } from 'lightweight-charts';
 
 const MILLISECONDS_PER_SECOND = 1000;

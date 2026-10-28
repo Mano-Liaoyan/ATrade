@@ -1,4 +1,5 @@
-// A forward test compared with a backtest of the same period (docs/architecture/forward_test.md section 12.10).
+// A forward test compared with a backtest of the same period (docs/architecture/forward_test.md section 12.10) on a
+// workbench: one key metric row for each test, both equity and drawdown curves, and the fill comparison in a panel.
 // backend/tests/e2e_server.py adds the stopped forward test "E2E compared forward test" on FTCMP / ARCA with a start
 // balance, 40 fills, equity points, 1 interruption, and the saved daily bars of its period. The forward test never runs:
 // the child start function of the e2e server is a fake. The backtest runs in a real child process.
@@ -18,6 +19,25 @@ async function openForwardTest(page: Page, row: Locator): Promise<string> {
   return forwardTestId;
 }
 
+/** Checks the key metric rows of the forward test and of the backtest of the same period. */
+async function expectComparedMetrics(metrics: Locator, forwardTestId: string): Promise<void> {
+  // One key metric row for each test, with the metrics of the forward test page in the same order.
+  const forwardTestLink = metrics.getByRole('link', { name: new RegExp(`^Forward test #${forwardTestId} ${COMPARED_STRATEGY_LABEL}$`) });
+  await expect(forwardTestLink).toHaveAttribute('href', `/forward-tests/${forwardTestId}`);
+  const backtestLink = metrics.getByRole('link', { name: /^Backtest #\d+$/ });
+  await expect(backtestLink).toBeVisible();
+  const forwardTestMetrics = metrics.locator('dl').first();
+  const backtestMetrics = metrics.locator('dl').last();
+  await expect(forwardTestMetrics.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
+  await expect(backtestMetrics.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
+  // The forward test records 40 fills. The bar count strategy of the backtest buys and sells 3 times.
+  await expect(forwardTestMetrics.getByRole('definition').nth(4)).toHaveText('40');
+  await expect(backtestMetrics.getByRole('definition').nth(4)).toHaveText('3');
+  await expect(backtestMetrics.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
+  // The win rates come from the fills and the trades: a percent, not a dash.
+  await expect(backtestMetrics.getByRole('definition').nth(3)).toHaveText(/^\s*\d+\.\d %$/);
+}
+
 test('backtests the same period and compares the metrics, the equity curves, and the fills', async ({ page }) => {
   test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
   await page.setViewportSize({ width: 1280, height: 640 });
@@ -35,16 +55,15 @@ test('backtests the same period and compares the metrics, the equity curves, and
   });
 
   const metrics = page.getByRole('region', { name: 'Compared metrics' });
-  await expect(metrics.getByRole('columnheader', { name: new RegExp(COMPARED_STRATEGY_LABEL) })).toBeVisible();
-  await expect(metrics.getByRole('columnheader', { name: /^Backtest #\d+$/ })).toBeVisible();
-  // The forward test records 40 fills. The bar count strategy of the backtest buys and sells 3 times.
-  await expect(metrics.getByRole('row', { name: /^Trades/ })).toHaveText(/Trades\s*40\s*3/);
-  await expect(page.getByRole('img', { name: 'Compared equity curves' })).toBeVisible();
-  await expect(page.getByRole('list', { name: 'Compared equity curves interruptions' }).getByRole('listitem')).toHaveText([
+  await expectComparedMetrics(metrics, forwardTestId);
+  await expect(page.getByRole('img', { name: 'Equity and drawdown' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Equity and drawdown legend' }).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByRole('list', { name: 'Equity and drawdown interruptions' }).getByRole('listitem')).toHaveText([
     'Interrupted from 2026-03-21 01:00:00 UTC to 2026-03-24 01:00:00 UTC',
   ]);
 
-  const fills = page.getByRole('region', { name: 'Compared fills' });
+  const tables = page.getByRole('region', { name: 'Comparison tables' });
+  const fills = tables.getByRole('region', { name: 'Compared fills' });
   const firstFill = fills.getByRole('row', { name: /2026-03-03 00:00:00 UTC/ });
   await expect(firstFill).toContainText('BUY');
   await expect(firstFill).toContainText('101.01');
@@ -62,13 +81,19 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await expect(lastRow).toBeInViewport();
   await expect(track).toHaveAttribute('aria-valuenow', '100');
 
+  // The tables panel maximizes and restores like the panels of the other pages.
+  await tables.getByRole('button', { name: 'Maximize panel' }).click();
+  await expect(metrics).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(metrics).toBeVisible();
+
   // The forward test page links to the comparison with this backtest in its Comparison tab.
   const comparisonUrl = page.url();
   const backtestId = comparisonUrl.split('/').at(-1) ?? '';
   await page.goto(forwardTestUrl);
-  const tables = page.getByRole('region', { name: 'Forward test tables' });
-  await tables.getByRole('tab', { name: 'Comparison' }).click();
-  await tables.getByRole('link', { name: `Compare with backtest #${backtestId}`, exact: true }).click();
+  const forwardTestTables = page.getByRole('region', { name: 'Forward test tables' });
+  await forwardTestTables.getByRole('tab', { name: 'Comparison' }).click();
+  await forwardTestTables.getByRole('link', { name: `Compare with backtest #${backtestId}`, exact: true }).click();
   await expect(page).toHaveURL(comparisonUrl);
 });
 

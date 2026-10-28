@@ -1,4 +1,4 @@
-<!-- The text under an equity chart (EquityChart, EquityDrawdownChart): with 2 or more curves, a legend with the line
+<!-- The text under an equity chart (EquityDrawdownChart): with 2 or more curves, a legend with the line
      style of each curve (readCurveStyle); with interruptions, the list of the times that the grey columns mark. -->
 <script lang="ts">
   import { LineStyle } from 'lightweight-charts';

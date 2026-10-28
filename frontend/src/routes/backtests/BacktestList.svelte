@@ -1,6 +1,6 @@
 <!-- The backtest list of the backtest workbench (the body of the "Backtests" side column): 32px rows with the number,
      the strategy version, the instrument symbol, the status (icon and word), and the total return (ChangeText). The open
-     backtest has the Carbon selected row color. A click on a row opens its backtest. When 2 or more rows are checked,
+     backtest (or both compared backtests) has the Carbon selected row color. A click on a row opens its backtest. When 2 or more rows are checked,
      the Carbon batch action bar shows Compare: it opens the comparison of 2 backtests of the same strategy, and its
      text says why Compare is not available (docs/architecture section 9.5). -->
 <script lang="ts">
@@ -23,9 +23,11 @@
     /** The read error of the list, or an empty text. */
     errorMessage: string;
     openBacktestId: number | null;
+    /** The compared backtests of a comparison page: their rows have the open row color too. */
+    comparedBacktestIds?: readonly number[];
   }
 
-  const { backtests, errorMessage, openBacktestId }: Props = $props();
+  const { backtests, errorMessage, openBacktestId, comparedBacktestIds = [] }: Props = $props();
 
   const COMPARED_BACKTEST_COUNT = 2;
   const COLUMNS: TableColumn[] = [
@@ -106,7 +108,10 @@
         {#snippet rows()}
           {#each backtests as item (item.id)}
             <tr
-              class={['backtest-row', item.id === openBacktestId && 'backtest-row--open']}
+              class={[
+                'backtest-row',
+                (item.id === openBacktestId || comparedBacktestIds.includes(item.id)) && 'backtest-row--open',
+              ]}
               onclick={(event) => {
                 openRow(event, item.id);
               }}
