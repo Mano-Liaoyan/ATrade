@@ -47,8 +47,9 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   await expect(row).toContainText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
   const forwardTestNumber = (await row.getByRole('rowheader').textContent())?.trim() ?? '';
 
-  // The order form does not send a paper order by hand on the instrument of the running forward test, and says why.
-  await page.getByRole('link', { name: 'Home' }).click();
+  // The order form of the instrument page does not send a paper order by hand on the instrument of the running
+  // forward test, and says why.
+  await page.goto(`/instruments/ARCA/${symbol}?currency=USD`);
   const ticket = page.getByRole('form', { name: 'Paper order' });
   await ticket.getByLabel('Order symbol').fill(symbol);
   await ticket.getByLabel('Exchange').fill('ARCA');

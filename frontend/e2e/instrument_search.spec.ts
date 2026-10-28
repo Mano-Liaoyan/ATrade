@@ -121,7 +121,7 @@ test('shows the backend message when IB Gateway is not reachable', async ({ page
 
   await searchFor(page, '700');
 
-  await expect(page.getByRole('alert')).toHaveText(
+  await expect(page.getByRole('search', { name: 'Instrument search' }).getByRole('alert')).toHaveText(
     'IB Gateway is not reachable at ib-gateway:4004. Instrument search needs IB Gateway.',
   );
 });

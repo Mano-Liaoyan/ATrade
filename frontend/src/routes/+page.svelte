@@ -47,6 +47,7 @@
   </SideColumn>
 
   <div class="overview">
+    <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
     <div class="key-numbers">
       {#if account === null || checkDescription === null}
         <StatusIndicator kind="in-progress" label="Reading the paper account." />
@@ -83,7 +84,6 @@
               <h2>{withCount('Positions', account?.positions.length ?? 0)}</h2>
             {/snippet}
             <div class="table">
-              <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
               {#if account === null}
                 <p role="status">Reading the paper account.</p>
               {:else}
@@ -105,7 +105,6 @@
             }}
           >
             <div class="table">
-              <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
               {#if ordersTable === 'open-orders'}
                 <OpenOrderList orders={accountFeed.openOrders} fill />
               {:else}
