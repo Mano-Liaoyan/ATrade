@@ -591,7 +591,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (`src/routes/InstrumentWatchlist.svelte`), with `editable`: the instrument
   search above the table adds an instrument, and each row has a Delete icon
   button. A row opens its instrument page. The main area has the key numbers
-  of the paper account in one line (`listBalanceMetrics` of `paper_trading`,
+  of the paper account in one `MetricRow` of `MetricTile`s
+  (`foundation/metric_tile`, values from `listBalanceMetrics` of `paper_trading`,
   and the account check status when the check did not pass), over a
   `PanelSplit` with the "Positions" panel and the "Orders" panel (tabs Open
   orders and Filled today). The tables are the same components as on the

@@ -15,8 +15,9 @@ test('the home page fills the window and shows the key numbers of the paper acco
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
 
-  const balance = page.getByRole('list', { name: 'Paper account balance' });
-  await expect(balance.getByRole('listitem')).toHaveText([/^Net liquidation \(USD\)\s*101,234\.50$/, /^Cash \(USD\)\s*25,000\.00$/]);
+  const balance = page.locator('dl[aria-label="Paper account balance"]');
+  await expect(balance.getByRole('term')).toHaveText(['Net liquidation (USD)', 'Cash (USD)']);
+  await expect(balance.getByRole('definition')).toHaveText(['101,234.50', '25,000.00']);
   await expect(page.getByRole('complementary', { name: 'Watchlist' })).toBeVisible();
   await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (40)' })).toBeVisible();
   await expect(ordersPanel(page).getByRole('tab', { name: /^Open orders/ })).toHaveAttribute('aria-selected', 'true');

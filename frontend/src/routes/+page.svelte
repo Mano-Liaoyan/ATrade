@@ -6,6 +6,7 @@
 <script lang="ts">
   import { StatusIndicator } from '#lib/foundation/carbon';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
+  import { MetricRow, MetricTile } from '#lib/foundation/metric_tile';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import {
     describeBalanceCurrency,
@@ -48,33 +49,32 @@
 
   <div class="overview">
     <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
-    <div class="key-numbers">
-      {#if account === null || checkDescription === null}
+    {#if account === null || checkDescription === null}
+      <div class="account-status">
         <StatusIndicator kind="in-progress" label="Reading the paper account." />
-      {:else}
-        {#if account.check.status !== 'passed'}
-          <div class="check" role="status" aria-label="Paper account check">
-            <StatusIndicator kind={findPaperAccountCheckKind(account.check.status)} label={checkDescription.title} />
-            {#if checkDescription.detail !== null}
-              <p class="check-detail">{checkDescription.detail}</p>
-            {/if}
+      </div>
+    {:else}
+      {#if account.check.status !== 'passed'}
+        <div class="account-status" role="status" aria-label="Paper account check">
+          <StatusIndicator kind={findPaperAccountCheckKind(account.check.status)} label={checkDescription.title} />
+          {#if checkDescription.detail !== null}
+            <p class="check-detail">{checkDescription.detail}</p>
+          {/if}
+        </div>
+      {/if}
+      {#if account.balance !== null}
+        <MetricRow label="Paper account balance">
+          {#each listBalanceMetrics(account.balance) as metric (metric.label)}
+            <MetricTile name={metric.label} text={metric.value} />
+          {/each}
+        </MetricRow>
+        {#if account.balance.usd_per_base_unit === null}
+          <div class="account-status">
+            <StatusIndicator kind="error" label={describeBalanceCurrency(account.balance)} />
           </div>
         {/if}
-        {#if account.balance !== null}
-          <ul class="metrics" aria-label="Paper account balance">
-            {#each listBalanceMetrics(account.balance) as metric (metric.label)}
-              <li class="metric">
-                <span class="metric-label">{metric.label}</span>
-                <span class="metric-value">{metric.value}</span>
-              </li>
-            {/each}
-          </ul>
-          {#if account.balance.usd_per_base_unit === null}
-            <StatusIndicator kind="error" label={describeBalanceCurrency(account.balance)} />
-          {/if}
-        {/if}
       {/if}
-    </div>
+    {/if}
 
     <PanelSplit storageKey="atrade.home.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
@@ -127,15 +127,11 @@
     min-inline-size: 0;
   }
 
-  /* The key numbers line: one surface level, a bottom divider like the panel header lines. */
-  .key-numbers {
-    display: flex;
+  /* A status line above or below the key numbers, with the same bottom divider as the metric row. */
+  .account-status {
     flex: none;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--cds-spacing-05) var(--cds-spacing-07);
-    padding: var(--cds-spacing-05);
-    box-shadow: inset 0 -1px 0 var(--cds-border-subtle-01);
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+    border-block-end: 1px solid var(--cds-border-subtle-01);
   }
 
   .check-detail {
@@ -143,35 +139,6 @@
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     color: var(--cds-text-secondary);
-  }
-
-  .metrics {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--cds-spacing-07);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .metric {
-    display: flex;
-    flex-direction: column;
-    gap: var(--cds-spacing-02);
-  }
-
-  .metric-label {
-    font-size: var(--cds-label-01-font-size);
-    line-height: var(--cds-label-01-line-height);
-    letter-spacing: var(--cds-label-01-letter-spacing);
-    color: var(--cds-text-secondary);
-  }
-
-  .metric-value {
-    font-size: var(--cds-heading-03-font-size);
-    font-weight: var(--cds-heading-03-font-weight);
-    line-height: var(--cds-heading-03-line-height);
-    font-variant-numeric: tabular-nums;
   }
 
   .table {
