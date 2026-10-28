@@ -635,15 +635,33 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   backtest panel (header line, `KeyMetricRow`, `EquityDrawdownChart`) over
   the Trades / Orders / Logs panel. `/backtests` opens the newest backtest
   (docs/architecture/backtest.md section 10.6). A backtest status is a
-  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The comparison
-  page shows the compared metrics as a data table. The equity chart
-  reads only Carbon tokens: `--cds-layer-01` (background),
-  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid),
-  `--cds-text-primary` (first curve, solid), `--cds-interactive` (second
-  curve, dashed), and `--cds-layer-accent-01` (interruptions). The equity and
-  drawdown chart reads `--cds-text-primary` (equity) and
-  `--cds-support-error` (drawdown line, and its fill with alpha), and
-  `--cds-border-subtle-01` for the line between its 2 panes.
+  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity and
+  drawdown chart reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid, and the line
+  between its 2 panes), `--cds-text-primary` (first equity curve, solid),
+  `--cds-interactive` (second equity curve, dashed), `--cds-layer-accent-01`
+  (interruptions), and `--cds-support-error` (drawdown line, and its fill
+  with alpha).
+- The comparison pages (`/backtests/<id>/comparison/<other id>` and
+  `/forward-tests/<id>/comparison/<backtest id>`, ticket
+  [#109](https://github.com/Mano-Liaoyan/ATrade/issues/109)) are workbenches
+  with the structure of the backtest page. The side column is the list of
+  the backtest page ("Backtests", both compared rows have the open row color:
+  `comparedBacktestIds` of `BacktestList`) or of the forward test page
+  ("Forward tests"). The comparison panel has the header line (name, strategy
+  link, instrument link and bar period; the backtest comparison shows these 2
+  only when both backtests have the same; the forward test comparison also
+  has the backtest status), `ComparedKeyMetrics` of `backtest`, and
+  `EquityDrawdownChart` with 2 curves. The chart panel has a minimum of
+  256px (160px on the other pages), and in a low panel the metric rows scroll
+  in their region "Compared metrics" with a visible track. The panel
+  under it has the tabs Code difference (backtests, `CodeDiff` with `fill`)
+  or Fills / Logs (forward test: `FillComparisonTable` and the backtest
+  error). `ComparedKeyMetrics` (`tests: ComparedTest[]`) shows one
+  `KeyMetricRow` for each test, under a line with the curve line style and a
+  link to the test. This line is the only key of the curves. `readKeyMetrics`
+  takes `metrics: null` (all tiles "–") and an optional `period`: only the
+  trades in the period count for the win rate.
 - `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
   (`name`, `text`, `change`) is a Carbon tile with the name and the
   right-aligned value (tabular numbers). With `change`, the value is a
@@ -659,10 +677,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-support-error`). Total return and net profit also are `change`
   values. Other metrics have no direction.
 - `EquityDrawdownChart` of `backtest` (`curves`, `label`, `interruptions`,
-  `fill`) is the one equity and drawdown chart. Each curve (`DrawdownCurve`:
-  `name`, `points`, `startCapitalUsd`) has an equity line and a drawdown
-  curve; the second curve is dashed (`readCurveStyle`), and `ChartLegend`
-  names the curves and lists the interruptions (grey columns). The drawdown
+  `fill`) is the one equity and drawdown chart of all pages. Each curve
+  (`DrawdownCurve`: `name`, `points`, `startCapitalUsd`) has an equity line
+  and a drawdown curve; the second curve is dashed (`readCurveStyle`). The
+  chart has no curve legend: `InterruptionList` lists the interruptions (grey
+  columns) under it. The drawdown
   axis is a percent. New points of the same curves do not reset the zoom.
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,

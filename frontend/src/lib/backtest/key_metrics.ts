@@ -14,11 +14,27 @@ export interface TestTrade {
   commission_usd: string;
 }
 
+/** A time range with a UTC start and end, both included. */
+export interface TestPeriod {
+  start_utc: string;
+  end_utc: string;
+}
+
 export interface KeyMetricInput {
-  metrics: BacktestMetrics;
+  /** Null for a test without a result (for example a backtest that runs): all tiles show a dash. */
+  metrics: BacktestMetrics | null;
   /** The paper capital of a backtest or the start balance of a forward test. Null when not known. */
   startCapitalUsd: string | null;
   trades: readonly TestTrade[];
+  /** Only the trades in this period count for the win rate (a forward test compared with a backtest). */
+  period?: TestPeriod | undefined;
+}
+
+/** One test of a comparison page (ComparedKeyMetrics): its name, its page, and its key metric input. */
+export interface ComparedTest extends KeyMetricInput {
+  name: string;
+  /** The resolved path of the backtest or forward test page. */
+  href: string;
 }
 
 /** One tile of the row. `change` gives the up or down direction (MetricTile); a tile without it has none. */
@@ -55,14 +71,27 @@ function computeWinRate(trades: readonly TestTrade[]): string {
   return roundTrips === 0 ? MISSING_VALUE : `${((wins / roundTrips) * PERCENT).toFixed(WIN_RATE_DECIMAL_PLACES)} %`;
 }
 
-export function readKeyMetrics({ metrics, startCapitalUsd, trades }: KeyMetricInput): KeyMetric[] {
+const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+
+function isInPeriod(trade: TestTrade, period: TestPeriod | undefined): boolean {
+  if (period === undefined) {
+    return true;
+  }
+  const time = Date.parse(trade.time_utc);
+  return time >= Date.parse(period.start_utc) && time <= Date.parse(period.end_utc);
+}
+
+export function readKeyMetrics({ metrics, startCapitalUsd, trades, period }: KeyMetricInput): KeyMetric[] {
+  if (metrics === null) {
+    return KEY_METRIC_NAMES.map((name) => ({ name, text: MISSING_VALUE }));
+  }
   const totalReturn = Number(metrics.total_return_percent);
   const netProfit = startCapitalUsd === null ? null : Number(metrics.final_equity_usd) - Number(startCapitalUsd);
   return [
     { name: 'Total return', text: formatPercent(metrics.total_return_percent), change: totalReturn },
     { name: 'Net profit (USD)', text: formatSignedNumber(netProfit), change: netProfit },
     { name: 'Max drawdown', ...formatMaxDrawdown(metrics.max_drawdown_percent) },
-    { name: 'Win rate', text: computeWinRate(trades) },
+    { name: 'Win rate', text: computeWinRate(trades.filter((trade) => isInPeriod(trade, period))) },
     { name: 'Trades', text: String(metrics.trade_count) },
     { name: 'Final equity (USD)', text: formatUsd(metrics.final_equity_usd) },
   ];

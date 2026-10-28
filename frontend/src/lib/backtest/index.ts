@@ -1,15 +1,17 @@
 // Public entry of the backtest capability: the backtest HTTP client, the key metric row and the equity and drawdown
-// chart (for the backtest page, and later for the strategy and forward test pages), the comparison view (also for
-// forward tests), and the value formats.
+// chart (for the backtest, strategy, forward test, and comparison pages), the compared key metrics of the comparison
+// pages, and the value formats.
 export { default as BacktestLimitsForm } from './BacktestLimitsForm.svelte';
 export { default as BacktestTradeTable } from './BacktestTradeTable.svelte';
-export { default as ComparisonView, type ComparedCode, type ComparedRun } from './ComparisonView.svelte';
-export { default as EquityChart, type EquityCurve } from './EquityChart.svelte';
+export { default as ComparedKeyMetrics } from './ComparedKeyMetrics.svelte';
 export { default as EquityDrawdownChart, type DrawdownCurve } from './EquityDrawdownChart.svelte';
 export { default as KeyMetricRow } from './KeyMetricRow.svelte';
 export { type TimeInterval } from './interruption_marks';
 export { computeDrawdownCurve, type DrawdownPoint } from './drawdown_curve';
-export { readKeyMetrics, type KeyMetric, type KeyMetricInput, type TestTrade } from './key_metrics';
+export {
+  readKeyMetrics,
+  type ComparedTest,
+  type KeyMetric, type KeyMetricInput, type TestPeriod, type TestTrade } from './key_metrics';
 export { checkComparisonSelection, type ComparisonSelection } from './backtest_comparison';
 export {
   changeBacktestLimits,
