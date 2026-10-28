@@ -1,5 +1,5 @@
 // Strategy editor: create a strategy, edit and save its code, see a failed save, and keep unsaved edits after a reload.
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 const VALID_CODE = `from nautilus_trader.config import StrategyConfig
 from nautilus_trader.trading import Strategy
@@ -34,23 +34,35 @@ async function replaceCode(page: Page, code: string): Promise<void> {
   await page.keyboard.insertText(code);
 }
 
-// In WebKit, a screenshot sometimes does not finish. The next screenshot then usually finishes, so the test tries again.
-const SCREENSHOT_ATTEMPTS = 3;
-const SCREENSHOT_TIMEOUT_MILLISECONDS = 3_000;
+// Before each screenshot, Playwright waits for document.fonts.ready. In WebKit, on this page, that promise can stay
+// pending for many seconds after all font files have loaded (the CI trace shows no font request after the page load).
+// Then the screenshot does not finish. This environment variable of Playwright stops that wait. The test loads the font
+// of the line itself (loadLineFont), and it reads only background pixels, not letters.
+const NO_FONTS_READY_VARIABLE = 'PW_TEST_SCREENSHOT_NO_FONTS_READY';
+
+// Loads the font of the line and its characters, so the line has its final size before the test measures it.
+async function loadLineFont(line: Locator): Promise<void> {
+  await line.evaluate(async (element) => {
+    const style = getComputedStyle(element);
+    await document.fonts.load(`${style.fontSize} ${style.fontFamily}`, element.textContent);
+  });
+}
 
 // The color of one screen pixel. The screenshot is decoded in the page, so the test needs no image library.
-// caret: 'initial' is necessary: in WebKit, the default caret hiding stops many screenshots.
-// CodeMirror draws its own cursor, and the test reads no pixel at the cursor.
+// caret: 'initial' keeps the caret style of the editor unchanged. CodeMirror draws its own cursor, and the test reads no
+// pixel at the cursor.
 async function readPixel(page: Page, x: number, y: number): Promise<string> {
   const clip = { x: Math.round(x), y: Math.round(y), width: 1, height: 1 };
-  let png: Buffer | undefined;
-  for (let attempt = 1; png === undefined; attempt += 1) {
-    try {
-      png = await page.screenshot({ clip, caret: 'initial', timeout: SCREENSHOT_TIMEOUT_MILLISECONDS });
-    } catch (error) {
-      if (attempt === SCREENSHOT_ATTEMPTS) {
-        throw error;
-      }
+  const previousValue = process.env[NO_FONTS_READY_VARIABLE];
+  process.env[NO_FONTS_READY_VARIABLE] = '1';
+  let png: Buffer;
+  try {
+    png = await page.screenshot({ clip, caret: 'initial' });
+  } finally {
+    if (previousValue === undefined) {
+      Reflect.deleteProperty(process.env, NO_FONTS_READY_VARIABLE);
+    } else {
+      process.env[NO_FONTS_READY_VARIABLE] = previousValue;
     }
   }
   return page.evaluate(async (base64) => {
@@ -76,6 +88,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     // selection with a click after the text, and drags again until the check passes. This is the same in all browsers.
     await expect(async () => {
       await line.scrollIntoViewIfNeeded();
+      await loadLineFont(line);
       // The line is wider than the editor panel, so the scroll can also move the editor to the right. The drag starts
       // at the start of the line, so the editor shows the start of the lines.
       const scroller = page.locator('.cm-scroller');
