@@ -52,10 +52,12 @@ test('starts a forward test, sees it running in the list, and stops it', async (
   await page.goto(`/instruments/ARCA/${symbol}?currency=USD`);
   const ticket = page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
   const reviewButton = ticket.getByRole('button', { name: 'Review buy order' });
-  await expect(reviewButton).toBeDisabled();
+  // The page reads the running forward tests from /ws/forward-tests after it opens.
   await expect(reviewButton).toHaveAccessibleDescription(
     `Forward test ${forwardTestNumber.replace('#', '')} (${strategyName} v1) trades ${symbol} / ARCA. Stop the forward test to send an order by hand.`,
+    { timeout: STATUS_TIMEOUT_MILLISECONDS },
   );
+  await expect(reviewButton).toBeDisabled();
 
   await page.getByRole('link', { name: 'Forward tests' }).click();
   const actions = row.getByRole('button', { name: `Actions for forward test ${forwardTestNumber.replace('#', '')}` });
