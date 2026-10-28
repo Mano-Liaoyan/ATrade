@@ -68,28 +68,36 @@ for (const colorScheme of ['light', 'dark'] as const) {
     const line = page
       .getByRole('textbox', { name: 'Strategy code' })
       .locator('.cm-line', { hasText: 'class MovingAverageStrategy(Strategy):' });
-    await line.scrollIntoViewIfNeeded();
-    const box = await line.boundingBox();
-    if (box === null) {
-      throw new Error('The class line is not visible.');
-    }
-    const centerY = box.y + box.height / 2;
+    const drawnSelection = page.locator('.cm-selectionBackground').first();
 
-    await page.mouse.move(box.x + 2, centerY);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 120, centerY, { steps: 5 });
-    await page.mouse.up();
+    // Under the load of the parallel tests, the editor can still change its lines (it loads the strategy version) when
+    // the drag starts, and then it draws no selection or a different one. The test measures the line again, clears the
+    // selection with a click after the text, and drags again until the check passes. This is the same in all browsers.
+    await expect(async () => {
+      await line.scrollIntoViewIfNeeded();
+      const box = await line.boundingBox();
+      if (box === null) {
+        throw new Error('The class line is not visible.');
+      }
+      const centerY = box.y + box.height / 2;
+      await page.mouse.click(box.x + box.width - 4, centerY);
+      await page.mouse.move(box.x + 2, centerY);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 120, centerY, { steps: 5 });
+      await page.mouse.up();
 
-    // Above the letters, the selected part of the line and the part after the text have different colors. The test
-    // reads the row from the drawn selection, because in WebKit the selection is lower than the top of the line box.
-    const selection = await page.locator('.cm-selectionBackground').first().boundingBox();
-    if (selection === null) {
-      throw new Error('The editor draws no selection.');
-    }
-    const topY = Math.ceil(selection.y) + 1;
-    expect(await readPixel(page, selection.x + selection.width / 2, topY)).not.toBe(
-      await readPixel(page, box.x + box.width - 4, topY),
-    );
+      // Above the letters, the selected part of the line and the part after the text have different colors. The
+      // test reads the row from the drawn selection, because in WebKit the selection is lower than the top of the
+      // line box.
+      const selection = await drawnSelection.boundingBox({ timeout: 1_000 });
+      if (selection === null) {
+        throw new Error('The editor draws no selection.');
+      }
+      const topY = Math.ceil(selection.y) + 1;
+      expect(await readPixel(page, selection.x + selection.width / 2, topY)).not.toBe(
+        await readPixel(page, box.x + box.width - 4, topY),
+      );
+    }).toPass();
   });
 }
 

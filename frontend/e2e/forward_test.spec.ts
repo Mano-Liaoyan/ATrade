@@ -112,7 +112,8 @@ test('at 1024 pixels the column names of the forward test list break only betwee
 
   const forwardTests = page.getByRole('region', { name: 'Forward tests' });
   const columnHeaders = forwardTests.getByRole('columnheader');
-  await expect(columnHeaders.first()).toBeVisible();
+  // The list comes from the e2e server, which the backtest children of other tests slow.
+  await expect(columnHeaders.first()).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   for (const columnHeader of await columnHeaders.all()) {
     expect(await findBrokenWords(columnHeader)).toEqual([]);
   }

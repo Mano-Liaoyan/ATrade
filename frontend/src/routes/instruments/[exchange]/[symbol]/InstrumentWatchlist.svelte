@@ -24,6 +24,9 @@
     { header: 'Change', align: 'right' },
   ];
 
+  // The number of daily bar requests at the same time.
+  const QUOTE_READERS = 2;
+
   let instruments = $state<WatchlistInstrument[] | null>(null);
   let failedMessage = $state<string | null>(null);
   let quotes = $state<Record<number, DayQuote | null>>({});
@@ -39,12 +42,21 @@
         return;
       }
       instruments = result.value;
-      for (const watchlistInstrument of result.value) {
-        void readBars(fetch, watchlistInstrument, '1-DAY').then((barsResult) => {
-          if (isCurrent) {
+      // Each daily bar request can call IBKR and save bars. A few requests at a time keep the backend free for the
+      // chart, and the reads stop when the column leaves the page.
+      const waiting = [...result.value];
+      const isReading = (): boolean => isCurrent;
+      const readNextQuote = async (): Promise<void> => {
+        for (let next = waiting.shift(); next !== undefined && isReading(); next = waiting.shift()) {
+          const watchlistInstrument = next;
+          const barsResult = await readBars(fetch, watchlistInstrument, '1-DAY');
+          if (isReading()) {
             quotes[watchlistInstrument.id] = barsResult.kind === 'loaded' ? readDayQuote(barsResult.bars) : null;
           }
-        });
+        }
+      };
+      for (let reader = 0; reader < QUOTE_READERS; reader += 1) {
+        void readNextQuote();
       }
     });
     return () => {
