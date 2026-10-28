@@ -5,8 +5,6 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
-// The forward test socket pushes a change after a worker comparison (every 2 seconds) and a socket read.
-const STATUS_TIMEOUT_MILLISECONDS = 15_000;
 const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
 
 function createUniqueName(currentTest: TestInfo, title: string): string {
@@ -146,27 +144,66 @@ test('runs a backtest from the toolbar and opens its result in a new tab', async
   await expectNoPageScroll(page);
 });
 
+// The e2e server allows 4 running forward tests (client IDs 10-13), and forward_test.spec.ts uses them in all browser
+// projects. So this test fakes the forward test routes and the /ws/forward-tests socket: it checks the toolbar button,
+// the dialog, and the requests, not the worker.
 test('starts a forward test from the toolbar and stops it with the same button', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Signal');
-  const uniqueNumber = String(Date.now() % 1_000_000);
+  const startRequests: unknown[] = [];
+  let sendForwardTests: (forwardTests: unknown[]) => void = () => {};
+  await page.routeWebSocket(/\/ws\/forward-tests$/, (socket) => {
+    sendForwardTests = (forwardTests) => {
+      socket.send(JSON.stringify({ type: 'forward_tests', forward_tests: forwardTests }));
+    };
+    sendForwardTests([]);
+  });
   await createStrategy(page, name);
-  const modifier = await readShortcutModifier(page);
+  const strategyId = Number(page.url().split('/').at(-1));
+  const forwardTest = {
+    id: 9001,
+    strategy_version_id: 0,
+    strategy_id: strategyId,
+    strategy_name: name,
+    version_number: 1,
+    symbol: 'SWT',
+    exchange: 'ARCA',
+    currency: 'USD',
+    bar_period: '1-MINUTE',
+    desired_state: 'running',
+    status: 'running',
+    client_id: 10,
+    start_balance_usd: null,
+    error_message: null,
+    created_at_utc: '2026-01-02T03:04:05Z',
+    stopped_at_utc: null,
+    end_time_utc: null,
+    crash_count: 0,
+    interruptions: [],
+  };
+  await page.route('**/api/forward-tests', async (route) => {
+    startRequests.push(route.request().postDataJSON());
+    sendForwardTests([forwardTest]);
+    await route.fulfill({ status: 201, json: forwardTest });
+  });
+  await page.route('**/api/forward-tests/9001/stop', async (route) => {
+    sendForwardTests([{ ...forwardTest, desired_state: 'stopped' }]);
+    await route.fulfill({ status: 202, json: { ...forwardTest, desired_state: 'stopped' } });
+  });
 
-  await page.keyboard.press(`${modifier}+Shift+F`);
+  await page.keyboard.press(`${await readShortcutModifier(page)}+Shift+F`);
   const dialog = page.getByRole('dialog', { name: `Start forward test of ${name} v1` });
-  await dialog.getByLabel('Symbol').fill(`SW${currentTest.project.name.slice(0, 2).toUpperCase()}${uniqueNumber}`);
-  await dialog.getByLabel('Exchange').fill('ARCA');
+  await dialog.getByLabel('Symbol').fill('swt');
+  await dialog.getByLabel('Exchange').fill('arca');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
   await page.getByRole('option', { name: '1 minute', exact: true }).click();
-  // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
-  await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
   await dialog.getByRole('button', { name: 'Start forward test' }).click();
   await expect(dialog).toHaveCount(0);
+  expect(startRequests).toEqual([
+    expect.objectContaining({ symbol: 'SWT', exchange: 'ARCA', currency: 'USD', bar_period: '1-MINUTE', end_time_utc: null }),
+  ]);
 
   const stopButton = page.getByRole('button', { name: 'Stop forward test', exact: true });
-  await expect(stopButton).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(stopButton).toBeVisible();
   await stopButton.click();
-  await expect(page.getByRole('button', { name: 'Start forward test', exact: true })).toBeVisible({
-    timeout: STATUS_TIMEOUT_MILLISECONDS,
-  });
+  await expect(page.getByRole('button', { name: 'Start forward test', exact: true })).toBeVisible();
 });
