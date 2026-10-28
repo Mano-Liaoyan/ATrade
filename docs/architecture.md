@@ -563,10 +563,22 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   and the live bar of the page belong to one chart request, so the chart gets
   no data of the previous bar period after a change. The "Paper account"
   panel has the tabs Positions, Open orders, and Filled today, with 32px
-  rows. The right `SideColumn` "Paper order" has the paper order form of the
-  instrument (`PaperOrderTicket` with `instrument`) after a passed account
-  check. The side column is the landmark; its content has no landmark with
-  the same name. The page reads the paper account with `PaperAccountFeed`
+  rows. The right `SideColumn` "Paper order" has `InstrumentOrderPanel` of
+  `paper_trading` (IBKR Desktop layout). The order is for the instrument of
+  the page, so the panel has no instrument fields. From top to bottom: the
+  Buy / Sell content switcher; Quantity and Order type, Limit price and Time
+  in force in two columns (the limit price starts with the last price); the
+  order value, position, average cost, unrealized P&L, cash (USD), and net
+  liquidation (USD) in two columns with right-aligned tabular numbers; and
+  the full-width button "Review buy order" (primary) or "Review sell order"
+  (danger). The button opens the confirmation dialog with the PAPER tag and
+  "Send paper order". A paper account check that did not pass, or a running
+  forward test on the instrument, disables the button, and the status above it
+  says why with a `StatusIndicator` (`findInstrumentOrderBlock`). A sent order
+  shows in the Open orders tab from `/ws/paper-trading`. The fields and the
+  button stay in view; only the numbers scroll, in their own `ScrollRegion`.
+  The side column is the landmark; its content has no landmark with the same
+  name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
   same feeds). While a socket is not connected, the panel and the column

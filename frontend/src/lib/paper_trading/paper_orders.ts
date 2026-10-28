@@ -103,7 +103,10 @@ export function describeOrderForConfirmation(request: SendOrderRequest): Confirm
  * Why ATrade refuses an order by hand on the instrument of the form, or null. A forward test that holds a client ID on
  * the instrument blocks the orders by hand on it (docs/architecture.md section 12.2). The backend checks it again.
  */
-export function findOrderBlock(form: OrderForm, blockingForwardTests: readonly BlockingForwardTest[]): string | null {
+export function findOrderBlock(
+  form: Pick<OrderForm, 'symbol' | 'exchange'>,
+  blockingForwardTests: readonly BlockingForwardTest[],
+): string | null {
   const symbol = form.symbol.trim().toUpperCase();
   const exchange = form.exchange.trim().toUpperCase();
   const blocking = blockingForwardTests.find((forwardTest) => forwardTest.symbol === symbol && forwardTest.exchange === exchange);
