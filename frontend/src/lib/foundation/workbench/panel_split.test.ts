@@ -41,7 +41,13 @@ describe('a panel that starts minimized', () => {
   });
 
   it('stays open when the stored layout opened it', () => {
-    expect(readPanelSplitLayout({ maximized: null, minimized: [], pixels: {} }, WITH_OUTPUT).minimized).toEqual([]);
+    expect(readPanelSplitLayout({ maximized: null, minimized: [], pixels: { output: 300 } }, WITH_OUTPUT).minimized).toEqual(
+      [],
+    );
+  });
+
+  it('is minimized when the stored layout is older than the panel (no height of it)', () => {
+    expect(readPanelSplitLayout({ maximized: null, minimized: [], pixels: {} }, WITH_OUTPUT).minimized).toEqual(['output']);
   });
 });
 
@@ -66,13 +72,32 @@ describe('togglePanelSize', () => {
     expect(findPanelSize(togglePanelSize(minimized, TWO, 'account', 'minimized'), 'account')).toBe('normal');
   });
 
-  it('maximizes a panel and restores the others, also a minimized one', () => {
-    const minimized = togglePanelSize(createPanelSplitLayout(TWO), TWO, 'account', 'minimized');
-    const maximized = togglePanelSize(minimized, TWO, 'chart', 'maximized');
+  it('maximizes a panel, and the restore gives a minimized panel its minimized size again', () => {
+    const minimized = togglePanelSize(createPanelSplitLayout(THREE), THREE, 'output', 'minimized');
+    const maximized = togglePanelSize(minimized, THREE, 'editor', 'maximized');
 
-    expect(findPanelSize(maximized, 'chart')).toBe('maximized');
-    expect(findPanelSize(maximized, 'account')).toBe('normal');
-    expect(findPanelSize(togglePanelSize(maximized, TWO, 'chart', 'maximized'), 'chart')).toBe('normal');
+    expect(findPanelSize(maximized, 'editor')).toBe('maximized');
+    expect(isPanelHeaderOnly(maximized, 'results')).toBe(true);
+    expect(isPanelHeaderOnly(maximized, 'output')).toBe(true);
+    const restored = togglePanelSize(maximized, THREE, 'editor', 'maximized');
+    expect(findPanelSize(restored, 'editor')).toBe('normal');
+    expect(findPanelSize(restored, 'results')).toBe('normal');
+    expect(findPanelSize(restored, 'output')).toBe('minimized');
+    expect(findPanelSize(restorePanelSplit(maximized), 'output')).toBe('minimized');
+  });
+
+  it('opens a minimized panel when it is maximized', () => {
+    const minimized = togglePanelSize(createPanelSplitLayout(THREE), THREE, 'output', 'minimized');
+    const maximized = togglePanelSize(minimized, THREE, 'output', 'maximized');
+
+    expect(findPanelSize(maximized, 'output')).toBe('maximized');
+    expect(findPanelSize(togglePanelSize(maximized, THREE, 'output', 'maximized'), 'output')).toBe('normal');
+  });
+
+  it('ends a maximize when the Restore button of a minimized panel opens it', () => {
+    const layout = { maximized: 'editor', minimized: ['output'], pixels: {} };
+
+    expect(togglePanelSize(layout, THREE, 'output', 'minimized')).toEqual({ maximized: null, minimized: [], pixels: {} });
   });
 
   it('keeps one panel open: the last open panel does not minimize', () => {
@@ -168,6 +193,12 @@ describe('readPanelSplitLayout', () => {
     expect(readPanelSplitLayout({ maximized: 'sideways', minimized: ['x'], pixels: { account: 'x' } }, TWO)).toEqual(
       createPanelSplitLayout(TWO),
     );
+  });
+
+  it('keeps the minimized panels of a stored layout with a maximized panel', () => {
+    const stored = { maximized: 'editor', minimized: ['output', 'editor'], pixels: {} };
+
+    expect(readPanelSplitLayout(stored, THREE)).toMatchObject({ maximized: 'editor', minimized: ['output'] });
   });
 
   it('opens a panel when the stored layout minimizes all panels', () => {

@@ -70,6 +70,10 @@ test('swaps the results and the editor, keeps the order after a reload, and size
   await expect(results.getByText('No backtests')).toBeHidden();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('separator', { name: 'Resize the results and the editor' })).toBeVisible();
+  // The problems and output panel was minimized before the maximize: it is the 24px status bar again.
+  const outputPanel = page.getByRole('region', { name: 'Problems and output' });
+  await expect(outputPanel.getByRole('tab')).toHaveCount(0);
+  expect((await outputPanel.boundingBox())?.height).toBe(24);
 
   await results.getByRole('button', { name: 'Minimize panel' }).click();
   await expect(results.getByText('No backtests')).toBeHidden();
@@ -274,4 +278,28 @@ test('opens problems and output from the 24px status bar and minimizes them agai
   await page.reload();
   await expect(outputPanel.getByRole('tab')).toHaveCount(0);
   await expectNoPageScroll(page);
+});
+
+// An error shows also while the panel is minimized: it opens the Output tab.
+test('opens the Output tab when the save fails', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Save error'));
+  await page.route('**/api/strategies/*/versions', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 500, json: { detail: 'The database is not available.' } });
+      return;
+    }
+    await route.fallback();
+  });
+  const code = page.getByRole('textbox', { name: 'Strategy code' });
+  await code.click();
+  await page.keyboard.press('End');
+  await page.keyboard.insertText('\n# A comment.');
+  await page.getByRole('button', { name: 'Save version' }).click();
+
+  const outputPanel = page.getByRole('region', { name: 'Problems and output' });
+  await expect(outputPanel.getByRole('tab', { name: 'Output' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('region', { name: 'Output', exact: true }).getByRole('listitem').last()).toContainText(
+    'Version not saved',
+  );
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
 });

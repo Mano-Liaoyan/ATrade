@@ -219,7 +219,7 @@
   async function loadStrategy(id: number, versionNumberToOpen: number | null): Promise<void> {
     const result = await readStrategy(fetch, id);
     if (result.kind === 'failed') {
-      writeOutput(`Strategy not read: ${result.message}`);
+      writeOutputError(`Strategy not read: ${result.message}`);
       return;
     }
     strategy = result.value;
@@ -232,7 +232,7 @@
   async function openStrategyVersion(id: number, versionNumber: number): Promise<void> {
     const result = await readStrategyVersion(fetch, id, versionNumber);
     if (result.kind === 'failed') {
-      writeOutput(`Version not read: ${result.message}`);
+      writeOutputError(`Version not read: ${result.message}`);
       return;
     }
     const draft = readDraft(localStorage, { strategyId: id, versionNumber });
@@ -272,7 +272,7 @@
       return;
     }
     if (result.kind === 'failed') {
-      writeOutput(`Version not saved: ${result.message}`);
+      writeOutputError(`Version not saved: ${result.message}`);
       return;
     }
     clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
@@ -284,6 +284,12 @@
 
   function writeOutput(text: string): void {
     outputLines = [...outputLines, createOutputLine(new Date(), text)];
+  }
+
+  // An error opens the Output tab, so it shows also while the panel is minimized to its status bar.
+  function writeOutputError(text: string): void {
+    writeOutput(text);
+    openOutput('output');
   }
 
   // A status bar control or a refused save: the panel opens above the status bar at the tab.
@@ -320,7 +326,7 @@
     const result = await stopForwardTest(fetch, forwardTestId);
     isStoppingForwardTest = false;
     if (result.kind === 'failed') {
-      writeOutput(`Forward test #${String(forwardTestId)} not stopped: ${result.message}`);
+      writeOutputError(`Forward test #${String(forwardTestId)} not stopped: ${result.message}`);
       return;
     }
     writeOutput(`Forward test #${String(forwardTestId)} stop requested.`);
@@ -381,7 +387,7 @@
     isDeleting = false;
     isDeleteDialogOpen = false;
     if (result.kind === 'failed') {
-      writeOutput(`Strategy not deleted: ${result.message}`);
+      writeOutputError(`Strategy not deleted: ${result.message}`);
       return;
     }
     listReadCount += 1;
@@ -555,8 +561,12 @@
                     openOutput('problems');
                   }}
                 >
-                  <span class="status-count status-count--error"><Icon icon={ErrorFilled16} />{problemCounts.errors}</span>
-                  <span class="status-count status-count--warning"><Icon icon={WarningAltFilled16} />{problemCounts.warnings}</span>
+                  <span class={['status-count', problemCounts.errors > 0 && 'status-count--error']}>
+                    <Icon icon={ErrorFilled16} />{problemCounts.errors}
+                  </span>
+                  <span class={['status-count', problemCounts.warnings > 0 && 'status-count--warning']}>
+                    <Icon icon={WarningAltFilled16} />{problemCounts.warnings}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -688,6 +698,11 @@
     gap: var(--cds-spacing-02);
     align-items: center;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* A count of 0 has the status bar text color; only a problem gets the support color. */
+  .status-count :global(svg) {
+    fill: var(--cds-icon-secondary);
   }
 
   .status-count--error :global(svg) {

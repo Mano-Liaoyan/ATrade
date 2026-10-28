@@ -2,7 +2,7 @@
 //  - Minimized: the panel shows only its header line (or its status bar). Several panels can be minimized, but one
 //    panel always stays open.
 //  - Maximized: the panel gets all the height. The other panels show only their header lines, so they can be restored.
-//    One panel at a time is maximized.
+//    One panel at a time is maximized. A minimized panel stays minimized: after the restore it is minimized again.
 //  - The first open panel fills the rest of the height. Each other open panel has its own height in pixels, and the
 //    splitter above it changes that height. A splitter shows only between 2 open panels and while no panel is
 //    maximized.
@@ -63,7 +63,9 @@ export function findPanelSize(layout: PanelSplitLayout, id: string): PanelSize {
 
 /**
  * A Minimize or Maximize button: the first click sets the size, a second click restores the panel. Maximize opens the
- * minimized panels again. Minimize ends a maximize. The last open panel does not minimize.
+ * maximized panel if it was minimized; the other minimized panels stay minimized, so the restore gives them their
+ * minimized size again. Minimize ends a maximize, and so does the Restore button of a minimized panel. The last open
+ * panel does not minimize.
  */
 export function togglePanelSize(
   layout: PanelSplitLayout,
@@ -72,10 +74,11 @@ export function togglePanelSize(
   size: 'minimized' | 'maximized',
 ): PanelSplitLayout {
   if (size === 'maximized') {
-    return { ...layout, maximized: layout.maximized === id ? null : id, minimized: [] };
+    const minimized = layout.minimized.filter((minimizedId) => minimizedId !== id);
+    return { ...layout, maximized: layout.maximized === id ? null : id, minimized };
   }
   if (layout.minimized.includes(id)) {
-    return { ...layout, minimized: layout.minimized.filter((minimizedId) => minimizedId !== id) };
+    return { ...layout, maximized: null, minimized: layout.minimized.filter((minimizedId) => minimizedId !== id) };
   }
   const minimized = specs.map((spec) => spec.id).filter((specId) => specId === id || layout.minimized.includes(specId));
   if (minimized.length >= specs.length) {
@@ -158,7 +161,13 @@ export function readPanelSplitLayout(stored: unknown, specs: readonly PanelSpec[
   const layout = stored as Partial<Record<keyof PanelSplitLayout, unknown>>;
   const ids = specs.map((spec) => spec.id);
   const maximized = ids.find((id) => id === layout.maximized) ?? null;
-  const minimized = maximized === null ? readMinimized(layout.minimized, ids) : [];
+  // A layout stored before a `startsMinimized` panel existed has no height of that panel: the panel starts minimized.
+  const storedPixels = typeof layout.pixels === 'object' && layout.pixels !== null ? layout.pixels : {};
+  const newMinimizedIds = specs
+    .filter((spec) => spec.startsMinimized === true && spec.defaultPixels !== undefined && !Object.hasOwn(storedPixels, spec.id))
+    .map((spec) => spec.id);
+  const storedMinimized: unknown[] = Array.isArray(layout.minimized) ? layout.minimized : [];
+  const minimized = readMinimized([...storedMinimized, ...newMinimizedIds], ids).filter((id) => id !== maximized);
   return { maximized, minimized, pixels: readPixels(layout.pixels, defaults.pixels) };
 }
 

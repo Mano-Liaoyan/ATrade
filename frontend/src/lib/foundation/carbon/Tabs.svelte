@@ -56,6 +56,11 @@
     selectedAtPress = value;
   }
 
+  // A press that does not end in a click on the tab (the pointer moved away) is not a click on the selected tab.
+  function forgetPress(): void {
+    selectedAtPress = null;
+  }
+
   function notePressKey(event: KeyboardEvent): void {
     if (event.key === 'Enter' || event.key === ' ') {
       selectedAtPress = value;
@@ -79,6 +84,8 @@
           value={item.value}
           class={['cds--tabs__nav-item', 'cds--tabs__nav-link', item.value === value && 'cds--tabs__nav-item--selected']}
           onpointerdown={notePress}
+          onpointercancel={forgetPress}
+          onpointerleave={forgetPress}
           onkeydown={notePressKey}
           onclick={() => {
             clickTab(item.value);

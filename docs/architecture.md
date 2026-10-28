@@ -532,7 +532,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     `onToggleMaximized`, `onRestore`) to spread on a `Panel`. Several panels
     can be minimized, but one panel stays open. One panel at a time is
     maximized, and the other panels show only their header lines. A second
-    click on the same button restores the panel. Escape restores a maximized
+    click on the same button restores the panel. A minimized panel stays
+    minimized through a maximize of another panel and its restore. Escape restores a maximized
     panel of the split that has the focus (the innermost split first), or of
     each split when the focus is outside all splits. `panel_split.ts` has the
     state as functions with unit tests.
@@ -547,7 +548,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     that shows only its header line shows only the status bar, and a click
     on the selected tab minimizes the panel. Status bar controls have the
     class `atrade-status-bar__item`. A `PanelSpec` with `startsMinimized` is
-    minimized in the default layout. `PanelSplit` exports `openPanel(id)`
+    minimized in the default layout, and also when a stored layout has no
+    height for it (a layout stored before the panel existed). `PanelSplit` exports `openPanel(id)`
     (through `bind:this`): it opens a panel that shows only its header line
     or its status bar.
   - `PanelHeader` (`end` snippet): the 32px header line with the class
@@ -736,7 +738,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   checks give no severity, so each code problem is an error) open the
   Problems tab, and "Output" opens the Output tab. A click on the selected
   tab or the Minimize button minimizes the panel again; the panel also
-  maximizes and restores. A save that the checks refuse opens Problems.
+  maximizes and restores. A count of 0 has a grey icon; a count above 0 has
+  the support color. A save that the checks refuse opens Problems. An error
+  (a failed save, read, delete, or forward test stop) opens Output.
   Problems lists the code problems of the last save (line and message); a
   click on a problem puts the cursor on its line (`CodeEditor`
   `revealLine`). Output lists the save results, the backtests that start
