@@ -29,9 +29,12 @@
 </span>
 
 <style>
+  /* vertical-align: top keeps the line box at the text height, so a 32px table row stays 32px. With the baseline
+     alignment of inline-flex, the 16px icon makes the line box higher. */
   .change {
     display: inline-flex;
     align-items: center;
+    vertical-align: top;
     gap: var(--cds-spacing-02);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

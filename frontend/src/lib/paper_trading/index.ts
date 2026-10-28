@@ -1,15 +1,24 @@
-// Public entry of paper_trading: the account panel with the paper account check, the balance, the positions,
-// the paper order form, the open orders, and the paper capital for the backtest form. The workbench of the instrument
-// page uses the tables on their own and the instrument order panel (IBKR Desktop layout).
-export { default as PaperAccountPanel } from './PaperAccountPanel.svelte';
+// Public entry of paper_trading: the paper account feed, the key numbers of the balance, the positions, the paper
+// order form, the open orders, the filled orders by hand, and the paper capital for the backtest form. The home page
+// puts the tables in its panels; the instrument page uses the tables and the instrument order panel (IBKR Desktop
+// layout).
 export { default as PaperOrderTicket } from './PaperOrderTicket.svelte';
 export { default as InstrumentOrderPanel } from './InstrumentOrderPanel.svelte';
 export { default as PositionTable } from './PositionTable.svelte';
 export { default as OpenOrderList } from './OpenOrderList.svelte';
 export { default as FilledManualOrderList } from './FilledManualOrderList.svelte';
 export { PaperAccountFeed } from './paper_account_feed.svelte';
-export { describePaperAccountCheck, describePaperAccountTag, findPaperAccountCheckKind, formatAmount, readPaperAccountMessage, PAPER_TRADING_SOCKET_PATH } from './paper_account';
-export type { PaperAccountCheck, PaperAccountMessage, PaperPosition } from './paper_account';
+export {
+  describeBalanceCurrency,
+  describePaperAccountCheck,
+  describePaperAccountTag,
+  findPaperAccountCheckKind,
+  formatAmount,
+  listBalanceMetrics,
+  readPaperAccountMessage,
+  PAPER_TRADING_SOCKET_PATH,
+} from './paper_account';
+export type { BalanceMetric, PaperAccountBalance, PaperAccountCheck, PaperAccountMessage, PaperPosition } from './paper_account';
 export { readPaperCapital } from './paper_capital';
 export {
   cancelPaperOrder,

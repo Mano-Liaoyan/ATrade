@@ -191,3 +191,16 @@ test('the order column keeps the paper order form and collapses to a rail', asyn
   await page.getByRole('button', { name: 'Open paper order' }).click();
   await expect(page.getByRole('form', { name: 'Paper order' })).toBeVisible();
 });
+
+test('the watchlist rows are 32px high', async ({ page, request }) => {
+  // The browser projects share one database: another project can add AAPL first (409).
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const response = await request.post('/api/watchlist', { data: { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' } });
+  expect([201, 409]).toContain(response.status());
+  await openWorkbench(page);
+  const watchlistRow = page.getByRole('region', { name: 'Watchlist table' }).getByRole('row', { name: /^AAPL/ });
+  // The change column has an arrow icon after the daily bars load.
+  await expect(watchlistRow.locator('svg')).toBeVisible();
+
+  await expect.poll(async () => Math.round((await watchlistRow.boundingBox())?.height ?? 0)).toBe(32);
+});

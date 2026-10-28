@@ -1,4 +1,4 @@
-// Turns /ws/paper-trading messages into the text of the account panel.
+// Turns /ws/paper-trading messages into the text of the account overview and the Paper tag.
 import { describe, expect, it } from 'vite-plus/test';
 import {
   describeBalanceCurrency,
@@ -6,6 +6,7 @@ import {
   describePaperAccountTag,
   findPaperAccountCheckKind,
   formatAmount,
+  listBalanceMetrics,
   readPaperAccountMessage,
   type PaperAccountBalance,
   type PaperAccountMessage,
@@ -174,5 +175,34 @@ describe('describePaperAccountTag', () => {
     expect(describePaperAccountTag({ status: 'disconnected', message: null, actual_accounts: [], expected_account: null })).toBe(
       'Paper account not checked. IB Gateway is not connected.',
     );
+  });
+});
+
+describe('listBalanceMetrics', () => {
+  it('lists the USD values of a USD account', () => {
+    expect(listBalanceMetrics({ ...eurBalance, base_currency: 'USD', net_liquidation_usd: '101234.5', cash_usd: '25000.00' })).toEqual([
+      { label: 'Net liquidation (USD)', value: '101,234.50' },
+      { label: 'Cash (USD)', value: '25,000.00' },
+    ]);
+  });
+
+  it('adds the base currency value and the rate of a EUR account', () => {
+    expect(listBalanceMetrics(eurBalance)).toEqual([
+      { label: 'Net liquidation (USD)', value: '111,390.00' },
+      { label: 'Cash (USD)', value: '89,112.00' },
+      { label: 'Net liquidation (EUR)', value: '100,000.00' },
+      { label: 'USD per EUR', value: '1.1139' },
+    ]);
+  });
+
+  it('shows a missing value when IBKR sent no rate', () => {
+    expect(
+      listBalanceMetrics({ ...eurBalance, net_liquidation_usd: null, cash_usd: null, usd_per_base_unit: null }),
+    ).toEqual([
+      { label: 'Net liquidation (USD)', value: '–' },
+      { label: 'Cash (USD)', value: '–' },
+      { label: 'Net liquidation (EUR)', value: '100,000.00' },
+      { label: 'USD per EUR', value: '–' },
+    ]);
   });
 });

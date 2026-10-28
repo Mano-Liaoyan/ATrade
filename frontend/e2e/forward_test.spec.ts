@@ -73,17 +73,17 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(tables.getByRole('row', { name: /Planned stop/ })).toBeVisible();
   await expectNoPageScroll(page);
 
-  // The order form does not send a paper order by hand on the instrument of the running forward test, and says why.
-  await page.getByRole('link', { name: 'Home' }).click();
-  const ticket = page.getByRole('form', { name: 'Paper order' });
-  await ticket.getByLabel('Order symbol').fill(symbol);
-  await ticket.getByLabel('Exchange').fill('ARCA');
-  const reviewButton = ticket.getByRole('button', { name: 'Review order' });
-  // The home page reads the running forward tests from its own /ws/forward-tests socket.
-  await expect(reviewButton).toBeDisabled({ timeout: STATUS_TIMEOUT_MILLISECONDS });
+  // The order panel of the instrument page does not send a paper order by hand on the instrument of the running
+  // forward test, and says why.
+  await page.goto(`/instruments/ARCA/${symbol}?currency=USD`);
+  const ticket = page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
+  const reviewButton = ticket.getByRole('button', { name: 'Review buy order' });
+  // The page reads the running forward tests from /ws/forward-tests after it opens.
   await expect(reviewButton).toHaveAccessibleDescription(
     `Forward test ${forwardTestId} (${strategyName} v1) trades ${symbol} / ARCA. Stop the forward test to send an order by hand.`,
+    { timeout: STATUS_TIMEOUT_MILLISECONDS },
   );
+  await expect(reviewButton).toBeDisabled();
 
   await page.goBack();
   const stopButton = chartPanel.getByRole('button', { name: 'Stop forward test', exact: true });
