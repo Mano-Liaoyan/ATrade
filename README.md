@@ -24,7 +24,8 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   routes under `/api/paper-trading`, the backtest routes under
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
-- The app shell header shows the backend status and the IB Gateway status.
+- The app shell header shows the backend status, the IB Gateway status, the
+  server time, and the Paper tag of the checked paper account.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home
@@ -48,8 +49,10 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   IB Gateway and shows each match as symbol / exchange / currency, for
   example `700 / SEHK / HKD`. The search needs a connected IB Gateway. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
-- Strategies: the page `/strategies` creates a strategy from a template. The
-  editor saves the code as strategy versions after the checks before save.
+- Strategies: the page `/strategies` is the strategy workbench. It creates a
+  strategy from a template. The editor saves the code as strategy versions after the checks before save.
+  `/strategies/<id>/versions/<n>` opens version n; the strategy links
+  "<name> vN" of the backtest and forward test pages open this address.
   Unsaved edits stay in the browser. The editor shows code completion and
   live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
@@ -90,8 +93,9 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   refuses a time range without saved bars (`422`). See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
 - Backtest comparison: select 2 backtests of the same strategy in the list on
-  `/backtests` and click "Compare". The comparison page shows the code diff, the
-  metric table, and both equity curves on one chart. ATrade refuses 2
+  `/backtests` and click "Compare". The comparison page shows one key metric
+  row for each backtest, both equity and drawdown curves on one chart, and the
+  code diff. ATrade refuses 2
   backtests of different strategies. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md) section 10.7.
 - Forward tests: the page `/forward-tests` starts a forward test of a
@@ -104,18 +108,20 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   forward test per instrument, 4 at the same time. A restart of `web` does
   not stop forward tests. Before the start, the child reads the warm-up bars
   of the last 7 days (or more for long bar periods) from IBKR, so
-  `request_bars` in the strategy gets them, as in a backtest. The forward
-  test ID in the list opens the forward test page: its state, its
-  interruptions, its equity curve and fills, and a link to the comparison
-  with each backtest of the same period. See
+  `request_bars` in the strategy gets them, as in a backtest. The page
+  `/forward-tests/<id>` shows the forward test list and the open forward test:
+  its state, its interruptions, its key metrics, its equity and drawdown
+  curves and fills, and a link to the comparison with each backtest of the
+  same period. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
 - Forward test records and comparison: at the end of each bar, the
   forward test records its new fills and one equity point in PostgreSQL. The
   button "Backtest the same period" starts a normal backtest of the same
   strategy version, instrument, bar period, and period, with the start
-  balance as paper capital. The comparison page shows the metric table, both
-  equity curves on one chart with the interruptions in grey, and the fill
-  price of each side and the difference for each bar. See
+  balance as paper capital. The comparison page shows one key metric row for
+  each test, both equity and drawdown curves on one chart with the
+  interruptions in grey, and the fill price of each side and the difference
+  for each bar. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md)
   section 12.10.
 

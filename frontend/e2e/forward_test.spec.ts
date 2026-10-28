@@ -72,7 +72,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
   await expect(heading).toContainText(`#${forwardTestId}`);
-  await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toBeVisible();
+  await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   await expect(heading).toContainText('1 min');
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.

@@ -250,8 +250,8 @@ Implementation (#77):
   - the same strategy version, instrument, and bar type
   - the period from the forward test start to its end, or to now while it runs
   - `paper_capital_usd` equal to the balance at forward test start
-- The comparison page uses the comparison view of section 9.5 ([`strategy.md`](strategy.md)): the metric
-  table and both equity curves on one chart.
+- The comparison page uses the comparison view of section 9.5 ([`strategy.md`](strategy.md)): one key
+  metric row for each test and both equity and drawdown curves on one chart.
 - A fill table shows, for each bar, the fill price on each side and the
   difference.
 - The chart marks interruptions in grey.
@@ -477,7 +477,7 @@ than the worker clock.
   backtest result". A refused start shows the `detail` text. A started
   forward test opens at once.
 - The page reads `GET /api/forward-tests/{id}` every 2 seconds. The header
-  line shows the number, the strategy version (link to the strategy page),
+  line shows the number, the strategy version (link to that version on the strategy page),
   the symbol (link to the instrument page), the bar period, the status, the
   crash count when it is not 0 and the status is not `stopped`, the red
   "Stop forward test" button while `canStop()`, and the "Backtest the same
@@ -531,7 +531,8 @@ than the worker clock.
   1-DAY) with a start balance, 40 fills, equity points, 1 interruption, and
   the saved bars of its period. `frontend/e2e/forward_test_comparison.spec.ts`
   clicks "Backtest the same period", waits for the real backtest child, and
-  checks the metric table, the interruption text, the fill table, and its
+  checks the key metric row of each test, the interruption text, the fill
+  table, and its
   scroll track. It also checks the key metrics, the chart, the Fills tab, and
   the Logs tab of the forward test page.
 

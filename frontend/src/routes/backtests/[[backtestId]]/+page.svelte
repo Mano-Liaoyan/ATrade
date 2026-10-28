@@ -228,7 +228,7 @@
             {#snippet header()}
               <h1 class="run-title">
                 <span class="run-number">#{detail.id}</span>
-                <a class="cds--link" href={resolve('/strategies/[strategyId]', { strategyId: String(detail.strategy_id) })}
+                <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
                   >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
                 >
                 <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->

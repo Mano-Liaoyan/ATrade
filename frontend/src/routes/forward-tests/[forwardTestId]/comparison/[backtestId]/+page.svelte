@@ -161,7 +161,7 @@
                 <span>{title}</span>
                 <a
                   class="cds--link"
-                  href={resolve('/strategies/[strategyId]', { strategyId: String(forwardTest.strategy_id) })}
+                  href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
                   >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
                 >
                 <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
