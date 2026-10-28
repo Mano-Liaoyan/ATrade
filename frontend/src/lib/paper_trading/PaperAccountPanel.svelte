@@ -1,9 +1,8 @@
 <!-- Account panel: the paper account check, the balance, the positions, the order form, and the open orders,
      updated live from /ws/paper-trading. -->
 <script lang="ts">
-  import { DataTable, StatusIndicator, Tag, type TableColumn } from '#lib/foundation/carbon';
+  import { StatusIndicator, Tag } from '#lib/foundation/carbon';
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
-  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     describeBalanceCurrency,
     describePaperAccountCheck,
@@ -23,6 +22,7 @@
     type OpenOrder,
   } from './paper_orders';
   import PaperOrderTicket from './PaperOrderTicket.svelte';
+  import PositionTable from './PositionTable.svelte';
 
   interface Props {
     // The forward tests that block orders by hand on their instruments.
@@ -30,17 +30,6 @@
   }
 
   const { blockingForwardTests = [] }: Props = $props();
-
-  const POSITION_COLUMNS: TableColumn[] = [
-    { header: 'Symbol' },
-    { header: 'Exchange' },
-    { header: 'Currency' },
-    { header: 'Quantity', align: 'right' },
-    { header: 'Average cost', align: 'right' },
-    { header: 'Market price', align: 'right' },
-    { header: 'Market value', align: 'right' },
-    { header: 'Unrealized P&L', align: 'right' },
-  ];
 
   let account = $state<PaperAccountMessage | null>(null);
   let isSocketConnected = $state(false);
@@ -121,29 +110,7 @@
       </p>
 
       <h3>Positions</h3>
-      {#if account.positions.length === 0}
-        <p>No positions.</p>
-      {:else}
-        {@const positions = account.positions}
-        <ScrollRegion label="Positions" maxHeight="18rem">
-          <DataTable columns={POSITION_COLUMNS} size="sm">
-            {#snippet rows()}
-              {#each positions as position (`${position.symbol}-${position.exchange}-${position.security_type}`)}
-                <tr>
-                  <th scope="row">{position.symbol}</th>
-                  <td>{position.exchange}</td>
-                  <td>{position.currency}</td>
-                  <td align="right">{position.quantity}</td>
-                  <td align="right">{formatAmount(position.average_cost)}</td>
-                  <td align="right">{formatAmount(position.market_price)}</td>
-                  <td align="right">{formatAmount(position.market_value)}</td>
-                  <td align="right">{formatAmount(position.unrealized_pnl)}</td>
-                </tr>
-              {/each}
-            {/snippet}
-          </DataTable>
-        </ScrollRegion>
-      {/if}
+      <PositionTable positions={account.positions} />
     {/if}
 
     {#if account.check.status === 'passed' && account.check.actual_accounts[0] !== undefined}

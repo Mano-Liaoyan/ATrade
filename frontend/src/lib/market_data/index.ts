@@ -12,6 +12,7 @@ export {
   type BarsResult,
   type ChartRequest,
 } from './bars';
+export { formatDayChange, readDayQuote, type DayQuote } from './day_quote';
 export {
   canDrawLiveBar,
   describeLiveBar,

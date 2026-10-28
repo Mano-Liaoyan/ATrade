@@ -8,9 +8,11 @@
 
   interface Props {
     orders: ManualOrder[];
+    /** The table takes the full height of a workbench panel and scrolls in it. */
+    fill?: boolean;
   }
 
-  const { orders }: Props = $props();
+  const { orders, fill = false }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
@@ -26,7 +28,7 @@
 {#if orders.length === 0}
   <p>No filled orders by hand today.</p>
 {:else}
-  <ScrollRegion label="Filled orders by hand" maxHeight="18rem">
+  <ScrollRegion label="Filled orders by hand" maxHeight="18rem" {fill}>
     <DataTable columns={COLUMNS} size="sm">
       {#snippet rows()}
         {#each orders as order (order.id)}

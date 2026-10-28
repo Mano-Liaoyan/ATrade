@@ -36,7 +36,15 @@
 >
   <Tabs.List aria-label={label}>
     {#snippet child({ props })}
-      <div {...props} class={['cds--content-switcher', size !== 'md' && `cds--content-switcher--${size}`]}>
+      <!-- Carbon v11 reads the switcher height from the layout size class (cds--layout--size-<size>). -->
+      <div
+        {...props}
+        class={[
+          'cds--content-switcher',
+          size !== 'md' && `cds--content-switcher--${size}`,
+          size !== 'md' && `cds--layout--size-${size}`,
+        ]}
+      >
         {#each items as item (item.value)}
           <Tabs.Trigger value={item.value}>
             {#snippet child({ props: triggerProps })}

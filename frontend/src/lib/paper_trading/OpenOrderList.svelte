@@ -8,9 +8,11 @@
 
   interface Props {
     orders: OpenOrder[];
+    /** The table takes the full height of a workbench panel and scrolls in it. */
+    fill?: boolean;
   }
 
-  const { orders }: Props = $props();
+  const { orders, fill = false }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
@@ -50,7 +52,7 @@
   }
 </script>
 
-<div class="open-orders">
+<div class={['open-orders', fill && 'open-orders--fill']}>
   {#if cancelResult !== null}
     <InlineNotification
       {...cancelResult}
@@ -61,7 +63,7 @@
   {#if orders.length === 0}
     <p>No open orders.</p>
   {:else}
-    <ScrollRegion label="Open orders" maxHeight="18rem">
+    <ScrollRegion label="Open orders" maxHeight="18rem" {fill}>
       <DataTable columns={COLUMNS} size="sm">
         {#snippet rows()}
           {#each orders as order (`${String(order.order_id)}-${order.source.kind}-${String(order.source.forward_test_id)}`)}
@@ -90,6 +92,17 @@
     display: flex;
     flex-direction: column;
     gap: var(--cds-spacing-03);
+  }
+
+  .open-orders--fill {
+    block-size: 100%;
+    min-block-size: 0;
+  }
+
+  .open-orders--fill > :global(.scroll-region) {
+    flex: 1;
+    block-size: auto;
+    min-block-size: 0;
   }
 
   p {

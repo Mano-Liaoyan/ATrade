@@ -1,6 +1,8 @@
 <!-- Order form for paper orders by hand. A confirmation dialog with the PAPER mark comes before each order. A forward
-     test that trades the instrument of the form disables the form button, and the form says why. -->
+     test that trades the instrument of the form disables the form button, and the form says why. With `instrument`
+     (the instrument page), the form starts with that instrument and changes to the next instrument that opens. -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { Button, ContentSwitcher, Dialog, InlineNotification, Select, Tag, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
   import {
     describeOrderForConfirmation,
@@ -17,9 +19,10 @@
     // The checked paper account. The backend checks it again before it sends the order.
     accountId: string;
     blockingForwardTests?: readonly BlockingForwardTest[];
+    instrument?: { symbol: string; exchange: string; currency: string };
   }
 
-  const { accountId, blockingForwardTests = [] }: Props = $props();
+  const { accountId, blockingForwardTests = [], instrument }: Props = $props();
 
   const SIDES = [
     { value: 'BUY' as const, label: 'Buy' },
@@ -46,6 +49,21 @@
     orderType: 'LMT',
     limitPrice: '',
     timeInForce: 'DAY',
+  });
+  // Only a new instrument changes the form. A new bar period of the same instrument keeps the edits of the user.
+  const instrumentKey = $derived(
+    instrument === undefined ? null : `${instrument.symbol}/${instrument.exchange}/${instrument.currency}`,
+  );
+  $effect(() => {
+    if (instrumentKey === null) {
+      return;
+    }
+    const opened = untrack(() => instrument);
+    if (opened !== undefined) {
+      form.symbol = opened.symbol;
+      form.exchange = opened.exchange;
+      form.currency = opened.currency;
+    }
   });
   let formMessage = $state<string | null>(null);
   let resultMessage = $state<NotificationMessage | null>(null);

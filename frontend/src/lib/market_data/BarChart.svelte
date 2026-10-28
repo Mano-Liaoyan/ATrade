@@ -1,10 +1,7 @@
 <!-- Bar chart: draws each bar as a candlestick with lightweight-charts. Bar times are UNIX timestamps (UTC).
      A live bar replaces the last candlestick or adds one after it (series.update), without a new fit of the view.
-
-     Attribution notice of lightweight-charts (Apache License 2.0):
-     TradingView Lightweight Charts™
-     Copyright (c) 2025 TradingView, Inc. https://www.tradingview.com/
-     The chart shows the TradingView attribution logo, and the text under the chart links to TradingView. -->
+     ChartFrame (foundation/chart_frame) gives the canvas container and the TradingView attribution. With `fill`, the
+     chart fills the height of its parent and follows each size change (autoSize). -->
 <script lang="ts">
   import {
     CandlestickSeries,
@@ -18,13 +15,21 @@
     type UTCTimestamp,
   } from 'lightweight-charts';
   import { untrack } from 'svelte';
+  import { ChartFrame } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import type { Bar } from './bars';
   import { canDrawLiveBar } from './live_bars';
 
-  const { bars, liveBar = null, label }: { bars: Bar[]; liveBar?: Bar | null; label: string } = $props();
+  interface Props {
+    bars: Bar[];
+    liveBar?: Bar | null;
+    label: string;
+    fill?: boolean;
+  }
 
-  let chartContainer: HTMLDivElement;
+  const { bars, liveBar = null, label, fill = false }: Props = $props();
+
+  let chartContainer: HTMLDivElement | undefined = $state();
   let chart: IChartApi | undefined = $state();
   let candlestickSeries: ISeriesApi<'Candlestick'> | undefined = $state();
 
@@ -32,8 +37,12 @@
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
   }
 
+  function readContainerStyle(): CSSStyleDeclaration {
+    return getComputedStyle(chartContainer ?? document.documentElement);
+  }
+
   function readColor(variableName: string): string {
-    return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
+    return readContainerStyle().getPropertyValue(variableName).trim();
   }
 
   // The chart colors are Carbon tokens of the current theme (g10 or g100).
@@ -45,7 +54,7 @@
         background: { color: readColor('--cds-layer-01') },
         textColor: readColor('--cds-text-secondary'),
         // IBM Plex Sans from the Carbon reset.
-        fontFamily: getComputedStyle(chartContainer).fontFamily,
+        fontFamily: readContainerStyle().fontFamily,
       },
       grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
       rightPriceScale: { borderColor: gridColor },
@@ -60,6 +69,9 @@
   }
 
   $effect(() => {
+    if (chartContainer === undefined) {
+      return;
+    }
     const themeOptions = readThemeOptions();
     const createdChart = createChart(chartContainer, {
       autoSize: true,
@@ -106,31 +118,4 @@
   });
 </script>
 
-<figure class="bar-chart">
-  <div class="chart-canvas" role="img" aria-label={label} bind:this={chartContainer}></div>
-  <figcaption class="chart-attribution">
-    Chart by <a class="cds--link cds--link--sm" href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
-    Lightweight Charts™
-  </figcaption>
-</figure>
-
-<style>
-  .bar-chart {
-    margin: 0;
-  }
-
-  .chart-canvas {
-    position: relative;
-    height: min(32rem, 60vh);
-    min-height: 16rem;
-    overflow: hidden;
-  }
-
-  .chart-attribution {
-    margin-block-start: var(--cds-spacing-03);
-    font-size: var(--cds-helper-text-01-font-size);
-    line-height: var(--cds-helper-text-01-line-height);
-    letter-spacing: var(--cds-helper-text-01-letter-spacing);
-    color: var(--cds-text-secondary);
-  }
-</style>
+<ChartFrame {label} {fill} bind:canvas={chartContainer} />

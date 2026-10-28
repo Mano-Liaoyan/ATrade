@@ -3,11 +3,7 @@
      in the Carbon interactive color, so the user can tell the curves apart without color. A legend names each curve.
      All colors are Carbon tokens of the current theme (docs/architecture.md section 13).
      Interruptions of a forward test are grey columns behind the curves, and a list names them as text.
-
-     Attribution notice of lightweight-charts (Apache License 2.0):
-     TradingView Lightweight Charts™
-     Copyright (c) 2025 TradingView, Inc. https://www.tradingview.com/
-     The chart shows the TradingView attribution logo, and the text under the chart links to TradingView. -->
+     ChartFrame (foundation/chart_frame) gives the canvas container and the TradingView attribution. -->
 <script module lang="ts">
   import type { EquityPoint } from './backtest_api';
 
@@ -31,6 +27,7 @@
     type LineData,
     type UTCTimestamp,
   } from 'lightweight-charts';
+  import { ChartFrame } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
@@ -56,12 +53,16 @@
   const CURVE_STYLES: CurveStyle[] = [FIRST_CURVE_STYLE, { colorVariable: '--cds-interactive', lineStyle: LineStyle.Dashed }];
   const INTERRUPTION_COLOR_VARIABLE = '--cds-layer-accent-01';
 
-  let chartContainer: HTMLDivElement;
+  let chartContainer: HTMLDivElement | undefined = $state();
   // A series with the color token that it uses. A change of the color scheme reads each token again.
   type ColoredSeries = [ISeriesApi<'Line'> | ISeriesApi<'Histogram'>, string];
 
+  function readContainerStyle(): CSSStyleDeclaration {
+    return getComputedStyle(chartContainer ?? document.documentElement);
+  }
+
   function readColor(variableName: string): string {
-    return getComputedStyle(chartContainer).getPropertyValue(variableName).trim();
+    return readContainerStyle().getPropertyValue(variableName).trim();
   }
 
   function convertToTimestamp(timeUtc: string): UTCTimestamp {
@@ -75,7 +76,7 @@
         background: { color: readColor('--cds-layer-01') },
         textColor: readColor('--cds-text-secondary'),
         // IBM Plex Sans from the Carbon reset.
-        fontFamily: getComputedStyle(chartContainer).fontFamily,
+        fontFamily: readContainerStyle().fontFamily,
       },
       grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
       rightPriceScale: { borderColor: gridColor },
@@ -111,6 +112,9 @@
   }
 
   $effect(() => {
+    if (chartContainer === undefined) {
+      return;
+    }
     const themeOptions = readThemeOptions();
     const chart = createChart(chartContainer, {
       autoSize: true,
@@ -149,8 +153,7 @@
   });
 </script>
 
-<figure class="equity-chart">
-  <div class="chart-canvas" role="img" aria-label={label} bind:this={chartContainer}></div>
+<ChartFrame {label} height="min(24rem, 50vh)" minHeight="12rem" bind:canvas={chartContainer}>
   {#if curves.length > 1}
     <ul class="legend" aria-label={`${label} legend`}>
       {#each curves as curve, curveIndex (curveIndex)}
@@ -175,24 +178,9 @@
       {/each}
     </ul>
   {/if}
-  <figcaption class="chart-attribution">
-    Chart by <a class="cds--link cds--link--sm" href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer">TradingView</a>
-    Lightweight Charts™
-  </figcaption>
-</figure>
+</ChartFrame>
 
 <style>
-  .equity-chart {
-    margin: 0;
-  }
-
-  .chart-canvas {
-    position: relative;
-    height: min(24rem, 50vh);
-    min-height: 12rem;
-    overflow: hidden;
-  }
-
   .legend,
   .interruptions {
     margin: var(--cds-spacing-03) 0 0;
@@ -232,13 +220,5 @@
     margin-inline-end: var(--cds-spacing-03);
     background: var(--cds-layer-accent-01);
     vertical-align: middle;
-  }
-
-  .chart-attribution {
-    margin-block-start: var(--cds-spacing-03);
-    font-size: var(--cds-helper-text-01-font-size);
-    line-height: var(--cds-helper-text-01-line-height);
-    letter-spacing: var(--cds-helper-text-01-letter-spacing);
-    color: var(--cds-text-secondary);
   }
 </style>

@@ -31,12 +31,12 @@ test('changes the bar period with a click and keeps it in the page address', asy
   await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('2160 bars');
   const barPeriods = page.getByRole('tablist', { name: 'Bar period' });
-  await expect(barPeriods.getByRole('tab', { name: '1 hour' })).toHaveAttribute('aria-selected', 'true');
+  await expect(barPeriods.getByRole('tab', { name: '1h', exact: true })).toHaveAttribute('aria-selected', 'true');
 
-  await barPeriods.getByRole('tab', { name: '1 day' }).click();
+  await barPeriods.getByRole('tab', { name: '1D', exact: true }).click();
 
   await expect(page).toHaveURL('/instruments/SEHK/700?currency=HKD&bar_period=1-DAY');
-  await expect(barPeriods.getByRole('tab', { name: '1 day' })).toHaveAttribute('aria-selected', 'true');
+  await expect(barPeriods.getByRole('tab', { name: '1D', exact: true })).toHaveAttribute('aria-selected', 'true');
   // The default range of daily bars is 1096 days: from 2023-01-02 to 2026-01-01, both included.
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
   await expect(page.getByRole('img', { name: 'Bar chart of 700 / SEHK / HKD, 1-DAY bars' })).toBeVisible();
@@ -46,15 +46,15 @@ test('changes the bar period with the arrow keys, Home, and End', async ({ page 
   await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('2160 bars');
   const barPeriods = page.getByRole('tablist', { name: 'Bar period' });
-  await barPeriods.getByRole('tab', { name: '1 hour' }).focus();
+  await barPeriods.getByRole('tab', { name: '1h', exact: true }).focus();
 
-  // Each key selects a tab, and the chart opens the bars of that bar period. The selected tab keeps the focus.
+  // Each key selects a bar period, and the chart opens the bars of that bar period. The selected tab keeps the focus.
   const steps = [
-    { key: 'ArrowRight', tab: '1 day', barPeriod: '1-DAY' },
-    { key: 'Home', tab: '1 minute', barPeriod: '1-MINUTE' },
-    { key: 'ArrowRight', tab: '5 minutes', barPeriod: '5-MINUTE' },
-    { key: 'End', tab: '1 day', barPeriod: '1-DAY' },
-    { key: 'ArrowLeft', tab: '1 hour', barPeriod: '1-HOUR' },
+    { key: 'ArrowRight', tab: '1D', barPeriod: '1-DAY' },
+    { key: 'Home', tab: '1m', barPeriod: '1-MINUTE' },
+    { key: 'ArrowRight', tab: '5m', barPeriod: '5-MINUTE' },
+    { key: 'End', tab: '1D', barPeriod: '1-DAY' },
+    { key: 'ArrowLeft', tab: '1h', barPeriod: '1-HOUR' },
   ];
   for (const step of steps) {
     await page.keyboard.press(step.key);
@@ -70,7 +70,7 @@ test('changes the bar period with the arrow keys, Home, and End', async ({ page 
 test('a watchlist link without a bar period opens daily bars', async ({ page }) => {
   await page.goto('/instruments/SEHK/9988?currency=HKD');
 
-  const dailyTab = page.getByRole('tablist', { name: 'Bar period' }).getByRole('tab', { name: '1 day' });
+  const dailyTab = page.getByRole('tablist', { name: 'Bar period' }).getByRole('tab', { name: '1D', exact: true });
   await expect(dailyTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
 });

@@ -11,13 +11,14 @@ type BarsResponse = components['schemas']['BarsResponse'];
 export type BarsResult = { kind: 'loaded'; bars: Bar[] } | { kind: 'failed'; message: string };
 export type ChartRequest = { instrument: Instrument; barPeriod: BarPeriod };
 
-export const BAR_PERIODS: readonly { value: BarPeriod; label: string }[] = [
-  { value: '1-MINUTE', label: '1 minute' },
-  { value: '5-MINUTE', label: '5 minutes' },
-  { value: '15-MINUTE', label: '15 minutes' },
-  { value: '30-MINUTE', label: '30 minutes' },
-  { value: '1-HOUR', label: '1 hour' },
-  { value: '1-DAY', label: '1 day' },
+// `shortLabel` is the TradingView-style name of the bar period switcher on the instrument page.
+export const BAR_PERIODS: readonly { value: BarPeriod; label: string; shortLabel: string }[] = [
+  { value: '1-MINUTE', label: '1 minute', shortLabel: '1m' },
+  { value: '5-MINUTE', label: '5 minutes', shortLabel: '5m' },
+  { value: '15-MINUTE', label: '15 minutes', shortLabel: '15m' },
+  { value: '30-MINUTE', label: '30 minutes', shortLabel: '30m' },
+  { value: '1-HOUR', label: '1 hour', shortLabel: '1h' },
+  { value: '1-DAY', label: '1 day', shortLabel: '1D' },
 ];
 export const DEFAULT_BAR_PERIOD: BarPeriod = '1-DAY';
 

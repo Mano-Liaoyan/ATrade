@@ -1,10 +1,19 @@
 <!-- A region that scrolls inside itself, with an app-owned track and thumb. Safari can hide native scrollbars, so the
-     region hides them in all browsers and draws its own (docs/architecture.md section 13.1). -->
+     region hides them in all browsers and draws its own (docs/architecture.md section 13.1).
+     With `fill`, the region takes the full height of its parent (a workbench panel) and scrolls in it. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { computeScrollThumb, computeScrollTopForThumbTop, type ScrollThumb } from './scroll_thumb';
 
-  const { label, maxHeight, children }: { label: string; maxHeight: string; children: Snippet } = $props();
+  interface Props {
+    label: string;
+    /** The maximum height of the viewport. Not used with `fill`. */
+    maxHeight?: string;
+    fill?: boolean;
+    children: Snippet;
+  }
+
+  const { label, maxHeight, fill = false, children }: Props = $props();
 
   // One arrow key press scrolls this far, like a mouse wheel step.
   const ARROW_KEY_STEP_PIXELS = 40;
@@ -95,13 +104,13 @@
   }
 </script>
 
-<div class="scroll-region">
+<div class={['scroll-region', fill && 'scroll-region--fill']}>
   <div
     class="scroll-viewport"
     id={viewportId}
     role="region"
     aria-label={label}
-    style:max-height={maxHeight}
+    style:max-height={fill ? undefined : maxHeight}
     bind:this={viewport}
     onscroll={measureScroll}
   >
@@ -141,6 +150,10 @@
     display: flex;
     gap: var(--cds-spacing-02);
     min-height: 0;
+  }
+
+  .scroll-region--fill {
+    block-size: 100%;
   }
 
   .scroll-viewport {
