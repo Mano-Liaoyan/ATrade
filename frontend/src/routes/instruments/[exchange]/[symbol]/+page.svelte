@@ -30,7 +30,7 @@
     type DayQuote,
   } from '#lib/market_data';
   import { FilledManualOrderList, InstrumentOrderPanel, OpenOrderList, PaperAccountFeed, PositionTable } from '#lib/paper_trading';
-  import InstrumentWatchlist from './InstrumentWatchlist.svelte';
+  import InstrumentWatchlist from '../../../InstrumentWatchlist.svelte';
 
   const chartRequest = $derived(readChartRequest(page.params, page.url.searchParams));
 

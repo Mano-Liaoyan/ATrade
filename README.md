@@ -28,22 +28,23 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home
-  page shows the account panel: the check result, the balance, and the
-  positions, updated live. When the check fails, the panel shows the actual
-  and the expected account number.
-- Paper orders by hand: after a passed check, the account panel sends market
-  and limit orders (DAY or GTC) to the IBKR paper account, after a
-  confirmation dialog with a `PAPER` mark. The open order list shows all open
+  page is the account overview: the key numbers of the balance, the
+  positions, the open orders, and the filled orders of today, updated live.
+  When the check fails, it shows the actual and the expected account number.
+- Paper orders by hand: after a passed check, the paper order form of the
+  instrument page sends market and limit orders (DAY or GTC) to the IBKR
+  paper account, after a confirmation dialog with a `PAPER` mark. The open order list shows all open
   orders of the account with their source ("by hand" or "forward test N").
   Only orders by hand can be cancelled. ATrade never sends live orders. An
   order by hand on the instrument of a running forward test is refused, with
-  the forward test named. The panel also lists the filled orders by hand of
-  the current day, with the fills from IBKR. See
+  the forward test named. The "Filled today" tab lists the filled orders by
+  hand of the current day, with the fills from IBKR. See
   [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md).
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database.
-- Instrument search: the home page finds instruments by symbol through
+- Instrument search: the watchlist column of the home page finds instruments
+  by symbol through
   IB Gateway and shows each match as symbol / exchange / currency, for
   example `700 / SEHK / HKD`. The search needs a connected IB Gateway. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
@@ -54,7 +55,7 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
 - Watchlist: the user adds an instrument from the search candidates (choose
   it with the arrow keys and press Enter, or click it) and deletes
-  it from the watchlist panel on the home page. The watchlist is in
+  it from the watchlist column on the home page. The watchlist is in
   PostgreSQL, so it stays after a restart. A watchlist instrument opens the
   instrument page `/instruments/<exchange>/<symbol>?currency=<currency>`.
   Routes are under `/api/watchlist`. See
@@ -183,8 +184,8 @@ reachable". To connect:
    `ATRADE_IBKR_AUTO_RESTART_TIME` in `ATRADE_IBKR_TIME_ZONE` (default
    `11:45 PM`, `America/New_York`).
 3. Run `./start run`. The header shows "IB Gateway connected." after the
-   Gateway has logged in. The account panel shows "Paper account DU...
-   checked." when the paper account check passes.
+   Gateway has logged in. The Paper tag in the header shows the paper
+   account (for example `DU****567`) when the paper account check passes.
 
 A login on the IBKR website or phone app with the same user name competes
 with the Gateway session.

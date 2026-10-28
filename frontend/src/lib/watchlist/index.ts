@@ -1,6 +1,5 @@
-// Public entry of the watchlist capability: the watchlist HTTP client, the watchlist panel, and the saved bars of
-// watchlist instruments.
-export { default as Watchlist } from './Watchlist.svelte';
+// Public entry of the watchlist capability: the watchlist HTTP client and the saved bars of watchlist instruments.
+// The watchlist column of the workbench pages is src/routes/InstrumentWatchlist.svelte (it combines capabilities).
 export { describeSavedBars, findSavedBars, selectInstrumentsWithSavedBars, type SavedBars } from './saved_bars';
 export {
   addToWatchlist,

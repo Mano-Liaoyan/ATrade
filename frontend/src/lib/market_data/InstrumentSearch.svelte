@@ -1,6 +1,7 @@
 <!-- Instrument search: the user types a symbol, and the combo box shows each match as symbol / exchange / currency.
      ArrowUp and ArrowDown choose a match and Enter gives it to `onSelect`. A page can give `marker` to mark a match,
-     for example "In watchlist". A marked match cannot be chosen. -->
+     for example "In watchlist". A marked match cannot be chosen. The search has no heading: the place around it names
+     it. The field is the 32px size of the workbench lines, and its label is for screen readers only. -->
 <script lang="ts">
   import { Combobox, Tag, type ComboboxItem } from '#lib/foundation/carbon';
   import { formatInstrument, searchInstruments, type Instrument, type InstrumentSearchResult } from './instrument_search';
@@ -8,9 +9,11 @@
   const {
     onSelect,
     marker,
+    placeholder = 'AAPL or 700',
   }: {
     onSelect: (instrument: Instrument) => void;
     marker?: (instrument: Instrument) => string | undefined;
+    placeholder?: string;
   } = $props();
 
   // IBKR allows about 1 symbol search per second, so the search waits until the user stops typing.
@@ -90,11 +93,12 @@
   {/if}
 {/snippet}
 
-<section class="instrument-search" aria-labelledby="instrument-search-heading">
-  <h2 id="instrument-search-heading">Instrument search</h2>
+<div class="instrument-search" role="search" aria-label="Instrument search">
   <Combobox
     label="Symbol"
-    placeholder="AAPL or 700"
+    hideLabel
+    size="sm"
+    {placeholder}
     {items}
     listLabel="Instrument search results"
     onInput={scheduleSearch}
@@ -103,18 +107,5 @@
     invalidText={searchResult?.kind === 'failed' ? searchResult.message : undefined}
     itemContent={candidateMarker}
   />
-</section>
+</div>
 
-<style>
-  .instrument-search {
-    max-inline-size: 28rem;
-  }
-
-  h2 {
-    margin-block: 0 var(--cds-spacing-05);
-    font-size: var(--cds-heading-compact-02-font-size);
-    font-weight: var(--cds-heading-compact-02-font-weight);
-    line-height: var(--cds-heading-compact-02-line-height);
-    letter-spacing: var(--cds-heading-compact-02-letter-spacing);
-  }
-</style>

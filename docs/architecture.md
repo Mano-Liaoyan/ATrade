@@ -267,7 +267,7 @@ routes (`/api/backtests`), and the backtest pages.
 Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
 It holds the live order switch, the paper account check, paper orders sent by
 hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
-account panel, the order routes (11.8), and the balance in USD for any base
+account overview and the paper order form (11.7), the order routes (11.8), and the balance in USD for any base
 currency (11.9).
 
 ## 12. Forward test
@@ -433,6 +433,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `disabled`). The list is a Bits UI `ContentStatic` in the
   `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
   `listLabel`. `statusText` and `invalidText` show below the field.
+  `hideLabel` keeps the label for screen readers only, and `size` `sm` gives
+  the 32px field (`cds--layout--size-sm`).
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -589,8 +591,23 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
-  same feeds; the strategy page reads its `forwardTests`, the full list). While a socket is not connected, the panel and the column
-  show `LiveUpdatesNotification`.
+  same paper account feed; the strategy page reads `forwardTests`, the full
+  list). While a socket is not connected, the panel and
+  the column show `LiveUpdatesNotification`.
+- The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))
+  is the account overview workbench. The left `SideColumn` "Watchlist"
+  (22rem) has the same watchlist table as the instrument page
+  (`src/routes/InstrumentWatchlist.svelte`), with `editable`: the instrument
+  search above the table adds an instrument, and each row has a Delete icon
+  button. A row opens its instrument page. The main area has the key numbers
+  of the paper account in one `MetricRow` of `MetricTile`s
+  (`foundation/metric_tile`, values from `listBalanceMetrics` of `paper_trading`,
+  and the account check status when the check did not pass), over a
+  `PanelSplit` with the "Positions" panel and the "Orders" panel (tabs Open
+  orders and Filled today). The tables are the same components as on the
+  instrument page (`PositionTable`, `OpenOrderList`, `FilledManualOrderList`),
+  and the row menu of an open order cancels it. The home page has no paper
+  order form: paper orders are sent on the instrument page.
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
   The native checkbox is transparent and covers the label, so a pointer

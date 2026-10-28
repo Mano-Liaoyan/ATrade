@@ -101,14 +101,15 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
 | | `502` with `{"detail": "The instrument check failed: <reason>"}`. |
 | `DELETE /api/watchlist/{id}` | `204`. `404` with `{"detail": "This instrument is not in the watchlist."}` when the ID is not in the watchlist. |
 
-- Frontend: `#lib/watchlist` has the HTTP client and the `Watchlist` panel.
-  The home page owns the list. A confirmed candidate of `InstrumentSearch`
-  (`onSelect`) is added to the watchlist. The page gives a `marker`: a
-  candidate that is in the watchlist has an "In watchlist" tag and cannot be
-  chosen. A capability does not import another capability, so the page
-  combines them.
-- The watchlist is a Carbon contained list in a `ScrollRegion` named
-  `Watchlist instruments`. Each row has a Delete icon button named
+- Frontend: `#lib/watchlist` has the HTTP client. The watchlist column of
+  the workbench pages is `src/routes/InstrumentWatchlist.svelte`: a Carbon
+  `sm` data table in a `ScrollRegion` named `Watchlist table`. A capability
+  does not import another capability, so the route file combines them.
+- On the home page the column is `editable`. The `InstrumentSearch` above
+  the table (a 32px combo box with the label "Symbol" for screen readers only)
+  adds a confirmed candidate (`onSelect`) to the watchlist. The column gives a
+  `marker`: a candidate that is in the watchlist has an "In watchlist" tag and
+  cannot be chosen. Each row has a Delete icon button named
   "Delete <instrument> from the watchlist".
 - Each watchlist instrument is a link to
   `/instruments/<exchange>/<symbol>?currency=<currency>`. This page shows
