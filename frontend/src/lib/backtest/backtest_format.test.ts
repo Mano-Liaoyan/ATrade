@@ -52,6 +52,11 @@ describe('formatPercent', () => {
     expect(formatPercent('-1.02')).toBe('-1.02 %');
     expect(formatPercent('0')).toBe('0.00 %');
   });
+
+  it('uses the one sign rule of all pages, with thousands separators', () => {
+    expect(formatPercent('1234.5')).toBe('+1,234.50 %');
+    expect(formatPercent('-0')).toBe('0.00 %');
+  });
 });
 
 describe('formatTimeoutMinutes', () => {

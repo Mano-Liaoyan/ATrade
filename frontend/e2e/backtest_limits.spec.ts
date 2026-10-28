@@ -1,4 +1,4 @@
-// Backtest limits: the user changes the timeout and the concurrency on the Backtests page. PostgreSQL stores them.
+// Backtest limits: the user changes the timeout and the concurrency in the Backtest limits dialog of the Backtests page. PostgreSQL stores them.
 import { expect, test } from '@playwright/test';
 
 const SAVED_TITLE = 'Limits saved';
@@ -7,6 +7,7 @@ const SAVED_TITLE = 'Limits saved';
 // timeout at its default and sets the default concurrency again at the end, so other tests are not affected.
 test('changes the backtest limits and sees the saved values', async ({ page }) => {
   await page.goto('/backtests');
+  await page.getByRole('button', { name: 'Backtest limits' }).click();
   const limitsForm = page.getByRole('form', { name: 'Backtest limits' });
   const limitsStatus = page.getByRole('status', { name: 'Backtest limits status' });
   const timeoutField = limitsForm.getByLabel('Timeout (minutes)');

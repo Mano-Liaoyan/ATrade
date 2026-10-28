@@ -57,7 +57,8 @@ _Avoid_: balance curve, PnL curve
 **Metric**:
 One number that describes the result of a test, for example the total return
 or the max drawdown. Backtests and forward tests use the same metric
-functions.
+functions. All pages show the same key metrics in the same order, and show
+the max drawdown as a negative percent.
 _Avoid_: statistic, KPI
 
 **Forward test**:

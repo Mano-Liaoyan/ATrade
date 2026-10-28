@@ -323,7 +323,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `cds--layout--size-<size>`), and `Dialog` (Carbon modal on
   Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
   `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
-  the accessible name of the dialog.
+  the accessible name of the dialog. Without `primaryText`, the `Dialog` is a
+  Carbon passive modal: no footer, and its content has its own controls.
 - `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
   (`header`, `align: 'right'` for a number column, `isMenu` for the column
   of row menus), `size`, and a `rows` snippet for the body rows. A number
@@ -419,7 +420,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   no command matches, the palette shows "No results". `src/routes/` gives the
   commands (`palette_commands.ts`): go to a page, go to the instrument page of
   a watchlist instrument, open the start form of a backtest or a forward test
-  (the form ids `start-backtest` and `start-forward-test`), and change the
+  (the form ids `start-backtest` and `start-forward-test`; the backtest page
+  opens its "New backtest" dialog for `#start-backtest`), and change the
   theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
   opens a page or a form. No command sends a paper order or starts a backtest
   or a forward test. The layout reads the watchlist each time the palette
@@ -540,8 +542,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     minimum height, and End its maximum height.
   - The browser keeps each layout in `localStorage` (`readStoredLayout`,
     `writeStoredLayout`). Blocked storage gives the default layout.
-- `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
-  tooltip that gives the action name. `Tabs` takes `size` (`sm` gives the 32px
+- `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
+  tooltip that gives the action name. A disabled `IconButton` has
+  `aria-disabled` and stays focusable, so its tooltip and its `label` say why
+  it is disabled. `SideColumn` takes an `actions` snippet: icon buttons in its
+  header line before the Collapse button. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
   `panelClass`.
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
@@ -574,15 +579,32 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   checkboxes. Its cells have class `cds--table-column-checkbox`. `TextInput`
   also takes `type` `date`. `InlineNotification` has `label` (the accessible
   name of the status or alert).
-- The backtest pages use Carbon: the start form (`Select`, `TextInput`,
-  `Button`), the limits form, the backtest list (`DataTable` with a selection
-  column, in a `ScrollRegion`), the metrics as Carbon tiles, and the trades
-  and compared metrics as data tables. A backtest status is a
-  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity chart
+- The backtest page (`/backtests/<id>`, spec #99, ticket
+  [#104](https://github.com/Mano-Liaoyan/ATrade/issues/104)) is a workbench
+  like QuantConnect: the "Backtests" `SideColumn` with the backtest list
+  (`DataTable` with a selection column and the Carbon batch action bar
+  "Compare") and the "New backtest" and "Backtest limits" dialogs; the
+  backtest panel (header line, `KeyMetricRow`, `EquityDrawdownChart`) over
+  the Trades / Orders / Logs panel. `/backtests` opens the newest backtest
+  (docs/architecture/backtest.md section 10.6). A backtest status is a
+  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The comparison
+  page shows the compared metrics as a data table. The equity chart
   reads only Carbon tokens: `--cds-layer-01` (background),
   `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid),
   `--cds-text-primary` (first curve, solid), `--cds-interactive` (second
-  curve, dashed), and `--cds-layer-accent-01` (interruptions).
+  curve, dashed), and `--cds-layer-accent-01` (interruptions). The equity and
+  drawdown chart reads `--cds-text-primary` (equity) and
+  `--cds-support-error` (drawdown line, and its fill with alpha), and
+  `--cds-border-subtle-01` for the line between its 2 panes.
+- `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
+  (`name`, `text`, `change`) is a Carbon tile with the name and the
+  right-aligned value (tabular numbers). With `change`, the value is a
+  `ChangeText`, so up and down show an arrow icon and a support color.
+  `MetricRow` (`label`) puts the tiles in one line, each the same width. The
+  key metrics of a backtest or a forward test use `KeyMetricRow` of
+  `backtest`: one set, one order, and one sign rule (the max drawdown is a
+  negative percent). `formatPercent` of `backtest` uses the sign rule of
+  `formatSignedNumber`.
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,
   `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,

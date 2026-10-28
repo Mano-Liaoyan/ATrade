@@ -236,12 +236,47 @@ the backtest finishes). Money values and percents are decimal strings.
 ## 10.6 Frontend
 
 - `frontend/src/lib/backtest/` holds the HTTP client (`startBacktest`,
-  `listBacktests`, `readBacktest`), the value formats, and the
-  `BacktestResult` component: the status, the strategy error, the metrics,
-  the equity curve (`EquityChart`, a `lightweight-charts` line series with
-  the TradingView attribution), and the trade table. The strategy error and
-  the trade table are in `ScrollRegion`s.
-- `/backtests` has the form and the list of backtests. The form combines the
+  `listBacktests`, `readBacktest`), the value formats, and the parts that the
+  backtest page, the strategy page, and the forward test page share (spec
+  [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99)):
+  - `KeyMetricRow` (`metrics`, `startCapitalUsd`, `trades`): the key metrics
+    of `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
+    drawdown, Win rate, Trades, Final equity (USD). Each is a `MetricTile` of
+    `foundation/metric_tile`. The API gives the max drawdown as a positive
+    percent; the row shows it as a negative percent (for example
+    "-37.71 %"), with the sign rule of `formatSignedNumber`. Total return, net
+    profit, and max drawdown show their direction with `ChangeText`. The win
+    rate comes from the trades: the share of round trips (from position 0
+    back to 0) with a profit after commissions; "–" without a round trip. The
+    API has no Sharpe ratio, so the row has none.
+  - `EquityDrawdownChart` (`points`, `startCapitalUsd`, `label`, `fill`): the
+    equity curve and, under it, the drawdown curve (`computeDrawdownCurve()`,
+    a negative percent from the highest equity so far, which starts at the
+    start capital) on one `lightweight-charts` chart with 2 panes. The panes
+    share one time scale, so both curves zoom and scroll together.
+- `/backtests/<id>` is the backtest workbench (`routes/backtests/[[backtestId]]`),
+  one page for the list and the open backtest. `/backtests` opens the newest
+  backtest. The page is a `Workbench` (docs/architecture.md section 13):
+  - The "Backtests" `SideColumn` has the "New backtest" and "Backtest limits"
+    icon buttons and the backtest list (section 10.7).
+  - The `PanelSplit` has the backtest panel and the "Backtest tables" panel.
+    The backtest panel header line has the number, the strategy version (a
+    link to the strategy page), the instrument symbol (a link to the
+    instrument page), the bar period, the status, and the "Start forward
+    test" icon button. The button starts a forward test of the same strategy
+    version, instrument, and bar period and opens it. For a bar period that
+    is not live (`isLiveBarPeriod`), the button is disabled and its name says
+    why. The body has the `KeyMetricRow` and the `EquityDrawdownChart`, which
+    fills the rest of the panel. A queued or running backtest shows its
+    status in the body instead.
+  - The "Backtest tables" panel has the tabs Trades (32px rows), Orders, and
+    Logs. The API has no orders, so Orders shows "No orders". Logs shows the
+    strategy error of a failed backtest, or "No logs".
+  - The page reads the open backtest each second until its status is final,
+    and the list every 2 seconds while a backtest in it is queued or running.
+- The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
+  id `start-backtest`). The address `#start-backtest` (command palette) opens
+  it. After the start, the page opens the new backtest. The form combines the
   strategy versions (`#lib/strategy`), the bar periods (`#lib/market_data`),
   the watchlist instruments with saved bars (`#lib/watchlist`), and the
   default paper capital (`readPaperCapital()` of `#lib/paper_trading`).
@@ -255,12 +290,11 @@ the backtest finishes). Money values and percents are decimal strings.
   (`describeSavedBars()`). When no watchlist instrument has saved bars of the
   bar period, the select is disabled and the status links to the watchlist
   on the home page: the bar chart of a watchlist instrument saves its bars.
-- `/backtests` also has the "Limits" form (`BacktestLimitsForm`). It shows
+- The "Backtest limits" dialog (a passive Carbon modal) has the "Limits" form
+  (`BacktestLimitsForm`). It shows
   the timeout in minutes (`formatTimeoutMinutes`) and takes only whole
   minutes (`convertTimeoutMinutesToSeconds`). The client functions are
   `readBacktestLimits` and `changeBacktestLimits`.
-- `/backtests/<id>` shows the request and the result. It reads the backtest
-  each second until the status is final.
 - `/backtests/<id>/comparison/<other id>` is the comparison page (section
   10.7).
 - Tests: `backend/tests/backtest/` (HTTP routes, metric functions, and real
@@ -283,15 +317,19 @@ the backtest finishes). Money values and percents are decimal strings.
 Source: [#72](https://github.com/Mano-Liaoyan/ATrade/issues/72). Rules:
 section 9.5.
 
-- The backtest list on `/backtests` shows the metrics of each backtest side by
-  side: the final equity, the total return, the maximum drawdown, and the
-  trade count. It is in a `ScrollRegion` with the height
-  `min(24rem, 50vh)`.
-- Each row has a check box. `checkComparisonSelection()` of `#lib/backtest`
-  accepts exactly 2 backtests of the same strategy. For other selections, the
-  "Compare selected backtests" button is disabled and the status line gives
-  the reason. The backend route applies the same rule (section 10.5), so a
-  typed URL with different strategies shows the refusal.
+- The backtest list (`routes/backtests/BacktestList.svelte`) has 32px rows:
+  the number, the strategy version, the instrument symbol, the status (icon
+  and word), and the total return (`ChangeText`). The open backtest has the
+  Carbon selected row color, and a click on a row opens its backtest. The
+  columns have fixed widths, and a long strategy name ends with an ellipsis.
+  The list is in a `ScrollRegion` that fills the side column.
+- Each row has a check box. When 2 or more rows are checked, the Carbon batch
+  action bar shows above the list with "Compare" and "Cancel".
+  `checkComparisonSelection()` of `#lib/backtest` accepts exactly 2
+  backtests of the same strategy. For other selections, Compare is disabled
+  and the status "Comparison selection" gives the reason. The backend route
+  applies the same rule (section 10.5), so a typed URL with different
+  strategies shows the refusal.
 - Two backtests of the same strategy version are also accepted. They can
   differ in the instrument, the period, or the paper capital. Their code diff
   is empty.

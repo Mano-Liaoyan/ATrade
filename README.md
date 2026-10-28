@@ -72,24 +72,24 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   again after a lost connection and when a background tab becomes visible.
   See [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.5.
-- Backtests: the page `/backtests` starts a backtest of a strategy version on
+- Backtests: the "New backtest" button on `/backtests` starts a backtest of a strategy version on
   the saved bars of one USD instrument, with paper capital from the paper
   account balance or the local setting. Each backtest runs in its own child
   process of `web`. The child has only the environment variables `PATH`,
   `HOME`, `TZ`, and `DATABASE_URL`, runs with `nice 10`, and has
-  `oom_score_adj` 1000. The "Limits" form on `/backtests` sets the timeout
+  `oom_score_adj` 1000. The "Backtest limits" button on `/backtests` sets the timeout
   (default 120 minutes) and the number of backtests at the same time
   (default 1). Other backtests wait in the queue. A backtest that runs longer
-  than the timeout stops with the status "Timed out". The backtest page shows the status, the
-  strategy error, the metrics, the equity curve, and the trades. Backtests
+  than the timeout stops with the status "Timed out". The backtest page shows the list of
+  backtests and the open backtest on one page: the status, the key metrics,
+  the equity and drawdown curves, the trades, and the strategy error (Logs). Backtests
   read only bars that are in PostgreSQL. Add the instrument to the watchlist
   and open its bar chart first: the form offers only watchlist instruments
   with saved bars of the selected bar period, and `POST /api/backtests`
   refuses a time range without saved bars (`422`). See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
-- Backtest comparison: the list on `/backtests` shows the metrics of all
-  backtests side by side. Select 2 backtests of the same strategy and click
-  "Compare selected backtests". The comparison page shows the code diff, the
+- Backtest comparison: select 2 backtests of the same strategy in the list on
+  `/backtests` and click "Compare". The comparison page shows the code diff, the
   metric table, and both equity curves on one chart. ATrade refuses 2
   backtests of different strategies. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md) section 10.7.

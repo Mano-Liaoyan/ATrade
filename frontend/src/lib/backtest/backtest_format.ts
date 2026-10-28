@@ -1,5 +1,6 @@
 // Labels and values that the backtest pages show.
 import type { StatusKind } from '#lib/foundation/carbon';
+import { formatSignedNumber } from '#lib/foundation/value_format';
 import type { BacktestStatus } from './backtest_api';
 
 const STATUS_LABELS: Record<BacktestStatus, string> = {
@@ -19,7 +20,6 @@ const STATUS_KINDS: Record<BacktestStatus, StatusKind> = {
   timed_out: 'warning',
 };
 const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out'];
-const PERCENT_DECIMAL_PLACES = 2;
 const SECONDS_PER_MINUTE = 60;
 const WHOLE_NUMBER_PATTERN = /^\d+$/;
 const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,10 +41,9 @@ export function convertDateToUtcStart(date: string): string {
   return `${date}T00:00:00Z`;
 }
 
+/** "1.6" gives "+1.60 %", "-1.02" gives "-1.02 %": the sign rule of formatSignedNumber (foundation/value_format). */
 export function formatPercent(percent: string): string {
-  const percentNumber = Number(percent);
-  const sign = percentNumber > 0 ? '+' : '';
-  return `${sign}${percentNumber.toFixed(PERCENT_DECIMAL_PLACES)} %`;
+  return `${formatSignedNumber(Number(percent))} %`;
 }
 
 export function formatUsd(amount: string): string {
