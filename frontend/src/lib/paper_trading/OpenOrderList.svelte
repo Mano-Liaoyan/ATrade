@@ -77,7 +77,7 @@
               <td>{order.status}</td>
               <td align="right">{order.filled_quantity}</td>
               <td>{describeOrderSource(order.source)}</td>
-              <td class="cds--table-column-menu">
+              <td class="cds--table-column-menu menu-cell">
                 <OverflowMenu label={`Actions for order ${String(order.order_id)}`} items={makeMenuItems(order)} size="sm" />
               </td>
             </tr>
@@ -103,6 +103,17 @@
   .open-orders--fill > :global(.scroll-region) {
     flex: 1;
     block-size: auto;
+    min-block-size: 0;
+  }
+
+  /* The 32px menu button fills its cell above the 1px row border, so the row keeps the 32px height of the sm table,
+     like the Delete cell of the watchlist. */
+  .menu-cell {
+    padding-block: 0;
+  }
+
+  .menu-cell :global(.cds--overflow-menu) {
+    block-size: calc(var(--cds-spacing-07) - 1px);
     min-block-size: 0;
   }
 
