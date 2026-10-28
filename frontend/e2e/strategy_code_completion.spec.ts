@@ -26,6 +26,8 @@ count: int = "not a number"
 
 // The first answer of basedpyright includes the analysis of NautilusTrader. A slow CI machine needs more time.
 const LANGUAGE_SERVER_TIMEOUT_MILLISECONDS = 30_000;
+// More than the 75 ms interactionDelay of @codemirror/autocomplete.
+const COMPLETION_INTERACTION_DELAY_MILLISECONDS = 150;
 
 function createUniqueName(currentTest: TestInfo, title: string): string {
   return `${title} ${currentTest.project.name} ${String(Date.now())}`;
@@ -75,6 +77,8 @@ test('Tab accepts the selected completion and keeps the focus in the editor', as
   });
   const selectedName = await page.getByRole('option', { selected: true }).getAttribute('aria-label') ??
     (await page.getByRole('option', { selected: true }).locator('.cm-completionLabel').innerText());
+  // CodeMirror ignores an accept for 75 ms (interactionDelay) after the list opens or changes. Then Tab only indents.
+  await page.waitForTimeout(COMPLETION_INTERACTION_DELAY_MILLISECONDS);
   await page.keyboard.press('Tab');
 
   await expect(editor).toContainText(`self.${selectedName}`);
