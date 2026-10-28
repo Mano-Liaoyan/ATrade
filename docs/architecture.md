@@ -431,6 +431,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `disabled`). The list is a Bits UI `ContentStatic` in the
   `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
   `listLabel`. `statusText` and `invalidText` show below the field.
+  `hideLabel` keeps the label for screen readers only, and `size` `sm` gives
+  the 32px field (`cds--layout--size-sm`).
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -564,8 +566,21 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   the same name. The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
-  same feeds). While a socket is not connected, the panel and the column
-  show `LiveUpdatesNotification`.
+  same paper account feed). While a socket is not connected, the panel and
+  the column show `LiveUpdatesNotification`.
+- The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))
+  is the account overview workbench. The left `SideColumn` "Watchlist"
+  (22rem) has the same watchlist table as the instrument page
+  (`src/routes/InstrumentWatchlist.svelte`), with `editable`: the instrument
+  search above the table adds an instrument, and each row has a Delete icon
+  button. A row opens its instrument page. The main area has the key numbers
+  of the paper account in one line (`listBalanceMetrics` of `paper_trading`,
+  and the account check status when the check did not pass), over a
+  `PanelSplit` with the "Positions" panel and the "Orders" panel (tabs Open
+  orders and Filled today). The tables are the same components as on the
+  instrument page (`PositionTable`, `OpenOrderList`, `FilledManualOrderList`),
+  and the row menu of an open order cancels it. The home page has no paper
+  order form: paper orders are sent on the instrument page.
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
   The native checkbox is transparent and covers the label, so a pointer

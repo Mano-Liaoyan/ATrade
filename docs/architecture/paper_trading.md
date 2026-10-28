@@ -95,7 +95,8 @@ orders only when all 4 conditions are true:
   are `null` when the check did not pass or IB Gateway does not answer.
   `reqExecutions` returns only the executions of the current day (section
   21), so an older fill shows `filled_quantity` `"0"`.
-- The account panel shows the list "Filled orders by hand"
+- The "Filled today" tab of the home page and the instrument page shows the
+  list "Filled orders by hand"
   (`FilledManualOrderList.svelte`, `ScrollRegion` with the same label): the
   rows with `filled_quantity` larger than 0, newest first. It reads the route
   again after each "orders" message, because a fill changes the open orders.
@@ -176,23 +177,26 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   (section 13). The order routes and the paper capital route are in
   `paper_trading/http_routes.py`.
 
-## 11.7 Account panel
+## 11.7 Account overview and paper order form
 
-- The home page shows the account panel (`lib/paper_trading/`) with a
-  `PAPER` mark, the check result, the balance, and the positions.
-- When the check fails, the panel shows the reason, the actual account, and
+- The home page is the account overview workbench (section 13): the key
+  numbers of the paper account in one line, the Positions panel, and the
+  Orders panel (Open orders and Filled today). It has no paper order form.
+  The header shows the `PAPER` tag with the checked account.
+- When the check does not pass, the key numbers line shows the check status.
+  When the check fails, it also shows the reason, the actual account, and
   the expected account.
-- The balance shows "Net liquidation (USD)" and "Cash (USD)". For a base
-  currency that is not USD, it also shows the net liquidation in the base
-  currency. A note "Balance currency" under the balance names the base
-  currency and the rate, for example "Base currency EUR. Converted to USD
-  with the IBKR EUR.USD rate: 1 EUR = 1.1139 USD." Without a rate, the note
-  shows the `message` of the balance and the USD values show `–`.
-- The panel uses `foundation/live_socket` for reconnection and heartbeat, and
-  `foundation/scroll_region` for the position table (section 13). The table
-  text wraps, so the table does not overflow to the side.
-- After a passed check, the panel shows the paper order form
-  (`PaperOrderTicket.svelte`, Carbon components of `foundation/carbon`): side
+- The key numbers (`listBalanceMetrics`) are "Net liquidation (USD)" and
+  "Cash (USD)". For a base currency that is not USD, they also have the net
+  liquidation in the base currency and the rate, for example
+  "USD per EUR 1.1139". Without a rate, the line shows the `message` of the
+  balance as an error status, and the USD values show `–`.
+- The page uses `PaperAccountFeed` (`foundation/live_socket` for
+  reconnection and heartbeat) and `foundation/scroll_region` for the tables
+  (section 13). The tables have 32px rows.
+- After a passed check, the "Paper order" column of the instrument page shows
+  the paper order form (`PaperOrderTicket.svelte`, Carbon components of
+  `foundation/carbon`): side
   (content switcher Buy / Sell), symbol, exchange, currency, quantity, order
   type (select Limit / Market), limit price (limit orders only), and time in
   force (select DAY / GTC). "Review order" checks the form and opens the
@@ -202,8 +206,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   paper order" in the modal sends the order. "Cancel", the close button, a
   click outside, and Escape send nothing. Focus stays in the modal while it is
   open, and goes back to "Review order" when it closes.
-- The home page (`src/routes/+page.svelte`) reads `/ws/forward-tests` and
-  gives the panel the forward tests that hold a client ID
+- The instrument page reads `/ws/forward-tests`
+  (`ForwardTestsOnInstrumentsFeed`) and gives the form the forward tests that hold a client ID
   (`listForwardTestsOnInstruments` of `forward_test`, type
   `BlockingForwardTest` of `paper_trading`). When the symbol and exchange of
   the form match one of them, "Review order" is disabled and the form says
@@ -216,7 +220,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   is enabled only when `can_cancel` is true. A disabled item says why, for
   example "Stop forward test 42 to cancel". It uses
   `foundation/scroll_region` with the label "Open orders".
-- The result of the order and cancel routes shows in the panel as an inline
+- The result of the order and cancel routes shows in the form or the order
+  list as an inline
   notification that the user can close: "Order N sent", "Cancel request sent
   for order N", or an error (an alert) with the actual and the expected
   account for a `403`.

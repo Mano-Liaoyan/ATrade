@@ -96,3 +96,25 @@ export function describeBalanceCurrency(balance: PaperAccountBalance): string {
       return `Base currency ${baseCurrency}.`;
   }
 }
+
+export interface BalanceMetric {
+  label: string;
+  value: string;
+}
+
+// The key numbers of the paper account in the order of the home page: the USD values, then, for an account with
+// another base currency, its value in that currency and the rate that converted it (section 11.9).
+export function listBalanceMetrics(balance: PaperAccountBalance): BalanceMetric[] {
+  const metrics: BalanceMetric[] = [
+    { label: 'Net liquidation (USD)', value: formatAmount(balance.net_liquidation_usd) },
+    { label: 'Cash (USD)', value: formatAmount(balance.cash_usd) },
+  ];
+  const baseCurrency = balance.base_currency;
+  if (baseCurrency !== null && baseCurrency !== 'USD') {
+    metrics.push(
+      { label: `Net liquidation (${baseCurrency})`, value: formatAmount(balance.net_liquidation_base) },
+      { label: `USD per ${baseCurrency}`, value: balance.usd_per_base_unit ?? MISSING_AMOUNT },
+    );
+  }
+  return metrics;
+}

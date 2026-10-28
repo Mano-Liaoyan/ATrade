@@ -1,0 +1,79 @@
+// The home page is the account overview workbench (#108): the watchlist column, the key numbers of the paper account,
+// the Positions panel, and the Orders panel. With the IBKR fake of backend/tests/e2e_server.py: account DU1234567,
+// a balance, 40 positions, and 30 open orders of forward test 42.
+import { expect, test, type Locator, type Page } from '@playwright/test';
+
+function positionsPanel(page: Page): Locator {
+  return page.getByRole('region', { name: 'Positions', exact: true }).first();
+}
+
+function ordersPanel(page: Page): Locator {
+  return page.getByRole('region', { name: 'Orders', exact: true });
+}
+
+test('the home page fills the window and shows the key numbers of the paper account', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+
+  const balance = page.getByRole('list', { name: 'Paper account balance' });
+  await expect(balance.getByRole('listitem')).toHaveText([/^Net liquidation \(USD\)\s*101,234\.50$/, /^Cash \(USD\)\s*25,000\.00$/]);
+  await expect(page.getByRole('complementary', { name: 'Watchlist' })).toBeVisible();
+  await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (40)' })).toBeVisible();
+  await expect(ordersPanel(page).getByRole('tab', { name: /^Open orders/ })).toHaveAttribute('aria-selected', 'true');
+  const hasPageScroll = await page.evaluate(() => {
+    const root = document.documentElement;
+    return root.scrollHeight > root.clientHeight || root.scrollWidth > root.clientWidth;
+  });
+  expect(hasPageScroll).toBe(false);
+});
+
+test('the home page has no paper order form', async ({ page }) => {
+  await page.goto('/');
+  await expect(ordersPanel(page).getByRole('row', { name: /FTO01/ })).toBeAttached();
+
+  await expect(page.getByRole('form', { name: 'Paper order' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Review order' })).toHaveCount(0);
+});
+
+test('position table has a visible scroll track and its last row can be scrolled into view', async ({ page }) => {
+  await page.goto('/');
+  const lastRow = positionsPanel(page).getByRole('row', { name: /TEST40/ });
+  const track = page.getByRole('scrollbar', { name: 'Positions scroll bar' });
+  const thumb = track.locator('.scroll-thumb');
+
+  await expect(positionsPanel(page).getByRole('row', { name: /TEST01/ })).toBeInViewport();
+  await expect(track).toBeVisible();
+  await expect(thumb).toBeVisible();
+  await expect(lastRow).not.toBeInViewport();
+
+  await track.focus();
+  await page.keyboard.press('End');
+
+  await expect(lastRow).toBeInViewport();
+  await expect(thumb).toBeVisible();
+  await expect(track).toHaveAttribute('aria-valuenow', '100');
+});
+
+test('the Positions panel maximizes and restores with Escape', async ({ page }) => {
+  await page.goto('/');
+  const splitter = page.getByRole('separator', { name: 'Resize the positions and the orders' });
+  await expect(splitter).toBeVisible();
+
+  await positionsPanel(page).getByRole('button', { name: 'Maximize panel' }).click();
+
+  await expect(splitter).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Open orders' })).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(splitter).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Open orders' })).toBeVisible();
+});
+
+test('the Orders panel shows the filled orders of today', async ({ page }) => {
+  await page.goto('/');
+  const tabs = ordersPanel(page).getByRole('tablist', { name: 'Orders' });
+
+  await tabs.getByRole('tab', { name: /^Filled today/ }).click();
+
+  await expect(tabs.getByRole('tab', { name: /^Filled today/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('region', { name: 'Open orders' })).toHaveCount(0);
+});

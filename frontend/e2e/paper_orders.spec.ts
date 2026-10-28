@@ -1,6 +1,14 @@
 // Paper orders by hand with the IBKR fake of backend/tests/e2e_server.py: account DU1234567 and 30 open orders of
-// forward test 42. The e2e server keeps its orders between tests, so each test uses its own symbol.
+// forward test 42. The e2e server keeps its orders between tests, so each test uses its own symbol. The order form is
+// on the instrument page. The home page shows the open orders and cancels them; it has no order form.
 import { expect, test, type Page } from '@playwright/test';
+
+const ORDER_PAGE_PATH = '/instruments/SEHK/700?currency=HKD';
+
+async function openOrderForm(page: Page): Promise<void> {
+  await page.goto(ORDER_PAGE_PATH);
+  await expect(page.getByRole('form', { name: 'Paper order' })).toBeVisible();
+}
 
 function makeUniqueSymbol(projectName: string): string {
   return `E2E${projectName.slice(0, 2).toUpperCase()}${String(Date.now() % 1_000_000)}`;
@@ -26,8 +34,7 @@ async function fillLimitOrder(page: Page, symbol: string): Promise<void> {
 
 test('sends a limit order after the confirmation and cancels it', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page);
 
   await fillLimitOrder(page, symbol);
 
@@ -46,6 +53,7 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
   await sentNotification.getByRole('button', { name: 'Close notification' }).click();
   await expect(sentNotification).toHaveCount(0);
 
+  await page.goto('/');
   const orders = page.getByRole('region', { name: 'Open orders' });
   const orderRow = orders.getByRole('row', { name: new RegExp(symbol) });
   await orderRow.scrollIntoViewIfNeeded();
@@ -60,13 +68,13 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
 
 test('cancels an open order with the keyboard only', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page);
   await fillLimitOrder(page, symbol);
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
   await dialog.getByRole('button', { name: 'Send paper order' }).click();
   await expect(dialog).toBeHidden();
 
+  await page.goto('/');
   const orderRow = page.getByRole('region', { name: 'Open orders' }).getByRole('row', { name: new RegExp(symbol) });
   await expect(orderRow).toContainText('Submitted');
   // The keyboard opens the row overflow menu, moves to the enabled item, and chooses it.
@@ -83,8 +91,7 @@ test('cancels an open order with the keyboard only', async ({ page }, currentTes
 
 test('sends no order when the user goes back from the confirmation', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page);
 
   await fillLimitOrder(page, symbol);
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
@@ -96,8 +103,7 @@ test('sends no order when the user goes back from the confirmation', async ({ pa
 
 test('the confirmation keeps the focus, closes with Escape, and gives the focus back', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page);
 
   await fillLimitOrder(page, symbol);
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
@@ -117,7 +123,7 @@ test('the confirmation keeps the focus, closes with Escape, and gives the focus 
 });
 
 test('the side, order type, and time in force work with the keyboard', async ({ page }) => {
-  await page.goto('/');
+  await openOrderForm(page);
   const ticket = page.getByRole('form', { name: 'Paper order' });
   const buy = ticket.getByRole('tab', { name: 'Buy' });
   const sell = ticket.getByRole('tab', { name: 'Sell' });
