@@ -1,7 +1,7 @@
 <!-- The backtest list of the backtest workbench (the body of the "Backtests" side column): 32px rows with the number,
      the strategy version, the instrument symbol, the status (icon and word), and the total return (ChangeText). The open
-     backtest (or both compared backtests) has the Carbon selected row color. A click on a row opens its backtest. When 2 or more rows are checked,
-     the Carbon batch action bar shows Compare: it opens the comparison of 2 backtests of the same strategy, and its
+     backtest (or both compared backtests) has the Carbon selected row color. A click on a row opens its backtest.
+     When 2 or more rows are checked, the Carbon batch action bar shows Compare: it opens the comparison of 2 backtests of the same strategy, and its
      text says why Compare is not available (docs/architecture section 9.5). -->
 <script lang="ts">
   import { goto } from '$app/navigation';

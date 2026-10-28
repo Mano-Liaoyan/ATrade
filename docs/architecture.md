@@ -640,14 +640,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   the backtest page ("Backtests", both compared rows have the open row color:
   `comparedBacktestIds` of `BacktestList`) or of the forward test page
   ("Forward tests"). The comparison panel has the header line (name, strategy
-  link; the forward test comparison also has the instrument, the bar period,
-  and the backtest status), `ComparedKeyMetrics` of `backtest`, and
-  `EquityDrawdownChart` with 2 curves (`showsLegend={false}`). The panel
+  link, instrument link and bar period; the backtest comparison shows these 2
+  only when both backtests have the same; the forward test comparison also
+  has the backtest status), `ComparedKeyMetrics` of `backtest`, and
+  `EquityDrawdownChart` with 2 curves. The chart panel has a minimum of
+  256px (160px on the other pages), and in a low panel the metric rows scroll
+  in their region "Compared metrics" with a visible track. The panel
   under it has the tabs Code difference (backtests, `CodeDiff` with `fill`)
   or Fills / Logs (forward test: `FillComparisonTable` and the backtest
   error). `ComparedKeyMetrics` (`tests: ComparedTest[]`) shows one
   `KeyMetricRow` for each test, under a line with the curve line style and a
-  link to the test, so the curves need no second legend. `readKeyMetrics`
+  link to the test. This line is the only key of the curves. `readKeyMetrics`
   takes `metrics: null` (all tiles "–") and an optional `period`: only the
   trades in the period count for the win rate.
 - `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
@@ -665,10 +668,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-support-error`). Total return and net profit also are `change`
   values. Other metrics have no direction.
 - `EquityDrawdownChart` of `backtest` (`curves`, `label`, `interruptions`,
-  `fill`, `showsLegend`) is the one equity and drawdown chart of all pages. Each curve (`DrawdownCurve`:
-  `name`, `points`, `startCapitalUsd`) has an equity line and a drawdown
-  curve; the second curve is dashed (`readCurveStyle`), and `ChartLegend`
-  names the curves and lists the interruptions (grey columns). The drawdown
+  `fill`) is the one equity and drawdown chart of all pages. Each curve
+  (`DrawdownCurve`: `name`, `points`, `startCapitalUsd`) has an equity line
+  and a drawdown curve; the second curve is dashed (`readCurveStyle`). The
+  chart has no curve legend: `InterruptionList` lists the interruptions (grey
+  columns) under it. The drawdown
   axis is a percent. New points of the same curves do not reset the zoom.
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,

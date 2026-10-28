@@ -4,8 +4,7 @@
      drawdown metric (formatMaxDrawdown). It is for the backtest page and, later, for the forward test page and the
      comparison pages:
      - `curves`: one curve, or 2 curves of a comparison. The second curve is dashed in the Carbon interactive color, and a
-       legend names the curves (ChartLegend). `showsLegend={false}` hides the legend when the page names the curves
-       with their line styles itself (ComparedKeyMetrics).
+       page names the curves with their line styles (ComparedKeyMetrics): the chart has no legend.
      - `interruptions`: grey columns behind the equity curves and a list under the chart (forward tests).
      - New points of the same curves (a live forward test) do not reset the zoom. The chart fits all points only when it
        gets other curves (another name or another first time).
@@ -37,7 +36,7 @@
   } from 'lightweight-charts';
   import { ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
-  import ChartLegend from './ChartLegend.svelte';
+  import InterruptionList from './InterruptionList.svelte';
   import { convertToTimestamp, readCurveStyle } from './chart_series';
   import { computeDrawdownCurve } from './drawdown_curve';
   import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
@@ -47,10 +46,9 @@
     label: string;
     interruptions?: readonly TimeInterval[];
     fill?: boolean;
-    showsLegend?: boolean;
   }
 
-  const { curves, label, interruptions = [], fill = false, showsLegend = true }: Props = $props();
+  const { curves, label, interruptions = [], fill = false }: Props = $props();
 
   const EQUITY_PANE_STRETCH = 3;
   const DRAWDOWN_PANE_STRETCH = 1;
@@ -232,5 +230,5 @@
 </script>
 
 <ChartFrame {label} {fill} bind:canvas={chartContainer}>
-  <ChartLegend {label} curveNames={showsLegend ? curves.map((curve) => curve.name) : []} {interruptions} />
+  <InterruptionList {label} {interruptions} />
 </ChartFrame>

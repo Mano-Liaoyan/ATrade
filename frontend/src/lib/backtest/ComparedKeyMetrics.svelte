@@ -1,9 +1,12 @@
 <!-- The key metrics of 2 compared tests (backtests or a forward test and a backtest), one KeyMetricRow for each test, so
      the same metrics stand in the same columns with the full width of the backtest page row (spec #99). A line with the
      name of the test is above its row: a link to the test with the line style of its curve in the equity and drawdown
-     chart (readCurveStyle). The region is "Compared metrics"; each row is "Metrics of <name>". -->
+     chart (readCurveStyle). This line is the only key of the curves: the chart has no legend.
+     The rows are in a ScrollRegion "Compared metrics" that fills its parent: in a low panel, the rows scroll with a
+     visible track, so all metrics stay reachable. Each row is "Metrics of <name>". -->
 <script lang="ts">
   import { LineStyle } from 'lightweight-charts';
+  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { readCurveStyle } from './chart_series';
   import type { ComparedTest } from './key_metrics';
   import KeyMetricRow from './KeyMetricRow.svelte';
@@ -11,7 +14,7 @@
   const { tests }: { tests: readonly ComparedTest[] } = $props();
 </script>
 
-<section class="compared-metrics" aria-label="Compared metrics">
+<ScrollRegion label="Compared metrics" fill>
   {#each tests as test, testIndex (test.href)}
     <div class="test-name">
       <span
@@ -31,15 +34,9 @@
       period={test.period}
     />
   {/each}
-</section>
+</ScrollRegion>
 
 <style>
-  .compared-metrics {
-    display: flex;
-    flex: none;
-    flex-direction: column;
-  }
-
   .test-name {
     display: flex;
     align-items: center;
@@ -60,7 +57,7 @@
 
   .curve-line {
     flex: none;
-    inline-size: var(--cds-spacing-06);
+    inline-size: var(--cds-spacing-07);
     border-top: 2px solid;
   }
 

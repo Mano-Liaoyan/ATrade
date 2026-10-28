@@ -1,6 +1,7 @@
 <!-- Comparison of 2 backtests of the same strategy (docs/architecture section 9.5): a workbench (foundation/workbench,
      spec #99) with the structure of the backtest page. Left: the "Backtests" side column (BacktestList) with both
-     compared rows marked. Center: the comparison panel (header line: the name and the strategy; then one key metric
+     compared rows marked. Center: the comparison panel (header line: the name, the strategy, and the instrument and bar period when both backtests
+     have the same; then one key metric
      row for each backtest and both equity and drawdown curves on one time axis) over the Code difference panel.
      The backend refuses backtests of different strategies, and the page shows its reason. -->
 <script lang="ts">
@@ -19,14 +20,18 @@
   } from '#lib/backtest';
   import { Button, InlineNotification } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
+  import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
+  import { isSameInstrument } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
+  import { createInstrumentHref } from '../../../../instrument_href';
   import BacktestList from '../../../BacktestList.svelte';
 
   const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
-  // The same panels and sizes as the backtest page.
+  // The panels of the backtest page. The chart panel has a higher minimum: the header line, the 2 metric rows (they
+  // scroll when they do not fit), and the chart.
   const PANELS: PanelSpec[] = [
-    { id: 'chart', minPixels: 160 },
+    { id: 'chart', minPixels: 256 },
     { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
   ];
   const TABLE_TABS = [{ value: 'code', label: 'Code difference' }];
@@ -146,16 +151,27 @@
                 <a class="cds--link" href={resolve('/strategies/[strategyId]', { strategyId: String(compared.strategy_id) })}
                   >{compared.strategy_name}</a
                 >
+                <!-- The instrument and the bar period show when both backtests have the same one. -->
+                {#if isSameInstrument(compared.first, compared.second)}
+                  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                  <a class="cds--link" href={createInstrumentHref(compared.first)}>{compared.first.symbol}</a>
+                {/if}
+                {#if compared.first.bar_period === compared.second.bar_period}
+                  <span class="run-period">{formatBarPeriod(compared.first.bar_period)}</span>
+                {/if}
               </h1>
             {/snippet}
-            <ComparedKeyMetrics tests={comparedTests} />
-            <div class="chart">
-              <EquityDrawdownChart
-                curves={comparedCurves}
-                label="Equity and drawdown"
-                showsLegend={false}
-                fill
-              />
+            <div class="compare-area">
+              <div class="metrics">
+                <ComparedKeyMetrics tests={comparedTests} />
+              </div>
+              <div class="chart">
+                <EquityDrawdownChart
+                  curves={comparedCurves}
+                  label="Equity and drawdown"
+                  fill
+                />
+              </div>
             </div>
           </Panel>
         {:else}
@@ -233,10 +249,26 @@
     letter-spacing: inherit;
   }
 
+  .run-period {
+    color: var(--cds-text-secondary);
+  }
+
+  /* The metrics over the chart: the chart keeps at least 6rem, and the metrics take the rest up to their full height.
+     In a low panel the metrics scroll in their own region (ComparedKeyMetrics) with a visible track. */
+  .compare-area {
+    display: grid;
+    flex: 1;
+    grid-template-rows: minmax(0, auto) minmax(var(--cds-spacing-12), 1fr);
+    min-block-size: 0;
+  }
+
+  .metrics {
+    min-block-size: 0;
+  }
+
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */
   .chart {
     position: relative;
-    flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
   }

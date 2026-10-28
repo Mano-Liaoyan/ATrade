@@ -36,9 +36,10 @@
   import ForwardTestList from '../../../ForwardTestList.svelte';
 
   const READ_INTERVAL_MILLISECONDS = 2000;
-  // The same panels and sizes as the forward test page.
+  // The panels of the forward test page. The chart panel has a higher minimum: the header line, the 2 metric rows (they
+  // scroll when they do not fit), and the chart.
   const PANELS: PanelSpec[] = [
-    { id: 'chart', minPixels: 160 },
+    { id: 'chart', minPixels: 256 },
     { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
   ];
   type ComparisonTable = 'fills' | 'logs';
@@ -58,6 +59,8 @@
   let forwardTestFills = $state<TestTrade[]>([]);
   let backtestTrades = $state<TestTrade[]>([]);
   let errorMessage = $state('');
+  // The read error of the forward test fills or the backtest trades: the win rates are not known then.
+  let tradeMessage = $state('');
   let selectedTable: ComparisonTable = $state('fills');
 
   const comparedTests = $derived.by<ComparedTest[]>(() => {
@@ -124,6 +127,8 @@
       if (backtestResult.kind === 'ok') {
         backtestTrades = backtestResult.value.trades;
       }
+      const failedTradeRead = [forwardTestResult, backtestResult].find((read) => read.kind === 'failed');
+      tradeMessage = failedTradeRead?.kind === 'failed' ? failedTradeRead.message : '';
       if (!isFinalStatus(result.value.backtest.status)) {
         timer = setTimeout(() => void readComparison(), READ_INTERVAL_MILLISECONDS);
       }
@@ -175,15 +180,21 @@
                 />
               </span>
             {/snippet}
-            <ComparedKeyMetrics tests={comparedTests} />
-            <div class="chart">
-              <EquityDrawdownChart
-                curves={comparedCurves}
-                label="Equity and drawdown"
-                showsLegend={false}
-                interruptions={compared.interruptions}
-                fill
-              />
+            {#if tradeMessage !== ''}
+              <InlineNotification kind="error" title="Win rates not read" subtitle={tradeMessage} lowContrast />
+            {/if}
+            <div class="compare-area">
+              <div class="metrics">
+                <ComparedKeyMetrics tests={comparedTests} />
+              </div>
+              <div class="chart">
+                <EquityDrawdownChart
+                  curves={comparedCurves}
+                  label="Equity and drawdown"
+                  interruptions={compared.interruptions}
+                  fill
+                />
+              </div>
             </div>
           </Panel>
         {:else}
@@ -245,10 +256,22 @@
     white-space: nowrap;
   }
 
+  /* The metrics over the chart: the chart keeps at least 6rem, and the metrics take the rest up to their full height.
+     In a low panel the metrics scroll in their own region (ComparedKeyMetrics) with a visible track. */
+  .compare-area {
+    display: grid;
+    flex: 1;
+    grid-template-rows: minmax(0, auto) minmax(var(--cds-spacing-12), 1fr);
+    min-block-size: 0;
+  }
+
+  .metrics {
+    min-block-size: 0;
+  }
+
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */
   .chart {
     position: relative;
-    flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
   }
