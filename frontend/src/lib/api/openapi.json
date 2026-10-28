@@ -23,6 +23,52 @@
         }
       }
     },
+    "/api/access-session": {
+      "get": {
+        "summary": "Read Access Session",
+        "operationId": "read_access_session_api_access_session_get",
+        "parameters": [
+          {
+            "name": "cf-access-jwt-assertion",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cf-Access-Jwt-Assertion"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ibkr/gateway": {
       "get": {
         "summary": "Read Gateway Status",
@@ -1326,6 +1372,26 @@
   },
   "components": {
     "schemas": {
+      "AccessSessionResponse": {
+        "properties": {
+          "logout_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logout Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "logout_url"
+        ],
+        "title": "AccessSessionResponse"
+      },
       "AddInstrumentRequest": {
         "properties": {
           "symbol": {

@@ -1,5 +1,6 @@
 <!-- App shell: the Carbon UI shell header (product name, page navigation, backend status, IB Gateway status,
-     server time, the Paper tag, the command palette, and the theme button) and the main region for each page. -->
+     server time, the Paper tag, the command palette, the theme button, and the Log out button behind Cloudflare
+     Access) and the main region for each page. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
@@ -10,6 +11,7 @@
     SERVER_TIME_TICK_MILLISECONDS,
     type BackendHealth,
   } from '#lib/foundation/backend_health';
+  import { LogOutButton } from '#lib/foundation/access_session';
   import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
   import { ThemeButton } from '#lib/foundation/color_scheme';
   import { CommandPalette } from '#lib/foundation/command_palette';
@@ -146,6 +148,7 @@
       </Tooltip>
       <CommandPalette groups={paletteCommandGroups} onOpen={readPaletteWatchlist} busy={paletteWatchlistReading} />
       <ThemeButton />
+      <LogOutButton />
     </div>
   </header>
   <main class="app-main">

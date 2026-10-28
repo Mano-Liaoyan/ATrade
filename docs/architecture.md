@@ -229,10 +229,11 @@ A restart of `web` does not stop forward tests.
 
 ### 6.5 Web app routes outside the capabilities
 
-`app/` owns two routers that belong to no capability:
+`app/` owns three routers that belong to no capability:
 
 | Route | Behavior |
 |---|---|
+| `GET /api/access-session` | `200` with `{"logout_url": "/cdn-cgi/access/logout"}` when the request has the header `Cf-Access-Jwt-Assertion` (it came through Cloudflare Access, section 14), else `{"logout_url": null}`. The Web process does not check the token. The answer only decides if the header shows the Log out link. |
 | `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
 | `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
 
@@ -419,6 +420,15 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   reads the account check from `/ws/paper-trading`. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
   navigation at all widths. Header buttons go in `cds--header__global`.
+- The Log out link (`LogOutButton` of `foundation/access_session`) is the
+  last header action, after the theme button: a Carbon header action with
+  the `@carbon/icons` Logout icon, the accessible name "Log out", and a
+  Carbon tooltip. It shows only when `GET /api/access-session` gives a
+  logout URL, so a development machine has no Log out link. A click opens
+  `/cdn-cgi/access/logout`: Cloudflare answers this path, deletes the
+  Access cookie, and ends the Access session in all Access applications.
+  When the browser is still logged in to GitHub, the next visit logs in
+  again without a passkey (section 14).
 - The command palette shell is `CommandPalette` of
   `foundation/command_palette`: a header search icon button ("Open command
   palette") and a Carbon modal with a large Carbon search field and Carbon
@@ -846,6 +856,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   only the user's email address. The login method is the GitHub identity
   provider. The user logs in to GitHub with a passkey. The session duration
   is 1 month. Cloudflare Access has no passkey login of its own.
+- The Log out link in the header (section 13) opens
+  `/cdn-cgi/access/logout`. This ends the Access session, not the GitHub
+  session.
 - Nginx Proxy Manager (NPM) runs on a different host in the user's tailnet.
   One proxy host sends the Web host name to
   `http://<server Tailscale IP>:<ATRADE_WEB_PORT>`
