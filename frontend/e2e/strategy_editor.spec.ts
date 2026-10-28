@@ -34,8 +34,10 @@ async function replaceCode(page: Page, code: string): Promise<void> {
 }
 
 // The color of one screen pixel. The screenshot is decoded in the page, so the test needs no image library.
+// caret: 'initial' is necessary: in WebKit, the default caret hiding can stop a screenshot until the test times out.
+// CodeMirror draws its own cursor, and the test reads no pixel at the cursor.
 async function readPixel(page: Page, x: number, y: number): Promise<string> {
-  const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } });
+  const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 }, caret: 'initial' });
   return page.evaluate(async (base64) => {
     const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob());
     const context = new OffscreenCanvas(1, 1).getContext('2d');
@@ -64,9 +66,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.mouse.move(box.x + 120, centerY, { steps: 5 });
     await page.mouse.up();
 
-    // Above the letters, the selected part of the line and the part after the text have different colors.
-    const topY = box.y + 1;
-    expect(await readPixel(page, box.x + 60, topY)).not.toBe(await readPixel(page, box.x + box.width - 4, topY));
+    // Above the letters, the selected part of the line and the part after the text have different colors. The test
+    // reads the row from the drawn selection, because in WebKit the selection is lower than the top of the line box.
+    const selection = await page.locator('.cm-selectionBackground').first().boundingBox();
+    if (selection === null) {
+      throw new Error('The editor draws no selection.');
+    }
+    const topY = Math.ceil(selection.y) + 1;
+    expect(await readPixel(page, selection.x + selection.width / 2, topY)).not.toBe(
+      await readPixel(page, box.x + box.width - 4, topY),
+    );
   });
 }
 
