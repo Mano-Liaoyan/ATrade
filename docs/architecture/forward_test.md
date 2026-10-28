@@ -454,10 +454,12 @@ than the worker clock.
 ## 12.16 Frontend and tests
 
 - `#lib/forward_test`: the HTTP calls, `readForwardTestsMessage()`,
-  `listForwardTestEvents()` (the events of the Logs tab), and
-  `ForwardTestList.svelte` (`ScrollRegion` "Forward test list": number,
-  strategy version, symbol, and status; the open forward test is the selected
-  row). `FillComparisonTable.svelte` (`ScrollRegion` "Compared fills") is the
+  `ForwardTestsOnInstrumentsFeed` (the one `/ws/forward-tests` feed of a page:
+  `forwardTests`, `onInstruments`, `isConnected`), and
+  `listForwardTestEvents()` (the events of the Logs tab).
+  `routes/forward-tests/ForwardTestList.svelte` (`ScrollRegion` "Forward test
+  list": number, strategy version, symbol, and status; the open forward test
+  is the selected row) is the list of the page. `FillComparisonTable.svelte` (`ScrollRegion` "Compared fills") is the
   fill table of section 12.10 (#78). `ForwardTestFillTable.svelte`
   (`ScrollRegion` "Fills") is the Fills tab of the forward test page.
 - The forward test page `/forward-tests/{id}` is a workbench like the
@@ -478,10 +480,13 @@ than the worker clock.
   backtest and opens the comparison page). Below: `KeyMetricRow` and
   `EquityDrawdownChart` of `backtest` (the same metrics and chart as the
   backtest page; the start balance is the start capital, the fills are the
-  trades), with the interruptions in grey. Without metrics, the panel shows the
+  trades). The chart lists the interruptions under it and marks grey only the
+  recorded bar ends inside one: a forward test has no bar end in an
+  interruption, so the grey is mostly absent. An interruption that still lasts
+  ends at the stop, or now. Without metrics, the panel shows the
   status. The Fills / Comparison / Logs panel: the fills; each backtest of the
-  same period with its status, period, return, and a link "Compare with
-  backtest #N"; the current error and the events (start, interruptions and
+  same period with its number (a link with the name "Compare with backtest
+  #N"), status, period, and return; the current error and the events (start, interruptions and
   their ends, stop, or the planned stop at the end time) in UTC.
 - Tables show a bar period as "1 min" or "1 day", an amount with thousands
   separators ("98,765.40"), and a UTC time as "2026-01-02 03:04:05 UTC"

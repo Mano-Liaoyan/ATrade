@@ -1,9 +1,7 @@
-// Public entry of forward_test: start and stop forward tests, the list with the actual status, the socket message,
-// the forward test list and the fills and events of the forward test page, and the comparison with a backtest of the
-// same period.
+// Public entry of forward_test: start and stop forward tests, the actual status, the socket message and its feed, the
+// fills and events of the forward test page, and the comparison with a backtest of the same period.
 export { default as FillComparisonTable } from './FillComparisonTable.svelte';
 export { default as ForwardTestFillTable } from './ForwardTestFillTable.svelte';
-export { default as ForwardTestList } from './ForwardTestList.svelte';
 export { listForwardTestEvents, type ForwardTestEvent } from './forward_test_events';
 export { ForwardTestsOnInstrumentsFeed } from './forward_tests_feed.svelte';
 export {

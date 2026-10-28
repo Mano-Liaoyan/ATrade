@@ -29,7 +29,7 @@
     StatusIndicator,
     type TableColumn,
   } from '#lib/foundation/carbon';
-  import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
+  import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ChangeText, formatBarPeriod } from '#lib/foundation/value_format';
@@ -39,12 +39,10 @@
     canStop,
     describeForwardTestStatus,
     findForwardTestStatusKind,
-    FORWARD_TESTS_SOCKET_PATH,
     ForwardTestFillTable,
-    ForwardTestList,
+    ForwardTestsOnInstrumentsFeed,
     listForwardTestEvents,
     readForwardTestDetail,
-    readForwardTestsMessage,
     showsCrashCount,
     startSamePeriodBacktest,
     stopForwardTest,
@@ -54,6 +52,7 @@
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
+  import ForwardTestList from '../ForwardTestList.svelte';
   import StartForwardTestDialog from '../StartForwardTestDialog.svelte';
 
   const READ_INTERVAL_MILLISECONDS = 2000;
@@ -70,7 +69,6 @@
     { header: 'Start' },
     { header: 'End' },
     { header: 'Return', align: 'right' },
-    { header: 'Comparison' },
   ];
   const EVENT_COLUMNS: TableColumn[] = [{ header: 'Time' }, { header: 'Event' }];
   type ForwardTestTable = 'fills' | 'comparison' | 'logs';
@@ -83,9 +81,8 @@
   const routeForwardTestId = $derived(page.params['forwardTestId']);
   const forwardTestId = $derived(routeForwardTestId === undefined ? null : Number(routeForwardTestId));
 
-  let forwardTests: ForwardTest[] = $state([]);
-  let isListRead = $state(false);
-  let isSocketConnected = $state(false);
+  // The one /ws/forward-tests socket of the page: the list.
+  const feed = new ForwardTestsOnInstrumentsFeed();
   let detail = $state<ForwardTestDetail | null>(null);
   let detailMessage = $state('');
   let selectedTable: ForwardTestTable = $state('fills');
@@ -96,29 +93,15 @@
   let isStartingBacktest = $state(false);
 
   const shownDetail = $derived(detail !== null && detail.forward_test.id === forwardTestId ? detail : null);
-  // An interruption that still lasts is grey on the chart up to now.
+  // An interruption that still lasts ends at the stop, or now (docs/architecture/forward_test.md 12.10).
   const chartInterruptions = $derived<TimeInterval[]>(
     (shownDetail?.forward_test.interruptions ?? []).map((interruption) => ({
       start_utc: interruption.started_at_utc,
-      end_utc: interruption.ended_at_utc ?? new Date().toISOString(),
+      end_utc: interruption.ended_at_utc ?? shownDetail?.forward_test.stopped_at_utc ?? new Date().toISOString(),
     })),
   );
 
-  $effect(() => {
-    return openLiveSocket({
-      url: buildSocketUrl(FORWARD_TESTS_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const forwardTestsMessage = readForwardTestsMessage(message);
-        if (forwardTestsMessage !== null) {
-          forwardTests = forwardTestsMessage;
-          isListRead = true;
-        }
-      },
-      onConnectionChange: (isConnected) => {
-        isSocketConnected = isConnected;
-      },
-    });
-  });
+  $effect(() => feed.start(window.location));
 
   // /forward-tests opens the newest forward test. The same page component stays, so an open dialog stays open. A
   // navigation that runs (for example a click on a header link) wins.
@@ -126,7 +109,7 @@
     if (navigating.to !== null) {
       return;
     }
-    const newest = forwardTests.reduce<ForwardTest | undefined>(
+    const newest = feed.forwardTests.reduce<ForwardTest | undefined>(
       (found, item) => (found === undefined || item.id > found.id ? item : found),
       undefined,
     );
@@ -193,7 +176,7 @@
   }
 
   function openStartedForwardTest(started: ForwardTest): void {
-    forwardTests = [started, ...forwardTests.filter((item) => item.id !== started.id)];
+    feed.forwardTests = [started, ...feed.forwardTests.filter((item) => item.id !== started.id)];
     void goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(started.id) }));
   }
 
@@ -254,15 +237,15 @@
         }}
       />
     {/snippet}
-    <LiveUpdatesNotification isConnected={isSocketConnected} />
-    <ForwardTestList {forwardTests} openForwardTestId={forwardTestId} />
+    <LiveUpdatesNotification isConnected={feed.isConnected} />
+    <ForwardTestList forwardTests={feed.forwardTests} openForwardTestId={forwardTestId} />
   </SideColumn>
 
   {#if shownDetail === null}
     <div class="empty-main">
       {#if detailMessage !== ''}
         <InlineNotification kind="error" title="Forward test not read" subtitle={detailMessage} lowContrast />
-      {:else if isListRead && forwardTests.length === 0}
+      {:else if feed.isConnected && feed.forwardTests.length === 0}
         <p class="empty-word">No forward tests</p>
       {/if}
     </div>
@@ -368,7 +351,16 @@
                     {#snippet rows()}
                       {#each records.same_period_backtests as backtest (backtest.id)}
                         <tr>
-                          <th scope="row" align="right">#{backtest.id}</th>
+                          <th scope="row" align="right">
+                            <a
+                              class="cds--link"
+                              aria-label={`Compare with backtest #${String(backtest.id)}`}
+                              href={resolve('/forward-tests/[forwardTestId]/comparison/[backtestId]', {
+                                forwardTestId: String(forwardTest.id),
+                                backtestId: String(backtest.id),
+                              })}>#{backtest.id}</a
+                            >
+                          </th>
                           <td>
                             <StatusIndicator
                               label={describeBacktestStatus(backtest.status)}
@@ -384,15 +376,6 @@
                                 text={formatPercent(backtest.metrics.total_return_percent)}
                               />
                             {/if}
-                          </td>
-                          <td>
-                            <a
-                              class="cds--link"
-                              href={resolve('/forward-tests/[forwardTestId]/comparison/[backtestId]', {
-                                forwardTestId: String(forwardTest.id),
-                                backtestId: String(backtest.id),
-                              })}>Compare with backtest #{backtest.id}</a
-                            >
                           </td>
                         </tr>
                       {/each}
@@ -471,14 +454,10 @@
     margin-inline-start: auto;
   }
 
-  /* Backtest the same period has the icon color of the backtest page header; Stop is a red stop square (spec #99
-     toolbar rule). A disabled button has the Carbon disabled color. */
-  .run-actions :global(.atrade-icon-button:not(.cds--btn--disabled) svg) {
-    fill: var(--cds-icon-primary);
-  }
-
-  .stop-action :global(.atrade-icon-button:not(.cds--btn--disabled) svg) {
-    fill: var(--cds-support-error);
+  /* Stop is a red stop square (spec #99 toolbar rule): Carbon paints the icon of a ghost icon button with
+     --cds-icon-primary. A disabled button keeps the Carbon disabled color. */
+  .stop-action :global(.atrade-icon-button:not(.cds--btn--disabled)) {
+    --cds-icon-primary: var(--cds-support-error);
   }
 
   .state-area {

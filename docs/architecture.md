@@ -356,11 +356,14 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - The forward test page (`/forward-tests/<id>`, spec #99, ticket
   [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
   with the structure of the backtest page: the "Forward tests" `SideColumn`
-  with the live list (`ForwardTestList` of `forward_test`, 32px rows) and the
+  with the live list (`routes/forward-tests/ForwardTestList.svelte`, 32px
+  rows, from `ForwardTestsOnInstrumentsFeed.forwardTests`) and the
   "New forward test" dialog (form id `start-forward-test`); the forward test
   panel (header line with the status, the red "Stop forward test" icon button
   while the forward test can stop, and the "Backtest the same period" icon
-  button; `KeyMetricRow`; `EquityDrawdownChart` with the interruptions) over
+  button; `KeyMetricRow`; `EquityDrawdownChart`, which lists the
+  interruptions under the chart and marks grey the recorded bar ends inside
+  one) over
   the Fills / Comparison / Logs panel. `/forward-tests` opens the newest
   forward test. The status of a forward test is a `StatusIndicator`
   (`findForwardTestStatusKind` of `forward_test`).
@@ -588,7 +591,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   The side column is the landmark; its content has no landmark with the same
   name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
-  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the home page uses the
+  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
+  `/ws/forward-tests` feed: `forwardTests`, `onInstruments`, `isConnected`;
+  the forward test page uses it for its list; the home page uses the
   same paper account feed). While a socket is not connected, the panel and
   the column show `LiveUpdatesNotification`.
 - The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))

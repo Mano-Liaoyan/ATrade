@@ -87,6 +87,16 @@ test('starts a forward test in the New forward test dialog, sees it running, and
 
   await page.goBack();
   const stopButton = chartPanel.getByRole('button', { name: 'Stop forward test', exact: true });
+  // The Stop icon is red: the support error color of the Carbon theme.
+  const iconColors = await stopButton.locator('path').first().evaluate((path) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--cds-support-error)';
+    document.body.append(probe);
+    const errorColor = getComputedStyle(probe).color;
+    probe.remove();
+    return { fill: getComputedStyle(path).fill, errorColor };
+  });
+  expect(iconColors.fill).toBe(iconColors.errorColor);
   await stopButton.click();
 
   await expect(status).toHaveText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });

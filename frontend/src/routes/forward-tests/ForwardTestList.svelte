@@ -7,7 +7,8 @@
   import { resolve } from '$app/paths';
   import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { describeForwardTestStatus, findForwardTestStatusKind, type ForwardTest } from './forward_test_api';
+  import { describeForwardTestStatus, findForwardTestStatusKind, type ForwardTest } from '#lib/forward_test';
+  import { formatVersionLabel } from '#lib/strategy';
 
   interface Props {
     forwardTests: ForwardTest[];
@@ -42,7 +43,7 @@
     <DataTable columns={COLUMNS} size="sm">
       {#snippet rows()}
         {#each forwardTests as forwardTest (forwardTest.id)}
-          {@const versionLabel = `${forwardTest.strategy_name} v${String(forwardTest.version_number)}`}
+          {@const versionLabel = formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}
           <tr
             class={['forward-test-row', forwardTest.id === openForwardTestId && 'forward-test-row--open']}
             onclick={(event) => {
@@ -136,14 +137,15 @@
     outline-offset: -2px;
   }
 
-  /* The open forward test: the Carbon selected row color and an interactive bar at the start of the row. */
-  .forward-test-row--open > :global(td),
-  .forward-test-row--open > :global(th) {
+  /* The open forward test: the Carbon selected row color and an interactive bar at the start of the row. 2 classes, so
+     the rule wins over the Carbon body header cell rule. */
+  .forward-test-row.forward-test-row--open > :global(td),
+  .forward-test-row.forward-test-row--open > :global(th) {
     background: var(--cds-layer-selected-01);
     color: var(--cds-text-primary);
   }
 
-  .forward-test-row--open > :global(th:first-child) {
+  .forward-test-row.forward-test-row--open > :global(th:first-child) {
     box-shadow: inset 3px 0 0 var(--cds-border-interactive);
   }
 </style>
