@@ -190,7 +190,7 @@
 {:else}
   {@const instrumentName = formatInstrument(chartRequest.instrument)}
   <Workbench>
-    <SideColumn label="Watchlist" side="start" storageKey="atrade.instrument-page.watchlist-column">
+    <SideColumn label="Watchlist" side="start" width="20rem" storageKey="atrade.instrument-page.watchlist-column">
       <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} />
     </SideColumn>
 
@@ -259,10 +259,10 @@
                 {#if account === null}
                   <p role="status">Reading the paper account.</p>
                 {:else}
-                  <PositionTable positions={account.positions} fill />
+                  <PositionTable positions={account.positions} fill compact />
                 {/if}
               {:else if accountTable === 'open-orders'}
-                <OpenOrderList orders={accountFeed.openOrders} fill />
+                <OpenOrderList orders={accountFeed.openOrders} fill compact />
               {:else}
                 <FilledManualOrderList orders={accountFeed.filledOrders} fill />
               {/if}

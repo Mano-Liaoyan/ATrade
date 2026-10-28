@@ -42,7 +42,7 @@
         {#snippet rows()}
           {#each strategies as item (item.id)}
             <tr
-              class={['strategy-row', item.id === openStrategyId && 'strategy-row--open']}
+              class={['strategy-row', item.id === openStrategyId && 'cds--data-table--selected']}
               onclick={(event) => {
                 openRow(event, item.id);
               }}
@@ -108,17 +108,5 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
-  }
-
-  /* The open strategy: the Carbon selected row color and an interactive bar at the start of the row. */
-  /* Two classes: the DataTable body header cells (th) have a transparent background with a higher specificity. */
-  .strategy-row.strategy-row--open > :global(td),
-  .strategy-row.strategy-row--open > :global(th) {
-    background: var(--cds-layer-selected-01);
-    color: var(--cds-text-primary);
-  }
-
-  .strategy-row--open > :global(th:first-child) {
-    box-shadow: inset 3px 0 0 var(--cds-border-interactive);
   }
 </style>

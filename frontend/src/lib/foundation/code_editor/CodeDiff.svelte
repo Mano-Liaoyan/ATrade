@@ -100,8 +100,4 @@
   .diff-view :global(.cm-mergeView) {
     overflow: visible;
   }
-
-  .diff-view :global(.cm-editor) {
-    font-size: var(--cds-code-01-font-size);
-  }
 </style>

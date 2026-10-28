@@ -7,6 +7,7 @@ export {
   formatBarPeriod,
   formatPrice,
   formatSignedNumber,
+  formatSignedPercent,
   MISSING_VALUE,
   type ChangeDirection,
 } from './value_format';

@@ -1,5 +1,5 @@
 <!-- The paper order panel of the instrument page (#103), IBKR Desktop layout: the Buy / Sell switch, the order fields
-     in two columns, the order and account numbers in two columns, and the full-width button at the bottom. The order
+     in two columns, the order and account numbers as metric tiles in two columns (MetricRow, like the key metrics of the other pages), and the full-width button at the bottom. The order
      is for the instrument of the page, so the panel has no instrument fields. The limit price starts with the last
      price. A confirmation dialog with the PAPER mark comes before each order. A failed paper account check or a forward
      test on the instrument disables the button, and the panel says why. ATrade sends paper orders only. -->
@@ -16,8 +16,9 @@
     type NotificationMessage,
   } from '#lib/foundation/carbon';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
+  import { MetricRow, MetricTile } from '#lib/foundation/metric_tile';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { ChangeText, formatPrice, formatSignedNumber } from '#lib/foundation/value_format';
+  import { formatPrice, formatSignedNumber } from '#lib/foundation/value_format';
   import {
     computeOrderValue,
     findInstrumentOrderBlock,
@@ -61,6 +62,8 @@
     { value: 'GTC' as const, label: 'GTC' },
   ];
 
+  // The order panel is narrow: the 6 key numbers are tiles in 2 columns.
+  const KEY_NUMBER_COLUMNS = 2;
   const uid = $props.id();
   const blockReasonId = `order-block-${uid}`;
 
@@ -175,32 +178,14 @@
     </div>
 
     <ScrollRegion label="Order and account numbers" fill>
-    <dl class="key-numbers">
-      <div>
-        <dt>Order value</dt>
-        <dd>{formatPrice(orderValue)}</dd>
-      </div>
-      <div>
-        <dt>Position</dt>
-        <dd>{position?.quantity ?? '0'}</dd>
-      </div>
-      <div>
-        <dt>Average cost</dt>
-        <dd>{formatAmount(position?.average_cost ?? null)}</dd>
-      </div>
-      <div>
-        <dt>Unrealized P&L</dt>
-        <dd><ChangeText value={unrealizedPnl} text={formatSignedNumber(unrealizedPnl)} /></dd>
-      </div>
-      <div>
-        <dt>Cash (USD)</dt>
-        <dd>{formatAmount(account?.balance?.cash_usd ?? null)}</dd>
-      </div>
-      <div>
-        <dt>Net liquidation (USD)</dt>
-        <dd>{formatAmount(account?.balance?.net_liquidation_usd ?? null)}</dd>
-      </div>
-    </dl>
+      <MetricRow label="Order and account numbers" columns={KEY_NUMBER_COLUMNS}>
+        <MetricTile name="Order value" text={formatPrice(orderValue)} />
+        <MetricTile name="Position" text={position?.quantity ?? '0'} />
+        <MetricTile name="Average cost" text={formatAmount(position?.average_cost ?? null)} />
+        <MetricTile name="Unrealized P&L" text={formatSignedNumber(unrealizedPnl)} change={unrealizedPnl} />
+        <MetricTile name="Cash (USD)" text={formatAmount(account?.balance?.cash_usd ?? null)} />
+        <MetricTile name="Net liquidation (USD)" text={formatAmount(account?.balance?.net_liquidation_usd ?? null)} />
+      </MetricRow>
     </ScrollRegion>
 
     <div class="submit">
@@ -290,42 +275,6 @@
 
   .order-panel > :global(.scroll-region) {
     border-block-start: 1px solid var(--cds-border-subtle-01);
-  }
-
-  .key-numbers {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-content: start;
-    margin: 0;
-    padding: 0 var(--cds-spacing-05);
-  }
-
-  .key-numbers div {
-    padding-block: var(--cds-spacing-03);
-    border-block-end: 1px solid var(--cds-border-subtle-01);
-  }
-
-  .key-numbers div:nth-child(odd) {
-    padding-inline-end: var(--cds-spacing-03);
-  }
-
-  .key-numbers div:nth-child(even) {
-    padding-inline-start: var(--cds-spacing-03);
-  }
-
-  .key-numbers dt {
-    font-size: var(--cds-label-01-font-size);
-    line-height: var(--cds-label-01-line-height);
-    letter-spacing: var(--cds-label-01-letter-spacing);
-    color: var(--cds-text-secondary);
-  }
-
-  .key-numbers dd {
-    margin: 0;
-    text-align: end;
-    font-size: var(--cds-body-compact-02-font-size);
-    line-height: var(--cds-body-compact-02-line-height);
-    font-variant-numeric: tabular-nums;
   }
 
   .submit {

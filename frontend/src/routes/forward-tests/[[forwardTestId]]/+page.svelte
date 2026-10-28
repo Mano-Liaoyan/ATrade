@@ -29,7 +29,9 @@
     StatusIndicator,
     type TableColumn,
   } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
+  import { startPolling } from '#lib/foundation/polling';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ChangeText, formatBarPeriod } from '#lib/foundation/value_format';
@@ -126,37 +128,31 @@
     if (forwardTestId === null) {
       return;
     }
-    let isActive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     // A new value only after a change: then the chart keeps its zoom while nothing changes.
     let lastDetailText = '';
     const id = forwardTestId;
     actionFailure = null;
     stoppingId = null;
-
-    async function readDetail(): Promise<void> {
-      const result = await readForwardTestDetail(fetch, id);
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        detailMessage = result.message;
-      } else {
+    return startPolling(
+      () => readForwardTestDetail(fetch, id),
+      (result) => {
+        if (result.kind === 'failed') {
+          detailMessage = result.message;
+          return true;
+        }
         detailMessage = '';
         const detailText = JSON.stringify(result.value);
         if (detailText !== lastDetailText) {
           lastDetailText = detailText;
           detail = result.value;
         }
-      }
-      timer = setTimeout(() => void readDetail(), READ_INTERVAL_MILLISECONDS);
-    }
-
-    void readDetail();
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
+        return true;
+      },
+      READ_INTERVAL_MILLISECONDS,
+      (message) => {
+        detailMessage = message;
+      },
+    );
   });
 
   // The command palette goes to #start-forward-test.
@@ -246,7 +242,7 @@
       {#if detailMessage !== ''}
         <InlineNotification kind="error" title="Forward test not read" subtitle={detailMessage} lowContrast />
       {:else if feed.isConnected && feed.forwardTests.length === 0}
-        <p class="empty-word">No forward tests</p>
+        <EmptyText text="No forward tests" />
       {/if}
     </div>
   {:else}
@@ -343,7 +339,7 @@
               <ForwardTestFillTable fills={records.fills} />
             {:else if selectedTable === 'comparison'}
               {#if records.same_period_backtests.length === 0}
-                <p class="empty-word">No backtests of the same period</p>
+                <EmptyText text="No backtests of the same period" />
               {:else}
                 <ScrollRegion label="Comparison" fill>
                   <DataTable columns={COMPARISON_COLUMNS} size="sm">
@@ -468,14 +464,6 @@
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
   }
 
   .log-text {

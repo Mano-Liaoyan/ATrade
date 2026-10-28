@@ -169,8 +169,8 @@ test('compares two versions of the same strategy and refuses different strategie
     new RegExp(`^\\s*${title}\\s*Compared ${suffix}\\s*AAPL\\s*1 day\\s*$`),
   );
   // Both compared rows of the side column have the open row color.
-  await expect(list.getByRole('row', { name: new RegExp(`#${String(firstBacktestId)} `) })).toHaveClass(/backtest-row--open/);
-  await expect(list.getByRole('row', { name: new RegExp(`#${String(secondBacktestId)} `) })).toHaveClass(/backtest-row--open/);
+  await expect(list.getByRole('row', { name: new RegExp(`#${String(firstBacktestId)} `) })).toHaveClass(/cds--data-table--selected/);
+  await expect(list.getByRole('row', { name: new RegExp(`#${String(secondBacktestId)} `) })).toHaveClass(/cds--data-table--selected/);
 
   await expectComparisonWorkbench(page, chartPanel, [
     `#${String(firstBacktestId)} Compared ${suffix} v1`,

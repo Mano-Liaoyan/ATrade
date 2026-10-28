@@ -55,7 +55,8 @@ test('the chart rescales when the watchlist collapses and opens, and the browser
 
   await page.getByRole('button', { name: 'Collapse watchlist' }).click();
 
-  await expect(page.getByRole('region', { name: 'Watchlist table' })).toBeHidden();
+  // The side column state, not the table: the watchlist can be empty when this test runs alone.
+  await expect(page.getByRole('button', { name: 'Open watchlist' })).toBeVisible();
   await expect.poll(async () => (await readBox(chart)).width).toBeGreaterThan(firstWidth + 100);
   await expect.poll(() => chart.locator('canvas').first().evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(
     firstWidth + 100,
@@ -66,7 +67,7 @@ test('the chart rescales when the watchlist collapses and opens, and the browser
 
   await page.getByRole('button', { name: 'Open watchlist' }).click();
 
-  await expect(page.getByRole('region', { name: 'Watchlist table' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Collapse watchlist' })).toBeVisible();
   await expect.poll(async () => Math.round((await readBox(chart)).width)).toBe(Math.round(firstWidth));
 });
 

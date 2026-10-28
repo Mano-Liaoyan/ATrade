@@ -1,6 +1,7 @@
 // The drawdown curve under the equity curve: the same sign rule as the max drawdown metric (negative percent).
 import { describe, expect, it } from 'vite-plus/test';
 import { computeDrawdownCurve } from './index';
+import { findDrawdownScaleRange } from './drawdown_curve';
 
 function point(timeUtc: string, equityUsd: string): { time_utc: string; equity_usd: string } {
   return { time_utc: timeUtc, equity_usd: equityUsd };
@@ -33,5 +34,15 @@ describe('computeDrawdownCurve', () => {
       { timeUtc: '2024-01-01T00:00:00Z', drawdownPercent: 0 },
       { timeUtc: '2024-01-02T00:00:00Z', drawdownPercent: -25 },
     ]);
+  });
+});
+
+describe('findDrawdownScaleRange', () => {
+  it('ends the drawdown scale at 0, so the scale never shows a positive drawdown', () => {
+    expect(findDrawdownScaleRange({ minValue: -37.7, maxValue: 0 })).toEqual({ minValue: -37.7, maxValue: 0 });
+  });
+
+  it('gives a flat drawdown of 0 a range from -1 % to 0', () => {
+    expect(findDrawdownScaleRange({ minValue: 0, maxValue: 0 })).toEqual({ minValue: -1, maxValue: 0 });
   });
 });

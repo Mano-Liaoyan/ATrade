@@ -43,6 +43,8 @@
 </script>
 
 <Workbench>
+  <!-- 20rem like the watchlist of the instrument page, plus 2rem for the Delete column: the other columns have the same
+       widths on both pages. -->
   <SideColumn label="Watchlist" side="start" width="22rem" storageKey="atrade.home.watchlist-column">
     <InstrumentWatchlist editable />
   </SideColumn>

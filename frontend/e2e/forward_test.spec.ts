@@ -17,6 +17,19 @@ async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
 }
 
+// The Stop icon is red: the support error color of the Carbon theme.
+async function expectErrorIconColor(button: Locator): Promise<void> {
+  const iconColors = await button.locator('path').first().evaluate((path) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--cds-support-error)';
+    document.body.append(probe);
+    const errorColor = getComputedStyle(probe).color;
+    probe.remove();
+    return { fill: getComputedStyle(path).fill, errorColor };
+  });
+  expect(iconColors.fill).toBe(iconColors.errorColor);
+}
+
 async function expectNoPageScroll(page: Page): Promise<void> {
   const sizes = await page.evaluate(() => ({
     scrollHeight: document.documentElement.scrollHeight,
@@ -28,6 +41,9 @@ async function expectNoPageScroll(page: Page): Promise<void> {
 test('starts a forward test in the New forward test dialog, sees it running, and stops it from the header line', async ({
   page,
 }, currentTest) => {
+  // The test waits for 5 server cycles (Running in the header and in the list, the order block, Stopped in the header and
+  // in the list), each up to STATUS_TIMEOUT_MILLISECONDS under the load of the full suite: more than the default 30 s.
+  test.slow();
   // The e2e database is not cleared between tests and browser projects, so the names are unique.
   const uniqueNumber = String(Date.now() % 1_000_000);
   const strategyName = `Forward test ${currentTest.project.name} ${uniqueNumber}`;
@@ -88,16 +104,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
 
   await page.goBack();
   const stopButton = chartPanel.getByRole('button', { name: 'Stop forward test', exact: true });
-  // The Stop icon is red: the support error color of the Carbon theme.
-  const iconColors = await stopButton.locator('path').first().evaluate((path) => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--cds-support-error)';
-    document.body.append(probe);
-    const errorColor = getComputedStyle(probe).color;
-    probe.remove();
-    return { fill: getComputedStyle(path).fill, errorColor };
-  });
-  expect(iconColors.fill).toBe(iconColors.errorColor);
+  await expectErrorIconColor(stopButton);
   await stopButton.click();
 
   await expect(status).toHaveText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });

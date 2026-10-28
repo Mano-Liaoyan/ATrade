@@ -27,6 +27,8 @@
     type BacktestDetail,
   } from '#lib/backtest';
   import { Dialog, IconButton, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
+  import { startPolling } from '#lib/foundation/polling';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -74,33 +76,25 @@
   const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
 
   $effect(() => {
-    const readNumber = listReadCount;
-    let isActive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    async function readList(): Promise<void> {
-      const result = await listBacktests(fetch);
-      // A newer read replaced this one.
-      if (!isActive || readNumber !== listReadCount) {
-        return;
-      }
-      isListRead = true;
-      if (result.kind === 'failed') {
-        listMessage = result.message;
-        return;
-      }
-      listMessage = '';
-      backtests = result.value;
-      if (result.value.some((item) => !isFinalStatus(item.status))) {
-        timer = setTimeout(() => void readList(), LIST_CHECK_INTERVAL_MILLISECONDS);
-      }
-    }
-
-    void readList();
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
+    // A new read count runs this effect again: its cleanup stops the old loop.
+    listReadCount satisfies number;
+    return startPolling(
+      () => listBacktests(fetch),
+      (result) => {
+        isListRead = true;
+        if (result.kind === 'failed') {
+          listMessage = result.message;
+          return true;
+        }
+        listMessage = '';
+        backtests = result.value;
+        return result.value.some((item) => !isFinalStatus(item.status));
+      },
+      LIST_CHECK_INTERVAL_MILLISECONDS,
+      (message) => {
+        listMessage = message;
+      },
+    );
   });
 
   // /backtests opens the newest backtest. The same page component stays, so an open dialog stays open. A navigation
@@ -126,33 +120,24 @@
     if (backtestId === null) {
       return;
     }
-    let isActive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const id = backtestId;
     forwardTestMessage = '';
-
-    async function readUntilFinal(): Promise<void> {
-      const result = await readBacktest(fetch, id);
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        detailMessage = result.message;
-      } else {
+    return startPolling(
+      () => readBacktest(fetch, id),
+      (result) => {
+        if (result.kind === 'failed') {
+          detailMessage = result.message;
+          return true;
+        }
         detailMessage = '';
         backtest = result.value;
-        if (isFinalStatus(result.value.status)) {
-          return;
-        }
-      }
-      timer = setTimeout(() => void readUntilFinal(), STATUS_CHECK_INTERVAL_MILLISECONDS);
-    }
-
-    void readUntilFinal();
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
+        return !isFinalStatus(result.value.status);
+      },
+      STATUS_CHECK_INTERVAL_MILLISECONDS,
+      (message) => {
+        detailMessage = message;
+      },
+    );
   });
 
   // The command palette goes to #start-backtest.
@@ -231,7 +216,7 @@
       {#if detailMessage !== ''}
         <InlineNotification kind="error" title="Backtest not read" subtitle={detailMessage} lowContrast />
       {:else if isListRead && backtests.length === 0 && listMessage === ''}
-        <p class="empty-word">No backtests</p>
+        <EmptyText text="No backtests" />
       {/if}
     </div>
   {:else}
@@ -305,9 +290,9 @@
             {#if selectedTable === 'trades'}
               <BacktestTradeTable trades={detail.trades} />
             {:else if selectedTable === 'orders'}
-              <p class="empty-word">No orders</p>
+              <EmptyText text="No orders" />
             {:else if detail.error_message === null}
-              <p class="empty-word">No logs</p>
+              <EmptyText text="No logs" />
             {:else}
               <ScrollRegion label="Logs" fill>
                 <pre class="log-text">{detail.error_message}</pre>
@@ -389,14 +374,6 @@
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
   }
 
   .log-text {

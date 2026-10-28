@@ -20,7 +20,9 @@
     type TestTrade,
   } from '#lib/backtest';
   import { InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
+  import { startPolling } from '#lib/foundation/polling';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -101,44 +103,37 @@
   $effect(() => feed.start(window.location));
 
   $effect(() => {
-    let isActive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const currentForwardTestId = forwardTestId;
     const currentBacktestId = backtestId;
-
-    async function readComparison(): Promise<void> {
-      const [result, forwardTestResult, backtestResult] = await Promise.all([
-        readForwardTestComparison(fetch, currentForwardTestId, currentBacktestId),
-        readForwardTestDetail(fetch, currentForwardTestId),
-        readBacktest(fetch, currentBacktestId),
-      ]);
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        errorMessage = result.message;
-        return;
-      }
-      errorMessage = '';
-      comparison = result.value;
-      if (forwardTestResult.kind === 'ok') {
-        forwardTestFills = forwardTestResult.value.fills;
-      }
-      if (backtestResult.kind === 'ok') {
-        backtestTrades = backtestResult.value.trades;
-      }
-      const failedTradeRead = [forwardTestResult, backtestResult].find((read) => read.kind === 'failed');
-      tradeMessage = failedTradeRead?.kind === 'failed' ? failedTradeRead.message : '';
-      if (!isFinalStatus(result.value.backtest.status)) {
-        timer = setTimeout(() => void readComparison(), READ_INTERVAL_MILLISECONDS);
-      }
-    }
-
-    void readComparison();
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
+    return startPolling(
+      () =>
+        Promise.all([
+          readForwardTestComparison(fetch, currentForwardTestId, currentBacktestId),
+          readForwardTestDetail(fetch, currentForwardTestId),
+          readBacktest(fetch, currentBacktestId),
+        ]),
+      ([result, forwardTestResult, backtestResult]) => {
+        if (result.kind === 'failed') {
+          errorMessage = result.message;
+          return true;
+        }
+        errorMessage = '';
+        comparison = result.value;
+        if (forwardTestResult.kind === 'ok') {
+          forwardTestFills = forwardTestResult.value.fills;
+        }
+        if (backtestResult.kind === 'ok') {
+          backtestTrades = backtestResult.value.trades;
+        }
+        const failedTradeRead = [forwardTestResult, backtestResult].find((read) => read.kind === 'failed');
+        tradeMessage = failedTradeRead?.kind === 'failed' ? failedTradeRead.message : '';
+        return !isFinalStatus(result.value.backtest.status);
+      },
+      READ_INTERVAL_MILLISECONDS,
+      (message) => {
+        errorMessage = message;
+      },
+    );
   });
 </script>
 
@@ -213,7 +208,7 @@
             {#if selectedTable === 'fills'}
               <FillComparisonTable fills={compared.fills} />
             {:else if compared.backtest.error_message === null}
-              <p class="empty-word">No logs</p>
+              <EmptyText text="No logs" />
             {:else}
               <ScrollRegion label="Logs" fill>
                 <pre class="log-text">{compared.backtest.error_message}</pre>
@@ -274,14 +269,6 @@
     position: relative;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
   }
 
   .log-text {

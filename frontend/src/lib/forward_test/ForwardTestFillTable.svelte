@@ -2,6 +2,7 @@
      of the forward test page. The columns are the columns of the Trades tab of the backtest page. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatAmount } from '#lib/foundation/value_format';
@@ -20,7 +21,7 @@
 </script>
 
 {#if fills.length === 0}
-  <p class="empty-word">No fills</p>
+  <EmptyText text="No fills" />
 {:else}
   <ScrollRegion label="Fills" fill>
     <DataTable columns={COLUMNS} size="sm">
@@ -39,13 +40,3 @@
     </DataTable>
   </ScrollRegion>
 {/if}
-
-<style>
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
-  }
-</style>

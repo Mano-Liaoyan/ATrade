@@ -28,7 +28,9 @@
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
   import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
+  import { startPolling } from '#lib/foundation/polling';
   import { ChangeText } from '#lib/foundation/value_format';
   import {
     Panel,
@@ -98,6 +100,8 @@
 
   let strategies: StrategyListItem[] = $state([]);
   let listMessage = $state('');
+  // The read error of the open strategy. No panel shows it (the panels need the strategy), so the main area does.
+  let strategyMessage = $state('');
   // A new value reads the strategy list again, for example after a save.
   let listReadCount = $state(0);
   let strategy = $state<StrategyDetail | null>(null);
@@ -178,36 +182,43 @@
   // The backtest list reads again while a backtest in it is queued or running. A backtest of this strategy that ends
   // opens in its tab.
   $effect(() => {
-    const readNumber = backtestReadCount;
-    let isActive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    async function readList(): Promise<void> {
-      const result = await listBacktests(fetch);
-      if (!isActive || readNumber !== backtestReadCount || result.kind === 'failed') {
-        return;
-      }
-      const finished = findFinishedBacktest(backtests, result.value, activeStrategyId);
-      if (finished !== null) {
-        selection = { tab: createBacktestTab(finished.id), backtestId: finished.id };
-        writeOutput(describeBacktestEvent(finished));
-      }
-      backtests = result.value;
-      if (result.value.some((item) => !isFinalStatus(item.status))) {
-        timer = setTimeout(() => void readList(), LIST_CHECK_INTERVAL_MILLISECONDS);
+    // A new read count runs this effect again: its cleanup stops the old loop.
+    backtestReadCount satisfies number;
+    // A failed read writes one Output line (not again for each retry), and the list reads again. It does not open the
+    // panel: a reload aborts the read, and an open panel would be stored in the layout of the next page.
+    let failureText = '';
+    function showFailure(message: string): void {
+      const text = `Backtests not read: ${message}`;
+      if (text !== failureText) {
+        failureText = text;
+        writeOutput(text);
       }
     }
-
-    void readList();
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
+    return startPolling(
+      () => listBacktests(fetch),
+      (result) => {
+        if (result.kind === 'failed') {
+          showFailure(result.message);
+          return true;
+        }
+        failureText = '';
+        const finished = findFinishedBacktest(backtests, result.value, activeStrategyId);
+        if (finished !== null) {
+          selection = { tab: createBacktestTab(finished.id), backtestId: finished.id };
+          writeOutput(describeBacktestEvent(finished));
+        }
+        backtests = result.value;
+        return result.value.some((item) => !isFinalStatus(item.status));
+      },
+      LIST_CHECK_INTERVAL_MILLISECONDS,
+      showFailure,
+    );
   });
 
   $effect(() => {
     const id = activeStrategyId;
     strategy = null;
+    strategyMessage = '';
     openVersion = null;
     problems = [];
     selection = { tab: null, backtestId: null };
@@ -219,9 +230,11 @@
   async function loadStrategy(id: number, versionNumberToOpen: number | null): Promise<void> {
     const result = await readStrategy(fetch, id);
     if (result.kind === 'failed') {
+      strategyMessage = result.message;
       writeOutputError(`Strategy not read: ${result.message}`);
       return;
     }
+    strategyMessage = '';
     strategy = result.value;
     const versionNumber = versionNumberToOpen ?? result.value.versions.at(-1)?.version_number;
     if (versionNumber !== undefined) {
@@ -583,8 +596,10 @@
           {/if}
         {/snippet}
       </PanelSplit>
+    {:else if strategyMessage !== ''}
+      <InlineNotification kind="error" title="Strategy not read" subtitle={strategyMessage} lowContrast />
     {:else if strategies.length === 0 && listMessage === '' && strategyId === null}
-      <p class="empty-word">No strategies</p>
+      <EmptyText text="No strategies" />
     {/if}
   </div>
 </Workbench>
@@ -715,13 +730,5 @@
 
   .new-strategy-form {
     margin-block-end: var(--cds-spacing-05);
-  }
-
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
   }
 </style>

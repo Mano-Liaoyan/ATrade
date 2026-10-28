@@ -37,8 +37,8 @@ describe('readDayQuote', () => {
 
 describe('formatDayChange', () => {
   it('shows the change and the change in percent with their signs', () => {
-    expect(formatDayChange({ last: 99, change: -1, changePercent: -1 })).toBe('-1.00 (-1.00%)');
-    expect(formatDayChange({ last: 102, change: 2, changePercent: 2 })).toBe('+2.00 (+2.00%)');
+    expect(formatDayChange({ last: 99, change: -1, changePercent: -1 })).toBe('-1.00 (-1.00 %)');
+    expect(formatDayChange({ last: 102, change: 2, changePercent: 2 })).toBe('+2.00 (+2.00 %)');
   });
 
   it('shows a dash without a change', () => {

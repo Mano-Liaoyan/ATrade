@@ -63,7 +63,7 @@ describe('readKeyMetrics', () => {
     const tiles = readKeyMetrics({ metrics: METRICS, startCapitalUsd: '100000', trades });
 
     // Round trips: +98 (won), -7 (lost), +17 (won).
-    expect(tiles[3]?.text).toBe('66.7 %');
+    expect(tiles[3]?.text).toBe('66.67 %');
   });
 
   it('counts a round trip that only covers its commissions as lost', () => {
@@ -71,7 +71,7 @@ describe('readKeyMetrics', () => {
 
     const tiles = readKeyMetrics({ metrics: METRICS, startCapitalUsd: '100000', trades });
 
-    expect(tiles[3]?.text).toBe('0.0 %');
+    expect(tiles[3]?.text).toBe('0.00 %');
   });
 
   it('gives the same names with dashes for a test without a result', () => {
@@ -104,6 +104,6 @@ describe('readKeyMetrics', () => {
       period: { start_utc: '2024-01-03T00:00:00Z', end_utc: '2024-01-04T00:00:00Z' },
     });
 
-    expect(tiles[3]?.text).toBe('100.0 %');
+    expect(tiles[3]?.text).toBe('100.00 %');
   });
 });

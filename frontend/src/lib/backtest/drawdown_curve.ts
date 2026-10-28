@@ -22,3 +22,17 @@ export function computeDrawdownCurve(
     return { timeUtc: point.time_utc, drawdownPercent: drawdownPercent === 0 ? 0 : drawdownPercent };
   });
 }
+
+/** The smallest range of the drawdown scale: a flat drawdown of 0 shows the scale from -1 % to 0. */
+const SMALLEST_DRAWDOWN_SCALE_PERCENT = -1;
+
+/**
+ * The value range of the drawdown scale: it ends at 0 (a drawdown is never positive) and reaches -1 % at least, so a
+ * flat drawdown of 0 shows no positive labels such as "+0.05 %".
+ */
+export function findDrawdownScaleRange(range: { minValue: number; maxValue: number }): {
+  minValue: number;
+  maxValue: number;
+} {
+  return { minValue: Math.min(range.minValue, SMALLEST_DRAWDOWN_SCALE_PERCENT), maxValue: 0 };
+}

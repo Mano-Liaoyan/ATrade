@@ -14,6 +14,7 @@
     type BacktestDetail,
   } from '#lib/backtest';
   import { InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { ResultTab } from './strategy_workbench';
 
@@ -58,7 +59,7 @@
 </script>
 
 {#if backtest === null}
-  <p class="empty-word">No backtests</p>
+  <EmptyText text="No backtests" />
 {:else if detailMessage !== ''}
   <InlineNotification kind="error" title="Backtest not read" subtitle={detailMessage} lowContrast />
 {:else if shownDetail !== null}
@@ -66,10 +67,10 @@
   {#if tab === 'trades'}
     <BacktestTradeTable trades={run.trades} />
   {:else if tab === 'orders'}
-    <p class="empty-word">No orders</p>
+    <EmptyText text="No orders" />
   {:else if tab === 'logs'}
     {#if run.error_message === null}
-      <p class="empty-word">No logs</p>
+      <EmptyText text="No logs" />
     {:else}
       <ScrollRegion label="Logs" fill>
         <pre class="log-text">{run.error_message}</pre>
@@ -109,14 +110,6 @@
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
   }
 
   .log-text {

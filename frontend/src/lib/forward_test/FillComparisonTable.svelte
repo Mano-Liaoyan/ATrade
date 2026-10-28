@@ -3,6 +3,7 @@
      The difference is the forward test price minus the backtest price. The table fills its parent (a workbench panel) and scrolls inside its own region. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { FillComparison } from './forward_test_api';
@@ -32,7 +33,7 @@
 </script>
 
 {#if fills.length === 0}
-  <p class="empty-word">No fills</p>
+  <EmptyText text="No fills" />
 {:else}
   <ScrollRegion label="Compared fills" fill>
     <div class="fill-comparison">
@@ -56,16 +57,13 @@
 {/if}
 
 <style>
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
-  }
-
-  /* A long value can break anywhere. A column name breaks only between words. */
+  /* A long value can break anywhere. A column name breaks only between words. The bar end stays on one line, like
+     the times of the other tables. */
   .fill-comparison :global(td) {
     overflow-wrap: anywhere;
+  }
+
+  .fill-comparison :global(tbody th) {
+    white-space: nowrap;
   }
 </style>

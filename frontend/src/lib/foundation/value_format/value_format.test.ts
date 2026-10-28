@@ -1,6 +1,6 @@
 // Bar periods and amounts as the tables show them.
 import { describe, expect, it } from 'vite-plus/test';
-import { findChangeDirection, formatAmount, formatBarPeriod, formatPrice, formatSignedNumber } from './index';
+import { findChangeDirection, formatAmount, formatBarPeriod, formatPrice, formatSignedNumber, formatSignedPercent } from './index';
 
 describe('formatBarPeriod', () => {
   it.each([
@@ -39,6 +39,18 @@ describe('formatSignedNumber', () => {
 
   it('shows a dash for a missing value', () => {
     expect(formatSignedNumber(null)).toBe('–');
+  });
+});
+
+describe('formatSignedPercent', () => {
+  it('shows a percent change with the sign rule and a space before the percent sign, on all pages', () => {
+    expect(formatSignedPercent(0.974)).toBe('+0.97 %');
+    expect(formatSignedPercent(-37.71)).toBe('-37.71 %');
+    expect(formatSignedPercent(0)).toBe('0.00 %');
+  });
+
+  it('shows a dash for a missing value', () => {
+    expect(formatSignedPercent(null)).toBe('–');
   });
 });
 
