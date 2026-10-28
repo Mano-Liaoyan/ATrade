@@ -8,8 +8,9 @@
   import { goto } from '$app/navigation';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { DataTable, IconButton, InlineNotification, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { ChangeText, formatPrice, formatSignedNumber, MISSING_VALUE } from '#lib/foundation/value_format';
+  import { ChangeText, formatPrice, formatSignedPercent } from '#lib/foundation/value_format';
   import {
     InstrumentSearch,
     isSameInstrument,
@@ -131,7 +132,7 @@
 
   function formatChangePercent(quote: DayQuote | null | undefined): string {
     const changePercent = quote?.changePercent ?? null;
-    return changePercent === null ? MISSING_VALUE : `${formatSignedNumber(changePercent)}%`;
+    return formatSignedPercent(changePercent);
   }
 
   // The link in the row is the keyboard way. A click anywhere else in the row (not on a button) opens the same page.
@@ -174,11 +175,11 @@
     />
   {/if}
   {#if failedMessage !== null}
-    <p class="message message--error" role="alert">{failedMessage}</p>
+    <InlineNotification kind="error" title="Watchlist not read" subtitle={failedMessage} lowContrast />
   {:else if instruments === null}
-    <p class="message" role="status">Loading the watchlist.</p>
+    <EmptyText text="Loading" role="status" />
   {:else if instruments.length === 0}
-    <p class="message">No instruments in the watchlist.</p>
+    <EmptyText text="No instruments" />
   {:else}
     {@const watchlistInstruments = instruments}
     <ScrollRegion label="Watchlist table" fill>
@@ -190,7 +191,7 @@
             <tr class={['row', isOpen(watchlistInstrument) && 'cds--data-table--selected']} {@attach openOnRowClick(href)}>
               <th scope="row">
                 <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolved the path. -->
-                <a class="symbol" {href} aria-current={isOpen(watchlistInstrument) ? 'page' : undefined}>
+                <a class="symbol" {href} title={watchlistInstrument.symbol} aria-current={isOpen(watchlistInstrument) ? 'page' : undefined}>
                   {watchlistInstrument.symbol}
                 </a>
               </th>
@@ -235,7 +236,27 @@
     cursor: pointer;
   }
 
-  .row th {
+  /* Fixed column widths, like the other lists: the table is never wider than the side column, so Last and Change stay
+     in view. A long symbol ends with an ellipsis. */
+  .watchlist :global(table) {
+    table-layout: fixed;
+  }
+
+  .watchlist :global(thead th:nth-child(2)) {
+    inline-size: var(--cds-spacing-12);
+  }
+
+  .watchlist :global(thead th:nth-child(3)) {
+    inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-05));
+  }
+
+  .watchlist :global(thead th:nth-child(4)) {
+    inline-size: var(--cds-spacing-07);
+  }
+
+  .row > :is(th, td):not(.delete-cell) {
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -250,27 +271,14 @@
     min-block-size: 0;
   }
 
+  /* The same row header style as the other lists (backtests, forward tests, strategies). */
   .symbol {
     color: var(--cds-text-primary);
-    font-weight: var(--cds-heading-compact-01-font-weight);
     text-decoration: none;
   }
 
   .symbol:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
-  }
-
-  .message {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    letter-spacing: var(--cds-body-compact-01-letter-spacing);
-    color: var(--cds-text-secondary);
-  }
-
-  .message--error {
-    color: var(--cds-text-error);
   }
 </style>

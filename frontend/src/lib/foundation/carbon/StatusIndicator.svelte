@@ -42,9 +42,11 @@
 </span>
 
 <style>
+  /* vertical-align: top keeps a 32px table row at 32px, like ChangeText. */
   .status-indicator {
     display: inline-flex;
     align-items: center;
+    vertical-align: top;
     gap: var(--cds-spacing-03);
     /* The status word breaks only between words, also in a table cell that breaks long values anywhere. */
     overflow-wrap: normal;

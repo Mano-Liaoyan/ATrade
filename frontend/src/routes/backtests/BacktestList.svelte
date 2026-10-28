@@ -110,7 +110,7 @@
             <tr
               class={[
                 'backtest-row',
-                (item.id === openBacktestId || comparedBacktestIds.includes(item.id)) && 'backtest-row--open',
+                (item.id === openBacktestId || comparedBacktestIds.includes(item.id)) && 'cds--data-table--selected',
               ]}
               onclick={(event) => {
                 openRow(event, item.id);
@@ -210,11 +210,6 @@
     white-space: nowrap;
   }
 
-  /* The inline-flex status and change keep the 32px row height (no baseline gap under them). */
-  .list :global(td > :is(.status-indicator, .change)) {
-    vertical-align: middle;
-  }
-
   .backtest-row {
     cursor: pointer;
   }
@@ -235,17 +230,5 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
-  }
-
-  /* The open backtest: the Carbon selected row color and an interactive bar at the start of the row. */
-  /* Two classes: the DataTable body header cells (th) have a transparent background with a higher specificity. */
-  .backtest-row.backtest-row--open > :global(td),
-  .backtest-row.backtest-row--open > :global(th) {
-    background: var(--cds-layer-selected-01);
-    color: var(--cds-text-primary);
-  }
-
-  .backtest-row--open > :global(td:first-child) {
-    box-shadow: inset 3px 0 0 var(--cds-border-interactive);
   }
 </style>

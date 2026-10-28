@@ -39,7 +39,12 @@ const editorChrome = EditorView.theme({
     color: 'var(--cds-text-primary)',
     backgroundColor: 'var(--cds-layer-01)',
   },
-  '.cm-scroller': { fontFamily: 'var(--cds-code-02-font-family)' },
+  // The Carbon code-02 type style in the editor and in the code diff (one code size on all pages).
+  '.cm-scroller': {
+    fontFamily: 'var(--cds-code-02-font-family)',
+    fontSize: 'var(--cds-code-02-font-size)',
+    lineHeight: 'var(--cds-code-02-line-height)',
+  },
   '.cm-content': { caretColor: 'var(--cds-text-primary)' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--cds-text-primary)' },
   '.cm-gutters': {

@@ -14,7 +14,7 @@
     type UTCTimestamp,
   } from 'lightweight-charts';
   import { untrack } from 'svelte';
-  import { ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
+  import { CHART_PRICE_FORMAT, ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import type { Bar } from './bars';
   import { canDrawLiveBar } from './live_bars';
@@ -54,7 +54,7 @@
       rightPriceScale: themeOptions.rightPriceScale,
       timeScale: { ...themeOptions.timeScale, timeVisible: true, secondsVisible: false },
     });
-    const createdSeries = createdChart.addSeries(CandlestickSeries, readCandlestickOptions());
+    const createdSeries = createdChart.addSeries(CandlestickSeries, { ...readCandlestickOptions(), priceFormat: CHART_PRICE_FORMAT });
     candlestickSeries = createdSeries;
     chart = createdChart;
     const endColorSchemeWatch = watchColorScheme(() => {

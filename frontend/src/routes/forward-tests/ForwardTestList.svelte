@@ -45,7 +45,7 @@
         {#each forwardTests as forwardTest (forwardTest.id)}
           {@const versionLabel = formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}
           <tr
-            class={['forward-test-row', forwardTest.id === openForwardTestId && 'forward-test-row--open']}
+            class={['forward-test-row', forwardTest.id === openForwardTestId && 'cds--data-table--selected']}
             onclick={(event) => {
               openRow(event, forwardTest.id);
             }}
@@ -110,11 +110,6 @@
     white-space: nowrap;
   }
 
-  /* The inline-flex status keeps the 32px row height (no baseline gap under it). */
-  .list :global(td > .status-indicator) {
-    vertical-align: middle;
-  }
-
   .forward-test-row {
     cursor: pointer;
   }
@@ -135,17 +130,5 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
-  }
-
-  /* The open forward test: the Carbon selected row color and an interactive bar at the start of the row. 2 classes, so
-     the rule wins over the Carbon body header cell rule. */
-  .forward-test-row.forward-test-row--open > :global(td),
-  .forward-test-row.forward-test-row--open > :global(th) {
-    background: var(--cds-layer-selected-01);
-    color: var(--cds-text-primary);
-  }
-
-  .forward-test-row.forward-test-row--open > :global(th:first-child) {
-    box-shadow: inset 3px 0 0 var(--cds-border-interactive);
   }
 </style>

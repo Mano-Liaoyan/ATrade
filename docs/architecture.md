@@ -496,7 +496,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   side column collapses. Without `fill`, `height` and `minHeight` set the
   canvas height. `readChartThemeOptions(container)` and
   `readChartColor(container, token)` of `foundation/chart_frame` read the
-  Carbon tokens for each chart.
+  Carbon tokens for each chart. The price scales use the number formats of
+  the tables and tiles: `CHART_PRICE_FORMAT` ("11,000.00", prices and equity)
+  and `CHART_PERCENT_FORMAT` ("-37.71 %", the drawdown, `formatSignedPercent`).
 - A chart draws on a canvas and reads the color tokens only when it draws.
   `foundation/color_scheme` has `watchColorScheme(onChange)`. It calls
   `onChange` after a change of `prefers-color-scheme` and after a change of
@@ -595,7 +597,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   Buy / Sell content switcher; Quantity and Order type, Limit price and Time
   in force in two columns (the limit price starts with the last price); the
   order value, position, average cost, unrealized P&L, cash (USD), and net
-  liquidation (USD) in two columns with right-aligned tabular numbers; and
+  liquidation (USD) as `MetricTile`s in a `MetricRow` with `columns` 2; and
   the full-width button "Review buy order" (primary) or "Review sell order"
   (danger). The button opens the confirmation dialog with the PAPER tag and
   "Send paper order". A paper account check that did not pass, or a running
@@ -614,7 +616,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   the column show `LiveUpdatesNotification`.
 - The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))
   is the account overview workbench. The left `SideColumn` "Watchlist"
-  (22rem) has the same watchlist table as the instrument page
+  (22rem: the 20rem of the instrument page and 2rem for the Delete column, so
+  both tables have the same column widths) has the same watchlist table as the instrument page
   (`src/routes/InstrumentWatchlist.svelte`), with `editable`: the instrument
   search above the table adds an instrument, and each row has a Delete icon
   button. A row opens its instrument page. The main area has the key numbers
@@ -673,11 +676,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (`name`, `text`, `change`) is a Carbon tile with the name and the
   right-aligned value (tabular numbers). With `change`, the value is a
   `ChangeText`, so up and down show an arrow icon and a support color.
-  `MetricRow` (`label`) puts the tiles in one line, each the same width. The
+  `MetricRow` (`label`, `columns`) puts the tiles in one line, each the same
+  width, or with `columns` in that many columns (the narrow order panel). The
   key metrics of a backtest or a forward test use `KeyMetricRow` of
   `backtest`: one set, one order, and one sign rule (the max drawdown is a
-  negative percent). `formatPercent` of `backtest` uses the sign rule of
-  `formatSignedNumber`. Rules for each page that shows a metric:
+  negative percent). `formatPercent` of `backtest`, the watchlist, and the
+  instrument header line use `formatSignedPercent` of `foundation/value_format`
+  ("+0.97 %": the sign rule of `formatSignedNumber` and a space before "%"). Rules for each page that shows a metric:
   `formatMaxDrawdown` of `backtest` gives the max drawdown text (a negative
   percent, "0.00 %" for 0) and the signed number; a tile gives that number as
   `change`, so the max drawdown shows with `ChangeText` (down arrow and
@@ -688,8 +693,26 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (`DrawdownCurve`: `name`, `points`, `startCapitalUsd`) has an equity line
   and a drawdown curve; the second curve is dashed (`readCurveStyle`). The
   chart has no curve legend: `InterruptionList` lists the interruptions (grey
-  columns) under it. The drawdown
-  axis is a percent. New points of the same curves do not reset the zoom.
+  columns) under it. An interruption without an equity point of a curve (a
+  forward test has no records in it) gets one grey column at its end time
+  (`findInterruptedTimes`). The drawdown axis is a percent and ends at 0
+  (`findDrawdownScaleRange`). New points of the same curves do not reset the zoom.
+- Consistency rules of all workbench pages (ticket
+  [#110](https://github.com/Mano-Liaoyan/ATrade/issues/110)):
+  - The open row of a list (watchlist, backtests, forward tests, strategies)
+    has the Carbon class `cds--data-table--selected`. `DataTable` gives it the
+    selected row color and a 3px `--cds-border-interactive` bar at the start.
+  - Table rows of size sm are 32px: `ChangeText` and `StatusIndicator` have
+    `vertical-align: top`. Lists have fixed column widths and an ellipsis
+    for long text; times do not wrap.
+  - An empty table, list, or panel shows `EmptyText` of
+    `foundation/empty_text` (`text`, optional `role` "status"): a short phrase
+    without a full stop, for example "No trades". A read error shows an
+    `InlineNotification` "<Thing> not read" where the data would be, also
+    when no panel exists (strategy page).
+  - A page that reads again while a test is queued or running uses
+    `startPolling(read, onResult, intervalMilliseconds)` of
+    `foundation/polling` in an `$effect` and returns its stop function.
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,
   `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,

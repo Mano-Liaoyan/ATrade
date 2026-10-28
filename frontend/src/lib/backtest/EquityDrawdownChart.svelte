@@ -28,17 +28,24 @@
   import {
     AreaSeries,
     createChart,
+    type AutoscaleInfo,
     HistogramSeries,
     LineSeries,
     type IChartApi,
     type ISeriesApi,
     type SeriesType,
   } from 'lightweight-charts';
-  import { ChartFrame, readChartColor, readChartThemeOptions } from '#lib/foundation/chart_frame';
+  import {
+    CHART_PERCENT_FORMAT,
+    CHART_PRICE_FORMAT,
+    ChartFrame,
+    readChartColor,
+    readChartThemeOptions,
+  } from '#lib/foundation/chart_frame';
   import { watchColorScheme } from '#lib/foundation/color_scheme';
   import InterruptionList from './InterruptionList.svelte';
   import { convertToTimestamp, readCurveStyle } from './chart_series';
-  import { computeDrawdownCurve } from './drawdown_curve';
+  import { computeDrawdownCurve, findDrawdownScaleRange } from './drawdown_curve';
   import { findInterruptedTimes, type TimeInterval } from './interruption_marks';
 
   interface Props {
@@ -62,10 +69,19 @@
   // The drawdown fill is the drawdown line color with this alpha (hex), so it stays a Carbon token color.
   const FILL_ALPHA_HEX = '33';
   const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
-  // The drawdown axis shows a percent, like the max drawdown tile.
-  const PERCENT_FORMAT = { type: 'percent', precision: 2, minMove: 0.01 } as const;
   // Each curve has 2 series: equity (even index) and drawdown (odd index).
   const SERIES_PER_CURVE = 2;
+  // The drawdown scale ends at 0: a drawdown is never positive.
+  const DRAWDOWN_SCALE_OPTIONS = {
+    priceFormat: CHART_PERCENT_FORMAT,
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- The option name of lightweight-charts.
+    autoscaleInfoProvider: (readRange: () => AutoscaleInfo | null): AutoscaleInfo | null => {
+      const autoscale = readRange();
+      return autoscale?.priceRange == null
+        ? autoscale
+        : { ...autoscale, priceRange: findDrawdownScaleRange(autoscale.priceRange) };
+    },
+  };
 
   let chartContainer: HTMLDivElement | undefined = $state();
   let chart: IChartApi | undefined = $state();
@@ -117,6 +133,7 @@
         lineWidth: 2,
         title: curves.length > 1 ? '' : 'Equity',
         priceLineVisible: false,
+        priceFormat: CHART_PRICE_FORMAT,
       },
       EQUITY_PANE_INDEX,
     );
@@ -130,7 +147,7 @@
               lineWidth: 1,
               title: curves.length > 1 ? '' : 'Drawdown',
               priceLineVisible: false,
-              priceFormat: PERCENT_FORMAT,
+              ...DRAWDOWN_SCALE_OPTIONS,
             },
             DRAWDOWN_PANE_INDEX,
           )
@@ -141,7 +158,7 @@
               lineStyle: style.lineStyle,
               lineWidth: 1,
               priceLineVisible: false,
-              priceFormat: PERCENT_FORMAT,
+              ...DRAWDOWN_SCALE_OPTIONS,
             },
             DRAWDOWN_PANE_INDEX,
           );

@@ -8,6 +8,10 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // 1 read (up to 4 seconds), "Stopped" takes 2 comparisons and 1 read. The worker and the socket run in the e2e server
 // process, and the backtest children of other tests slow it, so the waits are longer than the default 5 seconds.
 const STATUS_TIMEOUT_MILLISECONDS = 15_000;
+// The start and stop test waits for 5 server cycles (Running in the header and in the list, the order block, Stopped in
+// the header and in the list). Each can take up to STATUS_TIMEOUT_MILLISECONDS under the load of the full suite, so the
+// default test timeout of 30 seconds ended the test while the list still waited for its socket message.
+test.describe.configure({ timeout: STATUS_TIMEOUT_MILLISECONDS * 4 });
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');

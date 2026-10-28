@@ -2,6 +2,7 @@
      For other orders, the cancel item is disabled and says why. -->
 <script lang="ts">
   import { DataTable, InlineNotification, OverflowMenu, type NotificationMessage, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatAmount } from './paper_account';
   import { cancelPaperOrder, describeCancelAction, describeOrderSource, type OpenOrder } from './paper_orders';
@@ -61,7 +62,7 @@
     />
   {/if}
   {#if orders.length === 0}
-    <p>No open orders.</p>
+    <EmptyText text="No open orders" />
   {:else}
     <ScrollRegion label="Open orders" maxHeight="18rem" {fill}>
       <DataTable columns={COLUMNS} size="sm">
@@ -103,10 +104,6 @@
     flex: 1;
     block-size: auto;
     min-block-size: 0;
-  }
-
-  p {
-    margin: 0;
   }
 
   .exchange {

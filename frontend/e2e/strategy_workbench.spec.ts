@@ -303,3 +303,10 @@ test('opens the Output tab when the save fails', async ({ page }, currentTest) =
   );
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
 });
+
+test('a strategy that is not read shows the error in the main area, where no panel is', async ({ page }) => {
+  await page.goto('/strategies/999999');
+
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('Strategy not read');
+  await expect(page.getByRole('region', { name: 'Results' })).toHaveCount(0);
+});

@@ -26,6 +26,13 @@ describe('findInterruptedTimes', () => {
     ]);
   });
 
+  it('marks the end of an interruption that no curve has a bar end in, so a single forward test curve shows it', () => {
+    const forwardTestCurve = curve.filter((point) => point.time_utc !== '2026-01-02T03:07:00Z');
+    const interruptions = [{ start_utc: '2026-01-02T03:06:30Z', end_utc: '2026-01-02T03:07:30Z' }];
+
+    expect(findInterruptedTimes([forwardTestCurve], interruptions)).toEqual(['2026-01-02T03:07:30Z']);
+  });
+
   it('marks nothing without interruptions', () => {
     expect(findInterruptedTimes([curve], [])).toEqual([]);
   });

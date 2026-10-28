@@ -1,6 +1,6 @@
 // Labels and values that the backtest pages show.
 import type { StatusKind } from '#lib/foundation/carbon';
-import { formatSignedNumber } from '#lib/foundation/value_format';
+import { formatSignedPercent } from '#lib/foundation/value_format';
 import type { BacktestStatus } from './backtest_api';
 
 const STATUS_LABELS: Record<BacktestStatus, string> = {
@@ -41,9 +41,9 @@ export function convertDateToUtcStart(date: string): string {
   return `${date}T00:00:00Z`;
 }
 
-/** "1.6" gives "+1.60 %", "-1.02" gives "-1.02 %": the sign rule of formatSignedNumber (foundation/value_format). */
+/** "1.6" gives "+1.60 %", "-1.02" gives "-1.02 %": formatSignedPercent (foundation/value_format). */
 export function formatPercent(percent: string): string {
-  return `${formatSignedNumber(Number(percent))} %`;
+  return formatSignedPercent(Number(percent));
 }
 
 /**

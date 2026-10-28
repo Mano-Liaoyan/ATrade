@@ -2,7 +2,8 @@
      A number column has align "right": its cells must also have align="right", and they use tabular numbers.
      A menu column (an overflow menu in each row) has a header that only screen readers read.
      A selection column (a Checkbox in each row) also has a header that only screen readers read.
-     A row can start with <th scope="row">: it is the row header. -->
+     A row can start with <th scope="row">: it is the row header.
+     The open row of a list has class "cds--data-table--selected" (selected row color and an interactive bar). -->
 <script module lang="ts">
   export interface TableColumn {
     header: string;
@@ -59,6 +60,18 @@
   /* Carbon gives every th the header color. A row header (<th scope="row">) in the body looks like the other cells. */
   .data-table tbody :global(th) {
     background-color: transparent;
+  }
+
+  /* The open row of a list (the open instrument, backtest, forward test, or strategy) has the Carbon class
+     cds--data-table--selected: the Carbon selected row color on every cell, also on the row header, and an interactive
+     bar at the start of the row. All lists of all pages show the open row so. */
+  .data-table tbody :global(tr.cds--data-table--selected > :is(td, th)) {
+    background-color: var(--cds-layer-selected-01);
+    color: var(--cds-text-primary);
+  }
+
+  .data-table tbody :global(tr.cds--data-table--selected > :first-child) {
+    box-shadow: inset 3px 0 0 var(--cds-border-interactive);
   }
 
   .data-table :global(td[align='right']) {

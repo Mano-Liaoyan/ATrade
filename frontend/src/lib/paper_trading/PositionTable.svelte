@@ -2,6 +2,7 @@
      With `fill`, the table takes the full height of a workbench panel and scrolls in it. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatSignedNumber } from '#lib/foundation/value_format';
   import { formatAmount, type PaperPosition } from './paper_account';
@@ -26,7 +27,7 @@
 </script>
 
 {#if positions.length === 0}
-  <p class="empty">No positions.</p>
+  <EmptyText text="No positions" />
 {:else}
   <ScrollRegion label="Positions" maxHeight="18rem" {fill}>
     <DataTable columns={COLUMNS} size="sm">
@@ -49,8 +50,3 @@
   </ScrollRegion>
 {/if}
 
-<style>
-  .empty {
-    margin: 0;
-  }
-</style>

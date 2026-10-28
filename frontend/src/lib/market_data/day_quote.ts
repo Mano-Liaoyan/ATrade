@@ -1,5 +1,5 @@
 // The last price of an instrument and its change from the previous close, from its daily bars and its live bar.
-import { formatSignedNumber, MISSING_VALUE } from '#lib/foundation/value_format';
+import { formatSignedNumber, formatSignedPercent, MISSING_VALUE } from '#lib/foundation/value_format';
 import type { Bar } from './bars';
 
 export interface DayQuote {
@@ -27,10 +27,10 @@ export function readDayQuote(dailyBars: readonly Bar[], liveBar: Bar | null = nu
   return { last, change, changePercent: (change / previousBar.close) * PERCENT };
 }
 
-/** "+2.00 (+2.00%)". */
+/** "+2.00 (+2.00 %)". */
 export function formatDayChange(quote: DayQuote): string {
   if (quote.change === null || quote.changePercent === null) {
     return MISSING_VALUE;
   }
-  return `${formatSignedNumber(quote.change)} (${formatSignedNumber(quote.changePercent)}%)`;
+  return `${formatSignedNumber(quote.change)} (${formatSignedPercent(quote.changePercent)})`;
 }

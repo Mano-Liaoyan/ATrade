@@ -3,6 +3,7 @@
      page show it in their Trades tab. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import type { BacktestTrade } from './backtest_api';
@@ -21,7 +22,7 @@
 </script>
 
 {#if trades.length === 0}
-  <p class="empty-word">No trades</p>
+  <EmptyText text="No trades" />
 {:else}
   <ScrollRegion label="Trades" fill>
     <DataTable columns={TRADE_COLUMNS} size="sm">
@@ -40,13 +41,3 @@
     </DataTable>
   </ScrollRegion>
 {/if}
-
-<style>
-  .empty-word {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
-  }
-</style>

@@ -40,6 +40,11 @@ export function formatSignedNumber(value: number | null): string {
   return value === null ? MISSING_VALUE : SIGNED_FORMAT.format(value);
 }
 
+/** 0.974 gives "+0.97 %", 0 gives "0.00 %". All pages show a percent change (and the max drawdown) with this rule. */
+export function formatSignedPercent(percent: number | null): string {
+  return percent === null ? MISSING_VALUE : `${SIGNED_FORMAT.format(percent)} %`;
+}
+
 /** 1234.5 gives "1,234.50". */
 export function formatPrice(price: number | null): string {
   return price === null ? MISSING_VALUE : AMOUNT_FORMAT.format(price);

@@ -20,6 +20,7 @@
   } from '#lib/backtest';
   import { Button, InlineNotification } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
+  import { startPolling } from '#lib/foundation/polling';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isSameInstrument } from '#lib/market_data';
@@ -63,32 +64,21 @@
   );
 
   // The list reads again while a backtest in it is queued or running, like on the backtest page.
-  $effect(() => {
-    let isActive = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    async function readList(): Promise<void> {
-      const result = await listBacktests(fetch);
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        listMessage = result.message;
-        return;
-      }
-      listMessage = '';
-      backtests = result.value;
-      if (result.value.some((item) => !isFinalStatus(item.status))) {
-        timer = setTimeout(() => void readList(), LIST_CHECK_INTERVAL_MILLISECONDS);
-      }
-    }
-
-    void readList();
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
-  });
+  $effect(() =>
+    startPolling(
+      () => listBacktests(fetch),
+      (result) => {
+        if (result.kind === 'failed') {
+          listMessage = result.message;
+          return false;
+        }
+        listMessage = '';
+        backtests = result.value;
+        return result.value.some((item) => !isFinalStatus(item.status));
+      },
+      LIST_CHECK_INTERVAL_MILLISECONDS,
+    ),
+  );
 
   $effect(() => {
     let isActive = true;

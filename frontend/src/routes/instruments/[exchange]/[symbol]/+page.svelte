@@ -190,7 +190,7 @@
 {:else}
   {@const instrumentName = formatInstrument(chartRequest.instrument)}
   <Workbench>
-    <SideColumn label="Watchlist" side="start" storageKey="atrade.instrument-page.watchlist-column">
+    <SideColumn label="Watchlist" side="start" width="20rem" storageKey="atrade.instrument-page.watchlist-column">
       <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} />
     </SideColumn>
 
