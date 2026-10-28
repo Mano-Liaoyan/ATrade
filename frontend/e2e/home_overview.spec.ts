@@ -31,8 +31,24 @@ test('the home page has no paper order form', async ({ page }) => {
   await page.goto('/');
   await expect(ordersPanel(page).getByRole('row', { name: /FTO01/ })).toBeAttached();
 
-  await expect(page.getByRole('form', { name: 'Paper order' })).toHaveCount(0);
+  await expect(page.getByRole('main').getByRole('form')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Review order' })).toHaveCount(0);
+});
+
+test('the watchlist rows and the position rows are 32px high', async ({ page, request }) => {
+  // The browser projects share one database: another project can add AAPL first (409).
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const response = await request.post('/api/watchlist', { data: { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' } });
+  expect([201, 409]).toContain(response.status());
+  await page.goto('/');
+  const watchlistRow = page.getByRole('region', { name: 'Watchlist table' }).getByRole('row', { name: /^AAPL/ });
+  // The change column has an arrow icon after the daily bars load. The row also has the Delete button.
+  await expect(watchlistRow.getByText(/%$/).locator('svg')).toBeVisible();
+  await expect(watchlistRow.getByRole('button', { name: /^Delete AAPL/ })).toBeVisible();
+
+  await expect.poll(async () => Math.round((await watchlistRow.boundingBox())?.height ?? 0)).toBe(32);
+  const positionRow = positionsPanel(page).getByRole('row', { name: /TEST01/ });
+  await expect.poll(async () => Math.round((await positionRow.boundingBox())?.height ?? 0)).toBe(32);
 });
 
 test('position table has a visible scroll track and its last row can be scrolled into view', async ({ page }) => {

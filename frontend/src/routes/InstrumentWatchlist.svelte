@@ -159,6 +159,7 @@
           void addInstrument(candidate);
         }}
         marker={(candidate: Instrument) => (isInWatchlist(candidate) ? 'In watchlist' : undefined)}
+        placeholder="Add a symbol"
       />
     </div>
   {/if}
@@ -238,10 +239,15 @@
     white-space: nowrap;
   }
 
-  /* The 32px Delete button fills its cell, so the row keeps the 32px height of the sm table. */
+  /* The Delete button fills its cell above the 1px row border, so the row keeps the 32px height of the sm table. */
   .row td.delete-cell {
     inline-size: var(--cds-spacing-07);
     padding: 0;
+  }
+
+  .row td.delete-cell :global(.cds--btn) {
+    block-size: calc(var(--cds-spacing-07) - 1px);
+    min-block-size: 0;
   }
 
   .symbol {

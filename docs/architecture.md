@@ -267,7 +267,7 @@ routes (`/api/backtests`), and the backtest pages.
 Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
 It holds the live order switch, the paper account check, paper orders sent by
 hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
-account panel, the order routes (11.8), and the balance in USD for any base
+account overview and the paper order form (11.7), the order routes (11.8), and the balance in USD for any base
 currency (11.9).
 
 ## 12. Forward test

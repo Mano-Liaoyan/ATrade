@@ -1,4 +1,5 @@
-// Reads the /ws/paper-trading account messages and describes the paper account check for the account panel.
+// Reads the /ws/paper-trading account messages, describes the paper account check, and lists the key numbers of the
+// balance for the account overview of the home page.
 
 import type { components } from '#lib/api';
 import type { StatusKind } from '#lib/foundation/carbon';

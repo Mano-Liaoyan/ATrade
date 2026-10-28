@@ -1,4 +1,4 @@
-// Turns /ws/paper-trading messages into the text of the account panel.
+// Turns /ws/paper-trading messages into the text of the account overview and the Paper tag.
 import { describe, expect, it } from 'vite-plus/test';
 import {
   describeBalanceCurrency,

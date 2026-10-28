@@ -1,7 +1,7 @@
 <!-- Instrument search: the user types a symbol, and the combo box shows each match as symbol / exchange / currency.
      ArrowUp and ArrowDown choose a match and Enter gives it to `onSelect`. A page can give `marker` to mark a match,
-     for example "In watchlist". A marked match cannot be chosen. The search has no heading: the place around it (the
-     watchlist column of the home page) names it. The field is the 32px size of the workbench lines. -->
+     for example "In watchlist". A marked match cannot be chosen. The search has no heading: the place around it names
+     it. The field is the 32px size of the workbench lines, and its label is for screen readers only. -->
 <script lang="ts">
   import { Combobox, Tag, type ComboboxItem } from '#lib/foundation/carbon';
   import { formatInstrument, searchInstruments, type Instrument, type InstrumentSearchResult } from './instrument_search';
@@ -9,9 +9,11 @@
   const {
     onSelect,
     marker,
+    placeholder = 'AAPL or 700',
   }: {
     onSelect: (instrument: Instrument) => void;
     marker?: (instrument: Instrument) => string | undefined;
+    placeholder?: string;
   } = $props();
 
   // IBKR allows about 1 symbol search per second, so the search waits until the user stops typing.
@@ -96,7 +98,7 @@
     label="Symbol"
     hideLabel
     size="sm"
-    placeholder="Add a symbol"
+    {placeholder}
     {items}
     listLabel="Instrument search results"
     onInput={scheduleSearch}
