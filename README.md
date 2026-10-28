@@ -24,37 +24,41 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   routes under `/api/paper-trading`, the backtest routes under
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
-- The app shell header shows the backend status and the IB Gateway status.
+- The app shell header shows the backend status, the IB Gateway status, the
+  server time, and the Paper tag of the checked paper account.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home
-  page shows the account panel: the check result, the balance, and the
-  positions, updated live. When the check fails, the panel shows the actual
-  and the expected account number.
-- Paper orders by hand: after a passed check, the account panel sends market
-  and limit orders (DAY or GTC) to the IBKR paper account, after a
-  confirmation dialog with a `PAPER` mark. The open order list shows all open
+  page is the account overview: the key numbers of the balance, the
+  positions, the open orders, and the filled orders of today, updated live.
+  When the check fails, it shows the actual and the expected account number.
+- Paper orders by hand: after a passed check, the paper order form of the
+  instrument page sends market and limit orders (DAY or GTC) to the IBKR
+  paper account, after a confirmation dialog with a `PAPER` mark. The open order list shows all open
   orders of the account with their source ("by hand" or "forward test N").
   Only orders by hand can be cancelled. ATrade never sends live orders. An
   order by hand on the instrument of a running forward test is refused, with
-  the forward test named. The panel also lists the filled orders by hand of
-  the current day, with the fills from IBKR. See
+  the forward test named. The "Filled today" tab lists the filled orders by
+  hand of the current day, with the fills from IBKR. See
   [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md).
 - The `ib-gateway` service runs IB Gateway for the IBKR paper account. It is
   in the Compose profile `ibkr`.
 - The `postgres` service holds the database.
-- Instrument search: the home page finds instruments by symbol through
+- Instrument search: the watchlist column of the home page finds instruments
+  by symbol through
   IB Gateway and shows each match as symbol / exchange / currency, for
   example `700 / SEHK / HKD`. The search needs a connected IB Gateway. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md).
-- Strategies: the page `/strategies` creates a strategy from a template. The
-  editor saves the code as strategy versions after the checks before save.
+- Strategies: the page `/strategies` is the strategy workbench. It creates a
+  strategy from a template. The editor saves the code as strategy versions after the checks before save.
+  `/strategies/<id>/versions/<n>` opens version n; the strategy links
+  "<name> vN" of the backtest and forward test pages open this address.
   Unsaved edits stay in the browser. The editor shows code completion and
   live type errors from basedpyright. Type errors do not block the save. See
   [`docs/architecture/strategy.md`](docs/architecture/strategy.md).
 - Watchlist: the user adds an instrument from the search candidates (choose
   it with the arrow keys and press Enter, or click it) and deletes
-  it from the watchlist panel on the home page. The watchlist is in
+  it from the watchlist column on the home page. The watchlist is in
   PostgreSQL, so it stays after a restart. A watchlist instrument opens the
   instrument page `/instruments/<exchange>/<symbol>?currency=<currency>`.
   Routes are under `/api/watchlist`. See
@@ -72,25 +76,26 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   again after a lost connection and when a background tab becomes visible.
   See [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.5.
-- Backtests: the page `/backtests` starts a backtest of a strategy version on
+- Backtests: the "New backtest" button on `/backtests` starts a backtest of a strategy version on
   the saved bars of one USD instrument, with paper capital from the paper
   account balance or the local setting. Each backtest runs in its own child
   process of `web`. The child has only the environment variables `PATH`,
   `HOME`, `TZ`, and `DATABASE_URL`, runs with `nice 10`, and has
-  `oom_score_adj` 1000. The "Limits" form on `/backtests` sets the timeout
+  `oom_score_adj` 1000. The "Backtest limits" button on `/backtests` sets the timeout
   (default 120 minutes) and the number of backtests at the same time
   (default 1). Other backtests wait in the queue. A backtest that runs longer
-  than the timeout stops with the status "Timed out". The backtest page shows the status, the
-  strategy error, the metrics, the equity curve, and the trades. Backtests
+  than the timeout stops with the status "Timed out". The backtest page shows the list of
+  backtests and the open backtest on one page: the status, the key metrics,
+  the equity and drawdown curves, the trades, and the strategy error (Logs). Backtests
   read only bars that are in PostgreSQL. Add the instrument to the watchlist
   and open its bar chart first: the form offers only watchlist instruments
   with saved bars of the selected bar period, and `POST /api/backtests`
   refuses a time range without saved bars (`422`). See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md).
-- Backtest comparison: the list on `/backtests` shows the metrics of all
-  backtests side by side. Select 2 backtests of the same strategy and click
-  "Compare selected backtests". The comparison page shows the code diff, the
-  metric table, and both equity curves on one chart. ATrade refuses 2
+- Backtest comparison: select 2 backtests of the same strategy in the list on
+  `/backtests` and click "Compare". The comparison page shows one key metric
+  row for each backtest, both equity and drawdown curves on one chart, and the
+  code diff. ATrade refuses 2
   backtests of different strategies. See
   [`docs/architecture/backtest.md`](docs/architecture/backtest.md) section 10.7.
 - Forward tests: the page `/forward-tests` starts a forward test of a
@@ -103,18 +108,20 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   forward test per instrument, 4 at the same time. A restart of `web` does
   not stop forward tests. Before the start, the child reads the warm-up bars
   of the last 7 days (or more for long bar periods) from IBKR, so
-  `request_bars` in the strategy gets them, as in a backtest. The forward
-  test ID in the list opens the forward test page: its state, its
-  interruptions, its equity curve and fills, and a link to the comparison
-  with each backtest of the same period. See
+  `request_bars` in the strategy gets them, as in a backtest. The page
+  `/forward-tests/<id>` shows the forward test list and the open forward test:
+  its state, its interruptions, its key metrics, its equity and drawdown
+  curves and fills, and a link to the comparison with each backtest of the
+  same period. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
 - Forward test records and comparison: at the end of each bar, the
   forward test records its new fills and one equity point in PostgreSQL. The
   button "Backtest the same period" starts a normal backtest of the same
   strategy version, instrument, bar period, and period, with the start
-  balance as paper capital. The comparison page shows the metric table, both
-  equity curves on one chart with the interruptions in grey, and the fill
-  price of each side and the difference for each bar. See
+  balance as paper capital. The comparison page shows one key metric row for
+  each test, both equity and drawdown curves on one chart with the
+  interruptions in grey, and the fill price of each side and the difference
+  for each bar. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md)
   section 12.10.
 
@@ -183,8 +190,8 @@ reachable". To connect:
    `ATRADE_IBKR_AUTO_RESTART_TIME` in `ATRADE_IBKR_TIME_ZONE` (default
    `11:45 PM`, `America/New_York`).
 3. Run `./start run`. The header shows "IB Gateway connected." after the
-   Gateway has logged in. The account panel shows "Paper account DU...
-   checked." when the paper account check passes.
+   Gateway has logged in. The Paper tag in the header shows the paper
+   account (for example `DU****567`) when the paper account check passes.
 
 A login on the IBKR website or phone app with the same user name competes
 with the Gateway session.

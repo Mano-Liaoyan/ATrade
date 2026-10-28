@@ -1,16 +1,21 @@
 <!-- Open orders of the paper account from IBKR, with the source of each order. The row menu cancels an order by hand.
-     For other orders, the cancel item is disabled and says why. -->
+     For other orders, the cancel item is disabled and says why. With `compact` (the narrow panel of the instrument page),
+     the table has no Type and Filled columns, so all column names stay on one line. -->
 <script lang="ts">
   import { DataTable, InlineNotification, OverflowMenu, type NotificationMessage, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatAmount } from './paper_account';
   import { cancelPaperOrder, describeCancelAction, describeOrderSource, type OpenOrder } from './paper_orders';
 
   interface Props {
     orders: OpenOrder[];
+    /** The table takes the full height of a workbench panel and scrolls in it. */
+    fill?: boolean;
+    compact?: boolean;
   }
 
-  const { orders }: Props = $props();
+  const { orders, fill = false, compact = false }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
@@ -20,6 +25,15 @@
     { header: 'Limit price', align: 'right' },
     { header: 'Status' },
     { header: 'Filled', align: 'right' },
+    { header: 'Source' },
+    { header: 'Actions', isMenu: true },
+  ];
+  const COMPACT_COLUMNS: TableColumn[] = [
+    { header: 'Symbol' },
+    { header: 'Side' },
+    { header: 'Quantity', align: 'right' },
+    { header: 'Limit price', align: 'right' },
+    { header: 'Status' },
     { header: 'Source' },
     { header: 'Actions', isMenu: true },
   ];
@@ -50,7 +64,7 @@
   }
 </script>
 
-<div class="open-orders">
+<div class={['open-orders', fill && 'open-orders--fill']}>
   {#if cancelResult !== null}
     <InlineNotification
       {...cancelResult}
@@ -59,22 +73,26 @@
     />
   {/if}
   {#if orders.length === 0}
-    <p>No open orders.</p>
+    <EmptyText text="No open orders" />
   {:else}
-    <ScrollRegion label="Open orders" maxHeight="18rem">
-      <DataTable columns={COLUMNS} size="sm">
+    <ScrollRegion label="Open orders" maxHeight="18rem" {fill}>
+      <DataTable columns={compact ? COMPACT_COLUMNS : COLUMNS} size="sm">
         {#snippet rows()}
           {#each orders as order (`${String(order.order_id)}-${order.source.kind}-${String(order.source.forward_test_id)}`)}
             <tr>
               <th scope="row">{order.symbol} <span class="exchange">{order.exchange}</span></th>
               <td>{order.side}</td>
               <td align="right">{order.quantity}</td>
-              <td>{order.order_type} {order.time_in_force}</td>
+              {#if !compact}
+                <td>{order.order_type} {order.time_in_force}</td>
+              {/if}
               <td align="right">{formatAmount(order.limit_price)}</td>
               <td>{order.status}</td>
-              <td align="right">{order.filled_quantity}</td>
+              {#if !compact}
+                <td align="right">{order.filled_quantity}</td>
+              {/if}
               <td>{describeOrderSource(order.source)}</td>
-              <td class="cds--table-column-menu">
+              <td class="cds--table-column-menu menu-cell">
                 <OverflowMenu label={`Actions for order ${String(order.order_id)}`} items={makeMenuItems(order)} size="sm" />
               </td>
             </tr>
@@ -92,8 +110,37 @@
     gap: var(--cds-spacing-03);
   }
 
-  p {
-    margin: 0;
+  .open-orders--fill {
+    block-size: 100%;
+    min-block-size: 0;
+  }
+
+  .open-orders--fill > :global(.scroll-region) {
+    flex: 1;
+    block-size: auto;
+    min-block-size: 0;
+  }
+
+  /* The 32px menu button fills its cell above the 1px row border, so the row keeps the 32px height of the sm table,
+     like the Delete cell of the watchlist. */
+  /* Column names stay on one line (32px header like all tables). The menu column is as wide as its 32px button, so
+     the other columns have the room for it. */
+  .open-orders :global(.cds--table-header-label) {
+    white-space: nowrap;
+  }
+
+  .open-orders :global(thead th.cds--table-column-menu) {
+    inline-size: var(--cds-spacing-07);
+    padding: 0;
+  }
+
+  .menu-cell {
+    padding: 0;
+  }
+
+  .menu-cell :global(.cds--overflow-menu) {
+    block-size: calc(var(--cds-spacing-07) - 1px);
+    min-block-size: 0;
   }
 
   .exchange {

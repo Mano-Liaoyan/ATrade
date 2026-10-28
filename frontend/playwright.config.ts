@@ -12,7 +12,8 @@ export default defineConfig({
   testDir: 'e2e',
   forbidOnly: process.env['CI'] !== undefined,
   reporter: 'list',
-  use: { baseURL: `http://127.0.0.1:${E2E_PORT}` },
+  // CI keeps a trace of each failed test in test-results/ (the CI artifact), so a flaky failure can be read later.
+  use: { baseURL: `http://127.0.0.1:${E2E_PORT}`, trace: process.env['CI'] === undefined ? 'off' : 'retain-on-failure' },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },

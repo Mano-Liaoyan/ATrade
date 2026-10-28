@@ -1,5 +1,6 @@
 // Labels and values that the backtest pages show.
 import type { StatusKind } from '#lib/foundation/carbon';
+import { formatSignedPercent } from '#lib/foundation/value_format';
 import type { BacktestStatus } from './backtest_api';
 
 const STATUS_LABELS: Record<BacktestStatus, string> = {
@@ -19,7 +20,6 @@ const STATUS_KINDS: Record<BacktestStatus, StatusKind> = {
   timed_out: 'warning',
 };
 const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out'];
-const PERCENT_DECIMAL_PLACES = 2;
 const SECONDS_PER_MINUTE = 60;
 const WHOLE_NUMBER_PATTERN = /^\d+$/;
 const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -41,10 +41,19 @@ export function convertDateToUtcStart(date: string): string {
   return `${date}T00:00:00Z`;
 }
 
+/** "1.6" gives "+1.60 %", "-1.02" gives "-1.02 %": formatSignedPercent (foundation/value_format). */
 export function formatPercent(percent: string): string {
-  const percentNumber = Number(percent);
-  const sign = percentNumber > 0 ? '+' : '';
-  return `${sign}${percentNumber.toFixed(PERCENT_DECIMAL_PLACES)} %`;
+  return formatSignedPercent(Number(percent));
+}
+
+/**
+ * The one sign rule of the max drawdown on all pages (spec #99): the API gives a positive percent ("37.71"), the pages
+ * show a loss as a negative percent ("-37.71 %"). `change` is the signed number for ChangeText or MetricTile; 0 stays 0.
+ */
+export function formatMaxDrawdown(maxDrawdownPercent: string): { text: string; change: number } {
+  const drawdown = Number(maxDrawdownPercent);
+  const change = drawdown === 0 ? 0 : -drawdown;
+  return { text: formatPercent(String(change)), change };
 }
 
 export function formatUsd(amount: string): string {

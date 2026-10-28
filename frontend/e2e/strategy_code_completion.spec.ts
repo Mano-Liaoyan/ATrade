@@ -35,6 +35,7 @@ function createUniqueName(currentTest: TestInfo, title: string): string {
 
 async function openNewStrategy(page: Page, name: string): Promise<void> {
   await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(name);
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
@@ -45,6 +46,12 @@ async function replaceCode(page: Page, code: string): Promise<void> {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.insertText(code);
+}
+
+// The status bar "Output" opens the Output tab of the problems and output panel.
+async function expectOutputLine(page: Page, text: string): Promise<void> {
+  await page.getByRole('button', { name: 'Output', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Output', exact: true }).getByRole('listitem').last()).toContainText(text);
 }
 
 test('shows the members of the NautilusTrader Strategy class as completions', async ({ page }, currentTest) => {
@@ -93,5 +100,5 @@ test('shows type errors live and still saves the code', async ({ page }, current
 
   await expect(page.locator('.cm-lintRange-error')).toHaveCount(1, { timeout: LANGUAGE_SERVER_TIMEOUT_MILLISECONDS });
   await page.getByRole('button', { name: 'Save version' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveText(`Saved as ${name} v2.`);
+  await expectOutputLine(page, `Saved as ${name} v2.`);
 });

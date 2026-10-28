@@ -39,7 +39,10 @@ test('arrow keys choose a candidate, Enter confirms it, and Escape closes the li
   const chosenName = (await options.nth(1).textContent())?.trim() ?? '';
   await symbolInput.press('Enter');
 
-  await expect(page.getByRole('region', { name: 'Watchlist instruments' }).getByRole('link', { name: chosenName })).toBeVisible();
+  const chosenSymbol = chosenName.split(' / ')[0] ?? '';
+  await expect(
+    page.getByRole('complementary', { name: 'Watchlist' }).getByRole('link', { name: chosenSymbol, exact: true }),
+  ).toBeVisible();
   expect(addedInstruments).toHaveLength(1);
   await expect(options).toHaveCount(0);
 
@@ -118,7 +121,7 @@ test('shows the backend message when IB Gateway is not reachable', async ({ page
 
   await searchFor(page, '700');
 
-  await expect(page.getByRole('alert')).toHaveText(
+  await expect(page.getByRole('search', { name: 'Instrument search' }).getByRole('alert')).toHaveText(
     'IB Gateway is not reachable at ib-gateway:4004. Instrument search needs IB Gateway.',
   );
 });

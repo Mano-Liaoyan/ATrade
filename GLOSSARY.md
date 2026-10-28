@@ -57,8 +57,22 @@ _Avoid_: balance curve, PnL curve
 **Metric**:
 One number that describes the result of a test, for example the total return
 or the max drawdown. Backtests and forward tests use the same metric
-functions.
+functions. All pages show the same key metrics in the same order, and show
+the max drawdown as a negative percent.
 _Avoid_: statistic, KPI
+
+**Round trip**:
+The trades of a test from a position of 0 back to a position of 0.
+_Avoid_: closed trade
+
+**Win rate**:
+The share of round trips with a profit after commissions.
+_Avoid_: hit rate
+
+**Net profit**:
+The final equity of a test minus its start capital (the paper capital of a
+backtest, or the start balance of a forward test).
+_Avoid_: PnL
 
 **Forward test**:
 A test of a strategy that runs automatically on live market data and sends
@@ -101,3 +115,32 @@ _Avoid_: real trade, production order
 The cash amount a backtest starts with. It comes from the paper account
 balance, or from a local value when no balance is available.
 _Avoid_: fallback capital, ledger
+
+## User interface
+
+**Workbench**:
+A page that fills the window below the header and does not scroll as a page.
+It has side columns and panels. Each region that can overflow scrolls in
+itself. In Chinese, write 工作台.
+_Avoid_: dashboard, layout
+
+**Panel**:
+A region of a workbench with a 32px header line (a name or tabs) and a body.
+The user can minimize a panel (only its header line, or a 24px status bar,
+stays) or maximize it (it gets all the height). A panel with a status bar
+(the strategy page "Problems and output" panel) always shows the status bar
+at its bottom. In Chinese, write 面板.
+_Avoid_: pane, card, widget (in user copy; code and docs can name a part of
+a chart a pane, for example the drawdown pane, and keep the storage key
+`pane-order`)
+
+**Side column**:
+A column at the left or right side of a workbench, for example the watchlist
+or the paper order form. The user can collapse it to a 32px rail. In Chinese,
+write 侧栏.
+_Avoid_: sidebar, drawer
+
+**Splitter**:
+The bar between 2 panels. The user drags it, or moves it with the arrow keys,
+to change the panel heights. In Chinese, write 分隔条.
+_Avoid_: divider, resizer

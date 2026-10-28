@@ -1,33 +1,40 @@
 // Paper orders by hand with the IBKR fake of backend/tests/e2e_server.py: account DU1234567 and 30 open orders of
-// forward test 42. The e2e server keeps its orders between tests, so each test uses its own symbol.
-import { expect, test, type Page } from '@playwright/test';
+// forward test 42. The e2e server keeps its orders between tests, so each test uses its own symbol. The order panel is
+// on the instrument page (#103). The home page shows the open orders and cancels them; it has no order form (#108).
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 function makeUniqueSymbol(projectName: string): string {
   return `E2E${projectName.slice(0, 2).toUpperCase()}${String(Date.now() % 1_000_000)}`;
 }
 
-async function selectOption(page: Page, selectName: string, optionName: string): Promise<void> {
-  await page.getByRole('form', { name: 'Paper order' }).getByRole('combobox', { name: selectName }).click();
+function orderPanel(page: Page, symbol: string): Locator {
+  return page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
+}
+
+async function openOrderForm(page: Page, symbol: string): Promise<void> {
+  await page.goto(`/instruments/NASDAQ/${symbol}?currency=USD`);
+  await expect(orderPanel(page, symbol).getByRole('button', { name: 'Review buy order' })).toBeEnabled();
+}
+
+async function selectOption(page: Page, symbol: string, selectName: string, optionName: string): Promise<void> {
+  await orderPanel(page, symbol).getByRole('combobox', { name: selectName }).click();
   await page.getByRole('option', { name: optionName }).click();
 }
 
 async function fillLimitOrder(page: Page, symbol: string): Promise<void> {
-  const ticket = page.getByRole('form', { name: 'Paper order' });
-  await ticket.getByRole('tab', { name: 'Buy' }).click();
-  await ticket.getByLabel('Order symbol').fill(symbol);
-  await ticket.getByLabel('Exchange').fill('NASDAQ');
-  await ticket.getByLabel('Currency').fill('USD');
+  const ticket = orderPanel(page, symbol);
+  // Buy is the default side: no click (in WebKit, a click waits for animation frames that sometimes do not come).
+  await expect(ticket.getByRole('tab', { name: 'Buy' })).toHaveAttribute('aria-selected', 'true');
   await ticket.getByLabel('Quantity').fill('3');
-  await selectOption(page, 'Order type', 'Limit');
+  await selectOption(page, symbol, 'Order type', 'Limit');
   await ticket.getByLabel('Limit price').fill('1.25');
-  await selectOption(page, 'Time in force', 'GTC');
-  await ticket.getByRole('button', { name: 'Review order' }).click();
+  await selectOption(page, symbol, 'Time in force', 'GTC');
+  await ticket.getByRole('button', { name: 'Review buy order' }).click();
 }
 
 test('sends a limit order after the confirmation and cancels it', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page, symbol);
 
   await fillLimitOrder(page, symbol);
 
@@ -46,6 +53,7 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
   await sentNotification.getByRole('button', { name: 'Close notification' }).click();
   await expect(sentNotification).toHaveCount(0);
 
+  await page.goto('/');
   const orders = page.getByRole('region', { name: 'Open orders' });
   const orderRow = orders.getByRole('row', { name: new RegExp(symbol) });
   await orderRow.scrollIntoViewIfNeeded();
@@ -60,13 +68,13 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
 
 test('cancels an open order with the keyboard only', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page, symbol);
   await fillLimitOrder(page, symbol);
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
   await dialog.getByRole('button', { name: 'Send paper order' }).click();
   await expect(dialog).toBeHidden();
 
+  await page.goto('/');
   const orderRow = page.getByRole('region', { name: 'Open orders' }).getByRole('row', { name: new RegExp(symbol) });
   await expect(orderRow).toContainText('Submitted');
   // The keyboard opens the row overflow menu, moves to the enabled item, and chooses it.
@@ -83,8 +91,7 @@ test('cancels an open order with the keyboard only', async ({ page }, currentTes
 
 test('sends no order when the user goes back from the confirmation', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page, symbol);
 
   await fillLimitOrder(page, symbol);
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
@@ -96,8 +103,7 @@ test('sends no order when the user goes back from the confirmation', async ({ pa
 
 test('the confirmation keeps the focus, closes with Escape, and gives the focus back', async ({ page }, currentTest) => {
   const symbol = makeUniqueSymbol(currentTest.project.name);
-  await page.goto('/');
-  await expect(page.getByRole('status', { name: 'Paper account check' })).toHaveText('Paper account DU1234567 checked.');
+  await openOrderForm(page, symbol);
 
   await fillLimitOrder(page, symbol);
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
@@ -112,13 +118,14 @@ test('the confirmation keeps the focus, closes with Escape, and gives the focus 
   await page.keyboard.press('Escape');
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Review order' })).toBeFocused();
+  await expect(orderPanel(page, symbol).getByRole('button', { name: 'Review buy order' })).toBeFocused();
   await expect(page.getByRole('region', { name: 'Open orders' }).getByRole('row', { name: new RegExp(symbol) })).toHaveCount(0);
 });
 
-test('the side, order type, and time in force work with the keyboard', async ({ page }) => {
-  await page.goto('/');
-  const ticket = page.getByRole('form', { name: 'Paper order' });
+test('the side, order type, and time in force work with the keyboard', async ({ page }, currentTest) => {
+  const symbol = makeUniqueSymbol(currentTest.project.name);
+  await openOrderForm(page, symbol);
+  const ticket = orderPanel(page, symbol);
   const buy = ticket.getByRole('tab', { name: 'Buy' });
   const sell = ticket.getByRole('tab', { name: 'Sell' });
   await expect(buy).toHaveAttribute('aria-selected', 'true');

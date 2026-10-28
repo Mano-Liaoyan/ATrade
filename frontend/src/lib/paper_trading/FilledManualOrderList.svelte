@@ -1,6 +1,7 @@
 <!-- Filled orders by hand: the stored order and its fills from IBKR (docs/architecture/paper_trading.md section 11.4). -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatAmount } from './paper_account';
@@ -8,9 +9,11 @@
 
   interface Props {
     orders: ManualOrder[];
+    /** The table takes the full height of a workbench panel and scrolls in it. */
+    fill?: boolean;
   }
 
-  const { orders }: Props = $props();
+  const { orders, fill = false }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
@@ -24,9 +27,9 @@
 </script>
 
 {#if orders.length === 0}
-  <p>No filled orders by hand today.</p>
+  <EmptyText text="No filled orders by hand" />
 {:else}
-  <ScrollRegion label="Filled orders by hand" maxHeight="18rem">
+  <ScrollRegion label="Filled orders by hand" maxHeight="18rem" {fill}>
     <DataTable columns={COLUMNS} size="sm">
       {#snippet rows()}
         {#each orders as order (order.id)}
@@ -46,10 +49,6 @@
 {/if}
 
 <style>
-  p {
-    margin: 0;
-  }
-
   .exchange {
     color: var(--cds-text-helper);
   }

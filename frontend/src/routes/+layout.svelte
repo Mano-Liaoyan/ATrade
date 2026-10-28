@@ -34,8 +34,8 @@
   const PAGE_LINKS = [
     { label: 'Home', href: resolve('/') },
     { label: 'Strategies', href: resolve('/strategies') },
-    { label: 'Backtests', href: resolve('/backtests') },
-    { label: 'Forward tests', href: resolve('/forward-tests') },
+    { label: 'Backtests', href: resolve('/backtests/[[backtestId]]', {}) },
+    { label: 'Forward tests', href: resolve('/forward-tests/[[forwardTestId]]', {}) },
   ];
   const HOME_HREF = resolve('/');
 
@@ -178,8 +178,8 @@
     color: var(--cds-text-error);
   }
 
-  /* The page heading of each page. */
-  .app-main :global(h1) {
+  /* The page heading of each document page. A workbench gives its headings their own style. */
+  .app-main:not(:has(:global(.atrade-workbench))) :global(h1) {
     margin-block: 0 var(--cds-spacing-06);
     font-size: var(--cds-heading-04-font-size);
     font-weight: var(--cds-heading-04-font-weight);
@@ -190,5 +190,14 @@
   /* The Carbon header is fixed at the top and is 3rem high. */
   .app-main {
     padding: calc(var(--cds-spacing-09) + var(--cds-spacing-06)) var(--cds-spacing-07) var(--cds-spacing-06);
+  }
+
+  /* A workbench page (foundation/workbench) is exactly the window height below the header and does not scroll as a
+     page. Each region of the workbench scrolls in itself. */
+  .app-main:has(:global(.atrade-workbench)) {
+    box-sizing: border-box;
+    block-size: 100vh;
+    padding: var(--cds-spacing-09) 0 0;
+    overflow: hidden;
   }
 </style>

@@ -149,8 +149,9 @@ The checks run in the Web process. They do not import the user code.
 ## 9.5 Comparison
 
 - Compare only two versions of the same strategy. The user selects 2 backtest
-  results. The page shows the code diff (`@codemirror/merge`), the metric
-  table, and both equity curves on one chart.
+  results. The page shows one key metric row for each backtest
+  (`ComparedKeyMetrics`), both equity and drawdown curves on one chart
+  (`EquityDrawdownChart`), and the code diff (`@codemirror/merge`).
 - For different strategies, the backtest list shows the metrics side by side.
 - Implementation (#72): backtest section 10.7.
 
@@ -175,7 +176,10 @@ The public entry also exports `read_strategy_version(*, database_url,
 strategy_version_id)` for the capabilities that run strategy versions. It
 returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
 `version_number`, `code`), or `None` when the version does not exist
-(backtest, section 10).
+(backtest, section 10). `read_strategy_versions(*, database_url,
+strategy_version_ids)` reads many versions with one connection and returns
+them by ID. A missing ID is not in the result. The forward test list uses it
+(section 12.13).
 
 ## 9.7 Frontend
 
@@ -198,5 +202,14 @@ returns `StrategyVersion` (`id`, `strategy_id`, `strategy_name`,
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
   draft of the version that the user edited.
-- Pages: `/strategies` (list and create form) and `/strategies/<id>` (editor,
-  version list, save, delete).
+- Pages: `/strategies/<id>` is the strategy workbench (list, new strategy,
+  editor, version list, save, delete, Run backtest, Start forward test, and
+  the backtest results; docs/architecture.md section 13). `/strategies` shows
+  the first strategy of the list. `/strategies/<id>` opens the latest version.
+  `/strategies/<id>/versions/<n>` (`routes/strategies/[strategyId]/versions/[versionNumber]`)
+  opens version n. On this address, a change of the open version (the version
+  `Select` or a save) changes the address to that version (a shallow `goto`),
+  so a reload opens the same version. The strategy links "<name> vN" of the
+  backtest page, the forward test page, and the forward test comparison page
+  open this address. The backtest comparison page compares 2 versions, so its
+  strategy name link opens `/strategies/<id>`.

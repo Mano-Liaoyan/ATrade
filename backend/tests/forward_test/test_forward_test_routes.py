@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
 
 from atrade.app.web import create_web_app
@@ -68,6 +69,44 @@ async def test_lists_forward_tests_newest_first(web_client: httpx.AsyncClient) -
 
     assert response.status_code == 200
     assert [(item["symbol"], item["client_id"]) for item in response.json()] == [("MSFT", 11), ("AAPL", 10)]
+
+
+@pytest.mark.anyio
+async def test_the_list_reads_all_forward_tests_with_a_fixed_number_of_connections(
+    web_client: httpx.AsyncClient, database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # /ws/forward-tests reads the list every 2 seconds for each open page. Connections for each row made the first
+    # message of a page late by many seconds under the load of the e2e suite.
+    first_version_id = await save_test_strategy_version(web_client)
+    template_strategy = (await web_client.post("/api/strategies", json={"name": "Template"})).json()
+    template_version_id = (await web_client.get(f"/api/strategies/{template_strategy['id']}")).json()["versions"][0][
+        "id"
+    ]
+    aapl = (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(first_version_id, symbol="AAPL"))).json()
+    await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(template_version_id, symbol="MSFT"))
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO forward_test_interruption (forward_test_id, reason, started_at_utc)
+            VALUES (%(id)s, 'crash', '2026-01-02T03:05:00Z')
+            """,
+            {"id": aapl["id"]},
+        )
+    connect = psycopg.AsyncConnection.connect
+    connection_count = 0
+
+    async def count_connection(*args: Any, **kwargs: Any) -> psycopg.AsyncConnection:
+        nonlocal connection_count
+        connection_count += 1
+        return await connect(*args, **kwargs)
+
+    monkeypatch.setattr(psycopg.AsyncConnection, "connect", count_connection)
+
+    response = await web_client.get(FORWARD_TESTS_PATH)
+
+    listed = [(item["symbol"], item["strategy_name"], len(item["interruptions"])) for item in response.json()]
+    assert listed == [("MSFT", "Template", 0), ("AAPL", "Bar count", 1)]
+    assert connection_count == 3
 
 
 @pytest.mark.anyio

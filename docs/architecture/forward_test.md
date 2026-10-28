@@ -250,8 +250,8 @@ Implementation (#77):
   - the same strategy version, instrument, and bar type
   - the period from the forward test start to its end, or to now while it runs
   - `paper_capital_usd` equal to the balance at forward test start
-- The comparison page uses the comparison view of section 9.5 ([`strategy.md`](strategy.md)): the metric
-  table and both equity curves on one chart.
+- The comparison page uses the comparison view of section 9.5 ([`strategy.md`](strategy.md)): one key
+  metric row for each test and both equity and drawdown curves on one chart.
 - A fill table shows, for each bar, the fill price on each side and the
   difference.
 - The chart marks interruptions in grey.
@@ -268,9 +268,14 @@ Implementation (#77):
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
     `GET /api/forward-tests/{id}/comparison/{backtest_id}` every 2 seconds
-    until the backtest has a final status. It shows the backtest status, the
-    `ComparisonView` of `#lib/backtest` (no code diff: the same strategy
-    version), and the fill table.
+    until the backtest has a final status, with the forward test fills and
+    the backtest trades (for the win rates). It is a workbench (spec #99,
+    #109): the "Forward tests" side column, the comparison panel (header
+    line with the backtest status, `ComparedKeyMetrics` and
+    `EquityDrawdownChart` of `#lib/backtest`; no code diff: the same strategy
+    version) over the Fills / Logs panel (the fill table, and the backtest
+    error). The win rate of the forward test counts only the fills in the
+    backtest period.
   - Metrics: `calculate_metrics` with `start_balance_usd`, the recorded
     equity points, and the number of recorded fills.
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
@@ -283,7 +288,7 @@ Implementation (#77):
     be one row later than the live fill.
   - Grey marks: the interruptions of `forward_test_interruption` (section
     12.7, #77). An interruption that still lasts ends at the stop, or now.
-    `EquityChart` draws a grey column (a `HistogramSeries` on a hidden price
+    `EquityDrawdownChart` draws a grey column (a `HistogramSeries` on a hidden price
     scale, below the curves) at each bar end after the interruption start
     up to its end, and lists each interruption as text under the chart.
 
@@ -370,7 +375,7 @@ interruption does nothing.
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/same-period-backtests` | `201` with `{"backtest_id"}`: a queued backtest of the same period (section 12.10). `404` for an unknown ID. `422` without a start balance (`"The forward test has no start balance yet. The backtest uses it as the paper capital."`), for a currency that is not USD, or for an empty period. |
 | `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
-| `/ws/forward-tests` | `{"type": "forward_tests", "forward_tests": [...]}` at once and after each change. The server reads the table every 2 seconds. `{"type": "heartbeat"}` after 10 seconds without a change. The browser sends nothing. |
+| `/ws/forward-tests` | `{"type": "forward_tests", "forward_tests": [...]}` at once and after each change. The server reads the table every 2 seconds, with a fixed number of database connections for the full list (not connections for each row). `{"type": "heartbeat"}` after 10 seconds without a change. The browser sends nothing. |
 
 - All periods of `BarPeriod` (1, 5, 15, 30 minutes, 1 hour, 1 day) are IB
   live bar periods. `LIVE_BAR_PERIODS` in `http_routes.py` and
@@ -453,33 +458,46 @@ than the worker clock.
 
 ## 12.16 Frontend and tests
 
-- `#lib/forward_test`: the HTTP calls, `readForwardTestsMessage()`, and
-  `ForwardTestList.svelte` (`ScrollRegion` "Forward tests", a "Stop" button
-  while `desired_state` is `running` and the row holds a client ID, and a
-  "Backtest the same period" button when the row has a start balance; the
-  page starts the backtest and opens the comparison page).
-  `FillComparisonTable.svelte` (`ScrollRegion` "Compared fills") is the fill
-  table of section 12.10 (#78). `ForwardTestFillTable.svelte` (`ScrollRegion`
-  "Forward test fills") is the fill table of the forward test page.
-- The forward test ID in the list links to the forward test page
-  `/forward-tests/{id}`. The page reads `GET /api/forward-tests/{id}` every
-  2 seconds and shows the strategy version, the instrument, the bar period,
-  the status with the current error and the crash count, the client ID, the
-  start balance, the start, stop, and end times, the interruptions
-  (`ScrollRegion` "Interruptions"), the metrics, the equity curve with the
-  interruptions in grey, the fills, a link "Compare with backtest #N" for
-  each backtest of the same period, and the "Backtest the same period"
-  button.
+- `#lib/forward_test`: the HTTP calls, `readForwardTestsMessage()`,
+  `ForwardTestsOnInstrumentsFeed` (the one `/ws/forward-tests` feed of a page:
+  `forwardTests`, `onInstruments`, `isConnected`), and
+  `listForwardTestEvents()` (the events of the Logs tab).
+  `routes/forward-tests/ForwardTestList.svelte` (`ScrollRegion` "Forward test
+  list": number, strategy version, symbol, and status; the open forward test
+  is the selected row) is the list of the page. `FillComparisonTable.svelte` (`ScrollRegion` "Compared fills") is the
+  fill table of section 12.10 (#78). `ForwardTestFillTable.svelte`
+  (`ScrollRegion` "Fills") is the Fills tab of the forward test page.
+- The forward test page `/forward-tests/{id}` is a workbench like the
+  backtest page (spec #99, #105). `/forward-tests` opens the newest forward
+  test. The side column "Forward tests" has the list from `/ws/forward-tests`
+  and the "New forward test" button. The dialog has the start form (strategy,
+  strategy version, symbol, exchange, currency, a bar period from the IB live
+  bar periods, an optional end time in the local time zone) and the metrics of
+  the latest finished backtest of the selected strategy version or "no
+  backtest result". A refused start shows the `detail` text. A started
+  forward test opens at once.
+- The page reads `GET /api/forward-tests/{id}` every 2 seconds. The header
+  line shows the number, the strategy version (link to that version on the strategy page),
+  the symbol (link to the instrument page), the bar period, the status, the
+  crash count when it is not 0 and the status is not `stopped`, the red
+  "Stop forward test" button while `canStop()`, and the "Backtest the same
+  period" button (disabled without a start balance; the page starts the
+  backtest and opens the comparison page). Below: `KeyMetricRow` and
+  `EquityDrawdownChart` of `backtest` (the same metrics and chart as the
+  backtest page; the start balance is the start capital, the fills are the
+  trades). The chart lists the interruptions under it and marks grey only the
+  recorded bar ends inside one: a forward test has no bar end in an
+  interruption, so the grey is mostly absent. An interruption that still lasts
+  ends at the stop, or now. Without metrics, the panel shows the
+  status. The Fills / Comparison / Logs panel: the fills; each backtest of the
+  same period with its number (a link with the name "Compare with backtest
+  #N"), status, period, and return; the current error and the events (start, interruptions and
+  their ends, stop, or the planned stop at the end time) in UTC.
 - Tables show a bar period as "1 min" or "1 day", an amount with thousands
   separators ("98,765.40"), and a UTC time as "2026-01-02 03:04:05 UTC"
   (`#lib/foundation/value_format`, `#lib/foundation/time_format`). A column
-  name breaks only between words. A long cell value can break anywhere.
-- The page `/forward-tests` (nav link "Forward tests") has the start form
-  (strategy, strategy version, symbol, exchange, currency, and a bar period
-  from the IB live bar periods, an optional end time in the local time zone),
-  the metrics of the latest finished backtest
-  of the selected strategy version or "no backtest result", and the live
-  list. A refused start shows the `detail` text.
+  name breaks only between words. A long cell value ends with an ellipsis in
+  the list.
 - Backend tests (`backend/tests/forward_test/`): the routes, the worker with
   real PostgreSQL, the fixed clock, and the fake start function
   (`tests/fakes/forward_test_child.py`) (restarts, the 3-crash limit, the end
@@ -488,8 +506,7 @@ than the worker clock.
   the restart), and the real LiveNode without a Gateway (the stop request,
   and `"gateway_lost"` with a short `GatewayWatch`).
 - The list shows the status ("Waiting for IB Gateway", "Stop failed",
-  "Failed"), the crash count when it is not 0, and the end time in the local
-  time zone.
+  "Failed").
 - `test_forward_test_paper_contract.py` (`ibkr_paper`, by hand): a real
   LiveNode sends a buy limit order for 1 AAPL at 1.00 USD. The Web side
   (`reqAllOpenOrders`, client ID 98) sees it with the forward test ID from
@@ -501,9 +518,10 @@ than the worker clock.
   cancels the new one.
 - `backend/tests/e2e_server.py` runs the worker in the same process with
   fake children that stop at once, and adds 30 stopped forward tests. The
-  Playwright test `frontend/e2e/forward_test.spec.ts` starts a forward test,
-  sees "Running", sees the refusal of a paper order by hand on its
-  instrument, stops it, and checks the scroll track of the list.
+  Playwright test `frontend/e2e/forward_test.spec.ts` starts a forward test
+  in the dialog, sees "Running", sees the refusal of a paper order by hand on
+  its instrument, stops it from the header line, and checks the scroll track
+  of the list.
 - #78: `test_forward_test_recorder.py` runs `ForwardTestRecorder` in the
   NautilusTrader backtest engine with the bar count test strategy and 10
   bars of `tests/backtest/bars/`, and asserts the exact rows of both record
@@ -513,6 +531,8 @@ than the worker clock.
   1-DAY) with a start balance, 40 fills, equity points, 1 interruption, and
   the saved bars of its period. `frontend/e2e/forward_test_comparison.spec.ts`
   clicks "Backtest the same period", waits for the real backtest child, and
-  checks the metric table, the interruption text, the fill table, and its
-  scroll track.
+  checks the key metric row of each test, the interruption text, the fill
+  table, and its
+  scroll track. It also checks the key metrics, the chart, the Fills tab, and
+  the Logs tab of the forward test page.
 

@@ -28,7 +28,7 @@ from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
-from atrade.strategy import read_strategy_version
+from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 STATE_READ_INTERVAL_SECONDS = 2.0
@@ -106,11 +106,32 @@ FORWARD_TEST_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [ForwardTestsMessage
 
 
 async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> ForwardTestResponse:
+    [response] = await to_forward_test_responses(database_url, [row])
+    return response
+
+
+async def to_forward_test_responses(database_url: str, rows: list[ForwardTestRow]) -> list[ForwardTestResponse]:
+    """Reads the interruptions and the strategy versions of all rows with 2 connections, not 2 for each row.
+
+    /ws/forward-tests reads the list every 2 seconds for each open page, so the connections of each row slowed the
+    first message of a page by many seconds while other pages and backtest children used the database.
+    """
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        interruptions = await forward_test_store.select_interruptions(connection, row.id)
-    strategy_version = await read_strategy_version(
-        database_url=database_url, strategy_version_id=row.strategy_version_id
+        interruptions = await forward_test_store.select_interruptions_of_forward_tests(
+            connection, [row.id for row in rows]
+        )
+    strategy_versions = await read_strategy_versions(
+        database_url=database_url, strategy_version_ids=sorted({row.strategy_version_id for row in rows})
     )
+    return [build_forward_test_response(row, strategy_versions, interruptions[row.id]) for row in rows]
+
+
+def build_forward_test_response(
+    row: ForwardTestRow,
+    strategy_versions: dict[int, StrategyVersion],
+    interruptions: list[forward_test_store.ForwardTestInterruption],
+) -> ForwardTestResponse:
+    strategy_version = strategy_versions.get(row.strategy_version_id)
     if strategy_version is None:
         message = f"Forward test {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
         raise RuntimeError(message)
@@ -143,7 +164,7 @@ async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> Fo
 async def list_forward_tests(database_url: str) -> list[ForwardTestResponse]:
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         rows = await forward_test_store.select_forward_tests(connection)
-    return [await to_forward_test_response(database_url, row) for row in rows]
+    return await to_forward_test_responses(database_url, rows)
 
 
 async def describe_refusal(database_url: str, refusal: StartRefusal, instrument: Instrument) -> str:

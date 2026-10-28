@@ -1,4 +1,4 @@
-// Calls the watchlist routes and turns each answer into a value, or into a message for the watchlist panel.
+// Calls the watchlist routes and turns each answer into a value, or into a message for the watchlist column.
 import { describe, expect, it } from 'vite-plus/test';
 import { addToWatchlist, deleteFromWatchlist, listWatchlist } from './index';
 

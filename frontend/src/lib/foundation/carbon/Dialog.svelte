@@ -1,6 +1,8 @@
 <!-- Carbon modal on Bits UI Dialog. Focus stays in the dialog while it is open, Escape and a click outside close it,
      and focus goes back to `returnFocus` (or to the element that had focus before) when it closes. The footer has
-     the secondary button and the primary button side by side. The title is the accessible name of the dialog. -->
+     the secondary button and the primary button side by side. The title is the accessible name of the dialog.
+     Without `primaryText`, the dialog is a Carbon passive modal: no footer, the content has its own controls (for
+     example a form with its own submit button), and the Close button closes it. -->
 <script lang="ts">
   import Close20 from '@carbon/icons/es/close/20.js';
   import { Dialog } from 'bits-ui';
@@ -14,7 +16,7 @@
     title: string;
     // The small text above the title. Give it only when the user needs it to act.
     label?: string;
-    primaryText: string;
+    primaryText?: string;
     primaryKind?: ButtonKind;
     secondaryText?: string;
     // True while the primary action runs: the buttons do not react.
@@ -22,7 +24,7 @@
     size?: 'xs' | 'sm' | 'md' | 'lg';
     // The element that gets focus when the dialog closes, for example the button that opened the dialog from code.
     returnFocus?: HTMLElement | null;
-    onPrimary: () => void;
+    onPrimary?: () => void;
     children: Snippet;
   }
 
@@ -93,6 +95,7 @@
               <div class="cds--modal-content">
                 {@render children()}
               </div>
+              {#if primaryText !== undefined}
               <div class="cds--modal-footer cds--btn-set">
                 <Dialog.Close>
                   {#snippet child({ props: cancelProps })}
@@ -105,6 +108,7 @@
                   {primaryText}
                 </button>
               </div>
+              {/if}
             </div>
           {/snippet}
         </Dialog.Content>

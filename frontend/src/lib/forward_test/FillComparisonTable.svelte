@@ -1,8 +1,9 @@
 <!-- The fills of a forward test and of the backtest of the same period, one row for each bar and side
      (docs/architecture/forward_test.md section 12.10). A fill belongs to the last bar that ended before it.
-     The difference is the forward test price minus the backtest price. The table scrolls inside its own region. -->
+     The difference is the forward test price minus the backtest price. The table fills its parent (a workbench panel) and scrolls inside its own region. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { FillComparison } from './forward_test_api';
@@ -21,7 +22,9 @@
     { header: 'Difference (USD)', align: 'right' },
   ];
 
-  // Prices keep all their decimal places: a difference of less than one cent matters for a fill.
+  // Prices keep all their decimal places: a difference of less than one cent matters for a fill. So this column does
+  // not use formatSignedNumber (2 decimal places); it adds the same "+" to a positive difference. A price difference is
+  // not a gain or a loss, so it has no up or down icon.
   function formatDifference(amount: string | null): string {
     if (amount === null) {
       return NO_FILL;
@@ -32,9 +35,9 @@
 </script>
 
 {#if fills.length === 0}
-  <p>No fill on either side.</p>
+  <EmptyText text="No fills" />
 {:else}
-  <ScrollRegion label="Compared fills" maxHeight="min(20rem, 45vh)">
+  <ScrollRegion label="Compared fills" fill>
     <div class="fill-comparison">
       <DataTable columns={COLUMNS} size="sm">
         {#snippet rows()}
@@ -56,12 +59,13 @@
 {/if}
 
 <style>
-  p {
-    margin: 0;
-  }
-
-  /* A long value can break anywhere. A column name breaks only between words. */
+  /* A long value can break anywhere. A column name breaks only between words. The bar end stays on one line, like
+     the times of the other tables. */
   .fill-comparison :global(td) {
     overflow-wrap: anywhere;
+  }
+
+  .fill-comparison :global(tbody th) {
+    white-space: nowrap;
   }
 </style>

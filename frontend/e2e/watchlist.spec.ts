@@ -1,6 +1,6 @@
 // Watchlist against the real backend with the IBKR fake. The Playwright projects share one database and run at the same
 // time, so each project uses its own instruments <PROJECT NAME>01 ... <PROJECT NAME>25 (backend/tests/e2e_server.py).
-import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 const WATCHLIST_PATH = '/api/watchlist';
 const INSTRUMENTS_PER_PROJECT = 25;
@@ -41,6 +41,10 @@ test.beforeEach(async ({ request }, currentTest) => {
   await clearProjectInstruments(request, currentTest);
 });
 
+function watchlistColumn(page: Page): Locator {
+  return page.getByRole('complementary', { name: 'Watchlist' });
+}
+
 test('adds an instrument from the search, keeps it after a reload, and deletes it', async ({ page }, currentTest) => {
   const symbol = projectSymbol(currentTest, 1);
   const instrumentName = `${symbol} / ARCA / USD`;
@@ -49,8 +53,8 @@ test('adds an instrument from the search, keeps it after a reload, and deletes i
   await searchFor(page, symbol);
   await page.getByRole('option', { name: instrumentName }).click();
 
-  const watchlistRegion = page.getByRole('region', { name: 'Watchlist instruments' });
-  await expect(watchlistRegion.getByRole('link', { name: instrumentName })).toBeVisible();
+  const watchlistTable = watchlistColumn(page).getByRole('region', { name: 'Watchlist table' });
+  await expect(watchlistTable.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   // The candidate list marks an instrument that is in the watchlist.
   await page.getByLabel('Symbol', { exact: true }).press('ArrowDown');
   const savedOption = page.getByRole('option', { name: instrumentName });
@@ -59,13 +63,13 @@ test('adds an instrument from the search, keeps it after a reload, and deletes i
   await page.getByLabel('Symbol', { exact: true }).press('Escape');
 
   await page.reload();
-  await expect(watchlistRegion.getByRole('link', { name: instrumentName })).toBeVisible();
+  await expect(watchlistTable.getByRole('link', { name: symbol, exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: `Delete ${instrumentName} from the watchlist` }).click();
-  await expect(page.getByRole('link', { name: instrumentName })).toHaveCount(0);
+  await watchlistColumn(page).getByRole('button', { name: `Delete ${instrumentName} from the watchlist` }).click();
+  await expect(watchlistColumn(page).getByRole('link', { name: symbol, exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Watchlist' })).toBeVisible();
-  await expect(page.getByRole('link', { name: instrumentName })).toHaveCount(0);
+  await expect(watchlistColumn(page).getByRole('heading', { name: 'Watchlist' })).toBeVisible();
+  await expect(watchlistColumn(page).getByRole('link', { name: symbol, exact: true })).toHaveCount(0);
 });
 
 test('a watchlist instrument opens its instrument page', async ({ page, request }, currentTest) => {
@@ -73,7 +77,7 @@ test('a watchlist instrument opens its instrument page', async ({ page, request 
   await addThroughBackend(request, symbol);
   await page.goto('/');
 
-  await page.getByRole('link', { name: `${symbol} / ARCA / USD` }).click();
+  await watchlistColumn(page).getByRole('link', { name: symbol, exact: true }).click();
 
   await expect(page).toHaveURL(`/instruments/ARCA/${symbol}?currency=USD`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${symbol} / ARCA / USD`);
@@ -83,16 +87,15 @@ test('long watchlist has a visible scroll track and the last instrument is reach
   for (let number = 1; number <= INSTRUMENTS_PER_PROJECT; number += 1) {
     await addThroughBackend(request, projectSymbol(currentTest, number));
   }
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
 
-  const watchlistRegion = page.getByRole('region', { name: 'Watchlist instruments' });
-  await expect(
-    watchlistRegion.getByRole('link', { name: `${projectSymbol(currentTest, INSTRUMENTS_PER_PROJECT)} / ARCA / USD` }),
-  ).toBeAttached();
-  // Other projects can have instruments after ours. The page reads the list once, so its last item stays the same.
-  const lastInstrument = watchlistRegion.getByRole('listitem').last();
+  const watchlistTable = watchlistColumn(page).getByRole('region', { name: 'Watchlist table' });
+  await expect(watchlistTable.getByRole('link', { name: projectSymbol(currentTest, INSTRUMENTS_PER_PROJECT), exact: true })).toBeAttached();
+  // Other projects can have instruments after ours. The page reads the list once, so its last row stays the same.
+  const lastInstrument = watchlistTable.getByRole('row').last();
   await expect(lastInstrument).not.toBeInViewport();
-  const scrollTrack = page.getByRole('scrollbar', { name: 'Watchlist instruments scroll bar' });
+  const scrollTrack = page.getByRole('scrollbar', { name: 'Watchlist table scroll bar' });
   await expect(scrollTrack).toBeVisible();
 
   await scrollTrack.focus();

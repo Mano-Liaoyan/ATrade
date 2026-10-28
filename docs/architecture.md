@@ -267,7 +267,7 @@ routes (`/api/backtests`), and the backtest pages.
 Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_trading.md).
 It holds the live order switch, the paper account check, paper orders sent by
 hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
-account panel, the order routes (11.8), and the balance in USD for any base
+account overview and the paper order form (11.7), the order routes (11.8), and the balance in USD for any base
 currency (11.9).
 
 ## 12. Forward test
@@ -318,10 +318,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `ref`), `TextInput` (`label`, bindable `value`, `invalidText`), `Select`
   (Carbon dropdown on Bits UI Select: `label`, `items`, `value`,
   `onValueChange`), `ContentSwitcher` (on Bits UI Tabs without panels:
-  `label`, `items`, `value`, `onValueChange`), and `Dialog` (Carbon modal on
+  `label`, `items` with an optional `accessibleLabel` for a short name,
+  `value`, `onValueChange`, `size`; size `sm` and `lg` also write
+  `cds--layout--size-<size>`), and `Dialog` (Carbon modal on
   Bits UI Dialog: `open`, `onOpenChange`, `title`, `label`, `primaryText`,
   `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
-  the accessible name of the dialog.
+  the accessible name of the dialog. Without `primaryText`, the `Dialog` is a
+  Carbon passive modal: no footer, and its content has its own controls.
 - `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
   (`header`, `align: 'right'` for a number column, `isMenu` for the column
   of row menus), `size`, and a `rows` snippet for the body rows. A number
@@ -350,11 +353,19 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `neutral`; each kind has its own icon shape) and `label`. `Select` takes
   `placeholder` (the trigger text while no item is selected). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
-- The forward test pages use Carbon: the start form uses `Select` and
-  `TextInput`, the list and the fill tables use `DataTable`, and the row
-  `OverflowMenu` has only the actions that apply ("Stop forward test",
-  "Backtest the same period"). A forward test with no action has no menu.
-  The status of a forward test is a `StatusIndicator`
+- The forward test page (`/forward-tests/<id>`, spec #99, ticket
+  [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
+  with the structure of the backtest page: the "Forward tests" `SideColumn`
+  with the live list (`routes/forward-tests/ForwardTestList.svelte`, 32px
+  rows, from `ForwardTestsOnInstrumentsFeed.forwardTests`) and the
+  "New forward test" dialog (form id `start-forward-test`); the forward test
+  panel (header line with the status, the red "Stop forward test" icon button
+  while the forward test can stop, and the "Backtest the same period" icon
+  button; `KeyMetricRow`; `EquityDrawdownChart`, which lists the
+  interruptions under the chart and marks grey the recorded bar ends inside
+  one) over
+  the Fills / Comparison / Logs panel. `/forward-tests` opens the newest
+  forward test. The status of a forward test is a `StatusIndicator`
   (`findForwardTestStatusKind` of `forward_test`).
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
@@ -417,7 +428,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   no command matches, the palette shows "No results". `src/routes/` gives the
   commands (`palette_commands.ts`): go to a page, go to the instrument page of
   a watchlist instrument, open the start form of a backtest or a forward test
-  (the form ids `start-backtest` and `start-forward-test`), and change the
+  (the form ids `start-backtest` and `start-forward-test`; the backtest page
+  opens its "New backtest" dialog for `#start-backtest`, and the forward test
+  page opens its "New forward test" dialog for `#start-forward-test`), and change the
   theme (`selectThemeChoice` of `foundation/color_scheme`). A command only
   opens a page or a form. No command sends a paper order or starts a backtest
   or a forward test. The layout reads the watchlist each time the palette
@@ -429,6 +442,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `disabled`). The list is a Bits UI `ContentStatic` in the
   `cds--list-box__menu` and scrolls in a `ScrollRegion` named by
   `listLabel`. `statusText` and `invalidText` show below the field.
+  `hideLabel` keeps the label for screen readers only, and `size` `sm` gives
+  the 32px field (`cds--layout--size-sm`).
 - Generated API types go in `lib/api/`. `python -m atrade.app.openapi_document`
   writes the OpenAPI document to `lib/api/openapi.json`, and
   `openapi-typescript` writes `lib/api/index.ts`. `vp run generate:api` runs
@@ -460,7 +475,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   dragged, a click on the track scrolls one page, and the track takes Arrow,
   Page Up, Page Down, Home, and End keys. Use it for each region that can
   overflow (section 13.1).
-  The track and the thumb use Carbon tokens.
+  The track and the thumb use Carbon tokens. With `fill` (no `maxHeight`), the
+  region takes the full height of its parent, for example a workbench panel.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -471,7 +487,18 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   if it waits for a reconnection. After stop, a message of the closing
   socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
-  TradingView attribution.
+  TradingView attribution. Each chart uses `ChartFrame` of
+  `foundation/chart_frame`: the canvas container (`role="img"`, `label`,
+  bindable `canvas`) and the one attribution line under it ("Chart by
+  TradingView Lightweight Charts™"), so all charts show the same attribution.
+  With `fill`, the frame fills the height of its parent, and the chart
+  (`autoSize`) follows each size change of its container, for example after a
+  side column collapses. Without `fill`, `height` and `minHeight` set the
+  canvas height. `readChartThemeOptions(container)` and
+  `readChartColor(container, token)` of `foundation/chart_frame` read the
+  Carbon tokens for each chart. The price scales use the number formats of
+  the tables and tiles: `CHART_PRICE_FORMAT` ("11,000.00", prices and equity)
+  and `CHART_PERCENT_FORMAT` ("-37.71 %", the drawdown, `formatSignedPercent`).
 - A chart draws on a canvas and reads the color tokens only when it draws.
   `foundation/color_scheme` has `watchColorScheme(onChange)`. It calls
   `onChange` after a change of `prefers-color-scheme` and after a change of
@@ -483,13 +510,125 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
   borders), `--cds-support-success` (up bars), and `--cds-support-error`
   (down bars).
-- The instrument page (`/instruments/<exchange>/<symbol>`) shows the bar
-  periods as Carbon tabs (`Tabs` of `foundation/carbon`, on Bits UI Tabs).
-  The arrow keys, Home, and End select a bar period at once. The page
-  address keeps the bar period, and the tab keeps the focus. The tab panel
-  has the bar count, the live bar, and the chart. The bars and the live bar
-  of the page belong to one chart request, so the chart gets no data of the
-  previous bar period after a change.
+- Workbench pages (spec [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99),
+  [#102](https://github.com/Mano-Liaoyan/ATrade/issues/102)) fill the window
+  below the header and do not scroll as a page. Each region that can overflow
+  scrolls in itself (`ScrollRegion`). `foundation/workbench` has the shared
+  parts, and each workbench page uses them, so all pages have the same header
+  lines, buttons, and splitter:
+  - `Workbench`: the frame, a row of side columns and panels. When the main
+    region has a workbench (`.atrade-workbench`), the app shell gives it the
+    window height below the header (`:has()`), without padding.
+  - `SideColumn` (`label`, `side` `start` or `end`, `storageKey`, `width`,
+    default 17.5rem): a 32px header line with the name and the Collapse
+    button ("Collapse <label>"). A collapsed column is a 32px wide rail with
+    the Open button ("Open <label>"). The body stays in the page while the
+    column is collapsed, so a form keeps its values.
+  - `PanelSplit` (`storageKey`, `panels`, and the snippet `panel(id,
+    state)`): 2 or more stacked panels. Each `PanelSpec` has `id`,
+    `minPixels`, `defaultPixels` (not for the first panel), and
+    `splitterLabel` (the name of the splitter above it). The first open panel
+    fills the rest of the height; each other open panel has its own height.
+    A `Splitter` shows between 2 open panels while no panel is maximized. The
+    snippet gets a `PanelState` (`size`, `headerOnly`, `onToggleMinimized`,
+    `onToggleMaximized`, `onRestore`) to spread on a `Panel`. Several panels
+    can be minimized, but one panel stays open. One panel at a time is
+    maximized, and the other panels show only their header lines. A second
+    click on the same button restores the panel. A minimized panel stays
+    minimized through a maximize of another panel and its restore. Escape restores a maximized
+    panel of the split that has the focus (the innermost split first), or of
+    each split when the focus is outside all splits. `panel_split.ts` has the
+    state as functions with unit tests.
+  - `Panel` (`label`, `PanelState`, and `tabs` or a `header` snippet): a
+    region with a 32px header line and a body that fills the rest. The header
+    line has Carbon tabs (size `sm`) or other content, and at its right end
+    the Minimize and Maximize icon buttons ("Minimize panel", "Maximize
+    panel", "Restore panel"). A double-click on an empty part of the header
+    line toggles Maximize. A tab of a panel that shows only its header line
+    opens the panel again. With a `statusBar` snippet, the panel works like
+    the VS Code panel: a 24px status bar is always at its bottom, a panel
+    that shows only its header line shows only the status bar, and a click
+    on the selected tab minimizes the panel. Status bar controls have the
+    class `atrade-status-bar__item`. A `PanelSpec` with `startsMinimized` is
+    minimized in the default layout, and also when a stored layout has no
+    height for it (a layout stored before the panel existed). `PanelSplit` exports `openPanel(id)`
+    (through `bind:this`): it opens a panel that shows only its header line
+    or its status bar.
+  - `PanelHeader` (`end` snippet): the 32px header line with the class
+    `atrade-panel-header`. `Splitter` (`label`, `controls`, `value`, `min`,
+    `max`, `onValueChange`): a `role="separator"` (WAI-ARIA window splitter)
+    with `aria-controls` on the panel below it; its value is the height of
+    that panel, Arrow Up and Arrow Down move it 16px, Home gives the panel its
+    minimum height, and End its maximum height.
+  - The browser keeps each layout in `localStorage` (`readStoredLayout`,
+    `writeStoredLayout`). Blocked storage gives the default layout.
+- `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
+  tooltip that gives the action name. A disabled `IconButton` has
+  `aria-disabled` and stays focusable, so its tooltip and its `label` say why
+  it is disabled. A toolbar button can also take `shortcut` (shown in the
+  tooltip after the label, and `aria-keyshortcuts`), `tone` (`neutral`,
+  `interactive`, `success`, `warning`, `error`: the icon gets
+  `--cds-icon-secondary`, `--cds-icon-interactive`, or the support color),
+  `marked` (a `--cds-icon-interactive` dot on the icon), and `busy` (the
+  icon turns; use it with `disabled`). The icon shape changes with each
+  state, so the color is never the only sign. `Select` takes `size` (`sm`)
+  and `hideLabel`. `Tabs` (and `Panel` `tabs`) take `itemLabel`, a snippet
+  that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
+  header line before the Collapse button. `Tabs` takes `size` (`sm` gives the 32px
+  tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
+  `panelClass`.
+- The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
+  The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
+  rows: symbol, last price, and change from the previous close (from the
+  daily bars). A row opens its instrument page with the same bar period. The
+  center `PanelSplit` has the chart panel and the "Paper account" panel. The
+  chart panel header line has the instrument name, the last price, the change
+  from the previous close, and the bar periods as a Carbon `sm` content
+  switcher with short names (1m, 5m, 15m, 30m, 1h, 1D). The arrow keys, Home,
+  and End select a bar period at once. The page address keeps the bar period,
+  and the switcher keeps the focus. The bar chart fills the rest of the panel.
+  The bar count and the live bar are status text for screen readers. The bars
+  and the live bar of the page belong to one chart request, so the chart gets
+  no data of the previous bar period after a change. The "Paper account"
+  panel has the tabs Positions, Open orders, and Filled today, with 32px
+  rows. The right `SideColumn` "Paper order" has `InstrumentOrderPanel` of
+  `paper_trading` (IBKR Desktop layout). The order is for the instrument of
+  the page, so the panel has no instrument fields. From top to bottom: the
+  Buy / Sell content switcher; Quantity and Order type, Limit price and Time
+  in force in two columns (the limit price starts with the last price); the
+  order value, position, average cost, unrealized P&L, cash (USD), and net
+  liquidation (USD) as `MetricTile`s in a `MetricRow` with `columns` 2; and
+  the full-width button "Review buy order" (primary) or "Review sell order"
+  (danger). The button opens the confirmation dialog with the PAPER tag and
+  "Send paper order". A paper account check that did not pass, or a running
+  forward test on the instrument, disables the button, and the status above it
+  says why with a `StatusIndicator` (`findInstrumentOrderBlock`). A sent order
+  shows in the Open orders tab from `/ws/paper-trading`. The fields and the
+  button stay in view; only the numbers scroll, in their own `ScrollRegion`.
+  The side column is the landmark; its content has no landmark with the same
+  name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
+  of `paper_trading` and the running forward tests with
+  `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
+  `/ws/forward-tests` feed: `forwardTests`, `onInstruments`, `isConnected`;
+  the forward test page uses it for its list and the strategy page for
+  its Stop forward test button; the home page uses the
+  same paper account feed). While a socket is not connected, the panel and
+  the column show `LiveUpdatesNotification`.
+- The home page (`/`, [#108](https://github.com/Mano-Liaoyan/ATrade/issues/108))
+  is the account overview workbench. The left `SideColumn` "Watchlist"
+  (22rem: the 20rem of the instrument page and 2rem for the Delete column, so
+  both tables have the same column widths) has the same watchlist table as the instrument page
+  (`src/routes/InstrumentWatchlist.svelte`), with `editable`: the instrument
+  search above the table adds an instrument, and each row has a Delete icon
+  button. A row opens its instrument page. The main area has the key numbers
+  of the paper account in one `MetricRow` of `MetricTile`s
+  (`foundation/metric_tile`, values from `listBalanceMetrics` of `paper_trading`,
+  and the account check status when the check did not pass), over a
+  `PanelSplit` with the "Positions" panel and the "Orders" panel (tabs Open
+  orders and Filled today). The tables are the same components as on the
+  instrument page (`PositionTable`, `OpenOrderList`, `FilledManualOrderList`),
+  and the row menu of an open order cancels it. The home page has no paper
+  order form: paper orders are sent on the instrument page.
 - `foundation/carbon` `Checkbox` is the Carbon checkbox: `label`, `checked`,
   `onCheckedChange`, and `hideLabel` (the label is for screen readers only).
   The native checkbox is transparent and covers the label, so a pointer
@@ -498,15 +637,91 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   checkboxes. Its cells have class `cds--table-column-checkbox`. `TextInput`
   also takes `type` `date`. `InlineNotification` has `label` (the accessible
   name of the status or alert).
-- The backtest pages use Carbon: the start form (`Select`, `TextInput`,
-  `Button`), the limits form, the backtest list (`DataTable` with a selection
-  column, in a `ScrollRegion`), the metrics as Carbon tiles, and the trades
-  and compared metrics as data tables. A backtest status is a
-  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity chart
-  reads only Carbon tokens: `--cds-layer-01` (background),
-  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid),
-  `--cds-text-primary` (first curve, solid), `--cds-interactive` (second
-  curve, dashed), and `--cds-layer-accent-01` (interruptions).
+- The backtest page (`/backtests/<id>`, spec #99, ticket
+  [#104](https://github.com/Mano-Liaoyan/ATrade/issues/104)) is a workbench
+  like QuantConnect: the "Backtests" `SideColumn` with the backtest list
+  (`DataTable` with a selection column and the Carbon batch action bar
+  "Compare") and the "New backtest" and "Backtest limits" dialogs; the
+  backtest panel (header line, `KeyMetricRow`, `EquityDrawdownChart`) over
+  the Trades / Orders / Logs panel. `/backtests` opens the newest backtest
+  (docs/architecture/backtest.md section 10.6). A backtest status is a
+  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity and
+  drawdown chart reads only Carbon tokens: `--cds-layer-01` (background),
+  `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid, and the line
+  between its 2 panes), `--cds-text-primary` (first equity curve, solid),
+  `--cds-interactive` (second equity curve, dashed), `--cds-layer-accent-01`
+  (interruptions), and `--cds-support-error` (drawdown line, and its fill
+  with alpha).
+- The comparison pages (`/backtests/<id>/comparison/<other id>` and
+  `/forward-tests/<id>/comparison/<backtest id>`, ticket
+  [#109](https://github.com/Mano-Liaoyan/ATrade/issues/109)) are workbenches
+  with the structure of the backtest page. The side column is the list of
+  the backtest page ("Backtests", both compared rows have the open row color:
+  `comparedBacktestIds` of `BacktestList`) or of the forward test page
+  ("Forward tests"). The comparison panel has the header line (name, strategy
+  link, instrument link and bar period; the backtest comparison shows these 2
+  only when both backtests have the same; the forward test comparison also
+  has the backtest status), `ComparedKeyMetrics` of `backtest`, and
+  `EquityDrawdownChart` with 2 curves. The chart panel has a minimum of
+  256px (160px on the other pages), and in a low panel the metric rows scroll
+  in their region "Compared metrics" with a visible track. The panel
+  under it has the tabs Code difference (backtests, `CodeDiff` with `fill`)
+  or Fills / Logs (forward test: `FillComparisonTable` and the backtest
+  error). `ComparedKeyMetrics` (`tests: ComparedTest[]`) shows one
+  `KeyMetricRow` for each test, under a line with the curve line style and a
+  link to the test. This line is the only key of the curves. `readKeyMetrics`
+  takes `metrics: null` (all tiles "–") and an optional `period`: only the
+  trades in the period count for the win rate.
+- `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
+  (`name`, `text`, `change`) is a Carbon tile with the name and the
+  right-aligned value (tabular numbers). With `change`, the value is a
+  `ChangeText`, so up and down show an arrow icon and a support color.
+  `MetricRow` (`label`, `columns`) puts the tiles in one line, each the same
+  width, or with `columns` in that many columns (the narrow order panel). The
+  key metrics of a backtest or a forward test use `KeyMetricRow` of
+  `backtest`: one set, one order, and one sign rule (the max drawdown is a
+  negative percent). `formatPercent` of `backtest`, the watchlist, and the
+  instrument header line use `formatSignedPercent` of `foundation/value_format`
+  ("+0.97 %": the sign rule of `formatSignedNumber` and a space before "%"). Rules for each page that shows a metric:
+  `formatMaxDrawdown` of `backtest` gives the max drawdown text (a negative
+  percent, "0.00 %" for 0) and the signed number; a tile gives that number as
+  `change`, so the max drawdown shows with `ChangeText` (down arrow and
+  `--cds-support-error`). Total return and net profit also are `change`
+  values. Other metrics have no direction.
+- `EquityDrawdownChart` of `backtest` (`curves`, `label`, `interruptions`,
+  `fill`) is the one equity and drawdown chart of all pages. Each curve
+  (`DrawdownCurve`: `name`, `points`, `startCapitalUsd`) has an equity line
+  and a drawdown curve; the second curve is dashed (`readCurveStyle`). The
+  chart has no curve legend: `InterruptionList` lists the interruptions (grey
+  columns) under it. An interruption without an equity point of a curve (a
+  forward test has no records in it) gets one grey column at its end time
+  (`findInterruptedTimes`); an interruption after the last equity point (it
+  still lasts) gets its column at the right edge. The drawdown axis is a
+  percent and ends at 0 at the top of its pane (`findDrawdownScaleRange`, no
+  top margin), so the drawdown fill draws nothing above 0. New points of the same curves do not reset the zoom.
+- Consistency rules of all workbench pages (ticket
+  [#110](https://github.com/Mano-Liaoyan/ATrade/issues/110)):
+  - The open row of a list (watchlist, backtests, forward tests, strategies)
+    has the Carbon class `cds--data-table--selected`. `DataTable` gives it the
+    selected row color and a 3px `--cds-border-interactive` bar at the start.
+  - Table rows of size sm are 32px: `ChangeText` and `StatusIndicator` have
+    `vertical-align: top`. Lists have fixed column widths and an ellipsis
+    for long text; times do not wrap.
+  - An empty table, list, or panel shows `EmptyText` of
+    `foundation/empty_text` (`text`, optional `role` "status"): a short phrase
+    without a full stop, for example "No trades". A read error shows an
+    `InlineNotification` "<Thing> not read" where the data would be, also
+    when no panel exists (strategy page).
+  - A page that reads again while a test is queued or running uses
+    `startPolling(read, onResult, intervalMilliseconds, onFailure)` of
+    `foundation/polling` in an `$effect` and returns its stop function. A
+    failed read shows its message (`onFailure`, or the failed result in
+    `onResult`), and the loop reads again after the interval.
+  - Table column names stay on one line. The instrument page has a narrow
+    order panel, so its `PositionTable` and `OpenOrderList` have `compact`:
+    no Currency and Market price columns, and no Type and Filled columns. The
+    symbol cell of both tables shows the exchange in the helper color.
+  - Percents have 2 decimal places, also the win rate ("66.67 %").
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,
   `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,
@@ -520,17 +735,60 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   has a wavy `--cds-support-error` underline, and its tooltip looks like a
   low-contrast Carbon error notification. A type error does not block the
   save.
-- The strategy pages use the components of `foundation/carbon`: the list
-  page has a `TextInput` and a `Button` for the new strategy, and the editor
-  has a `Select` for the version, the Save version button, an "Unsaved
-  changes" tag, and a danger `Dialog` that confirms Delete strategy. The save
-  result and the refused checks show as an `InlineNotification`.
-  `InlineNotification` also takes child content, for example a list of
-  problems.
+- The strategy page (`/strategies/<id>`, spec #99, ticket
+  [#106](https://github.com/Mano-Liaoyan/ATrade/issues/106)) is a workbench
+  like the QuantConnect editor. `/strategies` shows the first strategy of the
+  list. `/strategies/<id>/versions/<n>` opens version n (strategy section
+  9.7). The "Strategies" `SideColumn` lists the strategies (32px rows: name
+  and latest version) and has the "New strategy" button (a `Dialog` with the
+  name). The toolbar line (`PanelHeader`) has the strategy name, the version
+  (`Select` size `sm`), and icon buttons with the state in the icon shape
+  and color: Delete strategy (danger `Dialog`), the swap button (an arrow to
+  the place that the editor moves to), Save version (a blue dot for unsaved
+  changes), Start forward test (blue signal; a red stop square "Stop forward
+  test" while a forward test of the strategy runs), and Run backtest (green
+  triangle; a turning yellow icon "Backtest is running", not clickable, while
+  a backtest of the strategy is queued or running). Ctrl S, Ctrl B, and Ctrl
+  Shift F (Cmd on macOS) run Save version, Run backtest, and Start or Stop
+  forward test, also in the editor: the editor and its language server
+  client use none of these keys (a unit test checks it). Run backtest opens
+  the "New backtest" dialog of the backtest page with the open strategy
+  version; Start forward test opens the "New forward test" dialog of the
+  forward test page with the open strategy version. Below the toolbar, a `PanelSplit` has the
+  results panel and the editor panel. The results are on top by default; the
+  swap button changes the order, and the browser keeps it
+  (`atrade.strategy-page.pane-order`). The results panel has one tab for each
+  backtest of the strategy (number and total return as `ChangeText`, the
+  newest first), then Trades, Orders, and Logs of the last selected backtest.
+  A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A backtest
+  of the strategy that ends opens in its tab. While the forward test socket is
+  not connected, `LiveUpdatesNotification` shows under the toolbar. The editor panel has the file
+  tab `strategy.py` and the `CodeEditor`. Below the two panels is the
+  "Problems and output" panel (ticket
+  [#107](https://github.com/Mano-Liaoyan/ATrade/issues/107)), always the
+  last panel of the split. By default it is minimized to its 24px status
+  bar: the error count and the warning count (each with its icon; the code
+  checks give no severity, so each code problem is an error) open the
+  Problems tab, and "Output" opens the Output tab. A click on the selected
+  tab or the Minimize button minimizes the panel again; the panel also
+  maximizes and restores. A count of 0 has a grey icon; a count above 0 has
+  the support color. A save that the checks refuse opens Problems. An error
+  (a failed save, read, delete, or forward test stop) opens Output.
+  Problems lists the code problems of the last save (line and message); a
+  click on a problem puts the cursor on its line (`CodeEditor`
+  `revealLine`). Output lists the save results, the backtests that start
+  and end, the forward tests that start or get a stop request, and the
+  errors of these actions, each line with its UTC time. Each tab scrolls in
+  its own `ScrollRegion` ("Code problems", "Output").
 - `Button` sizes `sm` and `md` also write `cds--layout--size-<size>`: Carbon
   v11 reads the button height from that class.
 - `foundation/value_format` shows API values in tables: `formatBarPeriod`
   ("1-MINUTE" as "1 min", "1-DAY" as "1 day") and `formatAmount` ("98,765.40").
+  `formatPrice` (1234.5 as "1,234.50") and `formatSignedNumber` (the one sign
+  rule for a change: "+1.26", "-1,234.50", "0.00") show "–" for a missing
+  value. `ChangeText` (`value`, `text`, `label`) shows each up or down change
+  on all pages: the text with an arrow icon and `--cds-support-success` (up)
+  or `--cds-support-error` (down), so the color is never the only sign.
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
 - The app shell header shows the server time and updates it every second:
   the `time_utc` of `GET /api/health` plus the browser time since the answer
