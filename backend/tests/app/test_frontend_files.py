@@ -30,6 +30,14 @@ async def test_serves_built_asset_file(web_client: httpx.AsyncClient) -> None:
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("path", ["/", "/backtests/42", "/_app/start.js"])
+async def test_tells_proxies_not_to_change_frontend_files(web_client: httpx.AsyncClient, path: str) -> None:
+    response = await web_client.get(path)
+
+    assert response.headers["cache-control"] == "no-transform"
+
+
+@pytest.mark.anyio
 async def test_unknown_api_path_returns_not_found(
     web_client: httpx.AsyncClient,
 ) -> None:
