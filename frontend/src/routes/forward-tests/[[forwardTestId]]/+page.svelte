@@ -149,6 +149,9 @@
         return true;
       },
       READ_INTERVAL_MILLISECONDS,
+      (message) => {
+        detailMessage = message;
+      },
     );
   });
 

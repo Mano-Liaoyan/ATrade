@@ -84,13 +84,16 @@
         isListRead = true;
         if (result.kind === 'failed') {
           listMessage = result.message;
-          return false;
+          return true;
         }
         listMessage = '';
         backtests = result.value;
         return result.value.some((item) => !isFinalStatus(item.status));
       },
       LIST_CHECK_INTERVAL_MILLISECONDS,
+      (message) => {
+        listMessage = message;
+      },
     );
   });
 
@@ -131,6 +134,9 @@
         return !isFinalStatus(result.value.status);
       },
       STATUS_CHECK_INTERVAL_MILLISECONDS,
+      (message) => {
+        detailMessage = message;
+      },
     );
   });
 

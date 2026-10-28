@@ -25,6 +25,7 @@ describe('startPolling', () => {
         return value < 2;
       },
       INTERVAL_MILLISECONDS,
+      vi.fn(),
     );
     await vi.advanceTimersByTimeAsync(0);
     expect(seen).toEqual([1]);
@@ -40,7 +41,7 @@ describe('startPolling', () => {
     const read = vi.fn(() => Promise.resolve('value'));
     const onResult = vi.fn(() => true);
 
-    const stop = startPolling(read, onResult, INTERVAL_MILLISECONDS);
+    const stop = startPolling(read, onResult, INTERVAL_MILLISECONDS, vi.fn());
     stop();
     await vi.advanceTimersByTimeAsync(INTERVAL_MILLISECONDS * 3);
 
@@ -48,10 +49,45 @@ describe('startPolling', () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
+  it('a failed read gives its message to onFailure and reads again after the interval', async () => {
+    const read = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('Network down'))
+      .mockResolvedValue('value');
+    const onResult = vi.fn(() => false);
+    const onFailure = vi.fn();
+
+    startPolling(read, onResult, INTERVAL_MILLISECONDS, onFailure);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onFailure).toHaveBeenCalledWith('Network down');
+    expect(onResult).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(INTERVAL_MILLISECONDS);
+    expect(onResult).toHaveBeenCalledWith('value');
+  });
+
+  it('an error in onResult goes to onFailure, and the loop reads again', async () => {
+    const read = vi.fn(() => Promise.resolve('value'));
+    const onFailure = vi.fn();
+
+    startPolling(
+      read,
+      () => {
+        throw new Error('Bad value');
+      },
+      INTERVAL_MILLISECONDS,
+      onFailure,
+    );
+    await vi.advanceTimersByTimeAsync(INTERVAL_MILLISECONDS);
+
+    expect(onFailure).toHaveBeenCalledWith('Bad value');
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
   it('a stop between 2 reads cancels the next read', async () => {
     const read = vi.fn(() => Promise.resolve('value'));
 
-    const stop = startPolling(read, () => true, INTERVAL_MILLISECONDS);
+    const stop = startPolling(read, () => true, INTERVAL_MILLISECONDS, vi.fn());
     await vi.advanceTimersByTimeAsync(0);
     stop();
     await vi.advanceTimersByTimeAsync(INTERVAL_MILLISECONDS * 3);

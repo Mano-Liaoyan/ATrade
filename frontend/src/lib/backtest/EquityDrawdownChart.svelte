@@ -71,6 +71,7 @@
   const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
   // Each curve has 2 series: equity (even index) and drawdown (odd index).
   const SERIES_PER_CURVE = 2;
+  const DRAWDOWN_SCALE_MARGINS = { top: 0, bottom: 0.1 };
   // The drawdown scale ends at 0: a drawdown is never positive.
   const DRAWDOWN_SCALE_OPTIONS = {
     priceFormat: CHART_PERCENT_FORMAT,
@@ -220,6 +221,8 @@
       const [equityPane, drawdownPane] = chart.panes();
       equityPane?.setStretchFactor(EQUITY_PANE_STRETCH);
       drawdownPane?.setStretchFactor(DRAWDOWN_PANE_STRETCH);
+      // The drawdown scale ends at 0 at the pane top: no margin above 0, so the inverted fill draws nothing there.
+      chart.priceScale('right', DRAWDOWN_PANE_INDEX).applyOptions({ scaleMargins: DRAWDOWN_SCALE_MARGINS });
     }
     interruptionSeries.setData(
       findInterruptedTimes(

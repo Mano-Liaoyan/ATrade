@@ -33,6 +33,18 @@ describe('findInterruptedTimes', () => {
     expect(findInterruptedTimes([forwardTestCurve], interruptions)).toEqual(['2026-01-02T03:07:30Z']);
   });
 
+  it('marks an interruption after the last bar end at its end: one column at the right edge (interrupted until now)', () => {
+    const interruptions = [{ start_utc: '2026-01-02T03:09:30Z', end_utc: '2026-01-02T03:12:00Z' }];
+
+    expect(findInterruptedTimes([curve], interruptions)).toEqual(['2026-01-02T03:12:00Z']);
+  });
+
+  it('marks nothing when no curve has points: the chart has no time scale yet', () => {
+    const interruptions = [{ start_utc: '2026-01-02T03:06:00Z', end_utc: '2026-01-02T03:08:00Z' }];
+
+    expect(findInterruptedTimes([[]], interruptions)).toEqual([]);
+  });
+
   it('marks nothing without interruptions', () => {
     expect(findInterruptedTimes([curve], [])).toEqual([]);
   });

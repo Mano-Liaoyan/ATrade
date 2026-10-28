@@ -184,12 +184,24 @@
   $effect(() => {
     // A new read count runs this effect again: its cleanup stops the old loop.
     backtestReadCount satisfies number;
+    // A failed read writes one Output line (not again for each retry), and the list reads again. It does not open the
+    // panel: a reload aborts the read, and an open panel would be stored in the layout of the next page.
+    let failureText = '';
+    function showFailure(message: string): void {
+      const text = `Backtests not read: ${message}`;
+      if (text !== failureText) {
+        failureText = text;
+        writeOutput(text);
+      }
+    }
     return startPolling(
       () => listBacktests(fetch),
       (result) => {
         if (result.kind === 'failed') {
-          return false;
+          showFailure(result.message);
+          return true;
         }
+        failureText = '';
         const finished = findFinishedBacktest(backtests, result.value, activeStrategyId);
         if (finished !== null) {
           selection = { tab: createBacktestTab(finished.id), backtestId: finished.id };
@@ -199,6 +211,7 @@
         return result.value.some((item) => !isFinalStatus(item.status));
       },
       LIST_CHECK_INTERVAL_MILLISECONDS,
+      showFailure,
     );
   });
 

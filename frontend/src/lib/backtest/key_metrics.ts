@@ -45,7 +45,8 @@ export interface KeyMetric {
 }
 
 const PERCENT = 100;
-const WIN_RATE_DECIMAL_PLACES = 1;
+// 2 decimal places, like the other percents of the metric row ("66.67 %").
+const WIN_RATE_DECIMAL_PLACES = 2;
 // Share quantities are decimal text. A position under this size is 0.
 const FLAT_POSITION_SHARES = 1e-9;
 

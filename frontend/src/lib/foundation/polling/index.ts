@@ -3,22 +3,35 @@
 
 /**
  * Calls `read` at once. Each result goes to `onResult`; when `onResult` returns true, `read` runs again after
- * `intervalMilliseconds`. The returned function stops the loop: no result reaches `onResult` after it.
+ * `intervalMilliseconds`. A read that throws or rejects, or an `onResult` that throws, gives its message to
+ * `onFailure` (the page shows it, AGENTS.md State) and the loop reads again after the interval. The returned function
+ * stops the loop: no result and no failure reach the callbacks after it.
  */
 export function startPolling<T>(
   read: () => Promise<T>,
   onResult: (value: T) => boolean,
   intervalMilliseconds: number,
+  onFailure: (message: string) => void,
 ): () => void {
   let isActive = true;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
   async function readOnce(): Promise<void> {
-    const value = await read();
-    if (!isActive) {
-      return;
+    let readsAgain: boolean;
+    try {
+      const value = await read();
+      if (!isActive) {
+        return;
+      }
+      readsAgain = onResult(value);
+    } catch (error: unknown) {
+      if (!isActive) {
+        return;
+      }
+      onFailure(error instanceof Error ? error.message : String(error));
+      readsAgain = true;
     }
-    if (onResult(value)) {
+    if (readsAgain) {
       timer = setTimeout(() => void readOnce(), intervalMilliseconds);
     }
   }

@@ -695,8 +695,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   chart has no curve legend: `InterruptionList` lists the interruptions (grey
   columns) under it. An interruption without an equity point of a curve (a
   forward test has no records in it) gets one grey column at its end time
-  (`findInterruptedTimes`). The drawdown axis is a percent and ends at 0
-  (`findDrawdownScaleRange`). New points of the same curves do not reset the zoom.
+  (`findInterruptedTimes`); an interruption after the last equity point (it
+  still lasts) gets its column at the right edge. The drawdown axis is a
+  percent and ends at 0 at the top of its pane (`findDrawdownScaleRange`, no
+  top margin), so the drawdown fill draws nothing above 0. New points of the same curves do not reset the zoom.
 - Consistency rules of all workbench pages (ticket
   [#110](https://github.com/Mano-Liaoyan/ATrade/issues/110)):
   - The open row of a list (watchlist, backtests, forward tests, strategies)
@@ -711,8 +713,15 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     `InlineNotification` "<Thing> not read" where the data would be, also
     when no panel exists (strategy page).
   - A page that reads again while a test is queued or running uses
-    `startPolling(read, onResult, intervalMilliseconds)` of
-    `foundation/polling` in an `$effect` and returns its stop function.
+    `startPolling(read, onResult, intervalMilliseconds, onFailure)` of
+    `foundation/polling` in an `$effect` and returns its stop function. A
+    failed read shows its message (`onFailure`, or the failed result in
+    `onResult`), and the loop reads again after the interval.
+  - Table column names stay on one line. The instrument page has a narrow
+    account panel, so its `PositionTable` and `OpenOrderList` have `compact`:
+    no Currency and Market price columns, and no Type and Filled columns. The
+    symbol cell of both tables shows the exchange in the helper color.
+  - Percents have 2 decimal places, also the win rate ("66.67 %").
 - The code editor and the code diff (`foundation/code_editor`) use Carbon
   tokens: `--cds-layer-01` (background), `--cds-text-primary`,
   `--cds-text-secondary` (gutter and comments), `--cds-border-subtle-01`,

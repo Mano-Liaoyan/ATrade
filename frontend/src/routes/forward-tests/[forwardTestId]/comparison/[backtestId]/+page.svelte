@@ -115,7 +115,7 @@
       ([result, forwardTestResult, backtestResult]) => {
         if (result.kind === 'failed') {
           errorMessage = result.message;
-          return false;
+          return true;
         }
         errorMessage = '';
         comparison = result.value;
@@ -130,6 +130,9 @@
         return !isFinalStatus(result.value.backtest.status);
       },
       READ_INTERVAL_MILLISECONDS,
+      (message) => {
+        errorMessage = message;
+      },
     );
   });
 </script>

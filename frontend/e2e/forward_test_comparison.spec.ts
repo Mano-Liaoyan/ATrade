@@ -51,7 +51,7 @@ async function expectComparedMetrics(metrics: Locator, forwardTestId: string): P
   await expect(backtestMetrics.getByRole('definition').nth(4)).toHaveText('3');
   await expect(backtestMetrics.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
   // The win rates come from the fills and the trades: a percent, not a dash.
-  await expect(backtestMetrics.getByRole('definition').nth(3)).toHaveText(/^\s*\d+\.\d %$/);
+  await expect(backtestMetrics.getByRole('definition').nth(3)).toHaveText(/^\s*\d+\.\d{2} %$/);
 }
 
 test('backtests the same period and compares the metrics, the equity curves, and the fills', async ({ page }) => {

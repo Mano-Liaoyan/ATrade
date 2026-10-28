@@ -259,10 +259,10 @@
                 {#if account === null}
                   <p role="status">Reading the paper account.</p>
                 {:else}
-                  <PositionTable positions={account.positions} fill />
+                  <PositionTable positions={account.positions} fill compact />
                 {/if}
               {:else if accountTable === 'open-orders'}
-                <OpenOrderList orders={accountFeed.openOrders} fill />
+                <OpenOrderList orders={accountFeed.openOrders} fill compact />
               {:else}
                 <FilledManualOrderList orders={accountFeed.filledOrders} fill />
               {/if}

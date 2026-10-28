@@ -23,7 +23,8 @@ async function selectOption(page: Page, symbol: string, selectName: string, opti
 
 async function fillLimitOrder(page: Page, symbol: string): Promise<void> {
   const ticket = orderPanel(page, symbol);
-  await ticket.getByRole('tab', { name: 'Buy' }).click();
+  // Buy is the default side: no click (in WebKit, a click waits for animation frames that sometimes do not come).
+  await expect(ticket.getByRole('tab', { name: 'Buy' })).toHaveAttribute('aria-selected', 'true');
   await ticket.getByLabel('Quantity').fill('3');
   await selectOption(page, symbol, 'Order type', 'Limit');
   await ticket.getByLabel('Limit price').fill('1.25');
