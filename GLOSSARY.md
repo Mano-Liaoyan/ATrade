@@ -122,6 +122,36 @@ The cash amount a backtest starts with. It comes from the paper account
 balance, or from a local value when no balance is available.
 _Avoid_: fallback capital, ledger
 
+## AI assistant
+
+**AI assistant**:
+The language model that discusses strategies with the user, writes strategy
+versions, and runs and compares backtests. It never sends a paper order and
+never starts a forward test. In Chinese, write AI 助手.
+_Avoid_: agent, bot, copilot
+
+**Conversation**:
+One exchange of messages between the user and the AI assistant. It belongs to
+at most one strategy. In Chinese, write 对话.
+_Avoid_: chat, thread, session
+
+**Credential**:
+One named subscription login or API key of a model provider that the AI
+assistant uses, for example "Anthropic API key · personal". In Chinese, write
+凭据.
+_Avoid_: account, auth, token
+
+**Prompt version**:
+One saved copy of the part of the AI assistant's system prompt that the user
+can edit. It does not change after it is saved. Each conversation records the
+prompt version that it used. In Chinese, write 提示词版本.
+_Avoid_: prompt revision, instructions
+
+**Discarded strategy version**:
+A strategy version that the AI assistant saved and the user discarded. It
+stays in the history, and its backtests stay. In Chinese, write 已丢弃的策略版本.
+_Avoid_: deleted version, rejected version
+
 ## User interface
 
 **Workbench**:
