@@ -27,12 +27,6 @@ range, the first bar source in the list that has saved that range gives the
 bars. In Chinese, write 来源顺序.
 _Avoid_: source priority, fallback
 
-**Universe**:
-The instruments that a backtest can use in one time period. A point-in-time
-rule makes it from data known at that time, so it includes instruments that
-stopped trading later. In Chinese, write 品种池.
-_Avoid_: index members, stock pool
-
 **Official close**:
 The price of the closing auction on the listing exchange of an instrument.
 The close of a daily bar is the official close. In Chinese, write 官方收盘价.
@@ -91,10 +85,11 @@ in the queue.
 _Avoid_: backtest settings, quota
 
 **Universe**:
-The instruments that one backtest can trade at each time. A rule (for
-example the top instruments by trading value of each quarter) or a fixed list
-gives it. It can change over time. In Chinese, write 品种池.
-_Avoid_: basket, symbol list, portfolio
+The instruments that one backtest can trade at each time. A point-in-time rule
+(for example the top instruments by trading value of each quarter) or a fixed
+list gives it. A point-in-time rule uses only data known at that time, so it
+includes instruments that stopped trading later. In Chinese, write 品种池.
+_Avoid_: index members, stock pool, basket, symbol list, portfolio
 
 **Parameter sweep**:
 A set of backtests of one strategy version on the same universe and time
