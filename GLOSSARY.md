@@ -97,6 +97,23 @@ The final equity of a test minus its start capital (the paper capital of a
 backtest, or the start balance of a forward test).
 _Avoid_: PnL
 
+**In-sample**:
+The part of a backtest range before the split time. The user develops the
+strategy on this part. In Chinese, write 样本内.
+_Avoid_: training set
+
+**Out-of-sample**:
+The part of a backtest range after the split time. The user checks the
+strategy on this part one time and does not change the strategy for it. In
+Chinese, write 样本外.
+_Avoid_: holdout, validation set
+
+**Trial count**:
+The number of finished backtests of the same strategy (all strategy
+versions), instrument, and bar period. It tells how many tries a result was
+selected from. In Chinese, write 尝试次数.
+_Avoid_: number of tries, N
+
 **Forward test**:
 A test of a strategy that runs automatically on live market data and sends
 orders to a paper account.
