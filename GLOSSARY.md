@@ -51,6 +51,18 @@ time (the concurrency). The user changes them in the UI. Other backtests wait
 in the queue.
 _Avoid_: backtest settings, quota
 
+**Universe**:
+The instruments that one backtest can trade at each time. A rule (for
+example the top instruments by trading value of each quarter) or a fixed list
+gives it. It can change over time. In Chinese, write 品种池.
+_Avoid_: basket, symbol list, portfolio
+
+**Parameter sweep**:
+A set of backtests of one strategy version on the same universe and time
+range, one backtest for each combination of parameter values. In Chinese,
+write 参数扫描.
+_Avoid_: optimization, grid search, batch backtest
+
 **Trade**:
 One fill of an order in a backtest or a forward test: the time, the side, the
 quantity, and the price.
