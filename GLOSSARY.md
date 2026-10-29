@@ -22,6 +22,23 @@ the IBKR forex rate. In Chinese, write 汇率. A backtest of an instrument that
 is not in USD uses it.
 _Avoid_: FX price, conversion factor
 
+**Indicator**:
+One number that describes an instrument at one time, calculated from its bars
+or its financial data, for example RSI(14) or the price to earnings ratio. In
+Chinese, write 指标.
+_Avoid_: metric, signal, factor (in user copy)
+
+**Screen**:
+A saved set of conditions on indicators and an order, for example "price to
+earnings below 15 and RSI(14) below 30, ordered by 12-month momentum". In
+Chinese, write 选股条件.
+_Avoid_: screener (the page name only), filter, scan
+
+**Screen result**:
+The ordered list of instruments that one run of a screen gives, with the run
+time. In Chinese, write 选股结果.
+_Avoid_: scan result, hits
+
 **Watchlist**:
 The list of instruments that the user saves. In Chinese, write 自选股.
 _Avoid_: favorites, pins
@@ -64,8 +81,8 @@ _Avoid_: balance curve, PnL curve
 One number that describes the result of a test, for example the total return
 or the max drawdown. Backtests and forward tests use the same metric
 functions. All pages show the same key metrics in the same order, and show
-the max drawdown as a negative percent.
-_Avoid_: statistic, KPI
+the max drawdown as a negative percent. In Chinese, write 绩效指标.
+_Avoid_: statistic, KPI, indicator
 
 **Round trip**:
 The trades of a test from a position of 0 back to a position of 0.
