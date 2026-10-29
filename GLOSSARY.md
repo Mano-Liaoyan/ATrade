@@ -16,6 +16,28 @@ instrument in one time period. In Chinese, write K 线. A chart can show a bar
 as a candlestick, but the data is always a bar.
 _Avoid_: candle
 
+**Bar source**:
+A data provider that gives bars, for example IBKR or Databento. ATrade keeps
+the bars of each bar source apart. In Chinese, write K 线来源.
+_Avoid_: feed, vendor (for this meaning), provider
+
+**Source order**:
+The ordered list of bar sources that ATrade reads bars from. For each time
+range, the first bar source in the list that has saved that range gives the
+bars. In Chinese, write 来源顺序.
+_Avoid_: source priority, fallback
+
+**Universe**:
+The instruments that a backtest can use in one time period. A point-in-time
+rule makes it from data known at that time, so it includes instruments that
+stopped trading later. In Chinese, write 品种池.
+_Avoid_: index members, stock pool
+
+**Official close**:
+The price of the closing auction on the listing exchange of an instrument.
+The close of a daily bar is the official close. In Chinese, write 官方收盘价.
+_Avoid_: last price, last trade
+
 **Exchange rate**:
 The USD value of 1 unit of another currency at the close of one day. It is
 the IBKR forex rate. In Chinese, write 汇率. A backtest of an instrument that
