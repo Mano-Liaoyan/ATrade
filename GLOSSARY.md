@@ -16,11 +16,44 @@ instrument in one time period. In Chinese, write K 线. A chart can show a bar
 as a candlestick, but the data is always a bar.
 _Avoid_: candle
 
+**Bar source**:
+A data provider that gives bars, for example IBKR or Databento. ATrade keeps
+the bars of each bar source apart. In Chinese, write K 线来源.
+_Avoid_: feed, vendor (for this meaning), provider
+
+**Source order**:
+The ordered list of bar sources that ATrade reads bars from. For each time
+range, the first bar source in the list that has saved that range gives the
+bars. In Chinese, write 来源顺序.
+_Avoid_: source priority, fallback
+
+**Official close**:
+The price of the closing auction on the listing exchange of an instrument.
+The close of a daily bar is the official close. In Chinese, write 官方收盘价.
+_Avoid_: last price, last trade
+
 **Exchange rate**:
 The USD value of 1 unit of another currency at the close of one day. It is
 the IBKR forex rate. In Chinese, write 汇率. A backtest of an instrument that
 is not in USD uses it.
 _Avoid_: FX price, conversion factor
+
+**Indicator**:
+One number that describes an instrument at one time, calculated from its bars
+or its financial data, for example RSI(14) or the price to earnings ratio. In
+Chinese, write 指标.
+_Avoid_: metric, signal, factor (in user copy)
+
+**Screen**:
+A saved set of conditions on indicators and an order, for example "price to
+earnings below 15 and RSI(14) below 30, ordered by 12-month momentum". In
+Chinese, write 选股条件.
+_Avoid_: screener (the page name only), filter, scan
+
+**Screen result**:
+The ordered list of instruments that one run of a screen gives, with the run
+time. In Chinese, write 选股结果.
+_Avoid_: scan result, hits
 
 **Watchlist**:
 The list of instruments that the user saves. In Chinese, write 自选股.
@@ -51,6 +84,19 @@ time (the concurrency). The user changes them in the UI. Other backtests wait
 in the queue.
 _Avoid_: backtest settings, quota
 
+**Universe**:
+The instruments that one backtest can trade at each time. A point-in-time rule
+(for example the top instruments by trading value of each quarter) or a fixed
+list gives it. A point-in-time rule uses only data known at that time, so it
+includes instruments that stopped trading later. In Chinese, write 品种池.
+_Avoid_: index members, stock pool, basket, symbol list, portfolio
+
+**Parameter sweep**:
+A set of backtests of one strategy version on the same universe and time
+range, one backtest for each combination of parameter values. In Chinese,
+write 参数扫描.
+_Avoid_: optimization, grid search, batch backtest
+
 **Trade**:
 One fill of an order in a backtest or a forward test: the time, the side, the
 quantity, and the price.
@@ -64,8 +110,8 @@ _Avoid_: balance curve, PnL curve
 One number that describes the result of a test, for example the total return
 or the max drawdown. Backtests and forward tests use the same metric
 functions. All pages show the same key metrics in the same order, and show
-the max drawdown as a negative percent.
-_Avoid_: statistic, KPI
+the max drawdown as a negative percent. In Chinese, write 绩效指标.
+_Avoid_: statistic, KPI, indicator
 
 **Round trip**:
 The trades of a test from a position of 0 back to a position of 0.
@@ -79,6 +125,23 @@ _Avoid_: hit rate
 The final equity of a test minus its start capital (the paper capital of a
 backtest, or the start balance of a forward test).
 _Avoid_: PnL
+
+**In-sample**:
+The part of a backtest range before the split time. The user develops the
+strategy on this part. In Chinese, write 样本内.
+_Avoid_: training set
+
+**Out-of-sample**:
+The part of a backtest range after the split time. The user checks the
+strategy on this part one time and does not change the strategy for it. In
+Chinese, write 样本外.
+_Avoid_: holdout, validation set
+
+**Trial count**:
+The number of finished backtests of the same strategy (all strategy
+versions), instrument, and bar period. It tells how many tries a result was
+selected from. In Chinese, write 尝试次数.
+_Avoid_: number of tries, N
 
 **Forward test**:
 A test of a strategy that runs automatically on live market data and sends
@@ -121,6 +184,36 @@ _Avoid_: real trade, production order
 The cash amount a backtest starts with. It comes from the paper account
 balance, or from a local value when no balance is available.
 _Avoid_: fallback capital, ledger
+
+## AI assistant
+
+**AI assistant**:
+The language model that discusses strategies with the user, writes strategy
+versions, and runs and compares backtests. It never sends a paper order and
+never starts a forward test. In Chinese, write AI 助手.
+_Avoid_: agent, bot, copilot
+
+**Conversation**:
+One exchange of messages between the user and the AI assistant. It belongs to
+at most one strategy. In Chinese, write 对话.
+_Avoid_: chat, thread, session
+
+**Credential**:
+One named subscription login or API key of a model provider that the AI
+assistant uses, for example "Anthropic API key · personal". In Chinese, write
+凭据.
+_Avoid_: account, auth, token
+
+**Prompt version**:
+One saved copy of the part of the AI assistant's system prompt that the user
+can edit. It does not change after it is saved. Each conversation records the
+prompt version that it used. In Chinese, write 提示词版本.
+_Avoid_: prompt revision, instructions
+
+**Discarded strategy version**:
+A strategy version that the AI assistant saved and the user discarded. It
+stays in the history, and its backtests stay. In Chinese, write 已丢弃的策略版本.
+_Avoid_: deleted version, rejected version
 
 ## User interface
 
