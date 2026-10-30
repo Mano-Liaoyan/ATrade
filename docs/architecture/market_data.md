@@ -551,7 +551,9 @@ Table `us_universe_member`:
 Quarterly update in the `forward-test` worker:
 
 1. At 06:00 ET on the first trading day of the quarter, download the
-   EQUS.SUMMARY `ohlcv-1d` bars of the previous quarter (`ALL_SYMBOLS`).
+   EQUS.SUMMARY `ohlcv-1d` bars of the 100 calendar days to the previous
+   trading day (`ALL_SYMBOLS`). 100 days always hold 63 trading days, also
+   when the previous quarter has fewer.
 2. Calculate the members and save them in one transaction.
 3. When the bar of the previous trading day is not available, try again each
    15 minutes until 09:00 ET.
@@ -576,8 +578,9 @@ Quarterly update in the `forward-test` worker:
   same value gives the lower rank to the symbol later in alphabetical order.
 - A day of the 63-day window is a day with Databento daily bars in
   `databento_bar`. `last_ranking_day_utc` is the last day with bars that the
-  window used. The calculation refuses a window with less than 63 days and
-  saves nothing.
+  window used. The calculation refuses a window with less than 63 days, or
+  a window that starts more than 100 calendar days before the last ranking
+  day (a gap in `databento_bar`), and saves nothing.
 - A saved quarter does not change. The history calculation adds only the
   quarters without members, so a quarter that the update calculated with the
   earlier window keeps it.

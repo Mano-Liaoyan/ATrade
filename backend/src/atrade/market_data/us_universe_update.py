@@ -1,7 +1,7 @@
 """Quarterly update of the US universe in the `forward-test` worker (docs/architecture/market_data.md section 8.9).
 
-At 06:00 ET on the first trading day of the quarter, the update downloads the EQUS.SUMMARY daily bars of the previous
-quarter, imports them into databento_bar, and saves the members. When the bar of the previous trading day is not
+At 06:00 ET on the first trading day of the quarter, the update downloads the EQUS.SUMMARY daily bars of the 100
+calendar days to the last ranking day (63 trading days and more), imports them into databento_bar, and saves the members. When the bar of the previous trading day is not
 available, it tries again each 15 minutes. At 09:00 ET it uses the window that ends 1 trading day earlier.
 """
 
@@ -16,12 +16,8 @@ import psycopg
 from atrade.foundation.clock import Clock
 from atrade.market_data.databento_client import DatabentoClient
 from atrade.market_data.databento_import import import_databento_files
-from atrade.market_data.us_trading_days import (
-    find_first_trading_day_of_quarter,
-    find_previous_quarter_first_day,
-    find_previous_trading_day,
-)
-from atrade.market_data.us_universe import has_us_universe, save_us_universe, to_utc_day
+from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
+from atrade.market_data.us_universe import WINDOW_CALENDAR_DAYS, has_us_universe, save_us_universe, to_utc_day
 
 logger = logging.getLogger(__name__)
 NEW_YORK = ZoneInfo("America/New_York")
@@ -83,8 +79,11 @@ class UsUniverseUpdate:
         last_ranking_day = self.find_last_ranking_day(now_utc, find_previous_trading_day(first_trading_day))
         if last_ranking_day is None:
             return
+        # The full window, also when the previous quarter has less than 63 trading days.
         path = self.client.download_daily_summary(
-            find_previous_quarter_first_day(first_trading_day), last_ranking_day + timedelta(days=1), self.download_dir
+            last_ranking_day - timedelta(days=WINDOW_CALENDAR_DAYS),
+            last_ranking_day + timedelta(days=1),
+            self.download_dir,
         )
         import_databento_files(database_url=self.database_url, file_paths=[path])
         save_us_universe(

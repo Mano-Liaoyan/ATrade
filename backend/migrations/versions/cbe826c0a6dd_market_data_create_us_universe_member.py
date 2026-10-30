@@ -1,12 +1,12 @@
 """market_data: the quarterly US universe
 
-Revision ID: a3c7e5b1d924
+Revision ID: cbe826c0a6dd
 Revises: 8d4f2a6c1e93
 """
 
 from alembic import op
 
-revision = "a3c7e5b1d924"
+revision = "cbe826c0a6dd"
 down_revision = "8d4f2a6c1e93"
 
 

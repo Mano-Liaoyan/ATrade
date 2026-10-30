@@ -7,7 +7,7 @@ the instrument counts as 0.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import LiteralString
 
@@ -23,6 +23,8 @@ from atrade.market_data.us_trading_days import (
 
 WINDOW_TRADING_DAYS = 63
 MEMBER_COUNT = 500
+# 63 trading days span at most about 92 calendar days. A window that starts earlier has a gap in databento_bar.
+WINDOW_CALENDAR_DAYS = 100
 # The first quarter with a full 63-day window after the Databento start 2018-05-01 (section 8.14).
 FIRST_QUARTER_DAY = date(2018, 10, 1)
 QUARTER_MONTHS = 3
@@ -97,6 +99,14 @@ def insert_members(connection: psycopg.Connection, quarter_start_utc: datetime, 
         message = (
             f"The universe of {quarter_start_utc:%Y-%m-%d} needs {WINDOW_TRADING_DAYS} trading days of Databento"
             f" daily bars up to {last_ranking_day}. databento_bar has {len(window_days)} trading days."
+        )
+        raise UsUniverseCalculationError(message)
+    window_first_day = last_ranking_day - timedelta(days=WINDOW_CALENDAR_DAYS)
+    if window_days[-1] < to_utc_day(window_first_day):
+        message = (
+            f"The universe of {quarter_start_utc:%Y-%m-%d} needs {WINDOW_TRADING_DAYS} trading days of Databento"
+            f" daily bars from {window_first_day} to {last_ranking_day}. databento_bar has a gap: the window starts"
+            f" on {window_days[-1]:%Y-%m-%d}."
         )
         raise UsUniverseCalculationError(message)
     connection.execute(

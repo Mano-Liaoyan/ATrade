@@ -45,10 +45,6 @@ def find_quarter_first_day(day: date) -> date:
     return date(day.year, QUARTER_FIRST_MONTHS[(day.month - 1) // 3], 1)
 
 
-def find_previous_quarter_first_day(day: date) -> date:
-    return find_quarter_first_day(find_quarter_first_day(day) - timedelta(days=1))
-
-
 def find_first_trading_day_of_quarter(day: date) -> date:
     """The first trading day of the quarter of `day`."""
     first_trading_day = find_quarter_first_day(day)

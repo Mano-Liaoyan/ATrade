@@ -138,6 +138,17 @@ def test_the_calculation_refuses_a_window_with_less_than_63_trading_days(databas
         )
 
 
+def test_the_calculation_refuses_a_window_with_a_gap_in_the_databento_bars(database_url: str) -> None:
+    # 62 days at the end of the quarter and 1 old day: 63 days, but the window starts more than 100 days earlier.
+    days = [date(2024, 6, 3), *weekdays(date(2024, 10, 1), LAST_RANKING_DAY)[-62:]]
+    insert_daily_bars(database_url, nasdaq("AAPL"), days, "1", 1)
+
+    with pytest.raises(UsUniverseCalculationError, match="gap"):
+        save_us_universe(
+            database_url=database_url, quarter_start_utc=QUARTER_START_UTC, last_ranking_day=LAST_RANKING_DAY
+        )
+
+
 @pytest.mark.anyio
 async def test_the_history_keeps_an_instrument_that_stopped_trading_later_in_its_quarter(database_url: str) -> None:
     days = weekdays(date(2018, 5, 1), date(2019, 3, 29))
