@@ -18,7 +18,7 @@ from nautilus_trader.model import BarType
 from atrade.forward_test.atrade_instruments import convert_bar, create_equity, read_bar_period
 from atrade.foundation.bar import Bar, TimeRange, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import BarRequest, read_saved_bars
+from atrade.market_data import BarRequest, read_saved_bars, read_source_order
 
 BAR_STORE_DATA_CLIENT_NAME = "ATRADE_BAR_STORE"
 # A request without a start reads from this time.
@@ -60,7 +60,13 @@ class BarStoreDataClient(DataClient):
         if instrument is None:
             return []
         bar_request = BarRequest(instrument, read_bar_period(bar_type), time_range)
-        return await read_saved_bars(database_url=self.bar_store_input.database_url, bar_request=bar_request)
+        # The global source order (docs/architecture/market_data.md section 8.7.2), as in a backtest.
+        database_url = self.bar_store_input.database_url
+        source_order = await read_source_order(database_url=database_url)
+        saved_bars = await read_saved_bars(
+            database_url=database_url, bar_request=bar_request, source_order=source_order
+        )
+        return saved_bars.bars
 
     @override
     async def _subscribe_bars(self, command: SubscribeBars) -> None:

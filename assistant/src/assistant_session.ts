@@ -23,6 +23,8 @@ export interface AssistantSessionOptions {
   /** The directory of the pi files (the volume atrade-assistant-pi in the container). */
   piDir: string;
   customTools: ToolDefinition[];
+  /** The session of one conversation (its JSONL file). Default: a session in memory. */
+  conversationSession?: SessionManager;
 }
 
 async function createResourceLoader(piDir: string, settings: SettingsManager): Promise<DefaultResourceLoader> {
@@ -53,7 +55,7 @@ export async function createAssistantSession(options: AssistantSessionOptions): 
     noTools: 'builtin',
     customTools: options.customTools,
     resourceLoader: await createResourceLoader(options.piDir, settings),
-    sessionManager: SessionManager.inMemory(options.piDir),
+    sessionManager: options.conversationSession ?? SessionManager.inMemory(options.piDir),
     settingsManager: settings,
   });
   return session;

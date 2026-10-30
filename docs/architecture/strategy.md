@@ -50,7 +50,7 @@ puts the new parts of this section in phases.
 ### 9.1.1 Tables
 
 Migrations: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`
-and `backend/migrations/versions/8d4f2a6c1e93_strategy_add_version_source_and_rules.py`.
+and `backend/migrations/versions/c4a8e2f6b913_strategy_add_version_source_and_rules.py`.
 
 | Table | Columns |
 |---|---|
@@ -484,8 +484,12 @@ It needs the multi-instrument backtest of
   ([`backtest.md`](backtest.md) section 10.3.1). SMA(200) and 12-1 momentum
   need about 252 bars. With the current look-back, these indicators have no
   value on the first part of the range, so no rule runs there.
-- How the platform tells the strategy the universe of each quarter (phase 3,
-  #142).
+- Decided (#198): the platform tells the strategy the universe of each
+  universe period with NautilusTrader custom data. The strategy calls
+  `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
+  members in `on_data(data)` as `data.data.bar_types`. Its configuration has
+  no `instrument_id`, no `bar_type`, and no universe field
+  ([`backtest.md`](backtest.md) section 10.10.8).
 
 ## 9.9 Strategy templates
 
@@ -556,8 +560,8 @@ commissions and the open gap.
 - S2 uses "High at or above", not "Close crosses above". The Donchian upper
   value at time t includes the high of the bar at t (ADR 0001), so the close
   can never cross above it.
-- S3 uses the 12-1 momentum indicator with 0 skipped days. When the
-  indicator cannot skip 0 days, S3 becomes a code template.
+- S3 uses the 12-1 momentum indicator with 0 skipped days. The indicator
+  accepts skip 0 (section 21.1 of [`docs/architecture.md`](../architecture.md), #162).
 - No Hong Kong templates: tests of moving average rules in Hong Kong show
   small effects (Bessembinder & Chan 1995).
 
@@ -589,7 +593,6 @@ must check them first.
 | The Brock et al. range break holds for 10 days and uses the close for the break. | Read section II of the paper. |
 | Faber 2007 checks "close above the 10-month average" only at the month end. | Read the paper. |
 | Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. |
-| The 12-1 momentum indicator can skip 0 days (S3). | Check the indicator parameters in the implementation ticket of #136. |
 | The IBKR instrument search returns ETFs, for example `SPY`. `backend/src/atrade/ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. | Search `SPY` on the paper account. |
 | A strategy file can import `atrade.indicator` (#136, #138). The code from the rules needs it. | Run 1 import in the backtest child process, in the implementation ticket of #136. |
 

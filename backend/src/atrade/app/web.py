@@ -19,6 +19,7 @@ from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
 from atrade.app.health_routes import create_health_router
+from atrade.assistant import AssistantService, AssistantServiceClient, create_assistant_router
 from atrade.backtest import BacktestRunner, create_backtest_router
 from atrade.forward_test import (
     create_forward_test_comparison_router,
@@ -43,7 +44,14 @@ DATABASE_CHECK_TIMEOUT_SECONDS = 10
 logger = logging.getLogger("atrade.web")
 
 
-def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: GatewayConnection) -> FastAPI:
+def create_web_app(
+    *,
+    settings: Settings,
+    clock: Clock,
+    gateway_connection: GatewayConnection,
+    assistant_service: AssistantService | None = None,
+) -> FastAPI:
+    """assistant_service: the connection to the assistant service. Default: HTTP to the Compose service assistant."""
     paper_account_monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
     backtest_runner = BacktestRunner(
         database_url=settings.database_url,
@@ -113,6 +121,13 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
     )
     app.include_router(
         create_watchlist_router(database_url=settings.database_url, clock=clock, instrument_lookup=instrument_lookup)
+    )
+    app.include_router(
+        create_assistant_router(
+            database_url=settings.database_url,
+            clock=clock,
+            assistant_service=assistant_service or AssistantServiceClient(),
+        )
     )
     # The frontend router matches every path, so it is mounted last.
     app.include_router(create_frontend_router(settings.frontend_build_dir))

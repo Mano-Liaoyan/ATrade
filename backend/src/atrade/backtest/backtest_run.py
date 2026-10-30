@@ -33,7 +33,7 @@ from atrade.backtest.strategy_engine_run import (
 )
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
-from atrade.market_data import BarRequest, read_saved_bars
+from atrade.market_data import BarRequest, BarSource, read_saved_bars, read_source_order
 from atrade.strategy import read_strategy_version
 
 # The look-back is the warm-up of the strategy template: 3 average periods of its default 20 bars, and 1 week at
@@ -54,6 +54,7 @@ class BacktestInputs:
     code: str
     bars: list[Bar]
     look_back_bars: list[Bar]
+    bar_count_by_source: dict[BarSource, int]
     # None for a USD instrument.
     exchange_rates: DailyExchangeRates | None
 
@@ -72,20 +73,25 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
         message = f"Strategy version {request.strategy_version_id} does not exist."
         raise LookupError(message)
     # Only saved bars: a backtest does not depend on IB Gateway or its rate limits (docs/architecture.md section 10).
-    bars = await read_saved_bars(
+    # The source order of the backtest. Only a row from before the source order has none: then the global source
+    # order (docs/architecture/backtest.md section 10.12).
+    source_order = request.source_order or await read_source_order(database_url=database_url)
+    saved_bars = await read_saved_bars(
         database_url=database_url,
         bar_request=BarRequest(
             instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
         ),
+        source_order=source_order,
     )
     start_utc = request.time_range.start_utc
-    look_back_bars = await read_saved_bars(
+    saved_look_back_bars = await read_saved_bars(
         database_url=database_url,
         bar_request=BarRequest(
             instrument=request.instrument,
             bar_period=request.bar_period,
             time_range=TimeRange(start_utc=start_utc - find_look_back_length(request.bar_period), end_utc=start_utc),
         ),
+        source_order=source_order,
     )
     exchange_rates = (
         None
@@ -95,8 +101,9 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
     return BacktestInputs(
         request=request,
         code=strategy_version.code,
-        bars=bars,
-        look_back_bars=look_back_bars,
+        bars=saved_bars.bars,
+        look_back_bars=saved_look_back_bars.bars,
+        bar_count_by_source=saved_bars.bar_counts,
         exchange_rates=exchange_rates,
     )
 
@@ -151,7 +158,12 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: D
         await backtest_store.save_result(
             connection,
             backtest_id=job.backtest_id,
-            result=BacktestResult(equity_curve=equity_curve, trades=trades, metrics=metrics),
+            result=BacktestResult(
+                equity_curve=equity_curve,
+                trades=trades,
+                metrics=metrics,
+                bar_count_by_source=inputs.bar_count_by_source,
+            ),
             ended_at_utc=job.clock.read_now_utc(),
         )
 

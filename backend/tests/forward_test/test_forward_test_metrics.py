@@ -12,6 +12,7 @@ import pytest
 from atrade.backtest import BacktestTrade
 from atrade.forward_test.comparison_routes import calculate_win_rate_in_period
 from atrade.foundation.bar import TimeRange
+from atrade.foundation.instrument import Instrument
 from tests.forward_test.test_forward_test_comparison import (
     make_minute,
     start_forward_test,
@@ -19,6 +20,7 @@ from tests.forward_test.test_forward_test_comparison import (
     write_forward_test_records,
 )
 from tests.forward_test.test_forward_test_routes import FORWARD_TESTS_PATH
+from tests.saved_ranges import save_ibkr_saved_range
 
 # The forward test starts at 03:04:05 and stops at 03:10:05. This backtest ends before the last forward test fills.
 SHORT_BACKTEST_END_UTC = datetime(2026, 1, 2, 3, 9, 5, tzinfo=UTC)
@@ -60,11 +62,12 @@ async def start_short_backtest(web_client: httpx.AsyncClient, database_url: str,
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('AAPL', 'NASDAQ', 'USD', '1-MINUTE', %(start_utc)s, 100, 101, 99, 100, 1000)
             """,
             {"start_utc": make_minute(5)},
         )
+        save_ibkr_saved_range(connection, Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD"), "1-MINUTE")
     response = await web_client.post(
         "/api/backtests",
         json={

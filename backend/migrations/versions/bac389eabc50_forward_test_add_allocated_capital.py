@@ -1,14 +1,13 @@
 """forward_test: add allocated_capital_usd and drop forward_test_one_per_instrument
 
-Revision ID: b5e2c8a4d716
-Revises: 8d4f2a6c1e93, c7a3e1f95b24
+Revision ID: bac389eabc50
+Revises: 2f6b8d1c4e97
 """
 
 from alembic import op
 
-revision = "b5e2c8a4d716"
-# This revision also joins the 2 heads before it: strategy (#171) and the owner ledger (#214).
-down_revision = ("8d4f2a6c1e93", "c7a3e1f95b24")
+revision = "bac389eabc50"
+down_revision = "2f6b8d1c4e97"
 
 
 def upgrade() -> None:
