@@ -236,8 +236,8 @@ def add_owner_ledger_start(database_url: str) -> None:
         for number in range(1, E2E_POSITION_COUNT + 1)
     ]
     with psycopg.connect(database_url) as connection:
-        if connection.execute("SELECT 1 FROM owner_ledger_entry LIMIT 1").fetchone() is not None:
-            return
+        # The backend tests can leave rows of the same account in the test database.
+        connection.execute("DELETE FROM owner_ledger_entry WHERE account = %s", (FAKE_ACCOUNT_ID,))
         with connection.cursor() as cursor:
             cursor.executemany(
                 """
