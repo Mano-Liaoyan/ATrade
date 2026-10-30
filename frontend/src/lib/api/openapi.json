@@ -5105,6 +5105,13 @@
             "type": "array",
             "title": "Fills"
           },
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/ForwardTestInstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          },
           "same_period_backtests": {
             "items": {
               "$ref": "#/components/schemas/ComparedBacktestSummaryResponse"
@@ -5119,6 +5126,7 @@
           "metrics",
           "equity_curve",
           "fills",
+          "instruments",
           "same_period_backtests"
         ],
         "title": "ForwardTestDetailResponse",
@@ -5171,6 +5179,40 @@
           "commission_usd"
         ],
         "title": "ForwardTestFillResponse"
+      },
+      "ForwardTestInstrumentResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "trade_count": {
+            "type": "integer",
+            "title": "Trade Count"
+          },
+          "net_profit_usd": {
+            "type": "string",
+            "title": "Net Profit Usd"
+          },
+          "quarter_count": {
+            "type": "integer",
+            "title": "Quarter Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "trade_count",
+          "net_profit_usd",
+          "quarter_count"
+        ],
+        "title": "ForwardTestInstrumentResponse",
+        "description": "One member of a multi-instrument forward test: the Instruments tab (section 12.16)."
       },
       "ForwardTestResponse": {
         "properties": {

@@ -1560,6 +1560,8 @@ export interface components {
             equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
             /** Fills */
             fills: components["schemas"]["ForwardTestFillResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["ForwardTestInstrumentResponse"][];
             /** Same Period Backtests */
             same_period_backtests: components["schemas"]["ComparedBacktestSummaryResponse"][];
         };
@@ -1585,6 +1587,22 @@ export interface components {
             price_usd: string;
             /** Commission Usd */
             commission_usd: string;
+        };
+        /**
+         * ForwardTestInstrumentResponse
+         * @description One member of a multi-instrument forward test: the Instruments tab (section 12.16).
+         */
+        ForwardTestInstrumentResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Net Profit Usd */
+            net_profit_usd: string;
+            /** Quarter Count */
+            quarter_count: number;
         };
         /** ForwardTestResponse */
         ForwardTestResponse: {

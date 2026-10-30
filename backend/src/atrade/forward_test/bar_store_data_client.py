@@ -1,8 +1,9 @@
 """`BarStoreDataClient`: a NautilusTrader data client that gives the strategy the bars of the bar store
 (docs/architecture/forward_test.md section 12.19). It never asks IBKR.
 
-New bars: the caller saves them in the bar store and calls `send_new_bars` (section 12.24, #217 decides the
-production caller).
+New bars: the bar fetcher saves them in the bar store. The universe poller of the child calls `send_new_bars`
+(section 12.24). The members of a multi-instrument forward test come as `UniverseUpdate` custom data, as in the
+multi-instrument backtest: after the strategy start, and at each new quarter (`send_universe_update`).
 """
 
 from dataclasses import dataclass
@@ -11,10 +12,17 @@ from typing import override
 
 from nautilus_trader.common import Clock
 from nautilus_trader.config import DataClientConfig
-from nautilus_trader.live import BarsResponse, ClientCache, RequestBars, SubscribeBars, UnsubscribeBars
+from nautilus_trader.live import (
+    BarsResponse,
+    ClientCache,
+    RequestBars,
+    SubscribeBars,
+    UnsubscribeBars,
+)
 from nautilus_trader.live.clients import DataClient, DataClientFactory
 from nautilus_trader.model import BarType
 
+from atrade.backtest import make_universe_update
 from atrade.forward_test.atrade_instruments import convert_bar, create_equity, read_bar_period
 from atrade.foundation.bar import Bar, TimeRange, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
@@ -45,6 +53,23 @@ class BarStoreDataClient(DataClient):
         self.instruments = {str(create_equity(instrument).id): instrument for instrument in bar_store_input.instruments}
         # Bar type -> the start of the next bar to send.
         self.next_bar_starts: dict[BarType, datetime] = {}
+
+    def add_instruments(self, instruments: tuple[Instrument, ...]) -> None:
+        """The new members of a quarter: the strategy and the bar requests can use them."""
+        for instrument in instruments:
+            equity = create_equity(instrument)
+            if str(equity.id) not in self.instruments:
+                self.instruments[str(equity.id)] = instrument
+                self._handle_instrument(equity)
+
+    def send_universe_update(self, bar_types: tuple[str, ...]) -> None:
+        """Tells the strategy the members of the quarter (section 12.17). The time is now.
+
+        The data engine publishes the custom data to each `subscribe_data(DataType("UniverseUpdate"))` of the node.
+        NautilusTrader 2.0.0rc7 does not send that subscription to the data client, so the universe poller sends
+        the first update after the strategy start.
+        """
+        self._handle_data(make_universe_update(read_utc(self.clock), list(bar_types)))
 
     @override
     async def _connect(self) -> None:
@@ -79,8 +104,10 @@ class BarStoreDataClient(DataClient):
     async def _unsubscribe_bars(self, command: UnsubscribeBars) -> None:
         self.next_bar_starts.pop(command.bar_type, None)
 
-    async def send_new_bars(self) -> None:
-        """Sends the saved bars of each subscription that the strategy did not get yet, in time order."""
+    async def send_new_bars(self) -> int:
+        """Sends the saved bars of each subscription that the strategy did not get yet, in time order. Returns the
+        number of sent bars."""
+        sent_count = 0
         for bar_type, next_bar_start in list(self.next_bar_starts.items()):
             bar_period = read_bar_period(bar_type)
             end_utc = floor_to_bar_start(read_utc(self.clock), bar_period) + bar_period.length
@@ -89,8 +116,10 @@ class BarStoreDataClient(DataClient):
             bars = await self.read_bars(bar_type, TimeRange(next_bar_start, end_utc))
             for bar in bars:
                 self._handle_data(convert_bar(bar, bar_type, bar_period))
+            sent_count += len(bars)
             if bars and bar_type in self.next_bar_starts:
                 self.next_bar_starts[bar_type] = bars[-1].start_utc + bar_period.length
+        return sent_count
 
     @override
     async def _request_bars(self, request: RequestBars) -> None:

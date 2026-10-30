@@ -11,7 +11,7 @@ import sys
 
 from pydantic import TypeAdapter
 
-from atrade.forward_test import ChildMode, IbkrAccess, run_forward_test_child, run_live_node
+from atrade.forward_test import ChildMode, IbkrAccess, run_forward_test_child, run_forward_test_live_node
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
 
@@ -35,7 +35,9 @@ async def run_child(settings: Settings, forward_test_id: int, mode: ChildMode) -
         settings=settings,
         forward_test_id=forward_test_id,
         mode=mode,
-        ibkr_access=IbkrAccess(open_gateway_connection=open_gateway_connection, run_live_node=run_live_node),
+        ibkr_access=IbkrAccess(
+            open_gateway_connection=open_gateway_connection, run_live_node=run_forward_test_live_node
+        ),
         stop_requested=stop_requested,
     )
 

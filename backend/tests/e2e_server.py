@@ -68,6 +68,10 @@ E2E_SURVIVORSHIP_INSTRUMENTS = [
     Instrument(symbol="700", exchange="SEHK", currency="HKD"),
     Instrument(symbol="SBUS", exchange="ARCA", currency="USD"),
 ]
+# The US universe of the quarter of the fixed clock: enough members to overflow the Instruments tab of a top N forward
+# test (docs/architecture/forward_test.md section 12.16). The stored quarter start is before the fixed clock.
+E2E_UNIVERSE_QUARTER_START_UTC = datetime(2026, 1, 2, tzinfo=UTC)
+E2E_UNIVERSE_MEMBER_COUNT = 30
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
@@ -348,6 +352,28 @@ def add_survivorship_bias_backtests(database_url: str) -> None:
             )
 
 
+def add_us_universe(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            ) VALUES (%s, %s, %s, 'NASDAQ', 'USD', %s, %s)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                (
+                    E2E_UNIVERSE_QUARTER_START_UTC,
+                    rank,
+                    f"UNIV{rank:02d}",
+                    Decimal(1_000_000_000 - rank),
+                    E2E_UNIVERSE_QUARTER_START_UTC - timedelta(days=1),
+                )
+                for rank in range(1, E2E_UNIVERSE_MEMBER_COUNT + 1)
+            ],
+        )
+
+
 async def serve_with_forward_test_worker(server: uvicorn.Server, worker: ForwardTestWorker) -> None:
     # The forward-test service of Compose runs the worker. Here it runs in the same process, with fake children.
     worker_task = asyncio.create_task(worker.keep_comparing())
@@ -397,6 +423,7 @@ def main() -> None:
     add_discarded_version(database_url)
     add_owner_ledger_start(database_url)
     add_survivorship_bias_backtests(database_url)
+    add_us_universe(database_url)
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )

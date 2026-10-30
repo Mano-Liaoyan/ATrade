@@ -13,6 +13,7 @@ export type FillComparison = components['schemas']['FillComparisonResponse'];
 export type ComparedInterruption = components['schemas']['ComparedInterruptionResponse'];
 export type ForwardTestDetail = components['schemas']['ForwardTestDetailResponse'];
 export type ForwardTestFill = components['schemas']['ForwardTestFillResponse'];
+export type ForwardTestInstrument = components['schemas']['ForwardTestInstrumentResponse'];
 export type ForwardTestInterruption = components['schemas']['InterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
 type ForwardTestsMessage = components['schemas']['ForwardTestsMessage'];
@@ -70,12 +71,24 @@ export function describeForwardTestStatus(status: ForwardTestStatus): string {
   return STATUS_LABELS[status];
 }
 
-// The universe name of a multi-instrument forward test for the page header (section 12.16). Null for one instrument.
-export function describeForwardTestUniverse(forwardTest: ForwardTest): string | null {
+// The universe name of a multi-instrument forward test for the page header (section 12.16), for example
+// "Watchlist (12)" with the instrument count of the detail. Null for one instrument.
+export function describeForwardTestUniverse(forwardTest: ForwardTest, instrumentCount?: number): string | null {
   if (forwardTest.universe_kind === 'rule') {
     return `Top ${String(forwardTest.universe_top_n)} by trading value`;
   }
-  return forwardTest.universe_kind === 'list' ? 'Watchlist' : null;
+  if (forwardTest.universe_kind !== 'list') {
+    return null;
+  }
+  return instrumentCount === undefined ? 'Watchlist' : `Watchlist (${String(instrumentCount)})`;
+}
+
+// The bar periods of the start dialog: a multi-instrument forward test runs on daily bars only (section 12.17).
+export function findUniverseBarPeriods<Period extends { value: string }>(
+  universeKind: ForwardTest['universe_kind'],
+  livePeriods: readonly Period[],
+): readonly Period[] {
+  return universeKind === 'single' ? livePeriods : livePeriods.filter((period) => period.value === '1-DAY');
 }
 
 // The instrument of a single-instrument forward test. Null for a multi-instrument forward test.

@@ -6,6 +6,7 @@ import {
   describeForwardTestStatus,
   describeForwardTestUniverse,
   findForwardTestStatusKind,
+  findUniverseBarPeriods,
   formatLocalTime,
   isLiveBarPeriod,
   readEndTimeUtc,
@@ -228,5 +229,23 @@ describe('describeForwardTestUniverse', () => {
     expect(describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'list' })).toBe(
       'Watchlist',
     );
+  });
+
+  it('counts the watchlist members when the instruments are known', () => {
+    expect(describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'list' }, 12)).toBe(
+      'Watchlist (12)',
+    );
+  });
+});
+
+describe('findUniverseBarPeriods', () => {
+  it('offers only 1 day for top N and watchlist, and all IB live bar periods for one instrument', () => {
+    const periods = [
+      { value: '1-MINUTE', label: '1 min' },
+      { value: '1-DAY', label: '1 day' },
+    ] as const;
+    expect(findUniverseBarPeriods('rule', periods)).toEqual([{ value: '1-DAY', label: '1 day' }]);
+    expect(findUniverseBarPeriods('list', periods)).toEqual([{ value: '1-DAY', label: '1 day' }]);
+    expect(findUniverseBarPeriods('single', periods)).toEqual(periods);
   });
 });

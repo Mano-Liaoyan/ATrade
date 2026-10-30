@@ -31,6 +31,24 @@ def save_equity_point(connection: psycopg.Connection, *, forward_test_id: int, e
     )
 
 
+async def save_equity_points(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, equity_points: list[EquityPoint]
+) -> None:
+    """The equity points of a multi-instrument forward test. A point that is saved already stays."""
+    async with connection.cursor() as cursor:
+        await cursor.executemany(
+            """
+            INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd)
+            VALUES (%(forward_test_id)s, %(time_utc)s, %(equity_usd)s)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                {"forward_test_id": forward_test_id, "time_utc": point.time_utc, "equity_usd": point.equity_usd}
+                for point in equity_points
+            ],
+        )
+
+
 @dataclass(frozen=True)
 class ForwardTestFill:
     instrument: Instrument
@@ -47,6 +65,8 @@ def convert_ledger_fill(fill: LedgerFill) -> ForwardTestFill:
             quantity_shares=abs(fill.quantity_change),
             price_usd=fill.price,
             commission_usd=fill.commission,
+            symbol=fill.symbol,
+            exchange=fill.exchange,
         ),
     )
 
