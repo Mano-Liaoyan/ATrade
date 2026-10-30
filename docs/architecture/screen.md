@@ -123,6 +123,11 @@ document.
   `assistant_conversation_id` becomes null (#150 A3, B4).
 - PostgreSQL deletes the rows and the excluded list of a screen result with
   the screen result (`ON DELETE CASCADE`).
+- Decided (#205): the migration `d41ce3053ba2_screen_create_tables.py` makes
+  the 4 tables with these column names. `screen_result.screen_id` is
+  `ON DELETE CASCADE`: a delete of a screen deletes its screen results. A
+  backtest keeps its own copy of the screen (section 24.1). `result_count`
+  and `screen_result_row.position` are at most 500.
 
 ### 24.4.1 Screen definition
 
@@ -151,6 +156,18 @@ The definition is JSON. The indicator reference is the reference of section
   (US), or `hk_instrument_list`, `watchlist` (HK).
 - Numbers are decimal strings, as in the other routes.
 - `keep_first` is optional.
+- Decided (#205): the JSON has exactly these keys. All 4 top-level keys are
+  required. The `filters` and `indicator_conditions` lists can be empty.
+
+  | Part | Keys | Values |
+  |---|---|---|
+  | Filter `still_trading` | `field` | |
+  | Filter `last_price`, `average_trading_value_20` | `field`, `operator`, `value` | `operator`: `<`, `<=`, `>`, `>=`. `value`: a decimal string. |
+  | Filter `exchange` | `field`, `values` | A list of 1 or more exchanges. |
+  | Condition `compare` | `kind`, `indicator`, `operator`, `value` | As the number filters. |
+  | Condition `close_versus_line` | `kind`, `indicator`, `side` | `indicator`: `sma` or `ema` with the output `value`, or `donchian_channel` with the output `upper`. `side`: `above` or `below`. |
+  | Condition `rank` | `kind`, `indicator`, `end`, `percent` | `end`: `top` or `bottom`. `percent`: an integer from 1 to 100. |
+  | `order` | `indicator`, `direction`, optional `keep_first` | `direction`: `ascending` or `descending`. `keep_first`: an integer from 1 to 500. |
 
 ## 24.5 Run flow
 
@@ -182,6 +199,53 @@ Source: [Indicator library scope and calculation place](https://github.com/Mano-
 | Universe of a quarter | The top 500 US instruments of a quarter (#141). |
 | Instrument name | The "Name" column of the result table (section 24.10). |
 
+Decided (#206):
+
+- Code: `screen/screen_run.py` (`run_screen_steps`, the 2 steps without a
+  database), `screen/screen_running.py` (`run_saved_screen`: the start
+  instruments, the reads, and the save), and the store functions of
+  `screen/screen_store.py`. Tests: `tests/screen/test_screen_run.py` and
+  `tests/screen/test_screen_run_routes.py`.
+- The start instruments come from these reads of `market_data` and
+  `watchlist`: `read_us_universe_members` with the quarter of the first
+  trading day of the run date (`quarter_universe`),
+  `read_daily_bar_summaries_of_currency` with `USD`
+  (`all_with_daily_bars`), `read_hk_instrument_list`
+  (`hk_instrument_list`), and `read_watchlist_instruments` with only the
+  instruments in the currency of the market (`USD` or `HKD`).
+- The daily bar summary has no trading status (`market_data.md` section
+  8.14). "Still trading" is a rule of `screen`: the last daily bar of the
+  instrument is at most 7 calendar days older than the daily bars date of
+  the run. The daily bars date is the date of the newest last daily bar of
+  the start instruments.
+- A start instrument without a summary row is excluded with the reason
+  "No daily bars". A filter on the average trading value (20) of an
+  instrument with fewer than 20 daily bars gives "No value: Avg trading
+  value (20)".
+- Step 2 reads the daily bars before the day after the daily bars date
+  with one `read_last_daily_bars` call. Its `bar_count` is the longest
+  look-back of the indicators (section 23.4). Each indicator gets only its
+  own look-back bars, the last bars of the read.
+- An instrument with "no value" for an indicator of a condition or of the
+  order gets the reason "No value: <indicator>" with the first such
+  indicator. The other excluded instruments get the reason of the first
+  condition that is not true, in the form "<location>: <condition>", for
+  example "filters[1]: Close > 5", "indicator_conditions[0]: RSI(14) < 30",
+  "indicator_conditions[1]: Close above SMA(200)", or
+  "indicator_conditions[2]: 12-1 momentum(252, 21) top 20%".
+- The percentile of a rank condition is 100 × the share of the values that
+  are lower or equal. "Top N" keeps a percentile above 100 − N. "Bottom N"
+  keeps the instruments whose share of lower values is below N percent.
+  Equal values get the same percentile and the same answer.
+- The sort uses the order indicator, then the symbol. When more than 500
+  instruments pass, the result keeps the first 500 of the order.
+  `after_indicator_conditions_count` counts all passing instruments.
+- A run saves the full excluded list, also for a run with all US
+  instruments.
+- `market_data` has no instrument name (`market_data.md` has no name
+  source), so the result has no "Name" column yet. The name source needs a
+  decision of the user.
+
 ## 24.6 Checks
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) B5.
@@ -199,18 +263,28 @@ gives the location of the condition and the reason. The checks:
 - Each operator and each field is known.
 - The name is 1 to 100 characters.
 
+Decided (#205): the check is `check_screen` in `screen/screen_check.py`. The
+`422` body is `{"problems": [{"location", "message"}]}`. `location` is the
+path in the request body, a list of keys and list indexes, for example
+`["definition", "indicator_conditions", 0, "indicator", "parameters", "period"]`.
+The indicator problems of section 23.6 get the location of their condition
+before their own location. A name that another screen has gives the
+problem `["name"]` with the reason "A screen with the name '<name>' exists.".
+The market is a problem `["market"]` when it is not `US` or `HK`.
+
 ## 24.7 HTTP routes
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) A8 and B3.
-The paths are proposals of #150. The implementation sets them.
+Decided (#205): the paths and the field names of this table are final.
+`screen/http_routes.py` has the first 5 routes.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/screens` | `200` with `[{"id", "name", "market", "kept", "updated_at_utc"}]`. |
-| `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and its recent screen results (`id`, `run_at_utc`, `result_count`). `404` when the screen does not exist. |
-| `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen. `422` with the problem list (section 24.6). |
+| `GET /api/screens` | `200` with `[{"id", "name", "market", "kept", "updated_at_utc"}]`, the last changed screen first. |
+| `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and `recent_screen_results`: the last 10 screen results (`id`, `run_at_utc`, `result_count`), the last run first. `404` when the screen does not exist. |
+| `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen, as `GET /api/screens/{screen_id}` gives it. A screen of the user has `kept` true and `assistant_conversation_id` null. `422` with the problem list (section 24.6). |
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
-| `DELETE /api/screens/{screen_id}` | `204`. `404` when the screen does not exist. Not on the AI assistant port. |
+| `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. |
 | `POST /api/screens/{screen_id}/runs` | Runs the saved screen. `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
@@ -221,6 +295,26 @@ The screen result answer:
 - `definition`: the copy of the screen.
 - `rows`: each row has all columns of the result table (section 24.10).
 - `exclusions`: the excluded instruments with their reasons.
+
+Decided (#206): the screen result answer is
+`{"id", "screen_id", "market", "assistant_conversation_id", "summary", "definition", "rows", "exclusions"}`.
+
+- `summary`: `row_count` (all rows, also the rows that are not on the
+  page), `start_count`, `after_filters_count`,
+  `after_indicator_conditions_count`, `result_count`, `exclusion_counts`
+  (`[{"reason", "count"}]`, the most frequent reason first),
+  `daily_bars_date` (null when no start instrument has daily bars),
+  `run_at_utc`, and `run_seconds`.
+- Each row: `position`, `symbol`, `exchange`, `currency`, `last_price`
+  (decimal string), `average_trading_value_20` (null with fewer than 20
+  daily bars), `indicator_values` (the value of each indicator of a
+  condition or of the order by its name, for example `{"RSI(14)": 28.4}`),
+  and `percentiles` (the percentile of each rank condition by the name of
+  its indicator).
+- `exclusions`: all excluded instruments (`symbol`, `exchange`,
+  `currency`, `reason`), by symbol. The route does not page them.
+- `offset` is 0 or more. `limit` is 1 to 500, default 50.
+- A run of the user has `assistant_conversation_id` null.
 
 ## 24.8 AI assistant access
 
@@ -371,25 +465,32 @@ Behavior:
 
 ## 24.13 Left to the implementation
 
-- The final route paths and the field names (#150 calls them proposals).
-- The form of the problem location in the `422` list.
+- Decided (#205): the final route paths and the field names (section
+  24.7).
+- Decided (#205): the form of the problem location in the `422` list
+  (section 24.6).
 - The route for Keep. Discard can use `DELETE /api/screens/{id}` on the Web
   port.
 - How a run of a screen with unsaved changes works: the run route takes a
   saved screen only.
 - How the user runs a screen again after new daily bars. The final title row
   of #145 has no "Run screen" button.
-- What the result does when more than 500 instruments pass. #145 and #150
-  give at most 500 rows.
-- The rank method for ties in a percentile.
-- The operators of a comparison (the tickets show `<` and `≥`).
+- Decided (#206): what the result does when more than 500 instruments
+  pass (section 24.5).
+- Decided (#206): the rank method for ties in a percentile (section 24.5).
+- Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
+  `>=` (section 24.4.1).
 - The default order of a new screen.
 - Where `/screens` stores the last opened screen.
-- What happens to the screen results when the user deletes a screen.
-- How many recent runs the side column and `GET /api/screens/{id}` show.
-- Whether `screen` saves the full excluded list of a run with all US
-  instruments (about 10000).
-- How `market_data` sets "Still trading" from the saved data.
+- Decided (#205): a delete of a screen deletes its screen results (section
+  24.4).
+- Decided (#205): `GET /api/screens/{id}` shows the last 10 runs. The side
+  column is left to the screen page.
+- Decided (#206): `screen` saves the full excluded list of a run with all
+  US instruments (section 24.5).
+- Decided (#206): `screen` sets "Still trading" from `last_day_start_utc`
+  of the daily bar summary (section 24.5). Decided (#195): `market_data`
+  stores no status ([`market_data.md`](market_data.md) section 8.14).
 - How the point-in-time run of a backtest uses the source order: the global
   source order or the source order of the backtest.
 - The survivorship bias warning of a point-in-time backtest whose screen

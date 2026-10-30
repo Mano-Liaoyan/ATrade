@@ -5,7 +5,15 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
 
 function createUniqueName(currentTest: TestInfo, title: string): string {
   return `${title} ${currentTest.project.name} ${String(Date.now())}`;
@@ -188,6 +196,7 @@ test('starts a forward test from the toolbar and stops it with the same button',
     stopped_at_utc: null,
     end_time_utc: null,
     crash_count: 0,
+    allocated_capital_usd: '1000',
     interruptions: [],
   };
   await page.route('**/api/forward-tests', async (route) => {
@@ -212,6 +221,7 @@ test('starts a forward test from the toolbar and stops it with the same button',
   await dialog.getByLabel('Exchange').fill('arca');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
   await page.getByRole('option', { name: '1 minute', exact: true }).click();
+  await dialog.getByLabel('Capital (USD)').fill('1000');
   await dialog.getByRole('button', { name: 'Start forward test' }).click();
   await expect(dialog).toHaveCount(0);
   expect(startRequests).toEqual([

@@ -16,9 +16,11 @@ import uvicorn
 
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.web import create_web_app
+from atrade.assistant.system_prompt import make_default_text
 from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
+from atrade.strategy import STRATEGY_TEMPLATE
 from tests.fakes.clock import FixedClock
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.fakes.ibkr import (
@@ -54,6 +56,9 @@ E2E_COMPARED_FILL_COUNT = 40
 # An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
+# A strategy with a discarded version of the AI assistant (docs/architecture/assistant.md 25.5.3): v1 of the user,
+# v2 of the AI assistant with the discarded mark and a failed backtest, and v3 of the AI assistant.
+E2E_DISCARDED_STRATEGY_NAME = "E2E discarded version"
 # A failed HK backtest and a failed US backtest of 2026: only the HK backtest shows the survivorship bias warning
 # (docs/architecture/backtest.md section 10.12). They never run, so their strategy version needs no real code.
 E2E_SURVIVORSHIP_STRATEGY_NAME = "E2E survivorship bias"
@@ -243,6 +248,78 @@ def add_compared_forward_test(database_url: str) -> None:
         add_compared_records(connection, int(forward_test_row[0]))
 
 
+def add_discarded_version(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_1_id = insert_strategy_version(
+            connection, name=E2E_DISCARDED_STRATEGY_NAME, code=E2E_COMPARED_STRATEGY_FILE.read_text()
+        )
+        if version_1_id is None:
+            return
+        # A conversation needs a prompt version and a fixed prompt (#184). Version 1 is the default prompt, as the app saves it.
+        connection.execute(
+            """
+            INSERT INTO assistant_prompt_version (version_number, text, created_at_utc)
+            SELECT 1, %(text)s, %(now)s WHERE NOT EXISTS (SELECT 1 FROM assistant_prompt_version)
+            """,
+            {"text": make_default_text(STRATEGY_TEMPLATE), "now": FIXED_NOW_UTC},
+        )
+        conversation_row = connection.execute(
+            """
+            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id, fixed_prompt)
+            SELECT strategy_id, 'E2E conversation', %(now)s,
+                (SELECT id FROM assistant_prompt_version ORDER BY version_number DESC LIMIT 1), 'E2E fixed prompt.'
+            FROM strategy_version WHERE id = %(version_id)s
+            RETURNING id, strategy_id
+            """,
+            {"version_id": version_1_id, "now": FIXED_NOW_UTC},
+        ).fetchone()
+        assert conversation_row is not None
+        conversation_id, strategy_id = conversation_row
+        version_ids: list[int] = []
+        for version_number in (2, 3):
+            code = f"{E2E_COMPARED_STRATEGY_FILE.read_text()}\n# Version {version_number} of the AI assistant.\n"
+            version_row = connection.execute(
+                """
+                INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc, source,
+                    conversation_id)
+                VALUES (%(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(now)s, 'ai_assistant',
+                    %(conversation_id)s)
+                RETURNING id
+                """,
+                {
+                    "strategy_id": strategy_id,
+                    "version_number": version_number,
+                    "code": code,
+                    "code_sha256": hashlib.sha256(code.encode()).hexdigest(),
+                    "now": FIXED_NOW_UTC,
+                    "conversation_id": conversation_id,
+                },
+            ).fetchone()
+            assert version_row is not None
+            version_ids.append(int(version_row[0]))
+        discarded_version_id = version_ids[0]
+        connection.execute(
+            "INSERT INTO strategy_version_discard (strategy_version_id, discarded_at_utc) VALUES (%(id)s, %(now)s)",
+            {"id": discarded_version_id, "now": FIXED_NOW_UTC},
+        )
+        connection.execute(
+            """
+            INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                paper_capital_usd, status, error_message, created_at_utc, started_at_utc, ended_at_utc, conversation_id)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(end_utc)s, 10000, 'failed',
+                'E2E backtest of a discarded version.', %(now)s, %(now)s, %(now)s, %(conversation_id)s)
+            """,
+            {
+                "version_id": discarded_version_id,
+                "symbol": E2E_COMPARED_SYMBOL,
+                "start_utc": E2E_COMPARED_FIRST_BAR_START_UTC,
+                "end_utc": E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+                "now": FIXED_NOW_UTC,
+                "conversation_id": conversation_id,
+            },
+        )
+
+
 def add_survivorship_bias_backtests(database_url: str) -> None:
     with psycopg.connect(database_url, autocommit=True) as connection:
         version_id = insert_strategy_version(
@@ -316,6 +393,7 @@ def main() -> None:
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
+    add_discarded_version(database_url)
     add_owner_ledger_start(database_url)
     add_survivorship_bias_backtests(database_url)
     settings = Settings(

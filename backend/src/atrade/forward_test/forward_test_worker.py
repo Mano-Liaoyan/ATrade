@@ -15,6 +15,7 @@ import psycopg
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.foundation.clock import Clock
+from atrade.paper_trading import transfer_to_by_hand
 
 COMPARE_INTERVAL_SECONDS = 2.0
 # The child exits with this code when the paper account check fails. It sent no order, so there is no retry.
@@ -125,9 +126,12 @@ class ForwardTestWorker:
         now_utc = self.clock.read_now_utc()
         is_stop = running_child.mode == "cancel_orders" or running_child.is_stop_requested
         if is_stop and exit_code == 0:
-            await forward_test_store.write_end(
-                connection, forward_test_id=row.id, status="stopped", stopped_at_utc=now_utc, error_message=None
-            )
+            async with connection.transaction():
+                await forward_test_store.write_end(
+                    connection, forward_test_id=row.id, status="stopped", stopped_at_utc=now_utc, error_message=None
+                )
+                # The positions and the remaining cash go to "By hand". The records do not change (section 12.6).
+                await transfer_to_by_hand(connection, forward_test_id=row.id, time_utc=now_utc)
             return
         if is_stop:
             await forward_test_store.write_failure_with_client_id(
@@ -135,13 +139,16 @@ class ForwardTestWorker:
             )
             return
         if exit_code == PAPER_CHECK_FAILED_EXIT_CODE:
-            await forward_test_store.write_end(
-                connection,
-                forward_test_id=row.id,
-                status="failed",
-                stopped_at_utc=now_utc,
-                error_message=PAPER_CHECK_FAILED_MESSAGE,
-            )
+            async with connection.transaction():
+                await forward_test_store.write_end(
+                    connection,
+                    forward_test_id=row.id,
+                    status="failed",
+                    stopped_at_utc=now_utc,
+                    error_message=PAPER_CHECK_FAILED_MESSAGE,
+                )
+                # The capital is not allocated any more, so it goes back to "By hand" (section 12.18).
+                await transfer_to_by_hand(connection, forward_test_id=row.id, time_utc=now_utc)
             return
         if exit_code == GATEWAY_UNREACHABLE_EXIT_CODE:
             await forward_test_store.write_waiting_for_gateway(

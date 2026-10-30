@@ -1,5 +1,6 @@
 """SQL for the record tables of a forward test: forward_test_fill and forward_test_equity_point (section 12.8), and
-forward_test_same_period_backtest (section 12.10).
+forward_test_same_period_backtest (section 12.10). The fills of a new forward test are in the owner ledger of
+`paper_trading`. forward_test_fill keeps only the fills of the forward tests before the owner ledger (section 12.24).
 
 The DataActor in the child process writes them with a synchronous connection, because NautilusTrader calls `on_bar`
 synchronously. The Web process reads them with an asynchronous connection.
@@ -12,75 +13,56 @@ import psycopg
 from psycopg.rows import class_row
 
 from atrade.backtest import BacktestTrade, EquityPoint
-
-
-@dataclass(frozen=True)
-class RecordedFill:
-    # The NautilusTrader TradeId. The same fill can come from the cache again after a restart.
-    trade_id: str
-    trade: BacktestTrade
-
+from atrade.foundation.instrument import Instrument
+from atrade.paper_trading import LedgerFill, read_forward_test_fills, read_forward_test_fills_blocking
 
 FILL_COLUMNS: Final = "time_utc, side, quantity_shares, price_usd, commission_usd"
 
 
-def select_recorded_fills(connection: psycopg.Connection, forward_test_id: int) -> list[RecordedFill]:
-    rows = connection.execute(
-        f"""
-        SELECT trade_id, {FILL_COLUMNS} FROM forward_test_fill
-        WHERE forward_test_id = %(forward_test_id)s ORDER BY time_utc, trade_id
+def save_equity_point(connection: psycopg.Connection, *, forward_test_id: int, equity_point: EquityPoint) -> None:
+    """A bar that a restart reads again adds no row (ON CONFLICT DO NOTHING)."""
+    connection.execute(
+        """
+        INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd)
+        VALUES (%(forward_test_id)s, %(time_utc)s, %(equity_usd)s)
+        ON CONFLICT DO NOTHING
         """,
-        {"forward_test_id": forward_test_id},
-    ).fetchall()
-    return [
-        RecordedFill(
-            trade_id=row[0],
-            trade=BacktestTrade(
-                time_utc=row[1], side=row[2], quantity_shares=row[3], price_usd=row[4], commission_usd=row[5]
-            ),
-        )
-        for row in rows
-    ]
+        {"forward_test_id": forward_test_id, "time_utc": equity_point.time_utc, "equity_usd": equity_point.equity_usd},
+    )
 
 
-def save_bar_records(
-    connection: psycopg.Connection, *, forward_test_id: int, new_fills: list[RecordedFill], equity_point: EquityPoint
-) -> None:
-    """One transaction. A fill or a bar that a restart reads again adds no row (ON CONFLICT DO NOTHING)."""
-    with connection.transaction(), connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
-                commission_usd)
-            VALUES (%(forward_test_id)s, %(trade_id)s, %(time_utc)s, %(side)s, %(quantity_shares)s, %(price_usd)s,
-                %(commission_usd)s)
-            ON CONFLICT DO NOTHING
-            """,
-            [
-                {
-                    "forward_test_id": forward_test_id,
-                    "trade_id": fill.trade_id,
-                    "time_utc": fill.trade.time_utc,
-                    "side": fill.trade.side,
-                    "quantity_shares": fill.trade.quantity_shares,
-                    "price_usd": fill.trade.price_usd,
-                    "commission_usd": fill.trade.commission_usd,
-                }
-                for fill in new_fills
-            ],
-        )
-        cursor.execute(
-            """
-            INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd)
-            VALUES (%(forward_test_id)s, %(time_utc)s, %(equity_usd)s)
-            ON CONFLICT DO NOTHING
-            """,
-            {
-                "forward_test_id": forward_test_id,
-                "time_utc": equity_point.time_utc,
-                "equity_usd": equity_point.equity_usd,
-            },
-        )
+@dataclass(frozen=True)
+class ForwardTestFill:
+    instrument: Instrument
+    trade: BacktestTrade
+
+
+def convert_ledger_fill(fill: LedgerFill) -> ForwardTestFill:
+    """A ledger fill as a trade: the sign of the quantity change gives the side."""
+    return ForwardTestFill(
+        instrument=Instrument(symbol=fill.symbol, exchange=fill.exchange, currency=fill.currency),
+        trade=BacktestTrade(
+            time_utc=fill.time_utc,
+            side="BUY" if fill.quantity_change > 0 else "SELL",
+            quantity_shares=abs(fill.quantity_change),
+            price_usd=fill.price,
+            commission_usd=fill.commission,
+        ),
+    )
+
+
+def select_ledger_fills_blocking(connection: psycopg.Connection, forward_test_id: int) -> list[ForwardTestFill]:
+    return [convert_ledger_fill(fill) for fill in read_forward_test_fills_blocking(connection, forward_test_id)]
+
+
+async def select_forward_test_fills(
+    connection: psycopg.AsyncConnection, *, forward_test_id: int, instrument: Instrument, uses_owner_ledger: bool
+) -> list[ForwardTestFill]:
+    """The fills from the owner ledger (section 12.8). A forward test of the time before the owner ledger keeps its
+    fills in forward_test_fill, on its one instrument (section 12.24)."""
+    if uses_owner_ledger:
+        return [convert_ledger_fill(fill) for fill in await read_forward_test_fills(connection, forward_test_id)]
+    return [ForwardTestFill(instrument, trade) for trade in await select_fills(connection, forward_test_id)]
 
 
 async def select_fills(connection: psycopg.AsyncConnection, forward_test_id: int) -> list[BacktestTrade]:

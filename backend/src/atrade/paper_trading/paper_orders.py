@@ -4,8 +4,6 @@ Each order and each cancel runs the paper account check first and fails closed (
 source of order status. ATrade stores only its orders by hand, without status (section 11.4).
 """
 
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Self
@@ -50,18 +48,6 @@ class SendOrderRequest(BaseModel):
             message = "A market order has no limit price."
             raise ValueError(message)
         return self
-
-
-@dataclass(frozen=True)
-class BlockingForwardTest:
-    """A forward test that runs on the instrument of an order by hand. `label` is like "Forward test 3 (Name v1)"."""
-
-    forward_test_id: int
-    label: str
-
-
-# paper_trading does not import forward_test (docs/architecture.md section 6.2). app/web.py passes this function.
-type FindBlockingForwardTest = Callable[[Instrument], Awaitable[BlockingForwardTest | None]]
 
 
 class ManualOrderResponse(BaseModel):
@@ -126,13 +112,6 @@ class OrderRefusedResponse(BaseModel):
 
 class OrderErrorResponse(BaseModel):
     detail: str
-
-
-class OrderBlockedResponse(BaseModel):
-    """A forward test runs on the instrument. ATrade did not send the order (section 12.2)."""
-
-    detail: str
-    forward_test_id: int
 
 
 class OrderRefusedByLedgerResponse(BaseModel):
@@ -249,12 +228,10 @@ class PaperOrderRoutes:
         paper_account_monitor: PaperAccountMonitor,
         database_url: str,
         clock: Clock,
-        find_blocking_forward_test: FindBlockingForwardTest,
     ) -> None:
         self.paper_account_monitor = paper_account_monitor
         self.database_url = database_url
         self.clock = clock
-        self.find_blocking_forward_test = find_blocking_forward_test
         self.ledger = ManualOrderLedger(
             paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock
         )
@@ -265,9 +242,6 @@ class PaperOrderRoutes:
         except PaperAccountCheckError as error:
             return refuse_order(error)
         instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
-        blocking_forward_test = await self.find_blocking_forward_test(instrument)
-        if blocking_forward_test is not None:
-            return block_order(blocking_forward_test, instrument)
         order_by_hand = OrderByHand(
             instrument=instrument, side=request.side, quantity=request.quantity, limit_price=request.limit_price
         )
@@ -349,17 +323,6 @@ class PaperOrderRoutes:
         except GatewayRequestError as error:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
         return None
-
-
-def block_order(blocking_forward_test: BlockingForwardTest, instrument: Instrument) -> JSONResponse:
-    blocked = OrderBlockedResponse(
-        detail=(
-            f"{blocking_forward_test.label} trades {instrument.symbol} / {instrument.exchange}. ATrade refuses orders"
-            " by hand for this instrument until the forward test stops."
-        ),
-        forward_test_id=blocking_forward_test.forward_test_id,
-    )
-    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=blocked.model_dump())
 
 
 def refuse_by_ledger(refusal: OrderRefusal) -> JSONResponse:

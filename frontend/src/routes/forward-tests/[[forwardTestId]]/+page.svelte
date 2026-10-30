@@ -2,7 +2,7 @@
      /forward-tests/<id>; /forward-tests opens the newest forward test.
      Left: the "Forward tests" side column (ForwardTestList, live from /ws/forward-tests) with the "New forward test"
      button. Center: the panel of the open forward test (header line: number, strategy version, instrument, bar
-     period, status, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
+     period, status, the allocated capital, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
      key metric row and the equity and drawdown curves with the interruptions in grey) over the
      Fills / Comparison / Logs panel. Comparison links to the comparison with each backtest of the same period. Logs
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
@@ -34,7 +34,7 @@
   import { startPolling } from '#lib/foundation/polling';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
-  import { ChangeText, formatBarPeriod } from '#lib/foundation/value_format';
+  import { ChangeText, formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import {
     canBacktestSamePeriod,
@@ -270,6 +270,9 @@
                   kind={findForwardTestStatusKind(forwardTest.status)}
                 />
               </span>
+              {#if forwardTest.allocated_capital_usd !== null}
+                <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
+              {/if}
               {#if showsCrashCount(forwardTest)}
                 <span class="run-note">Crashes in a row: {forwardTest.crash_count} of 3</span>
               {/if}
@@ -311,7 +314,7 @@
                 />
               </div>
             {:else}
-              <KeyMetricRow metrics={records.metrics} startCapitalUsd={forwardTest.start_balance_usd} trades={records.fills} />
+              <KeyMetricRow metrics={records.metrics} startCapitalUsd={forwardTest.start_balance_usd} />
               <div class="chart">
                 <EquityDrawdownChart
                   curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: forwardTest.start_balance_usd }]}
@@ -441,6 +444,10 @@
 
   .run-note {
     color: var(--cds-text-secondary);
+  }
+
+  .run-capital {
+    font-variant-numeric: tabular-nums;
   }
 
   .run-actions {

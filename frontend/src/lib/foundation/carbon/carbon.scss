@@ -47,6 +47,9 @@
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/tile';
 @use '@carbon/styles/scss/components/search';
+@use '@carbon/styles/scss/components/toggle';
+// The source order list of the settings page (#189).
+@use '@carbon/styles/scss/components/structured-list';
 
 // Themes: g10 is the light theme and g100 is the dark theme.
 // The system theme applies when <html> has no data-theme attribute. data-theme="light" or "dark" overrides it.

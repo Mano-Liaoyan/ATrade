@@ -15,6 +15,7 @@ from atrade.ibkr import GatewayConnection
 from atrade.market_data import bar_store
 from atrade.market_data.bar_source import BarSource, select_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
+from atrade.market_data.daily_bar_summary import update_daily_bar_summaries, update_daily_bar_summaries_blocking
 
 
 class GatewayNotConnectedError(Exception):
@@ -126,6 +127,17 @@ async def select_merged_bars(
     return SavedBars(bars=merged_bars, bar_counts=bar_counts)
 
 
+async def select_unsaved_ranges(
+    connection: psycopg.AsyncConnection, source_order: list[BarSource], bar_request: BarRequest
+) -> list[TimeRange]:
+    """The parts of the requested range that no bar source in the source order saved."""
+    source_ranges = await select_source_ranges(connection, source_order, bar_request)
+    saved_ranges = sorted(
+        (source_range.time_range for source_range in source_ranges), key=lambda saved: saved.start_utc
+    )
+    return find_missing_ranges(bar_request.time_range, saved_ranges)
+
+
 class BarReader:
     def __init__(self, *, database_url: str, clock: Clock, gateway_connection: GatewayConnection) -> None:
         self.database_url = database_url
@@ -150,16 +162,14 @@ class BarReader:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             source_order = await select_source_order(connection)
             async with self.fill_locks[instrument, bar_period]:
-                source_ranges = await select_source_ranges(connection, source_order, complete_request)
-                saved_ranges = sorted(
-                    (source_range.time_range for source_range in source_ranges), key=lambda saved: saved.start_utc
-                )
-                missing_ranges = find_missing_ranges(complete_range, saved_ranges)
+                missing_ranges = await select_unsaved_ranges(connection, source_order, complete_request)
                 if missing_ranges and not self.gateway_connection.is_connected():
                     raise GatewayNotConnectedError
                 for missing_range in missing_ranges:
                     bars = await self.gateway_connection.read_historical_bars(instrument, bar_period, missing_range)
                     await bar_store.save_bars_of_range(connection, instrument, bar_period, missing_range, bars)
+                if missing_ranges and bar_period == BarPeriod.ONE_DAY:
+                    await update_daily_bar_summaries(connection, [instrument])
             return (await select_merged_bars(connection, source_order, complete_request)).bars
 
 
@@ -170,16 +180,27 @@ async def read_saved_bars(*, database_url: str, bar_request: BarRequest, source_
         return await select_merged_bars(connection, source_order, bar_request)
 
 
+async def read_unsaved_ranges(*, database_url: str, bar_request: BarRequest) -> list[TimeRange]:
+    """The parts of `bar_request.time_range` that no bar source in the global source order saved, oldest first. A
+    caller reads them from IBKR and saves them with `save_received_bars`. It never calls IBKR."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        source_order = await select_source_order(connection)
+        return await select_unsaved_ranges(connection, source_order, bar_request)
+
+
 async def save_received_bars(*, database_url: str, bar_request: BarRequest, bars: list[Bar]) -> None:
     """Saves complete bars that a caller received from IBKR for `bar_request.time_range` in ibkr_bar, and records the
     range as saved. A forward test saves its warm-up bars with it, so a backtest of the same period finds them.
 
-    A bar that is already saved gets the new values: a second save of the same bars adds no row.
+    A bar that is already saved gets the new values: a second save of the same bars adds no row. A save of daily
+    bars updates the daily bar summary of the instrument.
     """
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         await bar_store.save_bars_of_range(
             connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
         )
+        if bar_request.bar_period == BarPeriod.ONE_DAY:
+            await update_daily_bar_summaries(connection, [bar_request.instrument])
 
 
 def save_received_bars_blocking(*, database_url: str, bar_request: BarRequest, bars: list[Bar]) -> None:
@@ -188,6 +209,8 @@ def save_received_bars_blocking(*, database_url: str, bar_request: BarRequest, b
         bar_store.save_bars_of_range_blocking(
             connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
         )
+        if bar_request.bar_period == BarPeriod.ONE_DAY:
+            update_daily_bar_summaries_blocking(connection, [bar_request.instrument])
 
 
 async def has_saved_bars(*, database_url: str, bar_request: BarRequest, source_order: list[BarSource]) -> bool:

@@ -1,9 +1,14 @@
-"""Reads one strategy version by its ID, for the capabilities that run strategy versions (backtest, forward test)."""
+"""Reads strategy versions for the capabilities that run them (backtest, forward test), and the outline of a
+strategy for the start context of an AI assistant conversation (app/)."""
 
 from dataclasses import dataclass
+from typing import Any
 
 import psycopg
-from psycopg.rows import class_row
+from psycopg.rows import class_row, dict_row
+
+from atrade.strategy.rules_code import find_warm_up_bar_count
+from atrade.strategy.strategy_rules import StrategyRules
 
 
 @dataclass(frozen=True)
@@ -15,6 +20,21 @@ class StrategyVersion:
     strategy_name: str
     version_number: int
     code: str
+    # The bars that the longest indicator of the rules needs (#164). None for a version without rules or without
+    # an indicator: the backtest and the forward test then use the default look-back length.
+    warm_up_bar_count: int | None = None
+
+
+def to_strategy_version(row: dict[str, Any]) -> StrategyVersion:
+    rules = row["rules"]
+    return StrategyVersion(
+        id=row["id"],
+        strategy_id=row["strategy_id"],
+        strategy_name=row["strategy_name"],
+        version_number=row["version_number"],
+        code=row["code"],
+        warm_up_bar_count=None if rules is None else find_warm_up_bar_count(StrategyRules.model_validate(rules)),
+    )
 
 
 async def read_strategy_version(*, database_url: str, strategy_version_id: int) -> StrategyVersion | None:
@@ -26,16 +46,44 @@ async def read_strategy_versions(*, database_url: str, strategy_version_ids: lis
     """The strategy versions by ID, with one connection and one query. A missing ID is not in the result."""
     async with (
         await psycopg.AsyncConnection.connect(database_url) as connection,
-        connection.cursor(row_factory=class_row(StrategyVersion)) as cursor,
+        connection.cursor(row_factory=dict_row) as cursor,
     ):
         await cursor.execute(
             """
             SELECT strategy_version.id, strategy_version.strategy_id, strategy.name AS strategy_name,
-                strategy_version.version_number, strategy_version.code
+                strategy_version.version_number, strategy_version.code, strategy_version.rules
             FROM strategy_version
             JOIN strategy ON strategy.id = strategy_version.strategy_id
             WHERE strategy_version.id = ANY(%(strategy_version_ids)s)
             """,
             {"strategy_version_ids": strategy_version_ids},
         )
-        return {version.id: version for version in await cursor.fetchall()}
+        return {version.id: version for version in map(to_strategy_version, await cursor.fetchall())}
+
+
+@dataclass(frozen=True)
+class StrategyOutline:
+    """The name of a strategy and the IDs of its versions."""
+
+    id: int
+    name: str
+    version_ids: list[int]
+
+
+async def read_strategy_outline(*, database_url: str, strategy_id: int) -> StrategyOutline | None:
+    """Returns None when the strategy does not exist."""
+    async with (
+        await psycopg.AsyncConnection.connect(database_url) as connection,
+        connection.cursor(row_factory=class_row(StrategyOutline)) as cursor,
+    ):
+        await cursor.execute(
+            """
+            SELECT strategy.id, strategy.name,
+                ARRAY(SELECT strategy_version.id FROM strategy_version WHERE strategy_version.strategy_id = strategy.id)
+                    AS version_ids
+            FROM strategy
+            WHERE strategy.id = %(strategy_id)s
+            """,
+            {"strategy_id": strategy_id},
+        )
+        return await cursor.fetchone()

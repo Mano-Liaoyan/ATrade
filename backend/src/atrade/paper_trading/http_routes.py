@@ -12,9 +12,7 @@ from atrade.foundation.clock import Clock
 from atrade.paper_trading.account_socket import create_account_socket_router
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor, fetch_paper_capital_usd
 from atrade.paper_trading.paper_orders import (
-    FindBlockingForwardTest,
     ManualOrderResponse,
-    OrderBlockedResponse,
     OrderErrorResponse,
     OrderRefusedByLedgerResponse,
     OrderRefusedResponse,
@@ -41,7 +39,7 @@ def add_order_routes(router: APIRouter, routes: PaperOrderRoutes) -> None:
         response_model=ManualOrderResponse,
         responses={
             **refused_or_failed,
-            status.HTTP_409_CONFLICT: {"model": OrderBlockedResponse | OrderRefusedByLedgerResponse},
+            status.HTTP_409_CONFLICT: {"model": OrderRefusedByLedgerResponse},
         },
     )
     router.add_api_route(
@@ -70,15 +68,12 @@ def create_paper_trading_router(
     paper_account_monitor: PaperAccountMonitor,
     database_url: str,
     clock: Clock,
-    find_blocking_forward_test: FindBlockingForwardTest,
 ) -> APIRouter:
-    """`find_blocking_forward_test` returns the forward test that runs on an instrument (section 12.2)."""
     router = APIRouter()
     routes = PaperOrderRoutes(
         paper_account_monitor=paper_account_monitor,
         database_url=database_url,
         clock=clock,
-        find_blocking_forward_test=find_blocking_forward_test,
     )
     add_order_routes(router, routes)
 

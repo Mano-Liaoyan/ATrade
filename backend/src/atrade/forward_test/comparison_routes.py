@@ -28,6 +28,7 @@ from atrade.backtest import (
 )
 from atrade.forward_test import forward_test_records, forward_test_store
 from atrade.forward_test.backtest_comparison import FillComparisonRow, FillTotal, compare_fills
+from atrade.forward_test.forward_test_records import ForwardTestFill
 from atrade.forward_test.forward_test_store import ForwardTestInterruption, ForwardTestRow
 from atrade.forward_test.http_routes import ForwardTestResponse, to_forward_test_response
 from atrade.foundation.bar import BarPeriod, TimeRange
@@ -95,6 +96,8 @@ class ComparedInterruptionResponse(BaseModel):
 
 
 class ForwardTestFillResponse(BaseModel):
+    symbol: str
+    exchange: str
     time_utc: datetime
     side: Literal["BUY", "SELL"]
     quantity_shares: Decimal
@@ -214,8 +217,11 @@ def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryRe
     )
 
 
-def to_forward_test_fill_response(fill: BacktestTrade) -> ForwardTestFillResponse:
+def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> ForwardTestFillResponse:
+    fill = forward_test_fill.trade
     return ForwardTestFillResponse(
+        symbol=forward_test_fill.instrument.symbol,
+        exchange=forward_test_fill.instrument.exchange,
         time_utc=fill.time_utc,
         side=fill.side,
         quantity_shares=fill.quantity_shares,
@@ -229,15 +235,15 @@ def calculate_forward_test_metrics(
 ) -> ForwardTestMetrics | None:
     """The range of a forward test goes from its start to its stop, or to now while it runs. The recorded equity
     points (one at each bar end) count as the bars of the exposure. The recorded fills are the trades."""
-    if row.start_balance_usd is None:
+    if row.start_capital_usd is None:
         return None
     metrics = calculate_metrics(
-        paper_capital_usd=row.start_balance_usd,
+        paper_capital_usd=row.start_capital_usd,
         time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
         equity_curve=equity_curve,
         trades=fills,
     )
-    return ForwardTestMetrics(metrics=metrics, start_capital_usd=row.start_balance_usd)
+    return ForwardTestMetrics(metrics=metrics, start_capital_usd=row.start_capital_usd)
 
 
 def calculate_win_rate_in_period(fills: list[BacktestTrade], period: TimeRange) -> Decimal | None:
@@ -289,7 +295,7 @@ class ComparisonRoutes:
     async def start_same_period_backtest(self, forward_test_id: int) -> SamePeriodBacktestResponse:
         """A normal backtest from the forward test start to its end, or to now while it runs."""
         row = await self.read_forward_test_row(forward_test_id)
-        if row.start_balance_usd is None:
+        if row.start_capital_usd is None:
             detail = "The forward test has no start balance yet. The backtest uses it as the paper capital."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         now_utc = self.clock.read_now_utc()
@@ -298,7 +304,9 @@ class ComparisonRoutes:
             instrument=forward_test_store.read_instrument(row),
             bar_period=BarPeriod(row.bar_period),
             time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
-            paper_capital_usd=row.start_balance_usd,
+            paper_capital_usd=row.start_capital_usd,
+            # A forward test has no split, so its same-period backtest has none (docs/architecture/backtest.md 10.9.4).
+            out_of_sample_share=0,
         )
         refusal = check_backtest_request(request) or check_comparison_currency(request)
         if refusal is not None:
@@ -313,7 +321,13 @@ class ComparisonRoutes:
     async def read_forward_test_detail(self, forward_test_id: int) -> ForwardTestDetailResponse:
         row = await self.read_forward_test_row(forward_test_id)
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            fills = await forward_test_records.select_fills(connection, forward_test_id)
+            forward_test_fills = await forward_test_records.select_forward_test_fills(
+                connection,
+                forward_test_id=forward_test_id,
+                instrument=forward_test_store.read_instrument(row),
+                uses_owner_ledger=row.allocated_capital_usd is not None,
+            )
+            fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             backtest_ids = await forward_test_records.select_same_period_backtest_ids(connection, forward_test_id)
         backtests = [
@@ -326,7 +340,7 @@ class ComparisonRoutes:
                 calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
             ),
             equity_curve=to_equity_curve_response(equity_curve),
-            fills=[to_forward_test_fill_response(fill) for fill in fills],
+            fills=[to_forward_test_fill_response(fill) for fill in forward_test_fills],
             same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests if backtest is not None],
         )
 
@@ -341,7 +355,13 @@ class ComparisonRoutes:
             )
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            fills = await forward_test_records.select_fills(connection, forward_test_id)
+            forward_test_fills = await forward_test_records.select_forward_test_fills(
+                connection,
+                forward_test_id=forward_test_id,
+                instrument=forward_test_store.read_instrument(row),
+                uses_owner_ledger=row.allocated_capital_usd is not None,
+            )
+            fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
         forward_test_metrics = limit_win_rate_to_period(
