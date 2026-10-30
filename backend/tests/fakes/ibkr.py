@@ -387,10 +387,11 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
     client_id: int = WEB_CLIENT_ID,
     side: str = "BOT",
     commission: str = "0",
+    execution_id: str | None = None,
 ) -> Execution:
-    """One fill from reqExecutions. The execution ID is unique for the order, the quantity, and the price."""
+    """One fill from reqExecutions. The default execution ID is unique for the order, the quantity, and the price."""
     return Execution(
-        execution_id=f"0000e0d5.{order_id}.{quantity}.{price}",
+        execution_id=execution_id or f"0000e0d5.{order_id}.{quantity}.{price}",
         order_id=order_id,
         client_id=client_id,
         account=account_id,

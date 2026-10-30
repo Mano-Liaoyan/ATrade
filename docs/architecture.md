@@ -244,7 +244,10 @@ app           -> all modules
   contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
-  (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
+  (`docs/architecture/assistant.md`). `app/` also gives `assistant` the
+  start context of a conversation (`strategy.read_strategy_outline()`,
+  `backtest.read_last_backtest_ids()`) and the strategy template for the
+  default system prompt (#184). The `conversation_id` foreign keys of
   `strategy_version`, `backtest`, and the screen tables point at
   `assistant_conversation` (section 6.3 allows a foreign key).
 - `paper_trading` does not import `forward_test`. Until phase 3, the refusal
@@ -1426,7 +1429,14 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - ATrade execution and data clients (phase 3, CI): a LiveNode test with a
   fake IBKR connection sends an order, fills it, restarts the child, asserts
   the strategy position, then applies a stock split and asserts the position
-  after the restart.
+  after the restart (`tests/forward_test/test_atrade_clients_live_node.py`).
+  A restart is a new LiveNode with new clients in the test process, with the
+  same fake ledger and IBKR fake. Other cases: `OrderDenied` from the ledger
+  rules, only the orders and fills of the own client ID, and `request_bars`
+  and `on_bar` from the bar store (`test_bar_store_data_client.py`).
+- ATrade execution client with the IB data client (phase 3, `ibkr_paper`, by
+  hand): both clients share 1 client ID in 1 LiveNode
+  (`test_the_ib_data_client_and_the_atrade_execution_client_can_share_the_client_id`).
 
 ### 17.5 End to end
 
@@ -1622,7 +1632,8 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | How Databento links symbol changes, for example FB to META (#141). | Free `symbology.resolve` for FB and META. |
 | IBKR scales `TRADES` volume by the split ratio (#149). | At the first stock split, read 1 year of daily bars again and compare. |
 | The paper account handles stock splits (#149). | Watch the first stock split of a held instrument. |
-| The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | The LiveNode test of section 17.4, then the `ibkr_paper` forward test contract test. |
+| The IB data client and the `ib_async` connection of the ATrade execution client share 1 client ID in 1 LiveNode (`forward_test.md` section 12.24) (#213). | `uv run pytest -m ibkr_paper -k share_the_client_id tests/forward_test`. |
+| A running LiveNode that gets a position report with a new quantity (`forward_test.md` section 12.22). The restart avoids it, so #213 did not check it. | A LiveNode test that changes the fake ledger position while the node runs. |
 | IBKR does or does not refuse opposite orders of 2 owners on one instrument (self-trade prevention) (#146). | 2 client IDs on the paper account place an AAPL buy and a sell, first with prices that do not cross, then with prices that cross. |
 | Real subscription logins and model calls through the pi SDK `ModelRuntime.login()` (#133, #140). Only a fake model server was run. | Log in with each provider and send one message. |
 | A real OAuth token refresh through the ATrade `CredentialStore` writes the new token to `/data/credentials.json` (#140). A fake refresh does (section 21.1). | Wait for a real token refresh of one provider, and read the file. |
@@ -1649,6 +1660,7 @@ implementation" list.
 | Strategy code can import `atrade.indicator` (#136, #138). | Yes. On 2026-10-30 (#160), a strategy version that imports `atrade.indicator` passed the checks before save (section 9.3, `ruff --select F` included) and ran in a real backtest child with the status `finished`. The indicator value in `on_bar` was the close of each of the 20 bars (`tests/indicator/test_indicator_registration.py`). |
 | The default smoothing (`ma_type`) of `RelativeStrengthIndex` and `AverageTrueRange` in NautilusTrader 2.0.0rc7. | On 2026-10-30 (#160), in the backend environment: both defaults are Wilder. `AverageTrueRange(14).ma_type` is `MovingAverageType.Wilder`. `RelativeStrengthIndex` has no `ma_type` property, so the check compared values: on 200 test closes, RSI(14) with the default gave 34.832627, the same as `ma_type=MovingAverageType.Wilder` and as a Wilder RSI written by hand; `Exponential` gave 14.769989 and `Simple` gave 5.270742. The value scale is 0 to 100. `MovingAverageConvergenceDivergence` defaults to `Exponential`. The indicator library does not need to pass `MovingAverageType.Wilder` for RSI and ATR. |
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
+| The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | Yes, with changes. On 2026-10-30 with NautilusTrader 2.0.0rc7 (#213), the Python `ExecutionClient` and `DataClient` of `nautilus_trader.live.clients` ran in a `LiveNode` with the IBKR fake and the owner ledger fake (`tests/forward_test/test_atrade_clients_live_node.py`). 2 or more LiveNodes can run one after the other in 1 process. After a restart, NautilusTrader made an external order with an inferred fill from the `PositionStatusReport` (`quantity`, `avg_px_open`): it does make a synthetic fill. With `external_order_instrument_ids` set to the instrument, the strategy got the position with the reported average price and did not buy again. Without it, the position belonged to the strategy `EXTERNAL`. After a 2-for-1 split in the fake ledger and a restart, the strategy got the new quantity and the new average price. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
@@ -1811,6 +1823,27 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#213): the owner ledger of the ATrade execution client is the
+  interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client
+  calls `check_order()` before each order, `save_fill()` for each fill, and
+  `read_positions()` and `read_cash_usd()` for reconciliation. #214 and #215
+  give the real ledger.
+- Decided (#213): the ATrade execution client gets its fills from
+  `reqExecutions` (`read_executions()`) every second. It sends a fill only
+  for a new execution (new IBKR `execId`, `execution_id`) of its own client ID and of an
+  order that it sent in the same run. A cancel does not remove the order
+  from this list. It reads the executions once more at the stop. When
+  `save_fill()` fails, the next read tries the execution again. Its fill
+  reports are empty: the position reports from the ledger give the
+  position. An execution that IBKR makes after the stop of a run does not
+  go into the owner ledger; #215 decides how the next run gets it.
+- Decided (#213): the ATrade execution client has the venue `ATRADE` and the
+  account `ATRADE-FT<ID>`. Both clients are the default route
+  (`RoutingConfig(default=True)`), so they handle all primary exchanges.
+  The instruments, bars, and fills use 4 price decimal places.
+- Decided (#213): the ATrade data client sends the new saved bars when its
+  caller calls `send_new_bars()`. Only the tests call it now. #217 decides
+  the production caller (`forward_test.md` section 12.24).
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
@@ -1818,6 +1851,11 @@ option and records it in this document.
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the
   login and credential routes of `assistant`. See section 25.14.
+- Decided (#184): the default prompt is saved as prompt version 1 when no
+  version exists. The browser sends the open version number when it creates
+  a conversation. A trigger refuses each `UPDATE` of
+  `assistant_prompt_version`. `app/` gives `assistant` the start context
+  reader and the strategy template. See section 25.9.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in

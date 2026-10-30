@@ -229,11 +229,13 @@ This replaces the rules above:
      on this instrument belongs to this strategy (section 12.2).
   3. The strategy indicators start from zero. NautilusTrader does not save
      strategy state without Redis.
-- Phase 3 (#146): restart step 2 changes. The child does not set
-  `external_order_instrument_ids` and does not reconcile with the account
-  position. The ATrade execution client reports the owner position of each
-  instrument from the owner ledger. NautilusTrader restores the strategy
-  position from these reports.
+- Phase 3 (#146): restart step 2 changes. The child does not reconcile
+  with the account position. The ATrade execution client reports the owner
+  position of each instrument from the owner ledger. NautilusTrader restores
+  the strategy position from these reports. The child sets
+  `external_order_instrument_ids` to the instruments of the forward test.
+  Without it, the restored position belongs to the strategy `EXTERNAL`, not
+  to the strategy (#213, `docs/architecture.md` section 21.1).
 - Phase 3 (#146): a multi-instrument forward test gets 1 year of warm-up
   daily bars from the bar store (section 12.17). When the quarter changed
   during an interruption, the restarted strategy gets the members of the
@@ -498,8 +500,10 @@ this document. The implementation can change them.
 
 | Name | Purpose |
 |---|---|
-| `OwnerLedgerExecutionClient` | The ATrade NautilusTrader execution client of section 12.19. |
-| `BarStoreDataClient` | The ATrade NautilusTrader data client of section 12.19. |
+| `OwnerLedgerExecutionClient`, `OwnerLedgerExecutionClientFactory(ledger_input, ledger, gateway)`, `OwnerLedgerInput` | The ATrade NautilusTrader execution client of section 12.19 (#213). `OwnerLedgerInput` has `forward_test_id`, `client_id`, `account_id`, `instruments`, and `fill_check_interval_seconds` (default 1). `gateway` is an `OrderGateway`: the order functions of the `ibkr` GatewayConnection. |
+| `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition` | The owner ledger interface of the execution client (#213). |
+| `BarStoreDataClient`, `BarStoreDataClientFactory(bar_store_input)`, `BarStoreInput` | The ATrade NautilusTrader data client of section 12.19 (#213). `BarStoreInput` has `database_url` and `instruments`. The factory keeps the created client in `client`, for `send_new_bars()`. |
+| `add_atrade_clients(builder, data_client_factory, execution_client_factory)` | Adds both clients to a `LiveNodeBuilder` as the default route. Without a data client factory, it adds only the execution client (#213). |
 | `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
 | `ReadMemberLists` | The type of `read_member_lists`: it returns the members of each running multi-instrument forward test. |
 | `QuarterlyUniverseJob(*, database_url, clock, databento_client)` | The quarterly universe calculation of section 12.21. |
@@ -886,7 +890,8 @@ ATrade writes its own NautilusTrader `ExecutionClient` and `DataClient` in
 Python with `nautilus_trader.live.clients`. ATrade does not change the
 NautilusTrader code and does not fork it.
 
-Execution client (`OwnerLedgerExecutionClient`):
+Execution client (`OwnerLedgerExecutionClient`,
+`backend/src/atrade/forward_test/owner_ledger_execution_client.py`):
 
 - It implements `_submit_order`, `_cancel_order`, and the 4 reconciliation
   hooks, including `_generate_position_status_reports`
@@ -907,13 +912,21 @@ Execution client (`OwnerLedgerExecutionClient`):
   account cash.
 - After a restart, NautilusTrader restores the strategy position from these
   reports. Thus the strategy knows its position and does not buy again.
+  NautilusTrader 2.0.0rc7 makes an external order with an inferred fill
+  from each report. The strategy gets the position only when its
+  `external_order_instrument_ids` hold the instrument (section 12.7).
+- Until #214 and #215, the owner ledger is the interface `OwnerLedger`
+  (`backend/src/atrade/forward_test/owner_ledger.py`). The tests use the
+  in-memory fake `backend/tests/fakes/owner_ledger.py`.
 - Each order adds 1 PostgreSQL query. The time is not measured.
 
-Data client (`BarStoreDataClient`):
+Data client (`BarStoreDataClient`,
+`backend/src/atrade/forward_test/bar_store_data_client.py`):
 
 - It implements `_subscribe_bars` and `_request_bars`.
-- It gives the strategy the bars from the bar store. The strategy uses
-  `on_bar` and `request_bars` as before.
+- It gives the strategy the bars from the bar store, merged by the global
+  source order as in a backtest (`market_data.md` section 8.7.2). The
+  strategy uses `on_bar` and `request_bars` as before.
 - A multi-instrument forward test uses it (section 12.17).
 
 Rules for both clients:
@@ -925,6 +938,10 @@ Rules for both clients:
 - Before the implementation, a LiveNode test must run both clients with a
   fake IBKR connection: send an order, fill it, restart, and check the
   strategy position. The test also gets a stock split step (section 12.22).
+  The tests are `backend/tests/forward_test/test_atrade_clients_live_node.py`
+  and `backend/tests/forward_test/test_bar_store_data_client.py` (#213).
+  `add_atrade_clients()` adds both clients to a `LiveNodeBuilder`. The child
+  process still uses the IB clients until #215.
 
 ## 12.20 Bar fetcher (Phase 3)
 
