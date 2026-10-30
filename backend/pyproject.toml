@@ -99,7 +99,8 @@ layers = [
     "atrade.forward_test",
     "atrade.backtest | atrade.paper_trading | atrade.watchlist",
     "atrade.strategy | atrade.market_data",
-    "atrade.ibkr",
+    # indicator -> foundation only (docs/architecture.md section 6.2).
+    "atrade.ibkr | atrade.indicator",
     "atrade.foundation",
 ]
 
@@ -148,6 +149,12 @@ name = "forward_test internals are private"
 type = "protected"
 protected_modules = ["atrade.forward_test.*"]
 allowed_importers = ["atrade.forward_test"]
+
+[[tool.importlinter.contracts]]
+name = "indicator internals are private"
+type = "protected"
+protected_modules = ["atrade.indicator.*"]
+allowed_importers = ["atrade.indicator"]
 
 [[tool.importlinter.contracts]]
 name = "ibkr internals are private"
