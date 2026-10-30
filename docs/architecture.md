@@ -1699,9 +1699,6 @@ option and records it in this document.
   `find_round_trips` with no change, because `select_fills` already gives
   `BacktestTrade` rows. The metrics of the forward test routes have
   `net_profit_usd` (forward test section 12.10).
-- Decided (#171): a named CHECK constraint holds the values of
-  `strategy_version.source`, and `read_strategy_version` does not return
-  `source` and `rules` (strategy section 9.1.1).
 - Decided (#172): `strategy` imports `indicator` (section 6.2). The rules
   format, the code from the rules, the empty group, the stop loss and take
   profit reference price, and the count of "Exit after N bars" are in
