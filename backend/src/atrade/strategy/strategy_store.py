@@ -4,9 +4,15 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import Any, Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
+
+# The version source (docs/architecture/strategy.md section 9.1.1). A CHECK constraint holds the same values.
+VersionSource = Literal["user", "rule_builder"]
+VERSION_COLUMNS: Final = "id, strategy_id, version_number, code, code_sha256, created_at_utc, source, rules"
 
 
 @dataclass(frozen=True)
@@ -31,6 +37,17 @@ class StrategyVersionRecord:
     code: str
     code_sha256: str
     created_at_utc: datetime
+    source: VersionSource
+    rules: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class VersionContent:
+    """What a save stores in a new version. Only versions with the source rule_builder have rules."""
+
+    code: str
+    source: VersionSource
+    rules: dict[str, Any] | None
 
 
 class DeleteResult(Enum):
@@ -91,8 +108,8 @@ async def select_strategy(connection: psycopg.AsyncConnection, strategy_id: int)
 async def select_versions(connection: psycopg.AsyncConnection, strategy_id: int) -> list[StrategyVersionRecord]:
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            SELECT {VERSION_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s
             ORDER BY version_number
@@ -107,8 +124,8 @@ async def select_version(
 ) -> StrategyVersionRecord | None:
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            SELECT {VERSION_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s AND version_number = %(version_number)s
             """,
@@ -132,8 +149,8 @@ async def save_version(
         return None
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            SELECT {VERSION_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s
             ORDER BY version_number DESC
@@ -150,7 +167,7 @@ async def save_version(
         connection,
         strategy_id=strategy_id,
         version_number=next_version_number,
-        code=code,
+        content=VersionContent(code=code, source="user", rules=None),
         created_at_utc=created_at_utc,
     )
     return SavedVersion(version=new_version, is_new_version=True)
@@ -161,22 +178,26 @@ async def insert_version(
     *,
     strategy_id: int,
     version_number: int,
-    code: str,
+    content: VersionContent,
     created_at_utc: datetime,
 ) -> StrategyVersionRecord:
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc)
-            VALUES (%(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(created_at_utc)s)
-            RETURNING id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc, source, rules)
+            VALUES (
+                %(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(created_at_utc)s, %(source)s, %(rules)s
+            )
+            RETURNING {VERSION_COLUMNS}
             """,
             {
                 "strategy_id": strategy_id,
                 "version_number": version_number,
-                "code": code,
-                "code_sha256": calculate_code_sha256(code),
+                "code": content.code,
+                "code_sha256": calculate_code_sha256(content.code),
                 "created_at_utc": created_at_utc,
+                "source": content.source,
+                "rules": None if content.rules is None else Jsonb(content.rules),
             },
         )
         inserted_version = await cursor.fetchone()
