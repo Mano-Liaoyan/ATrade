@@ -5,9 +5,11 @@ Real PostgreSQL. The function that starts a child process is a fake (section 17.
 """
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
 
 from atrade.forward_test import GATEWAY_UNREACHABLE_EXIT_CODE, PAPER_CHECK_FAILED_EXIT_CODE, ForwardTestWorker
@@ -305,4 +307,60 @@ async def test_a_new_worker_starts_the_running_forward_tests_again(
     assert (restarted["status"], restarted["client_id"], restarted["crash_count"]) == ("running", 10, 0)
     assert restarted["interruptions"] == [
         {"reason": "worker_restart", "started_at_utc": "2026-01-02T03:04:05Z", "ended_at_utc": None}
+    ]
+
+
+def read_owner_sums(database_url: str) -> list[tuple[object, ...]]:
+    """(owner kind, symbol, quantity, cash) for each owner and instrument of the owner ledger."""
+    with psycopg.connect(database_url) as connection:
+        return connection.execute(
+            """
+            SELECT owner_kind, symbol, sum(quantity_change), sum(cash_change) FROM owner_ledger_entry
+            GROUP BY owner_kind, symbol ORDER BY owner_kind, symbol NULLS FIRST
+            """
+        ).fetchall()
+
+
+@pytest.mark.anyio
+async def test_a_stop_transfers_the_positions_and_the_cash_to_by_hand_and_keeps_the_fills(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    # The ATrade execution client wrote a buy of 10 AAPL at 100 with 1 USD commission.
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD', 10, 100, 1,
+                -1001, 'E-1', 1)
+            """,
+            {"id": forward_test["id"], "time_utc": datetime(2026, 1, 2, 3, 5, tzinfo=UTC)},
+        )
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    await worker.compare_states()
+    [child] = child_starter.children
+    await web_client.post(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/stop")
+    await worker.compare_states()
+    # The ledger start of "By hand" is 100000 USD cash. The forward test got 10000 of it at the start.
+    assert read_owner_sums(database_url) == [
+        ("by_hand", None, Decimal(0), Decimal(90000)),
+        ("forward_test", None, Decimal(0), Decimal(10000)),
+        ("forward_test", "AAPL", Decimal(10), Decimal(-1001)),
+    ]
+
+    child.exit_code = 0
+    await worker.compare_states()
+    await worker.compare_states()
+
+    assert read_owner_sums(database_url) == [
+        ("by_hand", None, Decimal(0), Decimal(98999)),
+        ("by_hand", "AAPL", Decimal(10), Decimal(0)),
+        ("forward_test", None, Decimal(0), Decimal(1001)),
+        ("forward_test", "AAPL", Decimal(0), Decimal(-1001)),
+    ]
+    detail = (await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")).json()
+    assert [(fill["symbol"], fill["side"], fill["quantity_shares"]) for fill in detail["fills"]] == [
+        ("AAPL", "BUY", "10")
     ]

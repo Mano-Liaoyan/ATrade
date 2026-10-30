@@ -7,7 +7,6 @@ import {
   findForwardTestStatusKind,
   formatLocalTime,
   isLiveBarPeriod,
-  listForwardTestsOnInstruments,
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestsMessage,
@@ -24,6 +23,7 @@ const request: ForwardTestRequest = {
   exchange: 'NASDAQ',
   currency: 'USD',
   bar_period: '1-MINUTE',
+  allocated_capital_usd: '10000',
 };
 
 const runningForwardTest: ForwardTest = {
@@ -46,6 +46,7 @@ const runningForwardTest: ForwardTest = {
   end_time_utc: null,
   crash_count: 0,
   interruptions: [],
+  allocated_capital_usd: '10000',
 };
 
 function makeFetch(status: number, body: unknown, requests: Request[] = []): typeof fetch {
@@ -67,7 +68,7 @@ describe('startForwardTest', () => {
   });
 
   it('shows the limit of running forward tests', async () => {
-    const body = { detail: 'limit of running forward tests reached', forward_test_id: null };
+    const body = { detail: 'limit of running forward tests reached', forward_test_id: null, unallocated_usd: null };
 
     const result = await startForwardTest(makeFetch(409, body), request);
 
@@ -212,15 +213,5 @@ describe('the end time', () => {
   it('shows a UTC time in the local time zone', () => {
     expect(formatLocalTime(new Date(2026, 0, 3, 9, 30).toISOString())).toBe('2026-01-03 09:30');
     expect(formatLocalTime(null)).toBe('');
-  });
-});
-
-describe('listForwardTestsOnInstruments', () => {
-  it('names each forward test that holds a client ID, with its instrument', () => {
-    const stoppedForwardTest: ForwardTest = { ...runningForwardTest, id: 4, symbol: 'SPY', client_id: null, status: 'stopped' };
-
-    expect(listForwardTestsOnInstruments([runningForwardTest, stoppedForwardTest])).toEqual([
-      { label: 'Forward test 3 (Trend v2)', symbol: 'AAPL', exchange: 'NASDAQ' },
-    ]);
   });
 });

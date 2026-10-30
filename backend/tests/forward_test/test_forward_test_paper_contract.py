@@ -129,8 +129,9 @@ async def web_connection(paper_settings: Settings) -> AsyncIterator[GatewayConne
     connection.disconnect()
 
 
-def insert_forward_test(database_url: str) -> int:
-    """The rows that the start route writes, with client ID 10 and the far limit order strategy."""
+def insert_forward_test(database_url: str, account: str) -> int:
+    """The rows that the start route writes, with client ID 10, the far limit order strategy, and 10000 USD allocated
+    capital that "By hand" gives to the forward test in the owner ledger (forward_test.md section 12.18)."""
     with psycopg.connect(database_url, autocommit=True) as connection:
         strategy_row = connection.execute(
             "INSERT INTO strategy (name, created_at_utc) VALUES ('Far limit order', now()) RETURNING id"
@@ -152,13 +153,24 @@ def insert_forward_test(database_url: str) -> int:
             """
             INSERT INTO forward_test (
                 strategy_version_id, symbol, exchange, currency, bar_period, desired_state, status, client_id,
-                created_at_utc
-            ) VALUES (%(strategy_version_id)s, 'AAPL', 'NASDAQ', 'USD', '1-MINUTE', 'running', 'running', 10, now())
+                created_at_utc, allocated_capital_usd
+            ) VALUES (
+                %(strategy_version_id)s, 'AAPL', 'NASDAQ', 'USD', '1-MINUTE', 'running', 'running', 10, now(), 10000
+            )
             RETURNING id
             """,
             {"strategy_version_id": version_row[0]},
         ).fetchone()
-    assert forward_test_row is not None
+        assert forward_test_row is not None
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, currency,
+                quantity_change, cash_change)
+            VALUES ('by_hand', NULL, 'transfer', now(), %(account)s, 'USD', 0, -10000),
+                ('forward_test', %(id)s, 'transfer', now(), %(account)s, 'USD', 0, 10000)
+            """,
+            {"account": account, "id": forward_test_row[0]},
+        )
     return int(forward_test_row[0])
 
 
@@ -182,7 +194,7 @@ async def wait_for_forward_test_orders(
 async def test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it(
     paper_settings: Settings, web_connection: GatewayConnection
 ) -> None:
-    forward_test_id = insert_forward_test(paper_settings.database_url)
+    forward_test_id = insert_forward_test(paper_settings.database_url, paper_settings.ibkr_account_id or "")
     stop_requested = asyncio.Event()
 
     def open_gateway_connection(client_id: int) -> GatewayConnection:
@@ -237,7 +249,7 @@ async def test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_canc
     monkeypatch.setenv("ATRADE_IBKR_ACCOUNT_ID", paper_settings.ibkr_account_id or "")
     monkeypatch.setenv("ATRADE_IBKR_HOST", paper_settings.ibkr_host)
     monkeypatch.setenv("ATRADE_IBKR_PAPER_PORT", str(paper_settings.ibkr_paper_port))
-    forward_test_id = insert_forward_test(paper_settings.database_url)
+    forward_test_id = insert_forward_test(paper_settings.database_url, paper_settings.ibkr_account_id or "")
     processes: list[ForwardTestProcess] = []
 
     async def start_child(forward_test_id: int, mode: ChildMode) -> ForwardTestProcess:
