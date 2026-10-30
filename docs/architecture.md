@@ -1666,7 +1666,7 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | A US screen keeps 1000 to 2000 instruments after step 1 (estimate, #136). Not counted (#206): the local database has no real daily bars. | Run a screen with the start `all_with_daily_bars` and the filters of the example of `screen.md` section 24.4.1, and read `after_filters_count`. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
 | The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
-| The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. |
+| The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. Estimate (#209): 500 rows with 3 indicator values and 1 percentile are about 128,000 characters of JSON, about 32,000 to 43,000 tokens (3 to 4 characters for each token). 50 rows are about 3,200 to 4,300 tokens, so the default page of 50 rows stays. Not counted with a real tokenizer and real data. |
 | Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). Not measured in #199: there are no saved real hourly bars of 500 instruments locally. | Run one with real data and measure the peak memory and the time. |
 | The PostgreSQL read time and the Arrow conversion time of each backtest child with a universe (#142). Not measured in #199 (no real bars locally). | Time one real `rule` backtest child. |
 | Chunked loading memory (#131, source only). The child of #199 loads all bars at once. | Measure the peak memory of a 500-instrument child. |
@@ -1804,6 +1804,10 @@ option and records it in this document.
   diff card is not recorded, and the discard route answers `409` for a
   version that the AI assistant did not save (strategy sections 9.1.1 and
   9.6, assistant section 25.14).
+- Decided (#209): the port 8001 screen routes read the conversation from
+  the header `X-ATrade-Conversation-Id`, and `read_screen_result` reads
+  pages of 50 rows with the parameter `offset` (screen section 24.8,
+  assistant sections 25.3.3 and 25.4.3).
 - Decided (#185): the conversation controls of the assistant side column,
   the copy of its disabled controls, the diff cards after a reload, and the
   fake assistant service of the e2e server (assistant section 25.14).

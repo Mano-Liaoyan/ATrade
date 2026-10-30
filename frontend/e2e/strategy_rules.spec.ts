@@ -21,16 +21,18 @@ test('the Rules tab makes code from the rules and saves them as a new version', 
 
   await files.getByRole('tab', { name: 'Rules' }).click();
   const code = page.getByRole('region', { name: 'Code from the rules' });
-  await expect(code).toContainText('class RulesStrategy');
+  // The editor draws only the lines in view. The first lines name the config class of the made code.
+  await expect(code).toContainText('class RulesConfig(StrategyConfig)');
   await expect(page.locator('.code-editor__highlighted-line')).toHaveCount(0);
   const pageScrollY = await page.evaluate(() => window.scrollY);
 
   await page.getByRole('button', { name: 'Add condition to Entry' }).click();
   await expect(page.locator('.code-editor__highlighted-line').first()).toBeInViewport();
-  await expect(code).toContainText('sma_1');
+  // The first changed line is near the top: an indicator adds its import and the warm-up bar count.
+  await expect(code).toContainText('import atrade.indicator');
 
   await page.getByRole('spinbutton', { name: 'Entry condition 1 right side SMA period' }).fill('20');
-  await expect(code).toContainText('sma_1_period: int = 20');
+  await expect(code).toContainText('WARM_UP_BAR_COUNT = 20');
   await expect(page.locator('.code-editor__highlighted-line').first()).toBeInViewport();
   expect(await page.evaluate(() => window.scrollY)).toBe(pageScrollY);
 
@@ -41,6 +43,9 @@ test('the Rules tab makes code from the rules and saves them as a new version', 
     versions: { version_number: number; source: string }[];
   };
   expect(strategy.versions.at(-1)).toMatchObject({ version_number: 2, source: 'rule_builder' });
+  const version = (await (await page.request.get(`/api/strategies/${strategyId}/versions/2`)).json()) as { code: string };
+  expect(version.code).toContain('class RulesStrategy');
+  expect(version.code).toContain('sma_1_period: int = 20');
   await expect(page.getByRole('spinbutton', { name: 'Entry condition 1 right side SMA period' })).toHaveValue('20');
 });
 
@@ -116,4 +121,40 @@ test('the Rules tab of a version with rules has no warning and saves without a d
   await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v4');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect((await readVersions(page, strategyId)).at(-1)).toMatchObject({ version_number: 4, source: 'rule_builder' });
+});
+
+test('the Rules tab shows the universe mode settings and makes multi-instrument code', async ({
+  page,
+}, currentTest) => {
+  const name = createUniqueName(currentTest, 'Universe rules');
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const created = (await (await page.request.post('/api/strategies', { data: { name } })).json()) as StrategyBody;
+  const rules = {
+    format_version: 1,
+    settings: {
+      position_size: { type: 'percent_of_equity', percent: 95 },
+      universe: {
+        rank_indicator: { type: 'indicator', indicator: 'momentum_12_1', parameters: {} },
+        rank_direction: 'high_to_low',
+        hold_count: 2,
+        rebalance_period: 'monthly',
+      },
+    },
+    entry: { type: 'group', match: 'all_of', items: [] },
+    exits: { exit_when_entry_is_false: false },
+  };
+  const versionsUrl = `/api/strategies/${String(created.id)}/versions`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  expect((await page.request.post(versionsUrl, { data: { rules } })).status()).toBe(201);
+
+  await page.goto(`/strategies/${String(created.id)}`);
+  await page.getByRole('tablist', { name: 'Files' }).getByRole('tab', { name: 'Rules' }).click();
+  const code = page.getByRole('region', { name: 'Code from the rules' });
+  await expect(page.getByRole('heading', { name: 'Entry filter' })).toBeVisible();
+  await expect(page.getByText('Position size')).toHaveCount(0);
+  // The editor draws only the lines in view. The first line names the universe mode.
+  await expect(code).toContainText('Strategy from the rule builder in the universe mode');
+
+  await page.getByRole('spinbutton', { name: 'Hold' }).fill('3');
+  await expect(code).toContainText('hold_count: int = 3');
 });

@@ -5,18 +5,25 @@
      of section 9.8.4 when the code of the open version changed after the rules. -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Checkbox, ContentSwitcher, InlineNotification } from '#lib/foundation/carbon';
+  import { Checkbox, ContentSwitcher, InlineNotification, Select } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     findChangedLines,
     generateRulesCode,
+    RANK_DIRECTION_CHOICES,
+    REBALANCE_CHOICES,
+    type RankDirection,
+    type RebalancePeriod,
+    type RightOperand,
     type RuleExits,
     type RuleGroup,
     type StrategyRules,
+    type UniverseSettings,
   } from '#lib/strategy';
   import RuleGroupEditor from './RuleGroupEditor.svelte';
   import RuleNumberInput from './RuleNumberInput.svelte';
+  import RuleOperand from './RuleOperand.svelte';
 
   interface Props {
     rules: StrategyRules;
@@ -79,6 +86,16 @@
     onRulesChange({ ...rules, exits: { ...rules.exits, ...change } });
   }
 
+  // The universe mode (section 9.8.6): the rules hold `settings.universe`. It replaces the position size.
+  const universe = $derived(rules.settings.universe);
+
+  function changeUniverse(change: Partial<UniverseSettings>): void {
+    if (universe == null) {
+      return;
+    }
+    onRulesChange({ ...rules, settings: { ...rules.settings, universe: { ...universe, ...change } } });
+  }
+
   function changePositionKind(kind: PositionKind): void {
     const positionSize =
       kind === 'fixed_shares' ? { type: kind, shares } : { type: kind, percent: equityPercent };
@@ -96,6 +113,62 @@
         <section class="cds--tile rules-block" aria-labelledby="rules-settings">
           <h3 id="rules-settings" class="rules-block__heading">Settings</h3>
           <div class="rules-block__fields">
+            {#if universe != null}
+              <div class="rules-field">
+                <span class="cds--label">Rebalance</span>
+                <span class="rules-switcher">
+                  <Select
+                    label="Rebalance"
+                    hideLabel
+                    size="sm"
+                    items={REBALANCE_CHOICES}
+                    value={universe.rebalance_period}
+                    onValueChange={(rebalance_period: RebalancePeriod) => {
+                      changeUniverse({ rebalance_period });
+                    }}
+                  />
+                </span>
+              </div>
+              <div class="rules-field">
+                <span class="cds--label">Hold</span>
+                <span class="rules-item">
+                  <RuleNumberInput
+                    label="Hold"
+                    value={universe.hold_count}
+                    minimum={1}
+                    onValueChange={(hold_count: number) => {
+                      changeUniverse({ hold_count });
+                    }}
+                  />
+                  <span class="rules-unit">instruments</span>
+                </span>
+              </div>
+              <div class="rules-field">
+                <span class="cds--label">Rank by</span>
+                <span class="rules-item">
+                  <RuleOperand
+                    label="Rank by"
+                    side="rank"
+                    operand={universe.rank_indicator}
+                    onOperandChange={(operand: RightOperand) => {
+                      if (operand.type === 'indicator') {
+                        changeUniverse({ rank_indicator: operand });
+                      }
+                    }}
+                  />
+                  <Select
+                    label="Rank order"
+                    hideLabel
+                    size="sm"
+                    items={RANK_DIRECTION_CHOICES}
+                    value={universe.rank_direction}
+                    onValueChange={(rank_direction: RankDirection) => {
+                      changeUniverse({ rank_direction });
+                    }}
+                  />
+                </span>
+              </div>
+            {:else}
             <div class="rules-field">
               <span class="cds--label">Position size</span>
               <span class="rules-switcher">
@@ -143,13 +216,14 @@
                 </span>
               </div>
             {/if}
+            {/if}
           </div>
         </section>
 
         <section class="cds--tile rules-block" aria-labelledby="rules-entry">
-          <h3 id="rules-entry" class="rules-block__heading">Entry</h3>
+          <h3 id="rules-entry" class="rules-block__heading">{universe != null ? 'Entry filter' : 'Entry'}</h3>
           <RuleGroupEditor
-            label="Entry"
+            label={universe != null ? 'Entry filter' : 'Entry'}
             group={rules.entry}
             onGroupChange={(entry) => {
               onRulesChange({ ...rules, entry: entry as RuleGroup });

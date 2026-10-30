@@ -1,8 +1,9 @@
 // The tools of the AI assistant (docs/architecture/assistant.md 25.4.1). pi may run only these tools.
-// Each tool calls only the routes of port 8001 of web (25.3.3). Phase 3 adds the screen tools of 25.4.3.
+// Each tool calls only the routes of port 8001 of web (25.3.3). The screen tools of 25.4.3 are in screen_tools.ts.
 import { defineTool, type ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
 import { readBacktest, runBacktest, type BacktestWait, type UserMessageBudget } from './backtest_tools.ts';
+import { createScreenTools } from './screen_tools.ts';
 import { answerResult, isSuccess, textResult } from './tool_results.ts';
 import type { WebPortClient } from './web_port_client.ts';
 
@@ -16,6 +17,12 @@ export const ASSISTANT_TOOL_NAMES: readonly string[] = [
   'list_backtests',
   'read_backtest',
   'compare_backtests',
+  'list_screens',
+  'read_screen',
+  'create_screen',
+  'update_screen',
+  'run_screen',
+  'read_screen_result',
 ];
 
 export interface AssistantToolsContext {
@@ -163,7 +170,7 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
   ];
 }
 
-/** The 9 tools of 25.4.1 for one run of one conversation. */
+/** The 9 tools of 25.4.1 and the 6 screen tools of 25.4.3 for one run of one conversation. */
 export function createAssistantTools(context: AssistantToolsContext): ToolDefinition[] {
-  return [...createStrategyTools(context), ...createBacktestTools(context)];
+  return [...createStrategyTools(context), ...createBacktestTools(context), ...createScreenTools(context.client)];
 }

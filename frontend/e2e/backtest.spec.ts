@@ -96,6 +96,9 @@ async function expectMetricTable(page: Page): Promise<void> {
   await expect(page.getByRole('tooltip')).toHaveText(
     'Mean of the daily returns / standard deviation of the daily returns × √252. Risk-free rate: 0',
   );
+  // Keyboard focus on a row below the fold scrolls the table. The tooltip of the focused name stays open.
+  await table.getByRole('button', { name: 'Turnover', exact: true }).focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Amount of all fills / mean equity / years. Risk-free rate: 0');
   const dashes = table.getByRole('button', { name: '–', exact: true });
   for (const dash of await dashes.all()) {
     await dash.focus();

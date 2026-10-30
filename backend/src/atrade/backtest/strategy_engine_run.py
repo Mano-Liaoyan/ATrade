@@ -234,5 +234,11 @@ def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[Backtes
     )
     engine.add_instrument(nautilus_instrument)
     engine.add_data(nautilus_bars)
-    run_engine(engine, run.code, work_directory, {"instrument_id": nautilus_instrument.id, "bar_type": bar_type})
+    # The parameter values of a parameter sweep run replace the defaults (docs/architecture/backtest.md 10.11.2).
+    config_fields: dict[str, object] = {
+        **(request.parameters or {}),
+        "instrument_id": nautilus_instrument.id,
+        "bar_type": bar_type,
+    }
+    run_engine(engine, run.code, work_directory, config_fields)
     return read_trades(engine)

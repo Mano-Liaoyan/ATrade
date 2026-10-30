@@ -20,7 +20,7 @@ export class WebPortClient {
     this.conversationId = conversationId;
   }
 
-  async request(method: 'GET' | 'POST', path: string, body?: unknown, signal?: AbortSignal): Promise<WebPortAnswer> {
+  async request(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown, signal?: AbortSignal): Promise<WebPortAnswer> {
     const headers: Record<string, string> = { [CONVERSATION_HEADER]: this.conversationId };
     if (body !== undefined) {
       headers['content-type'] = 'application/json';

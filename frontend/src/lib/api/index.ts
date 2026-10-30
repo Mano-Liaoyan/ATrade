@@ -445,6 +445,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sweeps/parameters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Parameters */
+        get: operations["read_parameters_api_sweeps_parameters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sweeps */
+        get: operations["list_sweeps_api_sweeps_get"];
+        put?: never;
+        /** Start Sweep */
+        post: operations["start_sweep_api_sweeps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps/{sweep_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Sweep */
+        get: operations["read_sweep_api_sweeps__sweep_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps/{sweep_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Sweep */
+        post: operations["cancel_sweep_api_sweeps__sweep_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forward-tests/capital": {
         parameters: {
             query?: never;
@@ -1036,7 +1105,7 @@ export interface components {
             out_of_sample_use_count: number | null;
         };
         /** @enum {string} */
-        BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
+        BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out" | "cancelled";
         /**
          * BarPeriod
          * @description The bar periods that the chart offers. The values use the NautilusTrader bar specification format.
@@ -1514,11 +1583,14 @@ export interface components {
             /** Version Number */
             version_number: number;
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             desired_state: components["schemas"]["DesiredState"];
             status: components["schemas"]["ForwardTestStatus"];
@@ -1557,6 +1629,21 @@ export interface components {
             host: string;
             /** Port */
             port: number;
+        };
+        /**
+         * GridEntry
+         * @description One parameter of the grid. An `int` or `float` parameter needs `start`, `end`, and `step`. A `bool` parameter
+         *     takes no values: the grid uses false and true.
+         */
+        GridEntry: {
+            /** Name */
+            name: string;
+            /** Start */
+            start?: number | string | null;
+            /** End */
+            end?: number | string | null;
+            /** Step */
+            step?: number | string | null;
         };
         /** @enum {string} */
         GroupMatch: "all_of" | "any_of";
@@ -1849,6 +1936,23 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /** ParameterResponse */
+        ParameterResponse: {
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Default */
+            default: number | boolean;
+        };
+        ParameterValues: {
+            [key: string]: number | boolean;
+        };
+        /** ParametersResponse */
+        ParametersResponse: {
+            /** Parameters */
+            parameters: components["schemas"]["ParameterResponse"][];
+        };
         /**
          * PercentOfEquity
          * @description The quantity is equity x percent / close price, rounded down to whole shares.
@@ -1918,6 +2022,10 @@ export interface components {
             /** Models */
             models: components["schemas"]["ProviderModelResponse"][];
         };
+        /** @enum {string} */
+        RankDirection: "high_to_low" | "low_to_high";
+        /** @enum {string} */
+        RebalancePeriod: "weekly" | "monthly" | "quarterly";
         /** RenameConversationRequest */
         RenameConversationRequest: {
             /** Title */
@@ -1962,12 +2070,16 @@ export interface components {
             /** Items */
             items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
         };
-        /** RuleSettings */
+        /**
+         * RuleSettings
+         * @description `position_size` is not used in the universe mode: each member gets equity / `hold_count`.
+         */
         RuleSettings: {
             /** Position Size */
             position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
             /** Template Id */
             template_id?: string | null;
+            universe?: components["schemas"]["UniverseSettings"] | null;
         };
         /** RulesCodeRequest */
         RulesCodeRequest: {
@@ -2253,16 +2365,20 @@ export interface components {
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };
-        /** StartForwardTestRequest */
+        /**
+         * StartForwardTestRequest
+         * @description The universe comes in `universe`, or for a single instrument in `symbol`, `exchange`, and `currency`.
+         */
         StartForwardTestRequest: {
             /** Strategy Version Id */
             strategy_version_id: number;
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
             /** Exchange */
-            exchange: string;
+            exchange?: string | null;
             /** Currency */
-            currency: string;
+            currency?: string | null;
+            universe?: components["schemas"]["UniverseBody"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /** Allocated Capital Usd */
             allocated_capital_usd: number | string;
@@ -2282,6 +2398,48 @@ export interface components {
             forward_test_id?: number | null;
             /** Unallocated Usd */
             unallocated_usd?: string | null;
+        };
+        /**
+         * StartSweepRequest
+         * @description The fields of a backtest start and the grid of 1 to 3 parameters.
+         */
+        StartSweepRequest: {
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** @default single */
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+            /** Instruments */
+            instruments?: components["schemas"]["InstrumentBody"][] | null;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
+            /** Grid */
+            grid: components["schemas"]["GridEntry"][];
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -2399,6 +2557,60 @@ export interface components {
             /** Discarded */
             discarded: boolean;
         };
+        /** SweepDetailResponse */
+        SweepDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Grid */
+            grid: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Run Count */
+            run_count: number;
+            /** Status Counts */
+            status_counts: {
+                [key: string]: number;
+            };
+            /** Runs */
+            runs: components["schemas"]["SweepRunResponse"][];
+        };
+        /** SweepResponse */
+        SweepResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Grid */
+            grid: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Run Count */
+            run_count: number;
+            /** Status Counts */
+            status_counts: {
+                [key: string]: number;
+            };
+        };
+        /** SweepRunResponse */
+        SweepRunResponse: {
+            /** Backtest Id */
+            backtest_id: number;
+            parameters: components["schemas"]["ParameterValues"];
+            status: components["schemas"]["BacktestStatus"];
+            metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+        };
         /** TemplateSourceResponse */
         TemplateSourceResponse: {
             /** Label */
@@ -2433,6 +2645,22 @@ export interface components {
             /** Exchange */
             exchange: string | null;
         };
+        /**
+         * UniverseBody
+         * @description `single` needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, `list` needs nothing: the members
+         *     are the watchlist at the start (section 12.17).
+         */
+        UniverseBody: {
+            kind: components["schemas"]["UniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+        };
         /** UniverseInstrumentResponse */
         UniverseInstrumentResponse: {
             /** Symbol */
@@ -2448,6 +2676,20 @@ export interface components {
         };
         /** @enum {string} */
         UniverseKind: "single" | "rule" | "list";
+        /**
+         * UniverseSettings
+         * @description The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.
+         *
+         *     The strategy holds the `hold_count` members with the best rank, with equal weight, and ranks again at the start of
+         *     each `rebalance_period`.
+         */
+        UniverseSettings: {
+            rank_indicator: components["schemas"]["IndicatorOperand"];
+            rank_direction: components["schemas"]["RankDirection"];
+            /** Hold Count */
+            hold_count: number;
+            rebalance_period: components["schemas"]["RebalancePeriod"];
+        };
         /**
          * UsUniverseRangeResponse
          * @description The first and the last quarter start with US universe data. Null without universe data.
@@ -3985,6 +4227,179 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestComparisonResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_parameters_api_sweeps_parameters_get: {
+        parameters: {
+            query: {
+                strategy_version_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParametersResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sweeps_api_sweeps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepResponse"][];
+                };
+            };
+        };
+    };
+    start_sweep_api_sweeps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartSweepRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_sweep_api_sweeps__sweep_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_sweep_api_sweeps__sweep_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
                 };
             };
             /** @description Not Found */

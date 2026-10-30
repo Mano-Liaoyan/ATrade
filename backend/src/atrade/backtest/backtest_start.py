@@ -38,6 +38,32 @@ async def start_backtest(  # noqa: PLR0913 readability-exception: the keywords o
 ) -> int | BacktestRefusal:
     """Queues the backtest and returns its ID, or returns why it cannot start. A multi-instrument backtest also needs
     the members of each universe period (docs/architecture/backtest.md 10.10.6)."""
+    prepared = await prepare_backtest(
+        database_url=database_url,
+        exchange_rate_reader=exchange_rate_reader,
+        request=request,
+        universe_periods=universe_periods,
+    )
+    if isinstance(prepared, BacktestRefusal):
+        return prepared
+    return await queue_backtest(
+        database_url=database_url,
+        request=prepared,
+        created_at_utc=created_at_utc,
+        universe_periods=universe_periods,
+        conversation_id=conversation_id,
+    )
+
+
+async def prepare_backtest(
+    *,
+    database_url: str,
+    exchange_rate_reader: ExchangeRateReader,
+    request: BacktestRequest,
+    universe_periods: list[UniversePeriod] | None,
+) -> BacktestRequest | BacktestRefusal:
+    """The checks before a backtest is queued. Returns the request with its source order, or why it cannot start.
+    A parameter sweep uses the same checks for all its runs."""
     refusal = check_backtest_request(request)
     if refusal is not None:
         return BacktestRefusal(refusal)
@@ -65,10 +91,4 @@ async def start_backtest(  # noqa: PLR0913 readability-exception: the keywords o
     )
     if missing_rates is not None:
         return BacktestRefusal(missing_rates)
-    return await queue_backtest(
-        database_url=database_url,
-        request=request,
-        created_at_utc=created_at_utc,
-        universe_periods=universe_periods,
-        conversation_id=conversation_id,
-    )
+    return request

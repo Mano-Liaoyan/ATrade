@@ -7,14 +7,15 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 import psycopg
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, JsonValue
 
+from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.screen import screen_store
-from atrade.screen.screen_check import ScreenProblem, check_screen
+from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
 from atrade.screen.screen_run import name_indicator
 from atrade.screen.screen_running import run_saved_screen
 
@@ -217,6 +218,10 @@ def to_screen_response(
     )
 
 
+def to_new_screen(request: CreateScreenRequest) -> screen_store.NewScreen:
+    return screen_store.NewScreen(name=request.name, market=request.market, definition=request.definition)
+
+
 def check_failed(problems: list[ScreenProblem]) -> JSONResponse:
     failure = ScreenCheckFailedResponse(
         problems=[
@@ -230,8 +235,29 @@ def name_in_use(name: str) -> JSONResponse:
     return check_failed([ScreenProblem(("name",), f"A screen with the name {name!r} exists.")])
 
 
+# Port 8001 adds " (AI)" to the name of a new screen (section 24.8).
+MAX_AI_ASSISTANT_NAME_LENGTH = MAX_NAME_LENGTH - len(" (AI)")
+
+
+def ai_assistant_name_too_long(length: int) -> ScreenProblem:
+    return ScreenProblem(
+        ("name",),
+        f'The name must have 1 to {MAX_AI_ASSISTANT_NAME_LENGTH} characters, not {length}: port 8001 adds " (AI)".',
+    )
+
+
 def screen_not_found(screen_id: int) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, detail=f"The screen {screen_id} does not exist.")
+
+
+def change_refused(screen_id: int) -> HTTPException:
+    return HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        detail=(
+            f"The AI assistant cannot change screen {screen_id}. It can change only a screen that it made in this "
+            "conversation and that the user has not kept. Save a new screen instead."
+        ),
+    )
 
 
 def screen_result_not_found(screen_result_id: int) -> HTTPException:
@@ -274,23 +300,51 @@ class ScreenRoutes:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             try:
                 screen = await screen_store.insert_screen(
-                    connection,
-                    name=request.name,
-                    market=request.market,
-                    definition=request.definition,
-                    now_utc=self.clock.read_now_utc(),
+                    connection, to_new_screen(request), now_utc=self.clock.read_now_utc()
                 )
             except screen_store.NameInUseError:
                 return name_in_use(request.name)
             await connection.commit()
         return to_screen_response(screen, [])
 
+    async def create_ai_assistant_screen(
+        self, request: CreateScreenRequest, conversation_id: int
+    ) -> ScreenResponse | JSONResponse:
+        """Not kept, with the conversation, and the name with " (AI)" or " (AI N)" (section 24.8)."""
+        problems = check_screen(name=request.name, market=request.market, definition=request.definition)
+        if len(request.name) > MAX_AI_ASSISTANT_NAME_LENGTH:
+            problems = [problem for problem in problems if problem.location != ("name",)]
+            problems.insert(0, ai_assistant_name_too_long(len(request.name)))
+        if problems:
+            return check_failed(problems)
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            try:
+                screen = await screen_store.insert_ai_assistant_screen(
+                    connection,
+                    to_new_screen(request),
+                    now_utc=self.clock.read_now_utc(),
+                    assistant_conversation_id=conversation_id,
+                    max_name_length=MAX_NAME_LENGTH,
+                )
+            except screen_store.NameInUseError:
+                return name_in_use(f"{request.name} (AI)")
+            await connection.commit()
+        return to_screen_response(screen, [])
+
     async def change_screen(self, screen_id: int, request: ChangeScreenRequest) -> ScreenResponse | JSONResponse:
         """Overwrites the name and the definition. A screen has no versions (section 24.1)."""
+        return await self.change_screen_of(screen_id, request, None)
+
+    async def change_screen_of(
+        self, screen_id: int, request: ChangeScreenRequest, conversation_id: int | None
+    ) -> ScreenResponse | JSONResponse:
+        """With `conversation_id` (port 8001): only a screen of that conversation that the user has not kept. Else 403."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.select_screen(connection, screen_id)
             if screen is None:
                 raise screen_not_found(screen_id)
+            if conversation_id is not None and (screen.kept or screen.assistant_conversation_id != conversation_id):
+                raise change_refused(screen_id)
             problems = check_screen(name=request.name, market=screen.market, definition=request.definition)
             if problems:
                 return check_failed(problems)
@@ -322,6 +376,12 @@ class ScreenRoutes:
     ) -> ScreenResultResponse | JSONResponse:
         """Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and
         definition in place of the saved ones and keeps the saved screen (section 24.13)."""
+        return await self.run_screen_of(screen_id, None, request)
+
+    async def run_screen_of(
+        self, screen_id: int, conversation_id: int | None, request: RunScreenRequest | None = None
+    ) -> ScreenResultResponse | JSONResponse:
+        """Port 8001 gives the conversation. The screen result records it."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.select_screen(connection, screen_id)
         if screen is None:
@@ -334,7 +394,9 @@ class ScreenRoutes:
         problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
         if problems:
             return check_failed(problems)
-        screen_result_id = await run_saved_screen(database_url=self.database_url, clock=self.clock, screen=screen)
+        screen_result_id = await run_saved_screen(
+            database_url=self.database_url, clock=self.clock, screen=screen, assistant_conversation_id=conversation_id
+        )
         return await self.read_screen_result(screen_result_id)
 
     async def read_screen_result(
@@ -350,13 +412,75 @@ class ScreenRoutes:
         return response
 
 
+NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
+CHECK_FAILED: dict[int | str, dict[str, Any]] = {
+    status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ScreenCheckFailedResponse}
+}
+
+
+def add_read_routes(router: APIRouter, routes: ScreenRoutes) -> None:
+    router.add_api_route("/api/screens", routes.list_screens, methods=["GET"])
+    router.add_api_route("/api/screens/{screen_id}", routes.read_screen, methods=["GET"], responses=NOT_FOUND)
+    router.add_api_route(
+        "/api/screen-results/{screen_result_id}", routes.read_screen_result, methods=["GET"], responses=NOT_FOUND
+    )
+
+
+def create_screen_assistant_router(
+    *, database_url: str, clock: Clock, conversation_exists: ConversationCheck
+) -> APIRouter:
+    """The 6 screen routes of port 8001 (docs/architecture/assistant.md 25.3.3, screen.md 24.8). No delete."""
+    routes = ScreenRoutes(database_url=database_url, clock=clock)
+    read_conversation_id = create_conversation_dependency(conversation_exists)
+
+    async def create_screen(
+        request: CreateScreenRequest, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> ScreenResponse | JSONResponse:
+        return await routes.create_ai_assistant_screen(request, conversation_id)
+
+    async def change_screen(
+        screen_id: int, request: ChangeScreenRequest, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> ScreenResponse | JSONResponse:
+        return await routes.change_screen_of(screen_id, request, conversation_id)
+
+    async def run_screen(
+        screen_id: int, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> ScreenResultResponse | JSONResponse:
+        return await routes.run_screen_of(screen_id, conversation_id)
+
+    router = APIRouter()
+    add_read_routes(router, routes)
+    router.add_api_route(
+        "/api/screens",
+        create_screen,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        response_model=ScreenResponse,
+        responses=CHECK_FAILED,
+    )
+    router.add_api_route(
+        "/api/screens/{screen_id}",
+        change_screen,
+        methods=["PUT"],
+        response_model=ScreenResponse,
+        responses={**NOT_FOUND, **CHECK_FAILED, status.HTTP_403_FORBIDDEN: ERROR_RESPONSE},
+    )
+    router.add_api_route(
+        "/api/screens/{screen_id}/runs",
+        run_screen,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        response_model=ScreenResultResponse,
+        responses={**NOT_FOUND, **CHECK_FAILED},
+    )
+    return router
+
+
 def create_screen_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = ScreenRoutes(database_url=database_url, clock=clock)
     router = APIRouter()
-    not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
-    check_failed_response: dict[int | str, dict[str, Any]] = {
-        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ScreenCheckFailedResponse}
-    }
+    not_found = NOT_FOUND
+    check_failed_response = CHECK_FAILED
     router.add_api_route("/api/screens", routes.list_screens, methods=["GET"])
     router.add_api_route(
         "/api/screens",
