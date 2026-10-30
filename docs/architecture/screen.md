@@ -199,6 +199,53 @@ Source: [Indicator library scope and calculation place](https://github.com/Mano-
 | Universe of a quarter | The top 500 US instruments of a quarter (#141). |
 | Instrument name | The "Name" column of the result table (section 24.10). |
 
+Decided (#206):
+
+- Code: `screen/screen_run.py` (`run_screen_steps`, the 2 steps without a
+  database), `screen/screen_running.py` (`run_saved_screen`: the start
+  instruments, the reads, and the save), and the store functions of
+  `screen/screen_store.py`. Tests: `tests/screen/test_screen_run.py` and
+  `tests/screen/test_screen_run_routes.py`.
+- The start instruments come from these reads of `market_data` and
+  `watchlist`: `read_us_universe_members` with the quarter of the first
+  trading day of the run date (`quarter_universe`),
+  `read_daily_bar_summaries_of_currency` with `USD`
+  (`all_with_daily_bars`), `read_hk_instrument_list`
+  (`hk_instrument_list`), and `read_watchlist_instruments` with only the
+  instruments in the currency of the market (`USD` or `HKD`).
+- The daily bar summary has no trading status (`market_data.md` section
+  8.14). "Still trading" is a rule of `screen`: the last daily bar of the
+  instrument is at most 7 calendar days older than the daily bars date of
+  the run. The daily bars date is the date of the newest last daily bar of
+  the start instruments.
+- A start instrument without a summary row is excluded with the reason
+  "No daily bars". A filter on the average trading value (20) of an
+  instrument with fewer than 20 daily bars gives "No value: Avg trading
+  value (20)".
+- Step 2 reads the daily bars before the day after the daily bars date
+  with one `read_last_daily_bars` call. Its `bar_count` is the longest
+  look-back of the indicators (section 23.4). Each indicator gets only its
+  own look-back bars, the last bars of the read.
+- An instrument with "no value" for an indicator of a condition or of the
+  order gets the reason "No value: <indicator>" with the first such
+  indicator. The other excluded instruments get the reason of the first
+  condition that is not true, in the form "<location>: <condition>", for
+  example "filters[1]: Close > 5", "indicator_conditions[0]: RSI(14) < 30",
+  "indicator_conditions[1]: Close above SMA(200)", or
+  "indicator_conditions[2]: 12-1 momentum(252, 21) top 20%".
+- The percentile of a rank condition is 100 × the share of the values that
+  are lower or equal. "Top N" keeps a percentile above 100 − N. "Bottom N"
+  keeps the instruments whose share of lower values is below N percent.
+  Equal values get the same percentile and the same answer.
+- The sort uses the order indicator, then the symbol. When more than 500
+  instruments pass, the result keeps the first 500 of the order.
+  `after_indicator_conditions_count` counts all passing instruments.
+- A run saves the full excluded list, also for a run with all US
+  instruments.
+- `market_data` has no instrument name (`market_data.md` has no name
+  source), so the result has no "Name" column yet. The name source needs a
+  decision of the user.
+
 ## 24.6 Checks
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) B5.
@@ -248,6 +295,26 @@ The screen result answer:
 - `definition`: the copy of the screen.
 - `rows`: each row has all columns of the result table (section 24.10).
 - `exclusions`: the excluded instruments with their reasons.
+
+Decided (#206): the screen result answer is
+`{"id", "screen_id", "market", "assistant_conversation_id", "summary", "definition", "rows", "exclusions"}`.
+
+- `summary`: `row_count` (all rows, also the rows that are not on the
+  page), `start_count`, `after_filters_count`,
+  `after_indicator_conditions_count`, `result_count`, `exclusion_counts`
+  (`[{"reason", "count"}]`, the most frequent reason first),
+  `daily_bars_date` (null when no start instrument has daily bars),
+  `run_at_utc`, and `run_seconds`.
+- Each row: `position`, `symbol`, `exchange`, `currency`, `last_price`
+  (decimal string), `average_trading_value_20` (null with fewer than 20
+  daily bars), `indicator_values` (the value of each indicator of a
+  condition or of the order by its name, for example `{"RSI(14)": 28.4}`),
+  and `percentiles` (the percentile of each rank condition by the name of
+  its indicator).
+- `exclusions`: all excluded instruments (`symbol`, `exchange`,
+  `currency`, `reason`), by symbol. The route does not page them.
+- `offset` is 0 or more. `limit` is 1 to 500, default 50.
+- A run of the user has `assistant_conversation_id` null.
 
 ## 24.8 AI assistant access
 
@@ -408,9 +475,9 @@ Behavior:
   saved screen only.
 - How the user runs a screen again after new daily bars. The final title row
   of #145 has no "Run screen" button.
-- What the result does when more than 500 instruments pass. #145 and #150
-  give at most 500 rows.
-- The rank method for ties in a percentile.
+- Decided (#206): what the result does when more than 500 instruments
+  pass (section 24.5).
+- Decided (#206): the rank method for ties in a percentile (section 24.5).
 - Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
   `>=` (section 24.4.1).
 - The default order of a new screen.
@@ -419,11 +486,11 @@ Behavior:
   24.4).
 - Decided (#205): `GET /api/screens/{id}` shows the last 10 runs. The side
   column is left to the screen page.
-- Whether `screen` saves the full excluded list of a run with all US
-  instruments (about 10000).
-- How `screen` sets "Still trading" from `last_day_start_utc` of the
-  daily bar summary. Decided (#195): `market_data` stores no status
-  ([`market_data.md`](market_data.md) section 8.14).
+- Decided (#206): `screen` saves the full excluded list of a run with all
+  US instruments (section 24.5).
+- Decided (#206): `screen` sets "Still trading" from `last_day_start_utc`
+  of the daily bar summary (section 24.5). Decided (#195): `market_data`
+  stores no status ([`market_data.md`](market_data.md) section 8.14).
 - How the point-in-time run of a backtest uses the source order: the global
   source order or the source order of the backtest.
 - The survivorship bias warning of a point-in-time backtest whose screen

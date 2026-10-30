@@ -537,6 +537,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screens/{screen_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Screen
+         * @description Runs the saved screen and saves 1 screen result (section 24.5).
+         */
+        post: operations["run_screen_api_screens__screen_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screen-results/{screen_result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen Result */
+        get: operations["read_screen_result_api_screen_results__screen_result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -1286,6 +1323,13 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** ExclusionCountResponse */
+        ExclusionCountResponse: {
+            /** Reason */
+            reason: string;
+            /** Count */
+            count: number;
+        };
         /** FillComparisonResponse */
         FillComparisonResponse: {
             /**
@@ -1935,6 +1979,59 @@ export interface components {
             /** Recent Screen Results */
             recent_screen_results: components["schemas"]["ScreenResultSummaryResponse"][];
         };
+        /** ScreenResultExclusionResponse */
+        ScreenResultExclusionResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ScreenResultResponse */
+        ScreenResultResponse: {
+            /** Id */
+            id: number;
+            /** Screen Id */
+            screen_id: number;
+            market: components["schemas"]["Market"];
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            summary: components["schemas"]["ScreenRunSummaryResponse"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Rows */
+            rows: components["schemas"]["ScreenResultRowResponse"][];
+            /** Exclusions */
+            exclusions: components["schemas"]["ScreenResultExclusionResponse"][];
+        };
+        /** ScreenResultRowResponse */
+        ScreenResultRowResponse: {
+            /** Position */
+            position: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Last Price */
+            last_price: string;
+            /** Average Trading Value 20 */
+            average_trading_value_20: number | null;
+            /** Indicator Values */
+            indicator_values: {
+                [key: string]: number;
+            };
+            /** Percentiles */
+            percentiles: {
+                [key: string]: number;
+            };
+        };
         /** ScreenResultSummaryResponse */
         ScreenResultSummaryResponse: {
             /** Id */
@@ -1946,6 +2043,30 @@ export interface components {
             run_at_utc: string;
             /** Result Count */
             result_count: number;
+        };
+        /** ScreenRunSummaryResponse */
+        ScreenRunSummaryResponse: {
+            /** Row Count */
+            row_count: number;
+            /** Start Count */
+            start_count: number;
+            /** After Filters Count */
+            after_filters_count: number;
+            /** After Indicator Conditions Count */
+            after_indicator_conditions_count: number;
+            /** Result Count */
+            result_count: number;
+            /** Exclusion Counts */
+            exclusion_counts: components["schemas"]["ExclusionCountResponse"][];
+            /** Daily Bars Date */
+            daily_bars_date: string | null;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Run Seconds */
+            run_seconds: number;
         };
         /** SendOrderRequest */
         SendOrderRequest: {
@@ -3935,6 +4056,89 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_screen_api_screens__screen_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_result_api_screen_results__screen_result_id__get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                screen_result_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
             };
             /** @description Not Found */
             404: {
