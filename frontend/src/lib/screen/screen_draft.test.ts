@@ -116,6 +116,22 @@ describe('screen draft', () => {
     expect(grouped.other).toEqual(['A screen with the name exists.']);
   });
 
+  it('is not changed when only the key order differs, as in a definition that PostgreSQL stored', () => {
+    const stored = {
+      order: { direction: 'descending', indicator: { output: 'value', indicator: 'sma', parameters: { period: 3 } } },
+      start: 'watchlist',
+      filters: [{ values: ['NASDAQ'], field: 'exchange' }],
+      indicator_conditions: [],
+    };
+    const shown = {
+      start: 'watchlist',
+      filters: [{ field: 'exchange', values: ['NASDAQ'] }],
+      indicator_conditions: [],
+      order: { indicator: sma(3), direction: 'descending' },
+    };
+    expect(isDraftChanged({ market: 'US', definition: stored }, { market: 'US', definition: shown })).toBe(false);
+  });
+
   it('is changed when the definition or the market differs from the saved screen', () => {
     const saved = { market: 'US', definition };
     expect(isDraftChanged(saved, { market: 'US', definition: structuredClone(definition) })).toBe(false);

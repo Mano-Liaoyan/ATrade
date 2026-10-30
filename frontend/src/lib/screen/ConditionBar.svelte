@@ -107,7 +107,7 @@
           {/if}
         </span>
         {#each tagProblems as problem (problem)}
-          <span class="cds--form-requirement problem-text" role="alert">{problem}</span>
+          <span class="problem-text" role="alert">{problem}</span>
         {/each}
       {/each}
       {#if onAdd !== undefined && GROUP_PARTS[index] === 'indicator_conditions'}
@@ -152,7 +152,9 @@
     margin: 0;
   }
 
+  /* A tag shows its full text: the value is the data that the user reads. */
   .condition-tag .cds--tag__label {
+    max-inline-size: none;
     display: inline-flex;
     gap: var(--cds-spacing-02);
   }
@@ -176,9 +178,11 @@
     fill: var(--cds-support-error);
   }
 
+  /* The problem text of a Carbon invalid field ($helper-text-01, $text-error). */
   .problem-text {
-    display: block;
-    margin: 0;
+    font-size: var(--cds-helper-text-01-font-size);
+    line-height: var(--cds-helper-text-01-line-height);
+    letter-spacing: var(--cds-helper-text-01-letter-spacing);
     color: var(--cds-text-error);
   }
 

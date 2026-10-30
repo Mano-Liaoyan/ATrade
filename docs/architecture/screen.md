@@ -286,6 +286,7 @@ Decided (#205): the paths and the field names of this table are final.
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
 | `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. |
 | `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
+| `GET /api/screen-indicators` | `200` with the indicator catalog of section 23.3, in its order: `[{"key", "name", "parameters": [{"name", "value_type" ("int" or "float"), "default", "minimum", "maximum", "is_in_name"}], "outputs"}]`. The edit popover of the screen page reads it (#212). Not on the AI assistant port. |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
 The screen result answer:
@@ -450,6 +451,36 @@ Behavior:
 - When there are many conditions, the bar has 2 or 3 lines.
 - Filters and indicator conditions are told apart by their order and the
   group strips, not by color.
+- Decided (#212): the edit popover (Bits UI Popover below the tag) has the
+  name of the part as its title, the fields of the part, and the buttons
+  "Remove" (a filter or an indicator condition), "Cancel", and "Apply":
+
+  | Part | Fields |
+  |---|---|
+  | Start instruments | Instruments (the start instruments of the market, section 24.2) |
+  | Still trading | none |
+  | Close, Avg trading value (20) | Operator, Value |
+  | Exchange | A checkbox for each exchange of the market: US NASDAQ and NYSE, HK SEHK |
+  | Indicator (compare) | Indicator, its parameters, Output (only for MACD, Bollinger Bands, and the Donchian channel), Operator, Value |
+  | Close vs line | Close (above or below), Line (SMA, EMA, or the Donchian channel upper line), its parameters |
+  | Rank | Keep (Top or Bottom), %, Indicator, its parameters |
+  | Order | Indicator, its parameters, Output, Direction (High first or Low first), First (empty for all) |
+
+  The parameters show the parameters that are in the UI name (section 23.3);
+  `bars_per_year` keeps its value. The fields scroll in their own
+  `ScrollRegion`. The page does not check the values: the run route checks
+  them, and each problem of the `422` list shows next to its tag (the
+  Carbon error icon, an error outline, and the text in `$text-error`). A
+  problem without a tag location (for example the name of "Save as new
+  screen") shows in an error notification. While a change has a problem,
+  the bar has no funnel counts.
+- Decided (#212): "Add condition" is a menu: Close, Avg trading value (20),
+  Exchange, Still trading, then Indicator, Close vs line, and Rank. An item
+  opens the edit popover of a new condition with the values of the #145
+  prototype (Close ≥ 5, Avg trading value (20) ≥ 20,000,000, all exchanges
+  of the market, RSI(14) < 30, Close above SMA(200), top 20% by
+  12-1 momentum). Its button "Add condition" adds it to the filters or to
+  the indicator conditions and runs the screen.
 
 ### 24.10.2 Result table
 
@@ -502,20 +533,23 @@ Behavior:
   draft that "Save as new screen" saves; "Save screen" does not show for it.
   The switch sets the start instruments of the market (US: quarter
   universe, HK: HK instrument list) and removes the exchange filters.
-- Decided (#212): "Add condition" adds the indicator condition
-  RSI(14) < 30 and runs at once. A click on a Close or Avg trading value
-  filter, or on a compare condition, opens the "Edit condition" dialog
-  (operator and value).
+- Decided (#212): a click on a tag opens its edit popover, and "Add
+  condition" is a menu of the 7 conditions (section 24.10.1). The edit
+  popover reads the indicator catalog from `GET /api/screen-indicators`
+  (section 24.7).
 - Decided (#212): "Save as new screen" names the new screen
   "<name> copy" (or "<name> copy N" when that name is in use).
-- How the user runs a screen again after new daily bars. The final title row
-  of #145 has no "Run screen" button.
+- Decided (#212): how the user runs a screen again after new daily bars:
+  "Apply" in any edit popover runs the screen again, also without a change.
+  The page adds no "Run screen" button (#145).
 - Decided (#206): what the result does when more than 500 instruments
   pass (section 24.5).
 - Decided (#206): the rank method for ties in a percentile (section 24.5).
 - Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
   `>=` (section 24.4.1).
-- The default order of a new screen.
+- Decided (#212): a new screen has no default order. The definition
+  requires the order (section 24.4.1), and "Save as new screen" copies the
+  order of the open screen.
 - Decided (#207): `/screens` stores the id of the last opened screen in the
   browser storage (key `atrade.screen-page.last-screen`). The choice belongs
   to the browser. Without a stored id, or when that screen does not exist,

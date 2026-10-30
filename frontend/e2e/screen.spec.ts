@@ -130,3 +130,136 @@ test('/screens opens the last opened screen, and a long screen list scrolls in i
   await expect(lastScreen).toBeInViewport();
   await expect(scrollTrack).toHaveAttribute('aria-valuenow', '100');
 });
+
+// #212: the edit popover of each tag, "Add condition", the run at once after each change, and the save buttons.
+type Locator = ReturnType<Page['getByRole']>;
+
+const conditionBar = (page: Page): Locator => page.getByRole('list', { name: 'Conditions' });
+
+// A change runs the screen at once. The funnel counts show again when the screen result of the change is there.
+async function expectRunDone(page: Page): Promise<void> {
+  await expect(conditionBar(page).getByLabel('Order count')).toBeVisible();
+}
+
+async function addCondition(page: Page, kind: string): Promise<void> {
+  await page.getByRole('button', { name: 'Add condition', exact: true }).click();
+  await page.getByRole('menuitem', { name: kind, exact: true }).click();
+  await page.getByRole('dialog', { name: 'Edit condition' }).getByRole('button', { name: 'Add condition' }).click();
+}
+
+async function editTag(page: Page, tag: string): Promise<Locator> {
+  await page.getByRole('button', { name: `Edit ${tag}`, exact: true }).click();
+  const popover = page.getByRole('dialog', { name: 'Edit condition' });
+  await expect(popover).toBeVisible();
+  return popover;
+}
+
+async function selectOption(page: Page, popover: Locator, field: string, option: string): Promise<void> {
+  await popover.getByRole('combobox', { name: field, exact: true }).click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+}
+
+async function applyAndWait(page: Page, popover: Locator, tag: string): Promise<void> {
+  await popover.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByRole('button', { name: `Edit ${tag}`, exact: true })).toBeVisible();
+  await expectRunDone(page);
+}
+
+test('edits each kind of condition, runs at once, keeps the saved screen, and saves', async ({ page, request }, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const name = uniqueName(currentTest, 'Edit');
+  const screenId = await createScreen(request, name, 'US', {
+    start: 'watchlist',
+    filters: [{ field: 'last_price', operator: '>', value: '0' }],
+    indicator_conditions: [],
+    order: { indicator: SMA_3, direction: 'descending' },
+  });
+  await runScreen(request, screenId);
+  await page.goto(`/screens/${String(screenId)}`);
+  const bar = conditionBar(page);
+  const saveScreen = page.getByRole('button', { name: 'Save screen' });
+  await expectRunDone(page);
+  await expect(saveScreen).toHaveCount(0);
+
+  // Add each kind of condition.
+  const added: [string, string][] = [
+    ['Still trading', 'Still trading'],
+    ['Avg trading value (20)', 'Avg trading value (20) ≥ 20,000,000'],
+    ['Exchange', 'Exchange in NASDAQ, NYSE'],
+    ['Indicator', 'RSI(14) < 30'],
+    ['Close vs line', 'Close above SMA(200)'],
+    ['Rank', '12-1 momentum(252, 21) top 20%'],
+  ];
+  for (const [kind, tag] of added) {
+    await addCondition(page, kind);
+    await expect(page.getByRole('button', { name: `Edit ${tag}`, exact: true })).toBeVisible();
+    await expectRunDone(page);
+  }
+  await expect(saveScreen).toBeVisible();
+
+  // Change a filter, an indicator condition with its parameter, a line, a rank, the order, and the start instruments.
+  let popover = await editTag(page, 'Close > 0');
+  await popover.getByLabel('Value').fill('1');
+  await applyAndWait(page, popover, 'Close > 1');
+
+  popover = await editTag(page, 'RSI(14) < 30');
+  await popover.getByLabel('Period').fill('10');
+  await selectOption(page, popover, 'Operator', '≥');
+  await popover.getByLabel('Value').fill('0');
+  await applyAndWait(page, popover, 'RSI(10) ≥ 0');
+
+  popover = await editTag(page, 'Close above SMA(200)');
+  await selectOption(page, popover, 'Close', 'below');
+  await selectOption(page, popover, 'Line', 'EMA');
+  await applyAndWait(page, popover, 'Close below EMA(20)');
+
+  popover = await editTag(page, '12-1 momentum(252, 21) top 20%');
+  await selectOption(page, popover, 'Keep', 'Bottom');
+  await popover.getByLabel('%').fill('50');
+  await applyAndWait(page, popover, '12-1 momentum(252, 21) bottom 50%');
+
+  popover = await editTag(page, 'SMA(3) descending');
+  await selectOption(page, popover, 'Direction', 'Low first');
+  await popover.getByLabel('First').fill('5');
+  await applyAndWait(page, popover, 'SMA(3) ascending first 5');
+
+  popover = await editTag(page, 'Watchlist');
+  await selectOption(page, popover, 'Instruments', 'All with daily bars');
+  await applyAndWait(page, popover, 'All with daily bars');
+
+  // A parameter out of its range: the 422 problem shows next to its tag, and the funnel counts go.
+  popover = await editTag(page, 'RSI(10) ≥ 0');
+  await popover.getByLabel('Period').fill('0');
+  await popover.getByRole('button', { name: 'Apply' }).click();
+  await expect(bar.getByRole('alert')).toContainText('period');
+  await expect(bar.getByLabel('Order count')).toHaveCount(0);
+
+  // Remove with the × button and with the Remove button of the popover.
+  await page.getByRole('button', { name: 'Remove RSI(0) ≥ 0', exact: true }).click();
+  await expect(bar.getByRole('alert')).toHaveCount(0);
+  await expectRunDone(page);
+  popover = await editTag(page, 'Exchange in NASDAQ, NYSE');
+  await popover.getByRole('button', { name: 'Remove' }).click();
+  await expect(bar).not.toContainText('Exchange');
+  await expectRunDone(page);
+
+  // The runs did not change the saved screen.
+  const saved = (await (await request.get(`/api/screens/${String(screenId)}`)).json()) as { definition: { filters: unknown[] } };
+  expect(saved.definition.filters).toEqual([{ field: 'last_price', operator: '>', value: '0' }]);
+
+  await saveScreen.click();
+  await expect(saveScreen).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Edit Close > 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit SMA(3) ascending first 5', exact: true })).toBeVisible();
+
+  // A market switch makes a draft that only "Save as new screen" saves.
+  await page.getByRole('tablist', { name: 'Market' }).getByRole('tab', { name: 'HK' }).click();
+  await expect(page.getByRole('button', { name: 'Edit HK instrument list', exact: true })).toBeVisible();
+  await expectRunDone(page);
+  await expect(saveScreen).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save as new screen' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${name} copy`);
+  await expect(page.getByRole('region', { name: 'Screen list' })).toContainText(`${name} copy`);
+  await expect(page.getByText('The universe has survivorship bias', { exact: false })).toBeVisible();
+});

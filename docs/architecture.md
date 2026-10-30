@@ -430,6 +430,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   DropdownMenu: `label` (the trigger name), `items` (`label`, `disabled`,
   `danger`, `onSelect`), and `size`. The menu goes under `<body>`, so a
   scroll region does not clip it.
+- `foundation/carbon` `MenuButton` is a ghost button with a text that opens
+  a menu with the Carbon overflow menu options, on Bits UI DropdownMenu:
+  `label`, `items` (`label`, `divider`, `onSelect(trigger)`).
+  `foundation/carbon` `Popover` is the Carbon popover (drop shadow, no
+  caret) on Bits UI Popover: `open`, `onOpenChange`, `anchor` (the element
+  that it opens below; one popover can serve many triggers), and `label`
+  (the accessible name of the popover dialog). It goes under `<body>`.
 - `foundation/carbon` `InlineNotification` is the Carbon inline
   notification: `kind` (`success` and `info` are a status, `error` and
   `warning` are an alert), `title`, `subtitle`, `lowContrast`, and
@@ -2038,7 +2045,12 @@ option and records it in this document.
   once with the optional body `{market, definition}` of
   `POST /api/screens/{id}/runs`; the saved screen does not change. A screen
   keeps its market, so a US / HK switch is saved with "Save as new screen".
-  `docs/architecture/screen.md` sections 24.7 and 24.13 have the details.
+  The edit popover reads the indicator catalog from the new read-only route
+  `GET /api/screen-indicators`. "Apply" in an edit popover runs the screen
+  again also without a change: this is the run after new daily bars. A new
+  screen has no default order: "Save as new screen" copies the order.
+  `docs/architecture/screen.md` sections 24.7, 24.10.1, and 24.13 have the
+  details.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

@@ -192,7 +192,7 @@
         {@render comparison()}
       {:else if kind === 'exchange'}
         <fieldset class="cds--fieldset">
-          <legend class="cds--label">Exchanges</legend>
+          <legend class="cds--visually-hidden">Exchanges</legend>
           {#each exchanges as exchange (exchange)}
             <Checkbox
               label={exchange}
@@ -320,8 +320,10 @@
   }
 
   .editor-actions .cds--btn {
-    flex: 1;
+    flex: 1 1 0;
+    min-inline-size: 0;
     max-inline-size: none;
+    padding-inline-end: var(--cds-spacing-05);
   }
 
   /* The number fields: right-aligned with tabular numbers. */

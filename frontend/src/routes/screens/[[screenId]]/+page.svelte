@@ -73,6 +73,10 @@
   // The changed, unsaved screen (section 24.13). Null when the page shows the saved screen.
   let draft = $state<(Draft & { screenId: number }) | null>(null);
   let isSaving = $state(false);
+  // Counts the draft runs. Only the answer of the last run changes the page.
+  let runNumber = 0;
+  // The screen result of the last draft run. The page shows it also while the URL changes to its ?result.
+  let runResultId: number | null = null;
   // The problems of the last 422 answer for the draft (section 24.6), by tag.
   let problems = $state<{ byTarget: Map<string, string[]>; other: string[] } | null>(null);
   let catalog: ScreenIndicator[] = $state([]);
@@ -87,7 +91,7 @@
     return shownScreen?.recent_screen_results[0]?.id ?? null;
   });
   const shownResult = $derived(
-    screenResult !== null && screenResult.id === screenResultId && screenResult.screen_id === screenId
+    screenResult !== null && (screenResult.id === screenResultId || screenResult.id === runResultId) && screenResult.screen_id === screenId
       ? screenResult
       : null,
   );
@@ -150,6 +154,10 @@
       return;
     }
     const id = screenResultId;
+    // The page has the screen result of its own run already.
+    if (id === runResultId) {
+      return;
+    }
     selectedPositions = [];
     addMessage = null;
     resultMessage = '';
@@ -179,8 +187,11 @@
     draft = { screenId: current.id, market, definition };
     resultMessage = '';
     problems = null;
+    runNumber += 1;
+    const thisRun = runNumber;
     const result = await runScreenDraft(fetch, current.id, { market, definition });
-    if (draft.definition !== definition || draft.market !== market) {
+    // The answer of a run that a newer change replaced is stale.
+    if (thisRun !== runNumber) {
       return;
     }
     if (result.kind === 'check_failed') {
@@ -191,6 +202,8 @@
       resultMessage = result.message;
       return;
     }
+    runResultId = result.value.id;
+    selectedPositions = [];
     screenResult = result.value;
     const path = `${resolve('/screens/[[screenId]]', { screenId: String(current.id) })}?result=${String(result.value.id)}`;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- the path above is resolved.
@@ -237,9 +250,7 @@
     counts: ScreenResult['summary'] | null;
   } {
     const base = currentDraft(result);
-    const isResultDefinition =
-      base.market === result.market && JSON.stringify(base.definition) === JSON.stringify(result.definition);
-    return isResultDefinition
+    return !isDraftChanged({ market: result.market, definition: result.definition }, base)
       ? { definition: result.definition, names: result.indicator_names, counts: result.summary }
       : { definition: base.definition, names: nameDefinitionIndicators(base.definition, catalog), counts: null };
   }
@@ -351,29 +362,31 @@
         <h1 class="screen-title">{current.name}</h1>
         {#if shownResult !== null}
           {@const result = shownResult}
-          <ContentSwitcher
-            label="Market"
-            size="sm"
-            items={[
-              { value: 'US', label: 'US' },
-              { value: 'HK', label: 'HK' },
-            ]}
-            value={currentDraft(result).market}
-            onValueChange={(value: ScreenMarket) => {
-              switchDraftMarket(current, result, value);
-            }}
-          />
+          <div class="market-switch">
+            <ContentSwitcher
+              label="Market"
+              size="sm"
+              items={[
+                { value: 'US', label: 'US' },
+                { value: 'HK', label: 'HK' },
+              ]}
+              value={currentDraft(result).market}
+              onValueChange={(value: ScreenMarket) => {
+                switchDraftMarket(current, result, value);
+              }}
+            />
+          </div>
           <div class="title-actions">
             <button
               type="button"
-              class="cds--btn cds--btn--tertiary cds--btn--sm"
+              class="cds--btn cds--btn--tertiary cds--btn--sm cds--layout--size-sm"
               disabled={isSaving}
               onclick={() => void saveAsNewScreen(current, result)}>Save as new screen</button
             >
             {#if isChanged && shownDraft?.market === current.market}
               <button
                 type="button"
-                class="cds--btn cds--btn--primary cds--btn--sm"
+                class="cds--btn cds--btn--primary cds--btn--sm cds--layout--size-sm"
                 disabled={isSaving}
                 onclick={() => void saveDraft(current)}>Save screen</button
               >
@@ -545,6 +558,12 @@
     flex: none;
     gap: var(--cds-spacing-05);
     align-items: center;
+  }
+
+  /* The US / HK switch: 2 short labels. */
+  .market-switch {
+    flex: none;
+    inline-size: var(--cds-spacing-13);
   }
 
   .title-actions {

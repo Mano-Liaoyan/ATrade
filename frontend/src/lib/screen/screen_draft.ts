@@ -188,6 +188,23 @@ export function switchMarket(definition: ScreenDefinition, market: ScreenMarket)
   };
 }
 
+// PostgreSQL stores the definition as jsonb, which changes the key order. The comparison sorts the keys.
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeys);
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([first], [second]) => first.localeCompare(second))
+        .map(([key, item]) => [key, sortKeys(item)]),
+    );
+  }
+  return value;
+}
+
 export function isDraftChanged(saved: ScreenDraft, draft: ScreenDraft): boolean {
-  return saved.market !== draft.market || JSON.stringify(saved.definition) !== JSON.stringify(draft.definition);
+  return (
+    saved.market !== draft.market || JSON.stringify(sortKeys(saved.definition)) !== JSON.stringify(sortKeys(draft.definition))
+  );
 }
