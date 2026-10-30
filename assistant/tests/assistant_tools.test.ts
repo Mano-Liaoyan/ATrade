@@ -14,6 +14,10 @@ import {
   backtestBody,
   COMPARISON,
   NO_SAVED_BARS,
+  SCREEN,
+  SCREEN_LIST,
+  SCREEN_SUMMARY,
+  screenRow,
   startFakeWebPort,
   STRATEGY,
   STRATEGY_LIST,
@@ -281,5 +285,100 @@ describe('run_backtest', () => {
 
     expect(readToolResults()).toEqual([`Port 8001 answered 422: ${JSON.stringify(NO_SAVED_BARS)}`]);
     expect(eventsOfType(events, 'tool_step').at(-1)?.status).toBe('failed');
+  });
+});
+
+describe('the screen tools', () => {
+  const DEFINITION = { start: 'quarter_universe', filters: [], indicator_conditions: [] };
+
+  test('each tool calls port 8001 with the conversation (25.4.3)', async () => {
+    const conversations = await openConversations([
+      call('list_screens'),
+      call('read_screen', { screen_id: 5 }),
+      call('create_screen', { name: 'Momentum leaders', market: 'US', definition: DEFINITION }),
+      call('update_screen', { screen_id: 5, name: 'Momentum leaders (AI)', definition: DEFINITION }),
+      call('run_screen', { screen_id: 5 }),
+      call('read_screen_result', { screen_result_id: 9 }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(web.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      'GET /api/screens',
+      'GET /api/screens/5',
+      'POST /api/screens',
+      'PUT /api/screens/5',
+      'POST /api/screens/5/runs',
+      'GET /api/screen-results/9?offset=0&limit=50',
+    ]);
+    expect(web.requests.map((request) => request.conversationId)).toEqual(Array(6).fill(CONVERSATION_ID));
+    expect(web.requests[2]?.body).toEqual({ name: 'Momentum leaders', market: 'US', definition: DEFINITION });
+    expect(web.requests[3]?.body).toEqual({ name: 'Momentum leaders (AI)', definition: DEFINITION });
+    const results = readToolResults();
+    expect(results.slice(0, 4)).toEqual([SCREEN_LIST, SCREEN, SCREEN, SCREEN]);
+  });
+
+  test('read_screen_result gives the summary and the first 50 rows, and reads the next page', async () => {
+    const conversations = await openConversations([
+      call('read_screen_result', { screen_result_id: 9 }),
+      call('read_screen_result', { screen_result_id: 9, offset: 50 }),
+      call('read_screen_result', { screen_result_id: 9, offset: 100 }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    const [first, second, last] = readToolResults() as Record<string, unknown>[];
+    expect(first).toEqual({
+      id: 9,
+      screen_id: 5,
+      market: 'US',
+      summary: SCREEN_SUMMARY,
+      definition: { start: 'quarter_universe' },
+      offset: 0,
+      rows: Array.from({ length: 50 }, (_unused, index) => screenRow(index + 1)),
+      next_offset: 50,
+    });
+    expect((second?.rows as unknown[])[0]).toEqual(screenRow(51));
+    expect(second?.next_offset).toBe(100);
+    expect((last?.rows as unknown[]).length).toBe(20);
+    expect(last?.next_offset).toBeNull();
+  });
+
+  test.each([
+    ['create_screen', { name: 'Momentum leaders', market: 'US', definition: {} }],
+    ['update_screen', { screen_id: 5, name: 'Momentum leaders (AI)', definition: {} }],
+    ['run_screen', { screen_id: 5 }],
+  ])('%s gives the problem list of a 422 to the model, and the model tries again', async (toolName, toolArguments) => {
+    const problems = {
+      problems: [{ location: ['definition', 'indicator_conditions', 0, 'operator'], message: "Use one of '<', '<=', '>', '>='." }],
+    };
+    web.screenAnswers.push({ status: 422, body: problems });
+    const conversations = await openConversations([call(toolName, toolArguments), call(toolName, toolArguments), { text: 'Done.' }]);
+
+    const events = await runOnce(conversations);
+
+    const results = readToolResults();
+    expect(results[0]).toBe(`Port 8001 answered 422: ${JSON.stringify(problems)}`);
+    expect(eventsOfType(events, 'tool_step').map((event) => event.status)).toEqual([
+      'running',
+      'failed',
+      'running',
+      'succeeded',
+    ]);
+  });
+
+  test('update_screen gives the 403 of a screen that it cannot change to the model', async () => {
+    const refused = { detail: 'The AI assistant cannot change screen 5.' };
+    web.screenAnswers.push({ status: 403, body: refused });
+    const conversations = await openConversations([
+      call('update_screen', { screen_id: 5, name: 'Value', definition: {} }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(readToolResults()).toEqual([`Port 8001 answered 403: ${JSON.stringify(refused)}`]);
   });
 });

@@ -391,6 +391,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/us-universe/range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Us Universe Range */
+        get: operations["read_us_universe_range_api_us_universe_range_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backtests/{backtest_id}": {
         parameters: {
             query?: never;
@@ -945,6 +962,8 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
@@ -1204,6 +1223,8 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
@@ -1561,11 +1582,14 @@ export interface components {
             /** Version Number */
             version_number: number;
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             desired_state: components["schemas"]["DesiredState"];
             status: components["schemas"]["ForwardTestStatus"];
@@ -1997,6 +2021,10 @@ export interface components {
             /** Models */
             models: components["schemas"]["ProviderModelResponse"][];
         };
+        /** @enum {string} */
+        RankDirection: "high_to_low" | "low_to_high";
+        /** @enum {string} */
+        RebalancePeriod: "weekly" | "monthly" | "quarterly";
         /** RenameConversationRequest */
         RenameConversationRequest: {
             /** Title */
@@ -2041,12 +2069,16 @@ export interface components {
             /** Items */
             items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
         };
-        /** RuleSettings */
+        /**
+         * RuleSettings
+         * @description `position_size` is not used in the universe mode: each member gets equity / `hold_count`.
+         */
         RuleSettings: {
             /** Position Size */
             position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
             /** Template Id */
             template_id?: string | null;
+            universe?: components["schemas"]["UniverseSettings"] | null;
         };
         /** RulesCodeRequest */
         RulesCodeRequest: {
@@ -2323,16 +2355,20 @@ export interface components {
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };
-        /** StartForwardTestRequest */
+        /**
+         * StartForwardTestRequest
+         * @description The universe comes in `universe`, or for a single instrument in `symbol`, `exchange`, and `currency`.
+         */
         StartForwardTestRequest: {
             /** Strategy Version Id */
             strategy_version_id: number;
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
             /** Exchange */
-            exchange: string;
+            exchange?: string | null;
             /** Currency */
-            currency: string;
+            currency?: string | null;
+            universe?: components["schemas"]["UniverseBody"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /** Allocated Capital Usd */
             allocated_capital_usd: number | string;
@@ -2340,7 +2376,7 @@ export interface components {
             end_time_utc?: string | null;
         };
         /** @enum {string} */
-        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
+        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3" | "m1" | "m2" | "m3" | "m4";
         /**
          * StartRefusedResponse
          * @description The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18).
@@ -2599,8 +2635,61 @@ export interface components {
             /** Exchange */
             exchange: string | null;
         };
+        /**
+         * UniverseBody
+         * @description `single` needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, `list` needs nothing: the members
+         *     are the watchlist at the start (section 12.17).
+         */
+        UniverseBody: {
+            kind: components["schemas"]["UniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+        };
+        /** UniverseInstrumentResponse */
+        UniverseInstrumentResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Net Profit Usd */
+            net_profit_usd: string;
+            /** Quarter Count */
+            quarter_count: number;
+        };
         /** @enum {string} */
         UniverseKind: "single" | "rule" | "list";
+        /**
+         * UniverseSettings
+         * @description The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.
+         *
+         *     The strategy holds the `hold_count` members with the best rank, with equal weight, and ranks again at the start of
+         *     each `rebalance_period`.
+         */
+        UniverseSettings: {
+            rank_indicator: components["schemas"]["IndicatorOperand"];
+            rank_direction: components["schemas"]["RankDirection"];
+            /** Hold Count */
+            hold_count: number;
+            rebalance_period: components["schemas"]["RebalancePeriod"];
+        };
+        /**
+         * UsUniverseRangeResponse
+         * @description The first and the last quarter start with US universe data. Null without universe data.
+         */
+        UsUniverseRangeResponse: {
+            /** First Day Utc */
+            first_day_utc: string | null;
+            /** Last Day Utc */
+            last_day_utc: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -4045,6 +4134,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_us_universe_range_api_us_universe_range_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsUniverseRangeResponse"];
                 };
             };
         };

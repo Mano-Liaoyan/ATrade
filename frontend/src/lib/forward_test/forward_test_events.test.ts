@@ -13,6 +13,8 @@ const forwardTest: ForwardTest = {
   exchange: 'NASDAQ',
   currency: 'USD',
   bar_period: '1-MINUTE',
+  universe_kind: 'single',
+  universe_top_n: null,
   desired_state: 'running',
   status: 'running',
   client_id: 10,

@@ -44,7 +44,9 @@ export {
   findIndicatorChoice,
   findRulesVersionNumber,
   listOperandChoices,
+  RANK_DIRECTION_CHOICES,
   readOperandChoice,
+  REBALANCE_CHOICES,
   type Comparison,
   type GroupMatch,
   type IndicatorChoice,
@@ -57,5 +59,8 @@ export {
   type RuleCondition,
   type RuleExits,
   type RuleGroup,
+  type RankDirection,
+  type RebalancePeriod,
   type StrategyRules,
+  type UniverseSettings,
 } from './strategy_rules';

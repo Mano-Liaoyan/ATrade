@@ -288,6 +288,18 @@ async def select_universe_periods(
     return periods
 
 
+async def count_member_periods(connection: psycopg.AsyncConnection, backtest_id: int) -> dict[tuple[str, str], int]:
+    """The number of universe periods of each member of the backtest. Empty for a single-instrument backtest."""
+    cursor = await connection.execute(
+        """
+        SELECT symbol, exchange, count(*) FROM backtest_universe_member
+        WHERE backtest_id = %(backtest_id)s GROUP BY symbol, exchange
+        """,
+        {"backtest_id": backtest_id},
+    )
+    return {(symbol, exchange): count for symbol, exchange, count in await cursor.fetchall()}
+
+
 async def select_backtests(connection: psycopg.AsyncConnection) -> list[BacktestRow]:
     """Returns all backtests that are not runs of a parameter sweep, the newest first (docs/architecture/backtest.md
     section 10.11.4)."""

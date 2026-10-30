@@ -66,8 +66,8 @@ test('shows the condition bar with funnel counts, both tables, and adds selected
   await expect(bar.getByLabel('Filters count')).toHaveText(String(summary.after_filters_count));
   await expect(bar.getByLabel('Indicator conditions count')).toHaveText(String(summary.after_indicator_conditions_count));
   await expect(bar.getByLabel('Order count')).toHaveText(String(summary.result_count));
-  await expect(bar).toContainText('Close>0');
-  await expect(bar).toContainText('SMA(3)top100%');
+  await expect(bar).toContainText('Close > 0');
+  await expect(bar).toContainText('SMA(3) top 100%');
   await expect(page.getByText('Survivorship bias', { exact: false })).toHaveCount(0);
 
   const results = page.getByRole('region', { name: 'Result table' });

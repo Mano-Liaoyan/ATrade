@@ -56,11 +56,16 @@ def select_ledger_fills_blocking(connection: psycopg.Connection, forward_test_id
 
 
 async def select_forward_test_fills(
-    connection: psycopg.AsyncConnection, *, forward_test_id: int, instrument: Instrument, uses_owner_ledger: bool
+    connection: psycopg.AsyncConnection,
+    *,
+    forward_test_id: int,
+    instrument: Instrument | None,
+    uses_owner_ledger: bool,
 ) -> list[ForwardTestFill]:
     """The fills from the owner ledger (section 12.8). A forward test of the time before the owner ledger keeps its
-    fills in forward_test_fill, on its one instrument (section 12.24)."""
-    if uses_owner_ledger:
+    fills in forward_test_fill, on its one instrument (section 12.24). A multi-instrument forward test (instrument
+    None) always uses the owner ledger."""
+    if uses_owner_ledger or instrument is None:
         return [convert_ledger_fill(fill) for fill in await read_forward_test_fills(connection, forward_test_id)]
     return [ForwardTestFill(instrument, trade) for trade in await select_fills(connection, forward_test_id)]
 
