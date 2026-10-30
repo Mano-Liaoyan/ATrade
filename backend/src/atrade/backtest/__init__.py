@@ -34,6 +34,7 @@ from atrade.backtest.sharpe_probability import (
     find_sharpe_probability_status,
 )
 from atrade.backtest.strategy_engine_run import write_look_back_catalog
+from atrade.backtest.sweep_routes import create_sweep_router
 
 __all__ = [
     "BacktestMetrics",
@@ -58,6 +59,7 @@ __all__ = [
     "check_backtest_request",
     "create_backtest_assistant_router",
     "create_backtest_router",
+    "create_sweep_router",
     "find_look_back",
     "find_round_trips",
     "find_sharpe_probability_status",
