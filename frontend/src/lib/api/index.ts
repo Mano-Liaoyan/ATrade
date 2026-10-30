@@ -217,6 +217,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-rules/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Code
+         * @description Makes the code from the rules and saves nothing (section 9.8.3).
+         */
+        post: operations["make_code_api_strategy_rules_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -282,6 +302,8 @@ export interface paths {
         /**
          * Save Version
          * @description Checks the code first. Then it appends a version, or returns the latest version when the code is the same.
+         *
+         *     A `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.
          */
         post: operations["save_version_api_strategies__strategy_id__versions_post"];
         delete?: never;
@@ -545,6 +567,57 @@ export interface paths {
         head?: never;
         /** Rename Conversation */
         patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/assistant/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Providers */
+        get: operations["list_providers_api_assistant_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credentials */
+        get: operations["list_credentials_api_assistant_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Credential */
+        delete: operations["delete_credential_api_assistant_credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -973,6 +1046,8 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** @enum {string} */
+        Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
         /** ConversationDetailResponse */
         ConversationDetailResponse: {
             /** Id */
@@ -1048,6 +1123,34 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CredentialListResponse */
+        CredentialListResponse: {
+            /** Credentials */
+            credentials: components["schemas"]["CredentialResponse"][];
+        };
+        /** CredentialResponse */
+        CredentialResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "oauth" | "api_key";
+            /** Key Last4 */
+            key_last4: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "failed";
+            /** State Message */
+            state_message: string | null;
+        };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
         /** EquityPointResponse */
@@ -1087,6 +1190,16 @@ export interface components {
             backtest_price_usd: string | null;
             /** Price Difference Usd */
             price_difference_usd: string | null;
+        };
+        /** FixedShares */
+        FixedShares: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "fixed_shares";
+            /** Shares */
+            shares: number;
         };
         /**
          * ForwardTestCapitalResponse
@@ -1210,6 +1323,8 @@ export interface components {
             /** Port */
             port: number;
         };
+        /** @enum {string} */
+        GroupMatch: "all_of" | "any_of";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1259,6 +1374,39 @@ export interface components {
              */
             added_at_utc: string;
         };
+        /**
+         * IndicatorOperand
+         * @description A stored indicator reference. A single-line indicator without `output` uses `value`.
+         */
+        IndicatorOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "indicator";
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: components["schemas"]["Number"];
+            };
+            /** Output */
+            output?: string | null;
+        };
+        /**
+         * InnerRuleGroup
+         * @description A group in a group. It holds conditions only, so the maximum depth is 1 nested group.
+         */
+        InnerRuleGroup: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: components["schemas"]["RuleCondition"][];
+        };
         /** InstrumentResponse */
         InstrumentResponse: {
             /** Symbol */
@@ -1288,6 +1436,7 @@ export interface components {
         };
         /** @enum {string} */
         LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
+        LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -1359,6 +1508,16 @@ export interface components {
             filled_quantity: string | null;
             /** Average Fill Price */
             average_fill_price: string | null;
+        };
+        Number: number;
+        /** NumberOperand */
+        NumberOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "number";
+            value: components["schemas"]["Number"];
         };
         /** OpenOrderListResponse */
         OpenOrderListResponse: {
@@ -1443,20 +1602,125 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /**
+         * PercentOfEquity
+         * @description The quantity is equity x percent / close price, rounded down to whole shares.
+         */
+        PercentOfEquity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "percent_of_equity";
+            percent: components["schemas"]["Number"];
+        };
+        /** @enum {string} */
+        PriceName: "close" | "open" | "high" | "low";
+        /** PriceOperand */
+        PriceOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "price";
+            price: components["schemas"]["PriceName"];
+        };
+        /** ProviderListResponse */
+        ProviderListResponse: {
+            /** Providers */
+            providers: components["schemas"]["ProviderResponse"][];
+        };
+        /** ProviderModelResponse */
+        ProviderModelResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** ProviderResponse */
+        ProviderResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Login Methods */
+            login_methods: ("oauth" | "api_key")[];
+            /** Models */
+            models: components["schemas"]["ProviderModelResponse"][];
+        };
         /** RenameConversationRequest */
         RenameConversationRequest: {
             /** Title */
             title: string;
+        };
+        RightOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"] | components["schemas"]["NumberOperand"];
+        /** RuleCondition */
+        RuleCondition: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "condition";
+            left: components["schemas"]["LeftOperand"];
+            comparison: components["schemas"]["Comparison"];
+            right: components["schemas"]["RightOperand"];
+        };
+        /**
+         * RuleExits
+         * @description The exit items. Each item that is not null (or `true`) is selected.
+         */
+        RuleExits: {
+            stop_loss_percent?: components["schemas"]["Number"] | null;
+            take_profit_percent?: components["schemas"]["Number"] | null;
+            /** Exit After Bars */
+            exit_after_bars?: number | null;
+            /**
+             * Exit When Entry Is False
+             * @default false
+             */
+            exit_when_entry_is_false: boolean;
+            exit_group?: components["schemas"]["RuleGroup"] | null;
+        };
+        /** RuleGroup */
+        RuleGroup: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
+        };
+        /** RuleSettings */
+        RuleSettings: {
+            /** Position Size */
+            position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
+            /** Template Id */
+            template_id?: string | null;
+        };
+        /** RulesCodeRequest */
+        RulesCodeRequest: {
+            rules: components["schemas"]["StrategyRules"];
+        };
+        /** RulesCodeResponse */
+        RulesCodeResponse: {
+            /** Code */
+            code: string;
         };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
             backtest_id: number;
         };
-        /** SaveVersionRequest */
+        /**
+         * SaveVersionRequest
+         * @description Exactly one of `code` and `rules` (section 9.6).
+         */
         SaveVersionRequest: {
             /** Code */
-            code: string;
+            code?: string | null;
+            rules?: components["schemas"]["StrategyRules"] | null;
         };
         /**
          * SavedBarsResponse
@@ -1580,6 +1844,17 @@ export interface components {
             created_at_utc: string;
             /** Versions */
             versions: components["schemas"]["StrategyVersionSummary"][];
+        };
+        /** StrategyRules */
+        StrategyRules: {
+            /**
+             * Format Version
+             * @constant
+             */
+            format_version: 1;
+            settings: components["schemas"]["RuleSettings"];
+            entry: components["schemas"]["RuleGroup"];
+            exits: components["schemas"]["RuleExits"];
         };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
@@ -1760,6 +2035,98 @@ export interface components {
              */
             type: "bar";
             bar: components["schemas"]["BarResponse"];
+        };
+        /**
+         * LoginAnswerMessage
+         * @description Browser to server: the answer to a login step `prompt`. For a `select` prompt, the ID of the option.
+         */
+        LoginAnswerMessage: {
+            /**
+             * Type
+             * @default login_answer
+             * @constant
+             */
+            type: "login_answer";
+            /** Prompt Id */
+            prompt_id: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * LoginEndMessage
+         * @description The login ended. The credential is in the credential file of the assistant service.
+         */
+        LoginEndMessage: {
+            /**
+             * Type
+             * @default login_end
+             * @constant
+             */
+            type: "login_end";
+            credential: components["schemas"]["CredentialResponse"];
+        };
+        /** LoginOptionResponse */
+        LoginOptionResponse: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * LoginStartMessage
+         * @description Browser to server: start a login. `method` "oauth" is a subscription login. `name` names the new credential.
+         */
+        LoginStartMessage: {
+            /**
+             * Type
+             * @default login_start
+             * @constant
+             */
+            type: "login_start";
+            /** Provider */
+            provider: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "oauth" | "api_key";
+            /** Name */
+            name: string;
+        };
+        /**
+         * LoginStepMessage
+         * @description One login step of pi (25.7.3).
+         *
+         *     - `auth_url`: open `url` (the authorization link). `message` has the instructions of the provider.
+         *     - `device_code`: enter `user_code` at `url`.
+         *     - `progress`, `info`: `message` (and for `info` maybe a `url`).
+         *     - `prompt`: show a field for `prompt_type` (`text`, `secret` as a password field, `select` with `options`, or
+         *       `manual_code` to paste a code) with the label `message`, and answer with `login_answer` and `prompt_id`.
+         */
+        LoginStepMessage: {
+            /**
+             * Type
+             * @default login_step
+             * @constant
+             */
+            type: "login_step";
+            /**
+             * Step
+             * @enum {string}
+             */
+            step: "auth_url" | "device_code" | "progress" | "info" | "prompt";
+            /** Message */
+            message: string | null;
+            /** Url */
+            url: string | null;
+            /** User Code */
+            user_code: string | null;
+            /** Prompt Id */
+            prompt_id: string | null;
+            /** Prompt Type */
+            prompt_type: ("text" | "secret" | "select" | "manual_code") | null;
+            /** Options */
+            options: components["schemas"]["LoginOptionResponse"][] | null;
         };
         /**
          * MessageDeltaMessage
@@ -2493,6 +2860,39 @@ export interface operations {
             };
         };
     };
+    make_code_api_strategy_rules_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulesCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_strategies_api_strategies_get: {
         parameters: {
             query?: never;
@@ -2698,7 +3098,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The code is the same as the latest version. No new version is made. */
+            /** @description The code (and, for a rules body, the rules) is the same as the latest version. No new version is made. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3466,6 +3866,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_assistant_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_credentials_api_assistant_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_credential_api_assistant_credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

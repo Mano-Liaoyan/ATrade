@@ -1,5 +1,5 @@
-<!-- Carbon text input with its label. An invalid input shows the warning icon and the message below the field, in place
-     of the helper text. -->
+<!-- Carbon text input with its label. Type "password" hides the value (a new API key). An invalid input shows the
+     warning icon and the message below the field, in place of the note text. -->
 <script lang="ts">
   import WarningFilled16 from '@carbon/icons/es/warning--filled/16.js';
   import type { HTMLInputAttributes } from 'svelte/elements';
@@ -9,7 +9,7 @@
   interface Props extends Omit<HTMLInputAttributes, 'class' | 'value' | 'type'> {
     label: string;
     // A text input, or a native date and time input with the Carbon text input look.
-    type?: 'text' | 'date' | 'datetime-local';
+    type?: 'text' | 'password' | 'date' | 'datetime-local';
     value?: string;
     // The message that tells the user how to correct the value. The input is invalid when it is set.
     invalidText?: string | null;
