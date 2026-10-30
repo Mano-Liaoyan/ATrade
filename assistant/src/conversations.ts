@@ -32,6 +32,8 @@ export type CreateTools = (run: { conversationId: string; budget: UserMessageBud
 export interface RunRequest {
   text: string;
   selection: ModelSelection;
+  /** The system prompt of the conversation. web makes it from the prompt version and the fixed part. */
+  systemPrompt: string;
 }
 
 export interface ConversationsOptions {
@@ -131,6 +133,7 @@ export class Conversations {
       model: opened.model,
       piDir: this.options.piDir,
       customTools: this.options.createTools({ conversationId, budget }),
+      systemPrompt: request.systemPrompt,
       conversationSession,
     });
     if (this.abortedRuns.has(conversationId)) {

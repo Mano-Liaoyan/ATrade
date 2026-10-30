@@ -545,7 +545,10 @@ export interface paths {
         /** List Conversations */
         get: operations["list_conversations_api_assistant_conversations_get"];
         put?: never;
-        /** Create Conversation */
+        /**
+         * Create Conversation
+         * @description The conversation records the latest prompt version and the fixed part of the system prompt (25.9).
+         */
         post: operations["create_conversation_api_assistant_conversations_post"];
         delete?: never;
         options?: never;
@@ -573,6 +576,27 @@ export interface paths {
         head?: never;
         /** Rename Conversation */
         patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/assistant/prompt-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Prompt Versions
+         * @description When no version exists, saves the default text as version 1, so the list is never empty.
+         */
+        get: operations["list_prompt_versions_api_assistant_prompt_versions_get"];
+        put?: never;
+        /** Save Prompt Version */
+        post: operations["save_prompt_version_api_assistant_prompt_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/assistant/providers": {
@@ -713,6 +737,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -728,6 +756,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
@@ -826,6 +855,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -840,8 +873,8 @@ export interface components {
         };
         /**
          * BacktestRobustnessResponse
-         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
-         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         * @description The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+         *     value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`.
          */
         BacktestRobustnessResponse: {
             /** Trial Count */
@@ -854,6 +887,10 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+            /** Out Of Sample To In Sample Sharpe Percent */
+            out_of_sample_to_in_sample_sharpe_percent: string | null;
+            /** Out Of Sample Use Count */
+            out_of_sample_use_count: number | null;
         };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
@@ -947,6 +984,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -962,6 +1003,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
@@ -1080,6 +1122,10 @@ export interface components {
             last_model: string | null;
             /** Last Credential Name */
             last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
             /** Messages */
             messages: components["schemas"]["ConversationMessageResponse"][];
         };
@@ -1124,11 +1170,17 @@ export interface components {
             last_model: string | null;
             /** Last Credential Name */
             last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
         };
         /** CreateConversationRequest */
         CreateConversationRequest: {
             /** Strategy Id */
             strategy_id: number;
+            /** Version Number */
+            version_number?: number | null;
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -1628,6 +1680,29 @@ export interface components {
             type: "price";
             price: components["schemas"]["PriceName"];
         };
+        /** PromptVersionListResponse */
+        PromptVersionListResponse: {
+            /** Prompt Versions */
+            prompt_versions: components["schemas"]["PromptVersionResponse"][];
+            /** Default Text */
+            default_text: string;
+            /** Fixed Part */
+            fixed_part: string;
+        };
+        /** PromptVersionResponse */
+        PromptVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version Number */
+            version_number: number;
+            /** Text */
+            text: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+        };
         /** ProviderListResponse */
         ProviderListResponse: {
             /** Providers */
@@ -1716,6 +1791,11 @@ export interface components {
             /** Backtest Id */
             backtest_id: number;
         };
+        /** SavePromptVersionRequest */
+        SavePromptVersionRequest: {
+            /** Text */
+            text: string;
+        };
         /**
          * SaveVersionRequest
          * @description Exactly one of `code` and `rules` (section 9.6).
@@ -1771,6 +1851,11 @@ export interface components {
             /** Source Order */
             source_order: components["schemas"]["BarSource"][];
         };
+        /** SplitMetricsResponse */
+        SplitMetricsResponse: {
+            in_sample: components["schemas"]["BacktestMetricsResponse"];
+            out_of_sample: components["schemas"]["BacktestMetricsResponse"];
+        };
         /** StartBacktestRequest */
         StartBacktestRequest: {
             /** Strategy Version Id */
@@ -1794,6 +1879,11 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };
@@ -3955,6 +4045,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_versions_api_assistant_prompt_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionListResponse"];
+                };
+            };
+        };
+    };
+    save_prompt_version_api_assistant_prompt_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePromptVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"];
                 };
             };
             /** @description Validation Error */
