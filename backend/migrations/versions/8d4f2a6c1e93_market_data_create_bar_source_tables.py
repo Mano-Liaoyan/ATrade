@@ -1,13 +1,13 @@
 """market_data: one bar table and one saved-range table for each bar source, and the source order
 
 Revision ID: 8d4f2a6c1e93
-Revises: 6c3e9a1f2b80
+Revises: 8d4b1e7c2a90
 """
 
 from alembic import op
 
 revision = "8d4f2a6c1e93"
-down_revision = "6c3e9a1f2b80"
+down_revision = "8d4b1e7c2a90"
 
 
 def upgrade() -> None:

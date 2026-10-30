@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import httpx
+import psycopg
 import pytest
 
 from tests.backtest.real_runner import save_test_bars
@@ -149,6 +150,35 @@ async def test_new_backtest_waits_in_the_queue(web_client: httpx.AsyncClient, da
     detail = (await web_client.get(f"/api/backtests/{backtest['id']}")).json()
     assert detail["equity_curve"] == []
     assert detail["trades"] == []
+
+
+@pytest.mark.anyio
+async def test_backtest_that_finished_before_the_new_metrics_has_no_new_metrics(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    saved = await save_test_strategy_version(web_client)
+    queued = (await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))).json()
+    # The UPDATE of the backtest child before the new metric columns.
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            UPDATE backtest SET status = 'finished', final_equity_usd = 10100, total_return_percent = 1,
+                max_drawdown_percent = 0.5, trade_count = 2
+            WHERE id = %(backtest_id)s
+            """,
+            {"backtest_id": queued["id"]},
+        )
+
+    metrics = (await web_client.get(f"/api/backtests/{queued['id']}")).json()["metrics"]
+
+    assert metrics["final_equity_usd"] == "10100"
+    assert metrics["sharpe_ratio"] is None
+    assert metrics["win_rate_percent"] is None
+    assert len(metrics["missing_reasons"]) == 12
+    assert metrics["missing_reasons"]["sharpe_ratio"] == (
+        "The test has no equity points, or it ended before ATrade calculated this metric"
+    )
 
 
 @pytest.mark.anyio
