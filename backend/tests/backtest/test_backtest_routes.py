@@ -1,6 +1,7 @@
 """Backtest requests through the HTTP routes: the checks of the request, the queue, and the strategy delete rule."""
 
 from pathlib import Path
+from typing import Any
 
 import httpx
 import psycopg
@@ -199,3 +200,29 @@ async def test_strategy_that_a_backtest_uses_cannot_be_deleted(
     response = await web_client.delete(f"/api/strategies/{saved['strategy_id']}")
 
     assert response.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_backtest_list_reads_the_strategy_versions_with_one_connection(
+    web_client: httpx.AsyncClient, database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Regression: one connection for each listed backtest made the list slow while many pages read it (e2e load).
+    save_test_bars(database_url)
+    saved = await save_test_strategy_version(web_client)
+    for _ in range(3):
+        response = await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))
+        assert response.status_code == 201
+    connect = psycopg.AsyncConnection.connect
+    connect_count = 0
+
+    async def count_connect(*args: Any, **kwargs: Any) -> psycopg.AsyncConnection[Any]:
+        nonlocal connect_count
+        connect_count += 1
+        return await connect(*args, **kwargs)
+
+    monkeypatch.setattr(psycopg.AsyncConnection, "connect", count_connect)
+
+    listed = (await web_client.get("/api/backtests")).json()
+
+    assert [item["strategy_name"] for item in listed] == ["Bar count"] * 3
+    assert connect_count == 2
