@@ -5,7 +5,7 @@
 
      A message log with role="log". It holds ChatMessage and ChatDivider items. While the user is at the end of the
      log, the log scrolls to each new message and to each streamed part. While the user reads older messages, it does
-     not scroll. -->
+     not scroll, except to a message that the user sends. -->
 <script lang="ts">
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { Snippet } from 'svelte';
@@ -20,6 +20,13 @@
   const { label, children }: Props = $props();
 
   let viewport: HTMLDivElement | undefined = $state();
+
+  // A message that the user sends always comes into view (as in the Carbon ChatLog).
+  function addsMessageFromMe(record: MutationRecord): boolean {
+    return [...record.addedNodes].some(
+      (node) => node instanceof HTMLElement && node.classList.contains('cds--chat-message--me'),
+    );
+  }
 
   $effect(() => {
     if (viewport === undefined) {
@@ -36,7 +43,10 @@
       });
     }
     // A new message, a streamed part, or the typing indicator changes the DOM of the log.
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((records) => {
+      if (records.some(addsMessageFromMe)) {
+        follower.followAgain();
+      }
       if (follower.followsNewContent) {
         log.scrollTop = log.scrollHeight;
       }

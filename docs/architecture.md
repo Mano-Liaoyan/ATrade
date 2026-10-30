@@ -1462,10 +1462,12 @@ Do these checks by hand before each release. Tests cannot do them.
 
 Source: [Documentation rules for the new project](https://github.com/Mano-Liaoyan/ATrade/issues/57).
 
-- The repository root keeps 3 documents:
+- The repository root keeps 4 documents:
   - `README.md`: how to run ATrade.
   - `AGENTS.md`: rules for agents.
   - `GLOSSARY.md`: terms.
+  - `THIRD_PARTY_NOTICES.md`: the source, copyright, and license of adapted
+    third-party code (section 25.12.2).
 - This document (`docs/architecture.md`) is the architecture specification.
   When it is longer than 1000 lines, split it by capability. A moved section
   goes to `docs/architecture/<capability>.md`, and its number stays. Section 7
@@ -1626,7 +1628,9 @@ option and records it in this document.
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
-  `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). The
+  `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
+  message with `from="me"` always scrolls the log to the end, also while the
+  user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:

@@ -77,4 +77,11 @@ describe('LogFollower', () => {
     follower.measure({ ...viewport, scrollTopPixels: 600 });
     expect(follower.followsNewContent).toBe(true);
   });
+
+  it('follows again when the user sends a message while reading older messages', () => {
+    const follower = new LogFollower();
+    follower.measure({ ...viewport, scrollTopPixels: 200 });
+    follower.followAgain();
+    expect(follower.followsNewContent).toBe(true);
+  });
 });

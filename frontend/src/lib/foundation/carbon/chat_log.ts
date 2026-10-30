@@ -47,7 +47,8 @@ export const LOG_END_THRESHOLD_PIXELS = 48;
 
 /**
  * Decides if the log scrolls to new content. The log follows new content while the user is at the end. While the user
- * reads older messages, it does not follow. After the user scrolls back to the end, it follows again.
+ * reads older messages, it does not follow. After the user scrolls back to the end or sends a message, it follows
+ * again.
  */
 export class LogFollower {
   followsNewContent = true;
@@ -56,5 +57,10 @@ export class LogFollower {
   measure(metrics: LogScrollMetrics): void {
     const distanceToEndPixels = metrics.contentHeightPixels - metrics.scrollTopPixels - metrics.viewportHeightPixels;
     this.followsNewContent = distanceToEndPixels <= LOG_END_THRESHOLD_PIXELS;
+  }
+
+  /** Call this when the user sends a message: the log scrolls to it, also while the user reads older messages. */
+  followAgain(): void {
+    this.followsNewContent = true;
   }
 }
