@@ -28,7 +28,7 @@ SOURCE_ORDER_PATH = "/api/market-data/source-order"
 APPLE = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
 IBKR_CLOSE = Decimal(100)
 DATABENTO_CLOSE = Decimal(200)
-PREVIOUS_REVISION = "8d4f2a6c1e93"
+PREVIOUS_REVISION = "c4a8e2f6b913"
 
 
 def day(number: int) -> datetime:
