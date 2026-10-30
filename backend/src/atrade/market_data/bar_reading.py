@@ -126,6 +126,17 @@ async def select_merged_bars(
     return SavedBars(bars=merged_bars, bar_counts=bar_counts)
 
 
+async def select_unsaved_ranges(
+    connection: psycopg.AsyncConnection, source_order: list[BarSource], bar_request: BarRequest
+) -> list[TimeRange]:
+    """The parts of the requested range that no bar source in the source order saved."""
+    source_ranges = await select_source_ranges(connection, source_order, bar_request)
+    saved_ranges = sorted(
+        (source_range.time_range for source_range in source_ranges), key=lambda saved: saved.start_utc
+    )
+    return find_missing_ranges(bar_request.time_range, saved_ranges)
+
+
 class BarReader:
     def __init__(self, *, database_url: str, clock: Clock, gateway_connection: GatewayConnection) -> None:
         self.database_url = database_url
@@ -150,11 +161,7 @@ class BarReader:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             source_order = await select_source_order(connection)
             async with self.fill_locks[instrument, bar_period]:
-                source_ranges = await select_source_ranges(connection, source_order, complete_request)
-                saved_ranges = sorted(
-                    (source_range.time_range for source_range in source_ranges), key=lambda saved: saved.start_utc
-                )
-                missing_ranges = find_missing_ranges(complete_range, saved_ranges)
+                missing_ranges = await select_unsaved_ranges(connection, source_order, complete_request)
                 if missing_ranges and not self.gateway_connection.is_connected():
                     raise GatewayNotConnectedError
                 for missing_range in missing_ranges:
@@ -168,6 +175,14 @@ async def read_saved_bars(*, database_url: str, bar_request: BarRequest, source_
     depend on IB Gateway."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         return await select_merged_bars(connection, source_order, bar_request)
+
+
+async def read_unsaved_ranges(*, database_url: str, bar_request: BarRequest) -> list[TimeRange]:
+    """The parts of `bar_request.time_range` that no bar source in the global source order saved, oldest first. A
+    caller reads them from IBKR and saves them with `save_received_bars`. It never calls IBKR."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        source_order = await select_source_order(connection)
+        return await select_unsaved_ranges(connection, source_order, bar_request)
 
 
 async def save_received_bars(*, database_url: str, bar_request: BarRequest, bars: list[Bar]) -> None:
