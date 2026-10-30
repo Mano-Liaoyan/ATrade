@@ -16,8 +16,8 @@ function conversationLog(page: Page): Locator {
   return page.getByRole('log', { name: 'Conversation messages' });
 }
 
-async function openStrategyWithConversation(page: Page, name: string): Promise<void> {
-  await page.setViewportSize({ width: 1440, height: 900 });
+async function openStrategyWithConversation(page: Page, name: string, height = 900): Promise<void> {
+  await page.setViewportSize({ width: 1440, height });
   await page.goto('/strategies');
   await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(name);
@@ -199,14 +199,14 @@ test('the column is 28rem wide; Minimize gives a rail, Maximize takes the center
 test('the log has a visible scroll track and does not scroll while the user reads older messages', async ({
   page,
 }, currentTest) => {
-  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Scroll'));
-  await page.setViewportSize({ width: 1440, height: 600 });
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Scroll'), 600);
   const log = conversationLog(page);
-  for (const number of [1, 2, 3, 4, 5, 6]) {
+  for (const number of [1, 2, 3, 4, 5, 6, 7, 8]) {
     await sendMessage(page, `Message ${String(number)}.`);
     await expect(assistantColumn(page).getByRole('button', { name: 'Send' })).toBeVisible();
     await expect(log.getByText(`Message ${String(number)}.`)).toBeVisible();
   }
+  await expect.poll(() => log.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   const track = page.getByRole('scrollbar', { name: 'Conversation messages scroll bar' });
   await expect(track).toBeVisible();
   await expect(track.locator('.scroll-thumb')).toBeVisible();
