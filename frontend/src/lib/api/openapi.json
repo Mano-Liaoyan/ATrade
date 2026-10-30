@@ -2434,6 +2434,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2493,6 +2509,16 @@
             "type": "array",
             "title": "Trades"
           },
+          "split_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           }
@@ -2516,12 +2542,15 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "split_metrics",
           "robustness"
         ],
         "title": "BacktestDetailResponse"
@@ -2824,6 +2853,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2889,6 +2934,8 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "source_order",
           "bar_count_by_source",
@@ -2932,6 +2979,28 @@
             },
             "type": "object",
             "title": "Missing Reasons"
+          },
+          "out_of_sample_to_in_sample_sharpe_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample To In Sample Sharpe Percent"
+          },
+          "out_of_sample_use_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample Use Count"
           }
         },
         "type": "object",
@@ -2940,10 +3009,12 @@
           "sharpe_probability_percent",
           "sharpe_probability_kind",
           "sharpe_probability_status",
-          "missing_reasons"
+          "missing_reasons",
+          "out_of_sample_to_in_sample_sharpe_percent",
+          "out_of_sample_use_count"
         ],
         "title": "BacktestRobustnessResponse",
-        "description": "The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without\na meaning is null, and `missing_reasons` gives its reason by its field name."
+        "description": "The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A\nvalue without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."
       },
       "BacktestStatus": {
         "type": "string",
@@ -3177,6 +3248,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -3236,6 +3323,16 @@
             "type": "array",
             "title": "Trades"
           },
+          "split_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           },
@@ -3263,12 +3360,15 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "split_metrics",
           "robustness",
           "code"
         ],
@@ -5926,6 +6026,22 @@
         "title": "SourceOrderBody",
         "description": "The global source order: the first bar source that saved a time range gives all bars of the range."
       },
+      "SplitMetricsResponse": {
+        "properties": {
+          "in_sample": {
+            "$ref": "#/components/schemas/BacktestMetricsResponse"
+          },
+          "out_of_sample": {
+            "$ref": "#/components/schemas/BacktestMetricsResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "in_sample",
+          "out_of_sample"
+        ],
+        "title": "SplitMetricsResponse"
+      },
       "StartBacktestRequest": {
         "properties": {
           "strategy_version_id": {
@@ -5974,6 +6090,13 @@
               }
             ],
             "title": "Paper Capital Usd"
+          },
+          "out_of_sample_share": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Out Of Sample Share",
+            "default": 30
           },
           "source_order": {
             "anyOf": [

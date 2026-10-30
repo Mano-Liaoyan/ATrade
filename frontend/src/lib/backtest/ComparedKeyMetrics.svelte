@@ -26,13 +26,7 @@
       <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- the page resolves the path. -->
       <a class="cds--link" href={test.href} title={test.name}>{test.name}</a>
     </div>
-    <KeyMetricRow
-      label={`Metrics of ${test.name}`}
-      metrics={test.metrics}
-      startCapitalUsd={test.startCapitalUsd}
-      trades={test.trades}
-      period={test.period}
-    />
+    <KeyMetricRow label={`Metrics of ${test.name}`} metrics={test.metrics} startCapitalUsd={test.startCapitalUsd} />
   {/each}
 </ScrollRegion>
 

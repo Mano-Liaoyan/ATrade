@@ -3,7 +3,10 @@
 import type { components } from '#lib/api';
 import { requestJson as requestBackendJson, type RequestResult } from '#lib/foundation/http_request';
 
-export type BacktestRequest = components['schemas']['StartBacktestRequest'];
+// The generated type makes the fields with a default required. Without `out_of_sample_share`, the route uses 30.
+export type BacktestRequest = Omit<components['schemas']['StartBacktestRequest'], 'out_of_sample_share'> & {
+  out_of_sample_share?: number;
+};
 export type Backtest = components['schemas']['BacktestResponse'];
 export type BacktestDetail = components['schemas']['BacktestDetailResponse'];
 export type BacktestStatus = components['schemas']['BacktestStatus'];
