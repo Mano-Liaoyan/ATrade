@@ -114,6 +114,7 @@ class BacktestRow:
     exposure_percent: Decimal | None
     turnover_per_year: Decimal | None
     win_rate_percent: Decimal | None
+    conversation_id: int | None
     out_of_sample_share: int
     split_time_utc: datetime | None
     source_order: list[str] | None
@@ -128,7 +129,8 @@ BACKTEST_COLUMNS: Final = """
     final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
-    out_of_sample_share, split_time_utc, source_order, bar_count_by_source, universe_kind, universe_top_n
+    out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source, universe_kind,
+    universe_top_n
 """
 
 
@@ -197,6 +199,7 @@ async def insert_backtest(
     request: BacktestRequest,
     created_at_utc: datetime,
     universe_periods: list[UniversePeriod] | None = None,
+    conversation_id: int | None = None,
 ) -> BacktestRow:
     """Adds a queued backtest, and the members of each universe period of a multi-instrument backtest. One
     transaction."""
@@ -205,11 +208,11 @@ async def insert_backtest(
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, source_order,
-                universe_kind, universe_top_n)
+                paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, conversation_id,
+                source_order, universe_kind, universe_top_n)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
                 %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
-                %(created_at_utc)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s)
+                %(created_at_utc)s, %(conversation_id)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -224,6 +227,7 @@ async def insert_backtest(
                 "out_of_sample_share": request.out_of_sample_share,
                 "split_time_utc": find_split_time(request.time_range, request.out_of_sample_share),
                 "created_at_utc": created_at_utc,
+                "conversation_id": conversation_id,
                 "source_order": None
                 if request.source_order is None
                 else Jsonb([bar_source.value for bar_source in request.source_order]),

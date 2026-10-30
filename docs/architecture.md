@@ -1409,7 +1409,7 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Port 8001 app (phase 2): a unit test asserts that its routes are exactly
   the allow-list of section 25. A test asserts `403` on port 8000 for a
   request from the assistant subnet. A test asserts that a save on port 8001
-  records the source `assistant` and the conversation ID.
+  records the source `ai_assistant` and the conversation ID.
 - Market data (phase 3): the source order merge rule, the Databento import
   (price rules, 7 regular-hours hourly bars, split and symbol link
   detection), the quarterly universe (63-day ranking, retry and fallback
@@ -1748,6 +1748,11 @@ option and records it in this document.
   message with `from="me"` always scrolls the log to the end, also while the
   user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
+- Decided (#180): the table `strategy_version_discard` holds the discarded
+  mark, the source value of the AI assistant is `ai_assistant`, Keep of a
+  diff card is not recorded, and the discard route answers `409` for a
+  version that the AI assistant did not save (strategy sections 9.1.1 and
+  9.6, assistant section 25.14).
 - Decided (#168): the Metrics table names the metrics CAGR, Annual
   volatility, Sharpe ratio, Sortino ratio, Calmar ratio, Profit factor, Win
   rate, Average win (USD), Average loss (USD), Exposure, and Turnover

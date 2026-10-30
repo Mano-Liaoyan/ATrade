@@ -37,6 +37,13 @@ def check_list_members(members: list[Instrument]) -> str | None:
         return "The list has no instrument."
     if len(members) > MAX_UNIVERSE_SIZE:
         return f"The list has {len(members)} instruments. A list can have {MAX_UNIVERSE_SIZE} instruments at most."
+    exchanges_by_symbol: dict[str, set[str]] = {}
+    for member in members:
+        exchanges_by_symbol.setdefault(member.symbol, set()).add(member.exchange)
+    repeated = sorted(symbol for symbol, exchanges in exchanges_by_symbol.items() if len(exchanges) > 1)
+    if repeated:
+        # The simulated venue has one instrument for each symbol (ADR 0003).
+        return f"A symbol can be in the list on one exchange only. The list has {', '.join(repeated)} 2 times."
     currencies = sorted({member.currency for member in members})
     if len(currencies) > 1:
         return f"All instruments of the list must have one currency. The list has {', '.join(currencies)}."

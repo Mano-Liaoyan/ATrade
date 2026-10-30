@@ -1,6 +1,8 @@
 """The start route of a multi-instrument backtest: the universe kinds, their checks, and the members of each universe
 period (docs/architecture/backtest.md section 10.10.6)."""
 
+from dataclasses import replace
+
 import httpx
 import psycopg
 import pytest
@@ -136,6 +138,25 @@ HKD_INSTRUMENT = Instrument(symbol="700", exchange="SEHK", currency="HKD")
             id="1-minute bars",
         ),
         pytest.param({"universe_kind": "single"}, id="single without an instrument"),
+        pytest.param(
+            {"universe_kind": "single", **to_instrument_body(AAA), "top_n": 2}, id="single with top_n"
+        ),
+        pytest.param(
+            {"universe_kind": "rule", "top_n": 2, "instruments": [to_instrument_body(AAA)]}, id="rule with instruments"
+        ),
+        pytest.param(
+            {"universe_kind": "rule", "top_n": 2, **to_instrument_body(AAA)}, id="rule with an instrument"
+        ),
+        pytest.param(
+            {"universe_kind": "list", "top_n": 2, "instruments": [to_instrument_body(AAA)]}, id="list with top_n"
+        ),
+        pytest.param(
+            {
+                "universe_kind": "list",
+                "instruments": [to_instrument_body(AAA), to_instrument_body(replace(AAA, exchange="NYSE"))],
+            },
+            id="1 symbol on 2 exchanges",
+        ),
     ],
 )
 async def test_rejects_a_universe_that_is_not_valid_and_adds_no_row(
