@@ -32,6 +32,9 @@ from tests.fakes.ibkr import (
 FAKE_ACCOUNT_ID = "DU1234567"
 E2E_POSITION_COUNT = 40
 E2E_FORWARD_TEST_ORDER_COUNT = 30
+E2E_CASH_USD = "25000.00"
+E2E_UNATTRIBUTED_POSITION_NUMBER = 5
+E2E_SHORT_LEDGER_QUANTITY = 5
 E2E_FORWARD_TEST_ID = 42
 E2E_FORWARD_TEST_CLIENT_ID = 10
 E2E_FORWARD_TEST_STRATEGY_NAME = "E2E stopped forward tests"
@@ -225,6 +228,36 @@ async def serve_with_forward_test_worker(server: uvicorn.Server, worker: Forward
         worker_task.cancel()
 
 
+def add_owner_ledger_start(database_url: str) -> None:
+    """The owner ledger of "By hand" starts with 10 shares of each TEST position and the account cash, but only 5
+    shares of TEST05. So the Positions table shows "Unattributed: 5" for TEST05 (section 11.7)."""
+    rows = [
+        (f"TEST{number:02d}", Decimal(E2E_SHORT_LEDGER_QUANTITY if number == E2E_UNATTRIBUTED_POSITION_NUMBER else 10))
+        for number in range(1, E2E_POSITION_COUNT + 1)
+    ]
+    with psycopg.connect(database_url) as connection:
+        if connection.execute("SELECT 1 FROM owner_ledger_entry LIMIT 1").fetchone() is not None:
+            return
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO owner_ledger_entry (
+                    owner_kind, entry_kind, time_utc, account, symbol, exchange, currency, quantity_change, price,
+                    cash_change
+                ) VALUES ('by_hand', 'ledger_start', %s, %s, %s, 'NASDAQ', 'USD', %s, 100, 0)
+                """,
+                [(FIXED_NOW_UTC, FAKE_ACCOUNT_ID, symbol, quantity) for symbol, quantity in rows],
+            )
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (
+                owner_kind, entry_kind, time_utc, account, currency, quantity_change, cash_change
+            ) VALUES ('by_hand', 'ledger_start', %s, %s, 'USD', 0, %s)
+            """,
+            (FIXED_NOW_UTC, FAKE_ACCOUNT_ID, Decimal(E2E_CASH_USD)),
+        )
+
+
 def main() -> None:
     database_url = os.environ["ATRADE_TEST_DATABASE_URL"]
     frontend_build_dir = Path(os.environ["ATRADE_E2E_FRONTEND_BUILD_DIR"])
@@ -232,6 +265,7 @@ def main() -> None:
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
+    add_owner_ledger_start(database_url)
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )
@@ -239,8 +273,10 @@ def main() -> None:
         managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS]
     )
     gateway_connection.account_values = make_balance_values(
-        FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd="25000.00"
+        FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd=E2E_CASH_USD
     )
+    # Rule 2 of the owner ledger converts the amount of a buy order of 700 / SEHK to USD.
+    gateway_connection.exchange_rates[("HKD", "USD")] = Decimal("0.128")
     # Enough positions to overflow the position table, so that the e2e tests can check its scroll track.
     gateway_connection.portfolio = [
         make_stock_position(FAKE_ACCOUNT_ID, symbol=f"TEST{number:02d}", quantity="10", market_price="100")
