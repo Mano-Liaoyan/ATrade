@@ -782,6 +782,10 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   orders).
 - 500 instruments × 2,500 daily bars: `run()` takes 2.45 seconds, with a
   peak memory of about 2 GB.
+- Custom data (checked in #198): `subscribe_data(DataType(...))` without a
+  client ID gets the custom data that `add_data` added. With a client ID,
+  the backtest engine finds no data client and logs an error. A bar and a
+  custom data item with the same time come in the order bar first.
 - Estimate, not checked: a universe of 500 instruments on 1-hour bars has
   about 7.35 million bars (about 2,100 trading days × 7 bars). One run then
   takes about 15 seconds, with a peak memory of 4 to 5 GB.
@@ -860,11 +864,29 @@ them.
 
 ### 10.10.8 Left to the implementation
 
-- How the platform tells the strategy the new list at a universe period
-  start: NautilusTrader custom data or a platform timer. Make a small test
-  before the implementation.
-- How the strategy configuration gets the universe in place of
-  `instrument_id` and `bar_type`.
+- Decided (#198): the platform tells the strategy the new list at a
+  universe period start with NautilusTrader custom data, not with a
+  platform timer. For each universe period start, the child adds one
+  `CustomData` with `DataType("UniverseUpdate")` to the engine data. Its
+  data is a `UniverseUpdate` (`@customdataclass`) with the field
+  `bar_types`: the bar types of the members, joined with commas, for
+  example `AAA.SMART-1-DAY-LAST-EXTERNAL,BBB.SMART-1-DAY-LAST-EXTERNAL`.
+  `ts_event` and `ts_init` are the period start. The strategy calls
+  `subscribe_data(DataType("UniverseUpdate"))` in `on_start` and gets the
+  list in `on_data(data)` as `data.data.bar_types`. Then it subscribes to
+  the bars of the new members and unsubscribes from the bars of the old
+  members. Reason: a timer needs the list in the strategy before the time,
+  so the strategy can read a later list. The engine sends the custom data
+  in time order with the bars, so the strategy cannot read a later list.
+  The regression test is `backend/tests/backtest/test_universe_update.py`.
+  The `UniverseUpdate` class is in the test now. The multi-instrument
+  backtest ([#199](https://github.com/Mano-Liaoyan/ATrade/issues/199))
+  moves it to the platform code.
+- Decided (#198): the configuration of a multi-instrument strategy has no
+  `instrument_id`, no `bar_type`, and no universe field. The platform fills
+  no universe field. The strategy gets the bar types only from
+  `UniverseUpdate`, and the instrument ID of a member from
+  `BarType.instrument_id`.
 - When the start route or the child writes `backtest_universe_member`
   (a `screen` universe needs the daily bars of each date).
 - The decision names the member column "quarter start". This document uses
