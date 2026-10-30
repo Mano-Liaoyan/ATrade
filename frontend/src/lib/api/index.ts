@@ -512,6 +512,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assistant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversations */
+        get: operations["list_conversations_api_assistant_conversations_get"];
+        put?: never;
+        /** Create Conversation */
+        post: operations["create_conversation_api_assistant_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Conversation */
+        get: operations["read_conversation_api_assistant_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Deletes the JSONL file first. When the assistant service is not reachable, the row stays for a new try.
+         */
+        delete: operations["delete_conversation_api_assistant_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/assistant/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Providers */
+        get: operations["list_providers_api_assistant_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credentials */
+        get: operations["list_credentials_api_assistant_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Credential */
+        delete: operations["delete_credential_api_assistant_credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -600,6 +691,14 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -703,6 +802,14 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
         };
         /**
          * BacktestRobustnessResponse
@@ -814,6 +921,14 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -916,10 +1031,108 @@ export interface components {
         };
         /** @enum {string} */
         Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
+        /** ConversationDetailResponse */
+        ConversationDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+            /** Messages */
+            messages: components["schemas"]["ConversationMessageResponse"][];
+        };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations: components["schemas"]["ConversationResponse"][];
+        };
+        /** ConversationMessageResponse */
+        ConversationMessageResponse: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string | null;
+            /** Model */
+            model: string | null;
+            /** Credential Name */
+            credential_name: string | null;
+        };
+        /** ConversationResponse */
+        ConversationResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+        };
+        /** CreateConversationRequest */
+        CreateConversationRequest: {
+            /** Strategy Id */
+            strategy_id: number;
+        };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
             /** Name */
             name: string;
+        };
+        /** CredentialListResponse */
+        CredentialListResponse: {
+            /** Credentials */
+            credentials: components["schemas"]["CredentialResponse"][];
+        };
+        /** CredentialResponse */
+        CredentialResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "oauth" | "api_key";
+            /** Key Last4 */
+            key_last4: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "failed";
+            /** State Message */
+            state_message: string | null;
         };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
@@ -1386,6 +1599,34 @@ export interface components {
             type: "price";
             price: components["schemas"]["PriceName"];
         };
+        /** ProviderListResponse */
+        ProviderListResponse: {
+            /** Providers */
+            providers: components["schemas"]["ProviderResponse"][];
+        };
+        /** ProviderModelResponse */
+        ProviderModelResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** ProviderResponse */
+        ProviderResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Login Methods */
+            login_methods: ("oauth" | "api_key")[];
+            /** Models */
+            models: components["schemas"]["ProviderModelResponse"][];
+        };
+        /** RenameConversationRequest */
+        RenameConversationRequest: {
+            /** Title */
+            title: string;
+        };
         RightOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"] | components["schemas"]["NumberOperand"];
         /** RuleCondition */
         RuleCondition: {
@@ -1524,6 +1765,8 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
         };
         /** StartForwardTestRequest */
         StartForwardTestRequest: {
@@ -1631,6 +1874,8 @@ export interface components {
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
+        /** @enum {string} */
+        TitleState: "new" | "generating" | "generated" | "not_generated" | "renamed";
         /** TradeResponse */
         TradeResponse: {
             /**
@@ -1691,6 +1936,32 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["WatchlistInstrumentResponse"][];
         };
+        /**
+         * AbortMessage
+         * @description Browser to server: stop the active run (the "Stop" button).
+         */
+        AbortMessage: {
+            /**
+             * Type
+             * @default abort
+             * @constant
+             */
+            type: "abort";
+        };
+        /**
+         * AssistantErrorMessage
+         * @description An error of the conversation, for the Output tab of the "Problems and output" panel.
+         */
+        AssistantErrorMessage: {
+            /**
+             * Type
+             * @default error
+             * @constant
+             */
+            type: "error";
+            /** Message */
+            message: string;
+        };
         /** ForwardTestsMessage */
         ForwardTestsMessage: {
             /**
@@ -1734,6 +2005,132 @@ export interface components {
              */
             type: "bar";
             bar: components["schemas"]["BarResponse"];
+        };
+        /**
+         * LoginAnswerMessage
+         * @description Browser to server: the answer to a login step `prompt`. For a `select` prompt, the ID of the option.
+         */
+        LoginAnswerMessage: {
+            /**
+             * Type
+             * @default login_answer
+             * @constant
+             */
+            type: "login_answer";
+            /** Prompt Id */
+            prompt_id: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * LoginEndMessage
+         * @description The login ended. The credential is in the credential file of the assistant service.
+         */
+        LoginEndMessage: {
+            /**
+             * Type
+             * @default login_end
+             * @constant
+             */
+            type: "login_end";
+            credential: components["schemas"]["CredentialResponse"];
+        };
+        /** LoginOptionResponse */
+        LoginOptionResponse: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * LoginStartMessage
+         * @description Browser to server: start a login. `method` "oauth" is a subscription login. `name` names the new credential.
+         */
+        LoginStartMessage: {
+            /**
+             * Type
+             * @default login_start
+             * @constant
+             */
+            type: "login_start";
+            /** Provider */
+            provider: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "oauth" | "api_key";
+            /** Name */
+            name: string;
+        };
+        /**
+         * LoginStepMessage
+         * @description One login step of pi (25.7.3).
+         *
+         *     - `auth_url`: open `url` (the authorization link). `message` has the instructions of the provider.
+         *     - `device_code`: enter `user_code` at `url`.
+         *     - `progress`, `info`: `message` (and for `info` maybe a `url`).
+         *     - `prompt`: show a field for `prompt_type` (`text`, `secret` as a password field, `select` with `options`, or
+         *       `manual_code` to paste a code) with the label `message`, and answer with `login_answer` and `prompt_id`.
+         */
+        LoginStepMessage: {
+            /**
+             * Type
+             * @default login_step
+             * @constant
+             */
+            type: "login_step";
+            /**
+             * Step
+             * @enum {string}
+             */
+            step: "auth_url" | "device_code" | "progress" | "info" | "prompt";
+            /** Message */
+            message: string | null;
+            /** Url */
+            url: string | null;
+            /** User Code */
+            user_code: string | null;
+            /** Prompt Id */
+            prompt_id: string | null;
+            /** Prompt Type */
+            prompt_type: ("text" | "secret" | "select" | "manual_code") | null;
+            /** Options */
+            options: components["schemas"]["LoginOptionResponse"][] | null;
+        };
+        /**
+         * MessageDeltaMessage
+         * @description A part of the streamed text of an AI assistant message.
+         */
+        MessageDeltaMessage: {
+            /**
+             * Type
+             * @default message_delta
+             * @constant
+             */
+            type: "message_delta";
+            /** Text */
+            text: string;
+        };
+        /**
+         * MessageEndMessage
+         * @description The end of one AI assistant message: its full text, its model, and its credential name.
+         */
+        MessageEndMessage: {
+            /**
+             * Type
+             * @default message_end
+             * @constant
+             */
+            type: "message_end";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Name */
+            credential_name: string;
         };
         /** OpenOrdersMessage */
         OpenOrdersMessage: {
@@ -1840,6 +2237,57 @@ export interface components {
             owners: components["schemas"]["OwnerPositionMessage"][];
             /** Unattributed Quantity */
             unattributed_quantity: string;
+        };
+        /**
+         * PromptMessage
+         * @description Browser to server: a new user message, with the provider, the model, and the credential of this message.
+         */
+        PromptMessage: {
+            /**
+             * Type
+             * @default prompt
+             * @constant
+             */
+            type: "prompt";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Id */
+            credential_id: string;
+        };
+        /**
+         * RunStateMessage
+         * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
+         */
+        RunStateMessage: {
+            /**
+             * Type
+             * @default run_state
+             * @constant
+             */
+            type: "run_state";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "settled";
+        };
+        /**
+         * SteerMessage
+         * @description Browser to server: a user message while the AI assistant runs.
+         */
+        SteerMessage: {
+            /**
+             * Type
+             * @default steer
+             * @constant
+             */
+            type: "steer";
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -3155,6 +3603,324 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_assistant_conversations_get: {
+        parameters: {
+            query: {
+                strategy_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_api_assistant_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_conversation_api_assistant_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_assistant_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_assistant_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_assistant_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_credentials_api_assistant_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_credential_api_assistant_credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

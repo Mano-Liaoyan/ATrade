@@ -180,7 +180,7 @@ counts from `atrade/`.
 | `backtest/` | Run backtests and parameter sweeps. Save and read backtest results. Provide the metric functions and the robustness checks (in-sample and out-of-sample split, probabilistic and deflated Sharpe ratio). |
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, the paper account check, the owner ledger, the ledger changes at a stock split, and the "Split check needed" state. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, the quarterly universe job, and the daily stock split check. |
-| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It holds no credential. |
+| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It calls the `assistant` service over HTTP (`AssistantServiceClient`, section 25.14). It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
 | `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
@@ -239,6 +239,9 @@ app           -> all modules
   `foundation`. So `indicator` can import only `foundation`, and `indicator`
   and `ibkr` do not import each other. A contract keeps the internal files
   of `indicator` private (#160).
+- import-linter puts `assistant` in the same layer as `ibkr` and
+  `indicator`, so `assistant` can import only `foundation` (#179). A
+  contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
   (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
@@ -542,8 +545,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
   of each WebSocket message model to `components.schemas`. A capability
   exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`,
-  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`, and
-  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`. Each list has `HeartbeatMessage` of
+  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`,
+  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`, and
+  `ASSISTANT_SOCKET_MESSAGE_MODELS` (the messages of both directions). Each list has `HeartbeatMessage` of
   `foundation/socket_push`. A message schema must not have the name of a
   different schema. Routes declare their error bodies with `responses=`
   (`ErrorResponse` of `foundation/error_response`), so the frontend does not
@@ -1352,6 +1356,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Databento call in CI.
 - Model providers: the `assistant` service tests use a local fake
   OpenAI-compatible model server. No real provider in CI.
+- The `assistant` service: the `web` tests use a hand-written fake of
+  `AssistantService` in `tests/fakes/assistant.py`. The HTTP client has a
+  test with an `httpx.MockTransport`.
 
 ### 17.4 Tests for specific parts
 
@@ -1618,8 +1625,8 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | The LiveNode test of section 17.4, then the `ibkr_paper` forward test contract test. |
 | IBKR does or does not refuse opposite orders of 2 owners on one instrument (self-trade prevention) (#146). | 2 client IDs on the paper account place an AAPL buy and a sell, first with prices that do not cross, then with prices that cross. |
 | Real subscription logins and model calls through the pi SDK `ModelRuntime.login()` (#133, #140). Only a fake model server was run. | Log in with each provider and send one message. |
-| `ModelRuntime.create({ credentials })` with the ATrade `CredentialStore` writes an OAuth refresh back (#140). | Test with 2 credentials of one provider, and read the file after a refresh. |
-| OpenAI can count a self-hosted single-user server as "remotely hosted" (#133). | Read the OpenAI "Preview limitations" page. |
+| A real OAuth token refresh through the ATrade `CredentialStore` writes the new token to `/data/credentials.json` (#140). A fake refresh does (section 21.1). | Wait for a real token refresh of one provider, and read the file. |
+| OpenAI can count a self-hosted single-user server as "remotely hosted" (#133). Not settled by the OpenAI pages (section 21.1). | Ask OpenAI, or read their terms again when they name self-hosted servers. |
 
 Each section file of the map lists more facts in its "Left to the
 implementation" list.
@@ -1628,6 +1635,9 @@ implementation" list.
 
 | Fact | Result |
 |---|---|
+| `ModelRuntime.create({ credentials })` accepts ATrade's own `CredentialStore`, and an OAuth refresh writes back through it (#140 read the source only). | Yes, with a fake provider. On 2026-10-30 with pi 1.4.0 (#183), `ModelRuntime.create` takes `credentials` and wraps it. `getAuth()` refreshes an expired OAuth token inside `CredentialStore.modify()`. The test `assistant/tests/credential_file.test.ts` stores 2 OAuth credentials of one fake provider, refreshes the first, and reads the file: the first has the new token, the second is unchanged, the mode stays `0600`. A real provider refresh is #186. |
+| `ModelRuntime.login()` with an `AuthInteraction` does each login step from a web page (#140 read the source only). | Yes, with fake login flows. On 2026-10-30 (#183), `assistant/tests/logins.test.ts` runs a fake OAuth login (`auth_url`, `device_code`, `progress`, then a `manual_code` prompt) and a fake API key login (a `secret` prompt) through the interaction of `assistant/src/logins.ts`. Each `notify()` event became one `login_step`, and each `prompt()` waited for its answer. The first real login is #186. |
+| OpenAI "Preview limitations" and "remotely hosted" (#133). | Not settled. On 2026-10-30 (#183), the OpenAI "Sign in with ChatGPT" pages for open-source apps were read: [Preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations) lists the hosted Responses tools that plan usage does not support. A search result of the same pages says that a paid or remotely hosted app needs OpenAI approval through an interest form, but the page text read did not have this sentence. The [Self-hosted VMs](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms) guide describes an open-source app on the user's own remote VM: the OAuth callback reaches the computer with the browser, not the VM. The pages do not say whether a single-user self-hosted server is "remotely hosted". This does not change the scope: ATrade does not remove a provider because of its terms (section 25.7.1). |
 | `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Yes. On 2026-10-27, `uv lock` (uv 0.13.5) resolved `ib-async==2.1.0`, `nautilus-trader==2.0.0rc7`, and `tzdata==2025.3` for Python 3.14 (#62). |
 | `ghcr.io/gnzsnz/ib-gateway:stable` digest. | On 2026-10-27, the `stable` index was `sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581` (IB Gateway 10.50.1f) (#63). |
 | `ib_async` 2.1.0 and NautilusTrader 2.0.0rc7 import on Python 3.14. | Yes. Both packages import on CPython 3.14.9 (#62). The real connection is the next row. |
@@ -1743,6 +1753,14 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#197): the request field of the backtest source order is
+  `source_order`. It holds each `BarSource` exactly 1 time, like the global
+  source order (`422` otherwise). `bar_count_by_source` counts only the bars
+  of the backtest range, not the look-back bars. The backtest page shows the
+  source order and the bar counts in the "Bar sources" tab. A backtest has
+  survivorship bias when its currency is `HKD`, or its currency is `USD` and
+  it starts before 2018-05-01 (`docs/architecture/backtest.md` section
+  10.12).
 - Decided (#190): the Databento import program is `app/databento_import.py`.
   The user runs it in the `web` image with `docker compose run`. The bought
   files are in `data/databento/` of the repository (in `.gitignore`). The
@@ -1779,6 +1797,13 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#179): the protocol between `web` and `assistant`, the
+  `/ws/assistant` field names, the columns of `assistant_conversation`, and
+  the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#183): the credential file is `/data/credentials.json` in the
+  volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
+  rename, the state column, the login messages of `/ws/assistant`, and the
+  login and credential routes of `assistant`. See section 25.14.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in

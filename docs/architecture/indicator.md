@@ -299,5 +299,4 @@ indicator reference in JSON:
 
 ## 23.8 Left to the implementation
 
-
-Nothing is left. Section 23.2 has the #160 decision about the Wilder average.
+No open points.
