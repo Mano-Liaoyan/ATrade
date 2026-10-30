@@ -92,6 +92,27 @@ of #130 (A is the strongest, D is practitioner use only).
   | Bollinger Bands | `BollingerBands` | `period=20`, `k=2.0` | `period` |
   | Donchian channel | `DonchianChannel` | `period=20` | `period` |
 
+- The ATrade classes of the indicators that ATrade writes (#162) and their
+  defaults. #130 gives n = 60 or 252 for realized volatility and n = 20 or
+  60 for average trading value. The defaults are the shorter values.
+
+  | Indicator | Class | Defaults | First value at bar |
+  |---|---|---|---|
+  | 12-1 momentum | `Momentum12_1` | `look_back=252`, `skip=21` | `look_back + 1` |
+  | Distance to 52-week high | `DistanceTo52WeekHigh` | `period=252` | `period` |
+  | Realized volatility | `RealizedVolatility` | `period=60`, `bars_per_year=252` | `period + 1` |
+  | Average trading value | `AverageTradingValue` | `period=20` | `period` |
+
+- 12-1 momentum accepts `skip` from 0 to `look_back − 1`. With `skip=0` the
+  value is close(t) / close(t − look-back) − 1 (template S3). The class
+  refuses other values with a `ValueError`.
+- Realized volatility is the sample standard deviation (n − 1) of the last
+  n log returns of the close, times √`bars_per_year`. On daily bars
+  `bars_per_year` is 252. On 1-hour bars the strategy passes 1764 (252 days
+  × 7 regular-session bars, section 23.1). The class does not read the bar
+  period.
+- Distance to 52-week high uses the highs of the last `period` bars, the
+  current bar included, so the value is at most 1.
 - The Donchian `middle` is the mean of `upper` and `lower`. The MACD
   `histogram` is `value` − `signal`. RSI is on a scale of 0 to 100.
 - Average trading value is in the currency of the instrument (USD for US
@@ -218,9 +239,6 @@ indicator reference in JSON:
 
 ## 23.8 Left to the implementation
 
-- The skip parameter of 12-1 momentum must accept 0, or the strategy template
-  S3 "12-month time-series momentum" (look-back 252, skip 0) becomes a code
-  template ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139)).
 - The fixed look-back count of EMA, RSI, ATR, and MACD in a screen
   (section 23.4). Section 21.1 of
   [`docs/architecture.md`](../architecture.md) has the measured differences
@@ -229,6 +247,4 @@ indicator reference in JSON:
   The NautilusTrader 2.0.0rc7 default of both is Wilder, so the classes do
   not pass `MovingAverageType.Wilder` (section 21.1 of
   [`docs/architecture.md`](../architecture.md)).
-- The annualization factor of realized volatility on 1-hour bars. The #130
-  formula (√252) is for daily bars.
 - The names that the UI shows for the indicators.
