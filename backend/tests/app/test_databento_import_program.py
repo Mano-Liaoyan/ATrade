@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+import anyio.to_thread
 import psycopg
 import pytest
 
@@ -23,6 +24,7 @@ from tests.fakes.databento import (
     StatisticRecord,
     write_dbn_files,
 )
+from tests.fakes.ibkr import FakeGatewayConnection
 from tests.us_universe_bars import insert_daily_bars, nasdaq, weekdays
 
 TRADING_DAY = date(2020, 1, 2)
@@ -57,7 +59,17 @@ def count_bars(database_url: str) -> int:
     return 0 if row is None else int(row[0])
 
 
-def test_the_program_downloads_each_batch_job_and_imports_all_its_files(database_url: str, tmp_path: Path) -> None:
+@pytest.fixture
+async def gateway() -> FakeGatewayConnection:
+    connection = FakeGatewayConnection(managed_accounts=["DU1234567"])
+    await connection.connect()
+    return connection
+
+
+@pytest.mark.anyio
+async def test_the_program_downloads_each_batch_job_and_imports_all_its_files(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
     client = FakeDatabentoClient(
         {
             "XNAS-20261029-AAAA": [*create_daily_files("XNAS.ITCH", 1000), *create_statistics_files("XNAS.ITCH", True)],
@@ -68,11 +80,12 @@ def test_the_program_downloads_each_batch_job_and_imports_all_its_files(database
         }
     )
 
-    report = run_databento_import(
+    report = await run_databento_import(
         database_url=database_url,
         directory=tmp_path,
         job_ids=["XNAS-20261029-AAAA", "XNYS-20261029-BBBB"],
         client=client,
+        gateway=gateway,
     )
 
     assert client.downloaded_job_ids == ["XNAS-20261029-AAAA", "XNYS-20261029-BBBB"]
@@ -80,13 +93,18 @@ def test_the_program_downloads_each_batch_job_and_imports_all_its_files(database
     assert count_bars(database_url) == 1
 
 
-def test_the_program_imports_the_files_that_are_already_in_the_directory(database_url: str, tmp_path: Path) -> None:
+@pytest.mark.anyio
+async def test_the_program_imports_the_files_that_are_already_in_the_directory(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
     write_dbn_files(tmp_path / "XNAS-20261029-AAAA", [*create_daily_files("XNAS.ITCH", 1000)])
     write_dbn_files(tmp_path / "XNAS-20261029-AAAA", [*create_statistics_files("XNAS.ITCH", True)])
     write_dbn_files(tmp_path / "XNYS-20261029-BBBB", [*create_daily_files("XNYS.PILLAR", 300)])
     write_dbn_files(tmp_path / "XNYS-20261029-BBBB", [*create_statistics_files("XNYS.PILLAR", False)])
 
-    report = run_databento_import(database_url=database_url, directory=tmp_path, job_ids=[], client=None)
+    report = await run_databento_import(
+        database_url=database_url, directory=tmp_path, job_ids=[], client=None, gateway=gateway
+    )
 
     assert report.saved_bar_count == 1
 
@@ -111,9 +129,15 @@ async def test_the_program_calculates_the_us_universe_of_the_quarters_after_the_
     insert_daily_bars(database_url, nasdaq("AAPL"), weekdays(START, date(2018, 9, 28)), "10", 100)
     monkeypatch.setenv("DATABASE_URL", database_url)
     monkeypatch.setenv("DATABENTO_API_KEY", "")
+
+    def create_fake_gateway(**_: object) -> FakeGatewayConnection:
+        return FakeGatewayConnection(managed_accounts=["DU1234567"])
+
+    monkeypatch.setattr("atrade.app.databento_import.IbAsyncGatewayConnection", create_fake_gateway)
     caplog.set_level("INFO")
 
-    main([str(tmp_path)])
+    # main runs its own event loop, so it runs in a worker thread.
+    await anyio.to_thread.run_sync(lambda: main([str(tmp_path)]))
 
     members = await read_us_universe_members(
         database_url=database_url, quarter_start_utc=datetime(2018, 10, 1, tzinfo=UTC), top_n=500
