@@ -27,7 +27,7 @@
     onclick={onSort}
   >
     <span class="cds--table-sort__flex">
-      <div class="cds--table-header-label">{label}</div>
+      <div class="cds--table-header-label" title={label}>{label}</div>
       <Icon icon={ArrowUp16} class="cds--table-sort__icon" />
       <Icon icon={ArrowsVertical16} class="cds--table-sort__icon-unsorted" />
     </span>

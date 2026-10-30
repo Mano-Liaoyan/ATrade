@@ -23,7 +23,7 @@ function valueCount(entry: GridEntry): number {
 }
 
 export function countSweepRuns(grid: GridEntry[]): number {
-  return grid.reduce((runs, entry) => runs * valueCount(entry), 1);
+  return grid.length === 0 ? 0 : grid.reduce((runs, entry) => runs * valueCount(entry), 1);
 }
 
 // The reason that "Start parameter sweep" is disabled, or undefined when the grid can start.

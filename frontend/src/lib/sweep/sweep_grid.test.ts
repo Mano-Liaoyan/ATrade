@@ -29,6 +29,10 @@ describe('countSweepRuns', () => {
     expect(countSweepRuns(grid)).toBe(8 * 12);
   });
 
+  it('counts 0 runs for a grid without parameters', () => {
+    expect(countSweepRuns([])).toBe(0);
+  });
+
   it('counts a parameter without a range as 1 value', () => {
     expect(countSweepRuns([{ name: 'roc_period' }])).toBe(1);
   });

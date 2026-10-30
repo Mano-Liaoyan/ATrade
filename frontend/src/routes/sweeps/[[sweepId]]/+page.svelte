@@ -180,7 +180,7 @@
     {#if listMessage !== ''}
       <InlineNotification kind="error" title="Parameter sweeps not read" subtitle={listMessage} lowContrast />
     {:else}
-      <div class="table-region">
+      <div class="table-region sweep-list">
         <ScrollRegion label="Parameter sweep list" fill>
           <DataTable columns={LIST_COLUMNS} size="sm">
             {#snippet rows()}
@@ -201,7 +201,11 @@
                       aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
                     >
                   </th>
-                  <td><span class="ellipsis">{formatVersionLabel(item.strategy_name, item.version_number)}</span></td>
+                  <td>
+                    <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
+                      >{formatVersionLabel(item.strategy_name, item.version_number)}</span
+                    >
+                  </td>
                   <td><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} /></td>
                   <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
                 </tr>
@@ -409,6 +413,41 @@
   .table-region :global(th[align='right']) {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  /* Fixed column widths: the tables are never wider than their region. Long text ends with an ellipsis. */
+  .sweep-list :global(table),
+  .runs {
+    table-layout: fixed;
+  }
+
+  .sweep-list :global(th:nth-child(1)) {
+    inline-size: calc(var(--cds-spacing-09) + var(--cds-spacing-05));
+  }
+
+  .sweep-list :global(th:nth-child(3)) {
+    inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-06));
+  }
+
+  .sweep-list :global(th:nth-child(4)) {
+    inline-size: var(--cds-spacing-11);
+  }
+
+  .sweep-list :global(:is(td, th)),
+  .runs :global(:is(td, th)),
+  .runs :global(.cds--table-header-label) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The cell color shows at once when the metric changes: no Carbon background transition. */
+  .heatmap td {
+    transition: none;
+  }
+
+  .heatmap tbody th {
+    background-color: transparent;
   }
 
   .ellipsis {

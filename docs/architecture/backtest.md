@@ -363,7 +363,7 @@ Changes of later phases:
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, universe_periods, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6, done in #199 for `single`, `rule`, and `list`) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. Done in #203: the list has no sweep runs. The query `sweep_id` is not there yet; `GET /api/sweeps/{sweep_id}` lists the runs. |
-| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
 | 3 | `/api/sweeps` | New routes, section 10.11.3. |
 
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
@@ -1121,7 +1121,7 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 |---|---|
 | `GET /api/sweeps/parameters?strategy_version_id=<id>` | `200` with `{"parameters": [{"name", "type", "default"}]}`, the parameters of section 10.11.1. `404` when the strategy version does not exist. |
 | `POST /api/sweeps` | Body: the fields of `POST /api/backtests` (strategy version, universe, bar period, range, `paper_capital_usd`, `out_of_sample_share`) and `grid` (the grid of section 10.11.1). `201` with the sweep. The route queues all runs. `422` (no row) in these cases: a backtest field has an error (the cases of `POST /api/backtests`). The grid has no parameter or more than 3. A name is not a parameter of the strategy version. A step is not above 0. An end is before its start. The grid has more than 200 runs. |
-| `GET /api/sweeps` | `200` with all sweeps, the newest first. Each sweep has `id`, `strategy_version_id`, `grid`, `created_at_utc`, `run_count`, and `status_counts` (the number of runs in each status that has runs). |
+| `GET /api/sweeps` | `200` with all sweeps, the newest first. Each sweep has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`, `version_number` (#204), `grid`, `created_at_utc`, `run_count`, and `status_counts` (the number of runs in each status that has runs). |
 | `GET /api/sweeps/{sweep_id}` | `200` with the sweep and `runs` (`[{"backtest_id", "parameters", "status", "metrics"}]`). `404` when the sweep does not exist. |
 | `POST /api/sweeps/{sweep_id}/cancel` | `200` with the sweep. The queued runs get `cancelled`. `404` when the sweep does not exist. |
 
@@ -1168,6 +1168,16 @@ chart is hard to read on flat Carbon surfaces.
   highest first.
 - The page adds no other label or description (AGENTS.md, frontend rule
   one).
+- Done in #204. The status of a sweep in the list is the first status with
+  runs in this order: running, queued, finished, failed, timed out,
+  cancelled. The status line counts finished, failed, running, and queued
+  runs. The "Metric" select has Total return, Max drawdown, Sharpe ratio,
+  Win rate, and Trades. The Runs table has the parameter values, the run
+  status, and these 5 metrics, sorted by Total return, highest first. The
+  heat map has the first grid parameter on the columns and the second on
+  the rows. The third parameter select starts at its lowest value. A
+  `bool` parameter row of the dialog has no range inputs. The backtest
+  header line of a sweep run has the link "Parameter sweep #<id>".
 
 ### 10.11.5 Robustness checks of a sweep
 
@@ -1191,8 +1201,12 @@ returns of all runs of a sweep.
 - What happens to a running run when the user cancels its sweep, and the
   status of a sweep. Decided in #203 (section 10.11.2).
 - The header link to `/sweeps`, and the page that `/sweeps` without an ID
-  opens.
-- The chart library of the point chart and the heat map.
+  opens. Decided in #204: the header link "Parameter sweeps" after
+  "Backtests". `/sweeps` opens the newest sweep.
+- The chart library of the point chart and the heat map. Decided in #204:
+  no chart library. The heat map is a Carbon data table with the Carbon
+  sequential palette Blue 10 to Blue 100, and the point chart is an SVG
+  (`docs/architecture.md` section 13).
 - The grid values of a `float` step that does not divide the range.
   Decided in #203 (section 10.11.1).
 - How the backtest list shows sweep runs when the user asks for them.

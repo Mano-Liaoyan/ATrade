@@ -167,7 +167,7 @@
       </ScrollRegion>
     </div>
     <p class="run-count cds--form__helper-text" role="status" aria-label="Run count">
-      <span class="number">{runCount} runs</span>
+      <span class="number">{runCount} {runCount === 1 ? 'run' : 'runs'}</span>
       {#if blockReason !== null}
         <span id={BLOCK_ID} class="block-reason">{blockReason}</span>
       {/if}
