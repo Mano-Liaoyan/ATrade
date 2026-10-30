@@ -161,6 +161,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/source-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Source Order */
+        get: operations["read_source_order_api_market_data_source_order_get"];
+        /** Save Source Order */
+        put: operations["save_source_order_api_market_data_source_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/hk-instrument-list": {
         parameters: {
             query?: never;
@@ -629,6 +647,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
          * BacktestLimitsBody
@@ -730,6 +749,23 @@ export interface components {
             /** Conversation Id */
             conversation_id: number | null;
         };
+        /**
+         * BacktestRobustnessResponse
+         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
+         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         */
+        BacktestRobustnessResponse: {
+            /** Trial Count */
+            trial_count: number;
+            /** Sharpe Probability Percent */
+            sharpe_probability_percent: string | null;
+            sharpe_probability_kind: components["schemas"]["SharpeProbabilityKind"];
+            sharpe_probability_status: components["schemas"]["SharpeProbabilityStatus"] | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
+        };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
         /**
@@ -756,6 +792,12 @@ export interface components {
             /** Volume */
             volume: number;
         };
+        /**
+         * BarSource
+         * @description Each bar source has its own bar table and its own saved-range table (ADR 0002).
+         * @enum {string}
+         */
+        BarSource: "ibkr" | "databento";
         /** BarsResponse */
         BarsResponse: {
             /** Bars */
@@ -823,6 +865,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
         };
@@ -1396,9 +1439,10 @@ export interface components {
         };
         /**
          * SavedBarsResponse
-         * @description The saved bars of one bar period: the start of the first and of the last saved bar.
+         * @description The saved bars of one bar source and one bar period: the start of the first and of the last saved bar.
          */
         SavedBarsResponse: {
+            bar_source: components["schemas"]["BarSource"];
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * First Start Utc
@@ -1426,6 +1470,18 @@ export interface components {
             /** Limit Price */
             limit_price: number | string | null;
             time_in_force: components["schemas"]["TimeInForce"];
+        };
+        /** @enum {string} */
+        SharpeProbabilityKind: "probabilistic" | "deflated";
+        /** @enum {string} */
+        SharpeProbabilityStatus: "likely_real" | "uncertain" | "likely_luck";
+        /**
+         * SourceOrderBody
+         * @description The global source order: the first bar source that saved a time range gives all bars of the range.
+         */
+        SourceOrderBody: {
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][];
         };
         /** StartBacktestRequest */
         StartBacktestRequest: {
@@ -2310,6 +2366,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_source_order_api_market_data_source_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+        };
+    };
+    save_source_order_api_market_data_source_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceOrderBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

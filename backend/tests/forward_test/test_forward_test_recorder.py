@@ -175,7 +175,7 @@ def test_a_second_run_over_the_same_bars_adds_no_row(database_url: str, tmp_path
 
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]
-    assert read_table_rows(database_url, "SELECT count(*) FROM bar") == [(BAR_COUNT,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM ibkr_bar") == [(BAR_COUNT,)]
 
 
 def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str, tmp_path: Path) -> None:
@@ -186,7 +186,7 @@ def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str,
     saved_bars = read_table_rows(
         database_url,
         """
-        SELECT symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume FROM bar
+        SELECT symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume FROM ibkr_bar
         ORDER BY start_utc
         """,
     )
@@ -195,7 +195,7 @@ def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str,
         for bar in read_test_bars()
     ]
     # The bar ranges touch, so the store joins them into one saved range.
-    assert read_table_rows(database_url, "SELECT symbol, bar_period, start_utc, end_utc FROM bar_saved_range") == [
+    assert read_table_rows(database_url, "SELECT symbol, bar_period, start_utc, end_utc FROM ibkr_bar_saved_range") == [
         ("BTEST", "1-DAY", make_time(2), make_time(12))
     ]
 
@@ -212,7 +212,7 @@ def test_a_failed_bar_save_does_not_stop_the_records(database_url: str, tmp_path
         instrument=instrument_that_cannot_be_saved,
     )
 
-    assert read_table_rows(database_url, "SELECT count(*) FROM bar") == [(0,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM ibkr_bar") == [(0,)]
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]
 
