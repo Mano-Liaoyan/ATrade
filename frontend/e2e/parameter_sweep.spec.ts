@@ -29,12 +29,8 @@ async function setRange(page: Page, parameter: string, range: [string, string, s
   await dialog.getByLabel(`Step of ${parameter}`).fill(range[2]);
 }
 
-test('starts a parameter sweep, sorts its runs, and opens the backtest of a run', async ({ page, request }, currentTest) => {
-  test.setTimeout(RUN_TIMEOUT_MILLISECONDS * 2);
-  await saveAppleBars(page, request);
-  const strategyName = `Sweep ${currentTest.project.name} ${String(Date.now())}`;
-  await createStrategy(page, strategyName);
-
+/** Fills the "New parameter sweep" dialog with a grid of 2 x 2 runs and checks the run count and its limits. */
+async function fillSweepDialog(page: Page, strategyName: string): Promise<void> {
   await page.getByRole('banner').getByRole('link', { name: 'Parameter sweeps' }).click();
   await page.getByRole('button', { name: 'New parameter sweep' }).click();
   const dialog = page.getByRole('dialog', { name: 'New parameter sweep' });
@@ -60,44 +56,68 @@ test('starts a parameter sweep, sorts its runs, and opens the backtest of a run'
   await dialog.getByRole('checkbox', { name: 'Sweep trade_quantity_shares' }).check();
   await setRange(page, 'trade_quantity_shares', ['5', '10', '5']);
   await expect(runCount).toHaveText('4 runs');
+}
+
+/** Starts the sweep of the dialog and returns its ID. */
+async function startSweepFromDialog(page: Page): Promise<string> {
+  const startButton = page.getByRole('dialog', { name: 'New parameter sweep' }).getByRole('button', { name: 'Start parameter sweep' });
   // /sweeps already opened the newest sweep of an earlier test, so the page waits for the new sweep ID.
   const startResponse = page.waitForResponse(
     (response) => response.url().endsWith('/api/sweeps') && response.request().method() === 'POST',
   );
   await startButton.click();
   const sweepId = String(((await (await startResponse).json()) as { id: number }).id);
+  return sweepId;
+}
+
+/** The heatmap shows a value in each finished cell, and the "Metric" select changes the values. */
+async function checkHeatmap(page: Page, sweepId: string): Promise<void> {
+  const overview = page.getByRole('region', { name: `Parameter sweep #${sweepId}` });
+  await expect(overview.getByRole('status', { name: 'Run counts' })).toContainText(/[1-4] finished/, {
+    timeout: RUN_TIMEOUT_MILLISECONDS,
+  });
+  const heatmap = overview.getByRole('table', { name: 'Total return heatmap' });
+  await expect(heatmap.getByRole('cell', { name: /^[+-]?\d+\.\d{2} %$/ }).first()).toBeVisible();
+  await overview.getByRole('combobox', { name: 'Metric' }).click();
+  await page.getByRole('option', { name: 'Trades', exact: true }).click();
+  const tradesHeatmap = overview.getByRole('table', { name: 'Trades heatmap' });
+  await expect(tradesHeatmap.getByRole('cell', { name: /^\d+$/ }).first()).toBeVisible();
+}
+
+/** Sorts the Runs table, scrolls to its last row, opens the backtest of that run, and goes back to the sweep. */
+async function checkRuns(page: Page, sweepId: string): Promise<void> {
+  const runs = page.getByRole('region', { name: 'Runs' });
+  const periodHeader = runs.getByRole('columnheader', { name: 'average_period' });
+  await periodHeader.getByRole('button').click();
+  await expect(periodHeader).toHaveAttribute('aria-sort', 'descending');
+  const rows = runs.getByRole('row');
+  await expect(rows.nth(1).getByRole('cell').first()).toHaveText('15');
+  await periodHeader.getByRole('button').click();
+  await expect(periodHeader).toHaveAttribute('aria-sort', 'ascending');
+  await expect(rows.nth(1).getByRole('cell').first()).toHaveText('10');
+  const lastRow = rows.last();
+  await lastRow.scrollIntoViewIfNeeded();
+  await expect(lastRow).toBeInViewport();
+  await expect(lastRow.getByRole('cell').last()).toHaveAttribute('align', 'right');
+
+  await lastRow.getByRole('cell').nth(1).click();
+  await expect(page).toHaveURL(/\/backtests\/\d+$/);
+  await page.getByRole('link', { name: `Parameter sweep #${sweepId}` }).click();
+  await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
+}
+
+test('starts a parameter sweep, sorts its runs, and opens the backtest of a run', async ({ page, request }, currentTest) => {
+  test.setTimeout(RUN_TIMEOUT_MILLISECONDS * 2);
+  await saveAppleBars(page, request);
+  const strategyName = `Sweep ${currentTest.project.name} ${String(Date.now())}`;
+  await createStrategy(page, strategyName);
+  await fillSweepDialog(page, strategyName);
+  const sweepId = await startSweepFromDialog(page);
 
   await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
   try {
-    const overview = page.getByRole('region', { name: `Parameter sweep #${sweepId}` });
-    await expect(overview.getByRole('status', { name: 'Run counts' })).toContainText(/[1-4] finished/, {
-      timeout: RUN_TIMEOUT_MILLISECONDS,
-    });
-    const heatmap = overview.getByRole('table', { name: 'Total return heatmap' });
-    await expect(heatmap.getByRole('cell', { name: /^[+-]?\d+\.\d{2} %$/ }).first()).toBeVisible();
-    await overview.getByRole('combobox', { name: 'Metric' }).click();
-    await page.getByRole('option', { name: 'Trades', exact: true }).click();
-    const tradesHeatmap = overview.getByRole('table', { name: 'Trades heatmap' });
-    await expect(tradesHeatmap.getByRole('cell', { name: /^\d+$/ }).first()).toBeVisible();
-
-    const runs = page.getByRole('region', { name: 'Runs' });
-    const periodHeader = runs.getByRole('columnheader', { name: 'average_period' });
-    await periodHeader.getByRole('button').click();
-    await expect(periodHeader).toHaveAttribute('aria-sort', 'descending');
-    const rows = runs.getByRole('row');
-    await expect(rows.nth(1).getByRole('cell').first()).toHaveText('15');
-    await periodHeader.getByRole('button').click();
-    await expect(periodHeader).toHaveAttribute('aria-sort', 'ascending');
-    await expect(rows.nth(1).getByRole('cell').first()).toHaveText('10');
-    const lastRow = rows.last();
-    await lastRow.scrollIntoViewIfNeeded();
-    await expect(lastRow).toBeInViewport();
-    await expect(lastRow.getByRole('cell').last()).toHaveAttribute('align', 'right');
-
-    await lastRow.getByRole('cell').nth(1).click();
-    await expect(page).toHaveURL(/\/backtests\/\d+$/);
-    await page.getByRole('link', { name: `Parameter sweep #${sweepId}` }).click();
-    await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
+    await checkHeatmap(page, sweepId);
+    await checkRuns(page, sweepId);
   } finally {
     // The other specs share the backtest queue: the queued runs of this sweep must not wait in it.
     await request.post(`/api/sweeps/${sweepId}/cancel`);
