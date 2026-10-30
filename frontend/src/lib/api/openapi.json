@@ -163,7 +163,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrderBlockedResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/OrderBlockedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
+                    }
+                  ],
+                  "title": "Response 409 Send Order Api Paper Trading Orders Post"
                 }
               }
             }
@@ -3189,6 +3197,14 @@
         "title": "InterruptionResponse",
         "type": "object"
       },
+      "LedgerRule": {
+        "type": "string",
+        "enum": [
+          "sell_more_than_position",
+          "buy_more_than_cash",
+          "ledger_not_started"
+        ]
+      },
       "ManualOrderListResponse": {
         "properties": {
           "manual_orders": {
@@ -3513,6 +3529,24 @@
           "detail"
         ],
         "title": "OrderErrorResponse"
+      },
+      "OrderRefusedByLedgerResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/LedgerRule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "rule"
+        ],
+        "title": "OrderRefusedByLedgerResponse",
+        "description": "An order rule of the owner ledger failed for \"By hand\". ATrade did not send the order (section 11.10)."
       },
       "OrderRefusedResponse": {
         "properties": {
@@ -4252,6 +4286,67 @@
         "title": "OpenOrdersMessage",
         "type": "object"
       },
+      "OwnerKind": {
+        "enum": [
+          "by_hand",
+          "forward_test"
+        ],
+        "type": "string"
+      },
+      "OwnerMessage": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/OwnerKind"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "required": [
+          "kind",
+          "forward_test_id"
+        ],
+        "title": "OwnerMessage",
+        "type": "object"
+      },
+      "OwnerPositionMessage": {
+        "description": "The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/OwnerMessage"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "average_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Cost"
+          }
+        },
+        "required": [
+          "owner",
+          "quantity",
+          "average_cost"
+        ],
+        "title": "OwnerPositionMessage",
+        "type": "object"
+      },
       "PaperAccountBalanceMessage": {
         "description": "The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).",
         "properties": {
@@ -4439,12 +4534,24 @@
             },
             "title": "Positions",
             "type": "array"
+          },
+          "unattributed_cash_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unattributed Cash Usd"
           }
         },
         "required": [
           "check",
           "balance",
-          "positions"
+          "positions",
+          "unattributed_cash_usd"
         ],
         "title": "PaperAccountMessage",
         "type": "object"
@@ -4486,6 +4593,17 @@
           "unrealized_pnl": {
             "title": "Unrealized Pnl",
             "type": "string"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerPositionMessage"
+            },
+            "title": "Owners",
+            "type": "array"
+          },
+          "unattributed_quantity": {
+            "title": "Unattributed Quantity",
+            "type": "string"
           }
         },
         "required": [
@@ -4497,7 +4615,9 @@
           "average_cost",
           "market_price",
           "market_value",
-          "unrealized_pnl"
+          "unrealized_pnl",
+          "owners",
+          "unattributed_quantity"
         ],
         "title": "PositionMessage",
         "type": "object"
