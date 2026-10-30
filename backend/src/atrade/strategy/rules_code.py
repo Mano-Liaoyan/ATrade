@@ -17,6 +17,7 @@ from atrade.strategy.strategy_rules import (
     RuleGroup,
     StrategyRules,
 )
+from atrade.strategy.strategy_templates import TEMPLATES_BY_ID
 
 RULES_CODE_DOCSTRING = (
     "Strategy from the rule builder: buy when the entry group is true, sell when an exit item is true."
@@ -147,7 +148,8 @@ def write_on_start(parts: CodeParts) -> list[str]:
     ]
     warm_up = (
         [
-            "        warm_up_length = max(self.settings.bar_type.spec.timedelta * WARM_UP_BAR_COUNT, MIN_WARM_UP_LENGTH)",
+            "        bar_length = self.settings.bar_type.spec.timedelta",
+            "        warm_up_length = max(bar_length * WARM_UP_BAR_COUNT * WARM_UP_CALENDAR_FACTOR, MIN_WARM_UP_LENGTH)",
             "        self.request_bars(self.settings.bar_type, start=self.clock.utc_now() - warm_up_length)",
         ]
         if parts.indicators
@@ -199,13 +201,34 @@ def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
     ]
 
 
-def write_warm_up_constants(parts: CodeParts) -> list[str]:
+def count_warm_up_bars(parts: CodeParts) -> int | None:
+    """The bars that the longest indicator needs (section 23.4), or None without an indicator."""
     if not parts.indicators:
+        return None
+    return max(indicator.definition.screen_look_back_bars(indicator.parameters) for indicator in parts.indicators)
+
+
+def find_warm_up_bar_count(rules: StrategyRules) -> int | None:
+    """The look-back bar count of a rule builder version: the bars of its longest indicator (#164).
+
+    The backtest and the forward test give the strategy the last bars of this count before the start.
+    """
+    parts = CodeParts()
+    write_group(parts, rules.entry)
+    write_exit_checks(parts, rules)
+    return count_warm_up_bars(parts)
+
+
+def write_warm_up_constants(parts: CodeParts) -> list[str]:
+    bar_count = count_warm_up_bars(parts)
+    if bar_count is None:
         return []
-    bar_count = max(indicator.definition.screen_look_back_bars(indicator.parameters) for indicator in parts.indicators)
     return [
-        "# The warm-up asks for the bars that the longest indicator needs, and for 1 week at least.",
+        "# The warm-up asks for the bars that the longest indicator needs. The platform gives only the last bars of",
+        "# this count before the start. A bar comes only in the trading hours, so the request goes 6 times further back",
+        "# in calendar time, and 1 week at least.",
         f"WARM_UP_BAR_COUNT = {bar_count}",
+        "WARM_UP_CALENDAR_FACTOR = 6",
         "MIN_WARM_UP_LENGTH = timedelta(days=7)",
         "",
         "",
@@ -277,6 +300,13 @@ def type_name(indicator: IndicatorUse) -> str:
     return indicator.definition.indicator_class.__name__
 
 
+def write_docstring(rules: StrategyRules) -> str:
+    """The template docstring when the rules hold a known template ID (section 9.9.2), else the rules docstring."""
+    template_id = rules.settings.template_id
+    template = None if template_id is None else TEMPLATES_BY_ID.get(template_id)
+    return RULES_CODE_DOCSTRING if template is None else template.write_docstring()
+
+
 def make_rules_code(rules: StrategyRules) -> str:
     """Makes the strategy code of section 9.2 from correct rules."""
     parts = CodeParts()
@@ -284,7 +314,7 @@ def make_rules_code(rules: StrategyRules) -> str:
     exit_checks = write_exit_checks(parts, rules)
     buy = write_buy(rules, parts)
     lines = [
-        f'"""{RULES_CODE_DOCSTRING}"""',
+        f'"""{write_docstring(rules)}"""',
         "",
         *write_imports(rules, parts),
         "",

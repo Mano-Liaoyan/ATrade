@@ -90,12 +90,16 @@ async def add_global_source_order(*, database_url: str, request: BacktestRequest
     return replace(request, source_order=await read_source_order(database_url=database_url))
 
 
-async def queue_backtest(*, database_url: str, request: BacktestRequest, created_at_utc: datetime) -> int:
+async def queue_backtest(
+    *, database_url: str, request: BacktestRequest, created_at_utc: datetime, conversation_id: int | None = None
+) -> int:
     """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it. Without a source
     order in the request, the backtest saves and uses the global source order."""
     request = await add_global_source_order(database_url=database_url, request=request)
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        row = await backtest_store.insert_backtest(connection, request=request, created_at_utc=created_at_utc)
+        row = await backtest_store.insert_backtest(
+            connection, request=request, created_at_utc=created_at_utc, conversation_id=conversation_id
+        )
     return row.id
 
 
@@ -115,3 +119,13 @@ async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> Backt
         equity_curve=equity_curve,
         trades=trades,
     )
+
+
+async def read_last_backtest_ids(*, database_url: str, strategy_version_ids: list[int], count: int) -> list[int]:
+    """The IDs of the last backtests of these strategy versions, the newest first. At most `count`."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        cursor = await connection.execute(
+            "SELECT id FROM backtest WHERE strategy_version_id = ANY(%(ids)s) ORDER BY id DESC LIMIT %(count)s",
+            {"ids": strategy_version_ids, "count": count},
+        )
+        return [backtest_id for (backtest_id,) in await cursor.fetchall()]

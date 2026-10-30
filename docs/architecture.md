@@ -179,7 +179,7 @@ counts from `atrade/`.
 | `screen/` | Save, check, and run screens. Save and read screen results (section 24). |
 | `backtest/` | Run backtests and parameter sweeps. Save and read backtest results. Provide the metric functions and the robustness checks (in-sample and out-of-sample split, probabilistic and deflated Sharpe ratio). |
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, the paper account check, the owner ledger, the ledger changes at a stock split, and the "Split check needed" state. |
-| `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, the quarterly universe job, and the daily stock split check. |
+| `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, and the daily stock split check. The worker also runs the quarterly universe update of `market_data`. |
 | `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It calls the `assistant` service over HTTP (`AssistantServiceClient`, section 25.14). It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
 | `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
@@ -239,12 +239,20 @@ app           -> all modules
   `foundation`. So `indicator` can import only `foundation`, and `indicator`
   and `ibkr` do not import each other. A contract keeps the internal files
   of `indicator` private (#160).
+- import-linter puts `screen` in its own layer below `backtest` and
+  `paper_trading` and above `watchlist`, so `backtest` can import `screen`
+  and `screen` can import `watchlist`. A forbidden contract keeps `screen`
+  from `strategy`, `ibkr`, and `assistant`, and a contract keeps the
+  internal files of `screen` private (#205).
 - import-linter puts `assistant` in the same layer as `ibkr` and
   `indicator`, so `assistant` can import only `foundation` (#179). A
   contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
-  (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
+  (`docs/architecture/assistant.md`). `app/` also gives `assistant` the
+  start context of a conversation (`strategy.read_strategy_outline()`,
+  `backtest.read_last_backtest_ids()`) and the strategy template for the
+  default system prompt (#184). The `conversation_id` foreign keys of
   `strategy_version`, `backtest`, and the screen tables point at
   `assistant_conversation` (section 6.3 allows a foreign key).
 - `paper_trading` does not import `forward_test`. Since #215 the owner
@@ -256,7 +264,7 @@ app           -> all modules
   (`docs/architecture/paper_trading.md` section 11.13). `forward_test` calls
   the public owner ledger functions of `paper_trading`.
 - `forward_test -> backtest` is only for the comparison, the metric
-  functions, and the look-back of `request_bars` (`find_look_back_length()`,
+  functions, and the look-back of `request_bars` (`find_look_back()`,
   `write_look_back_catalog()`).
 - `backtest` does not depend on `paper_trading`. A backtest request carries
   `paper_capital_usd` as an input.
@@ -286,10 +294,11 @@ app           -> all modules
 
 | Entry point | Runs in | Purpose |
 |---|---|---|
-| `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second listener on port 8001 has only the allow-list routes for the `assistant` service (section 25). Runs the daily bar update after the close of each trading day (section 8). |
+| `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second uvicorn server on port 8001 runs in the same event loop (`serve_both`) and has only the allow-list routes for the `assistant` service (`app/assistant_port.py`, section 25). When one server stops, the other stops too. Only port 8000 has a lifespan (IB Gateway connection, paper account check, backtest runner). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
-| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. From #191 it also writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
+| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. It reads the IBKR daily closes of the instruments that still trade (IB Gateway, client ID `--ibkr-client-id`, default `30`), links symbol changes, adjusts the bars for stock splits, and writes `stock_split` and `databento_symbol_link` rows (section 8.8.3, 8.8.4). |
+| `app/databento_check.py` | Run by the user after the Databento import, in the `web` image with `docker compose run` (README.md) | Lists the detected stock splits that wait for the user check and the symbol links that are not checked. `--accept` confirms them, `--reject-split <ID>` rejects one stock split (section 8.8.3). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
@@ -305,8 +314,12 @@ A restart of `web` does not stop forward tests.
 | `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
 | `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
 
-Port 8000 refuses with `403` each request that comes from an address of the
-`atrade-assistant-internal` subnet (section 25).
+Port 8000 refuses with `403` each request that arrives on a local address
+(ASGI `scope["server"]`) of the `atrade-assistant-internal` subnet
+`172.31.250.0/24` (section 25). The middleware is `RefuseAssistantSubnet` in
+`app/assistant_port.py`. The body is `{"detail": "Port 8000 does not answer
+requests from the assistant network."}`. A WebSocket from this subnet is
+closed before accept, so uvicorn answers `403`.
 
 ## 7. IBKR access
 
@@ -778,8 +791,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   error). `ComparedKeyMetrics` (`tests: ComparedTest[]`) shows one
   `KeyMetricRow` for each test, under a line with the curve line style and a
   link to the test. This line is the only key of the curves. `readKeyMetrics`
-  takes `metrics: null` (all tiles "–") and an optional `period`: only the
-  trades in the period count for the win rate.
+  takes `metrics: null` (all tiles "–"). The win rate comes from the API
+  (#168); the forward test comparison route gives the win rate of the
+  backtest period.
 - `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
   (`name`, `text`, `change`) is a Carbon tile with the name and the
   right-aligned value (tabular numbers). With `change`, the value is a
@@ -1094,7 +1108,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   default network, so it cannot connect to `postgres` or `ib-gateway`. `web`
   is on the default network and on `atrade-assistant-internal`. `web` also
   listens on port 8001 in `atrade-assistant-internal`. Compose does not
-  publish port 8001.
+  publish port 8001. `web` has no `ports` or `expose` entry for 8001: the
+  `assistant` service reaches it on the shared network. A test reads
+  `deploy/compose.yaml` and asserts this (#181).
 - `assistant` uses the image of `deploy/assistant.Dockerfile`: a Vite+ stage
   installs the production dependencies of `assistant/`, and a
   `node:24.13.0-slim` stage runs `node src/main.ts` as the user `node`.
@@ -1168,8 +1184,8 @@ Settings that `foundation/settings` reads:
 | `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
-| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
-| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason, and the Databento import program does not download batch jobs. Compose gives it to `web`, so the import program in the `web` image gets it. |
+| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. Compose gives it to `web` and `forward-test`. |
+| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason, and the Databento import program does not download batch jobs. Compose gives it to `web`, so the import program in the `web` image gets it, and to `forward-test` for the quarterly update. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
 that ends before it starts, a Web client ID inside the forward test range,
@@ -1403,7 +1419,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Port 8001 app (phase 2): a unit test asserts that its routes are exactly
   the allow-list of section 25. A test asserts `403` on port 8000 for a
   request from the assistant subnet. A test asserts that a save on port 8001
-  records the source `assistant` and the conversation ID.
+  records the source `ai_assistant` and the conversation ID, and that a
+  backtest on port 8001 records the conversation ID or gets `422` without
+  saved bars (`backend/tests/app/test_assistant_port.py`).
 - Market data (phase 3): the source order merge rule, the Databento import
   (price rules, 7 regular-hours hourly bars, split and symbol link
   detection), the quarterly universe (63-day ranking, retry and fallback
@@ -1619,7 +1637,8 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 
 | Fact | How to check |
 |---|---|
-| The default parameters of the template sources (#139). | Read the method section of each paper. |
+| The default parameters of the template sources (#139). Brock, Lakonishok & LeBaron 1992 (S1, S2: range break of 10 days, break by the close) and Faber 2007 (S1: check only at the month end) were not read on 2026-10-30 (#175): both papers are paywalled. The phase 3 sources (Blitz & van Vliet 2007, Barroso & Santa-Clara 2015) were not read. | Read section II of Brock et al. and the Faber paper with library access (strategy section 9.9.4). |
+| The IBKR instrument search returns ETFs, for example `SPY` (#175, templates S1 to S3). `ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. Not checked: no IB Gateway in the implementation environment. | Search `SPY` on the paper account. |
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
 | The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
@@ -1632,6 +1651,7 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The Databento usage-based plan can download 2018 data, and the data stays usable after the account closes (#141, #144). | Download 1 instrument for 1 day. Ask Databento support about the license. |
 | The time of day at which the EQUS.SUMMARY bar of the previous trading day is available (#146). | `metadata.get_dataset_range` at 06:00, 07:00, and 08:00 ET on one trading day. |
 | How Databento links symbol changes, for example FB to META (#141). | Free `symbology.resolve` for FB and META. |
+| The number of stock splits of instruments that stopped trading, and the false positives of the detection rule and the symbol link rule (#191, only tested with fake data). | Run the import on the bought daily bars and check the listed detections by hand. |
 | IBKR scales `TRADES` volume by the split ratio (#149). | At the first stock split, read 1 year of daily bars again and compare. |
 | The paper account handles stock splits (#149). | Watch the first stock split of a held instrument. |
 | The IB data client and the `ib_async` connection of the ATrade execution client share 1 client ID in 1 LiveNode (`forward_test.md` section 12.24) (#213). | `uv run pytest -m ibkr_paper -k share_the_client_id tests/forward_test`. |
@@ -1664,6 +1684,7 @@ implementation" list.
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
 | The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | Yes, with changes. On 2026-10-30 with NautilusTrader 2.0.0rc7 (#213), the Python `ExecutionClient` and `DataClient` of `nautilus_trader.live.clients` ran in a `LiveNode` with the IBKR fake and the owner ledger fake (`tests/forward_test/test_atrade_clients_live_node.py`). 2 or more LiveNodes can run one after the other in 1 process. After a restart, NautilusTrader made an external order with an inferred fill from the `PositionStatusReport` (`quantity`, `avg_px_open`): it does make a synthetic fill. With `external_order_instrument_ids` set to the instrument, the strategy got the position with the reported average price and did not buy again. Without it, the position belonged to the strategy `EXTERNAL`. After a 2-for-1 split in the fake ledger and a restart, the strategy got the new quantity and the new average price. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
+| Moskowitz, Ooi & Pedersen 2012 use a 12-month look-back and a 1-month hold (#139, template S3). | Yes. On 2026-10-30 (#175), from the published paper (JFE 104, 228–250, author copy at `pages.stern.nyu.edu/~lpederse`): section 4 (p. 237) uses k = 12 months and h = 1 month as the main strategy. Eq. (5) uses the return from t − 12 to t, so no month is skipped (only the cross-sectional strategy of footnote 10 skips 1 month): S3 uses skip 0. The signal is the sign of the past excess return: long above 0, short below 0. Each position is scaled to 40% annual ex ante volatility. S3 differs: no short sale, no volatility scaling, price return (strategy section 9.9.3). |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1718,6 +1739,11 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#166): the out-of-sample share is a share of the calendar time
+  of the request range, and the split time does not align to a bar end. The
+  route calculates the split metrics at each read from the saved equity
+  curve and trades. The out-of-sample Sharpe percent is null when the
+  in-sample Sharpe ratio is 0, below 0, or null (backtest section 10.9.4).
 - Decided (#167): the route calculates the daily Sharpe ratio of each trial
   from its saved equity curve at each read. When fewer than 2 trials have a
   daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
@@ -1737,6 +1763,15 @@ option and records it in this document.
   message with `from="me"` always scrolls the log to the end, also while the
   user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
+- Decided (#180): the table `strategy_version_discard` holds the discarded
+  mark, the source value of the AI assistant is `ai_assistant`, Keep of a
+  diff card is not recorded, and the discard route answers `409` for a
+  version that the AI assistant did not save (strategy sections 9.1.1 and
+  9.6, assistant section 25.14).
+- Decided (#168): the Metrics table names the metrics CAGR, Annual
+  volatility, Sharpe ratio, Sortino ratio, Calmar ratio, Profit factor, Win
+  rate, Average win (USD), Average loss (USD), Exposure, and Turnover
+  (backtest section 10.9.6). The frontend has no win rate calculation.
 - Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
   its `storageKey`. `widthPixels` null gives the default width, and a
   double-click on the splitter sets it to null. A value stored before the
@@ -1767,6 +1802,10 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#205): the `screen` tables, the definition keys, the comparison
+  operators, the `422` problem `location`, and the final paths of the screen
+  routes are in [`screen.md`](architecture/screen.md) sections 24.4, 24.4.1,
+  24.6, and 24.7. A delete of a screen deletes its screen results.
 - Decided (#197): the request field of the backtest source order is
   `source_order`. It holds each `BarSource` exactly 1 time, like the global
   source order (`422` otherwise). `bar_count_by_source` counts only the bars
@@ -1790,14 +1829,55 @@ option and records it in this document.
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.
+- Decided (#191): the Databento import reads the IBKR daily closes through
+  IB Gateway with its own client ID (`--ibkr-client-id`, default `30`), so
+  it needs IB Gateway. The user checks the detections with the program
+  `app/databento_check.py`. Enum values of `stock_split`, the order of the
+  check and the save, and symbol reuse:
+  `docs/architecture/market_data.md` section 8.14.
+- Decided (#192): `market_data` owns the quarterly US universe
+  (`us_universe_member`, `docs/architecture/market_data.md` section 8.9).
+  The quarterly update is `UsUniverseUpdate` of the `market_data` public
+  entry. `app/forward_test_worker.py` runs it next to the forward test
+  comparison. It downloads to `/tmp/databento` of the `forward-test` service
+  and imports the file into `databento_bar`. The Databento import program
+  calculates the quarters without members after each import. The other
+  #192 choices are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#195): the daily bar update is `DailyBarUpdate` of the
+  `market_data` public entry. `app/web.py` runs it and gives it the
+  watchlist read (`read_watchlist_instruments` of `watchlist`), because
+  `market_data` does not import `watchlist`. The time, the calendar, and
+  "still trading" are in `docs/architecture/market_data.md` section 8.14.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
+- Decided (#216): the bar fetcher is `BarFetcher` in
+  `forward_test/bar_fetcher.py`. The worker runs it next to the state
+  comparison. It reads only the ranges that no bar source in the global
+  source order saved (`read_unsaved_ranges` of `market_data`), so the daily
+  read and the warm-up fill are one code path. The daily read runs at the
+  first check after 00:30 UTC of each UTC day. When IB Gateway is not
+  reachable, it logs the reason and tries again 5 minutes later
+  (`docs/architecture/forward_test.md` section 12.24).
+- Decided (#216): the bar fetcher and the daily bar update of `web` are
+  different jobs. They use different client IDs in different processes.
+- Decided (#216): `Settings` refuses a bar fetcher client ID inside the
+  forward test range or equal to the Web client ID. The `web` and
+  `forward-test` services both get `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, so
+  both check the same value. The worker then does not start and logs the
+  reason.
 - The open points of the map #129 are in the "Left to the implementation"
-  lists of sections 8 to 12 and 23 to 25. One of them:
-  - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
-    momentum need about 252 bars. The look-back must follow the longest
-    indicator of the strategy, or this effect is accepted.
+  lists of sections 8 to 12 and 23 to 25.
+- Decided (#164): the backtest and the forward test give a rule builder
+  version the last N saved bars before the start, where N is the largest
+  look-back count of the indicators in its `rules` (option 1 of the issue).
+  The look-back is a bar count; the read range converts it to calendar time
+  with factor 2 for 1-day bars and 6 for intraday bars. A version without
+  rules keeps the default length (`max(bar period × 60, 7 days)`)
+  (`docs/architecture/backtest.md` section 10.3.1).
+- Decided (#175): the template list, the template IDs, the rules of
+  "Blank rules", and the template docstring are in strategy section 9.9.3.
+  `strategy_template.py` keeps its name.
 - Decided (#178): the `assistant` service code is in `assistant/`, an own
   pnpm project that Vite+ runs like `frontend/`. Node.js runs the
   TypeScript files directly (type stripping), so there is no build step. The
@@ -1853,10 +1933,19 @@ option and records it in this document.
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#181): the 2 uvicorn servers of the `web` process, the
+  conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
+  exchange rates of a backtest on port 8001. See section 25.14 and
+  [`backtest.md`](architecture/backtest.md) section 10.13.
 - Decided (#183): the credential file is `/data/credentials.json` in the
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the
   login and credential routes of `assistant`. See section 25.14.
+- Decided (#184): the default prompt is saved as prompt version 1 when no
+  version exists. The browser sends the open version number when it creates
+  a conversation. A trigger refuses each `UPDATE` of
+  `assistant_prompt_version`. `app/` gives `assistant` the start context
+  reader and the strategy template. See section 25.9.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in

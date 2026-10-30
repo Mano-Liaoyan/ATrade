@@ -237,6 +237,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description The template list in the order of section 9.9.3.
+         */
+        get: operations["list_templates_api_strategy_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -290,6 +310,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard Version
+         * @description Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).
+         */
+        post: operations["discard_version_api_strategies__strategy_id__versions__version_number__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies/{strategy_id}/versions": {
         parameters: {
             query?: never;
@@ -322,25 +362,11 @@ export interface paths {
         /** List Backtests */
         get: operations["list_backtests_api_backtests_get"];
         put?: never;
-        /** Start Backtest */
+        /**
+         * Start Backtest
+         * @description The start of port 8000: a backtest without a conversation.
+         */
         post: operations["start_backtest_api_backtests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/backtests/{backtest_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Backtest */
-        get: operations["read_backtest_api_backtests__backtest_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -358,6 +384,23 @@ export interface paths {
         get: operations["read_limits_api_backtest_limits_get"];
         /** Change Limits */
         put: operations["change_limits_api_backtest_limits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Backtest */
+        get: operations["read_backtest_api_backtests__backtest_id__get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -491,6 +534,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens */
+        get: operations["list_screens_api_screens_get"];
+        put?: never;
+        /** Create Screen */
+        post: operations["create_screen_api_screens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen */
+        get: operations["read_screen_api_screens__screen_id__get"];
+        /**
+         * Change Screen
+         * @description Overwrites the name and the definition. A screen has no versions (section 24.1).
+         */
+        put: operations["change_screen_api_screens__screen_id__put"];
+        post?: never;
+        /**
+         * Delete Screen
+         * @description Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.
+         */
+        delete: operations["delete_screen_api_screens__screen_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -539,7 +625,10 @@ export interface paths {
         /** List Conversations */
         get: operations["list_conversations_api_assistant_conversations_get"];
         put?: never;
-        /** Create Conversation */
+        /**
+         * Create Conversation
+         * @description The conversation records the latest prompt version and the fixed part of the system prompt (25.9).
+         */
         post: operations["create_conversation_api_assistant_conversations_post"];
         delete?: never;
         options?: never;
@@ -567,6 +656,27 @@ export interface paths {
         head?: never;
         /** Rename Conversation */
         patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/assistant/prompt-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Prompt Versions
+         * @description When no version exists, saves the default text as version 1, so the list is never empty.
+         */
+        get: operations["list_prompt_versions_api_assistant_prompt_versions_get"];
+        put?: never;
+        /** Save Prompt Version */
+        post: operations["save_prompt_version_api_assistant_prompt_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/assistant/providers": {
@@ -707,7 +817,13 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -720,6 +836,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
@@ -818,7 +935,13 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -830,8 +953,8 @@ export interface components {
         };
         /**
          * BacktestRobustnessResponse
-         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
-         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         * @description The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+         *     value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`.
          */
         BacktestRobustnessResponse: {
             /** Trial Count */
@@ -844,6 +967,10 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+            /** Out Of Sample To In Sample Sharpe Percent */
+            out_of_sample_to_in_sample_sharpe_percent: string | null;
+            /** Out Of Sample Use Count */
+            out_of_sample_use_count: number | null;
         };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
@@ -881,6 +1008,12 @@ export interface components {
         BarsResponse: {
             /** Bars */
             bars: components["schemas"]["BarResponse"][];
+        };
+        /** ChangeScreenRequest */
+        ChangeScreenRequest: {
+            /** Name */
+            name: string;
+            definition: components["schemas"]["JsonValue"];
         };
         /** CodeCheckFailedResponse */
         CodeCheckFailedResponse: {
@@ -937,7 +1070,13 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -950,6 +1089,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
@@ -1068,6 +1208,10 @@ export interface components {
             last_model: string | null;
             /** Last Credential Name */
             last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
             /** Messages */
             messages: components["schemas"]["ConversationMessageResponse"][];
         };
@@ -1112,16 +1256,32 @@ export interface components {
             last_model: string | null;
             /** Last Credential Name */
             last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
         };
         /** CreateConversationRequest */
         CreateConversationRequest: {
             /** Strategy Id */
             strategy_id: number;
+            /** Version Number */
+            version_number?: number | null;
+        };
+        /** CreateScreenRequest */
+        CreateScreenRequest: {
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
             /** Name */
             name: string;
+            /** @default blank_code */
+            start_from: components["schemas"]["StartPoint"];
         };
         /** CredentialListResponse */
         CredentialListResponse: {
@@ -1434,6 +1594,7 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        JsonValue: unknown;
         /** @enum {string} */
         LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
         LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
@@ -1509,6 +1670,8 @@ export interface components {
             /** Average Fill Price */
             average_fill_price: string | null;
         };
+        /** @enum {string} */
+        Market: "US" | "HK";
         Number: number;
         /** NumberOperand */
         NumberOperand: {
@@ -1625,6 +1788,29 @@ export interface components {
             type: "price";
             price: components["schemas"]["PriceName"];
         };
+        /** PromptVersionListResponse */
+        PromptVersionListResponse: {
+            /** Prompt Versions */
+            prompt_versions: components["schemas"]["PromptVersionResponse"][];
+            /** Default Text */
+            default_text: string;
+            /** Fixed Part */
+            fixed_part: string;
+        };
+        /** PromptVersionResponse */
+        PromptVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version Number */
+            version_number: number;
+            /** Text */
+            text: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+        };
         /** ProviderListResponse */
         ProviderListResponse: {
             /** Providers */
@@ -1713,6 +1899,11 @@ export interface components {
             /** Backtest Id */
             backtest_id: number;
         };
+        /** SavePromptVersionRequest */
+        SavePromptVersionRequest: {
+            /** Text */
+            text: string;
+        };
         /**
          * SaveVersionRequest
          * @description Exactly one of `code` and `rules` (section 9.6).
@@ -1739,6 +1930,73 @@ export interface components {
              * Format: date-time
              */
             last_start_utc: string;
+        };
+        /** ScreenCheckFailedResponse */
+        ScreenCheckFailedResponse: {
+            /** Problems */
+            problems: components["schemas"]["ScreenProblemResponse"][];
+        };
+        /** ScreenListItemResponse */
+        ScreenListItemResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Kept */
+            kept: boolean;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+        };
+        /** ScreenProblemResponse */
+        ScreenProblemResponse: {
+            /** Location */
+            location: (string | number)[];
+            /** Message */
+            message: string;
+        };
+        /** ScreenResponse */
+        ScreenResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Kept */
+            kept: boolean;
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+            /** Recent Screen Results */
+            recent_screen_results: components["schemas"]["ScreenResultSummaryResponse"][];
+        };
+        /** ScreenResultSummaryResponse */
+        ScreenResultSummaryResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Result Count */
+            result_count: number;
         };
         /** SendOrderRequest */
         SendOrderRequest: {
@@ -1768,6 +2026,11 @@ export interface components {
             /** Source Order */
             source_order: components["schemas"]["BarSource"][];
         };
+        /** SplitMetricsResponse */
+        SplitMetricsResponse: {
+            in_sample: components["schemas"]["BacktestMetricsResponse"];
+            out_of_sample: components["schemas"]["BacktestMetricsResponse"];
+        };
         /** StartBacktestRequest */
         StartBacktestRequest: {
             /** Strategy Version Id */
@@ -1791,6 +2054,11 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };
@@ -1810,6 +2078,8 @@ export interface components {
             /** End Time Utc */
             end_time_utc?: string | null;
         };
+        /** @enum {string} */
+        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
         /**
          * StartRefusedResponse
          * @description The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18).
@@ -1856,6 +2126,34 @@ export interface components {
             entry: components["schemas"]["RuleGroup"];
             exits: components["schemas"]["RuleExits"];
         };
+        /** StrategyTemplateResponse */
+        StrategyTemplateResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "rules" | "code";
+            /** Entry */
+            entry: string;
+            /** Exit */
+            exit: string;
+            /** Defaults */
+            defaults: string;
+            /** Market */
+            market: string;
+            /** Bar Period */
+            bar_period: string;
+            /** Evidence */
+            evidence: string;
+            /** Sources */
+            sources: components["schemas"]["TemplateSourceResponse"][];
+            /** Differs From Source */
+            differs_from_source: string;
+        };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
             /** Id */
@@ -1877,11 +2175,15 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
             /** Rules */
             rules: {
                 [key: string]: unknown;
             } | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1900,7 +2202,18 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
+        };
+        /** TemplateSourceResponse */
+        TemplateSourceResponse: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
@@ -2893,6 +3206,26 @@ export interface operations {
             };
         };
     };
+    list_templates_api_strategy_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyTemplateResponse"][];
+                };
+            };
+        };
+    };
     list_strategies_api_strategies_get: {
         parameters: {
             query?: never;
@@ -3083,6 +3416,56 @@ export interface operations {
             };
         };
     };
+    discard_version_api_strategies__strategy_id__versions__version_number__discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_version_api_strategies__strategy_id__versions_post: {
         parameters: {
             query?: never;
@@ -3189,46 +3572,6 @@ export interface operations {
             };
         };
     };
-    read_backtest_api_backtests__backtest_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                backtest_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestDetailResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_limits_api_backtest_limits_get: {
         parameters: {
             query?: never;
@@ -3269,6 +3612,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_backtest_api_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3517,6 +3900,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ForwardTestComparisonResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screens_api_screens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenListItemResponse"][];
+                };
+            };
+        };
+    };
+    create_screen_api_screens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_api_screens__screen_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_screen_api_screens__screen_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    delete_screen_api_screens__screen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3857,6 +4415,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_versions_api_assistant_prompt_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionListResponse"];
+                };
+            };
+        };
+    };
+    save_prompt_version_api_assistant_prompt_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePromptVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"];
                 };
             };
             /** @description Validation Error */

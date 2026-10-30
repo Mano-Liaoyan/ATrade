@@ -9,9 +9,12 @@ from psycopg.rows import class_row
 
 type TitleState = Literal["new", "generating", "generated", "not_generated", "renamed"]
 
-CONVERSATION_COLUMNS: Final = (
-    "id, strategy_id, title, title_state, created_at_utc, last_provider, last_model, last_credential_name"
-)
+CONVERSATION_COLUMNS: Final = """
+    id, strategy_id, title, title_state, created_at_utc, last_provider, last_model, last_credential_name,
+    prompt_version_id,
+    (SELECT version_number FROM assistant_prompt_version
+        WHERE assistant_prompt_version.id = assistant_conversation.prompt_version_id) AS prompt_version_number
+"""
 
 
 @dataclass(frozen=True)
@@ -24,21 +27,43 @@ class ConversationRecord:
     last_provider: str | None
     last_model: str | None
     last_credential_name: str | None
+    prompt_version_id: int
+    prompt_version_number: int
 
 
-async def insert_conversation(
-    connection: psycopg.AsyncConnection, *, strategy_id: int, title: str, created_at_utc: datetime
+@dataclass(frozen=True)
+class SystemPromptParts:
+    """The text of the prompt version of a conversation and the fixed part of its start."""
+
+    editable_part: str
+    fixed_part: str
+
+
+async def insert_conversation(  # noqa: PLR0913 readability-exception: the columns of a new conversation.
+    connection: psycopg.AsyncConnection,
+    *,
+    strategy_id: int,
+    title: str,
+    created_at_utc: datetime,
+    prompt_version_id: int,
+    fixed_prompt: str,
 ) -> ConversationRecord | None:
-    """Returns None when the strategy does not exist."""
+    """Returns None when the strategy does not exist. Call in a transaction."""
     try:
         async with connection.transaction(), connection.cursor(row_factory=class_row(ConversationRecord)) as cursor:
             await cursor.execute(
                 f"""
-                INSERT INTO assistant_conversation (strategy_id, title, created_at_utc)
-                VALUES (%(strategy_id)s, %(title)s, %(created_at_utc)s)
+                INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id, fixed_prompt)
+                VALUES (%(strategy_id)s, %(title)s, %(created_at_utc)s, %(prompt_version_id)s, %(fixed_prompt)s)
                 RETURNING {CONVERSATION_COLUMNS}
                 """,
-                {"strategy_id": strategy_id, "title": title, "created_at_utc": created_at_utc},
+                {
+                    "strategy_id": strategy_id,
+                    "title": title,
+                    "created_at_utc": created_at_utc,
+                    "prompt_version_id": prompt_version_id,
+                    "fixed_prompt": fixed_prompt,
+                },
             )
             return await cursor.fetchone()
     except psycopg.errors.ForeignKeyViolation:
@@ -61,6 +86,22 @@ async def select_conversation(connection: psycopg.AsyncConnection, conversation_
     async with connection.cursor(row_factory=class_row(ConversationRecord)) as cursor:
         await cursor.execute(
             f"SELECT {CONVERSATION_COLUMNS} FROM assistant_conversation WHERE id = %(id)s",
+            {"id": conversation_id},
+        )
+        return await cursor.fetchone()
+
+
+async def select_system_prompt_parts(
+    connection: psycopg.AsyncConnection, conversation_id: int
+) -> SystemPromptParts | None:
+    async with connection.cursor(row_factory=class_row(SystemPromptParts)) as cursor:
+        await cursor.execute(
+            """
+            SELECT assistant_prompt_version.text AS editable_part, assistant_conversation.fixed_prompt AS fixed_part
+            FROM assistant_conversation
+            JOIN assistant_prompt_version ON assistant_prompt_version.id = assistant_conversation.prompt_version_id
+            WHERE assistant_conversation.id = %(id)s
+            """,
             {"id": conversation_id},
         )
         return await cursor.fetchone()

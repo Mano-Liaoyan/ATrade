@@ -65,10 +65,10 @@ async def test_the_same_code_and_rules_make_no_new_version(web_client: httpx.Asy
 
 @pytest.mark.anyio
 async def test_the_same_code_with_other_rules_makes_a_new_version(web_client: httpx.AsyncClient) -> None:
-    # A template ID changes the rules but not the code (#175 adds the template docstring).
+    # An unknown template ID changes the rules but not the code. A known template ID adds its docstring (#175).
     strategy_id = await create_strategy(web_client)
     await save(web_client, strategy_id, {"rules": RSI_RULES})
-    other_rules = {**RSI_RULES, "settings": {**RSI_RULES["settings"], "template_id": "s1"}}
+    other_rules = {**RSI_RULES, "settings": {**RSI_RULES["settings"], "template_id": "my_template"}}
 
     response = await save(web_client, strategy_id, {"rules": other_rules})
 
