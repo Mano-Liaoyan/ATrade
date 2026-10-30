@@ -86,6 +86,13 @@ conditions, and a position size. It writes code in one direction only: it
 does not read code back into conditions. In Chinese, write 规则构建器.
 _Avoid_: no-code editor, visual editor, wizard, strategy generator
 
+**Strategy template**:
+A named start point for a new strategy, with its sources in published
+research. It holds rules for the rule builder (a rule template) or strategy
+code (a code template). The user makes version 1 of a strategy from it. Its
+rules have peer-reviewed evidence for its market and use. In Chinese, write 策略模板.
+_Avoid_: preset, example, sample, starter
+
 ## Strategy testing
 
 **Backtest**:
