@@ -38,6 +38,7 @@
     readSweepStatus,
     sortSweepRows,
     SWEEP_METRICS,
+    SWEEP_STATUS_COLUMN,
     type ParameterValue,
     type SortDirection,
     type Sweep,
@@ -332,7 +333,13 @@
                             }}
                           />
                         {/each}
-                        <th scope="col"><div class="cds--table-header-label">Status</div></th>
+                        <SortHeader
+                          label="Status"
+                          direction={sortColumn === SWEEP_STATUS_COLUMN ? sortDirection : null}
+                          onSort={() => {
+                            sortBy(SWEEP_STATUS_COLUMN);
+                          }}
+                        />
                         {#each SWEEP_METRICS as item (item.value)}
                           <SortHeader
                             label={item.label}
@@ -356,7 +363,7 @@
                           {#each parameterNames as name, index (name)}
                             <td align="right">
                               {#if index === 0}
-                                <a class="row-link" href={resolve("/backtests/[[backtestId]]", { backtestId: String(row.backtestId) })}>{String(row.values[name])}</a>
+                                <a class="row-link" href={resolve('/backtests/[[backtestId]]', { backtestId: String(row.backtestId) })}>{String(row.values[name])}</a>
                               {:else}
                                 {String(row.values[name])}
                               {/if}

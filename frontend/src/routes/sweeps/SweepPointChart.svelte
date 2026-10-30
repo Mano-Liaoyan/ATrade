@@ -79,7 +79,6 @@
 
   .label {
     fill: var(--cds-text-secondary);
-    font-family: var(--cds-label-01-font-family, inherit);
     font-size: var(--cds-label-01-font-size);
     font-variant-numeric: tabular-nums;
   }

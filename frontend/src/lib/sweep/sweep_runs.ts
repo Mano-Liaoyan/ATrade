@@ -13,9 +13,15 @@ export interface SweepRow {
   values: Record<string, number | boolean | null>;
 }
 
+// The sort column of the Status column. It is not a Python name, so no strategy parameter has it.
+export const SWEEP_STATUS_COLUMN = ':status';
+
 // A row without a value in the column goes last in both directions.
 export function sortSweepRows(rows: SweepRow[], column: string, direction: SortDirection): SweepRow[] {
   const sign = direction === 'ascending' ? 1 : -1;
+  if (column === SWEEP_STATUS_COLUMN) {
+    return [...rows].sort((left, right) => sign * left.status.localeCompare(right.status));
+  }
   return [...rows].sort((left, right) => {
     const leftValue = left.values[column] ?? null;
     const rightValue = right.values[column] ?? null;

@@ -95,6 +95,9 @@ async function checkRuns(page: Page, sweepId: string): Promise<void> {
   await periodHeader.getByRole('button').click();
   await expect(periodHeader).toHaveAttribute('aria-sort', 'ascending');
   await expect(rows.nth(1).getByRole('cell').first()).toHaveText('10');
+  const statusHeader = runs.getByRole('columnheader', { name: 'Status' });
+  await statusHeader.getByRole('button').click();
+  await expect(statusHeader).toHaveAttribute('aria-sort', 'descending');
   const lastRow = rows.last();
   await lastRow.scrollIntoViewIfNeeded();
   await expect(lastRow).toBeInViewport();

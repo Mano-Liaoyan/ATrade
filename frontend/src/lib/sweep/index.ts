@@ -31,7 +31,7 @@ export {
   type SweepPoint,
   type SweepSlice,
 } from './sweep_view';
-export { sortSweepRows, type SortDirection, type SweepRow } from './sweep_runs';
+export { sortSweepRows, SWEEP_STATUS_COLUMN, type SortDirection, type SweepRow } from './sweep_runs';
 export {
   listSweeps,
   readSweep,
