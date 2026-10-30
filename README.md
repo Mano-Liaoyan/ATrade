@@ -153,7 +153,7 @@ For development and checks, also:
    `ATRADE_POSTGRES_PASSWORD` to a new password (letters, digits, and `-`
    only). PostgreSQL keeps this password in its volume at the first start.
 4. On rootless Podman without the memory cgroup controller, set
-   `ATRADE_WEB_MEMORY_LIMIT=0`.
+   `ATRADE_WEB_MEMORY_LIMIT=0` and `ATRADE_ASSISTANT_MEMORY_LIMIT=0`.
 5. Start all services:
 
    ```sh
@@ -220,12 +220,23 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
 | `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default `127.0.0.1:8000`). Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
 | `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
+| `assistant` | The AI assistant: a Node.js process with the pi SDK (`assistant/`, image from `deploy/assistant.Dockerfile`). Memory limit `ATRADE_ASSISTANT_MEMORY_LIMIT` (default `1g`), read-only root file system, writable `/tmp`, volume `atrade-assistant-pi` on `/data`. No published port, no database URL, no IBKR setting. Networks `atrade-assistant-internal` (with `web` only) and `atrade-assistant-egress` (to the model providers). Health check on `GET /health` (port 8002, inside the network only). |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
 `live`, `web` does not start and writes the reason.
 
 Rootless Podman without the memory cgroup controller cannot set a memory
-limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` in `.env`.
+limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
+`ATRADE_ASSISTANT_MEMORY_LIMIT=0` in `.env`. Only Compose reads these 2
+values.
+
+The volume `atrade-assistant-pi` holds the files of the AI assistant. Later
+it also holds the AI assistant credentials, so keep each backup of it like
+`.env`. ATrade makes no automatic backup. A manual backup:
+
+```sh
+docker run --rm -v atrade-assistant-pi:/data:ro -v "$PWD":/backup busybox tar czf /backup/atrade-assistant-pi.tar.gz -C /data .
+```
 
 ### Old data
 
@@ -342,6 +353,7 @@ One command runs the same checks as CI:
 ./scripts/check            # all checks
 ./scripts/check backend    # ruff, basedpyright, import-linter, file length, pytest
 ./scripts/check frontend   # API types, ESLint, svelte-check, Vitest, build
+./scripts/check assistant  # assistant service: ESLint, TypeScript, Vitest
 ./scripts/check e2e        # Playwright
 ```
 
@@ -362,6 +374,8 @@ One command runs the same checks as CI:
   Gateway port is not published, so set `ATRADE_IBKR_HOST` and
   `ATRADE_IBKR_PAPER_PORT` to an address that you can reach, for example an
   SSH tunnel. See `docs/architecture/ibkr.md` section 7.5.
+- The `assistant` tests use a local fake OpenAI-compatible model server. They
+  call no real model provider and need no credential.
 
 ## Generate the API types
 
@@ -402,7 +416,10 @@ frontend/
   src/lib/           # one directory per capability, plus foundation/
   src/routes/        # pages
   e2e/               # Playwright tests
-deploy/              # compose.yaml, web.Dockerfile
+assistant/           # the assistant service (TypeScript, pi SDK)
+  src/               # Node.js runs these files directly; no build step
+  tests/             # Vitest, with a fake model server
+deploy/              # compose.yaml, web.Dockerfile, assistant.Dockerfile
 scripts/check        # the quality gate
 scripts/deploy       # deploys one commit of main on the server
 start                # ./start run

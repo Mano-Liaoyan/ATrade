@@ -1,5 +1,5 @@
 // The instrument page is a workbench (#102): it fills the window below the header and does not scroll as a page.
-// The watchlist column collapses, the chart panel and the paper account panel minimize and maximize, and the
+// The watchlist column minimizes, the chart panel and the paper account panel minimize and maximize, and the
 // browser keeps the layout. Against the real backend with the IBKR fake (backend/tests/e2e_server.py).
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
@@ -47,13 +47,13 @@ test('the page fills the window and the chart rescales with the window', async (
   );
 });
 
-test('the chart rescales when the watchlist collapses and opens, and the browser keeps the choice', async ({ page }) => {
+test('the chart rescales when the watchlist minimizes and opens, and the browser keeps the choice', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openWorkbench(page);
   const chart = page.getByRole('img', { name: CHART_NAME });
   const firstWidth = (await readBox(chart)).width;
 
-  await page.getByRole('button', { name: 'Collapse watchlist' }).click();
+  await page.getByRole('button', { name: 'Minimize watchlist' }).click();
 
   // The side column state, not the table: the watchlist can be empty when this test runs alone.
   await expect(page.getByRole('button', { name: 'Open watchlist' })).toBeVisible();
@@ -67,7 +67,7 @@ test('the chart rescales when the watchlist collapses and opens, and the browser
 
   await page.getByRole('button', { name: 'Open watchlist' }).click();
 
-  await expect(page.getByRole('button', { name: 'Collapse watchlist' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Minimize watchlist' })).toBeVisible();
   await expect.poll(async () => Math.round((await readBox(chart)).width)).toBe(Math.round(firstWidth));
 });
 
@@ -183,11 +183,11 @@ test('the paper account panel shows the positions, the open orders, and the fill
   await expect(tabs.getByRole('tab', { name: /^Filled today/ })).toHaveAttribute('aria-selected', 'true');
 });
 
-test('the order column keeps the paper order form and collapses to a rail', async ({ page }) => {
+test('the order column keeps the paper order form and minimizes to a rail', async ({ page }) => {
   await openWorkbench(page);
 
   await expect(page.getByRole('form', { name: 'Paper order' })).toBeVisible();
-  await page.getByRole('button', { name: 'Collapse paper order' }).click();
+  await page.getByRole('button', { name: 'Minimize paper order' }).click();
   await expect(page.getByRole('form', { name: 'Paper order' })).toBeHidden();
   await page.getByRole('button', { name: 'Open paper order' }).click();
   await expect(page.getByRole('form', { name: 'Paper order' })).toBeVisible();

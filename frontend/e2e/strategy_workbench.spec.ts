@@ -65,7 +65,7 @@ test('swaps the results and the editor, keeps the order after a reload, and size
 
   // Maximize: the other panel shows only its tab line, and no splitter shows. Escape restores.
   await editor.getByRole('button', { name: 'Maximize panel' }).click();
-  await expect(page.getByRole('separator')).toHaveCount(0);
+  await expect(page.getByRole('separator', { name: /^Resize the / })).toHaveCount(0);
   await expect(results.getByRole('button', { name: 'Minimize panel' })).toBeVisible();
   await expect(results.getByText('No backtests')).toBeHidden();
   await page.keyboard.press('Escape');
@@ -267,7 +267,7 @@ test('opens problems and output from the 24px status bar and minimizes them agai
 
   // The open panel maximizes and restores like the other panels.
   await outputPanel.getByRole('button', { name: 'Maximize panel' }).click();
-  await expect(page.getByRole('separator')).toHaveCount(0);
+  await expect(page.getByRole('separator', { name: /^Resize the / })).toHaveCount(0);
   await expect(editor.getByRole('textbox', { name: 'Strategy code' })).toBeHidden();
   await outputPanel.getByRole('button', { name: 'Restore panel' }).click();
   await expect(editor.getByRole('textbox', { name: 'Strategy code' })).toBeVisible();
