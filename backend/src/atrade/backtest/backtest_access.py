@@ -2,15 +2,16 @@
 comparison with a backtest of the same period (docs/architecture/forward_test.md section 12.10).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from typing import Final
 
 import psycopg
 
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
-from atrade.market_data import BarRequest, has_saved_bars, read_source_order
+from atrade.market_data import BarRequest, check_source_order, has_saved_bars, read_source_order
 
 
 @dataclass(frozen=True)
@@ -26,11 +27,26 @@ class BacktestOutcome:
     trades: list[BacktestTrade]
 
 
+# The start of the Databento history: no bar source has US instruments that stopped trading before it.
+DATABENTO_HISTORY_START_UTC: Final = datetime(2018, 5, 1, tzinfo=UTC)
+
+
 def check_backtest_request(request: BacktestRequest) -> str | None:
     """Returns why a backtest cannot run with this request, or None."""
     if request.time_range.end_utc <= request.time_range.start_utc:
         return "The time range must end after it starts."
+    if request.source_order is not None:
+        return check_source_order(request.source_order)
     return None
+
+
+def has_survivorship_bias(request: BacktestRequest) -> bool:
+    """True for an HK backtest and a US backtest that starts before the Databento history: their universe has no
+    instruments that stopped trading (docs/architecture/backtest.md section 10.12)."""
+    currency = request.instrument.currency
+    if currency == "HKD":
+        return True
+    return currency == "USD" and request.time_range.start_utc < DATABENTO_HISTORY_START_UTC
 
 
 def format_message_time(time_utc: datetime) -> str:
@@ -61,14 +77,23 @@ async def check_saved_bars(*, database_url: str, request: BacktestRequest) -> st
     bar_request = BarRequest(
         instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
     )
-    source_order = await read_source_order(database_url=database_url)
+    source_order = request.source_order or await read_source_order(database_url=database_url)
     if await has_saved_bars(database_url=database_url, bar_request=bar_request, source_order=source_order):
         return None
     return describe_missing_bars(request)
 
 
+async def add_global_source_order(*, database_url: str, request: BacktestRequest) -> BacktestRequest:
+    """The request with the global source order when it has no source order (docs/architecture/backtest.md 10.12)."""
+    if request.source_order is not None:
+        return request
+    return replace(request, source_order=await read_source_order(database_url=database_url))
+
+
 async def queue_backtest(*, database_url: str, request: BacktestRequest, created_at_utc: datetime) -> int:
-    """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it."""
+    """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it. Without a source
+    order in the request, the backtest saves and uses the global source order."""
+    request = await add_global_source_order(database_url=database_url, request=request)
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         row = await backtest_store.insert_backtest(connection, request=request, created_at_utc=created_at_utc)
     return row.id

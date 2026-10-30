@@ -7,10 +7,12 @@ from typing import Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint, find_split_time
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.market_data import BarSource
 
 type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out"]
 
@@ -25,6 +27,9 @@ class BacktestRequest:
     # The last percent of the range that is out of sample (docs/architecture/backtest.md section 10.9.4). 0 is no
     # split. The same-period backtest of a forward test uses 0, because a forward test has no split.
     out_of_sample_share: int = 0
+    # The source order of the bars and the look-back bars. None in a new request: the global source order. None in
+    # a saved backtest only for a row from before the source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 @dataclass(frozen=True)
@@ -32,6 +37,8 @@ class BacktestResult:
     equity_curve: list[EquityPoint]
     trades: list[BacktestTrade]
     metrics: BacktestMetrics
+    # The bar count of each bar source in the backtest range, without the look-back bars.
+    bar_count_by_source: dict[BarSource, int]
 
 
 @dataclass(frozen=True)
@@ -68,6 +75,8 @@ class BacktestRow:
     win_rate_percent: Decimal | None
     out_of_sample_share: int
     split_time_utc: datetime | None
+    source_order: list[str] | None
+    bar_count_by_source: dict[str, int] | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -76,7 +85,7 @@ BACKTEST_COLUMNS: Final = """
     final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
-    out_of_sample_share, split_time_utc
+    out_of_sample_share, split_time_utc, source_order, bar_count_by_source
 """
 
 
@@ -94,6 +103,7 @@ def read_request(row: BacktestRow) -> BacktestRequest:
         time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
         paper_capital_usd=row.paper_capital_usd,
         out_of_sample_share=row.out_of_sample_share,
+        source_order=None if row.source_order is None else [BarSource(value) for value in row.source_order],
     )
 
 
@@ -132,10 +142,10 @@ async def insert_backtest(
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc)
+                paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, source_order)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
                 %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
-                %(created_at_utc)s)
+                %(created_at_utc)s, %(source_order)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -150,6 +160,9 @@ async def insert_backtest(
                 "out_of_sample_share": request.out_of_sample_share,
                 "split_time_utc": find_split_time(request.time_range, request.out_of_sample_share),
                 "created_at_utc": created_at_utc,
+                "source_order": None
+                if request.source_order is None
+                else Jsonb([bar_source.value for bar_source in request.source_order]),
             },
         )
         inserted_row = await cursor.fetchone()
@@ -380,12 +393,16 @@ async def save_result(
                 sortino_ratio = %(sortino_ratio)s, calmar_ratio = %(calmar_ratio)s, profit_factor = %(profit_factor)s,
                 average_win_usd = %(average_win_usd)s, average_win_percent = %(average_win_percent)s,
                 average_loss_usd = %(average_loss_usd)s, exposure_percent = %(exposure_percent)s,
-                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s
+                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s,
+                bar_count_by_source = %(bar_count_by_source)s
             WHERE id = %(backtest_id)s
             """,
             {
                 "backtest_id": backtest_id,
                 **asdict(result.metrics),
+                "bar_count_by_source": Jsonb(
+                    {bar_source.value: count for bar_source, count in result.bar_count_by_source.items()}
+                ),
                 "ended_at_utc": ended_at_utc,
             },
         )

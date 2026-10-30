@@ -1,13 +1,13 @@
 """backtest: add the in-sample and out-of-sample split of docs/architecture/backtest.md section 10.9.4
 
 Revision ID: 2f6a9c1e4d85
-Revises: b7e3c9a4d158
+Revises: 2f6b8d1c4e97, 8d4b2e6f1a90
 """
 
 from alembic import op
 
 revision = "2f6a9c1e4d85"
-down_revision = "b7e3c9a4d158"
+down_revision = ("2f6b8d1c4e97", "8d4b2e6f1a90")
 
 
 def upgrade() -> None:

@@ -490,6 +490,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assistant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversations */
+        get: operations["list_conversations_api_assistant_conversations_get"];
+        put?: never;
+        /** Create Conversation */
+        post: operations["create_conversation_api_assistant_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Conversation */
+        get: operations["read_conversation_api_assistant_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Deletes the JSONL file first. When the assistant service is not reachable, the row stays for a new try.
+         */
+        delete: operations["delete_conversation_api_assistant_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -582,6 +622,14 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -690,6 +738,14 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
         };
         /**
          * BacktestRobustnessResponse
@@ -809,6 +865,14 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -909,6 +973,76 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+        };
+        /** ConversationDetailResponse */
+        ConversationDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+            /** Messages */
+            messages: components["schemas"]["ConversationMessageResponse"][];
+        };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations: components["schemas"]["ConversationResponse"][];
+        };
+        /** ConversationMessageResponse */
+        ConversationMessageResponse: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string | null;
+            /** Model */
+            model: string | null;
+            /** Credential Name */
+            credential_name: string | null;
+        };
+        /** ConversationResponse */
+        ConversationResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+        };
+        /** CreateConversationRequest */
+        CreateConversationRequest: {
+            /** Strategy Id */
+            strategy_id: number;
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -1301,6 +1435,11 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /** RenameConversationRequest */
+        RenameConversationRequest: {
+            /** Title */
+            title: string;
+        };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
@@ -1390,6 +1529,8 @@ export interface components {
              * @default 30
              */
             out_of_sample_share: number;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
         };
         /** StartForwardTestRequest */
         StartForwardTestRequest: {
@@ -1486,6 +1627,8 @@ export interface components {
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
+        /** @enum {string} */
+        TitleState: "new" | "generating" | "generated" | "not_generated" | "renamed";
         /** TradeResponse */
         TradeResponse: {
             /**
@@ -1546,6 +1689,32 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["WatchlistInstrumentResponse"][];
         };
+        /**
+         * AbortMessage
+         * @description Browser to server: stop the active run (the "Stop" button).
+         */
+        AbortMessage: {
+            /**
+             * Type
+             * @default abort
+             * @constant
+             */
+            type: "abort";
+        };
+        /**
+         * AssistantErrorMessage
+         * @description An error of the conversation, for the Output tab of the "Problems and output" panel.
+         */
+        AssistantErrorMessage: {
+            /**
+             * Type
+             * @default error
+             * @constant
+             */
+            type: "error";
+            /** Message */
+            message: string;
+        };
         /** ForwardTestsMessage */
         ForwardTestsMessage: {
             /**
@@ -1589,6 +1758,40 @@ export interface components {
              */
             type: "bar";
             bar: components["schemas"]["BarResponse"];
+        };
+        /**
+         * MessageDeltaMessage
+         * @description A part of the streamed text of an AI assistant message.
+         */
+        MessageDeltaMessage: {
+            /**
+             * Type
+             * @default message_delta
+             * @constant
+             */
+            type: "message_delta";
+            /** Text */
+            text: string;
+        };
+        /**
+         * MessageEndMessage
+         * @description The end of one AI assistant message: its full text, its model, and its credential name.
+         */
+        MessageEndMessage: {
+            /**
+             * Type
+             * @default message_end
+             * @constant
+             */
+            type: "message_end";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Name */
+            credential_name: string;
         };
         /** OpenOrdersMessage */
         OpenOrdersMessage: {
@@ -1695,6 +1898,57 @@ export interface components {
             owners: components["schemas"]["OwnerPositionMessage"][];
             /** Unattributed Quantity */
             unattributed_quantity: string;
+        };
+        /**
+         * PromptMessage
+         * @description Browser to server: a new user message, with the provider, the model, and the credential of this message.
+         */
+        PromptMessage: {
+            /**
+             * Type
+             * @default prompt
+             * @constant
+             */
+            type: "prompt";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Id */
+            credential_id: string;
+        };
+        /**
+         * RunStateMessage
+         * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
+         */
+        RunStateMessage: {
+            /**
+             * Type
+             * @default run_state
+             * @constant
+             */
+            type: "run_state";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "settled";
+        };
+        /**
+         * SteerMessage
+         * @description Browser to server: a user message while the AI assistant runs.
+         */
+        SteerMessage: {
+            /**
+             * Type
+             * @default steer
+             * @constant
+             */
+            type: "steer";
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -2968,6 +3222,219 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_assistant_conversations_get: {
+        parameters: {
+            query: {
+                strategy_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_api_assistant_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_conversation_api_assistant_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_assistant_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_assistant_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

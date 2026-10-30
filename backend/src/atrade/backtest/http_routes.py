@@ -13,7 +13,12 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_access import check_backtest_request, check_saved_bars
+from atrade.backtest.backtest_access import (
+    add_global_source_order,
+    check_backtest_request,
+    check_saved_bars,
+    has_survivorship_bias,
+)
 from atrade.backtest.backtest_exchange_rates import save_exchange_rates
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
@@ -38,7 +43,7 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import ExchangeRateReader
+from atrade.market_data import BarSource, ExchangeRateReader
 from atrade.strategy import read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -60,6 +65,8 @@ class StartBacktestRequest(BaseModel):
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
     # The last percent of the range that is out of sample (docs/architecture/backtest.md section 10.9.4). 0 is no split.
     out_of_sample_share: Annotated[int, Field(ge=0, le=MAX_OUT_OF_SAMPLE_SHARE)] = DEFAULT_OUT_OF_SAMPLE_SHARE
+    # Only for this backtest. Without it, the global source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 class BacktestLimitsBody(BaseModel):
@@ -113,6 +120,10 @@ class BacktestResponse(BaseModel):
     out_of_sample_share: int
     split_time_utc: datetime | None
     metrics: BacktestMetricsResponse | None
+    # Null for a backtest from before the source order. The bar counts are null until the backtest finishes.
+    source_order: list[BarSource] | None
+    bar_count_by_source: dict[BarSource, int] | None
+    survivorship_bias: bool
 
 
 class SplitMetricsResponse(BaseModel):
@@ -236,6 +247,7 @@ class BacktestRoutes:
         if strategy_version is None:
             message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
             raise RuntimeError(message)
+        request = backtest_store.read_request(row)
         return BacktestResponse(
             id=row.id,
             strategy_version_id=row.strategy_version_id,
@@ -257,6 +269,11 @@ class BacktestRoutes:
             out_of_sample_share=row.out_of_sample_share,
             split_time_utc=row.split_time_utc,
             metrics=to_metrics_response(backtest_store.read_metrics(row)),
+            source_order=request.source_order,
+            bar_count_by_source=None
+            if row.bar_count_by_source is None
+            else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
+            survivorship_bias=has_survivorship_bias(request),
         )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
@@ -267,6 +284,7 @@ class BacktestRoutes:
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
             out_of_sample_share=request.out_of_sample_share,
+            source_order=request.source_order,
         )
         refusal = check_backtest_request(backtest_request)
         if refusal is not None:
@@ -277,6 +295,7 @@ class BacktestRoutes:
         if strategy_version is None:
             detail = f"Strategy version {request.strategy_version_id} does not exist."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        backtest_request = await add_global_source_order(database_url=self.database_url, request=backtest_request)
         # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
         missing_bars = await check_saved_bars(database_url=self.database_url, request=backtest_request)
         if missing_bars is not None:

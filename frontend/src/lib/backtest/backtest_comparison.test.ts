@@ -24,6 +24,9 @@ function makeBacktest(id: number, strategyId: number, strategyName: string): Bac
     out_of_sample_share: 30,
     split_time_utc: '2025-09-07T00:00:00Z',
     metrics: null,
+    source_order: ['ibkr', 'databento'],
+    bar_count_by_source: null,
+    survivorship_bias: false,
   };
 }
 
