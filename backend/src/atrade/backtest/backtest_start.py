@@ -7,7 +7,12 @@ of the AI assistant (docs/architecture/assistant.md 25.5.1).
 from dataclasses import dataclass
 from datetime import datetime
 
-from atrade.backtest.backtest_access import check_backtest_request, check_saved_bars, queue_backtest
+from atrade.backtest.backtest_access import (
+    add_global_source_order,
+    check_backtest_request,
+    check_saved_bars,
+    queue_backtest,
+)
 from atrade.backtest.backtest_exchange_rates import save_exchange_rates
 from atrade.backtest.backtest_store import BacktestRequest
 from atrade.market_data import ExchangeRateReader
@@ -38,6 +43,7 @@ async def start_backtest(
     )
     if strategy_version is None:
         return BacktestRefusal(f"Strategy version {request.strategy_version_id} does not exist.")
+    request = await add_global_source_order(database_url=database_url, request=request)
     # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
     missing_bars = await check_saved_bars(database_url=database_url, request=request)
     if missing_bars is not None:

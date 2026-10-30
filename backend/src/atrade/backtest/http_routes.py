@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_access import has_survivorship_bias
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -29,7 +30,7 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import ExchangeRateReader
+from atrade.market_data import BarSource, ExchangeRateReader
 from atrade.strategy import read_strategy_version
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -47,6 +48,8 @@ class StartBacktestRequest(BaseModel):
     end_utc: AwareDatetime
     # Required, with no default: a backtest never starts with an unknown amount (docs/architecture.md section 10).
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
+    # Only for this backtest. Without it, the global source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 class BacktestLimitsBody(BaseModel):
@@ -100,6 +103,10 @@ class BacktestResponse(BaseModel):
     metrics: BacktestMetricsResponse | None
     # The conversation of the AI assistant that started the backtest. Null for a backtest of the user.
     conversation_id: int | None
+    # Null for a backtest from before the source order. The bar counts are null until the backtest finishes.
+    source_order: list[BarSource] | None
+    bar_count_by_source: dict[BarSource, int] | None
+    survivorship_bias: bool
 
 
 class EquityPointResponse(BaseModel):
@@ -182,6 +189,7 @@ class BacktestRoutes:
         if strategy_version is None:
             message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
             raise RuntimeError(message)
+        request = backtest_store.read_request(row)
         return BacktestResponse(
             id=row.id,
             strategy_version_id=row.strategy_version_id,
@@ -202,6 +210,11 @@ class BacktestRoutes:
             ended_at_utc=row.ended_at_utc,
             metrics=to_metrics_response(backtest_store.read_metrics(row)),
             conversation_id=row.conversation_id,
+            source_order=request.source_order,
+            bar_count_by_source=None
+            if row.bar_count_by_source is None
+            else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
+            survivorship_bias=has_survivorship_bias(request),
         )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
@@ -211,6 +224,7 @@ class BacktestRoutes:
             bar_period=request.bar_period,
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
+            source_order=request.source_order,
         )
         started = await start_backtest(
             database_url=self.database_url,
