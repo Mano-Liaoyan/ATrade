@@ -4,10 +4,20 @@
      the selected bar period (docs/architecture/backtest.md section 10.6). The form id is START_BACKTEST_FORM_ID: the
      command palette opens the dialog with it. With `strategyVersion`, each open selects that strategy version, for
      example the open version of the strategy page (Run backtest). The source order starts at the global source order
-     and changes only this backtest. -->
+     and changes only this backtest. The Instruments select picks one instrument, the top N US instruments by trading
+     value, or all watchlist instruments with saved bars (docs/architecture/backtest.md section 10.10.7). -->
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { convertDateToUtcStart, startBacktest, type Backtest } from '#lib/backtest';
+  import {
+    checkTopN,
+    convertDateToUtcStart,
+    formatUniverseRange,
+    readUsUniverseRange,
+    startBacktest,
+    type Backtest,
+    type BacktestRequest,
+    type UsUniverseRange,
+  } from '#lib/backtest';
   import { Dialog, InlineNotification, Select, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
   import {
     BAR_PERIODS,
@@ -17,6 +27,7 @@
     readSourceOrder,
     type BarPeriod,
     type BarSource,
+    SurvivorshipBiasWarning,
   } from '#lib/market_data';
   import { readPaperCapital } from '#lib/paper_trading';
   import {
@@ -65,6 +76,17 @@
   let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let form: HTMLFormElement | undefined = $state();
+  type UniverseChoice = 'single' | 'rule' | 'list';
+  const UNIVERSE_ITEMS: { value: UniverseChoice; label: string }[] = [
+    { value: 'single', label: 'One instrument' },
+    { value: 'rule', label: 'Top N by trading value' },
+    { value: 'list', label: 'Watchlist' },
+  ];
+  let universeChoice = $state<UniverseChoice>('single');
+  let topNText = $state('500');
+  let universeRange = $state<UsUniverseRange | null>(null);
+  const topNCheck = $derived(checkTopN(topNText));
+  const topNReason = $derived(universeChoice === 'rule' && topNCheck.kind === 'refused' ? topNCheck.reason : null);
 
   const barPeriodLabel = $derived(BAR_PERIODS.find((period) => period.value === barPeriod)?.label ?? barPeriod);
   const instrumentChoices = $derived(selectInstrumentsWithSavedBars(watchlistInstruments, barPeriod));
@@ -113,6 +135,11 @@
         watchlistMessage = result.message;
       }
     });
+    void readUsUniverseRange(fetch).then((result) => {
+      if (result.kind === 'ok') {
+        universeRange = result.value;
+      }
+    });
     if (paperCapitalUsd === '') {
       void readPaperCapital(fetch).then((paperCapital) => {
         paperCapitalUsd = paperCapital ?? '';
@@ -158,21 +185,42 @@
     strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
   }
 
+  type UniverseFields = Pick<BacktestRequest, 'universe_kind' | 'symbol' | 'exchange' | 'currency' | 'top_n' | 'instruments'>;
+
+  // The universe fields of the request. Null when the universe cannot start (the Start button says why).
+  function readUniverseFields(): UniverseFields | null {
+    if (universeChoice === 'rule') {
+      return topNCheck.kind === 'ok' ? { universe_kind: 'rule', top_n: topNCheck.value } : null;
+    }
+    if (universeChoice === 'list') {
+      return {
+        universe_kind: 'list',
+        instruments: instrumentChoices.map(({ symbol, exchange, currency }) => ({ symbol, exchange, currency })),
+      };
+    }
+    if (selectedInstrument === undefined) {
+      return null;
+    }
+    const { symbol, exchange, currency } = selectedInstrument;
+    return { universe_kind: 'single', symbol, exchange, currency };
+  }
+
   async function submitBacktest(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     // The dropdowns are not native selects, so the form checks them itself.
-    if (strategyVersionId === '' || selectedInstrument === undefined) {
+    if (strategyVersionId === '' || (universeChoice === 'single' && selectedInstrument === undefined)) {
       startError = { kind: 'error', title: 'Backtest not started', subtitle: 'Select a strategy version and an instrument.' };
+      return;
+    }
+    const universe = readUniverseFields();
+    if (universe === null) {
       return;
     }
     isStarting = true;
     startError = null;
     const result = await startBacktest(fetch, {
       strategy_version_id: Number(strategyVersionId),
-      universe_kind: 'single',
-      symbol: selectedInstrument.symbol,
-      exchange: selectedInstrument.exchange,
-      currency: selectedInstrument.currency,
+      ...universe,
       bar_period: barPeriod,
       start_utc: convertDateToUtcStart(startDate),
       end_utc: convertDateToUtcStart(endDate),
@@ -197,6 +245,8 @@
   size="md"
   primaryText={isStarting ? 'Starting…' : 'Start backtest'}
   busy={isStarting}
+  primaryDisabled={topNReason !== null}
+  primaryDescribedBy="top-n-error"
   onPrimary={() => form?.requestSubmit()}
 >
   <form
@@ -232,21 +282,42 @@
       }}
     />
     <Select
-      label="Instrument"
-      placeholder="Select an instrument"
-      items={instrumentItems}
-      value={watchlistInstrumentId}
-      disabled={instrumentItems.length === 0}
-      onValueChange={(instrumentId: string) => {
-        watchlistInstrumentId = instrumentId;
+      label="Instruments"
+      items={UNIVERSE_ITEMS}
+      value={universeChoice}
+      onValueChange={(choice: UniverseChoice) => {
+        universeChoice = choice;
       }}
     />
+    {#if universeChoice === 'single'}
+      <Select
+        label="Instrument"
+        placeholder="Select an instrument"
+        items={instrumentItems}
+        value={watchlistInstrumentId}
+        disabled={instrumentItems.length === 0}
+        onValueChange={(instrumentId: string) => {
+          watchlistInstrumentId = instrumentId;
+        }}
+      />
+    {:else if universeChoice === 'rule'}
+      <TextInput id="top-n" label="N" inputmode="numeric" class="number" bind:value={topNText} invalidText={topNReason} />
+    {/if}
+    {#if universeChoice === 'list'}
+      <div class="form-note">
+        <SurvivorshipBiasWarning />
+      </div>
+    {/if}
     <p class="form-note cds--form__helper-text" role="status" aria-label="Saved bars">
-      {#if watchlistMessage !== ''}
+      {#if universeChoice === 'rule'}
+        {formatUniverseRange(universeRange)}
+      {:else if watchlistMessage !== ''}
         {watchlistMessage}
       {:else if instrumentChoices.length === 0}
         No watchlist instrument has saved {barPeriodLabel} bars. Add an instrument to the
         <a class="cds--link cds--link--sm" href={resolve('/')}>watchlist</a> and open its bar chart: the chart saves the bars.
+      {:else if universeChoice === 'list'}
+        {instrumentChoices.length} watchlist instruments with saved {barPeriodLabel} bars
       {:else if selectedSavedBars !== undefined}
         {describeSavedBars(selectedSavedBars)}
       {/if}

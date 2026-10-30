@@ -15,6 +15,8 @@ export type EquityPoint = components['schemas']['EquityPointResponse'];
 export type BacktestTrade = components['schemas']['TradeResponse'];
 export type BacktestLimits = components['schemas']['BacktestLimitsBody'];
 export type BacktestComparison = components['schemas']['BacktestComparisonResponse'];
+export type UniverseInstrument = components['schemas']['UniverseInstrumentResponse'];
+export type UsUniverseRange = components['schemas']['UsUniverseRangeResponse'];
 
 export type { RequestResult } from '#lib/foundation/http_request';
 
@@ -79,4 +81,9 @@ export function compareBacktests(
   secondBacktestId: number,
 ): Promise<RequestResult<BacktestComparison>> {
   return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
+}
+
+// The first and the last quarter start with US universe data (docs/architecture/backtest.md 10.10.6).
+export function readUsUniverseRange(fetchFunction: typeof fetch): Promise<RequestResult<UsUniverseRange>> {
+  return requestJson(fetchFunction, '/api/us-universe/range');
 }
