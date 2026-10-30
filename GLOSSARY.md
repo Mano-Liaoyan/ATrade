@@ -216,6 +216,23 @@ The forward test trades only with this amount and its own fills. In Chinese,
 write 分配资金.
 _Avoid_: start balance, budget, allocation
 
+**Stock split**:
+A change of the share count of one instrument without a fill: a forward
+split, a reverse split, or a bonus issue. It has an ex-date and a split ratio.
+In Chinese, write 拆股事件.
+_Avoid_: split (alone, because of Splitter), corporate action (for this meaning)
+
+**Split ratio**:
+The number of new shares that one old share becomes on the ex-date of a stock
+split, for example 4 for a 4-for-1 split and 0.1 for a 1-for-10 reverse split.
+In Chinese, write 拆股比例.
+_Avoid_: split factor, adjustment factor
+
+**Cash in lieu**:
+The cash that an owner gets for the part of a new share below 1 after a stock
+split. In Chinese, write 碎股现金.
+_Avoid_: fractional payout, leftover cash
+
 **Paper capital**:
 The cash amount a backtest starts with. It comes from the paper account
 balance, or from a local value when no balance is available.
