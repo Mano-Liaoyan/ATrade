@@ -1,9 +1,15 @@
 // Public entry of forward_test: start and stop forward tests, the actual status, the socket message and its feed, the
-// fills and events of the forward test page, and the comparison with a backtest of the same period.
+// fills and events of the forward test page, the allocated capital of the start dialog, and the comparison with a backtest of the same period.
 export { default as FillComparisonTable } from './FillComparisonTable.svelte';
 export { default as ForwardTestFillTable } from './ForwardTestFillTable.svelte';
 export { listForwardTestEvents, type ForwardTestEvent } from './forward_test_events';
 export { ForwardTestsOnInstrumentsFeed } from './forward_tests_feed.svelte';
+export {
+  describeUnallocated,
+  findCapitalBlockReason,
+  readForwardTestCapital,
+  type ForwardTestCapital,
+} from './forward_test_capital';
 export {
   canBacktestSamePeriod,
   canStop,
@@ -13,7 +19,6 @@ export {
   formatLocalTime,
   FORWARD_TESTS_SOCKET_PATH,
   isLiveBarPeriod,
-  listForwardTestsOnInstruments,
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestDetail,

@@ -101,7 +101,9 @@ async def test_without_external_order_claims_the_restored_position_is_not_the_st
     report. Without `external_order_instrument_ids`, the position belongs to the strategy `EXTERNAL`."""
     world = make_world(database_url)
     await world.ledger.save_fill(
-        OwnerFill(FORWARD_TEST_ID, APPLE, "BUY", Decimal(5), Decimal(100), LIVE_BAR_NOW_UTC, "FT7")
+        OwnerFill(
+            FORWARD_TEST_ID, APPLE, "BUY", Decimal(5), Decimal(100), LIVE_BAR_NOW_UTC, "FT7", "0001", 1, Decimal(0)
+        )
     )
 
     strategy = make_strategy(claims_external_orders=False)

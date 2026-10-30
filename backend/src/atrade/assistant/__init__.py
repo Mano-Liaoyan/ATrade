@@ -5,12 +5,15 @@ conversation metadata and the prompt versions in PostgreSQL and connects the bro
 credentials stay in the assistant service (ADR 0005).
 """
 
+import psycopg
 from fastapi import APIRouter
 
+from atrade.assistant import conversation_store
 from atrade.assistant.assistant_service import (
     AssistantService,
     AssistantServiceClient,
     AssistantServiceError,
+    BacktestFinished,
     ConversationMessage,
     CredentialSummary,
     LoginEnd,
@@ -23,7 +26,9 @@ from atrade.assistant.assistant_service import (
     ProviderSummary,
     RunError,
     RunEvent,
+    StrategyVersionSaved,
     TextDelta,
+    ToolStep,
 )
 from atrade.assistant.assistant_socket import ASSISTANT_SOCKET_MESSAGE_MODELS, create_assistant_socket_router
 from atrade.assistant.credential_routes import create_credential_router
@@ -66,11 +71,18 @@ def create_assistant_router(
     return router
 
 
+async def conversation_exists(*, database_url: str, conversation_id: int) -> bool:
+    """Port 8001 records only a conversation that exists (docs/architecture/assistant.md 25.3.2)."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        return await conversation_store.select_conversation(connection, conversation_id) is not None
+
+
 __all__ = [
     "ASSISTANT_SOCKET_MESSAGE_MODELS",
     "AssistantService",
     "AssistantServiceClient",
     "AssistantServiceError",
+    "BacktestFinished",
     "ConversationMessage",
     "CredentialSummary",
     "LoginEnd",
@@ -85,6 +97,9 @@ __all__ = [
     "RunEvent",
     "StartContext",
     "StartContextReader",
+    "StrategyVersionSaved",
     "TextDelta",
+    "ToolStep",
+    "conversation_exists",
     "create_assistant_router",
 ]

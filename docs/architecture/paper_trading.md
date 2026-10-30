@@ -84,8 +84,10 @@ orders only when all 4 conditions are true:
   fails, the response is `409` with the reason. ATrade sends nothing and
   stores nothing.
 - Implemented (#214): the ledger rules for orders by hand run after the
-  paper account check and after the forward test refusal above. The forward
-  test refusal stays until the ATrade execution client (#215) is done.
+  paper account check.
+- Implemented (#215): the forward test refusal and `OrderBlockedResponse`
+  are gone. An order by hand on the instrument of a running forward test
+  goes to IBKR when the ledger rules of "By hand" pass.
 - Phase 3 (#149): an order by hand on an instrument in the
   "Split check needed" state is refused with `409` and the reason
   (section 11.11). Cancels are not blocked.
@@ -156,7 +158,10 @@ The public entry `atrade.paper_trading` exports:
 | `PaperAccountMonitor` | The check result of the Web process in memory, the balance, and the positions. |
 | `PaperAccountBalance` | The balance of `read_balance()` (section 11.9): `net_liquidation_usd`, `cash_usd`, `base_currency`, `net_liquidation_base`, `cash_base`, `usd_per_base_unit`, `exchange_rate_source`, `message`. |
 | `fetch_paper_capital_usd(paper_account_monitor)` | Async. The `NetLiquidation` value of the paper account in USD (section 11.9) after a passed check. Otherwise, and when no exchange rate is available, `settings.local_paper_capital_usd`. |
-| `create_paper_trading_router(*, paper_account_monitor, database_url, clock, find_blocking_forward_test)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. `find_blocking_forward_test(instrument)` returns a `BlockingForwardTest` (`forward_test_id`, `label`) or `None`. `app/web.py` makes it from `forward_test.find_forward_test_on_instrument()`, because `paper_trading` does not import `forward_test`. |
+| `create_paper_trading_router(*, paper_account_monitor, database_url, clock)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. `find_blocking_forward_test` is gone (#215). |
+| `ManualOrderLedger`, `ForwardTestLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition`, `LedgerFill` | The owner ledger (#214, #215). `ManualOrderLedger.read_entries(account)` starts the ledger when needed. `ForwardTestLedger(*, database_url, account, forward_test_id, gateway_connection, clock)` is the `OwnerLedger` of the ATrade execution client (`check_order`, `save_fill`, `read_positions`, `read_cash_usd`). |
+| `write_capital_allocation(connection, *, account, forward_test_id, allocated_capital_usd, time_utc)`, `transfer_to_by_hand(connection, *, forward_test_id, time_utc)` | The `transfer` rows at the start and at the stop of a forward test (section 11.13). The caller commits. |
+| `read_forward_test_fills(connection, forward_test_id)`, `read_forward_test_fills_blocking(connection, forward_test_id)` | The fills of a forward test in the owner ledger, oldest first, for the routes and the recorder of `forward_test`. |
 | `PAPER_TRADING_SOCKET_MESSAGE_MODELS` | The models of `/ws/paper-trading` (`PaperAccountMessage`, `OpenOrdersMessage`, `HeartbeatMessage`) for the OpenAPI document. The frontend uses their generated types. |
 
 Phase 3 changes of the public entry (#146, #149). The names are choices of
@@ -174,9 +179,14 @@ this document. The implementation can change them.
 - Implemented (#214): the ledger of "By hand" is in
   `paper_trading/manual_order_ledger.py` (`ManualOrderLedger`: the ledger
   start, the fills of orders by hand, and the 3 order rules) and
-  `paper_trading/owner_ledger_store.py` (the SQL and the sums). They are not
-  in the public entry yet. #215 adds the public functions above for
-  `forward_test`.
+  `paper_trading/owner_ledger_store.py` (the SQL and the sums).
+- Implemented (#215): `forward_test` uses `ForwardTestLedger`,
+  `write_capital_allocation`, `transfer_to_by_hand`, and
+  `read_forward_test_fills` of the first table
+  (`paper_trading/forward_test_ledger.py`), not the planned names
+  `check_owner_order`, `record_owner_fill`, `read_owner_positions`, and
+  `transfer_owner_to_by_hand`. `apply_stock_split` comes with the split
+  check.
 - Phase 3: `create_paper_trading_router` loses `find_blocking_forward_test`,
   because the refusal of section 11.3 goes away. It gets
   `read_allocated_capital` from `app/web.py`, which calls
@@ -281,14 +291,9 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   the modal sends the order. "Cancel", the close button, a click outside, and
   Escape send nothing. Focus stays in the modal while it is open, and goes
   back to the review button when it closes.
-- The instrument page reads `/ws/forward-tests`
-  (`ForwardTestsOnInstrumentsFeed`) and gives the panel the forward tests that
-  hold a client ID (`listForwardTestsOnInstruments` of `forward_test`, type
-  `BlockingForwardTest` of `paper_trading`). When the instrument matches one
-  of them, the review button is disabled and the panel says why, for example
-  "Forward test 3 (Trend v2) trades AAPL / NASDAQ. Stop the forward test to
-  send an order by hand." (`findInstrumentOrderBlock`). The backend still
-  refuses the order with `409` (section 11.3).
+- Implemented (#215): the instrument page does not read `/ws/forward-tests`.
+  `findInstrumentOrderBlock(account)` blocks the review button only while
+  the paper account is not read or its check did not pass.
 - The open order list (`OpenOrderList.svelte`) comes from the "orders"
   message. It shows the source of each order ("by hand" or "forward test
   42"). Each row has an overflow menu "Actions for order N". Its cancel item
@@ -323,7 +328,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   is disabled and the panel says why, for example "AAPL needs a split check.
   Apply the split or keep the ledger on the paper trading page.".
 - Phase 3: the review button no longer depends on `/ws/forward-tests`, because
-  the forward test block of section 11.3 goes away.
+  the forward test block of section 11.3 goes away. Implemented (#215).
 - The result of the order and cancel routes shows in the form or the order
   list as an inline
   notification that the user can close: "Order N sent", "Cancel request sent
@@ -334,10 +339,10 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 
 | Route | Behavior |
 |---|---|
-| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `409` (`OrderBlockedResponse`: `detail`, `forward_test_id`) when a forward test runs on the instrument (section 11.3). `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
+| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when a ledger rule fails (section 11.10). `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
 | `GET /api/paper-trading/orders` | `200` with `{"orders": [OpenOrderResponse]}`: the open orders of the checked account. Each order has `order_id`, `account`, `symbol`, `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`, `time_in_force`, `status` (IBKR text), `filled_quantity`, `source` (`kind`: `by_hand` or `forward_test`, `forward_test_id`), `can_cancel`. `502` when IB Gateway does not answer. |
 | `DELETE /api/paper-trading/orders/{order_id}` | `202` after ATrade sends the cancel request. IBKR confirms it later in the order list. `403` as for `POST`. `404` when no open order of the account has this ID, or when ATrade did not send it by hand. `409` for an order of a forward test or of another client. `502` when IB Gateway does not answer. |
-| Phase 3: `POST /api/paper-trading/orders` | The `409` with `OrderBlockedResponse` for a forward test goes away. New `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when an order rule of section 11.10 fails (`rule`: `sell_more_than_position`, `buy_more_than_cash`) or the instrument is in the "Split check needed" state (`rule`: `split_check_needed`). Example `detail`: "By hand holds 40 AAPL and has open sell orders for 10. ATrade refuses a sell order for 50.". |
+| Phase 3: `POST /api/paper-trading/orders` | The `409` with `OrderBlockedResponse` for a forward test goes away (implemented, #215). New `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when an order rule of section 11.10 fails (`rule`: `sell_more_than_position`, `buy_more_than_cash`) or the instrument is in the "Split check needed" state (`rule`: `split_check_needed`). Example `detail`: "By hand holds 40 AAPL and has open sell orders for 10. ATrade refuses a sell order for 50.". |
 | Phase 3: `POST /api/paper-trading/stock-splits/{id}/apply` (new) | Applies the stock split of the "Split check needed" state to the owner ledger (section 11.11). `200` with the changed owner positions. `404` for an unknown ID. `409` when the instrument is not in the "Split check needed" state for this stock split. |
 | Phase 3: `POST /api/paper-trading/stock-splits/{id}/keep-ledger` (new) | Ends the "Split check needed" state without a ledger change. The difference stays as "Unattributed". `200`. `404` and `409` as for `apply`. |
 | `GET /api/paper-trading/manual-orders` | `200` with `{"manual_orders": [ManualOrderWithFillsResponse]}`: the rows of `manual_order`, oldest first, each with `filled_quantity` and `average_fill_price` (section 11.4). |
@@ -590,6 +595,32 @@ Decided (#214):
 - Rule 3 (no short sale) is part of rule 1: the position of "By hand" is
   never below 0, so a sell larger than the position fails rule 1 with
   `sell_more_than_position`.
+
+Decided (#215):
+
+- The allocated capital is a ledger `transfer`. The start of a forward test
+  writes 2 cash rows in the same transaction as the `forward_test` row:
+  "By hand" `-allocated_capital_usd`, the forward test
+  `+allocated_capital_usd`. So the cash of "By hand" for rule 2 is its
+  ledger cash, which no longer holds the allocated capital, and the cash of
+  a forward test is its allocated capital plus the cash of its fills. This
+  is the simplest form of "the capital of By hand is `NetLiquidation` minus
+  the allocated capital" (section 11.10) that keeps rule 2 a cash rule: the
+  positions of "By hand" do not become buying power. The start runs the
+  ledger start first. Without a ledger start, the start gets `409`.
+- The stop transfer: when the worker writes `stopped` (or `failed` after a
+  failed paper account check), it writes `transfer` rows in the same
+  transaction. Each position of the forward test goes to "By hand" with its
+  average cost as `price`, and the remaining cash goes to "By hand". The
+  fills of the forward test stay. A second transfer moves nothing.
+- Rules 1 and 2 of a forward test use the open orders of its client ID with
+  the `orderRef` `FT<ID>`, the same amount rules as "By hand", and the
+  label "Forward test <ID>" in the reason, for example "Forward test 7 has
+  1001.00 USD cash and open buy orders for 0.00 USD. ATrade refuses a buy
+  order for 1010.00 USD.".
+- A forward test fill: `cash_change` is the signed amount with the
+  commission, converted to USD with the IBKR forex rate. Without a rate,
+  the fill is saved at a later read.
 
 Still open:
 

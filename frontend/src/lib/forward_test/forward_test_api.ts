@@ -116,22 +116,6 @@ export function canStop(forwardTest: ForwardTest): boolean {
   return forwardTest.desired_state === 'running' && forwardTest.client_id !== null;
 }
 
-/**
- * The forward tests that hold a client ID, each with its instrument. ATrade refuses paper orders by hand on these
- * instruments (docs/architecture.md section 12.2). The label is the label of the backend refusal.
- */
-export function listForwardTestsOnInstruments(
-  forwardTests: readonly ForwardTest[],
-): { label: string; symbol: string; exchange: string }[] {
-  return forwardTests
-    .filter((forwardTest) => forwardTest.client_id !== null)
-    .map((forwardTest) => ({
-      label: `Forward test ${String(forwardTest.id)} (${forwardTest.strategy_name} v${String(forwardTest.version_number)})`,
-      symbol: forwardTest.symbol,
-      exchange: forwardTest.exchange,
-    }));
-}
-
 /** The same period backtest uses the start balance as its paper capital (docs/architecture/forward_test.md 12.10). */
 export function canBacktestSamePeriod(forwardTest: ForwardTest): boolean {
   return forwardTest.start_balance_usd !== null;

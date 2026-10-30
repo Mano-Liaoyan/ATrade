@@ -127,11 +127,24 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - So `assistant` cannot call a route of port 8000.
 - A unit test checks the allow-list: the port 8001 app has exactly the
   routes of 25.3.3.
+- Done (#181): `app/assistant_port.py` builds the port 8001 app
+  (`create_assistant_port_app`) from `create_strategy_assistant_router` and
+  `create_backtest_assistant_router`. The app has no OpenAPI document and no
+  `/docs` page. A route that is not in the allow-list gets `404`, or `405`
+  when an allowed route has the same path.
+- Done (#181): each request of `assistant` to port 8001 sends the header
+  `X-ATrade-Conversation-Id` with the conversation ID. The 2 routes that
+  record the conversation (`POST /api/strategies/{strategy_id}/versions` and
+  `POST /api/backtests`) need it. Without the header, or with a value that is
+  not a positive integer, the answer is FastAPI's `422` validation body. When
+  the conversation does not exist, the answer is `422` with
+  `{"detail": "Conversation <id> does not exist."}`. The read routes ignore
+  the header.
 
 ### 25.3.3 Allow-list
 
-The screen paths come from #150. They are proposals. The ticket that
-implements the screen routes names the final paths.
+The screen paths come from #150. Decided (#205): they are the final paths
+(screen section 24.7).
 
 | Route on port 8001 | Tool | Phase | Limit on port 8001 |
 |---|---|---|---|
@@ -194,6 +207,22 @@ prompt does not list the tools.
 - The AI assistant does not change the rules of the rule builder. It changes
   only code. ATrade treats a code change of the AI assistant like a code
   change by hand (#138, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)).
+- Done (#182): `assistant/src/assistant_tools.ts` (`createAssistantTools`)
+  makes the 9 tools for each run. `WebPortClient`
+  (`assistant/src/web_port_client.ts`) calls `http://web:8001` with the
+  header `X-ATrade-Conversation-Id` of the run. A tool gives a refusal of
+  port 8001 to the model as an error with the status and the body, for
+  example `Port 8001 answered 422: {"problems": [{"line": 4, "message":
+  "..."}]}`.
+- Decided (#182): `read_strategy_version` returns `id`, `strategy_id`,
+  `version_number`, `source`, and `code`. It adds `rules` only when
+  `source` is `rule_builder`.
+- Decided (#182): `read_backtest` returns all fields of
+  `GET /api/backtests/{backtest_id}` with 2 summaries. `equity_curve` has at
+  most 50 points, evenly spread, with the first and the last point.
+  `equity_curve_point_count` gives the full count. `trades` has the first 50
+  trades with all their fields (`time_utc`, `side`, `quantity_shares`,
+  `price_usd`, `commission_usd`). `trade_count_total` gives the full count.
 
 ### 25.4.2 `run_backtest`
 
@@ -210,6 +239,13 @@ prompt does not list the tools.
   without saved bars with `422` (backtest section 10.1).
 - One user message can start at most 5 backtests. At the sixth, the tool
   returns an error. The error tells the AI assistant to ask the user first.
+- Decided (#182): the tool counts the backtests (backtest section 10.13).
+  The error text is "This user message already started 5 backtests. No
+  backtest started. Ask the user before you start more backtests."
+- Decided (#182): the wait is a parameter of the tools (`BacktestWait` in
+  `assistant/src/backtest_tools.ts`: `limitMilliseconds`,
+  `pollMilliseconds`, `now`). The service uses 15 minutes and 2 seconds.
+  The tests use a few milliseconds.
 - Phase 3: the tool takes a universe, with the same choices as the backtest
   form ([#142](https://github.com/Mano-Liaoyan/ATrade/issues/142),
   [#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)):
@@ -276,15 +312,17 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 | Table | New column | Meaning |
 |---|---|---|
-| `strategy_version` | source | `user`, `assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
+| `strategy_version` | `source` | `user`, `ai_assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
 | `strategy_version` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant saved the version. |
-| `strategy_version` | discarded mark | Set when the user discards the version. |
+| `strategy_version_discard` | `strategy_version_id`, `discarded_at_utc` | The discarded mark: one row for each discarded version. Added when the user discards the version. |
 | `backtest` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant started the backtest. |
 
 - A discarded strategy version is never deleted. Its backtests stay.
 - The trigger `strategy_version_append_only` refuses each `UPDATE`
   (strategy section 9.1.1). The discarded mark cannot be an `UPDATE` of the
-  version row. See 25.14.
+  version row, so it is a row of `strategy_version_discard` (#180). The
+  trigger lets through only the `ON DELETE SET NULL` of `conversation_id`
+  (strategy section 9.1.1).
 
 ### 25.5.2 Diff card
 
@@ -302,8 +340,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 - The version `Select` of the strategy page hides discarded strategy
   versions by default.
-- A toggle "Show discarded versions" below the `Select` shows them. Each
+- A toggle "Show discarded versions" next to the `Select` shows them. Each
   shows the tag "Discarded" after its version number.
+- Decided (#180): the toggle is in the toolbar line after the `Select`,
+  because the toolbar has one line. It shows only when the strategy has a
+  discarded version. When the open version is discarded, the `Select` also
+  lists it with the toggle off, so that the `Select` names the open
+  version. Without a version address, the strategy page opens the latest
+  version that is not discarded.
 - The backtest list shows the backtests of discarded strategy versions as
   usual.
 
@@ -716,9 +760,24 @@ Fields (#179). Each message is a JSON object with `type`.
   not valid each get an `error` message. A `prompt` during a run does not
   start a second run.
 - When the browser leaves during a run, `web` stops the run (`abort`).
-- `tool_step`, `strategy_version_saved`, and `backtest_finished` come with
-  #182.
+- Decided (#182): the fields of the tool messages:
 
+  | `type` | Direction | Fields |
+  |---|---|---|
+  | `tool_step` | Server to browser | `tool_call_id`, `tool_name`, `status` (`running`, `succeeded`, or `failed`), `backtest_id`, `backtest_status` |
+  | `strategy_version_saved` | Server to browser | `strategy_id`, `strategy_version_id`, `version_number` |
+  | `backtest_finished` | Server to browser | `backtest_id` |
+
+  One `tool_call_id` is one tool step. `status` is `running` at the start
+  and at each `onUpdate`, then `succeeded` or `failed`. `backtest_id` and
+  `backtest_status` are set only for `run_backtest` after its start:
+  `backtest_status` is the queue state (`queued`) or the run state
+  (`running`, then `finished`, `failed`, or `timed_out`). They are null
+  for the other tools. `strategy_version_saved` comes only for a save that
+  made a new version (`201`). `backtest_finished` comes when
+  `run_backtest` saw a final status in its wait. The `assistant` service
+  sends the same 3 events, with the same fields, as JSON lines of
+  `POST /conversations/{id}/runs` (25.14).
 Login fields (#183):
 
 | `type` | Direction | Fields |
@@ -737,7 +796,8 @@ Login fields (#183):
 - `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
   of both directions. Message model names: `PromptMessage`, `SteerMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
-  `RunStateMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
+  `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
+  `BacktestFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
   `LoginStartMessage`, `LoginAnswerMessage`, `LoginStepMessage`,
   `LoginEndMessage`.
 
@@ -758,7 +818,7 @@ below are choices of this document. The implementation can change them.
 | Delete a credential | `DELETE /api/assistant/credentials/{credential_id}` | 2 |
 | List prompt versions | `GET /api/assistant/prompt-versions` | 2 |
 | Save a prompt version | `POST /api/assistant/prompt-versions` | 2 |
-| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` | 2 |
+| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (done, #180, strategy section 9.6) | 2 |
 | Keep a screen of the AI assistant | `POST /api/screens/{screen_id}/keep` | 3 |
 | Discard a screen of the AI assistant | `DELETE /api/screens/{screen_id}` (the user route) | 3 |
 
@@ -936,7 +996,7 @@ columns behave the same (section 13).
 
   | Request | Answer |
   |---|---|
-  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`. The answer ends when the run ends. |
+  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`, and (#182) `tool_step`, `strategy_version_saved`, and `backtest_finished` with the fields of 25.10. The answer ends when the run ends. |
   | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
   | `POST /conversations/{id}/abort` | `204`. |
   | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |
@@ -969,17 +1029,30 @@ columns behave the same (section 13).
 - Decided (#178): the subnet of `atrade-assistant-internal` is
   `172.31.250.0/24`. It is fixed in `deploy/compose.yaml` and is not a
   setting.
-- How port 8001 knows the conversation of a request (for example a header
-  that `assistant` sends), so that it records the conversation ID.
-- How the `web` process runs 2 uvicorn listeners in 1 process.
-- Where the discarded mark is kept. The trigger
-  `strategy_version_append_only` refuses each `UPDATE` of
-  `strategy_version`, so a separate table or a narrower trigger is
-  necessary.
-- The column names and types of the version source. Decided (#179): the
-  title state and the last provider, model, and credential name (25.8.1).
-- Whether Keep of a diff card is recorded on the server, so a reload shows
-  "Kept".
+- Decided (#181): port 8001 knows the conversation of a request from the
+  header `X-ATrade-Conversation-Id` (25.3.2). The constant is
+  `CONVERSATION_HEADER` in `backend/src/atrade/foundation/assistant_conversation.py`.
+  A missing header gets `422` (FastAPI validation), and an unknown
+  conversation gets `422` with a text `detail`. The check of the
+  conversation is `conversation_exists` of the `assistant` public entry.
+  `app/` gives it to the routers, so `strategy` and `backtest` do not import
+  `assistant`.
+- Decided (#181): `app/web.py` runs 2 `uvicorn.Server` objects in 1 event
+  loop (`serve_both`): port 8000 with the lifespan, and port 8001 with
+  `lifespan="off"`. When one server stops, the other stops too.
+- Decided (#180): the discarded mark is a row of the table
+  `strategy_version_discard` (25.5.1). The trigger
+  `strategy_version_append_only` still refuses each `UPDATE` statement.
+- Decided (#180): the version source is the `text` column `source` with
+  the CHECK constraint `strategy_version_source_check` (`user`,
+  `rule_builder`, `ai_assistant`). Decided (#179): the title state and the
+  last provider, model, and credential name (25.8.1).
+- Decided (#180): Keep of a diff card is not recorded on the server. Only
+  Discard changes a version (25.5.2), so a reload shows a version without
+  the discarded mark as kept.
+- Decided (#180): the discard route answers `409` for a version that the AI
+  assistant did not save, and `200` for a version that is already
+  discarded (25.11).
 - How the server records that the user kept a screen, so `update_screen`
   returns `403` after Keep.
 - Decided (#179): a delete of the strategy deletes its conversation rows
@@ -991,20 +1064,24 @@ columns behave the same (section 13).
   versions. The browser sends the open version number in the body of the
   new conversation request. A trigger refuses each `UPDATE` of a prompt
   version. See 25.9.
-- Which part enforces the 5 backtests of one user message: only the tool, or
-  also port 8001.
-- How the AI assistant finds the instruments and bar periods with saved bars.
-  No tool reads the watchlist.
-- Whether `POST /api/backtests` from port 8001 may save daily exchange rates
-  from IBKR (backtest section 10.8). The AI assistant "cannot download
-  bars", and the rates come from IBKR.
-- The phase 3 message for the condition card. Decided (#179): the field
-  names of the other `/ws/assistant` messages (25.10).
-- The field that names the position of a condition in a screen problem
-  (25.4.3).
+- Decided (#182): only the tool `run_backtest` enforces the 5 backtests of
+  one user message. Port 8001 does not (backtest section 10.13).
+- Decided (#182): no tool and no new route lists the instruments and bar
+  periods with saved bars. The AI assistant uses the instrument that the
+  user names, or an instrument of `list_backtests`. A range without saved
+  bars gets `422`, and the model reads it (backtest section 10.13).
+- Decided (#181): `POST /api/backtests` from port 8001 saves the daily
+  exchange rates from IBKR like port 8000 (backtest section 10.13). Rates
+  are not bars.
+- The phase 3 message for the condition card. Decided (#179, #182): the
+  field names of the other `/ws/assistant` messages (25.10).
+- Decided (#205): the field that names the position of a condition in a
+  screen problem (25.4.3) is `location`, the path in the request body (screen
+  section 24.6).
 - The pages of `read_screen_result` (page size and parameter names).
-- The summaries in the `read_backtest` result (how many points of the
-  equity curve and which trade fields).
+- Decided (#182): the summaries in the `read_backtest` result: at most 50
+  points of the equity curve and the first 50 trades with all fields
+  (25.4.1).
 - Decided (#183): the credential delete and rename behavior, and the
   meaning of the credential state column (25.7.2). Delete removes the entry
   from the file. There is no rename. The state is `ready` or `failed` (the

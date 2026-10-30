@@ -163,15 +163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/OrderBlockedResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
-                    }
-                  ],
-                  "title": "Response 409 Send Order Api Paper Trading Orders Post"
+                  "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
                 }
               }
             }
@@ -951,6 +943,75 @@
         }
       }
     },
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+      "post": {
+        "summary": "Discard Version",
+        "description": "Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).",
+        "operationId": "discard_version_api_strategies__strategy_id__versions__version_number__discard_post",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          },
+          {
+            "name": "version_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies/{strategy_id}/versions": {
       "post": {
         "summary": "Save Version",
@@ -1044,6 +1105,7 @@
       },
       "post": {
         "summary": "Start Backtest",
+        "description": "The start of port 8000: a backtest without a conversation.",
         "operationId": "start_backtest_api_backtests_post",
         "requestBody": {
           "content": {
@@ -1072,55 +1134,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/backtests/{backtest_id}": {
-      "get": {
-        "summary": "Read Backtest",
-        "operationId": "read_backtest_api_backtests__backtest_id__get",
-        "parameters": [
-          {
-            "name": "backtest_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Backtest Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BacktestDetailResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1168,6 +1181,55 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtests/{backtest_id}": {
+      "get": {
+        "summary": "Read Backtest",
+        "operationId": "read_backtest_api_backtests__backtest_id__get",
+        "parameters": [
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -1237,6 +1299,24 @@
               }
             },
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/forward-tests/capital": {
+      "get": {
+        "summary": "Read Capital",
+        "operationId": "read_capital_api_forward_tests_capital_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestCapitalResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1459,6 +1539,334 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens": {
+      "get": {
+        "summary": "List Screens",
+        "operationId": "list_screens_api_screens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenListItemResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Screens Api Screens Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Screen",
+        "operationId": "create_screen_api_screens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens/{screen_id}": {
+      "get": {
+        "summary": "Read Screen",
+        "operationId": "read_screen_api_screens__screen_id__get",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change Screen",
+        "description": "Overwrites the name and the definition. A screen has no versions (section 24.1).",
+        "operationId": "change_screen_api_screens__screen_id__put",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeScreenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Screen",
+        "description": "Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.",
+        "operationId": "delete_screen_api_screens__screen_id__delete",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens/{screen_id}/runs": {
+      "post": {
+        "summary": "Run Screen",
+        "description": "Runs the saved screen and saves 1 screen result (section 24.5).",
+        "operationId": "run_screen_api_screens__screen_id__runs_post",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResultResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/screen-results/{screen_result_id}": {
+      "get": {
+        "summary": "Read Screen Result",
+        "operationId": "read_screen_result_api_screen_results__screen_result_id__get",
+        "parameters": [
+          {
+            "name": "screen_result_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Result Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResultResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -2277,6 +2685,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "source_order": {
             "anyOf": [
               {
@@ -2362,6 +2781,7 @@
           "out_of_sample_share",
           "split_time_utc",
           "metrics",
+          "conversation_id",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
@@ -2696,6 +3116,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "source_order": {
             "anyOf": [
               {
@@ -2754,6 +3185,7 @@
           "out_of_sample_share",
           "split_time_utc",
           "metrics",
+          "conversation_id",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias"
@@ -2920,6 +3352,23 @@
         ],
         "title": "BarsResponse"
       },
+      "ChangeScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "ChangeScreenRequest"
+      },
       "CodeCheckFailedResponse": {
         "properties": {
           "problems": {
@@ -3074,6 +3523,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "source_order": {
             "anyOf": [
               {
@@ -3163,6 +3623,7 @@
           "out_of_sample_share",
           "split_time_utc",
           "metrics",
+          "conversation_id",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
@@ -3733,6 +4194,28 @@
         ],
         "title": "CreateConversationRequest"
       },
+      "CreateScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "market",
+          "definition"
+        ],
+        "title": "CreateScreenRequest"
+      },
       "CreateStrategyRequest": {
         "properties": {
           "name": {
@@ -3872,6 +4355,24 @@
         ],
         "title": "ErrorResponse"
       },
+      "ExclusionCountResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "count"
+        ],
+        "title": "ExclusionCountResponse"
+      },
       "FillComparisonResponse": {
         "properties": {
           "bar_end_utc": {
@@ -3975,6 +4476,51 @@
           "shares"
         ],
         "title": "FixedShares"
+      },
+      "ForwardTestCapitalResponse": {
+        "properties": {
+          "net_liquidation_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Liquidation Usd"
+          },
+          "allocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Usd"
+          },
+          "unallocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "net_liquidation_usd",
+          "allocated_usd",
+          "unallocated_usd"
+        ],
+        "title": "ForwardTestCapitalResponse",
+        "description": "The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not\npass or IBKR has no NetLiquidation value in USD."
       },
       "ForwardTestComparisonResponse": {
         "properties": {
@@ -4085,6 +4631,14 @@
       },
       "ForwardTestFillResponse": {
         "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
           "time_utc": {
             "type": "string",
             "format": "date-time",
@@ -4113,6 +4667,8 @@
         },
         "type": "object",
         "required": [
+          "symbol",
+          "exchange",
           "time_utc",
           "side",
           "quantity_shares",
@@ -4236,6 +4792,17 @@
             },
             "title": "Interruptions",
             "type": "array"
+          },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Capital Usd"
           }
         },
         "required": [
@@ -4257,7 +4824,8 @@
           "stopped_at_utc",
           "end_time_utc",
           "crash_count",
-          "interruptions"
+          "interruptions",
+          "allocated_capital_usd"
         ],
         "title": "ForwardTestResponse",
         "type": "object"
@@ -4561,6 +5129,7 @@
         "title": "InterruptionResponse",
         "type": "object"
       },
+      "JsonValue": {},
       "LedgerRule": {
         "type": "string",
         "enum": [
@@ -4779,6 +5348,13 @@
         "title": "ManualOrderWithFillsResponse",
         "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
       },
+      "Market": {
+        "type": "string",
+        "enum": [
+          "US",
+          "HK"
+        ]
+      },
       "Number": {
         "anyOf": [
           {
@@ -4907,25 +5483,6 @@
         ],
         "title": "OpenOrderResponse",
         "type": "object"
-      },
-      "OrderBlockedResponse": {
-        "properties": {
-          "detail": {
-            "type": "string",
-            "title": "Detail"
-          },
-          "forward_test_id": {
-            "type": "integer",
-            "title": "Forward Test Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detail",
-          "forward_test_id"
-        ],
-        "title": "OrderBlockedResponse",
-        "description": "A forward test runs on the instrument. ATrade did not send the order (section 12.2)."
       },
       "OrderErrorResponse": {
         "properties": {
@@ -5539,6 +6096,386 @@
         "title": "SavedBarsResponse",
         "description": "The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."
       },
+      "ScreenCheckFailedResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems"
+        ],
+        "title": "ScreenCheckFailedResponse"
+      },
+      "ScreenListItemResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "updated_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "market",
+          "kept",
+          "updated_at_utc"
+        ],
+        "title": "ScreenListItemResponse"
+      },
+      "ScreenProblemResponse": {
+        "properties": {
+          "location": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "message"
+        ],
+        "title": "ScreenProblemResponse"
+      },
+      "ScreenResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "assistant_conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Conversation Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "updated_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At Utc"
+          },
+          "recent_screen_results": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultSummaryResponse"
+            },
+            "type": "array",
+            "title": "Recent Screen Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "market",
+          "definition",
+          "kept",
+          "assistant_conversation_id",
+          "created_at_utc",
+          "updated_at_utc",
+          "recent_screen_results"
+        ],
+        "title": "ScreenResponse"
+      },
+      "ScreenResultExclusionResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency",
+          "reason"
+        ],
+        "title": "ScreenResultExclusionResponse"
+      },
+      "ScreenResultResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "screen_id": {
+            "type": "integer",
+            "title": "Screen Id"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "assistant_conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Conversation Id"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ScreenRunSummaryResponse"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultRowResponse"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultExclusionResponse"
+            },
+            "type": "array",
+            "title": "Exclusions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "screen_id",
+          "market",
+          "assistant_conversation_id",
+          "summary",
+          "definition",
+          "rows",
+          "exclusions"
+        ],
+        "title": "ScreenResultResponse"
+      },
+      "ScreenResultRowResponse": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "last_price": {
+            "type": "string",
+            "title": "Last Price"
+          },
+          "average_trading_value_20": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Trading Value 20"
+          },
+          "indicator_values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Indicator Values"
+          },
+          "percentiles": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Percentiles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "position",
+          "symbol",
+          "exchange",
+          "currency",
+          "last_price",
+          "average_trading_value_20",
+          "indicator_values",
+          "percentiles"
+        ],
+        "title": "ScreenResultRowResponse"
+      },
+      "ScreenResultSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "run_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Run At Utc"
+          },
+          "result_count": {
+            "type": "integer",
+            "title": "Result Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_at_utc",
+          "result_count"
+        ],
+        "title": "ScreenResultSummaryResponse"
+      },
+      "ScreenRunSummaryResponse": {
+        "properties": {
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "start_count": {
+            "type": "integer",
+            "title": "Start Count"
+          },
+          "after_filters_count": {
+            "type": "integer",
+            "title": "After Filters Count"
+          },
+          "after_indicator_conditions_count": {
+            "type": "integer",
+            "title": "After Indicator Conditions Count"
+          },
+          "result_count": {
+            "type": "integer",
+            "title": "Result Count"
+          },
+          "exclusion_counts": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionCountResponse"
+            },
+            "type": "array",
+            "title": "Exclusion Counts"
+          },
+          "daily_bars_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Bars Date"
+          },
+          "run_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Run At Utc"
+          },
+          "run_seconds": {
+            "type": "number",
+            "title": "Run Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row_count",
+          "start_count",
+          "after_filters_count",
+          "after_indicator_conditions_count",
+          "result_count",
+          "exclusion_counts",
+          "daily_bars_date",
+          "run_at_utc",
+          "run_seconds"
+        ],
+        "title": "ScreenRunSummaryResponse"
+      },
       "SendOrderRequest": {
         "properties": {
           "symbol": {
@@ -5761,6 +6698,18 @@
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
           },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Allocated Capital Usd"
+          },
           "end_time_utc": {
             "anyOf": [
               {
@@ -5780,7 +6729,8 @@
           "symbol",
           "exchange",
           "currency",
-          "bar_period"
+          "bar_period",
+          "allocated_capital_usd"
         ],
         "title": "StartForwardTestRequest"
       },
@@ -5810,15 +6760,25 @@
               }
             ],
             "title": "Forward Test Id"
+          },
+          "unallocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Usd"
           }
         },
         "type": "object",
         "required": [
-          "detail",
-          "forward_test_id"
+          "detail"
         ],
         "title": "StartRefusedResponse",
-        "description": "The start was refused. `forward_test_id` is the forward test that already runs on the instrument."
+        "description": "The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18)."
       },
       "StrategyListItem": {
         "properties": {
@@ -6003,7 +6963,8 @@
             "type": "string",
             "enum": [
               "user",
-              "rule_builder"
+              "rule_builder",
+              "ai_assistant"
             ],
             "title": "Source"
           },
@@ -6018,6 +6979,21 @@
               }
             ],
             "title": "Rules"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "discarded": {
+            "type": "boolean",
+            "title": "Discarded"
           }
         },
         "type": "object",
@@ -6029,7 +7005,9 @@
           "code_sha256",
           "created_at_utc",
           "source",
-          "rules"
+          "rules",
+          "conversation_id",
+          "discarded"
         ],
         "title": "StrategyVersionResponse"
       },
@@ -6056,9 +7034,25 @@
             "type": "string",
             "enum": [
               "user",
-              "rule_builder"
+              "rule_builder",
+              "ai_assistant"
             ],
             "title": "Source"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "discarded": {
+            "type": "boolean",
+            "title": "Discarded"
           }
         },
         "type": "object",
@@ -6067,7 +7061,9 @@
           "version_number",
           "code_sha256",
           "created_at_utc",
-          "source"
+          "source",
+          "conversation_id",
+          "discarded"
         ],
         "title": "StrategyVersionSummary"
       },
@@ -6286,6 +7282,26 @@
           "message"
         ],
         "title": "AssistantErrorMessage",
+        "type": "object"
+      },
+      "BacktestFinishedMessage": {
+        "description": "A backtest of `run_backtest` ended in the wait of the tool, for the metric card.",
+        "properties": {
+          "type": {
+            "const": "backtest_finished",
+            "default": "backtest_finished",
+            "title": "Type",
+            "type": "string"
+          },
+          "backtest_id": {
+            "title": "Backtest Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backtest_id"
+        ],
+        "title": "BacktestFinishedMessage",
         "type": "object"
       },
       "ForwardTestsMessage": {
@@ -7062,6 +8078,95 @@
           "text"
         ],
         "title": "SteerMessage",
+        "type": "object"
+      },
+      "StrategyVersionSavedMessage": {
+        "description": "The AI assistant saved a strategy version, for the diff card (25.5.2).",
+        "properties": {
+          "type": {
+            "const": "strategy_version_saved",
+            "default": "strategy_version_saved",
+            "title": "Type",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "integer"
+          },
+          "strategy_version_id": {
+            "title": "Strategy Version Id",
+            "type": "integer"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "strategy_id",
+          "strategy_version_id",
+          "version_number"
+        ],
+        "title": "StrategyVersionSavedMessage",
+        "type": "object"
+      },
+      "ToolStepMessage": {
+        "description": "The start, an update, or the end of one tool call. One `tool_call_id` is one tool step of the conversation.\n\n`status` is `running` at the start and at each update, then `succeeded` or `failed`. For `run_backtest`,\n`backtest_id` and `backtest_status` give the queue state (`queued`) or the run state (`running`, then a final\nstatus). They are null for the other tools and at the start.",
+        "properties": {
+          "type": {
+            "const": "tool_step",
+            "default": "tool_step",
+            "title": "Type",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "backtest_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Id"
+          },
+          "backtest_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Status"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name",
+          "status",
+          "backtest_id",
+          "backtest_status"
+        ],
+        "title": "ToolStepMessage",
         "type": "object"
       }
     }

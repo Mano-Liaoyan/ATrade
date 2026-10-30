@@ -494,6 +494,29 @@ ratio and multiplies the volume by the split ratio.
   (section 8.13.1).
 - The user checks all detected stock splits of instruments that stopped
   trading one time.
+- An instrument still trades when it has a bar on the last day of the
+  import. The import reads its IBKR daily bars for the days of its
+  Databento bars. A ratio step is a change of more than 3% from one day to
+  the next. The split ratio is the nearest fraction with a small
+  denominator (2 for 2.004, 11/10 for 1.098). When IBKR has no bars of the
+  instrument, the detection rule finds its stock splits.
+- The detection rule accepts the split ratios 3/2, 2, 3, 4, 5, 10, 1/2,
+  1/3, 1/4, 1/5, 1/10, and 1/20, each with a tolerance of 3%. A forward
+  split needs a higher volume on the ex-date, a reverse split a lower
+  volume.
+- A stock split from the IBKR closes has the confirmation `bar_evidence`.
+  The import adjusts the bars at once. A stock split of the detection rule
+  has no confirmation: it waits for the user check, and the bars do not
+  change until the user confirms it (section 8.14).
+- A second import adjusts its bars with all confirmed stock splits of the
+  instrument. A stock split that is in `stock_split` keeps its row and its
+  confirmation.
+- Code (#191): `market_data/stock_split_detection.py` (the 2 rules),
+  `market_data/databento_import_adjustment.py` (links and adjustment in
+  the import), `market_data/import_check.py` (the user check), and the
+  program `app/databento_check.py`. Tests:
+  `tests/market_data/test_stock_split_import.py` and
+  `tests/app/test_databento_check_program.py`.
 
 ### 8.8.4 Symbol change links
 
@@ -510,7 +533,14 @@ ratio and multiplies the volume by the split ratio.
   the same as IBKR does.
 - The import writes each link to `databento_symbol_link`: `old_symbol`,
   `new_symbol`, `exchange`, `change_day`, `checked_at_utc` (empty until the
-  user checks it).
+  user checks it). `(old_symbol, new_symbol, exchange, change_day)` is
+  unique.
+- Adjacent trading days: no day of the import with a bar of any symbol is
+  between the 2 days. A symbol with more than 1 candidate link gets no link.
+  Links of 2 changes in a row go in the order of their change days, so the
+  history ends under the last symbol.
+- The import links the symbols before it finds the stock splits, so the
+  stock splits use the full history under the new symbol.
 - The user checks all detected links one time.
 - Thus a backtest does not see a symbol change as a stop of trading. The
   new symbol has the history that the universe ranking needs.
@@ -675,6 +705,23 @@ Table `daily_bar_summary`: one row for each instrument.
 - The summary reads the daily bars through the global source order.
 - Screens use the summary for step 1 (still trading, last price, average
   trading value (20), exchange).
+- `average_trading_value_20` is `double precision`. The class
+  `AverageTradingValue(20)` of `atrade.indicator` calculates it from the
+  same merged bars, so it is the value of the indicator (ADR 0001). It is
+  NULL when the instrument has fewer than 20 daily bars.
+- `read_last_daily_bars` of the `market_data` public entry reads the last n
+  daily bars before a date for a list of instruments in one SQL statement.
+  The statement reads the global source order too and applies the merge
+  rule of section 8.7.2. Screens (section 24.5) and the summary use it.
+- Screens read the summary rows with `read_daily_bar_summaries` (a list of
+  instruments) and `read_daily_bar_summaries_of_currency` (all instruments
+  with saved daily bars in one currency, #206), and the HK instrument list
+  with `read_hk_instrument_list` (#206). All 3 are in the `market_data`
+  public entry.
+- Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
+  summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
+  `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and
+  `tests/market_data/test_daily_bar_update.py`.
 
 ## 8.12 Bar fetcher of multi-instrument forward tests
 
@@ -725,11 +772,15 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 | `symbol`, `exchange`, `currency` | The instrument. |
 | `ex_date_utc` | 00:00 UTC of the ex-date. |
 | `split_ratio` | `numeric`, above 0. New shares for 1 old share. |
-| `source` | How ATrade found it: IBKR evidence, or the Databento import (section 8.8.3). |
-| `confirmation` | How it was confirmed: both IBKR evidences, the bar evidence only (no owner holds the instrument), the user ("Apply split"), or the user check of the import. |
+| `source` | How ATrade found it: `ibkr_evidence` (section 8.13.2), or `databento_import` (section 8.8.3). |
+| `confirmation` | How it was confirmed: `both_evidences` (both IBKR evidences), `bar_evidence` (the bar evidence only: no owner holds the instrument, or the IBKR closes of the Databento import), `user_apply` (the user, "Apply split"), or `import_check` (the user check of the import). `import_rejected`: the user rejected a detection of the import. Empty: the stock split waits for the user check. |
 | `recorded_at_utc` | |
 
-- One instrument has at most one stock split on one ex-date.
+- One instrument has at most one stock split on one ex-date:
+  `(symbol, exchange, currency, ex_date_utc)` is unique. Migration
+  `20a1ab3c3c30` creates `stock_split` and `databento_symbol_link`.
+- Only a stock split with the confirmation `both_evidences`,
+  `bar_evidence`, `user_apply`, or `import_check` changes the bars.
 
 ### 8.13.2 Evidence from the stored bars
 
@@ -764,10 +815,27 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 
 ## 8.14 Left to the implementation
 
-- The enum values of `stock_split.source` and `stock_split.confirmation`.
-- The interface for the user check of detected stock splits (section 8.8.3)
-  and symbol links (section 8.8.4): a page, a report file, or a command. Also
-  if the import saves the bars before or after the check.
+- Decided (#191): the enum values of `stock_split.source` and
+  `stock_split.confirmation` are in section 8.13.1.
+- Decided (#191): the user checks the detections with the command
+  `python -m atrade.app.databento_check` (README.md). Without options, it
+  lists the stock splits that wait for the check (with their IDs) and the
+  symbol links that are not checked. `--accept` confirms all listed stock
+  splits, changes the stored bars before their ex-dates in all bar tables
+  (section 8.13.3), and records `checked_at_utc` on all listed links.
+  `--reject-split <ID>` (with `--accept`) rejects one stock split: its row
+  stays with `import_rejected`, so the next import does not find it again,
+  and the bars do not change.
+- Decided (#191): the import saves the bars before the check. It applies
+  the symbol links and the stock splits from the IBKR closes at once. The
+  stock splits of the detection rule change the bars only after the check.
+- Not done (#191): a command that undoes a wrong symbol link. The import
+  log and the check list show each link.
+- Decided (#191): symbol reuse (a different company uses the symbol later)
+  is not detected. The bars of both companies are under the same
+  instrument. The link rule does not link them, because there is a gap of
+  trading days between the 2 companies. The detection rule can see the
+  price gap as a stock split; the user rejects it in the check.
 - Decided (#190): the program `app/databento_import.py` runs the Databento
   import in the `web` image with `docker compose run`. The downloaded files
   are in `data/databento/` of the repository (in `.gitignore`), one
@@ -808,16 +876,33 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Decided (#192): no table records each calculation. The `forward-test` log
   has the tries, the 09:00 ET fallback, and the errors. After an error, the
   update tries again after 15 minutes.
-- The time of the daily bar update after the US close and after the Hong
-  Kong close, and the trading calendars that it uses.
-- How `daily_bar_summary` decides "still trading", and how it is calculated
-  again after a change of the global source order.
+- Decided (#195): the daily bar update runs 1 time at 18:00 ET
+  (`America/New_York`) on each US trading day of `market_data/us_trading_days.py`
+  (weekdays without New Year's Day and Good Friday). 18:00 ET is after the
+  US close and after the Hong Kong close of the same day, so 1 run reads
+  all instruments. On another holiday, IBKR returns no new bar. A Hong Kong
+  trading day that is not a US trading day comes with the next run. The
+  `web` process runs the update after a start when 18:00 ET of the day has
+  passed. After an IBKR error for one instrument, the update logs it and
+  reads the next instrument.
+- Decided (#195): for each instrument, the update reads from the start of
+  its last IBKR daily bar (read again, section 8.13) to the start of the
+  current UTC day. An instrument without an IBKR daily bar gets 366 days.
+  When IB Gateway is not reachable at 18:00 ET, the update of that day does
+  not run and the log names the day.
+- Decided (#195): `daily_bar_summary` has no status column. "Still trading"
+  is a rule of `screen` on `last_day_start_utc`. After a change of the
+  global source order, `PUT /api/market-data/source-order` calculates all
+  summary rows again in the same transaction. It calculates a row for each
+  instrument with a saved daily range in a bar source, so daily bars saved
+  before the summary table existed also get a row.
 - Decided (#216): the daily bar update (`web`, client ID of the Web
   process) and the bar fetcher (`forward-test`, client ID 20) can save the
   same instrument at the same time. The fill lock of section 8.4 is only in
   the Web process. Both saves use the same SQL (`save_received_bars`), so a
   second save adds no row. A test of the bar fetcher saves the same bars a
-  second time and finds the same bar count.
+  second time and finds the same bar count. Each save of daily bars
+  calculates the summary row again from all saved bars (#195).
 - How symbol reuse is handled: a symbol that a different company uses later.
 - The bar start of the hourly 9:30 ET bar is not on a whole hour from the
   UNIX epoch (section 8.4). The bars route widens a range to whole bar

@@ -33,7 +33,7 @@ afterEach(async () => {
 async function startOnFreePort(script: ModelStep[] = []): Promise<string> {
   model = await startFakeModelServer(script);
   const openModel = await createFakeOpenModel(model.baseUrl, workDir);
-  const conversations = new Conversations({ piDir: workDir, openModel, customTools: [] });
+  const conversations = new Conversations({ piDir: workDir, openModel, createTools: () => [] });
   const file = new CredentialFile(path.join(workDir, 'credentials.json'));
   const createRuntime = createFakeRuntimeFactory(model.baseUrl);
   const logins = new Logins({ file, createRuntime });

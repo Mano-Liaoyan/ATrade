@@ -20,9 +20,9 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
-from atrade.ibkr import Execution, GatewayRequestError, OpenOrder, OrderSide
+from atrade.ibkr import Execution, GatewayConnection, GatewayRequestError, OpenOrder, OrderSide
 from atrade.paper_trading import manual_order_store, owner_ledger_store
-from atrade.paper_trading.owner_ledger_store import BY_HAND, LedgerEntry, OwnerPosition
+from atrade.paper_trading.owner_ledger_store import BY_HAND, LedgerEntry, Owner, OwnerPosition
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 
 USD = "USD"
@@ -55,10 +55,6 @@ def format_quantity(quantity: Decimal) -> str:
 
 def format_usd(amount: Decimal) -> str:
     return f"{amount.quantize(CENT):f} USD"
-
-
-def is_open_order_by_hand(order: OpenOrder, account: str, side: OrderSide) -> bool:
-    return order.account == account and order.side == side and read_order_source(order.order_ref).kind == "by_hand"
 
 
 class ManualOrderLedger:
@@ -154,31 +150,48 @@ class ManualOrderLedger:
                 rule="ledger_not_started",
                 detail="The owner ledger has no start: the paper account has no cash value in USD yet.",
             )
-        open_orders = await self.paper_account_monitor.gateway_connection.read_open_orders()
-        if order.side == "SELL":
-            return check_sell(entries, open_orders, account, order)
-        return await self.check_buy(entries, open_orders, account, order)
-
-    async def check_buy(
-        self, entries: list[LedgerEntry], open_orders: list[OpenOrder], account: str, order: OrderByHand
-    ) -> OrderRefusal | None:
-        cash = owner_ledger_store.sum_owner_cash_usd(entries, BY_HAND)
-        open_buy_amount = Decimal(0)
-        for open_order in open_orders:
-            if is_open_order_by_hand(open_order, account, "BUY"):
-                open_buy_amount += await self.find_amount_usd(
-                    open_order.instrument, open_order.quantity - open_order.filled_quantity, open_order.limit_price
-                )
-        amount = await self.find_amount_usd(order.instrument, Decimal(order.quantity), order.limit_price)
-        if amount <= cash - open_buy_amount:
-            return None
-        return OrderRefusal(
-            rule="buy_more_than_cash",
-            detail=(
-                f"{BY_HAND_LABEL} has {format_usd(cash)} cash and open buy orders for {format_usd(open_buy_amount)}. "
-                f"ATrade refuses a buy order for {format_usd(amount)}."
-            ),
+        open_orders = [
+            open_order
+            for open_order in await self.paper_account_monitor.gateway_connection.read_open_orders()
+            if open_order.account == account and read_order_source(open_order.order_ref).kind == "by_hand"
+        ]
+        owner_order = LedgerOrder(
+            owner=BY_HAND,
+            owner_label=BY_HAND_LABEL,
+            instrument=order.instrument,
+            side=order.side,
+            quantity=Decimal(order.quantity),
+            limit_price=order.limit_price,
         )
+        amounts = OrderAmounts(gateway_connection=self.paper_account_monitor.gateway_connection, clock=self.clock)
+        return await check_owner_order(amounts, entries, open_orders, owner_order)
+
+    async def convert_to_usd(self, amount: Decimal, currency: str) -> Decimal:
+        amounts = OrderAmounts(gateway_connection=self.paper_account_monitor.gateway_connection, clock=self.clock)
+        return await amounts.convert_to_usd(amount, currency)
+
+
+@dataclass(frozen=True)
+class LedgerOrder:
+    """An order of one owner for the order rules (section 11.10)."""
+
+    owner: Owner
+    # "By hand", or "Forward test 3", for the reason of a refusal.
+    owner_label: str
+    instrument: Instrument
+    side: OrderSide
+    quantity: Decimal
+    # None for a market order.
+    limit_price: Decimal | None
+
+
+class OrderAmounts:
+    """The USD amount of a buy order for rule 2 (section 11.13): the limit price, or the last daily close for a market
+    order, without the commission. Other currencies use the IBKR forex rate."""
+
+    def __init__(self, *, gateway_connection: GatewayConnection, clock: Clock) -> None:
+        self.gateway_connection = gateway_connection
+        self.clock = clock
 
     async def find_amount_usd(self, instrument: Instrument, quantity: Decimal, limit_price: Decimal | None) -> Decimal:
         price = limit_price if limit_price is not None else await self.read_last_close(instrument)
@@ -186,7 +199,7 @@ class ManualOrderLedger:
 
     async def read_last_close(self, instrument: Instrument) -> Decimal:
         now_utc = self.clock.read_now_utc()
-        bars = await self.paper_account_monitor.gateway_connection.read_historical_bars(
+        bars = await self.gateway_connection.read_historical_bars(
             instrument,
             BarPeriod.ONE_DAY,
             TimeRange(start_utc=now_utc - timedelta(days=LAST_CLOSE_DAYS), end_utc=now_utc),
@@ -199,26 +212,60 @@ class ManualOrderLedger:
     async def convert_to_usd(self, amount: Decimal, currency: str) -> Decimal:
         if currency == USD:
             return amount
-        rate = await self.paper_account_monitor.gateway_connection.read_exchange_rate(currency, USD)
+        rate = await self.gateway_connection.read_exchange_rate(currency, USD)
         return amount * rate
 
 
+async def check_owner_order(
+    amounts: OrderAmounts, entries: list[LedgerEntry], owner_open_orders: list[OpenOrder], order: LedgerOrder
+) -> OrderRefusal | None:
+    """The 3 order rules for one owner. `owner_open_orders` are the open orders of this owner only.
+
+    Raises GatewayRequestError when IBKR does not answer.
+    """
+    if order.side == "SELL":
+        return check_sell(entries, owner_open_orders, order)
+    return await check_buy(amounts, entries, owner_open_orders, order)
+
+
+async def check_buy(
+    amounts: OrderAmounts, entries: list[LedgerEntry], owner_open_orders: list[OpenOrder], order: LedgerOrder
+) -> OrderRefusal | None:
+    cash = owner_ledger_store.sum_owner_cash_usd(entries, order.owner)
+    open_buy_amount = Decimal(0)
+    for open_order in owner_open_orders:
+        if open_order.side == "BUY":
+            open_buy_amount += await amounts.find_amount_usd(
+                open_order.instrument, open_order.quantity - open_order.filled_quantity, open_order.limit_price
+            )
+    amount = await amounts.find_amount_usd(order.instrument, order.quantity, order.limit_price)
+    if amount <= cash - open_buy_amount:
+        return None
+    return OrderRefusal(
+        rule="buy_more_than_cash",
+        detail=(
+            f"{order.owner_label} has {format_usd(cash)} cash and open buy orders for {format_usd(open_buy_amount)}. "
+            f"ATrade refuses a buy order for {format_usd(amount)}."
+        ),
+    )
+
+
 def check_sell(
-    entries: list[LedgerEntry], open_orders: list[OpenOrder], account: str, order: OrderByHand
+    entries: list[LedgerEntry], owner_open_orders: list[OpenOrder], order: LedgerOrder
 ) -> OrderRefusal | None:
     position = sum(
         (
             owner_position.quantity
             for owner_position in owner_ledger_store.sum_owner_positions(entries)
-            if owner_position.owner == BY_HAND and owner_position.instrument == order.instrument
+            if owner_position.owner == order.owner and owner_position.instrument == order.instrument
         ),
         Decimal(0),
     )
     open_sell_quantity = sum(
         (
             open_order.quantity - open_order.filled_quantity
-            for open_order in open_orders
-            if is_open_order_by_hand(open_order, account, "SELL") and open_order.instrument == order.instrument
+            for open_order in owner_open_orders
+            if open_order.side == "SELL" and open_order.instrument == order.instrument
         ),
         Decimal(0),
     )
@@ -227,8 +274,9 @@ def check_sell(
     return OrderRefusal(
         rule="sell_more_than_position",
         detail=(
-            f"{BY_HAND_LABEL} holds {format_quantity(position)} {order.instrument.symbol} and has open sell orders for "
-            f"{format_quantity(open_sell_quantity)}. ATrade refuses a sell order for {order.quantity}."
+            f"{order.owner_label} holds {format_quantity(position)} {order.instrument.symbol} and has open sell orders "
+            f"for {format_quantity(open_sell_quantity)}. ATrade refuses a sell order for "
+            f"{format_quantity(order.quantity)}."
         ),
     )
 
