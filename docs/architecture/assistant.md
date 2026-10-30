@@ -143,8 +143,8 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 ### 25.3.3 Allow-list
 
-The screen paths come from #150. They are proposals. The ticket that
-implements the screen routes names the final paths.
+The screen paths come from #150. Decided (#205): they are the final paths
+(screen section 24.7).
 
 | Route on port 8001 | Tool | Phase | Limit on port 8001 |
 |---|---|---|---|
@@ -1075,8 +1075,9 @@ columns behave the same (section 13).
   are not bars.
 - The phase 3 message for the condition card. Decided (#179, #182): the
   field names of the other `/ws/assistant` messages (25.10).
-- The field that names the position of a condition in a screen problem
-  (25.4.3).
+- Decided (#205): the field that names the position of a condition in a
+  screen problem (25.4.3) is `location`, the path in the request body (screen
+  section 24.6).
 - The pages of `read_screen_result` (page size and parameter names).
 - Decided (#182): the summaries in the `read_backtest` result: at most 50
   points of the equity curve and the first 50 trades with all fields

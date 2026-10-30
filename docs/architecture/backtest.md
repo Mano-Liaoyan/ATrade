@@ -349,22 +349,18 @@ document. The implementation can change them.
   `listBacktests`, `readBacktest`), the value formats, and the parts that the
   backtest page, the strategy page, and the forward test page share (spec
   [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99)):
-  - `KeyMetricRow` (`metrics`, `startCapitalUsd`, `trades`): the key metrics
-    of `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
-    drawdown, Win rate, Trades, Final equity (USD). Each is a `MetricTile` of
+  - `KeyMetricRow` (`metrics`, `startCapitalUsd`): the key metrics of
+    `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
+    drawdown, Sharpe ratio, Win rate, Trades, Final equity (USD). Each is a
+    `MetricTile` of
     `foundation/metric_tile`. The API gives the max drawdown as a positive
     percent; the row shows it as a negative percent (for example
     "-37.71 %"), with the sign rule of `formatSignedNumber`. Total return, net
-    profit, and max drawdown show their direction with `ChangeText`. The win
-    rate comes from the trades: the share of round trips (from position 0
-    back to 0) with a profit after commissions; "–" without a round trip. The
-    API has no Sharpe ratio, so the row has none.
-  - Phase 1 changes the row
-    ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)). The order
-    is: Total return, Net profit (USD), Max drawdown, Sharpe ratio, Win rate,
-    Trades, Final equity (USD). The Sharpe ratio and the win rate come from
-    the API (section 10.9.2). The frontend no longer calculates the win rate.
-    Under the row, the robustness row of section 10.9.6 shows.
+    profit, and max drawdown show their direction with `ChangeText`. The
+    Sharpe ratio and the win rate come from the API (section 10.9.2,
+    [#137](https://github.com/Mano-Liaoyan/ATrade/issues/137), #168). A null
+    value shows "–". The frontend does not calculate the win rate.
+  - Phase 1: under the row, the robustness row of section 10.9.6 shows.
   - `EquityDrawdownChart` (`curves`, `label`, `interruptions`, `fill`): the
     equity curves and, under them, the drawdown curves
     (`computeDrawdownCurve()`, a negative percent from the highest equity so
@@ -392,9 +388,9 @@ document. The implementation can change them.
   - The "Backtest tables" panel has the tabs Trades (32px rows), Orders, and
     Logs. The API has no orders, so Orders shows "No orders". Logs shows the
     strategy error of a failed backtest, or "No logs". Phase 1 adds the tab
-    Metrics (section 10.9.6). Phase 3 adds the tab Instruments and the
-    Symbol column of Trades (section 10.10.7), and the tab Bar sources
-    (section 10.12).
+    Metrics (section 10.9.6, `BacktestMetricTable`, #168). Phase 3 adds the
+    tab Instruments and the Symbol column of Trades (section 10.10.7), and
+    the tab Bar sources (section 10.12).
   - The page reads the open backtest each second until its status is final,
     and the list every 2 seconds while a backtest in it is queued or running.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
@@ -756,11 +752,20 @@ longer bars first.
   (section 10.7).
 - The page adds no other label or description (AGENTS.md, frontend rule
   one).
+- Decided (#168): the Metrics table has the metrics of section 10.9.2 in
+  this order: CAGR, Annual volatility, Sharpe ratio, Sortino ratio, Calmar
+  ratio, Profit factor, Win rate, Average win (USD), Average loss (USD),
+  Exposure, and Turnover. These are the English names in the UI. The
+  average win shows the USD value and the percent of the entry amount, for
+  example "+1,234.50 (+2.10 %)". The turnover shows the API value with 2
+  decimal places, for example "3.20× per year". Each name is a Carbon
+  definition term. Its tooltip is the formula and "Risk-free rate: 0".
+  `readMetricRows(metricSets)` gives one value column for each set of
+  metrics, so the In-sample and Out-of-sample columns (#169) and the
+  comparison page can use the same rows.
 
 ### 10.9.7 Left to the implementation
 
-- The English names of the new metrics in the UI. The decisions name
-  "Sharpe ratio", "Sortino ratio", "Calmar ratio", and "Profit factor" only.
 - The tile name and the tooltip when the tile shows PSR(0) (trial count 1).
 
 ## 10.10 Multi-instrument backtest
