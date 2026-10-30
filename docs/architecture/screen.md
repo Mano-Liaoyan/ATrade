@@ -316,6 +316,13 @@ Decided (#206): the screen result answer is
 - `offset` is 0 or more. `limit` is 1 to 500, default 50.
 - A run of the user has `assistant_conversation_id` null.
 
+Decided (#207): the screen result answer also has `indicator_names`:
+`{"indicator_conditions": ["RSI(14)", ...], "order": "Momentum(252, 21)"}`.
+It has one UI name for each indicator condition, in the order of the
+definition, and the name of the order indicator. These names are the keys of
+`indicator_values` and `percentiles`. The condition bar and the result table
+use them, so the frontend has no copy of the indicator catalog.
+
 ## 24.8 AI assistant access
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150).
@@ -426,7 +433,7 @@ Behavior:
   |---|---|---|
   | Subject (indicator or field) | `RSI(14)` | `$text-primary` |
   | Operation | `≥`, `top`, `above` | `$text-helper` |
-  | Value | `30` | blue 70 (`#0043ce`) |
+  | Value | `30` | `$link-primary` (decided #207, see section 24.13) |
 
 - When there are many conditions, the bar has 2 or 3 lines.
 - Filters and indicator conditions are told apart by their order and the
@@ -452,7 +459,7 @@ Behavior:
 - `backtest` imports `screen` for the point-in-time runs of section 24.9.
 - HTTP routes: `screen/http_routes.py` with `create_screen_router(...)`.
 - Frontend: `frontend/src/lib/screen/` has the HTTP client and the screen
-  page parts. `src/routes/screens/[screenId]/` is the page.
+  page parts. `src/routes/screens/[[screenId]]/` is the page.
 
 ## 24.12 Phase
 
@@ -481,7 +488,18 @@ Behavior:
 - Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
   `>=` (section 24.4.1).
 - The default order of a new screen.
-- Where `/screens` stores the last opened screen.
+- Decided (#207): `/screens` stores the id of the last opened screen in the
+  browser storage (key `atrade.screen-page.last-screen`). The choice belongs
+  to the browser. Without a stored id, or when that screen does not exist,
+  `/screens` opens the first screen of the list.
+- Decided (#207): the side column shows the recent runs of
+  `GET /api/screens/{id}` (the last 10). `?result=<id>` opens one run.
+  Without it, the page opens the last run.
+- Decided (#207): the tag value color is `$link-primary`: blue 60 in g10 and
+  blue 40 in g100. Blue 70 (`#0043ce`) is not a Carbon token and has no g100
+  value.
+- Decided (#207): the result table has no "Name" column yet. The result rows
+  have no instrument name, and no source for the name is decided (#206).
 - Decided (#205): a delete of a screen deletes its screen results (section
   24.4).
 - Decided (#205): `GET /api/screens/{id}` shows the last 10 runs. The side
@@ -495,9 +513,12 @@ Behavior:
   source order or the source order of the backtest.
 - The survivorship bias warning of a point-in-time backtest whose screen
   starts from the watchlist or the HK instrument list.
-- How "Add to watchlist" adds many instruments. The watchlist add route
+- Decided (#207): "Add to watchlist" adds many instruments with one
+  `POST /api/watchlist` for each instrument, one after the other. The route
   checks each instrument with IBKR ([`market_data.md`](market_data.md)
-  section 8.3).
-- The Carbon token for blue 70 in the g100 theme (Dark).
+  section 8.3), so 500 instruments take about 500 seconds. The page then
+  shows how many instruments it added, and the last refusal (for example an
+  instrument that is in the watchlist already). Without selected rows, it
+  adds all rows of the screen result.
 - How the API reports the AI assistant caller and the conversation ID to the
   screen routes (the AI assistant section).
