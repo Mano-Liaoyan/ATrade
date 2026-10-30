@@ -5,20 +5,27 @@
      command palette opens the dialog with it. With `strategyVersion`, each open selects that strategy version, for
      example the open version of the strategy page (Run backtest). The source order starts at the global source order
      and changes only this backtest. The Instruments select picks one instrument, the top N US instruments by trading
-     value, or all watchlist instruments with saved bars (docs/architecture/backtest.md section 10.10.7). -->
+     value, all watchlist instruments with saved bars, or a screen (docs/architecture/backtest.md section 10.10.7). A
+     screen is a point-in-time rule (the default: it runs again at each rebalance) or a fixed list of one screen
+     result. With `screenSource`, each open selects that screen, its screen result, and the selected rows (the buttons
+     of the screen page). -->
 <script lang="ts">
   import { resolve } from '$app/paths';
   import {
     checkTopN,
     convertDateToUtcStart,
     formatUniverseRange,
+    makeScreenUniverseFields,
     readUsUniverseRange,
     startBacktest,
     type Backtest,
     type BacktestRequest,
+    type RebalancePeriod,
+    type ScreenSource,
     type UsUniverseRange,
   } from '#lib/backtest';
   import { Dialog, InlineNotification, Select, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
+  import { formatUtcTime } from '#lib/foundation/time_format';
   import {
     BAR_PERIODS,
     DEFAULT_BAR_PERIOD,
@@ -30,6 +37,7 @@
     SurvivorshipBiasWarning,
   } from '#lib/market_data';
   import { readPaperCapital } from '#lib/paper_trading';
+  import { listScreens, readScreen, type Screen, type ScreenListItem } from '#lib/screen';
   import {
     formatVersionLabel,
     listStrategies,
@@ -53,9 +61,10 @@
     onOpenChange: (open: boolean) => void;
     onStarted: (backtest: Backtest) => void;
     strategyVersion?: StrategyVersionKey | null;
+    screenSource?: ScreenSource | null;
   }
 
-  const { open, onOpenChange, onStarted, strategyVersion = null }: Props = $props();
+  const { open, onOpenChange, onStarted, strategyVersion = null, screenSource = null }: Props = $props();
 
   let strategies: StrategyListItem[] = $state([]);
   let selectedStrategy = $state<StrategyDetail | null>(null);
@@ -76,18 +85,47 @@
   let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let form: HTMLFormElement | undefined = $state();
-  type UniverseChoice = 'single' | 'rule' | 'list';
+  type UniverseChoice = 'single' | 'rule' | 'list' | 'screen';
   const UNIVERSE_ITEMS: { value: UniverseChoice; label: string }[] = [
     { value: 'single', label: 'One instrument' },
     { value: 'rule', label: 'Top N by trading value' },
     { value: 'list', label: 'Watchlist' },
+    { value: 'screen', label: 'Screen' },
   ];
+  type ScreenMode = 'rerun' | 'fixed';
+  const SCREEN_MODE_ITEMS: { value: ScreenMode; label: string }[] = [
+    { value: 'rerun', label: 'Point-in-time rule' },
+    { value: 'fixed', label: 'Fixed list' },
+  ];
+  const REBALANCE_ITEMS: { value: RebalancePeriod; label: string }[] = [
+    { value: 'quarter', label: 'Each quarter' },
+    { value: 'month', label: 'Each month' },
+  ];
+  let screens: ScreenListItem[] = $state([]);
+  let screenId = $state('');
+  let selectedScreen = $state<Screen | null>(null);
+  let screenMode = $state<ScreenMode>('rerun');
+  let rebalancePeriod = $state<RebalancePeriod>('quarter');
+  // The screen result of the fixed list and its selected rows: from the screen page, else the last run of the screen.
+  let sourceResultId = $state<number | null>(null);
+  let sourceSymbols = $state<string[] | null>(null);
   let universeChoice = $state<UniverseChoice>('single');
   let topNText = $state('500');
   let universeRange = $state<UsUniverseRange | null>(null);
   const topNCheck = $derived(checkTopN(topNText));
   const topNReason = $derived(universeChoice === 'rule' && topNCheck.kind === 'refused' ? topNCheck.reason : null);
 
+  const screenItems = $derived(screens.map((item) => ({ value: String(item.id), label: item.name })));
+  const fixedListResult = $derived.by(() => {
+    const results = selectedScreen?.recent_screen_results ?? [];
+    return results.find((result) => result.id === sourceResultId) ?? results[0] ?? null;
+  });
+  const fixedListCount = $derived(sourceSymbols?.length ?? fixedListResult?.result_count ?? 0);
+  // A fixed list is chosen at the end of the range. A rule that does not start from the US universe of each quarter
+  // starts from the list of today (docs/architecture/screen.md section 24.13).
+  const screenHasSurvivorshipBias = $derived(
+    screenMode === 'fixed' || (selectedScreen !== null && selectedScreen.definition['start'] !== 'quarter_universe'),
+  );
   const barPeriodLabel = $derived(BAR_PERIODS.find((period) => period.value === barPeriod)?.label ?? barPeriod);
   const instrumentChoices = $derived(selectInstrumentsWithSavedBars(watchlistInstruments, barPeriod));
   const selectedInstrument = $derived(
@@ -135,6 +173,17 @@
         watchlistMessage = result.message;
       }
     });
+    void listScreens(fetch).then((result) => {
+      if (result.kind === 'ok') {
+        screens = result.value;
+      }
+    });
+    if (screenSource !== null) {
+      universeChoice = 'screen';
+      // Selected rows are a fixed list. All rows start with the default: the point-in-time rule.
+      screenMode = screenSource.symbols === null ? 'rerun' : 'fixed';
+      void selectScreen(String(screenSource.screenId), screenSource.screenResultId, screenSource.symbols);
+    }
     void readUsUniverseRange(fetch).then((result) => {
       if (result.kind === 'ok') {
         universeRange = result.value;
@@ -185,10 +234,53 @@
     strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
   }
 
-  type UniverseFields = Pick<BacktestRequest, 'universe_kind' | 'symbol' | 'exchange' | 'currency' | 'top_n' | 'instruments'>;
+  // Without a screen result, the fixed list is the last run of the screen.
+  async function selectScreen(
+    selectedId: string,
+    resultId: number | null = null,
+    symbols: string[] | null = null,
+  ): Promise<void> {
+    screenId = selectedId;
+    selectedScreen = null;
+    sourceResultId = resultId;
+    sourceSymbols = symbols;
+    const result = await readScreen(fetch, Number(selectedId));
+    if (result.kind === 'failed') {
+      startError = { kind: 'error', title: 'Screen not read', subtitle: result.message };
+      return;
+    }
+    if (screenId === selectedId) {
+      selectedScreen = result.value;
+    }
+  }
+
+  type UniverseFields = Pick<
+    BacktestRequest,
+    | 'universe_kind'
+    | 'symbol'
+    | 'exchange'
+    | 'currency'
+    | 'top_n'
+    | 'instruments'
+    | 'screen_id'
+    | 'rebalance_period'
+    | 'screen_result_id'
+    | 'symbols'
+  >;
 
   // The universe fields of the request. Null when the universe cannot start (the Start button says why).
   function readUniverseFields(): UniverseFields | null {
+    if (universeChoice === 'screen') {
+      return selectedScreen === null
+        ? null
+        : makeScreenUniverseFields({
+            mode: screenMode,
+            screenId: selectedScreen.id,
+            rebalancePeriod,
+            screenResultId: fixedListResult?.id ?? null,
+            symbols: sourceSymbols,
+          });
+    }
     if (universeChoice === 'rule') {
       return topNCheck.kind === 'ok' ? { universe_kind: 'rule', top_n: topNCheck.value } : null;
     }
@@ -214,6 +306,13 @@
     }
     const universe = readUniverseFields();
     if (universe === null) {
+      if (universeChoice === 'screen') {
+        startError = {
+          kind: 'error',
+          title: 'Backtest not started',
+          subtitle: selectedScreen === null ? 'Select a screen.' : 'The screen has no screen result. Run the screen first.',
+        };
+      }
       return;
     }
     isStarting = true;
@@ -302,8 +401,35 @@
       />
     {:else if universeChoice === 'rule'}
       <TextInput id="top-n" label="N" inputmode="numeric" class="number" bind:value={topNText} invalidText={topNReason} />
+    {:else if universeChoice === 'screen'}
+      <Select
+        label="Screen"
+        placeholder="Select a screen"
+        items={screenItems}
+        value={screenId}
+        disabled={screenItems.length === 0}
+        onValueChange={(selectedId: string) => void selectScreen(selectedId)}
+      />
+      <Select
+        label="Mode"
+        items={SCREEN_MODE_ITEMS}
+        value={screenMode}
+        onValueChange={(mode: ScreenMode) => {
+          screenMode = mode;
+        }}
+      />
+      {#if screenMode === 'rerun'}
+        <Select
+          label="Rebalance"
+          items={REBALANCE_ITEMS}
+          value={rebalancePeriod}
+          onValueChange={(period: RebalancePeriod) => {
+            rebalancePeriod = period;
+          }}
+        />
+      {/if}
     {/if}
-    {#if universeChoice === 'list'}
+    {#if universeChoice === 'list' || (universeChoice === 'screen' && screenHasSurvivorshipBias)}
       <div class="form-note">
         <SurvivorshipBiasWarning />
       </div>
@@ -311,6 +437,12 @@
     <p class="form-note cds--form__helper-text" role="status" aria-label="Saved bars">
       {#if universeChoice === 'rule'}
         {formatUniverseRange(universeRange)}
+      {:else if universeChoice === 'screen'}
+        {#if screenMode === 'fixed' && selectedScreen !== null}
+          {fixedListResult === null
+            ? 'No screen result'
+            : `${String(fixedListCount)} ${fixedListCount === 1 ? 'instrument' : 'instruments'} of the screen result ${formatUtcTime(fixedListResult.run_at_utc)}`}
+        {/if}
       {:else if watchlistMessage !== ''}
         {watchlistMessage}
       {:else if instrumentChoices.length === 0}

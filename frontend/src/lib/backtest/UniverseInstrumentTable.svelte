@@ -1,5 +1,5 @@
 <!-- The Instruments tab of a multi-instrument backtest: one row for each universe member with its trade count, net
-     profit, and quarters in the universe as right-aligned tabular numbers (docs/architecture/backtest.md 10.10.7). It
+     profit, and the universe periods (quarters, or months of a monthly screen universe) as right-aligned tabular numbers (docs/architecture/backtest.md 10.10.7). It
      fills the height of its panel body and scrolls in itself. The forward test page uses it with the count header
      "Fills" (docs/architecture/forward_test.md 12.16). -->
 <script lang="ts">
@@ -9,14 +9,17 @@
   import type { UniverseInstrument } from './backtest_api';
   import { formatUsd } from './backtest_format';
 
-  const { instruments, countHeader = 'Trades' }: { instruments: UniverseInstrument[]; countHeader?: string } =
-    $props();
+  const {
+    instruments,
+    countHeader = 'Trades',
+    periodHeader = 'Quarters',
+  }: { instruments: UniverseInstrument[]; countHeader?: string; periodHeader?: string } = $props();
 
   const columns: TableColumn[] = $derived([
     { header: 'Instrument' },
     { header: countHeader, align: 'right' },
     { header: 'Net profit (USD)', align: 'right' },
-    { header: 'Quarters', align: 'right' },
+    { header: periodHeader, align: 'right' },
   ]);
 </script>
 
