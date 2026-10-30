@@ -9,8 +9,12 @@ const WARNING_TEXT = 'The universe has survivorship bias: instruments that stopp
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
   await page.getByRole('button', { name: 'New strategy' }).click();
-  await page.getByLabel('Strategy name').fill(strategyName);
-  await page.getByRole('button', { name: 'Create strategy' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New strategy' });
+  await dialog.getByLabel('Strategy name').fill(strategyName);
+  // A universe backtest needs a multi-instrument strategy: its configuration has no instrument_id and no bar_type
+  // (docs/architecture/backtest.md, decided in #198). Template M1 is one.
+  await dialog.getByRole('listbox', { name: 'Start from' }).getByRole('option', { name: 'Cross-sectional momentum' }).click();
+  await dialog.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
 }
 

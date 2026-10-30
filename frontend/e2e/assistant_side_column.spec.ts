@@ -203,8 +203,10 @@ test('the log has a visible scroll track and does not scroll while the user read
   const log = conversationLog(page);
   for (const number of [1, 2, 3, 4, 5, 6, 7, 8]) {
     await sendMessage(page, `Message ${String(number)}.`);
-    await expect(assistantColumn(page).getByRole('button', { name: 'Send' })).toBeVisible();
     await expect(log.getByText(`Message ${String(number)}.`)).toBeVisible();
+    // Send is visible also before the run starts. Wait for the answer, so that the next click is not on Stop.
+    await expect(log.getByText('Hello from the fake AI assistant.')).toHaveCount(number);
+    await expect(assistantColumn(page).getByRole('button', { name: 'Send' })).toBeVisible();
   }
   await expect.poll(() => log.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   const track = page.getByRole('scrollbar', { name: 'Conversation messages scroll bar' });
