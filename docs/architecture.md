@@ -1716,6 +1716,11 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#166): the out-of-sample share is a share of the calendar time
+  of the request range, and the split time does not align to a bar end. The
+  route calculates the split metrics at each read from the saved equity
+  curve and trades. The out-of-sample Sharpe percent is null when the
+  in-sample Sharpe ratio is 0, below 0, or null (backtest section 10.9.4).
 - Decided (#167): the route calculates the daily Sharpe ratio of each trial
   from its saved equity curve at each read. When fewer than 2 trials have a
   daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
