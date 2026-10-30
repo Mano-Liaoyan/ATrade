@@ -1137,8 +1137,11 @@ simplest option and records it in this document.
   client can share the client ID (section 21).
 - How the ATrade data client gets the new daily bars after the bar fetcher
   saved them.
-- How the platform tells the strategy the new members at a quarter start.
-  The multi-instrument backtest makes the same choice.
+- Decided (#198): the platform tells the strategy the new members at a
+  quarter start with NautilusTrader custom data, as the multi-instrument
+  backtest does ([`backtest.md`](backtest.md) section 10.10.8): one
+  `CustomData` with `DataType("UniverseUpdate")`, which the strategy gets in
+  `on_data`. Not checked in a LiveNode: how the ATrade data client sends it.
 - The time after the daily close at which the bar fetcher reads the bars,
   and what it does when IB Gateway is not reachable.
 - Whether the bar fetcher and the daily bar update of `web`
