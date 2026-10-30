@@ -202,7 +202,7 @@ test('the log has a visible scroll track and does not scroll while the user read
   await openStrategyWithConversation(page, createUniqueName(currentTest, 'Scroll'));
   await page.setViewportSize({ width: 1440, height: 600 });
   const log = conversationLog(page);
-  for (const number of [1, 2, 3, 4]) {
+  for (const number of [1, 2, 3, 4, 5, 6]) {
     await sendMessage(page, `Message ${String(number)}.`);
     await expect(assistantColumn(page).getByRole('button', { name: 'Send' })).toBeVisible();
     await expect(log.getByText(`Message ${String(number)}.`)).toBeVisible();

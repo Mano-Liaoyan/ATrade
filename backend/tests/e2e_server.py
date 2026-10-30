@@ -257,9 +257,9 @@ def add_discarded_version(database_url: str) -> None:
         )
         conversation_row = connection.execute(
             """
-            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id)
+            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id, fixed_prompt)
             SELECT strategy_id, 'E2E conversation', %(now)s,
-                (SELECT id FROM assistant_prompt_version ORDER BY version_number LIMIT 1)
+                (SELECT id FROM assistant_prompt_version ORDER BY version_number LIMIT 1), ''
             FROM strategy_version WHERE id = %(version_id)s
             RETURNING id, strategy_id
             """,
