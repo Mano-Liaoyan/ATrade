@@ -340,7 +340,7 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
 | `databento_bar_saved_range` | The columns of `ibkr_bar_saved_range`. | The Databento import writes the time range that it bought for each instrument and bar period. |
 | `source_order` | 1 row: `bar_sources` (ordered list of `BarSource` values), `changed_at_utc`. | `PUT /api/market-data/source-order`. |
 
-- One migration (`8d4f2a6c1e93`) renames `bar` to `ibkr_bar` and
+- One migration (`b7e3c9a4d158`) renames `bar` to `ibkr_bar` and
   `bar_saved_range` to `ibkr_bar_saved_range`. The data does not change. All
   SQL that uses the old names changes in the same PR.
 - The default source order is `ibkr`, then `databento`. The migration writes
