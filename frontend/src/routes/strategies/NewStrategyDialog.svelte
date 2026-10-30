@@ -146,10 +146,15 @@
             <h3>{selectedName}</h3>
             {#if selectedTemplate !== null}
               <dl class="template-rows">
-                <dt>Entry</dt>
-                <dd>{selectedTemplate.entry}</dd>
-                <dt>Exit</dt>
-                <dd>{selectedTemplate.exit}</dd>
+                {#if selectedTemplate.kind === 'code'}
+                  <dt>Rule</dt>
+                  <dd>{selectedTemplate.entry}</dd>
+                {:else}
+                  <dt>Entry</dt>
+                  <dd>{selectedTemplate.entry}</dd>
+                  <dt>Exit</dt>
+                  <dd>{selectedTemplate.exit}</dd>
+                {/if}
                 <dt>Defaults</dt>
                 <dd class="numbers">{selectedTemplate.defaults}</dd>
                 <dt>Market</dt>
