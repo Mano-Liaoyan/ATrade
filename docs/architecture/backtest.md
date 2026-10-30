@@ -229,8 +229,26 @@ temporary NautilusTrader `ParquetDataCatalog` holds them. The child fills it
 from the saved bars in PostgreSQL. So a strategy warms up its indicators as
 in a forward test, and it can trade on the first bar of the range.
 
-- Look-back length: `find_look_back_length(bar_period)` in
-  `backtest/backtest_run.py`. It is the warm-up of the "Blank code" start
+- Look-back: `find_look_back(bar_period, warm_up_bar_count)` in
+  `backtest/backtest_run.py`. It gives a read length and an optional bar
+  count (`LookBack`).
+- Decided (#164): a rule builder version (a version with `rules`) gets the
+  last N saved bars before the start. N is the largest look-back count of
+  the indicators in its rules ([`indicator.md`](indicator.md) section 23.4,
+  `find_warm_up_bar_count()` in `strategy/rules_code.py`).
+  `read_strategy_version()` gives N as `warm_up_bar_count`. The child reads
+  the saved bars of the range `start_utc` minus `N × bar period × factor`
+  (factor 2 for 1-day bars, 6 for intraday bars, because a bar comes only
+  in the trading hours), and at least the default length below, to
+  `start_utc`. It keeps only the last N bars. So SMA(200) has a value on the
+  first bar of the range when PostgreSQL has 200 daily bars before the
+  start. The generated code asks `request_bars` for
+  `max(bar period × N × 6, 7 days)` before the start, so the request holds
+  all N bars. With the earlier 60 days, SMA(200) had no value in the first
+  months of the range (a test with 20 bars in the range made no trade).
+- A version without rules, or with rules without an indicator ("Blank code"
+  and code written by hand), keeps the default length and all bars of it.
+  The default length is the warm-up of the "Blank code" start
   point (`backend/src/atrade/strategy/strategy_template.py`,
   [`strategy.md`](strategy.md) section 9.2): 3 average periods of the
   default 20 bars of its SMA(20), and 7 days at least
@@ -246,8 +264,8 @@ in a forward test, and it can trade on the first bar of the range.
   starts earlier gets only these bars. When PostgreSQL has no saved bars
   before the start, `request_bars` gets no bars and the indicator warms up on
   the first bars of the range.
-- A forward test uses the same length and the same catalog for its warm-up
-  bars (`find_look_back_length()` and `write_look_back_catalog()` of the
+- A forward test uses the same look-back and the same catalog for its
+  warm-up bars (`find_look_back()` and `write_look_back_catalog()` of the
   public entry, [`forward_test.md`](forward_test.md) section 12.15).
 - Mechanism (`create_look_back_catalog()` in
   `backtest/strategy_engine_run.py`): the child writes the look-back bars to
@@ -271,7 +289,10 @@ in a forward test, and it can trade on the first bar of the range.
   bars) and
   `test_the_template_warms_up_on_saved_bars_before_the_start` in
   `tests/backtest/test_backtest_runs.py` (a real child process reads the
-  look-back bars from PostgreSQL).
+  look-back bars from PostgreSQL). `tests/backtest/test_rules_backtest.py`:
+  a rule builder version with SMA(200) buys on the first bar of the range
+  with 300 saved bars before the start, and SMA(3) without saved bars before
+  the start warms up on the first bars of the range.
 
 ## 10.4 Metric functions
 
@@ -1177,6 +1198,11 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
   the user deletes the conversation, the ID becomes null. The backtest stays.
 - The AI assistant cannot change the backtest limits and cannot start a
   parameter sweep.
+- Decided (#181): `POST /api/backtests` on port 8001 makes the same checks
+  as port 8000 (`start_backtest`). When the instrument is not in USD and a
+  daily exchange rate is missing, it saves the rates from IBKR (section
+  10.8), like port 8000. The rule "cannot load bars" is about bars only. A
+  backtest without saved bars gets `422` (section 10.1).
 
 Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
 

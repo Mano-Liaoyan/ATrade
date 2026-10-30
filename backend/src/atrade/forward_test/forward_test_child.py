@@ -14,7 +14,7 @@ from typing import Literal
 
 import psycopg
 
-from atrade.backtest import find_look_back_length
+from atrade.backtest import find_look_back
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.forward_test.forward_test_worker import (
@@ -116,15 +116,20 @@ async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None)
 
 
 async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection) -> tuple[Bar, ...]:
-    """The complete bars of the look-back length before now, the same length as a backtest look-back. The child also
-    saves them in the bar store of `market_data`, so a same-period backtest finds them (section 12.15).
+    """The complete bars of the look-back before now, the same look-back as a backtest of the strategy version
+    (`find_look_back`): with rules, the last bars that the longest indicator needs. The child saves all read bars in the bar store
+    of `market_data`, so a same-period backtest finds them (section 12.15).
 
     `read_historical_bars` splits the range into requests of the IBKR step size of the bar period. A failed read
     gives no warm-up bars: the forward test starts, and the strategy gets an empty `request_bars` answer.
     """
     bar_period = BarPeriod(job.row.bar_period)
+    strategy_version = await read_strategy_version(
+        database_url=job.settings.database_url, strategy_version_id=job.row.strategy_version_id
+    )
+    look_back = find_look_back(bar_period, None if strategy_version is None else strategy_version.warm_up_bar_count)
     end_utc = floor_to_bar_start(job.ibkr_access.clock.read_now_utc(), bar_period)
-    time_range = TimeRange(start_utc=end_utc - find_look_back_length(bar_period), end_utc=end_utc)
+    time_range = TimeRange(start_utc=end_utc - look_back.length, end_utc=end_utc)
     bar_request = BarRequest(
         instrument=forward_test_store.read_instrument(job.row), bar_period=bar_period, time_range=time_range
     )
@@ -136,7 +141,7 @@ async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection
         logger.warning("Forward test %s: the warm-up bars were not read: %s", job.row.id, error)
         return ()
     await save_warm_up_bars(job, bar_request, bars)
-    return tuple(bars)
+    return tuple(look_back.keep_bars(bars))
 
 
 async def save_warm_up_bars(job: ChildJob, bar_request: BarRequest, bars: list[Bar]) -> None:
