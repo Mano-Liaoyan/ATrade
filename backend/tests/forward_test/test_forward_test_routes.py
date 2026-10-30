@@ -483,6 +483,24 @@ async def start_watchlist_forward_test(web_client: httpx.AsyncClient, database_u
 
 
 @pytest.mark.anyio
+async def test_a_multi_instrument_forward_test_counts_in_the_limit_of_4_client_ids(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    watchlist_forward_test = await start_watchlist_forward_test(web_client, database_url)
+    strategy_version_id = watchlist_forward_test["strategy_version_id"]
+    for symbol in ["MSFT", "AMZN", "ABNB"]:
+        await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol=symbol))
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert watchlist_forward_test["client_id"] == 10
+    assert response.status_code == 409
+    assert response.json()["detail"] == "limit of running forward tests reached"
+
+
+@pytest.mark.anyio
 async def test_the_detail_of_a_multi_instrument_forward_test_has_no_instrument(
     web_client: httpx.AsyncClient, database_url: str
 ) -> None:
