@@ -45,9 +45,11 @@ Chinese, write 指标.
 _Avoid_: metric, signal, factor (in user copy)
 
 **Screen**:
-A saved set of conditions on indicators and an order, for example "price to
-earnings below 15 and RSI(14) below 30, ordered by 12-month momentum". In
-Chinese, write 选股条件.
+A saved set of conditions on the instruments of one market, and an order. It
+names the instruments that it starts from, then filters them by price, trading
+value, exchange, and trading status, then applies conditions on indicators, for
+example "still trading, price above $10, RSI(14) below 30, ordered by 12-1
+momentum". All conditions must be true. In Chinese, write 选股条件.
 _Avoid_: screener (the page name only), filter, scan
 
 **Screen result**:
@@ -58,6 +60,12 @@ _Avoid_: scan result, hits
 **Watchlist**:
 The list of instruments that the user saves. In Chinese, write 自选股.
 _Avoid_: favorites, pins
+
+**HK instrument list**:
+The list of Hong Kong instruments that the user keeps for screens. ATrade keeps
+the daily bars of these instruments up to date. It has no instruments that
+stopped trading. In Chinese, write 港股品种表.
+_Avoid_: HK universe, HK watchlist, HK pool
 
 ## Strategies
 
@@ -94,7 +102,9 @@ _Avoid_: backtest settings, quota
 The instruments that one backtest can trade at each time. A point-in-time rule
 (for example the top instruments by trading value of each quarter) or a fixed
 list gives it. A point-in-time rule uses only data known at that time, so it
-includes instruments that stopped trading later. In Chinese, write 品种池.
+includes instruments that stopped trading later. A screen that runs again at
+each rebalance on the data known at that date is a point-in-time rule. A screen
+result used for the full time range is a fixed list. In Chinese, write 品种池.
 _Avoid_: index members, stock pool, basket, symbol list, portfolio
 
 **Parameter sweep**:
