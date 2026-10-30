@@ -49,7 +49,8 @@ puts the new parts of this section in phases.
 
 ### 9.1.1 Tables
 
-Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
+Migrations: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`
+and `backend/migrations/versions/8d4f2a6c1e93_strategy_add_version_source_and_rules.py`.
 
 | Table | Columns |
 |---|---|
@@ -72,6 +73,15 @@ New columns of `strategy_version`:
   of a version do not change.
 - The migration that adds the columns includes the capability name, for
   example `<revision>_strategy_add_version_source_and_rules.py`.
+- Decided (#171): the named CHECK constraint `strategy_version_source_check`
+  holds the values of `source`, not a PostgreSQL enum. Phase 2 drops the
+  constraint and adds it again with `ai_assistant`.
+- Decided (#171): `source` has the default `user`. The default fills the
+  existing rows, because an `UPDATE` would hit the trigger. A save sets the
+  source explicitly.
+- Decided (#171): `read_strategy_version` does not return `source` and
+  `rules`. Section 9.6 does not ask for them. A later change can add them
+  when a capability needs them.
 - The discarded mark of a discarded strategy version is part of the AI
   assistant design (ADR 0004, phase 2). This section does not set its
   storage.
