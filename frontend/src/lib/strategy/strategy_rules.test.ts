@@ -6,6 +6,7 @@ import {
   createCondition,
   createOperand,
   findChangedLines,
+  describeRulesWarning,
   findRulesVersionNumber,
   readOperandChoice,
   type RuleCondition,
@@ -83,6 +84,24 @@ describe('findRulesVersionNumber', () => {
 
   it('gives null when no version has rules', () => {
     expect(findRulesVersionNumber([version(1, 'user')], 1)).toBeNull();
+  });
+});
+
+describe('describeRulesWarning', () => {
+  it('warns when the open version has no rules and is newer than the version of the rules', () => {
+    expect(describeRulesWarning(2, 1)).toBe('Code of v2 changed. Rules are from v1.');
+  });
+
+  it('gives no warning when the rules are from the open version', () => {
+    expect(describeRulesWarning(2, 2)).toBeNull();
+  });
+
+  it('gives no warning when the open version is older than the version of the rules', () => {
+    expect(describeRulesWarning(1, 3)).toBeNull();
+  });
+
+  it('gives no warning when no version has rules', () => {
+    expect(describeRulesWarning(2, 0)).toBeNull();
   });
 });
 
