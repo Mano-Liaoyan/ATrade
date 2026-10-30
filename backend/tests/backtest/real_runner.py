@@ -15,7 +15,9 @@ import pytest
 
 from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.backtest import BacktestRunner
+from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
+from tests.saved_ranges import save_ibkr_saved_range
 
 TEST_DIRECTORY = Path(__file__).parent
 TEST_STRATEGY_FILE = TEST_DIRECTORY / "strategies" / "buy_and_sell_by_bar_count.py"
@@ -32,12 +34,13 @@ def save_test_bars(database_url: str, *, exchange: str = "ARCA", currency: str =
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('BTEST', %(exchange)s, %(currency)s, '1-DAY', %(start_utc)s, %(open)s, %(high)s, %(low)s,
                 %(close)s, %(volume)s)
             """,
             bar_rows,
         )
+        save_ibkr_saved_range(connection, Instrument(symbol="BTEST", exchange=exchange, currency=currency), "1-DAY")
 
 
 async def start_backtest(web_client: httpx.AsyncClient, code: str, *, strategy_name: str = "Bar count") -> int:
