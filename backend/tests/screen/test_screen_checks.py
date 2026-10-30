@@ -161,6 +161,32 @@ CASES = [
         [problem(["definition", "filters", 3, "values"], "The values must be a list of 1 or more exchanges.")],
     ),
     CheckCase(
+        "start instruments that are null",
+        set_value("definition", "start", value=None),
+        [
+            problem(
+                ["definition", "start"],
+                "The start instruments None do not belong to the market US. "
+                "Known start instruments: quarter_universe, all_with_daily_bars, watchlist.",
+            )
+        ],
+    ),
+    CheckCase(
+        "filters that are null",
+        set_value("definition", "filters", value=None),
+        [problem(["definition", "filters"], "This must be a list.")],
+    ),
+    CheckCase(
+        "indicator conditions that are null",
+        set_value(*CONDITIONS, value=None),
+        [problem([*CONDITIONS], "This must be a list.")],
+    ),
+    CheckCase(
+        "exchange filter with null exchanges",
+        set_value("definition", "filters", 3, "values", value=None),
+        [problem(["definition", "filters", 3, "values"], "The values must be a list of 1 or more exchanges.")],
+    ),
+    CheckCase(
         "name longer than 100 characters",
         set_value("name", value="x" * 101),
         [problem(["name"], "The name must have 1 to 100 characters, not 101.")],

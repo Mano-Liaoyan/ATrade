@@ -55,10 +55,13 @@ def check_definition(market: str, definition: object, location: Location) -> lis
     )
     if fields is None:
         return problems
-    if market in MARKETS:
-        problems += check_start(market, fields.get("start"), (*location, "start"))
-    problems += check_list(fields.get("filters"), (*location, "filters"), check_filter)
-    problems += check_list(fields.get("indicator_conditions"), (*location, "indicator_conditions"), check_condition)
+    # check_object gives the problem of a missing key. A key with the value null is a problem of its value.
+    if market in MARKETS and "start" in fields:
+        problems += check_start(market, fields["start"], (*location, "start"))
+    if "filters" in fields:
+        problems += check_list(fields["filters"], (*location, "filters"), check_filter)
+    if "indicator_conditions" in fields:
+        problems += check_list(fields["indicator_conditions"], (*location, "indicator_conditions"), check_condition)
     if "order" in fields:
         problems += check_order(fields["order"], (*location, "order"))
     return problems
@@ -66,7 +69,7 @@ def check_definition(market: str, definition: object, location: Location) -> lis
 
 def check_start(market: str, start: object, location: Location) -> list[ScreenProblem]:
     known = START_INSTRUMENTS[market]
-    if start is None or start in known:
+    if start in known:
         return []
     message = (
         f"The start instruments {start!r} do not belong to the market {market}. "
@@ -91,7 +94,9 @@ def check_filter(item: object, location: Location) -> list[ScreenProblem]:
         return problems + check_comparison(fields or {}, location)
     if field == "exchange":
         problems, fields = check_object(item, location, required=("field", "values"), optional=())
-        return problems + check_exchanges((fields or {}).get("values"), (*location, "values"))
+        if fields is None or "values" not in fields:
+            return problems
+        return problems + check_exchanges(fields["values"], (*location, "values"))
     if not isinstance(item, Mapping):
         return check_object(item, location, required=("field",), optional=())[0]
     return [ScreenProblem((*location, "field"), unknown_message("field", field, FILTER_FIELDS))]
@@ -166,8 +171,6 @@ def check_comparison(fields: Mapping[str, object], location: Location) -> list[S
 
 
 def check_exchanges(values: object, location: Location) -> list[ScreenProblem]:
-    if values is None:
-        return []
     if not is_list(values) or not values:
         return [ScreenProblem(location, "The values must be a list of 1 or more exchanges.")]
     return [
@@ -188,8 +191,6 @@ def check_choice(
 def check_list(
     items: object, location: Location, check_item: Callable[[object, Location], list[ScreenProblem]]
 ) -> list[ScreenProblem]:
-    if items is None:
-        return []
     if not is_list(items):
         return [ScreenProblem(location, "This must be a list.")]
     return [
