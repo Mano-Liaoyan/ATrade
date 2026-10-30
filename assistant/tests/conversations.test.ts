@@ -189,6 +189,28 @@ describe('a run of a conversation', () => {
     expect(existsSync(path.join(workDir, 'conversations', '7.jsonl'))).toBe(false);
     expect(conversations.readMessages('7')).toEqual([]);
   });
+
+  test('delete before the session exists stops the run, and the run does not write the file again', async () => {
+    const { model } = await openConversations([{ text: 'Hello.' }]);
+    const openModel = await createFakeOpenModel(model.baseUrl, workDir);
+    const gate = holdGate();
+    const conversations = new Conversations({
+      piDir: workDir,
+      openModel: async (selection) => {
+        await gate.promise;
+        return openModel(selection);
+      },
+      customTools: [],
+    });
+
+    const run = runOnce(conversations, 'Hi.');
+    const deleted = conversations.delete('7');
+    gate.release();
+    await Promise.all([run, deleted]);
+
+    expect(model.requests).toHaveLength(0);
+    expect(existsSync(path.join(workDir, 'conversations', '7.jsonl'))).toBe(false);
+  });
 });
 
 describe('the title of a conversation', () => {

@@ -69,8 +69,10 @@ function toRunEvent(event: AgentSessionEvent, credentialName: string): RunEvent 
 
 export class Conversations {
   private readonly options: ConversationsOptions;
-  /** The conversation IDs with an active run. A run is active before its session exists. */
-  private readonly activeRuns = new Set<string>();
+  /** The active runs. A run is active before its session exists. */
+  private readonly activeRuns = new Map<string, Promise<void>>();
+  /** The active runs that got an abort before their session existed. */
+  private readonly abortedRuns = new Set<string>();
   private readonly sessions = new Map<string, AgentSession>();
 
   constructor(options: ConversationsOptions) {
@@ -87,20 +89,25 @@ export class Conversations {
       emit({ type: 'error', message: 'The conversation has an active run. Send a steer message.' });
       return;
     }
-    this.activeRuns.add(conversationId);
-    try {
-      await this.runSession(conversationId, request, emit);
-    } catch (error) {
-      emit({ type: 'error', message: readErrorText(error) });
-    } finally {
-      this.sessions.delete(conversationId);
-      this.activeRuns.delete(conversationId);
-    }
+    const run = this.runSession(conversationId, request, emit)
+      .catch((error: unknown) => {
+        emit({ type: 'error', message: readErrorText(error) });
+      })
+      .finally(() => {
+        this.sessions.delete(conversationId);
+        this.abortedRuns.delete(conversationId);
+        this.activeRuns.delete(conversationId);
+      });
+    this.activeRuns.set(conversationId, run);
+    await run;
   }
 
   private async runSession(conversationId: string, request: RunRequest, emit: (event: RunEvent) => void) {
     const opened = await this.options.openModel(request.selection);
     await mkdir(conversationDir(this.options.piDir), { recursive: true });
+    if (this.abortedRuns.has(conversationId)) {
+      return;
+    }
     const conversationSession = openConversationSession(this.options.piDir, conversationId);
     conversationSession.appendCustomEntry(CREDENTIAL_ENTRY_TYPE, { credential_name: opened.credentialName });
     const session = await createAssistantSession({
@@ -110,6 +117,10 @@ export class Conversations {
       customTools: this.options.customTools,
       conversationSession,
     });
+    if (this.abortedRuns.has(conversationId)) {
+      session.dispose();
+      return;
+    }
     this.sessions.set(conversationId, session);
     const unsubscribe = session.subscribe((event) => {
       const runEvent = toRunEvent(event, opened.credentialName);
@@ -136,7 +147,15 @@ export class Conversations {
   }
 
   async abort(conversationId: string): Promise<void> {
-    await this.sessions.get(conversationId)?.abort();
+    if (!this.activeRuns.has(conversationId)) {
+      return;
+    }
+    const session = this.sessions.get(conversationId);
+    if (session === undefined) {
+      this.abortedRuns.add(conversationId);
+      return;
+    }
+    await session.abort();
   }
 
   readMessages(conversationId: string): ConversationMessage[] {
@@ -151,6 +170,8 @@ export class Conversations {
   /** Stops the active run and deletes the JSONL file. */
   async delete(conversationId: string): Promise<void> {
     await this.abort(conversationId);
+    // The run can still write the file until it ends.
+    await this.activeRuns.get(conversationId);
     rmSync(conversationFile(this.options.piDir, conversationId), { force: true });
   }
 }
