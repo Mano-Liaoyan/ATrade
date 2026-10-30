@@ -24,6 +24,8 @@ export interface FakeWebPort {
   backtestStatuses: string[];
   /** POST /api/backtests answers 422: no saved bars. */
   hasNoSavedBars: boolean;
+  /** The answers of the screen creates, changes, and runs, in order. After the last: the success answer. */
+  screenAnswers: FakeAnswer[];
   close: () => Promise<void>;
 }
 
@@ -32,6 +34,39 @@ export const STRATEGY = { id: 3, name: 'SMA crossover', created_at_utc: '2026-01
 export const COMPARISON = { strategy_id: 3, strategy_name: 'SMA crossover', first: { id: 11 }, second: { id: 12 } };
 export const NO_SAVED_BARS = { detail: 'No saved bars for AAPL NASDAQ USD 1-DAY in the range.' };
 export const EQUITY_POINT_COUNT = 120;
+export const SCREEN = { id: 5, name: 'Momentum leaders (AI)', market: 'US', kept: false, assistant_conversation_id: 7 };
+export const SCREEN_LIST = [{ id: 5, name: 'Momentum leaders (AI)', market: 'US', kept: false }];
+export const SCREEN_ROW_COUNT = 120;
+export const SCREEN_SUMMARY = {
+  row_count: SCREEN_ROW_COUNT,
+  start_count: 500,
+  after_filters_count: 300,
+  after_indicator_conditions_count: SCREEN_ROW_COUNT,
+  result_count: SCREEN_ROW_COUNT,
+  exclusion_counts: [{ reason: 'Filter 2: last_price > 5', count: 200 }],
+  daily_bars_date: '2025-12-31',
+  run_at_utc: '2026-01-02T03:04:05Z',
+  run_seconds: 1.5,
+};
+
+export function screenRow(position: number) {
+  return { position, symbol: `S${String(position)}`, exchange: 'NASDAQ', currency: 'USD', last_price: '10' };
+}
+
+/** GET /api/screen-results/9 as port 8001 gives it: one page of rows and all exclusions. */
+export function screenResultBody(offset: number, limit: number) {
+  const last = Math.min(offset + limit, SCREEN_ROW_COUNT);
+  return {
+    id: 9,
+    screen_id: 5,
+    market: 'US',
+    assistant_conversation_id: 7,
+    summary: SCREEN_SUMMARY,
+    definition: { start: 'quarter_universe' },
+    rows: Array.from({ length: Math.max(last - offset, 0) }, (_unused, index) => screenRow(offset + index + 1)),
+    exclusions: [{ symbol: 'X', exchange: 'NYSE', currency: 'USD', reason: 'Filter 2: last_price > 5' }],
+  };
+}
 export const TRADE_COUNT = 60;
 
 export function versionBody(versionNumber: number) {
@@ -96,6 +131,10 @@ class FakeRoutes {
     if (versionMatch !== null) {
       return { status: 200, body: versionBody(Number(versionMatch[1])) };
     }
+    const resultMatch = /^GET \/api\/screen-results\/9\?offset=(\d+)&limit=(\d+)$/u.exec(route);
+    if (resultMatch !== null) {
+      return { status: 200, body: screenResultBody(Number(resultMatch[1]), Number(resultMatch[2])) };
+    }
     const backtestMatch = /^GET \/api\/backtests\/(\d+)$/u.exec(route);
     if (backtestMatch !== null) {
       return this.readBacktest(Number(backtestMatch[1]));
@@ -108,8 +147,17 @@ class FakeRoutes {
       'POST /api/backtests': () => this.startBacktest(),
       'GET /api/backtests': () => ({ status: 200, body: [backtestBody(11, 'finished')] }),
       'GET /api/backtests/11/comparison/12': () => ({ status: 200, body: COMPARISON }),
+      'GET /api/screens': () => ({ status: 200, body: SCREEN_LIST }),
+      'GET /api/screens/5': () => ({ status: 200, body: SCREEN }),
+      'POST /api/screens': () => this.screenAnswer({ status: 201, body: SCREEN }),
+      'PUT /api/screens/5': () => this.screenAnswer({ status: 200, body: SCREEN }),
+      'POST /api/screens/5/runs': () => this.screenAnswer({ status: 201, body: screenResultBody(0, 50) }),
     };
     return fixed[route]?.() ?? { status: 404, body: { detail: 'Not Found' } };
+  }
+
+  private screenAnswer(success: FakeAnswer): FakeAnswer {
+    return this.port.screenAnswers.shift() ?? success;
   }
 
   private save(): FakeAnswer {
@@ -145,6 +193,7 @@ export async function startFakeWebPort(): Promise<FakeWebPort> {
     saveAnswers: [] as FakeAnswer[],
     backtestStatuses: ['queued', 'running', 'finished'],
     hasNoSavedBars: false,
+    screenAnswers: [] as FakeAnswer[],
   };
   const routes = new FakeRoutes(state);
   const server: Server = createServer((request, response) => {

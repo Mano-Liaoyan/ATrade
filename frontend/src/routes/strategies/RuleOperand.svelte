@@ -14,7 +14,7 @@
 
   interface Props {
     label: string;
-    side: 'left' | 'right';
+    side: 'left' | 'right' | 'rank';
     operand: RightOperand;
     onOperandChange: (operand: RightOperand) => void;
   }

@@ -941,7 +941,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - New pages and parts of the map #129 (section 20.1):
   - The screen page `/screens/<id>` is a workbench
     (`docs/architecture/screen.md` section 24.10). `#lib/screen` holds its
-    HTTP client and parts.
+    HTTP client and parts. Decided (#207): the route is
+    `src/routes/screens/[[screenId]]/` (an optional parameter, as the
+    backtest page), `?result=<id>` opens one run, and the "Screens"
+    `SideColumn` is `routes/screens/ScreenList.svelte`. `ConditionBar` is
+    read-only and has no page state, so the condition card of the AI
+    assistant can use it. The condition bar, the result table, the excluded
+    table, and the screen list each scroll in their own `ScrollRegion`.
   - The backtest page gets a robustness row under `KeyMetricRow`, a Metrics
     tab, and one vertical line at the split time on the equity chart (phase
     1). A multi-instrument backtest gets an Instruments tab and a Symbol
@@ -1654,13 +1660,13 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 
 | Fact | How to check |
 |---|---|
-| The default parameters of the template sources (#139). Brock, Lakonishok & LeBaron 1992 (S1, S2: range break of 10 days, break by the close) and Faber 2007 (S1: check only at the month end) were not read on 2026-10-30 (#175): both papers are paywalled. The phase 3 sources (Blitz & van Vliet 2007, Barroso & Santa-Clara 2015) were not read. | Read section II of Brock et al. and the Faber paper with library access (strategy section 9.9.4). |
+| The default parameters of the template sources (#139). Brock, Lakonishok & LeBaron 1992 (S1, S2: range break of 10 days, break by the close) and Faber 2007 (S1: check only at the month end) were not read on 2026-10-30 (#175): both papers are paywalled. The phase 3 sources (Jegadeesh & Titman 1993, Blitz & van Vliet 2007, Barroso & Santa-Clara 2015) were not read (#202). M1 to M4 use the defaults of strategy section 9.9.3. | Read section II of Brock et al. and the Faber paper with library access (strategy section 9.9.4). |
 | The IBKR instrument search returns ETFs, for example `SPY` (#175, templates S1 to S3). `ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. Not checked: no IB Gateway in the implementation environment. | Search `SPY` on the paper account. |
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). Synthetic tables give 14 to 16 seconds (section 21.1). Not measured on the real bar tables (#206): the local database has no real daily bars. | Run `read_last_daily_bars` for all instruments of `daily_bar_summary` with `bar_count` 260 on the server and time it. |
 | A US screen keeps 1000 to 2000 instruments after step 1 (estimate, #136). Not counted (#206): the local database has no real daily bars. | Run a screen with the start `all_with_daily_bars` and the filters of the example of `screen.md` section 24.4.1, and read `after_filters_count`. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
 | The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
-| The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. |
+| The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. Estimate (#209): 500 rows with 3 indicator values and 1 percentile are about 128,000 characters of JSON, about 32,000 to 43,000 tokens (3 to 4 characters for each token). 50 rows are about 3,200 to 4,300 tokens, so the default page of 50 rows stays. Not counted with a real tokenizer and real data. |
 | Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). Not measured in #199: there are no saved real hourly bars of 500 instruments locally. | Run one with real data and measure the peak memory and the time. |
 | The PostgreSQL read time and the Arrow conversion time of each backtest child with a universe (#142). Not measured in #199 (no real bars locally). | Time one real `rule` backtest child. |
 | Chunked loading memory (#131, source only). The child of #199 loads all bars at once. | Measure the peak memory of a 500-instrument child. |
@@ -1798,6 +1804,10 @@ option and records it in this document.
   diff card is not recorded, and the discard route answers `409` for a
   version that the AI assistant did not save (strategy sections 9.1.1 and
   9.6, assistant section 25.14).
+- Decided (#209): the port 8001 screen routes read the conversation from
+  the header `X-ATrade-Conversation-Id`, and `read_screen_result` reads
+  pages of 50 rows with the parameter `offset` (screen section 24.8,
+  assistant sections 25.3.3 and 25.4.3).
 - Decided (#185): the conversation controls of the assistant side column,
   the copy of its disabled controls, the diff cards after a reload, and the
   fake assistant service of the e2e server (assistant section 25.14).
@@ -2016,6 +2026,14 @@ option and records it in this document.
   USD conversion, and when the Web process records fills) is in
   [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
   11.13.
+- Decided (#207): `/screens` stores the id of the last opened screen in the
+  browser storage (`atrade.screen-page.last-screen`). Without it, `/screens`
+  opens the first screen of the list. The side column shows the last 10 runs
+  of `GET /api/screens/{id}`. "Add to watchlist" sends one
+  `POST /api/watchlist` for each instrument, one after the other, and then
+  shows how many it added. The tag value color is `$link-primary` (blue 60
+  in g10, blue 40 in g100): blue 70 is not a token. `docs/architecture/screen.md`
+  section 24.13 has the details.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

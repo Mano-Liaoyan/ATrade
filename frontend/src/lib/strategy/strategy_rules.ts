@@ -17,6 +17,20 @@ export type PriceName = Schemas['PriceName'];
 export type GroupMatch = Schemas['GroupMatch'];
 export type PositionSize = Schemas['RuleSettings']['position_size'];
 export type RuleExits = Schemas['RuleExits'];
+export type UniverseSettings = Schemas['UniverseSettings'];
+export type RankDirection = Schemas['RankDirection'];
+export type RebalancePeriod = Schemas['RebalancePeriod'];
+
+// The universe mode settings (docs/architecture/strategy.md section 9.8.6), with the words of the prototype (#138).
+export const REBALANCE_CHOICES: { value: RebalancePeriod; label: string }[] = [
+  { value: 'weekly', label: 'Each week' },
+  { value: 'monthly', label: 'Each month' },
+  { value: 'quarterly', label: 'Each quarter' },
+];
+export const RANK_DIRECTION_CHOICES: { value: RankDirection; label: string }[] = [
+  { value: 'high_to_low', label: 'Highest first' },
+  { value: 'low_to_high', label: 'Lowest first' },
+];
 
 export interface IndicatorParameterChoice {
   name: string;
@@ -113,8 +127,9 @@ export const COMPARISON_CHOICES: { value: Comparison; label: string }[] = [
 /** The value of the operand select: `price:<name>`, `indicator:<key>`, or `number` (right side only). */
 export type OperandChoice = `price:${PriceName}` | `indicator:${string}` | 'number';
 
-export function listOperandChoices(side: 'left' | 'right'): { value: OperandChoice; label: string }[] {
-  const prices = PRICE_CHOICES.map(([name, label]) => ({ value: `price:${name}` as const, label }));
+// The rank of the universe mode takes an indicator only.
+export function listOperandChoices(side: 'left' | 'right' | 'rank'): { value: OperandChoice; label: string }[] {
+  const prices = side === 'rank' ? [] : PRICE_CHOICES.map(([name, label]) => ({ value: `price:${name}` as const, label }));
   const indicators = INDICATOR_CHOICES.map((choice) => ({ value: `indicator:${choice.key}` as const, label: choice.label }));
   const numbers = side === 'right' ? [{ value: 'number' as const, label: 'Number' }] : [];
   return [...prices, ...indicators, ...numbers];

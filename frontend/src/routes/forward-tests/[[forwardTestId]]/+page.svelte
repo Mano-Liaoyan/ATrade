@@ -40,6 +40,8 @@
     canBacktestSamePeriod,
     canStop,
     describeForwardTestStatus,
+    describeForwardTestUniverse,
+    readForwardTestInstrument,
     findForwardTestStatusKind,
     ForwardTestFillTable,
     ForwardTestsOnInstrumentsFeed,
@@ -222,6 +224,16 @@
   }
 </script>
 
+{#snippet instrumentOrUniverse(forwardTest: ForwardTest)}
+  {@const instrument = readForwardTestInstrument(forwardTest)}
+  {#if instrument === null}
+    <span>{describeForwardTestUniverse(forwardTest)}</span>
+  {:else}
+    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+    <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
+  {/if}
+{/snippet}
+
 <Workbench>
   <SideColumn label="Forward tests" side="start" width="30rem" storageKey="atrade.forward-test-page.list-column">
     {#snippet actions()}
@@ -260,8 +272,7 @@
                   href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
                   >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
                 >
-                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                <a class="cds--link" href={createInstrumentHref(forwardTest)}>{forwardTest.symbol}</a>
+                {@render instrumentOrUniverse(forwardTest)}
                 <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
               <span class="run-status" role="status" aria-label="Forward test status">

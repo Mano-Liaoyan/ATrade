@@ -274,7 +274,8 @@ def limit_win_rate_to_period(
 def is_same_setup(row: ForwardTestRow, backtest: BacktestOutcome) -> bool:
     request = backtest.request
     return (
-        request.strategy_version_id == row.strategy_version_id
+        row.universe_kind == "single"
+        and request.strategy_version_id == row.strategy_version_id
         and request.instrument == forward_test_store.read_instrument(row)
         and request.bar_period.value == row.bar_period
     )
@@ -297,6 +298,9 @@ class ComparisonRoutes:
         row = await self.read_forward_test_row(forward_test_id)
         if row.start_capital_usd is None:
             detail = "The forward test has no start balance yet. The backtest uses it as the paper capital."
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        if row.universe_kind != "single":
+            detail = "A multi-instrument forward test has no same-period backtest yet."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         now_utc = self.clock.read_now_utc()
         request = BacktestRequest(
@@ -324,7 +328,7 @@ class ComparisonRoutes:
             forward_test_fills = await forward_test_records.select_forward_test_fills(
                 connection,
                 forward_test_id=forward_test_id,
-                instrument=forward_test_store.read_instrument(row),
+                instrument=forward_test_store.read_single_instrument(row),
                 uses_owner_ledger=row.allocated_capital_usd is not None,
             )
             fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
@@ -358,7 +362,7 @@ class ComparisonRoutes:
             forward_test_fills = await forward_test_records.select_forward_test_fills(
                 connection,
                 forward_test_id=forward_test_id,
-                instrument=forward_test_store.read_instrument(row),
+                instrument=forward_test_store.read_single_instrument(row),
                 uses_owner_ledger=row.allocated_capital_usd is not None,
             )
             fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]

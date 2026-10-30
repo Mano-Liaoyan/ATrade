@@ -9,6 +9,7 @@ const STATUS_LABELS: Record<BacktestStatus, string> = {
   finished: 'Finished',
   failed: 'Failed',
   timed_out: 'Timed out',
+  cancelled: 'Cancelled',
 };
 // The status indicator kind of each status. The indicator also shows an icon and the status word, so the color is
 // never the only sign.
@@ -18,8 +19,9 @@ const STATUS_KINDS: Record<BacktestStatus, StatusKind> = {
   finished: 'success',
   failed: 'error',
   timed_out: 'warning',
+  cancelled: 'neutral',
 };
-const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out'];
+const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out', 'cancelled'];
 const SECONDS_PER_MINUTE = 60;
 const WHOLE_NUMBER_PATTERN = /^\d+$/;
 const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

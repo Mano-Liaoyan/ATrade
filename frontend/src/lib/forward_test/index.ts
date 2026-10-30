@@ -14,6 +14,8 @@ export {
   canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
+  describeForwardTestUniverse,
+  readForwardTestInstrument,
   describeInterruptionReason,
   findForwardTestStatusKind,
   formatLocalTime,

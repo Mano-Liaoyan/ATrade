@@ -41,6 +41,19 @@ def make_rules(entry: Json | None = None, *, exits: Json | None = None, position
     }
 
 
+def make_universe_rules(entry: Json | None = None, *, exits: Json | None = None, **universe: object) -> Json:
+    """Universe mode rules (section 9.8.6). The default ranks by 12-1 momentum, high to low, holds 2, monthly."""
+    rules = make_rules(entry, exits=exits)
+    rules["settings"]["universe"] = {
+        "rank_indicator": indicator("momentum_12_1"),
+        "rank_direction": "high_to_low",
+        "hold_count": 2,
+        "rebalance_period": "monthly",
+        **universe,
+    }
+    return rules
+
+
 def make_full_rules() -> Json:
     """Rules with each kind of left side, multi-line output, comparison, right side, nested group, and exit item."""
     lines = [indicator("macd", output) for output in ("value", "signal", "histogram")] + [
