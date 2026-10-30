@@ -7,45 +7,75 @@ import json
 import math
 import random
 import statistics
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 
-import atrade.indicator
 from atrade.backtest.backtest_store import BacktestRequest
 from atrade.backtest.strategy_engine_run import StrategyRun, run_strategy_on_bars
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.indicator import ATR, EMA, MACD, RSI, SMA, BollingerBands, DonchianChannel
 
 RECORD_STRATEGY_FILE = Path(__file__).parent / "strategies" / "record_indicator_outputs.py"
 FIRST_BAR_UTC = datetime(2026, 1, 1, tzinfo=UTC)
 BAR_COUNT = 80
 
+type Outputs = list[float | None]
+
+
+class ScreenIndicator(Protocol):
+    @property
+    def initialized(self) -> bool: ...
+
+    def update(self, bar: Bar) -> None: ...
+
+    def reset(self) -> None: ...
+
+
+type IndicatorWithOutputs = tuple[ScreenIndicator, Callable[[], Outputs]]
+
+
+def with_value(indicator: SMA | EMA | ATR | RSI) -> IndicatorWithOutputs:
+    return indicator, lambda: [indicator.value]
+
+
+def with_macd_lines(indicator: MACD) -> IndicatorWithOutputs:
+    return indicator, lambda: [indicator.value, indicator.signal, indicator.histogram]
+
+
+def with_channel_lines(indicator: BollingerBands | DonchianChannel) -> IndicatorWithOutputs:
+    return indicator, lambda: [indicator.upper, indicator.middle, indicator.lower]
+
 
 @dataclass(frozen=True)
 class IndicatorCase:
-    name: str
-    outputs: list[str]
+    # The constructor call in the test strategy code, for example "SMA(period=5)".
+    constructor_code: str
+    output_names: list[str]
     # The number of bars that give the first value.
     warm_up_bars: int
-    parameters: dict[str, object] = field(default_factory=dict[str, object])
+    create: Callable[[], IndicatorWithOutputs]
 
 
 CASES = [
-    IndicatorCase("SMA", ["value"], 50),
-    IndicatorCase("SMA", ["value"], 5, {"period": 5}),
-    IndicatorCase("EMA", ["value"], 20),
-    IndicatorCase("ATR", ["value"], 14),
+    IndicatorCase("SMA()", ["value"], 50, lambda: with_value(SMA())),
+    IndicatorCase("SMA(period=5)", ["value"], 5, lambda: with_value(SMA(period=5))),
+    IndicatorCase("EMA()", ["value"], 20, lambda: with_value(EMA())),
+    IndicatorCase("ATR()", ["value"], 14, lambda: with_value(ATR())),
     # 14 close changes need 15 closes.
-    IndicatorCase("RSI", ["value"], 15),
+    IndicatorCase("RSI()", ["value"], 15, lambda: with_value(RSI())),
     # The slow EMA (26 bars) and then the signal EMA (9 values): 26 + 9 - 1.
-    IndicatorCase("MACD", ["value", "signal", "histogram"], 34),
-    IndicatorCase("BollingerBands", ["upper", "middle", "lower"], 20),
-    IndicatorCase("DonchianChannel", ["upper", "middle", "lower"], 20),
+    IndicatorCase("MACD()", ["value", "signal", "histogram"], 34, lambda: with_macd_lines(MACD())),
+    IndicatorCase("BollingerBands()", ["upper", "middle", "lower"], 20, lambda: with_channel_lines(BollingerBands())),
+    IndicatorCase("DonchianChannel()", ["upper", "middle", "lower"], 20, lambda: with_channel_lines(DonchianChannel())),
 ]
+CASE_IDS = [case.constructor_code for case in CASES]
 
 
 def make_test_bars() -> list[Bar]:
@@ -71,23 +101,23 @@ def make_test_bars() -> list[Bar]:
     return bars
 
 
-def read_screen_path_outputs(case: IndicatorCase, bars: list[Bar]) -> list[list[float | None]]:
-    indicator = getattr(atrade.indicator, case.name)(**case.parameters)
-    outputs: list[list[float | None]] = []
+def read_screen_path_outputs(indicator_with_outputs: IndicatorWithOutputs, bars: list[Bar]) -> list[Outputs]:
+    indicator, read_outputs = indicator_with_outputs
+    outputs: list[Outputs] = []
     for bar in bars:
         indicator.update(bar)
-        outputs.append([getattr(indicator, name) for name in case.outputs])
+        outputs.append(read_outputs())
     return outputs
 
 
-def read_strategy_path_outputs(case: IndicatorCase, bars: list[Bar], tmp_path: Path) -> list[list[float | None]]:
+def read_strategy_path_outputs(case: IndicatorCase, bars: list[Bar], tmp_path: Path) -> list[Outputs]:
     record_file = tmp_path / "records.txt"
     code = RECORD_STRATEGY_FILE.read_text()
+    output_code = ", ".join(f"self.indicator.{name}" for name in case.output_names)
     settings = {
         'RECORD_FILE = "/tmp/indicator_records.txt"': f"RECORD_FILE = {str(record_file)!r}",
-        'INDICATOR_NAME = "SMA"': f"INDICATOR_NAME = {case.name!r}",
-        "PARAMETERS: dict[str, object] = {}": f"PARAMETERS: dict[str, object] = {case.parameters!r}",
-        'OUTPUT_NAMES = ["value"]': f"OUTPUT_NAMES = {case.outputs!r}",
+        "self.indicator = atrade.indicator.SMA()": f"self.indicator = atrade.indicator.{case.constructor_code}",
+        "outputs = [self.indicator.value]": f"outputs = [{output_code}]",
     }
     for default_line, test_line in settings.items():
         assert default_line in code
@@ -108,38 +138,35 @@ def read_strategy_path_outputs(case: IndicatorCase, bars: list[Bar], tmp_path: P
     return [json.loads(line) for line in record_file.read_text().splitlines()]
 
 
-@pytest.mark.parametrize("case", CASES, ids=[f"{case.name}{case.parameters}" for case in CASES])
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
 def test_the_screen_path_and_the_strategy_path_give_the_same_outputs(case: IndicatorCase, tmp_path: Path) -> None:
     bars = make_test_bars()
 
-    screen_outputs = read_screen_path_outputs(case, bars)
+    screen_outputs = read_screen_path_outputs(case.create(), bars)
     strategy_outputs = read_strategy_path_outputs(case, bars, tmp_path)
 
     assert len(strategy_outputs) == BAR_COUNT
     assert screen_outputs == strategy_outputs
     # Both paths have "no value" first and values after the warm-up.
-    assert screen_outputs[0] == [None] * len(case.outputs)
+    assert screen_outputs[0] == [None] * len(case.output_names)
     assert None not in screen_outputs[-1]
 
 
-@pytest.mark.parametrize("case", CASES, ids=[f"{case.name}{case.parameters}" for case in CASES])
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
 def test_the_outputs_are_no_value_before_the_warm_up_end_not_zero(case: IndicatorCase) -> None:
-    bars = make_test_bars()
-    indicator = getattr(atrade.indicator, case.name)(**case.parameters)
+    indicator, read_outputs = case.create()
 
-    outputs = read_screen_path_outputs(case, bars)
+    outputs = read_screen_path_outputs((indicator, read_outputs), make_test_bars())
 
-    no_value = [None] * len(case.outputs)
+    no_value = [None] * len(case.output_names)
     assert outputs[: case.warm_up_bars - 1] == [no_value] * (case.warm_up_bars - 1)
     assert None not in outputs[case.warm_up_bars - 1]
     assert 0.0 not in outputs[case.warm_up_bars - 1]
     # `reset` removes all received bars.
-    for bar in bars:
-        indicator.update(bar)
     assert indicator.initialized
     indicator.reset()
     assert not indicator.initialized
-    assert [getattr(indicator, name) for name in case.outputs] == no_value
+    assert read_outputs() == no_value
 
 
 def calculate_wilder_averages(values: list[float], period: int) -> list[float]:
@@ -160,7 +187,7 @@ def test_rsi_uses_the_wilder_average_of_the_gains_and_the_losses() -> None:
     average_losses = calculate_wilder_averages([max(-change, 0.0) for change in changes], 14)
     expected = [100 - 100 / (1 + gain / loss) for gain, loss in zip(average_gains, average_losses, strict=True)]
 
-    values = [output[0] for output in read_screen_path_outputs(IndicatorCase("RSI", ["value"], 15), bars)]
+    values = [outputs[0] for outputs in read_screen_path_outputs(with_value(RSI()), bars)]
 
     # The first value is at bar 15, after 14 close changes.
     assert values[14:] == pytest.approx(expected, rel=1e-12)
@@ -174,16 +201,15 @@ def test_atr_uses_the_wilder_average_of_the_true_range() -> None:
     ]
     expected = calculate_wilder_averages(true_ranges, 14)
 
-    values = [output[0] for output in read_screen_path_outputs(IndicatorCase("ATR", ["value"], 14), bars)]
+    values = [outputs[0] for outputs in read_screen_path_outputs(with_value(ATR()), bars)]
 
     assert values[13:] == pytest.approx(expected, rel=1e-12)
 
 
-def read_last_outputs(name: str, outputs: list[str], parameters: dict[str, object]) -> dict[str, float | None]:
-    indicator = getattr(atrade.indicator, name)(**parameters)
+def give_all_test_bars[IndicatorT: ScreenIndicator](indicator: IndicatorT) -> IndicatorT:
     for bar in make_test_bars():
         indicator.update(bar)
-    return {output: getattr(indicator, output) for output in outputs}
+    return indicator
 
 
 def test_the_donchian_channel_lines_are_upper_middle_and_lower() -> None:
@@ -191,8 +217,9 @@ def test_the_donchian_channel_lines_are_upper_middle_and_lower() -> None:
     highest_high = float(max(bar.high for bar in last_bars))
     lowest_low = float(min(bar.low for bar in last_bars))
 
-    lines = read_last_outputs("DonchianChannel", ["upper", "middle", "lower"], {})
+    channel = give_all_test_bars(DonchianChannel())
 
+    lines = {"upper": channel.upper, "middle": channel.middle, "lower": channel.lower}
     assert lines == pytest.approx(
         {"upper": highest_high, "middle": (highest_high + lowest_low) / 2, "lower": lowest_low}, rel=1e-12
     )
@@ -203,21 +230,22 @@ def test_the_bollinger_bands_lines_are_upper_middle_and_lower() -> None:
     mean = statistics.fmean(last_closes)
     deviation = statistics.pstdev(last_closes)
 
-    lines = read_last_outputs("BollingerBands", ["upper", "middle", "lower"], {"period": 20, "k": 2.0})
+    bands = give_all_test_bars(BollingerBands(period=20, k=2.0))
 
+    lines = {"upper": bands.upper, "middle": bands.middle, "lower": bands.lower}
     assert lines == pytest.approx(
         {"upper": mean + 2 * deviation, "middle": mean, "lower": mean - 2 * deviation}, rel=1e-12
     )
 
 
 def test_the_macd_lines_are_value_signal_and_histogram() -> None:
-    fast = read_last_outputs("EMA", ["value"], {"period": 12})["value"]
-    slow = read_last_outputs("EMA", ["value"], {"period": 26})["value"]
+    fast = give_all_test_bars(EMA(period=12)).value
+    slow = give_all_test_bars(EMA(period=26)).value
     assert fast is not None
     assert slow is not None
 
-    lines = read_last_outputs("MACD", ["value", "signal", "histogram"], {})
+    macd = give_all_test_bars(MACD())
 
-    assert lines["value"] == pytest.approx(fast - slow, rel=1e-12)
-    assert lines["signal"] is not None
-    assert lines["histogram"] == pytest.approx(fast - slow - lines["signal"], rel=1e-12)
+    assert macd.value == pytest.approx(fast - slow, rel=1e-12)
+    assert macd.signal is not None
+    assert macd.histogram == pytest.approx(fast - slow - macd.signal, rel=1e-12)
