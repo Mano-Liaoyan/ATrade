@@ -1173,7 +1173,9 @@ returns of all runs of a sweep.
   status of a sweep. Decided in #203 (section 10.11.2).
 - The header link to `/sweeps`, and the page that `/sweeps` without an ID
   opens.
-- The chart library of the point chart and the heat map.
+- The chart library of the point chart and the heat map. Partly decided in
+  #204: the heat map is a Carbon data table with the value in each cell, so
+  it needs no chart library.
 - The grid values of a `float` step that does not divide the range.
   Decided in #203 (section 10.11.1).
 - How the backtest list shows sweep runs when the user asks for them.
