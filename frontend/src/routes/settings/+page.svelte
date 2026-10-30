@@ -1,16 +1,16 @@
-<!-- Settings page (docs/architecture.md section 13): the source order of the bar sources and the HK instrument list
-     editor. -->
+<!-- Settings page (docs/architecture.md section 13): the HK instrument list editor and the source order of the bar
+     sources. -->
 <script lang="ts">
   import { HkInstrumentListEditor, SourceOrderList } from '#lib/market_data';
 </script>
 
 <div class="settings">
   <h1>Settings</h1>
-  <SourceOrderList />
   <section aria-labelledby="hk-instrument-list-heading">
     <h2 id="hk-instrument-list-heading">HK instrument list</h2>
     <HkInstrumentListEditor />
   </section>
+  <SourceOrderList />
 </div>
 
 <style>

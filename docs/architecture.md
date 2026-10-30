@@ -1711,9 +1711,9 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
-- Decided (#189): the "Source order" section is the first section of the
-  settings page, before "HK instrument list". `SourceOrderList` is in
-  `#lib/market_data`.
+- Decided (#189): the "Source order" section comes after "HK instrument
+  list" on the settings page, so the HK table with its own scroll track
+  stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each

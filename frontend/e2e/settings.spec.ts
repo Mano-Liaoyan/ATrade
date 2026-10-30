@@ -53,7 +53,8 @@ test('moves a bar source and shows the new source order after the page opens aga
   await expect(page).toHaveURL('/settings');
 
   const sourceOrder = page.getByRole('table', { name: 'Source order' });
-  await expect(sourceOrder.getByRole('row')).toHaveText(['IBKR', 'Databento']);
+  // A row text starts with the bar source name. The tooltip of a hovered move button follows it.
+  await expect(sourceOrder.getByRole('row')).toHaveText([/^\s*IBKR/, /^\s*Databento/]);
   // The first row has no up button and the last row has no down button.
   await expect(sourceOrder.getByRole('button', { name: 'Move IBKR up' })).toHaveCount(0);
   await expect(sourceOrder.getByRole('button', { name: 'Move Databento down' })).toHaveCount(0);
@@ -61,11 +62,11 @@ test('moves a bar source and shows the new source order after the page opens aga
   const savedOrder = page.waitForRequest((sentRequest) => sentRequest.method() === 'PUT');
   await sourceOrder.getByRole('button', { name: 'Move IBKR down' }).click();
   expect((await savedOrder).postDataJSON()).toEqual({ source_order: ['databento', 'ibkr'] });
-  await expect(sourceOrder.getByRole('row')).toHaveText(['Databento', 'IBKR']);
+  await expect(sourceOrder.getByRole('row')).toHaveText([/^\s*Databento/, /^\s*IBKR/]);
 
   await page.reload();
 
-  await expect(sourceOrder.getByRole('row')).toHaveText(['Databento', 'IBKR']);
+  await expect(sourceOrder.getByRole('row')).toHaveText([/^\s*Databento/, /^\s*IBKR/]);
   await expect(sourceOrder.getByRole('button', { name: 'Move Databento up' })).toHaveCount(0);
 });
 
@@ -83,5 +84,5 @@ test('shows the detail text of the backend when the save fails', async ({ page }
   await sourceOrder.getByRole('button', { name: 'Move IBKR down' }).click();
 
   await expect(page.getByRole('alert')).toHaveText('The source order has a bar source 2 times.');
-  await expect(sourceOrder.getByRole('row')).toHaveText(['IBKR', 'Databento']);
+  await expect(sourceOrder.getByRole('row')).toHaveText([/^\s*IBKR/, /^\s*Databento/]);
 });
