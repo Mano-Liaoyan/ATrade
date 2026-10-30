@@ -33,8 +33,8 @@ test('the dialog lists the start points and shows the rows of the selected templ
   await expect(dialog.getByRole('link')).toHaveCount(2);
 });
 
-test('a strategy from template S1 opens with version 1 made by the rule builder', async ({ page }, testInfo) => {
-  const name = `S1 trend ${testInfo.project.name} ${String(Date.now())}`;
+test('a strategy from template S1 opens with version 1 made by the rule builder', async ({ page }, currentTest) => {
+  const name = `S1 trend ${currentTest.project.name} ${String(Date.now())}`;
   await page.goto('/strategies');
   await page.getByRole('button', { name: 'New strategy' }).click();
   const dialog = page.getByRole('dialog', { name: 'New strategy' });
