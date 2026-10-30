@@ -1,7 +1,7 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
 source order, saved bars, received bars to save, the daily bars of many instruments, the daily
-bar summary and the daily bar update, the Databento import, the quarterly US universe, live bars, and daily exchange
-rates in USD."""
+bar summary and the daily bar update, the Databento import and its user check, the quarterly US universe, live bars, and
+daily exchange rates in USD."""
 
 from atrade.market_data.bar_reading import (
     BarRequest,
@@ -27,7 +27,9 @@ from atrade.market_data.databento_import import (
     DatabentoImportError,
     DatabentoImportReport,
     import_databento_files,
+    import_databento_files_with_ibkr,
 )
+from atrade.market_data.databento_import_adjustment import DetectedSplit, SymbolLink
 from atrade.market_data.exchange_rate_reading import (
     ExchangeRateReader,
     ExchangeRatesNotReadError,
@@ -36,6 +38,14 @@ from atrade.market_data.exchange_rate_reading import (
 from atrade.market_data.exchange_rate_store import SavedExchangeRate
 from atrade.market_data.hk_instrument_list_store import read_hk_instrument_list
 from atrade.market_data.http_routes import create_market_data_router
+from atrade.market_data.import_check import (
+    ImportCheckError,
+    ImportDetections,
+    UncheckedLink,
+    WaitingSplit,
+    check_import_detections,
+    read_unchecked_import_detections,
+)
 from atrade.market_data.instrument_lookup import (
     GatewayNotReachableError,
     InstrumentLookup,
@@ -63,25 +73,33 @@ __all__ = [
     "DatabentoHistoricalClient",
     "DatabentoImportError",
     "DatabentoImportReport",
+    "DetectedSplit",
     "ExchangeRateReader",
     "ExchangeRatesNotReadError",
     "GatewayNotReachableError",
+    "ImportCheckError",
+    "ImportDetections",
     "InstrumentLookup",
     "InstrumentLookupError",
     "InstrumentLookupFailedError",
     "SavedBarCoverage",
     "SavedBars",
     "SavedExchangeRate",
+    "SymbolLink",
+    "UncheckedLink",
     "UsUniverseCalculationError",
     "UsUniverseMember",
     "UsUniverseUpdate",
+    "WaitingSplit",
     "calculate_us_universe_history",
+    "check_import_detections",
     "check_source_order",
     "create_market_data_router",
     "find_first_trading_day_of_quarter",
     "find_previous_trading_day",
     "has_saved_bars",
     "import_databento_files",
+    "import_databento_files_with_ibkr",
     "read_daily_bar_summaries",
     "read_daily_bar_summaries_of_currency",
     "read_hk_instrument_list",
@@ -90,6 +108,7 @@ __all__ = [
     "read_saved_bars",
     "read_saved_exchange_rates",
     "read_source_order",
+    "read_unchecked_import_detections",
     "read_unsaved_ranges",
     "read_us_universe_members",
     "save_received_bars",

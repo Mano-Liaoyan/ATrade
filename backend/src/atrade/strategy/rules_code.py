@@ -17,6 +17,7 @@ from atrade.strategy.strategy_rules import (
     RuleGroup,
     StrategyRules,
 )
+from atrade.strategy.strategy_templates import TEMPLATES_BY_ID
 
 RULES_CODE_DOCSTRING = (
     "Strategy from the rule builder: buy when the entry group is true, sell when an exit item is true."
@@ -299,6 +300,13 @@ def type_name(indicator: IndicatorUse) -> str:
     return indicator.definition.indicator_class.__name__
 
 
+def write_docstring(rules: StrategyRules) -> str:
+    """The template docstring when the rules hold a known template ID (section 9.9.2), else the rules docstring."""
+    template_id = rules.settings.template_id
+    template = None if template_id is None else TEMPLATES_BY_ID.get(template_id)
+    return RULES_CODE_DOCSTRING if template is None else template.write_docstring()
+
+
 def make_rules_code(rules: StrategyRules) -> str:
     """Makes the strategy code of section 9.2 from correct rules."""
     parts = CodeParts()
@@ -306,7 +314,7 @@ def make_rules_code(rules: StrategyRules) -> str:
     exit_checks = write_exit_checks(parts, rules)
     buy = write_buy(rules, parts)
     lines = [
-        f'"""{RULES_CODE_DOCSTRING}"""',
+        f'"""{write_docstring(rules)}"""',
         "",
         *write_imports(rules, parts),
         "",
