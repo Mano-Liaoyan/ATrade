@@ -184,11 +184,17 @@ def to_forward_test_fill_response(fill: BacktestTrade) -> ForwardTestFillRespons
 
 
 def calculate_forward_test_metrics(
-    row: ForwardTestRow, equity_curve: list[EquityPoint], fills: list[BacktestTrade]
+    row: ForwardTestRow, equity_curve: list[EquityPoint], fills: list[BacktestTrade], now_utc: datetime
 ) -> BacktestMetrics | None:
+    """The range of a forward test goes from its start to its stop, or to now while it runs."""
     if row.start_balance_usd is None:
         return None
-    return calculate_metrics(paper_capital_usd=row.start_balance_usd, equity_curve=equity_curve, trade_count=len(fills))
+    return calculate_metrics(
+        paper_capital_usd=row.start_balance_usd,
+        time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
+        equity_curve=equity_curve,
+        trades=fills,
+    )
 
 
 def is_same_setup(row: ForwardTestRow, backtest: BacktestOutcome) -> bool:
@@ -248,7 +254,9 @@ class ComparisonRoutes:
         ]
         return ForwardTestDetailResponse(
             forward_test=await to_forward_test_response(self.database_url, row),
-            metrics=to_metrics_response(calculate_forward_test_metrics(row, equity_curve, fills)),
+            metrics=to_metrics_response(
+                calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
+            ),
             equity_curve=to_equity_curve_response(equity_curve),
             fills=[to_forward_test_fill_response(fill) for fill in fills],
             same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests if backtest is not None],
@@ -268,7 +276,7 @@ class ComparisonRoutes:
             fills = await forward_test_records.select_fills(connection, forward_test_id)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
-        forward_test_metrics = calculate_forward_test_metrics(row, equity_curve, fills)
+        forward_test_metrics = calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
         fill_rows = compare_fills(
             forward_test_fills=fills,
             backtest_fills=backtest.trades,

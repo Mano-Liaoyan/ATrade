@@ -520,7 +520,11 @@ export interface components {
             /** Concurrency */
             concurrency: number;
         };
-        /** BacktestMetricsResponse */
+        /**
+         * BacktestMetricsResponse
+         * @description The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and
+         *     `missing_reasons` gives its reason by its field name (section 10.9.3). The page shows "–" with the reason.
+         */
         BacktestMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
@@ -530,6 +534,34 @@ export interface components {
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
         };
         /** BacktestResponse */
         BacktestResponse: {

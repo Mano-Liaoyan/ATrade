@@ -9,6 +9,7 @@ Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `acco
 No mock library is used (section 17.3).
 """
 
+import itertools
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -378,6 +379,9 @@ def make_forward_test_order(
     )
 
 
+EXECUTION_NUMBERS = itertools.count(1)
+
+
 def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument per field of a fill.
     account_id: str,
     *,
@@ -388,9 +392,9 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
     side: str = "BOT",
     commission: str = "0",
 ) -> Execution:
-    """One fill from reqExecutions. The execution ID is unique for the order, the quantity, and the price."""
+    """One fill from reqExecutions, with a new execution ID (execId)."""
     return Execution(
-        execution_id=f"0000e0d5.{order_id}.{quantity}.{price}",
+        execution_id=f"0000e0d5.{next(EXECUTION_NUMBERS):08d}.01.01",
         order_id=order_id,
         client_id=client_id,
         account=account_id,
