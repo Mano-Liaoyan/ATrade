@@ -486,6 +486,10 @@ Behavior:
   draft that "Save as new screen" saves; "Save screen" does not show for it.
   The switch sets the start instruments of the market (US: quarter
   universe, HK: HK instrument list) and removes the exchange filters.
+- Decided (#212): "Add condition" adds the indicator condition
+  RSI(14) < 30 and runs at once. A click on a Close or Avg trading value
+  filter, or on a compare condition, opens the "Edit condition" dialog
+  (operator and value).
 - Decided (#212): "Save as new screen" names the new screen
   "<name> copy" (or "<name> copy N" when that name is in use).
 - How the user runs a screen again after new daily bars. The final title row

@@ -22,6 +22,34 @@ export function removeCondition(definition: ScreenDefinition, group: RemovableGr
   return { ...definition, [key]: items(definition[key]).filter((_, itemIndex) => itemIndex !== index) };
 }
 
+/** "Add condition" adds RSI(14) < 30; the user then changes it in the edit dialog. */
+export function addIndicatorCondition(definition: ScreenDefinition): ScreenDefinition {
+  const condition = {
+    kind: 'compare',
+    indicator: { indicator: 'rsi', parameters: { period: 14 }, output: 'value' },
+    operator: '<',
+    value: '30',
+  };
+  return { ...definition, indicator_conditions: [...items(definition.indicator_conditions), condition] };
+}
+
+/** Changes the operator and the value of one comparison (a Close or Avg trading value filter, or a compare). */
+export function changeComparison(
+  definition: ScreenDefinition,
+  group: RemovableGroup,
+  index: number,
+  operator: string,
+  value: string,
+): ScreenDefinition {
+  const key = group === 'Filters' ? 'filters' : 'indicator_conditions';
+  return {
+    ...definition,
+    [key]: items(definition[key]).map((item, itemIndex) =>
+      itemIndex === index ? { ...(item as Record<string, unknown>), operator, value } : item,
+    ),
+  };
+}
+
 /** The exchanges of one market do not apply to the other market, so the switch removes the exchange filters. */
 export function switchMarket(definition: ScreenDefinition, market: ScreenMarket): ScreenDefinition {
   return {

@@ -8,13 +8,15 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { navigating, page } from '$app/state';
-  import { ContentSwitcher, InlineNotification } from '#lib/foundation/carbon';
+  import { ContentSwitcher, Dialog, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { SideColumn, Workbench } from '#lib/foundation/workbench';
   import { SurvivorshipBiasWarning } from '#lib/market_data';
   import {
+    addIndicatorCondition,
+    changeComparison,
     ConditionBar,
     createScreen,
     isDraftChanged,
@@ -58,6 +60,14 @@
   // The changed, unsaved screen (section 24.13). Null when the page shows the saved screen.
   let draft = $state<{ screenId: number; market: ScreenMarket; definition: Record<string, unknown> } | null>(null);
   let isSaving = $state(false);
+  // The edit dialog of one comparison: a Close or Avg trading value filter, or a compare condition.
+  let editing = $state<{ group: RemovableGroup; index: number; operator: string; value: string } | null>(null);
+  const OPERATOR_ITEMS = [
+    { value: '<', label: '<' },
+    { value: '<=', label: '≤' },
+    { value: '>', label: '>' },
+    { value: '>=', label: '≥' },
+  ];
 
   const shownScreen = $derived(screen !== null && screen.id === screenId ? screen : null);
   const screenResultId = $derived.by(() => {
@@ -175,6 +185,31 @@
   function switchDraftMarket(current: Screen, result: ScreenResult, market: ScreenMarket): void {
     const base = currentDraft(current, result);
     void changeDraft(current, market, switchMarket(base.definition, market) as Record<string, unknown>);
+  }
+
+  function addToDraft(current: Screen, result: ScreenResult): void {
+    const base = currentDraft(current, result);
+    void changeDraft(current, base.market, addIndicatorCondition(base.definition) as Record<string, unknown>);
+  }
+
+  function openEdit(current: Screen, result: ScreenResult, group: RemovableGroup, index: number): void {
+    const key = group === 'Filters' ? 'filters' : 'indicator_conditions';
+    const list = currentDraft(current, result).definition[key];
+    const item = (Array.isArray(list) ? list[index] : undefined) as Record<string, unknown> | undefined;
+    if (item === undefined || typeof item['operator'] !== 'string') {
+      return;
+    }
+    editing = { group, index, operator: item['operator'], value: typeof item['value'] === 'string' ? item['value'] : '' };
+  }
+
+  function applyEdit(current: Screen, result: ScreenResult): void {
+    if (editing === null) {
+      return;
+    }
+    const base = currentDraft(current, result);
+    const changed = changeComparison(base.definition, editing.group, editing.index, editing.operator, editing.value);
+    editing = null;
+    void changeDraft(current, base.market, changed as Record<string, unknown>);
   }
 
   async function saveDraft(current: Screen): Promise<void> {
@@ -325,9 +360,51 @@
               onRemove={(group: RemovableGroup, index: number) => {
                 removeFromDraft(current, result, group, index);
               }}
+              onEdit={(group: RemovableGroup, index: number) => {
+                openEdit(current, result, group, index);
+              }}
+              onAdd={() => {
+                addToDraft(current, result);
+              }}
             />
           </ScrollRegion>
         </div>
+        {#if editing !== null}
+          {@const edit = editing}
+          <Dialog
+            open
+            onOpenChange={(open: boolean) => {
+              if (!open) {
+                editing = null;
+              }
+            }}
+            title="Edit condition"
+            size="xs"
+            primaryText="Apply condition"
+            secondaryText="Cancel"
+            onPrimary={() => {
+              applyEdit(current, result);
+            }}
+          >
+            <Select
+              label="Operator"
+              items={OPERATOR_ITEMS}
+              value={edit.operator}
+              onValueChange={(value: string) => {
+                edit.operator = value;
+              }}
+            />
+            <TextInput
+              label="Value"
+              class="number-input"
+              inputmode="decimal"
+              value={edit.value}
+              oninput={(event: Event) => {
+                edit.value = (event.currentTarget as HTMLInputElement).value;
+              }}
+            />
+          </Dialog>
+        {/if}
         {#if addMessage !== null}
           <InlineNotification
             kind={addMessage.kind}
@@ -419,6 +496,12 @@
     padding: var(--cds-spacing-05);
     /* $layer-01, so the $background group strips of the condition bar show (screen.md section 24.10.1). */
     background: var(--cds-layer-01);
+  }
+
+  /* The value of the edit dialog: a number, right-aligned with tabular numbers. */
+  :global(.number-input) {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
   }
 
   .title-row {

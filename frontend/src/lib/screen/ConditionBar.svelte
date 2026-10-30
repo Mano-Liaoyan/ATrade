@@ -15,9 +15,13 @@
     counts: FunnelCounts;
     // The screen page passes it: each filter and indicator condition then has a × button.
     onRemove?: (group: RemovableGroup, index: number) => void;
+    // The screen page passes them: a click on a filter or indicator condition opens its edit dialog, and the
+    // indicator conditions end with "Add condition".
+    onEdit?: (group: RemovableGroup, index: number) => void;
+    onAdd?: () => void;
   }
 
-  const { definition, indicatorNames, counts, onRemove }: Props = $props();
+  const { definition, indicatorNames, counts, onRemove, onEdit, onAdd }: Props = $props();
 
   function removableGroup(label: string): RemovableGroup | null {
     return label === 'Filters' || label === 'Indicator conditions' ? label : null;
@@ -36,11 +40,21 @@
       {#each group.tags as tag, tagIndex (tagIndex)}
         {@const removable = onRemove === undefined ? null : removableGroup(group.label)}
         <span class={['cds--tag cds--tag--gray condition-tag', removable !== null && 'cds--tag--filter']}>
-          <span class="cds--tag__label">
-            <span class="subject">{tag.subject}</span>
-            {#if tag.operation !== ''}<span class="operation">{tag.operation}</span>{/if}
-            {#if tag.value !== ''}<span class="value">{tag.value}</span>{/if}
-          </span>
+          {#if removable !== null && onEdit !== undefined}
+            <button type="button" class="cds--tag__label tag-edit" onclick={() => {
+                onEdit(removable, tagIndex);
+              }}>
+              <span class="subject">{tag.subject}</span>
+              {#if tag.operation !== ''}<span class="operation">{tag.operation}</span>{/if}
+              {#if tag.value !== ''}<span class="value">{tag.value}</span>{/if}
+            </button>
+          {:else}
+            <span class="cds--tag__label">
+              <span class="subject">{tag.subject}</span>
+              {#if tag.operation !== ''}<span class="operation">{tag.operation}</span>{/if}
+              {#if tag.value !== ''}<span class="value">{tag.value}</span>{/if}
+            </span>
+          {/if}
           {#if removable !== null}
             <button
               type="button"
@@ -51,6 +65,9 @@
           {/if}
         </span>
       {/each}
+      {#if onAdd !== undefined && group.label === 'Indicator conditions'}
+        <button type="button" class="cds--btn cds--btn--ghost cds--btn--sm" onclick={onAdd}>Add condition</button>
+      {/if}
       <span class={['count', index === groups.length - 1 && 'count-last']} aria-label={`${group.label} count`}
         >{COUNT_FORMAT.format(group.count)}</span
       >
@@ -91,6 +108,14 @@
   .condition-tag .cds--tag__label {
     display: inline-flex;
     gap: var(--cds-spacing-02);
+  }
+
+  .tag-edit {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
   }
 
   .subject {

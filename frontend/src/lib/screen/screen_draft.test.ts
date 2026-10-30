@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { isDraftChanged, removeCondition, switchMarket } from './screen_draft';
+import { addIndicatorCondition, changeComparison, isDraftChanged, removeCondition, switchMarket } from './screen_draft';
 
 const sma = (period: number) => ({ indicator: 'sma', parameters: { period }, output: 'value' });
 const definition = {
@@ -13,6 +13,26 @@ const definition = {
 };
 
 describe('screen draft', () => {
+  it('adds an indicator condition RSI(14) < 30 at the end', () => {
+    expect(addIndicatorCondition(definition).indicator_conditions).toEqual([
+      ...definition.indicator_conditions,
+      {
+        kind: 'compare',
+        indicator: { indicator: 'rsi', parameters: { period: 14 }, output: 'value' },
+        operator: '<',
+        value: '30',
+      },
+    ]);
+  });
+
+  it('changes the operator and the value of one comparison', () => {
+    const changed = changeComparison(addIndicatorCondition(definition), 'Indicator conditions', 1, '>=', '70');
+    expect(changed.indicator_conditions).toEqual([
+      definition.indicator_conditions[0],
+      expect.objectContaining({ kind: 'compare', operator: '>=', value: '70' }),
+    ]);
+  });
+
   it('removes one filter or one indicator condition and keeps the rest', () => {
     expect(removeCondition(definition, 'Filters', 0).filters).toEqual([{ field: 'exchange', values: ['NASDAQ'] }]);
     expect(removeCondition(definition, 'Indicator conditions', 0).indicator_conditions).toEqual([]);

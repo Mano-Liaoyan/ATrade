@@ -13,6 +13,8 @@ export {
 } from './condition_bar';
 export { describeExclusionReason, listResultColumns, sortResultRows, type ScreenResultRow } from './result_table';
 export {
+  addIndicatorCondition,
+  changeComparison,
   isDraftChanged,
   removeCondition,
   switchMarket,
