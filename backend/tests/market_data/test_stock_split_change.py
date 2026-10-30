@@ -17,6 +17,7 @@ from atrade.app.web import create_web_app
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
+from atrade.ibkr import GatewayRequestError
 from atrade.market_data import (
     BarRequest,
     BarSource,
@@ -347,3 +348,102 @@ async def test_the_saved_results_of_a_finished_backtest_do_not_change(
     )
 
     assert (await web_client.get(f"/api/backtests/{backtest_id}")).json() == finished
+
+
+def write_waiting_import_split(database_url: str, ex_date_utc: datetime) -> None:
+    """A Databento import split of 2 for APPLE that waits for the import check."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO stock_split (
+                symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
+            )
+            VALUES ('AAPL', 'NASDAQ', 'USD', %(ex_date_utc)s, 2, 'databento_import', NULL, now())
+            """,
+            {"ex_date_utc": ex_date_utc},
+        )
+
+
+@pytest.mark.anyio
+async def test_a_waiting_import_split_gives_no_second_candidate_and_new_ibkr_bars_get_the_stored_form(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    # The real ex-date is 2 days after the stored day. The import check confirms the split later.
+    await save_daily_bar(database_url, create_bar(STORED_DAY_UTC, "100"))
+    write_waiting_import_split(database_url, STORED_DAY_UTC + ONE_DAY * 2)
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(STORED_DAY_UTC + ONE_DAY * offset, "50") for offset in range(4)
+    ]
+
+    closes = await read_daily_closes(client, TimeRange(STORED_DAY_UTC, datetime(2026, 1, 2, tzinfo=UTC)))
+
+    assert await read_stock_split_candidates(database_url=database_url) == []
+    assert closes == [100.0, 100.0, 50.0, 50.0]
+
+
+@pytest.mark.anyio
+async def test_an_ibkr_confirmation_does_not_take_a_waiting_import_split(database_url: str) -> None:
+    store_bars_of_all_sources(database_url)
+    write_waiting_import_split(database_url, EX_DATE_UTC)
+
+    with pytest.raises(StockSplitConfirmedError):
+        await apply_stock_split(
+            database_url=database_url, change=SPLIT_OF_2, confirmation="bar_evidence", recorded_at_utc=RECORDED_AT_UTC
+        )
+
+    assert [row[3:] for row in read_stock_split_rows(database_url)] == [("databento_import", None)]
+    unchanged = ["100 100 100 100 1000"] * len(BAR_DAYS_UTC)
+    assert await read_prices_and_volumes(database_url, BarSource.IBKR, BarPeriod.ONE_DAY) == unchanged
+
+
+@pytest.mark.anyio
+async def test_received_bars_before_the_ex_date_of_a_candidate_get_the_stored_form(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    await save_daily_bar(database_url, create_bar(STORED_DAY_UTC, "100"))
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(STORED_DAY_UTC + ONE_DAY * offset, "50") for offset in range(4)
+    ]
+    await read_missing_daily_bars(client)
+
+    # A forward test saves warm-up bars that it received from IBKR in the new form.
+    await save_daily_bar(database_url, create_bar(STORED_DAY_UTC - ONE_DAY, "50", volume="2000"))
+
+    saved = await read_saved_bars(
+        database_url=database_url,
+        bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(STORED_DAY_UTC - ONE_DAY, STORED_DAY_UTC)),
+        source_order=[BarSource.IBKR],
+    )
+    assert [(bar.close, bar.volume) for bar in saved.bars] == [(Decimal(100), Decimal(1000))]
+
+
+class StoredDayFailingGateway(FakeGatewayConnection):
+    """The read of the stored day again fails. Other reads work."""
+
+    async def read_historical_bars(
+        self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+    ) -> list[Bar]:
+        if time_range == TimeRange(STORED_DAY_UTC, STORED_DAY_UTC + ONE_DAY):
+            message = "Historical data request pacing violation"
+            raise GatewayRequestError(message)
+        return await super().read_historical_bars(instrument, bar_period, time_range)
+
+
+@pytest.mark.anyio
+async def test_a_failed_read_of_the_stored_day_does_not_stop_the_read_of_the_missing_bars(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = StoredDayFailingGateway(managed_accounts=["DU1234567"])
+    gateway_connection.connected = True
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(STORED_DAY_UTC + ONE_DAY * offset, "50") for offset in range(1, 4)
+    ]
+    await save_daily_bar(database_url, create_bar(STORED_DAY_UTC, "100"))
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir)
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http_client:
+        missing_range = TimeRange(STORED_DAY_UTC + ONE_DAY, datetime(2026, 1, 2, tzinfo=UTC))
+        closes = await read_daily_closes(http_client, missing_range)
+
+    assert closes == [50.0, 50.0, 50.0]
+    assert await read_stock_split_candidates(database_url=database_url) == []

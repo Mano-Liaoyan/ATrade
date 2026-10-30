@@ -873,11 +873,18 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   day. The stored day is the last stored daily bar, so no stored daily bar
   is between the stored day and the real ex-date. The recorded ex-date can
   be earlier than the real ex-date.
-- Decided (#196): while a candidate waits for its confirmation, each bar
+- Decided (#196): while a stock split waits for its confirmation (a
+  candidate, or a Databento import split before the import check), each bar
   that IBKR returns before its ex-date is saved in the old form: the prices
-  are multiplied by the split ratio and the volume is divided by it. Thus all
-  stored bars before the ex-date have one form, and the change divides each
-  of them 1 time.
+  are multiplied by the split ratio and the volume is divided by it. This
+  applies to the bars route, the daily bar update, and
+  `save_received_bars`. Thus all stored bars before the ex-date have one
+  form, and the change divides each of them 1 time.
+- Decided (#196): when a stock split with an ex-date after the stored day
+  waits already, evidence A records no second candidate. `apply_stock_split()`
+  does not confirm a Databento import split; the import check does. A failed
+  IBKR read of the stored day is logged, and the read of the missing parts
+  continues.
 - Decided (#196): `market_data` does not know positions (`docs/architecture.md`
   section 6.2). The stock split check gives the confirmation: `bar_evidence`
   for an instrument that no owner holds.

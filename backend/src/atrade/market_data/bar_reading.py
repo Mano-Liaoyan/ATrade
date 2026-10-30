@@ -200,11 +200,13 @@ async def save_received_bars(*, database_url: str, bar_request: BarRequest, bars
     range as saved. A forward test saves its warm-up bars with it, so a backtest of the same period finds them.
 
     A bar that is already saved gets the new values: a second save of the same bars adds no row. A save of daily
-    bars updates the daily bar summary of the instrument.
+    bars updates the daily bar summary of the instrument. Bars before the ex-date of a waiting stock split get the
+    stored form (section 8.13.2). Live bars of `save_received_bars_blocking` start after that ex-date.
     """
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
+        stored_form_bars = await to_stored_form(connection, bar_request.instrument, bars)
         await bar_store.save_bars_of_range(
-            connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
+            connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, stored_form_bars
         )
         if bar_request.bar_period == BarPeriod.ONE_DAY:
             await update_daily_bar_summaries(connection, [bar_request.instrument])

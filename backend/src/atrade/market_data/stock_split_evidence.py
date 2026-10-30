@@ -6,6 +6,7 @@ split ratio. A candidate is a `stock_split` row with the source `ibkr_evidence` 
 check reads it and confirms it (forward_test.md section 12.22).
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -15,11 +16,12 @@ import psycopg
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import GatewayConnection
+from atrade.ibkr import GatewayConnection, GatewayRequestError
 from atrade.market_data.daily_bar_summary import select_last_daily_bars
 from atrade.market_data.stock_split_detection import RATIO_STEP_TOLERANCE, find_split_ratio, to_decimal
 
-IBKR_EVIDENCE = "ibkr_evidence"
+logger = logging.getLogger(__name__)
+
 ONE_DAY = timedelta(days=1)
 
 INSERT_CANDIDATE: LiteralString = """
@@ -35,9 +37,11 @@ SELECT_CANDIDATES: LiteralString = """
     WHERE source = 'ibkr_evidence' AND confirmation IS NULL
     ORDER BY symbol, exchange, currency, ex_date_utc
 """
-SELECT_INSTRUMENT_CANDIDATES: LiteralString = """
+# The stock splits of all sources that wait for a confirmation: the stored bars before their ex-dates are in the old
+# form. A Databento import split waits for the import check (section 8.13.2).
+SELECT_WAITING_SPLITS: LiteralString = """
     SELECT ex_date_utc, split_ratio FROM stock_split
-    WHERE source = 'ibkr_evidence' AND confirmation IS NULL
+    WHERE confirmation IS NULL
         AND symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
 """
 
@@ -76,9 +80,14 @@ async def check_evidence_a(
     if not stored_bars:
         return
     stored_bar = stored_bars[-1]
-    ibkr_bars = await gateway_connection.read_historical_bars(
-        instrument, BarPeriod.ONE_DAY, TimeRange(stored_bar.start_utc, stored_bar.start_utc + ONE_DAY)
-    )
+    try:
+        ibkr_bars = await gateway_connection.read_historical_bars(
+            instrument, BarPeriod.ONE_DAY, TimeRange(stored_bar.start_utc, stored_bar.start_utc + ONE_DAY)
+        )
+    except GatewayRequestError:
+        # The read of the missing bars continues without evidence A.
+        logger.exception("The bars route did not read the stored day of %s again from IBKR.", instrument)
+        return
     await record_evidence(connection, instrument, stored_bar, ibkr_bars, recorded_at_utc)
 
 
@@ -89,12 +98,17 @@ async def record_evidence(
     ibkr_bars: list[Bar],
     recorded_at_utc: datetime,
 ) -> None:
-    """Records a candidate when `ibkr_bars` holds the bar of the stored day and the 2 closes show a stock split."""
+    """Records a candidate when `ibkr_bars` holds the bar of the stored day and the 2 closes show a stock split. A
+    stock split that waits with an ex-date after the stored day already explains the difference, so it gives no second
+    candidate: 2 confirmations would divide the bars 2 times."""
     ibkr_bar = next((bar for bar in ibkr_bars if bar.start_utc == stored_bar.start_utc), None)
     if ibkr_bar is None:
         return
     split_ratio = find_evidence_ratio(stored_bar.close, ibkr_bar.close)
     if split_ratio is None:
+        return
+    waiting_splits = await select_waiting_splits(connection, instrument)
+    if any(ex_date_utc > stored_bar.start_utc for ex_date_utc, _ in waiting_splits):
         return
     await connection.execute(
         INSERT_CANDIDATE,
@@ -109,17 +123,24 @@ async def record_evidence(
     )
 
 
-async def to_stored_form(connection: psycopg.AsyncConnection, instrument: Instrument, bars: list[Bar]) -> list[Bar]:
-    """IBKR bars that start before the ex-date of a candidate get the old prices of the stored bars: the prices are
-    multiplied by the split ratio and the volume is divided by it. Thus all stored bars before the ex-date have one
-    form, and the change of the stored bars (section 8.13.3) divides each of them 1 time."""
+async def select_waiting_splits(
+    connection: psycopg.AsyncConnection, instrument: Instrument
+) -> list[tuple[datetime, Decimal]]:
     async with connection.cursor() as cursor:
         await cursor.execute(
-            SELECT_INSTRUMENT_CANDIDATES,
+            SELECT_WAITING_SPLITS,
             {"symbol": instrument.symbol, "exchange": instrument.exchange, "currency": instrument.currency},
         )
-        candidates: list[tuple[datetime, Decimal]] = [(row[0], row[1]) for row in await cursor.fetchall()]
-    return [convert_bar(bar, candidates) for bar in bars]
+        return [(row[0], row[1]) for row in await cursor.fetchall()]
+
+
+async def to_stored_form(connection: psycopg.AsyncConnection, instrument: Instrument, bars: list[Bar]) -> list[Bar]:
+    """IBKR bars that start before the ex-date of a waiting stock split (a candidate, or a Databento import split)
+    get the old prices of the stored bars: the prices are multiplied by the split ratio and the volume is divided by it.
+    Thus all stored bars before the ex-date have one form, and the change of the stored bars (section 8.13.3) divides
+    each of them 1 time."""
+    waiting_splits = await select_waiting_splits(connection, instrument)
+    return [convert_bar(bar, waiting_splits) for bar in bars]
 
 
 def convert_bar(bar: Bar, candidates: list[tuple[datetime, Decimal]]) -> Bar:

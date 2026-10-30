@@ -19,8 +19,8 @@ from atrade.market_data.daily_bar_summary import update_daily_bar_summaries
 # The confirmations of a stock split from IBKR evidence (section 8.13.1).
 type SplitConfirmation = Literal["both_evidences", "bar_evidence", "user_apply"]
 
-# A candidate of evidence A gets the confirmation. A stock split that is confirmed already gives no row, so the bars
-# are not divided 2 times.
+# A candidate of evidence A gets the confirmation. A stock split that is confirmed already, or a Databento import split
+# (it waits for the import check), gives no row, so the bars are not divided 2 times.
 WRITE_STOCK_SPLIT: LiteralString = """
     INSERT INTO stock_split (
         symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
@@ -30,7 +30,7 @@ WRITE_STOCK_SPLIT: LiteralString = """
     ON CONFLICT (symbol, exchange, currency, ex_date_utc) DO UPDATE SET
         split_ratio = excluded.split_ratio, confirmation = excluded.confirmation,
         recorded_at_utc = excluded.recorded_at_utc
-    WHERE stock_split.confirmation IS NULL
+    WHERE stock_split.confirmation IS NULL AND stock_split.source = 'ibkr_evidence'
     RETURNING id
 """
 CHANGE_BARS_TEMPLATE = sql.SQL("""
@@ -44,7 +44,7 @@ CHANGE_BARS_QUERIES = [CHANGE_BARS_TEMPLATE.format(bar_table=bar_table(bar_sourc
 
 
 class StockSplitConfirmedError(Exception):
-    """The stock split is confirmed already. Nothing changed."""
+    """The stock split is confirmed already, or is a Databento import split. Nothing changed."""
 
 
 @dataclass(frozen=True)
@@ -80,7 +80,8 @@ async def apply_stock_split(
     `stock_split` row, changes the bars before the ex-date in all bar tables and bar periods, and updates the daily
     bar summary of the instrument. No IBKR call.
 
-    Raises StockSplitConfirmedError when the stock split of the instrument and the ex-date is confirmed already.
+    Raises StockSplitConfirmedError when the stock split of the instrument and the ex-date is confirmed already, or is a
+    Databento import split.
     """
     async with await psycopg.AsyncConnection.connect(database_url) as connection, connection.transaction():
         parameters = create_change_parameters(change)
@@ -89,7 +90,8 @@ async def apply_stock_split(
         )
         if await cursor.fetchone() is None:
             message = (
-                f"The stock split of {change.instrument.symbol} on {change.ex_date_utc:%Y-%m-%d} is confirmed already."
+                f"The stock split of {change.instrument.symbol} on {change.ex_date_utc:%Y-%m-%d} is confirmed "
+                "already or waits for the import check."
             )
             raise StockSplitConfirmedError(message)
         for query in CHANGE_BARS_QUERIES:
