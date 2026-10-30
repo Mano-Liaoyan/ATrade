@@ -139,7 +139,7 @@ _Avoid_: hit rate
 
 **Net profit**:
 The final equity of a test minus its start capital (the paper capital of a
-backtest, or the start balance of a forward test).
+backtest, or the allocated capital of a forward test).
 _Avoid_: PnL
 
 **In-sample**:
