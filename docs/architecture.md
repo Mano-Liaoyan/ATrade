@@ -8,6 +8,16 @@ method. It covers the three capabilities of this stage:
 2. Run backtests.
 3. Paper trading: paper orders sent by hand, and forward tests.
 
+The map [Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129) adds these capabilities. Section 20.1 gives their phases.
+
+4. The indicator library (section 23).
+5. Screens (section 24) and the data sources that they need (section 8).
+6. Strategy help: the rule builder and the strategy templates (section 9),
+   more metrics and robustness checks, multi-instrument backtests, and
+   parameter sweeps (section 10), and multi-instrument forward tests with the
+   owner ledger (sections 11 and 12).
+7. The AI assistant (section 25).
+
 The old system is not a constraint. The rewrite does not reuse old code.
 
 Terms in this document have the meaning that [`GLOSSARY.md`](../GLOSSARY.md)
@@ -42,11 +52,21 @@ reasoning. The planning map is
 ## 3. Out of scope
 
 - Local order simulation with fake prices (the old `POST /api/orders/simulate`).
-- The 8 disabled modules of the old system: news, portfolio, research,
-  screener, econ, ai, node, orders. The rewrite has no page and no entry for
-  them.
+- The 6 disabled modules of the old system: news, portfolio, research,
+  econ, node, orders. The rewrite has no page and no entry for them. The old
+  `screener` and `ai` modules are also not used: screens (section 24) and the
+  AI assistant (section 25) are new designs and reuse no old code.
 - The implementation of live orders. That is the next stage, with its own map.
-- Parameter optimization and tick data.
+- Tick data. Parameter optimization other than the parameter sweep of
+  section 10.
+- The AI assistant does not send paper orders and does not start forward
+  tests. Only the user does these actions in the UI.
+- The AI assistant does not turn natural language into trades that run.
+- AI assistant extensions that the AI writes and the user reviews before
+  use. A security review of them needs its own design.
+- Indicators from financial data, financial data sources (SEC EDGAR or
+  others), and financial data of Hong Kong instruments. No data source is
+  selected. Phases 1 to 3 use only bars. A later map can add them.
 - More than one user.
 - Native Windows start scripts.
 - Mobile layout.
@@ -60,7 +80,7 @@ and its revision comments.
 
 | Area | Decision | Main reason |
 |---|---|---|
-| Backend language | Python only. CPython 3.14, standard GIL build. | NautilusTrader has a Python interface. One language is easiest to read. |
+| Backend language | Python. CPython 3.14, standard GIL build. One exception: the `assistant` service is TypeScript on Node.js 22.19 or later, because the pi SDK is TypeScript (section 25). | NautilusTrader has a Python interface. One language is easiest to read. |
 | Backend framework | FastAPI, Pydantic v2, uvicorn with 1 worker. | Plain functions with type hints. Automatic OpenAPI. |
 | Backtest and forward test engine | NautilusTrader 2.0. Pin the exact version (`==2.0.0rcN`, then `==2.0.0`). | See section 4.1. |
 | IBKR library for the Web process | `ib_async==2.1.0`. Upgrade to 3.0.0 after its release on PyPI. | See section 7. |
@@ -76,6 +96,8 @@ and its revision comments.
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
+| AI agent runtime | pi SDK `@earendil-works/pi-coding-agent` (MIT), exact version pinned. Built-in tools off, only custom tools (section 25). | The SDK does each provider login from the web page. RPC mode has no login command ([#133](https://github.com/Mano-Liaoyan/ATrade/issues/133), [#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
+| History bars | `databento` Python client for the one-time history import and the quarterly EQUS.SUMMARY download (section 8). | Point-in-time US data with instruments that stopped trading ([#141](https://github.com/Mano-Liaoyan/ATrade/issues/141)). |
 | Deployment | User's own server, one Docker Compose project, Cloudflare proxy and Cloudflare Access, Nginx Proxy Manager, GitHub Actions deployment through Tailscale and SSH. | See section 14. |
 | Effect-TS | Not used. | Its HTTP and SQL modules are unstable, it has no Svelte binding, and its style conflicts with the readability rules ([Effect-TS evaluation](https://github.com/Mano-Liaoyan/ATrade/issues/47)). |
 
@@ -118,7 +140,8 @@ frontend/
   src/lib/             # one directory per capability, plus foundation/
   src/routes/          # pages, the only place that combines capabilities
   e2e/                 # Playwright tests
-deploy/                # compose.yaml, web.Dockerfile
+assistant/             # TypeScript pi SDK service (section 25); path left to the implementation
+deploy/                # compose.yaml, web.Dockerfile, assistant.Dockerfile
 scripts/check          # the quality gate: the same checks as CI (section 17.7)
 scripts/deploy         # deploys one commit of main on the server (section 14.2)
 docs/
@@ -146,12 +169,15 @@ counts from `atrade/`.
 
 | Module | Responsibility |
 |---|---|
-| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Push live market data. |
+| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Import Databento history bars. Keep the bar tables of each bar source, the source order, the quarterly US universe, the HK instrument list, the daily bar summary, and the stock splits of the stored bars. Push live market data. |
 | `watchlist/` | Add, delete, and list watchlist instruments. |
-| `strategy/` | Save, check, and compare strategies and strategy versions. |
-| `backtest/` | Run backtests. Save and read backtest results. Provide the metric functions. |
-| `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, and the paper account check. |
-| `forward_test/` | Start and stop forward tests. Record forward test results. |
+| `strategy/` | Save, check, and compare strategies and strategy versions. Make strategy code from rule builder rules. Hold the strategy template list. |
+| `indicator/` | The indicators of screens and strategies (section 23). One class for each indicator. It reads no database and has no table. |
+| `screen/` | Save, check, and run screens. Save and read screen results (section 24). |
+| `backtest/` | Run backtests and parameter sweeps. Save and read backtest results. Provide the metric functions and the robustness checks (in-sample and out-of-sample split, probabilistic and deflated Sharpe ratio). |
+| `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, the paper account check, the owner ledger, the ledger changes at a stock split, and the "Split check needed" state. |
+| `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, the quarterly universe job, and the daily stock split check. |
+| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
 | `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
@@ -165,7 +191,10 @@ rules.
 market_data   -> ibkr
 watchlist     -> market_data
 strategy      -> (foundation only)
-backtest      -> strategy, market_data
+indicator     -> (foundation only)
+screen        -> indicator, market_data, watchlist
+backtest      -> strategy, market_data, screen
+assistant     -> (foundation only)
 paper_trading -> ibkr
 forward_test  -> strategy, paper_trading, backtest, market_data, ibkr
 all modules   -> foundation
@@ -173,22 +202,44 @@ app           -> all modules
 ```
 
 - `ibkr` depends on no capability.
-- `forward_test -> paper_trading` is only for the paper account check
+- `forward_test -> paper_trading` is for the paper account check
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
-  start).
+  start). From phase 3 (section 20.1) it is also for the owner ledger
+  (`check_owner_order()`, `record_owner_fill()`, `read_owner_positions()`,
+  `transfer_owner_to_by_hand()`, `apply_stock_split()`).
 - `forward_test -> ibkr` is only for the `GatewayConnection` protocol of the
   child process: the connection for the paper account check, the warm-up
   bars (`read_historical_bars()`), and the stop steps
   (`read_own_open_orders()`, `cancel_order_and_wait()`) (#76, section 22).
+  From phase 3 it is also for the connections of the bar fetcher and of the
+  stock split check.
 - `forward_test -> market_data` is only to save the bars that a forward test
   receives (`save_received_bars()` for the warm-up bars,
   `save_received_bars_blocking()` for each live bar), so a same-period
   backtest finds them (`docs/architecture/forward_test.md` sections 12.8 and
-  12.15).
-- `paper_trading` does not import `forward_test`. The refusal of paper orders
-  by hand on the instrument of a running forward test (section 12.2) gets a
-  function from `app/web.py`, which calls
-  `forward_test.find_forward_test_on_instrument()`.
+  12.15). From phase 3 it is also for the bar fetcher, the quarterly
+  universe update, the warm-up reads in the source order, and the change of
+  the stored bars at a stock split (`docs/architecture/market_data.md`).
+- `market_data` holds the Databento client. `ibkr` stays IBKR only.
+- `backtest -> screen` is only for the point-in-time screen runs of a
+  backtest universe (`docs/architecture/screen.md` section 24.9).
+- `backtest -> strategy` also reads the sweep parameters of a strategy
+  version with the Python AST (`docs/architecture/backtest.md` section
+  10.11.1).
+- `indicator` imports `nautilus_trader` for the built-in indicators. Strategy
+  code imports `atrade.indicator` at run time in the backtest child and the
+  forward test child. import-linter does not check user code.
+- `assistant` does not import other capabilities. `app/` builds the port 8001
+  app from the routers of `strategy`, `backtest`, and `screen`
+  (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
+  `strategy_version`, `backtest`, and the screen tables point at
+  `assistant_conversation` (section 6.3 allows a foreign key).
+- `paper_trading` does not import `forward_test`. Until phase 3, the refusal
+  of paper orders by hand on the instrument of a running forward test
+  (section 12.2) gets a function from `app/web.py`, which calls
+  `forward_test.find_forward_test_on_instrument()`. From phase 3, the owner
+  ledger replaces this refusal, and `app/web.py` gives `paper_trading` the
+  function `forward_test.read_allocated_capital()` for the "By hand" capital.
 - `forward_test -> backtest` is only for the comparison, the metric
   functions, and the look-back of `request_bars` (`find_look_back_length()`,
   `write_look_back_catalog()`).
@@ -220,9 +271,11 @@ app           -> all modules
 
 | Entry point | Runs in | Purpose |
 |---|---|---|
-| `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker. |
-| `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. |
-| `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. |
+| `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second listener on port 8001 has only the allow-list routes for the `assistant` service (section 25). Runs the daily bar update after the close of each trading day (section 8). |
+| `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
+| `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
+| Databento import program (name left to the implementation) | One-time run by the user | Imports the bought Databento files into `databento_bar`. Writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
+| `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
 A restart of `web` does not stop forward tests.
@@ -237,6 +290,9 @@ A restart of `web` does not stop forward tests.
 | `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
 | `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
 
+Port 8000 refuses with `403` each request that comes from an address of the
+`atrade-assistant-internal` subnet (section 25).
+
 ## 7. IBKR access
 
 Section 7 is in [`docs/architecture/ibkr.md`](architecture/ibkr.md). It holds
@@ -248,22 +304,28 @@ the IBKR decisions, the `ibkr` module, `GET /api/ibkr/gateway`, the
 Section 8 is in [`docs/architecture/market_data.md`](architecture/market_data.md).
 It holds the bar storage decisions, the watchlist decisions, the
 instrument search (`GET /api/market-data/instrument-search`), the
-watchlist routes (`/api/watchlist`), and the daily exchange rates of
-backtests.
+watchlist routes (`/api/watchlist`), the daily exchange rates of
+backtests, the bar sources and the source order, the Databento history
+import, the quarterly US universe, the HK instrument list, the daily bar
+update and the daily bar summary, and the change of the stored bars at a
+stock split.
 
 ## 9. Strategies and strategy versions
 
 Section 9 is in [`docs/architecture/strategy.md`](architecture/strategy.md).
 It holds the storage rules, the `strategy` and `strategy_version` tables, the
-strategy file format and template, the checks before save, the strategy HTTP
-routes, and the editor pages.
+strategy file format and the start points (Blank code, Blank rules, strategy
+templates), the rule builder, the strategy template library, the checks
+before save, the strategy HTTP routes, and the editor pages.
 
 ## 10. Backtest
 
 Section 10 is in [`docs/architecture/backtest.md`](architecture/backtest.md).
 It holds the backtest decisions and isolation controls, the backtest tables,
-the run flow in the child process, the metric functions, the backtest HTTP
-routes (`/api/backtests`), and the backtest pages.
+the run flow in the child process, the metric functions and the robustness
+checks, multi-instrument backtests and universes, parameter sweeps
+(`/api/sweeps`, `/sweeps/<id>`), walk-forward, the backtest HTTP routes
+(`/api/backtests`), and the backtest pages.
 
 ## 11. Paper trading
 
@@ -271,14 +333,17 @@ Section 11 is in [`docs/architecture/paper_trading.md`](architecture/paper_tradi
 It holds the live order switch, the paper account check, paper orders sent by
 hand, the order list, the `paper_trading` module, `/ws/paper-trading`, the
 account overview and the paper order form (11.7), the order routes (11.8), and the balance in USD for any base
-currency (11.9).
+currency (11.9), the owner ledger (11.10), stock splits in the owner ledger
+(11.11), and the limits of the owner ledger (11.12).
 
 ## 12. Forward test
 
 Section 12 is in [`docs/architecture/forward_test.md`](architecture/forward_test.md).
-It holds the forward test decisions (input, one forward test per instrument,
-Web and worker, client IDs, paper account check, stop, recovery, records,
-order source, comparison) and the implementation: the `forward_test` table,
+It holds the forward test decisions (input, shared instruments and the owner
+ledger, Web and worker, client IDs, paper account check, stop, recovery,
+records, order source, comparison, the multi-instrument forward test,
+allocated capital, the ATrade execution and data clients, the bar fetcher,
+the quarterly universe, the stock split check) and the implementation: the `forward_test` table,
 the routes under `/api/forward-tests`, `/ws/forward-tests`, the worker, the
 child process, and the forward test page.
 
@@ -413,7 +478,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `carbon_icons.d.ts` declares these modules with the type `CarbonIcon`.
 - The app shell header (`src/routes/+layout.svelte`) is the Carbon UI shell
   header in a `cds--g100` zone in all themes. It shows the product name, the
-  page links (Home, Strategies, Backtests, Forward tests) with
+  page links (Home, Screens, Strategies, Backtests, Forward tests) with
   `aria-current="page"` on the current page, the backend status, the IB
   Gateway status, the server time, and the Paper tag. The Paper tag is a
   Carbon operational tag with a tooltip. The tooltip shows the checked paper
@@ -532,10 +597,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     region has a workbench (`.atrade-workbench`), the app shell gives it the
     window height below the header (`:has()`), without padding.
   - `SideColumn` (`label`, `side` `start` or `end`, `storageKey`, `width`,
-    default 17.5rem): a 32px header line with the name and the Collapse
-    button ("Collapse <label>"). A collapsed column is a 32px wide rail with
-    the Open button ("Open <label>"). The body stays in the page while the
-    column is collapsed, so a form keeps its values.
+    default 17.5rem): a 32px header line with the name and the Minimize
+    button ("Minimize <label>"). A vertical `Splitter` on the inner edge
+    (`role="separator"`, `aria-orientation="vertical"`) changes the width:
+    drag, or Arrow Left and Arrow Right 16px, Home minimum, End maximum,
+    double-click default. The width is 16rem to 60% of the workbench, and the
+    center keeps at least 24rem. `localStorage` keeps the width under
+    `storageKey`. A minimized column is a 32px wide rail with the Open button
+    ("Open <label>"), and it opens with the width from before. The body stays
+    in the page while the column is minimized, so a form keeps its values.
+    Only the AI assistant column has Maximize (section 25)
+    ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)).
   - `PanelSplit` (`storageKey`, `panels`, and the snippet `panel(id,
     state)`): 2 or more stacked panels. Each `PanelSpec` has `id`,
     `minPixels`, `defaultPixels` (not for the first panel), and
@@ -752,8 +824,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   like the QuantConnect editor. `/strategies` shows the first strategy of the
   list. `/strategies/<id>/versions/<n>` opens version n (strategy section
   9.7). The "Strategies" `SideColumn` lists the strategies (32px rows: name
-  and latest version) and has the "New strategy" button (a `Dialog` with the
-  name). The toolbar line (`PanelHeader`) has the strategy name, the version
+  and latest version) and has the "New strategy" button (a wide `Dialog`:
+  the start points on the left, the selected start point on the right, the
+  name, and "Create strategy"; strategy section 9.7.1). The editor panel has
+  the tabs "Rules" (the rule builder, strategy section 9.8) and
+  `strategy.py`. The right `SideColumn` "AI assistant" (default 28rem) holds
+  the conversation (section 25). The toolbar line (`PanelHeader`) has the strategy name, the version
   (`Select` size `sm`), and icon buttons with the state in the icon shape
   and color: Delete strategy (danger `Dialog`), the swap button (an arrow to
   the place that the editor moves to), Save version (a blue dot for unsaved
@@ -807,6 +883,39 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (`foundation/backend_health`).
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
   consistent.
+- New pages and parts of the map #129 (section 20.1):
+  - The screen page `/screens/<id>` is a workbench
+    (`docs/architecture/screen.md` section 24.10). `#lib/screen` holds its
+    HTTP client and parts.
+  - The backtest page gets a robustness row under `KeyMetricRow`, a Metrics
+    tab, and one vertical line at the split time on the equity chart (phase
+    1). A multi-instrument backtest gets an Instruments tab and a Symbol
+    column in Trades (phase 3) (`docs/architecture/backtest.md` section 10).
+    The key metric order is: Total return, Net profit (USD), Max drawdown,
+    Sharpe ratio, Win rate, Trades, Final equity (USD).
+  - The parameter sweep page `/sweeps/<id>` (phase 3) is a workbench with
+    the structure of the backtest page: the "Parameter sweeps" `SideColumn`,
+    a top panel with the status line and the point chart or the heat map,
+    and the "Runs" panel. Heat map cells use a Carbon sequential color and
+    show their value as text.
+  - The forward test start dialog has "Instruments" (one instrument, top N by
+    trading value, watchlist), "Capital (USD)", and "Unallocated: <amount>
+    USD". The forward test page has an "Instruments" tab, a "Symbol" column
+    in "Fills", and the split adjustment rows. The paper trading Positions
+    table has an "Owner" column, "Unattributed: <n>" with a warning icon, and
+    the "Split check needed" row with "Apply split <ratio>" and "Keep
+    ledger" (phase 3, sections 11 and 12).
+  - A settings page has the "Source order" list of the bar sources
+    (`docs/architecture/market_data.md`). Its route and the place of the HK
+    instrument list editor are left to the implementation.
+  - A survivorship bias warning (icon, word, and warning color) shows on HK
+    screens, on HK backtest results, and on US backtest results that start
+    before 2018-05-01.
+  - `foundation/carbon` gets the message components of the AI assistant,
+    rewritten from the Carbon `ChatLog`, `ChatMessage`, and `ChatDivider`
+    (Apache-2.0 header in each file, `THIRD_PARTY_NOTICES.md` in the
+    repository root). `ASSISTANT_SOCKET_MESSAGE_MODELS` is the model list of
+    `/ws/assistant`.
 
 ### 13.1 Browser behavior
 
@@ -843,6 +952,7 @@ One Docker Compose project on the user's own server runs all services:
 | `ib-gateway` | `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest, `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`. |
 | `web` | `app/web.py`, backtest child processes, basedpyright processes. Memory limit, read-only root file system, writable `/tmp`. |
 | `forward-test` | `app/forward_test_worker.py` and the forward test child processes. |
+| `assistant` | The Node.js process with the pi SDK (section 25). Read-only root file system, `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}` (default `1g`), volume `atrade-assistant-pi`, networks `atrade-assistant-internal` and `atrade-assistant-egress`. No published port, no `DATABASE_URL`, and no IBKR settings. |
 
 External access (#73). The user's existing network already has these parts.
 ATrade adds no Compose service for them:
@@ -902,7 +1012,10 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default
   `127.0.0.1:8000`).
 - `web` has `read_only: true`, a `tmpfs` on `/tmp`, and
-  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`). `0` turns the memory
+  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`; phase 3 changes it
+  to `8g`, because a multi-instrument backtest of 500 instruments on 1-hour
+  bars can need 4 to 5 GB,
+  [#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)). `0` turns the memory
   limit off. Use `0` only on a host that cannot set memory limits, for example
   rootless Podman without the memory cgroup controller.
 - `postgres` uses the image `postgres:18.3` and the new volume
@@ -925,7 +1038,18 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   `ATRADE_IBKR_USERNAME` or `ATRADE_IBKR_PASSWORD`. It waits until the
   health check of `web` passes, because `web` runs the migrations. It starts
   also without IB Gateway: a forward test start then fails with the reason
-  in its `error_message` (#76).
+  in its `error_message` (#76). From phase 3, `forward-test` also gets
+  `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID` and `DATABENTO_API_KEY`, and needs
+  outbound HTTPS to Databento. IB Gateway then has at most 8 API clients:
+  Web 1, forward tests 10 to 13, bar fetcher 20, contract tests 98 and 99.
+  The limit is 32.
+- The AI assistant (phase 2, section 25) adds 2 networks.
+  `atrade-assistant-internal` has `internal: true` and a fixed subnet, and
+  only `web` and `assistant` are in it. `atrade-assistant-egress` has only
+  `assistant`. `web` also listens on port 8001 in
+  `atrade-assistant-internal`. Compose does not publish port 8001.
+- Disk: plan about 4 GB more in PostgreSQL for the Databento daily bars and
+  the universe hourly bars (estimate, #141).
 
 ### 14.2 Deployment from GitHub Actions
 
@@ -991,16 +1115,22 @@ Settings that `foundation/settings` reads:
 | `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
+| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
+| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
-that ends before it starts, and a Web client ID inside the forward test range.
+that ends before it starts, a Web client ID inside the forward test range,
+and a bar fetcher client ID inside the forward test range or equal to the
+Web client ID.
 `ATRADE_IBKR_USERNAME`, `ATRADE_IBKR_PASSWORD`,
 `ATRADE_IBKR_AUTO_RESTART_TIME`, and `ATRADE_IBKR_TIME_ZONE` are not settings:
 only the `ib-gateway` service reads them (section 7.4).
 
 Environment variable names: `DATABASE_URL` has no prefix, because the backtest
-child process gets it by this name (section 10). All other settings use the
-prefix `ATRADE_`, for example `ATRADE_TRADING_MODE`. `foundation/settings`
+child process gets it by this name (section 10). `DATABENTO_API_KEY` has no
+prefix, because the decision
+[#146](https://github.com/Mano-Liaoyan/ATrade/issues/146) names it so and
+the user kept that name. All other settings use the prefix `ATRADE_`, for example `ATRADE_TRADING_MODE`. `foundation/settings`
 also reads `ATRADE_FRONTEND_BUILD_DIR` (default `/app/frontend-build`, the
 path in the `web` image). Compose builds `DATABASE_URL` from
 `ATRADE_POSTGRES_PASSWORD`. The ticket that first uses a setting adds it to
@@ -1008,6 +1138,15 @@ path in the `web` image). Compose builds `DATABASE_URL` from
 
 The backtest timeout and concurrency are not in `settings`. PostgreSQL stores
 them (section 10).
+
+`ATRADE_WEB_MEMORY_LIMIT` and `ATRADE_ASSISTANT_MEMORY_LIMIT` are not
+settings: only Compose reads them (section 14.1).
+
+Exception ([ADR 0005](adr/0005-assistant-credentials-outside-postgresql.md)):
+AI assistant credentials (subscription logins and API keys) come from the
+web UI. The `assistant` service keeps them in a `0600` file in the volume
+`atrade-assistant-pi`, not in environment variables, PostgreSQL, or `.env`.
+A backup of this volume holds credentials and must be kept like `.env`.
 
 ## 16. Readability rules
 
@@ -1160,6 +1299,10 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Alembic migrations at start and `TRUNCATE` before each test.
 - Time: `foundation/clock` comes in as an argument. Tests pass a clock with a
   fixed time. Do not use `freezegun`.
+- Databento: a hand-written fake in `tests/fakes/databento.py`. No real
+  Databento call in CI.
+- Model providers: the `assistant` service tests use a local fake
+  OpenAI-compatible model server. No real provider in CI.
 
 ### 17.4 Tests for specific parts
 
@@ -1186,6 +1329,48 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - The contract tests must check whether `reqExecutions` and
   `reqCompletedOrders` read filled orders of other client IDs. Run this check
   on the paper account during US market hours.
+- Indicators (phase 1): each indicator has a consistency test (the screen
+  path and a NautilusTrader engine run with `register_indicator_for_bars`
+  give equal values and equal "no value" for the same bars), a no-value test
+  (no `0.0` before the warm-up end), and for ATrade-written indicators a test
+  with known values (section 23.5).
+- Metric functions (phase 1): exact values on fixed equity curves and trades
+  for each metric of backtest section 10.9, PSR and DSR against
+  hand-calculated values, the trial count, and the out-of-sample use count.
+- Rule builder (phase 1): for each rule template and for empty rules, the
+  code from the rules passes the checks of strategy section 9.3. The same
+  rules give the same code. The append-only trigger refuses an `UPDATE` of
+  `rules`. Each rule template runs on the single-instrument backtest.
+- Port 8001 app (phase 2): a unit test asserts that its routes are exactly
+  the allow-list of section 25. A test asserts `403` on port 8000 for a
+  request from the assistant subnet. A test asserts that a save on port 8001
+  records the source `assistant` and the conversation ID.
+- Market data (phase 3): the source order merge rule, the Databento import
+  (price rules, 7 regular-hours hourly bars, split and symbol link
+  detection), the quarterly universe (63-day ranking, retry and fallback
+  day), the HK instrument list routes, the daily bar update, and the change
+  of the stored bars at a stock split.
+- Screens (phase 3): HTTP tests of `/api/screens` and `/api/screen-results`
+  with saved daily bars. They check the 2 steps, the exclusion reason "no
+  value", the `422` problem list, and the `403` of `PUT` on port 8001 for a
+  screen that the user saved or kept.
+- Parameter sweep (phase 3): the AST reader finds only the `int`, `float`,
+  and `bool` fields with a type annotation and a default, and does not
+  import the code. A grid of more than 200 runs or more than 3 parameters
+  gets `422`. A cancel sets the queued runs to `cancelled`.
+- Multi-instrument backtest child (phase 3): a real child process runs a
+  universe on one `SMART` venue with one cash account. The test asserts the
+  exact trades, the members of each period, and that the strategy gets no
+  list before its period.
+- Owner ledger (phase 3, CI with real PostgreSQL): a sell larger than the
+  position minus open sells, a buy larger than cash minus open buys, no
+  short, the `409` of an order by hand, `OrderDenied` of a forward test
+  order, the transfer to "By hand" at stop, the stock split formula, and
+  "Split check needed" with apply and keep.
+- ATrade execution and data clients (phase 3, CI): a LiveNode test with a
+  fake IBKR connection sends an order, fills it, restarts the child, asserts
+  the strategy position, then applies a stock split and asserts the position
+  after the restart.
 
 ### 17.5 End to end
 
@@ -1228,6 +1413,10 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - The test PostgreSQL fixture runs the migrations one time per session and
   truncates all tables except `alembic_version` before each test.
 
+- The `assistant` service checks (lint, type check, tests) run in
+  `./scripts/check` from phase 2. The job name is left to the
+  implementation.
+
 ### 17.8 Release checklist
 
 Do these checks by hand before each release. Tests cannot do them.
@@ -1266,7 +1455,10 @@ Source: [Documentation rules for the new project](https://github.com/Mano-Liaoya
   `docs/architecture/strategy.md`. Section 10 is in
   `docs/architecture/backtest.md`. Section 11 is in
   `docs/architecture/paper_trading.md`. Section 12 is in
-  `docs/architecture/forward_test.md`.
+  `docs/architecture/forward_test.md`. Section 23 is in
+  `docs/architecture/indicator.md`. Section 24 is in
+  `docs/architecture/screen.md`. Section 25 is in
+  `docs/architecture/assistant.md`.
 - `docs/adr/` holds decisions that are hard to reverse.
 - The plan lives only in GitHub Issues. There is no `PLAN.md`.
 - There is no document index and no `active` or `obsolete` status.
@@ -1293,13 +1485,42 @@ Source: [Old data migration](https://github.com/Mano-Liaoyan/ATrade/issues/58).
   migration code.
 - The rewrite uses the volume `atrade-postgres18-data`. It does not use the
   volume `atrade-pgdata` of earlier test starts. ATrade never deletes or
-  changes a volume. The user removes old volumes by hand.
+  changes a volume. The user removes old volumes by hand. This rule also
+  covers the volume `atrade-assistant-pi` (section 25).
 
 ## 20. Implementation phases
 
 1. Market data and backtests. This includes the watchlist and strategies.
 2. Paper orders and forward tests.
 3. Live orders. This is the next stage, with its own map.
+
+### 20.1 Phases of the indicators, screens, and strategy help map
+
+The map [Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129) has its own phases. In sections 8 to 12 and 23 to 25,
+"phase 1", "phase 2", and "phase 3" mean these phases.
+
+1. The indicator library (section 23), the new metrics and the robustness
+   checks (section 10), the rule builder, and the strategy templates
+   (section 9). They use only the single-instrument backtest.
+2. The AI assistant (section 25).
+3. The data sources (section 8), screens (section 24), multi-instrument
+   backtests, parameter sweeps and walk-forward (section 10), and
+   multi-instrument forward tests with the owner ledger (sections 11 and
+   12).
+
+### 20.2 Limits of the first version
+
+- The first version does not handle cash dividends. Backtests do not include
+  dividends. On the paper trading page, a dividend shows as an
+  "Unattributed" difference (section 11).
+
+### 20.3 Later work
+
+These items are in scope of the map #129, but not of phases 1 to 3:
+
+- Multi-instrument forward tests on 1-hour bars. First measure the time to
+  fetch the bars of 500 instruments.
+- Scheduled runs of screens, and alerts.
 
 ## 21. Facts not yet verified
 
@@ -1322,6 +1543,37 @@ ran them. The implementation must check them.
 | `reqExecutions` returns the executions of the current day only. The filled orders by hand (section 11.4) show only those fills. | The `ibkr_paper` contract tests, during US market hours. |
 | Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. Checked on a weekday outside the trading hours (section 21.1). Not checked on a weekend. | `uv run pytest -m ibkr_paper -k live_bar` on a Saturday or Sunday. |
 | The account `ExchangeRate` for USD (section 11.9 of `paper_trading.md`, step 3): IBKR sends it only when the ledger holds USD, as base currency units for 1 USD. Checked only with the fake; the paper account of the owner holds only EUR. | `uv run pytest -m ibkr_paper -k balance_and_the_positions` after the account holds USD cash, and compare the panel rate with the IBKR `EUR.USD` rate. |
+
+Facts of the map #129 (section 20.1) that the implementation must check:
+
+| Fact | How to check |
+|---|---|
+| A Python indicator class written by ATrade registers with `register_indicator_for_bars` (#131 read the source only). | Write a minimal class and run 1 backtest before the indicator work. |
+| Strategy code can import `atrade.indicator` (#136, #138). | Import the module in a backtest child. |
+| The 12-1 momentum class accepts skip 0 (#139, template S3). | Check the parameter in the indicator implementation. |
+| The default parameters of the template sources (#139). | Read the method section of each paper. |
+| The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
+| The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
+| The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
+| The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. |
+| Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). | Run one with real data and measure the peak memory and the time. |
+| Look-back bars of many bar types in one catalog, and chunked loading memory (#131, source only). | A multi-instrument child test with look-back bars for each member. |
+| Databento `ohlcv-1h` is on whole hours. The first IBKR regular-hours hourly bar starts at 9:30 ET and is 30 minutes long (#141). | Compare IBKR and Databento hourly bars of one instrument on one day. |
+| NYSE American and NYSE Arca instruments have no official open and close in XNAS or XNYS `statistics` (#141). | After the daily import, count the instruments without `stat_type` 11. |
+| The cost of the universe hourly bars is about 24 USD (#141). | `metadata.get_cost` before the purchase. |
+| The Databento usage-based plan can download 2018 data, and the data stays usable after the account closes (#141, #144). | Download 1 instrument for 1 day. Ask Databento support about the license. |
+| The time of day at which the EQUS.SUMMARY bar of the previous trading day is available (#146). | `metadata.get_dataset_range` at 06:00, 07:00, and 08:00 ET on one trading day. |
+| How Databento links symbol changes, for example FB to META (#141). | Free `symbology.resolve` for FB and META. |
+| IBKR scales `TRADES` volume by the split ratio (#149). | At the first stock split, read 1 year of daily bars again and compare. |
+| The paper account handles stock splits (#149). | Watch the first stock split of a held instrument. |
+| The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | The LiveNode test of section 17.4, then the `ibkr_paper` forward test contract test. |
+| IBKR does or does not refuse opposite orders of 2 owners on one instrument (self-trade prevention) (#146). | 2 client IDs on the paper account place an AAPL buy and a sell, first with prices that do not cross, then with prices that cross. |
+| Real subscription logins and model calls through the pi SDK `ModelRuntime.login()` (#133, #140). Only a fake model server was run. | Log in with each provider and send one message. |
+| `ModelRuntime.create({ credentials })` with the ATrade `CredentialStore` writes an OAuth refresh back (#140). | Test with 2 credentials of one provider, and read the file after a refresh. |
+| OpenAI can count a self-hosted single-user server as "remotely hosted" (#133). | Read the OpenAI "Preview limitations" page. |
+
+Each section file of the map lists more facts in its "Left to the
+implementation" list.
 
 ### 21.1 Facts checked
 
@@ -1353,8 +1605,39 @@ option and records it in this document.
   before the LiveNode starts.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- The open points of the map #129 are in the "Left to the implementation"
+  lists of sections 8 to 12 and 23 to 25. Two of them:
+  - How the platform gives the strategy the new universe list at each
+    period start: NautilusTrader custom data or a platform timer (#142).
+    Make a small test first.
+  - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
+    momentum need about 252 bars. The look-back must follow the longest
+    indicator of the strategy, or this effect is accepted.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`
   - the path `backend/migrations/`
   - the default Web client ID `1`
+
+## 23. Indicator library
+
+Section 23 is in [`docs/architecture/indicator.md`](architecture/indicator.md).
+It holds the indicator decisions (one definition for screens and strategies,
+the time rule, no value), the first 11 indicators, the `indicator` module and
+its catalog, the look-back bars of a screen, and the consistency tests.
+
+## 24. Screens
+
+Section 24 is in [`docs/architecture/screen.md`](architecture/screen.md). It
+holds the screen decisions (two-step run, rank rule, one market), the
+`screen` tables, the run flow, the checks, the routes under `/api/screens`
+and `/api/screen-results`, the AI assistant access, screens as a backtest
+universe, and the `/screens/<id>` page.
+
+## 25. AI assistant
+
+Section 25 is in [`docs/architecture/assistant.md`](architecture/assistant.md).
+It holds the AI assistant decisions, the `assistant` service with the pi SDK,
+port 8001 and its allow-list, credentials and provider login, conversations
+and prompt versions, the tools for strategies, backtests, and screens, Keep
+and Discard, and the AI assistant column of the strategy page.
