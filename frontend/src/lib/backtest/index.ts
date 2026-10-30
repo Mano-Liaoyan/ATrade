@@ -2,16 +2,15 @@
 // chart (for the backtest, strategy, forward test, and comparison pages), the compared key metrics of the comparison
 // pages, and the value formats.
 export { default as BacktestLimitsForm } from './BacktestLimitsForm.svelte';
+export { default as BacktestMetricTable } from './BacktestMetricTable.svelte';
 export { default as BacktestTradeTable } from './BacktestTradeTable.svelte';
 export { default as ComparedKeyMetrics } from './ComparedKeyMetrics.svelte';
 export { default as EquityDrawdownChart, type DrawdownCurve } from './EquityDrawdownChart.svelte';
 export { default as KeyMetricRow } from './KeyMetricRow.svelte';
 export { type TimeInterval } from './interruption_marks';
 export { computeDrawdownCurve, type DrawdownPoint } from './drawdown_curve';
-export {
-  readKeyMetrics,
-  type ComparedTest,
-  type KeyMetric, type KeyMetricInput, type TestPeriod, type TestTrade } from './key_metrics';
+export { readKeyMetrics, type ComparedTest, type KeyMetric, type KeyMetricInput } from './key_metrics';
+export { readMetricRows, type MetricTableRow, type MetricTableValue } from './metric_table';
 export { checkComparisonSelection, type ComparisonSelection } from './backtest_comparison';
 export {
   changeBacktestLimits,

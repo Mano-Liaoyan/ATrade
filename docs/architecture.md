@@ -780,8 +780,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   error). `ComparedKeyMetrics` (`tests: ComparedTest[]`) shows one
   `KeyMetricRow` for each test, under a line with the curve line style and a
   link to the test. This line is the only key of the curves. `readKeyMetrics`
-  takes `metrics: null` (all tiles "–") and an optional `period`: only the
-  trades in the period count for the win rate.
+  takes `metrics: null` (all tiles "–"). The win rate comes from the API
+  (#168); the forward test comparison route gives the win rate of the
+  backtest period.
 - `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
   (`name`, `text`, `change`) is a Carbon tile with the name and the
   right-aligned value (tabular numbers). With `change`, the value is a
@@ -1170,7 +1171,7 @@ Settings that `foundation/settings` reads:
 | `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
-| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
+| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. Compose gives it to `web` and `forward-test`. |
 | `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason, and the Databento import program does not download batch jobs. Compose gives it to `web`, so the import program in the `web` image gets it. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
@@ -1742,6 +1743,10 @@ option and records it in this document.
   message with `from="me"` always scrolls the log to the end, also while the
   user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
+- Decided (#168): the Metrics table names the metrics CAGR, Annual
+  volatility, Sharpe ratio, Sortino ratio, Calmar ratio, Profit factor, Win
+  rate, Average win (USD), Average loss (USD), Exposure, and Turnover
+  (backtest section 10.9.6). The frontend has no win rate calculation.
 - Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
   its `storageKey`. `widthPixels` null gives the default width, and a
   double-click on the splitter sets it to null. A value stored before the
@@ -1804,6 +1809,21 @@ option and records it in this document.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
+- Decided (#216): the bar fetcher is `BarFetcher` in
+  `forward_test/bar_fetcher.py`. The worker runs it next to the state
+  comparison. It reads only the ranges that no bar source in the global
+  source order saved (`read_unsaved_ranges` of `market_data`), so the daily
+  read and the warm-up fill are one code path. The daily read runs at the
+  first check after 00:30 UTC of each UTC day. When IB Gateway is not
+  reachable, it logs the reason and tries again 5 minutes later
+  (`docs/architecture/forward_test.md` section 12.24).
+- Decided (#216): the bar fetcher and the daily bar update of `web` are
+  different jobs. They use different client IDs in different processes.
+- Decided (#216): `Settings` refuses a bar fetcher client ID inside the
+  forward test range or equal to the Web client ID. The `web` and
+  `forward-test` services both get `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, so
+  both check the same value. The worker then does not start and logs the
+  reason.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
