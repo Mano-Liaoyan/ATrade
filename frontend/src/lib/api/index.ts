@@ -2001,6 +2001,16 @@ export interface components {
             /** Problems */
             problems: components["schemas"]["ScreenProblemResponse"][];
         };
+        /**
+         * ScreenIndicatorNamesResponse
+         * @description The UI names of the indicators of the definition, for example "RSI(14)" (screen.md section 24.7).
+         */
+        ScreenIndicatorNamesResponse: {
+            /** Indicator Conditions */
+            indicator_conditions: string[];
+            /** Order */
+            order: string;
+        };
         /** ScreenListItemResponse */
         ScreenListItemResponse: {
             /** Id */
@@ -2076,6 +2086,7 @@ export interface components {
             definition: {
                 [key: string]: unknown;
             };
+            indicator_names: components["schemas"]["ScreenIndicatorNamesResponse"];
             /** Rows */
             rows: components["schemas"]["ScreenResultRowResponse"][];
             /** Exclusions */
