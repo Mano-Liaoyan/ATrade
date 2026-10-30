@@ -130,7 +130,7 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
         request=request,
         code=strategy_version.code,
         bars=saved_bars.bars,
-        look_back_bars=look_back.keep_bars(list(saved_look_back_bars.bars)),
+        look_back_bars=look_back.keep_bars(saved_look_back_bars.bars),
         exchange_rates=exchange_rates,
     )
 

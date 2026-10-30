@@ -284,7 +284,7 @@ app           -> all modules
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second listener on port 8001 has only the allow-list routes for the `assistant` service (section 25). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
-| Databento import program (name left to the implementation) | One-time run by the user | Imports the bought Databento files into `databento_bar`. Writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
+| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. From #191 it also writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
@@ -1163,7 +1163,7 @@ Settings that `foundation/settings` reads:
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
 | `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
-| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason. |
+| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason, and the Databento import program does not download batch jobs. Compose gives it to `web`, so the import program in the `web` image gets it. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
 that ends before it starts, a Web client ID inside the forward test range,
@@ -1694,6 +1694,10 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read. When fewer than 2 trials have a
+  daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
+  10.9.5).
 - Decided (#170): the exposure of a forward test counts its recorded equity
   points (one at each bar end) as its bars. The recorded fills go to
   `find_round_trips` with no change, because `select_fills` already gives
@@ -1716,6 +1720,12 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#198): the platform gives the strategy the new universe list at
+  each period start as NautilusTrader custom data
+  (`DataType("UniverseUpdate")`, `on_data`), not with a platform timer. The
+  configuration of a multi-instrument strategy has no `instrument_id`, no
+  `bar_type`, and no universe field
+  ([`backtest.md`](architecture/backtest.md) section 10.10.8).
 - Decided (#188): a source order holds each `BarSource` exactly 1 time.
   `PUT /api/market-data/source-order` refuses an order that leaves out a bar
   source with `422`. Thus the bars route always reads the IBKR bars that it
@@ -1733,11 +1743,23 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#190): the Databento import program is `app/databento_import.py`.
+  The user runs it in the `web` image with `docker compose run`. The bought
+  files are in `data/databento/` of the repository (in `.gitignore`). The
+  program downloads a batch job with `--job-id <ID>` to
+  `data/databento/<ID>/`, or it imports the files that the user downloaded
+  from the Databento portal. It reads DBN files (`*.dbn`, `*.dbn.zst`), the
+  default encoding of a batch job
+  (`docs/architecture/market_data.md` section 8.14).
+- Decided (#190): the listing exchange of an EQUS.SUMMARY daily bar (from
+  2024-07-01) is the exchange of the latest earlier Databento daily bar of
+  the same symbol. A symbol without an earlier bar, for example a new
+  listing after 2024-07-01, gets no bar. The import names these symbols in
+  its log. `docs/architecture/forward_test.md` section 12.24 (how a
+  Databento symbol maps to the IBKR primary exchange) is the same question
+  and stays open for these symbols.
 - The open points of the map #129 are in the "Left to the implementation"
-  lists of sections 8 to 12 and 23 to 25. One of them:
-  - How the platform gives the strategy the new universe list at each
-    period start: NautilusTrader custom data or a platform timer (#142).
-    Make a small test first.
+  lists of sections 8 to 12 and 23 to 25.
 - Decided (#164): the backtest and the forward test give a rule builder
   version the last N saved bars before the start, where N is the largest
   look-back count of the indicators in its `rules` (option 1 of the issue).
