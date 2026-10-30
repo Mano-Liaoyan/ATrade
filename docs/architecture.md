@@ -1684,9 +1684,17 @@ option and records it in this document.
   23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#170): the exposure of a forward test counts its recorded equity
+  points (one at each bar end) as its bars. The recorded fills go to
+  `find_round_trips` with no change, because `select_fills` already gives
+  `BacktestTrade` rows. The metrics of the forward test routes have
+  `net_profit_usd` (forward test section 12.10).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1741,8 +1749,14 @@ option and records it in this document.
   back (`docs/architecture/paper_trading.md` section 11.13).
   `forward_test_fill` keeps only the fills of the old forward tests
   (`forward_test.md` section 12.24).
-- Decided (#215): migration `b5e2c8a4d716` joins the 3 Alembic heads of the
-  branches before it (`8d4b1e7c2a90`, `8d4b6f2a1c93`, `8d4f2a6c1e93`).
+- Decided (#215): the owner ledger migration has the revision
+  `c7a3e1f95b24`, because the migration of #171 also had the revision
+  `8d4f2a6c1e93`. Migration `b5e2c8a4d716` joins the 2 Alembic heads
+  (`8d4f2a6c1e93` and `c7a3e1f95b24`).
+- Decided (#215): an execution that IBKR makes after the stop of a run does
+  not go into the owner ledger. The next run sends fills only for its own
+  orders. The position then shows the difference as "Unattributed"
+  (`docs/architecture/paper_trading.md` section 11.7).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client
   calls `check_order()` before each order, `save_fill()` for each fill, and

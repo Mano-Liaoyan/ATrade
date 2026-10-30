@@ -821,16 +821,50 @@ export interface components {
              */
             end_utc: string;
         };
-        /** ComparedMetricsResponse */
+        /**
+         * ComparedMetricsResponse
+         * @description The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the
+         *     final equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10).
+         */
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
+            /** Net Profit Usd */
+            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -1367,6 +1401,15 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
+            /** Rules */
+            rules: {
+                [key: string]: unknown;
+            } | null;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1381,6 +1424,11 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";

@@ -465,7 +465,7 @@ Table (the names are choices of this document):
 
 - An insert of a fill has `ON CONFLICT DO NOTHING` on `ibkr_execution_id`, so
   a fill that ATrade reads again adds no row.
-- Implemented (#214, migration `8d4f2a6c1e93`): `cash_change` is USD.
+- Implemented (#214, migration `c7a3e1f95b24`): `cash_change` is USD.
   `commission` is in the currency of the instrument. A cash row (the start
   cash) has `symbol` and `exchange` `null` and `quantity_change` `0`.
   `ibkr_execution_id` has a partial unique index (not null rows).

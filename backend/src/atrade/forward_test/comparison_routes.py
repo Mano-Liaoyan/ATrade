@@ -3,6 +3,7 @@ the same period, start a backtest of the same period, and compare the forward te
 (docs/architecture/forward_test.md section 12.10).
 """
 
+import dataclasses
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
@@ -19,7 +20,9 @@ from atrade.backtest import (
     BacktestTrade,
     EquityPoint,
     calculate_metrics,
+    calculate_round_trip_metrics,
     check_backtest_request,
+    find_round_trips,
     queue_backtest,
     read_backtest_outcome,
 )
@@ -37,10 +40,27 @@ class SamePeriodBacktestResponse(BaseModel):
 
 
 class ComparedMetricsResponse(BaseModel):
+    """The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the
+    final equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10)."""
+
     final_equity_usd: Decimal
+    net_profit_usd: Decimal
     total_return_percent: Decimal
     max_drawdown_percent: Decimal
     trade_count: int
+    cagr_percent: Decimal | None
+    annual_volatility_percent: Decimal | None
+    sharpe_ratio: Decimal | None
+    sortino_ratio: Decimal | None
+    calmar_ratio: Decimal | None
+    profit_factor: Decimal | None
+    average_win_usd: Decimal | None
+    average_win_percent: Decimal | None
+    average_loss_usd: Decimal | None
+    exposure_percent: Decimal | None
+    turnover_per_year: Decimal | None
+    win_rate_percent: Decimal | None
+    missing_reasons: dict[str, str]
 
 
 class ComparedEquityPointResponse(BaseModel):
@@ -120,15 +140,36 @@ def check_comparison_currency(request: BacktestRequest) -> str | None:
     )
 
 
-def to_metrics_response(metrics: BacktestMetrics | None) -> ComparedMetricsResponse | None:
+NO_ROUND_TRIPS_IN_PERIOD = "No round trips in the backtest period"
+
+
+@dataclasses.dataclass(frozen=True)
+class ForwardTestMetrics:
+    """The metrics of a forward test with its start capital. `extra_reasons` replace reasons of `metrics`."""
+
+    metrics: BacktestMetrics
+    start_capital_usd: Decimal
+    extra_reasons: dict[str, str] = dataclasses.field(default_factory=dict[str, str])
+
+
+def to_metrics_response(
+    metrics: BacktestMetrics | None, start_capital_usd: Decimal, extra_reasons: dict[str, str] | None = None
+) -> ComparedMetricsResponse | None:
+    """Only a metric that is None has a reason."""
     if metrics is None:
         return None
+    reasons = metrics.missing_reasons | (extra_reasons or {})
     return ComparedMetricsResponse(
-        final_equity_usd=metrics.final_equity_usd,
-        total_return_percent=metrics.total_return_percent,
-        max_drawdown_percent=metrics.max_drawdown_percent,
-        trade_count=metrics.trade_count,
+        **{field.name: getattr(metrics, field.name) for field in dataclasses.fields(metrics)},
+        net_profit_usd=metrics.final_equity_usd - start_capital_usd,
+        missing_reasons={name: reason for name, reason in reasons.items() if getattr(metrics, name) is None},
     )
+
+
+def to_forward_test_metrics_response(metrics: ForwardTestMetrics | None) -> ComparedMetricsResponse | None:
+    if metrics is None:
+        return None
+    return to_metrics_response(metrics.metrics, metrics.start_capital_usd, metrics.extra_reasons)
 
 
 def to_equity_curve_response(equity_curve: list[EquityPoint]) -> list[ComparedEquityPointResponse]:
@@ -172,7 +213,7 @@ def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryRe
         start_utc=backtest.request.time_range.start_utc,
         end_utc=backtest.request.time_range.end_utc,
         paper_capital_usd=backtest.request.paper_capital_usd,
-        metrics=to_metrics_response(backtest.metrics),
+        metrics=to_metrics_response(backtest.metrics, backtest.request.paper_capital_usd),
     )
 
 
@@ -191,15 +232,42 @@ def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> Forward
 
 def calculate_forward_test_metrics(
     row: ForwardTestRow, equity_curve: list[EquityPoint], fills: list[BacktestTrade], now_utc: datetime
-) -> BacktestMetrics | None:
-    """The range of a forward test goes from its start to its stop, or to now while it runs."""
+) -> ForwardTestMetrics | None:
+    """The range of a forward test goes from its start to its stop, or to now while it runs. The recorded equity
+    points (one at each bar end) count as the bars of the exposure. The recorded fills are the trades."""
     if row.start_capital_usd is None:
         return None
-    return calculate_metrics(
+    metrics = calculate_metrics(
         paper_capital_usd=row.start_capital_usd,
         time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
         equity_curve=equity_curve,
         trades=fills,
+    )
+    return ForwardTestMetrics(metrics=metrics, start_capital_usd=row.start_capital_usd)
+
+
+def calculate_win_rate_in_period(fills: list[BacktestTrade], period: TimeRange) -> Decimal | None:
+    """The win rate of the round trips whose fills are all in the period (both ends included), or None without one.
+    The round trips come from all fills, so a round trip that starts before the period does not change the pairs."""
+    round_trips = [
+        round_trip
+        for round_trip in find_round_trips(fills)
+        if period.start_utc <= round_trip.start_utc and round_trip.end_utc <= period.end_utc
+    ]
+    return calculate_round_trip_metrics(round_trips).win_rate_percent
+
+
+def limit_win_rate_to_period(
+    metrics: ForwardTestMetrics | None, fills: list[BacktestTrade], period: TimeRange
+) -> ForwardTestMetrics | None:
+    """The comparison counts only the forward test fills in the backtest period for the win rate (section 12.10)."""
+    if metrics is None:
+        return None
+    win_rate_percent = calculate_win_rate_in_period(fills, period)
+    return ForwardTestMetrics(
+        metrics=dataclasses.replace(metrics.metrics, win_rate_percent=win_rate_percent),
+        start_capital_usd=metrics.start_capital_usd,
+        extra_reasons={} if win_rate_percent is not None else {"win_rate_percent": NO_ROUND_TRIPS_IN_PERIOD},
     )
 
 
@@ -266,7 +334,7 @@ class ComparisonRoutes:
         ]
         return ForwardTestDetailResponse(
             forward_test=await to_forward_test_response(self.database_url, row),
-            metrics=to_metrics_response(
+            metrics=to_forward_test_metrics_response(
                 calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
             ),
             equity_curve=to_equity_curve_response(equity_curve),
@@ -294,7 +362,11 @@ class ComparisonRoutes:
             fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
-        forward_test_metrics = calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
+        forward_test_metrics = limit_win_rate_to_period(
+            calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc()),
+            fills,
+            backtest.request.time_range,
+        )
         fill_rows = compare_fills(
             forward_test_fills=fills,
             backtest_fills=backtest.trades,
@@ -304,7 +376,7 @@ class ComparisonRoutes:
         return ForwardTestComparisonResponse(
             forward_test=await to_forward_test_response(self.database_url, row),
             backtest=to_compared_backtest(backtest),
-            forward_test_metrics=to_metrics_response(forward_test_metrics),
+            forward_test_metrics=to_forward_test_metrics_response(forward_test_metrics),
             forward_test_equity_curve=to_equity_curve_response(equity_curve),
             backtest_equity_curve=to_equity_curve_response(backtest.equity_curve),
             fills=[to_fill_response(fill_row) for fill_row in fill_rows],

@@ -133,7 +133,11 @@ async def test_refuses_start_when_no_client_id_is_free(web_client: httpx.AsyncCl
     response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol="AMD"))
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "limit of running forward tests reached", "forward_test_id": None, "unallocated_usd": None}
+    assert response.json() == {
+        "detail": "limit of running forward tests reached",
+        "forward_test_id": None,
+        "unallocated_usd": None,
+    }
 
 
 @pytest.mark.anyio
