@@ -56,10 +56,26 @@ class BacktestLimitsBody(BaseModel):
 
 
 class BacktestMetricsResponse(BaseModel):
+    """The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and
+    `missing_reasons` gives its reason by its field name (section 10.9.3). The page shows "–" with the reason."""
+
     final_equity_usd: Decimal
     total_return_percent: Decimal
     max_drawdown_percent: Decimal
     trade_count: int
+    cagr_percent: Decimal | None
+    annual_volatility_percent: Decimal | None
+    sharpe_ratio: Decimal | None
+    sortino_ratio: Decimal | None
+    calmar_ratio: Decimal | None
+    profit_factor: Decimal | None
+    average_win_usd: Decimal | None
+    average_win_percent: Decimal | None
+    average_loss_usd: Decimal | None
+    exposure_percent: Decimal | None
+    turnover_per_year: Decimal | None
+    win_rate_percent: Decimal | None
+    missing_reasons: dict[str, str]
 
 
 class BacktestResponse(BaseModel):
@@ -120,6 +136,19 @@ def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsRespo
         total_return_percent=metrics.total_return_percent,
         max_drawdown_percent=metrics.max_drawdown_percent,
         trade_count=metrics.trade_count,
+        cagr_percent=metrics.cagr_percent,
+        annual_volatility_percent=metrics.annual_volatility_percent,
+        sharpe_ratio=metrics.sharpe_ratio,
+        sortino_ratio=metrics.sortino_ratio,
+        calmar_ratio=metrics.calmar_ratio,
+        profit_factor=metrics.profit_factor,
+        average_win_usd=metrics.average_win_usd,
+        average_win_percent=metrics.average_win_percent,
+        average_loss_usd=metrics.average_loss_usd,
+        exposure_percent=metrics.exposure_percent,
+        turnover_per_year=metrics.turnover_per_year,
+        win_rate_percent=metrics.win_rate_percent,
+        missing_reasons=metrics.missing_reasons,
     )
 
 
