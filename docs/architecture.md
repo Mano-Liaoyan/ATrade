@@ -281,7 +281,8 @@ app           -> all modules
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second listener on port 8001 has only the allow-list routes for the `assistant` service (section 25). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
-| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. From #191 it also writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
+| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. It reads the IBKR daily closes of the instruments that still trade (IB Gateway, client ID `--ibkr-client-id`, default `30`), links symbol changes, adjusts the bars for stock splits, and writes `stock_split` and `databento_symbol_link` rows (section 8.8.3, 8.8.4). |
+| `app/databento_check.py` | Run by the user after the Databento import, in the `web` image with `docker compose run` (README.md) | Lists the detected stock splits that wait for the user check and the symbol links that are not checked. `--accept` confirms them, `--reject-split <ID>` rejects one stock split (section 8.8.3). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
@@ -1608,6 +1609,7 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The Databento usage-based plan can download 2018 data, and the data stays usable after the account closes (#141, #144). | Download 1 instrument for 1 day. Ask Databento support about the license. |
 | The time of day at which the EQUS.SUMMARY bar of the previous trading day is available (#146). | `metadata.get_dataset_range` at 06:00, 07:00, and 08:00 ET on one trading day. |
 | How Databento links symbol changes, for example FB to META (#141). | Free `symbology.resolve` for FB and META. |
+| The number of stock splits of instruments that stopped trading, and the false positives of the detection rule and the symbol link rule (#191, only tested with fake data). | Run the import on the bought daily bars and check the listed detections by hand. |
 | IBKR scales `TRADES` volume by the split ratio (#149). | At the first stock split, read 1 year of daily bars again and compare. |
 | The paper account handles stock splits (#149). | Watch the first stock split of a held instrument. |
 | The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | The LiveNode test of section 17.4, then the `ibkr_paper` forward test contract test. |
@@ -1699,6 +1701,12 @@ option and records it in this document.
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.
+- Decided (#191): the Databento import reads the IBKR daily closes through
+  IB Gateway with its own client ID (`--ibkr-client-id`, default `30`), so
+  it needs IB Gateway. The user checks the detections with the program
+  `app/databento_check.py`. Enum values of `stock_split`, the order of the
+  check and the save, and symbol reuse:
+  `docs/architecture/market_data.md` section 8.14.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
