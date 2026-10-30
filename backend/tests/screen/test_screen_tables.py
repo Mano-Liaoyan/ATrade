@@ -108,12 +108,20 @@ def test_a_delete_of_a_conversation_keeps_its_screens_and_screen_results(databas
             "INSERT INTO strategy (name, created_at_utc) VALUES ('SMA', %(now)s) RETURNING id", {"now": NOW_UTC}
         ).fetchone()
         assert strategy is not None
+        prompt_version = connection.execute(
+            """
+            INSERT INTO assistant_prompt_version (version_number, text, created_at_utc)
+            VALUES (1, 'Prompt', %(now)s) RETURNING id
+            """,
+            {"now": NOW_UTC},
+        ).fetchone()
+        assert prompt_version is not None
         conversation = connection.execute(
             """
-            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc)
-            VALUES (%(strategy_id)s, 'Talk', %(now)s) RETURNING id
+            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id, fixed_prompt)
+            VALUES (%(strategy_id)s, 'Talk', %(now)s, %(prompt_version_id)s, '') RETURNING id
             """,
-            {"strategy_id": strategy[0], "now": NOW_UTC},
+            {"strategy_id": strategy[0], "now": NOW_UTC, "prompt_version_id": prompt_version[0]},
         ).fetchone()
         assert conversation is not None
         screen_id = insert_screen(connection)
