@@ -125,7 +125,7 @@ def test_the_program_does_not_download_without_a_databento_api_key(
 
 @pytest.mark.anyio
 async def test_the_program_calculates_the_us_universe_of_the_quarters_after_the_import(
-    database_url: str, caplog: pytest.LogCaptureFixture
+    database_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     insert_daily_bars(database_url, nasdaq("AAPL"), weekdays(START, date(2018, 9, 28)), "10", 100)
     monkeypatch.setenv("DATABASE_URL", database_url)
