@@ -50,7 +50,7 @@ puts the new parts of this section in phases.
 ### 9.1.1 Tables
 
 Migrations: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`
-and `backend/migrations/versions/55bb89141c9e_strategy_add_version_source_and_rules.py`.
+and `backend/migrations/versions/c4a8e2f6b913_strategy_add_version_source_and_rules.py`.
 
 | Table | Columns |
 |---|---|
@@ -551,8 +551,12 @@ It needs the multi-instrument backtest of
   edits in the browser).
 - The delay between a rule change and the code request.
 - The buttons of the diff before the save.
-- How the platform tells the strategy the universe of each quarter (phase 3,
-  #142).
+- Decided (#198): the platform tells the strategy the universe of each
+  universe period with NautilusTrader custom data. The strategy calls
+  `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
+  members in `on_data(data)` as `data.data.bar_types`. Its configuration has
+  no `instrument_id`, no `bar_type`, and no universe field
+  ([`backtest.md`](backtest.md) section 10.10.8).
 
 ## 9.9 Strategy templates
 
