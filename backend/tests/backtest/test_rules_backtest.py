@@ -65,7 +65,7 @@ def save_bars_before_the_start(database_url: str, count: int) -> None:
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('BTEST', 'ARCA', 'USD', '1-DAY', %s, 50, 51, 49, 50, 1000)
             """,
             [(datetime(2026, 3, 1, tzinfo=UTC) - timedelta(days=index + 1),) for index in range(count)],
