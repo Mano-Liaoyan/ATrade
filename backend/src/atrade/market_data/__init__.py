@@ -47,6 +47,13 @@ from atrade.market_data.instrument_lookup import (
     InstrumentLookupFailedError,
 )
 from atrade.market_data.live_bar_socket import MARKET_DATA_SOCKET_MESSAGE_MODELS
+from atrade.market_data.stock_split_change import (
+    SplitConfirmation,
+    StockSplitChange,
+    StockSplitConfirmedError,
+    apply_stock_split,
+)
+from atrade.market_data.stock_split_evidence import StockSplitCandidate, read_stock_split_candidates
 from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
 from atrade.market_data.us_universe import (
     UsUniverseCalculationError,
@@ -79,12 +86,17 @@ __all__ = [
     "SavedBarCoverage",
     "SavedBars",
     "SavedExchangeRate",
+    "SplitConfirmation",
+    "StockSplitCandidate",
+    "StockSplitChange",
+    "StockSplitConfirmedError",
     "SymbolLink",
     "UncheckedLink",
     "UsUniverseCalculationError",
     "UsUniverseMember",
     "UsUniverseUpdate",
     "WaitingSplit",
+    "apply_stock_split",
     "calculate_us_universe_history",
     "check_import_detections",
     "check_source_order",
@@ -100,6 +112,7 @@ __all__ = [
     "read_saved_bars",
     "read_saved_exchange_rates",
     "read_source_order",
+    "read_stock_split_candidates",
     "read_unchecked_import_detections",
     "read_unsaved_ranges",
     "read_us_universe_members",
