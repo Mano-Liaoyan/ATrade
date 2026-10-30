@@ -1371,6 +1371,15 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
+            /** Rules */
+            rules: {
+                [key: string]: unknown;
+            } | null;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1385,6 +1394,11 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
