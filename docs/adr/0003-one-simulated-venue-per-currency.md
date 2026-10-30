@@ -23,5 +23,8 @@ backtests keep the exchange as the venue. Decision:
 
 - One multi-instrument backtest has one currency. A USD cash account cannot
   pay for an HKD instrument, and the engine does not convert cash.
-- A multi-instrument forward test must use the same instrument IDs as its
-  backtest, or map them. That design is still open.
+- A multi-instrument forward test uses the live IDs `SYMBOL.EXCHANGE`, not
+  `SYMBOL.SMART`. The live IB account has one account for all venues. A
+  strategy uses only the instrument IDs that the platform gives it and does
+  not write a venue in its code
+  ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146)).
