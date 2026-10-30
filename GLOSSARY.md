@@ -248,9 +248,12 @@ _Avoid_: fallback capital, ledger
 ## AI assistant
 
 **AI assistant**:
-The language model that discusses strategies with the user, writes strategy
-versions, and runs and compares backtests. It never sends a paper order and
-never starts a forward test. In Chinese, write AI 助手.
+The language model that discusses strategies and screens with the user, writes
+strategy versions and new screens, runs screens, and runs and compares
+backtests. It changes only a screen that it made in the same conversation and
+that the user has not kept. It never deletes a screen, never changes the
+watchlist, never sends a paper order, and never starts a forward test. In
+Chinese, write AI 助手.
 _Avoid_: agent, bot, copilot
 
 **Conversation**:
