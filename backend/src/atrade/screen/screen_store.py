@@ -1,5 +1,7 @@
 """SQL for the screen tables. Only the screen capability reads or writes them (docs/architecture/screen.md 24.4)."""
 
+import itertools
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
@@ -35,24 +37,77 @@ class NameInUseError(Exception):
     """Another screen has the name."""
 
 
+@dataclass(frozen=True)
+class NewScreen:
+    name: str
+    market: str
+    definition: object
+
+
 async def insert_screen(
-    connection: psycopg.AsyncConnection, *, name: str, market: str, definition: object, now_utc: datetime
+    connection: psycopg.AsyncConnection,
+    screen: NewScreen,
+    *,
+    now_utc: datetime,
+    assistant_conversation_id: int | None = None,
 ) -> ScreenRecord:
-    """A screen of the user: kept, with no conversation. Raises NameInUseError."""
+    """A screen of the user (kept, no conversation), or of the AI assistant when `assistant_conversation_id` is
+    given (not kept). Raises NameInUseError."""
     async with connection.cursor(row_factory=class_row(ScreenRecord)) as cursor:
         await cursor.execute(
             """
-            INSERT INTO screen (name, market, definition, kept, created_at_utc, updated_at_utc)
-            VALUES (%(name)s, %(market)s, %(definition)s, true, %(now)s, %(now)s)
+            INSERT INTO screen (
+                name, market, definition, kept, assistant_conversation_id, created_at_utc, updated_at_utc
+            )
+            VALUES (%(name)s, %(market)s, %(definition)s, %(kept)s, %(conversation)s, %(now)s, %(now)s)
             ON CONFLICT (name) DO NOTHING
             RETURNING id, name, market, definition, kept, assistant_conversation_id, created_at_utc, updated_at_utc
             """,
-            {"name": name, "market": market, "definition": Jsonb(definition), "now": now_utc},
+            {
+                "name": screen.name,
+                "market": screen.market,
+                "definition": Jsonb(screen.definition),
+                "kept": assistant_conversation_id is None,
+                "conversation": assistant_conversation_id,
+                "now": now_utc,
+            },
         )
         record = await cursor.fetchone()
     if record is None:
         raise NameInUseError
     return record
+
+
+def ai_assistant_names(name: str) -> Iterator[str]:
+    """The name "<name> (AI)", then "<name> (AI 2)", "<name> (AI 3)", and so on (screen.md section 24.8)."""
+    yield f"{name} (AI)"
+    for number in itertools.count(2):
+        yield f"{name} (AI {number})"
+
+
+async def insert_ai_assistant_screen(
+    connection: psycopg.AsyncConnection,
+    screen: NewScreen,
+    *,
+    now_utc: datetime,
+    assistant_conversation_id: int,
+    max_name_length: int,
+) -> ScreenRecord:
+    """A screen of the AI assistant with the first free name of `ai_assistant_names`. Raises NameInUseError when no
+    free name has at most `max_name_length` characters."""
+    for candidate in ai_assistant_names(screen.name):
+        if len(candidate) > max_name_length:
+            raise NameInUseError
+        try:
+            return await insert_screen(
+                connection,
+                NewScreen(name=candidate, market=screen.market, definition=screen.definition),
+                now_utc=now_utc,
+                assistant_conversation_id=assistant_conversation_id,
+            )
+        except NameInUseError:
+            continue
+    raise AssertionError("ai_assistant_names never ends.")
 
 
 async def update_screen(
@@ -136,6 +191,8 @@ class NewScreenResult:
     rows: list[tuple[str, str, str, dict[str, Any]]]
     # (symbol, exchange, currency, reason).
     exclusions: list[tuple[str, str, str, str]]
+    # Null for a run of the user.
+    assistant_conversation_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -183,11 +240,13 @@ async def insert_screen_result(connection: psycopg.AsyncConnection, result: NewS
         """
         INSERT INTO screen_result (
             screen_id, run_at_utc, definition, market, daily_bars_date, run_seconds,
-            start_count, after_filters_count, after_indicator_conditions_count, result_count
+            start_count, after_filters_count, after_indicator_conditions_count, result_count,
+            assistant_conversation_id
         )
         VALUES (
             %(screen_id)s, %(run_at_utc)s, %(definition)s, %(market)s, %(daily_bars_date)s, %(run_seconds)s,
-            %(start_count)s, %(after_filters_count)s, %(after_indicator_conditions_count)s, %(result_count)s
+            %(start_count)s, %(after_filters_count)s, %(after_indicator_conditions_count)s, %(result_count)s,
+            %(assistant_conversation_id)s
         )
         RETURNING id
         """,
@@ -202,6 +261,7 @@ async def insert_screen_result(connection: psycopg.AsyncConnection, result: NewS
             "after_filters_count": result.after_filters_count,
             "after_indicator_conditions_count": result.after_indicator_conditions_count,
             "result_count": len(result.rows),
+            "assistant_conversation_id": result.assistant_conversation_id,
         },
     )
     row = await cursor.fetchone()
