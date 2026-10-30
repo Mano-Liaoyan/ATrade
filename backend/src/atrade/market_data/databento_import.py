@@ -1,5 +1,5 @@
-"""Databento import: saves the daily bars of the bought DBN files in databento_bar, with one saved range for each
-instrument and bar period (docs/architecture/market_data.md section 8.8).
+"""Databento import: saves the daily and the hourly bars of the bought DBN files in databento_bar, with one saved range
+for each instrument and bar period (docs/architecture/market_data.md section 8.8).
 
 The records go to temporary tables first, and SQL makes the bars. Thus the import does not keep the millions of
 records of a full purchase in memory. One transaction: a failed import saves nothing.
@@ -23,14 +23,15 @@ from databento.common.symbology import InstrumentMap
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection
-from atrade.market_data import databento_import_sql
+from atrade.market_data import databento_hourly, databento_import_sql
 from atrade.market_data.bar_source import BarSource, saved_range_table
 from atrade.market_data.bar_store import JOIN_SAVED_RANGE_TEMPLATE, create_key_parameters
 from atrade.market_data.databento_import_adjustment import (
     DetectedSplit,
     IbkrDailyBarReader,
     SymbolLink,
-    link_and_adjust_import_bars,
+    adjust_import_bars,
+    link_and_detect_splits,
 )
 
 NEW_YORK = ZoneInfo("America/New_York")
@@ -39,6 +40,7 @@ NASDAQ_DATASET = "XNAS.ITCH"
 NYSE_DATASET = "XNYS.PILLAR"
 SUMMARY_DATASET = "EQUS.SUMMARY"
 DAILY_SCHEMA = "ohlcv-1d"
+HOURLY_SCHEMA = "ohlcv-1h"
 STATISTICS_SCHEMA = "statistics"
 # The 4 files of the daily bars before 2024-07-01 (section 8.8.1). The import needs all 4 together, because the high,
 # the low, and the volume come from both exchanges.
@@ -51,6 +53,9 @@ HISTORY_FILE_KINDS = frozenset(
     }
 )
 SUMMARY_FILE_KIND = (SUMMARY_DATASET, DAILY_SCHEMA)
+# The hourly bars are XNAS.ITCH only (section 8.8.2).
+HOURLY_FILE_KIND = (NASDAQ_DATASET, HOURLY_SCHEMA)
+READ_FILE_KINDS = HISTORY_FILE_KINDS | {SUMMARY_FILE_KIND, HOURLY_FILE_KIND}
 # The `statistics` stat_type of the official open and the official close. INSERT_HISTORY_BARS uses the same values.
 OFFICIAL_PRICE_STAT_TYPES = frozenset({1, 11})
 NEW_STATISTIC_ACTION = 1
@@ -72,6 +77,8 @@ class DatabentoImportReport:
     `symbols_without_listing_exchange`: EQUS.SUMMARY symbols without an earlier Databento daily bar. The import does
     not know their listing exchange and saves no bar for them.
     `stock_splits` and `symbol_links`: what the import found (sections 8.8.3 and 8.8.4).
+    `symbols_without_daily_bar`: symbols with hourly bars of a universe quarter on a day without a Databento daily
+    bar. The import does not know their official open and saves no hourly bar of that day.
     """
 
     saved_bar_count: int
@@ -79,6 +86,7 @@ class DatabentoImportReport:
     symbols_without_listing_exchange: list[str]
     stock_splits: list[DetectedSplit] = field(default_factory=list[DetectedSplit])
     symbol_links: list[SymbolLink] = field(default_factory=list[SymbolLink])
+    symbols_without_daily_bar: list[str] = field(default_factory=list[str])
 
 
 def to_price(fixed_price: int) -> Decimal:
@@ -105,6 +113,15 @@ def create_daily_row(dataset: str, record: databento_dbn.OHLCVMsg, instrument_ma
         return ()
     prices = (to_price(record.open), to_price(record.high), to_price(record.low), to_price(record.close))
     return (dataset, symbol, trading_day, *prices, record.volume)
+
+
+def create_hourly_row(record: databento_dbn.OHLCVMsg, instrument_map: InstrumentMap) -> tuple[object, ...]:
+    start_utc = datetime.fromtimestamp(record.ts_event // NANOSECONDS_PER_SECOND, tz=UTC)
+    symbol = instrument_map.resolve(record.instrument_id, start_utc.date())
+    if symbol is None:
+        return ()
+    prices = (to_price(record.open), to_price(record.high), to_price(record.low), to_price(record.close))
+    return (symbol, start_utc, *prices, record.volume)
 
 
 def create_statistic_row(
@@ -138,7 +155,7 @@ def copy_file_records(connection: psycopg.Connection, path: Path) -> tuple[tuple
     store = databento.DBNStore.from_file(path)
     metadata = store.metadata
     file_kind = (metadata.dataset, str(metadata.schema))
-    if file_kind not in HISTORY_FILE_KINDS and file_kind != SUMMARY_FILE_KIND:
+    if file_kind not in READ_FILE_KINDS:
         message = f"{path.name}: the import does not read {file_kind[0]} {file_kind[1]} files."
         raise DatabentoImportError(message)
     instrument_map = InstrumentMap()
@@ -150,6 +167,11 @@ def copy_file_records(connection: psycopg.Connection, path: Path) -> tuple[tuple
             if isinstance(record, databento_dbn.StatMsg)
         )
         copy_rows(connection, databento_import_sql.COPY_STATISTICS, statistic_rows)
+    elif file_kind == HOURLY_FILE_KIND:
+        hourly_rows = (
+            create_hourly_row(record, instrument_map) for record in store if isinstance(record, databento_dbn.OHLCVMsg)
+        )
+        copy_rows(connection, databento_hourly.COPY_HOURLY_RECORDS, hourly_rows)
     else:
         daily_rows = (
             create_daily_row(metadata.dataset, record, instrument_map)
@@ -233,7 +255,7 @@ def read_file_kinds(connection: psycopg.Connection, file_paths: list[Path]) -> d
 def import_databento_files(
     *, database_url: str, file_paths: list[Path], read_ibkr_daily_bars: IbkrDailyBarReader | None = None
 ) -> DatabentoImportReport:
-    """Imports the DBN files of the daily bar purchase (section 8.8.1). A second import of the same files adds no
+    """Imports the DBN files of the daily and the hourly bar purchase (section 8.8.1). A second import of the same files adds no
     row: a saved bar gets the same values, and the saved ranges join.
 
     Without `read_ibkr_daily_bars`, the detection rule finds the stock splits of all instruments (section 8.8.3).
@@ -258,16 +280,25 @@ def import_databento_files(
                 connection, databento_import_sql.SELECT_SYMBOLS_WITHOUT_LISTING_EXCHANGE, summary_range
             )
             saved_ranges.append(summary_range)
-        symbol_links, stock_splits = link_and_adjust_import_bars(connection, read_ibkr_daily_bars)
+        symbol_links, stock_splits = link_and_detect_splits(connection, read_ibkr_daily_bars)
+        hourly_range = to_whole_days(kind_ranges[HOURLY_FILE_KIND]) if HOURLY_FILE_KIND in kind_ranges else None
+        symbols_without_daily_bar: list[str] = []
+        if hourly_range is not None:
+            symbols_without_daily_bar = databento_hourly.insert_hourly_bars(connection, hourly_range)
+        adjust_import_bars(connection)
+        databento_hourly.set_official_open(connection)
         saved_bar_count = connection.execute(databento_import_sql.SAVE_IMPORT_BARS).rowcount
         for saved_range in saved_ranges:
             save_saved_ranges(connection, saved_range)
+        if hourly_range is not None:
+            databento_hourly.save_hourly_saved_ranges(connection, hourly_range)
     return DatabentoImportReport(
         saved_bar_count=saved_bar_count,
         symbols_without_official_close=symbols_without_official_close,
         symbols_without_listing_exchange=symbols_without_listing_exchange,
         stock_splits=stock_splits,
         symbol_links=symbol_links,
+        symbols_without_daily_bar=symbols_without_daily_bar,
     )
 
 
