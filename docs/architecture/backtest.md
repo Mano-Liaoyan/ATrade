@@ -343,6 +343,7 @@ clock, exchange_rate_reader)`, `BacktestRunner(*, database_url, clock, process_c
 | `GET /api/backtests` | `200` with all backtests, the newest first. |
 | `GET /api/backtest-limits` | `200` with `{"timeout_seconds", "concurrency"}`. The defaults are `7200` and `1`. |
 | `PUT /api/backtest-limits` | Body `{"timeout_seconds", "concurrency"}`. `200` with the saved limits. `422` when `timeout_seconds` is not from 1 to 604800 or `concurrency` is not from 1 to 16. |
+| `GET /api/us-universe/range` | `200` with `{"first_day_utc", "last_day_utc"}`: the first and the last quarter start in `us_universe_member`. Both are null without universe data. Done in #200 (section 10.10.6). |
 | `GET /api/backtests/{backtest_id}` | `200` with the backtest, `equity_curve` (`[{"time_utc", "equity_usd"}]`), and `trades`. `404` when the backtest does not exist. |
 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `200` with `{"strategy_id", "strategy_name", "first", "second"}`. `first` and `second` are the two backtests as `GET /api/backtests/{backtest_id}` gives them, each with the `code` of its strategy version. `422` when the two backtests use different strategies, or when the two IDs are the same. `404` when a backtest does not exist. Section 10.7. |
 
@@ -362,7 +363,7 @@ Changes of later phases:
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, universe_periods, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6, done in #199 for `single`, `rule`, and `list`) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. Done in #203: the list has no sweep runs. The query `sweep_id` is not there yet; `GET /api/sweeps/{sweep_id}` lists the runs. |
-| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
 | 3 | `/api/sweeps` | New routes, section 10.11.3. |
 
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
@@ -949,6 +950,11 @@ before `start_utc`. Each later quarter that starts before `end_utc` is one
 more period. When no quarter starts at or before `start_utc`, the route
 refuses the request ("No universe data covers the range").
 
+Decided (#200): the "New backtest" form reads the first and the last day
+with universe data from the new route `GET /api/us-universe/range`
+(section 6). The days are the first and the last quarter start in
+`us_universe_member`.
+
 ### 10.10.7 Frontend
 
 - The "Instrument" select of the "New backtest" form becomes "Instruments".
@@ -973,6 +979,19 @@ refuses the request ("No universe data covers the range").
   columns are right aligned and use tabular numbers.
 - The Trades table adds the column Symbol.
 - The `KeyMetricRow` and the `EquityDrawdownChart` do not change.
+- Done in #200 (not the Screen option, #208): `StartBacktestDialog.svelte`
+  (the Instruments select, the N input with the universe range, the
+  watchlist with the warning), `backtest/backtest_universe.ts` (the header
+  label and the N check), `UniverseInstrumentTable.svelte` (the Instruments
+  tab), and the Symbol column of `BacktestTradeTable.svelte`. Decided
+  (#200): the Watchlist option sends `universe_kind=list` with all
+  watchlist instruments that have saved bars of the bar period. The
+  Instruments tab is on each backtest; a single-instrument backtest shows
+  "No instruments". When N is not from 1 to 500, "Start backtest" is
+  disabled, and the N field shows the reason. Backend:
+  `backtest/universe_instruments.py`. Tests:
+  `backend/tests/backtest/test_universe_instruments.py`,
+  `frontend/src/lib/backtest/backtest_universe.test.ts`.
 
 ### 10.10.8 Left to the implementation
 
@@ -1221,8 +1240,12 @@ Phase 3. Sources: [#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
   `frontend/src/routes/backtests/BarSourceTable.svelte`. Tests:
   `backend/tests/backtest/test_backtest_bar_sources.py`,
   `frontend/e2e/backtest_bar_sources.spec.ts`.
-- Left to the implementation: whether a `list` universe also shows the
-  warning on the backtest page. The English warning text is a translation
+- Decided (#200): a `list` universe uses the same backend rule
+  (`survivorship_bias`) on the backtest page as each other backtest: the
+  rule of the currency and the start date. The "New backtest" form always
+  shows the warning for the Watchlist option. Reason: the simplest
+  solution; the backtest page needs no new rule.
+- Left to the implementation: none. The English warning text is a translation
   of the decided Chinese text.
 
 ## 10.13 Backtests of the AI assistant
