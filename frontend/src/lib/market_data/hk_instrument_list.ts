@@ -13,7 +13,7 @@ export type HkInstrumentsAdded = components['schemas']['AddHkInstrumentsResponse
 type HkInstrumentListResponse = components['schemas']['HkInstrumentListResponse'];
 
 const HK_INSTRUMENT_LIST_PATH = '/api/market-data/hk-instrument-list';
-// The backend sends {"detail": "<message>"} for 404, 502, and 503. A proxy sends no JSON.
+// The start of the error message when the response has no {"detail": "<message>"}, for example from a proxy.
 const FAILED_ACTION = 'The HK instrument list request';
 
 // The user pastes symbols from a list or a spreadsheet: spaces, tabs, commas, and line ends separate them.

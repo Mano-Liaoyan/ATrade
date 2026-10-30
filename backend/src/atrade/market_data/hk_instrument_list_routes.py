@@ -87,10 +87,11 @@ class HkInstrumentListRoutes:
             else:
                 found.append(instrument)
         added: list[str] = []
+        added_at_utc = self.clock.read_now_utc()
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             for instrument in found:
                 is_added = await hk_instrument_list_store.insert_member(
-                    connection, instrument=instrument, added_at_utc=self.clock.read_now_utc()
+                    connection, instrument=instrument, added_at_utc=added_at_utc
                 )
                 (added if is_added else already_in_list).append(instrument.symbol)
             await connection.commit()

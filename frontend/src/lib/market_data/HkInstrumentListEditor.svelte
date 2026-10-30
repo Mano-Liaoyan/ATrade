@@ -39,6 +39,7 @@
   let invalidText = $state<string | null>(null);
   let isAdding = $state(false);
   let symbolResults = $state<SymbolResult[]>([]);
+  let deletingIds = $state<number[]>([]);
 
   async function readInstruments(): Promise<void> {
     const listResult = await listHkInstrumentList(fetch);
@@ -88,7 +89,9 @@
   }
 
   async function deleteInstrument(instrument: HkInstrument): Promise<void> {
+    deletingIds = [...deletingIds, instrument.id];
     const deleteResult = await deleteFromHkInstrumentList(fetch, instrument.id);
+    deletingIds = deletingIds.filter((deletingId) => deletingId !== instrument.id);
     if (deleteResult.kind === 'failed') {
       changeMessage = deleteResult.message;
       return;
@@ -143,10 +146,15 @@
               <th scope="row">{instrument.symbol}</th>
               <td class="time">{formatUtcTime(instrument.added_at_utc)}</td>
               <td class="cds--table-column-menu delete-cell">
+                {@const isDeleting = deletingIds.includes(instrument.id)}
                 <IconButton
-                  label="Delete {instrument.symbol} from the HK instrument list"
+                  label={isDeleting
+                    ? `Deleting ${instrument.symbol} from the HK instrument list`
+                    : `Delete ${instrument.symbol} from the HK instrument list`}
                   icon={TrashCan16}
                   align="left"
+                  disabled={isDeleting}
+                  busy={isDeleting}
                   onclick={() => {
                     void deleteInstrument(instrument);
                   }}
