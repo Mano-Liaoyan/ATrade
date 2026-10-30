@@ -113,7 +113,6 @@
       href: resolve('/backtests/[[backtestId]]', { backtestId: String(backtest.id) }),
       metrics: backtest.metrics,
       startCapitalUsd: backtest.paper_capital_usd,
-      trades: backtest.trades,
     };
   }
 

@@ -1,21 +1,25 @@
-"""Public entry of the backtest capability: backtest runs, their results, the metric functions (with PSR and DSR), backtests for
-other capabilities (queue one, read its outcome), and the look-back bars of `request_bars`."""
+"""Public entry of the backtest capability: backtest runs, their results, the metric functions (with PSR and DSR),
+backtests for other capabilities (queue one, read its outcome, the last IDs of a strategy), and the look-back bars of
+`request_bars`."""
 
 from atrade.backtest.backtest_access import (
     BacktestOutcome,
     check_backtest_request,
     queue_backtest,
     read_backtest_outcome,
+    read_last_backtest_ids,
 )
 from atrade.backtest.backtest_metrics import (
     BacktestMetrics,
     BacktestTrade,
     EquityPoint,
     RoundTrip,
+    SplitMetrics,
     calculate_daily_returns,
     calculate_equity_curve,
     calculate_metrics,
     calculate_round_trip_metrics,
+    calculate_split_metrics,
     calculate_universe_equity_curve,
     find_round_trips,
 )
@@ -39,12 +43,14 @@ __all__ = [
     "BacktestTrade",
     "EquityPoint",
     "RoundTrip",
+    "SplitMetrics",
     "calculate_daily_returns",
     "calculate_deflated_sharpe",
     "calculate_equity_curve",
     "calculate_metrics",
     "calculate_probabilistic_sharpe",
     "calculate_round_trip_metrics",
+    "calculate_split_metrics",
     "calculate_universe_equity_curve",
     "check_backtest_request",
     "create_backtest_router",
@@ -53,6 +59,7 @@ __all__ = [
     "find_sharpe_probability_status",
     "queue_backtest",
     "read_backtest_outcome",
+    "read_last_backtest_ids",
     "run_backtest",
     "write_look_back_catalog",
 ]

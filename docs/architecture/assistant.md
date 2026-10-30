@@ -21,7 +21,9 @@ routes of an allow-list.
 This section is the target. Most of it is not implemented. #178 adds the
 service skeleton and the networks (25.2, 25.3.1). #179 adds the
 conversations, the titles, `/ws/assistant` with `prompt`, `steer`, and
-`abort`, and the first 5 browser routes (25.8, 25.10, 25.11). The tickets name facts
+`abort`, and the first 5 browser routes (25.8, 25.10, 25.11). #184 adds the
+system prompt, the prompt versions, their 2 routes, and the "Prompt" dialog
+component (25.9). The tickets name facts
 that nobody ran. Section 25.15 lists them.
 
 ## 25.1 Phases
@@ -473,7 +475,7 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 | `assistant_conversation` | `id`, `title`, `title_state`, `strategy_id`, `created_at_utc`, `prompt_version_id` (foreign key to `assistant_prompt_version`, added by #184), `last_provider`, `last_model`, `last_credential_name` |
 | `assistant_prompt_version` | See 25.9. |
 
-Implemented (#179):
+Implemented (#179, #184):
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -483,7 +485,11 @@ Implemented (#179):
 | `title_state` | `text` | `new`, `generating`, `generated`, `not_generated` (the generation failed), or `renamed`. |
 | `created_at_utc` | `timestamptz` | The creation time. |
 | `last_provider`, `last_model`, `last_credential_name` | `text`, nullable | The provider, model, and credential name of the last AI assistant message. Null before the first answer. |
+| `prompt_version_id` | `bigint`, foreign key to `assistant_prompt_version` | The prompt version of the conversation (#184). All runs of the conversation use it. |
+| `fixed_prompt` | `text` | The fixed part of the system prompt, made when the conversation starts (#184, 25.9). |
 
+- Implemented (#184): the routes of 25.11 answer each conversation also with
+  `prompt_version_id` and `prompt_version_number` (for "Prompt v3").
 - The JSONL file of a conversation is `/data/conversations/<id>.jsonl` in
   the volume `atrade-assistant-pi`. Before each run, `assistant` adds a pi
   custom entry `atrade_credential` with the credential name. So each AI
@@ -564,6 +570,40 @@ editable part.
 - The forbidden actions in the prompt only tell the model. They are not a
   security control. The allow-list of port 8001 is the control (25.3).
 
+Implemented (#184):
+
+- `web` makes the system prompt, not `assistant`. The default editable part
+  is `make_default_text()` in `backend/src/atrade/assistant/system_prompt.py`.
+  It has the role, the rules of strategy section 9.2 with the "Blank code"
+  start point (`STRATEGY_TEMPLATE`, which `app/` gives to `assistant`), and
+  the answer rules.
+- The system prompt is the editable part, an empty line, and the fixed part.
+  The fixed part is the forbidden actions and these lines:
+
+  ```text
+  The context at the start of this conversation:
+  - The open strategy: ID <strategy ID>, name <strategy name>.
+  - The open version: <version number>.
+  - The last 3 backtests of the strategy: <backtest IDs>.
+  ```
+
+  A missing version or no backtest gives `none`. The backtest IDs are the
+  newest first, from all versions of the strategy.
+- The browser sends the open version number in the body of
+  `POST /api/assistant/conversations`: `{"strategy_id", "version_number"}`.
+  `version_number` is optional. `web` reads the strategy name and the last 3
+  backtests when the conversation starts, and saves the fixed part in
+  `assistant_conversation.fixed_prompt`. So all runs of one conversation get
+  the same system prompt, also after a rename of the strategy or a new
+  backtest.
+- `assistant` imports only `foundation` (section 6.2). `app/web.py` gives
+  `create_assistant_router()` a start context reader that calls
+  `strategy.read_strategy_outline()` and `backtest.read_last_backtest_ids()`.
+- `web` sends the system prompt with each run (`system_prompt` in
+  `POST /conversations/{id}/runs`, 25.14). pi adds one section after it:
+  `<cwd>` with the pi directory. pi adds nothing else, because the prompt is
+  a custom prompt.
+
 ### 25.9.1 `assistant_prompt_version`
 
 | Table | Columns |
@@ -579,6 +619,26 @@ editable part.
 - So all answers in one conversation use the same prompt and are easy to
   compare. To use a new prompt, the user starts a new conversation.
 
+Implemented (#184):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `bigint` identity | The prompt version ID. |
+| `version_number` | `integer`, unique, 1 or more | 1, 2, 3, … The next save takes the highest number plus 1. |
+| `text` | `text`, 1 to 50000 characters | The editable part. |
+| `created_at_utc` | `timestamptz` | The save time. |
+
+- The trigger `assistant_prompt_version_append_only` refuses each `UPDATE`,
+  like `strategy_version_append_only`.
+- A save locks the table (`EXCLUSIVE` mode) in its transaction, so 2 saves
+  cannot take the same number.
+- The default text is saved as version 1 when no version exists and a
+  conversation starts or the dialog lists the versions. So the list is never
+  empty. A later change of the default text in the code does not change
+  version 1. "Restore default" puts the default of the code in the text area.
+- The conversations of #179 got version 1 with their old system prompt "You
+  are the ATrade strategy assistant." in the migration.
+
 ### 25.9.2 Prompt dialog
 
 - The "Prompt" icon button of the assistant side column opens a `Dialog`.
@@ -587,6 +647,13 @@ editable part.
   button.
 - "Restore default" puts the default text in the text area. It saves
   nothing. The user must click "Save as new version".
+- Implemented (#184): `PromptDialog` in `frontend/src/lib/assistant/`, with
+  its logic in `prompt_dialog.ts`. The dialog opens with the latest version.
+  A version of the `Select` puts its text in the text area. The text area
+  and the fixed part each scroll in a `ScrollRegion`. The 2 buttons are in
+  the dialog content, so the dialog has no other button than Close. A save
+  of an empty text shows the error "Enter the prompt text.". #185 puts the
+  dialog in the assistant side column.
 
 ## 25.10 `/ws/assistant`
 
@@ -709,6 +776,17 @@ below are choices of this document. The implementation can change them.
   - `DELETE {conversation_id}` answers `204`.
   - A conversation that does not exist gets `404`. `GET {conversation_id}`
     and `DELETE` answer `503` when `assistant` is not reachable.
+- #184 implements the prompt version rows:
+  - `GET` answers `{"prompt_versions": [...], "default_text", "fixed_part"}`.
+    The versions are the newest first. Each has `id`, `version_number`,
+    `text`, and `created_at_utc`. `fixed_part` has the names of the values
+    (`<strategy ID>`, …) in the place of the values.
+  - `POST` takes `{"text"}` (1 to 50000 characters after the trim) and
+    answers `201` with the new version. These routes refuse nothing else, so
+    they declare no `ErrorResponse`. A text that is not valid gets FastAPI's
+    `422`.
+  - `POST /api/assistant/conversations` also takes the optional
+    `version_number` (25.9).
 - #183 implements the providers and credentials rows:
   - `GET /api/assistant/providers` answers `{"providers": [{id, name,
     login_methods, models: [{id, name}]}]}` (25.7.1).
@@ -858,7 +936,7 @@ columns behave the same (section 13).
 
   | Request | Answer |
   |---|---|
-  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id}` | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`. The answer ends when the run ends. |
+  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`. The answer ends when the run ends. |
   | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
   | `POST /conversations/{id}/abort` | `204`. |
   | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |
@@ -908,8 +986,11 @@ columns behave the same (section 13).
   (`ON DELETE CASCADE`). The JSONL files stay in the volume.
 - Decided (#179): a title generation failure reaches the browser as an
   `error` message (25.8.3).
-- Whether the default prompt is saved as prompt version 1, or only exists in
-  code until the first save.
+- Decided (#184): the default prompt is saved as prompt version 1 when no
+  version exists and a conversation starts or the Prompt dialog lists the
+  versions. The browser sends the open version number in the body of the
+  new conversation request. A trigger refuses each `UPDATE` of a prompt
+  version. See 25.9.
 - Which part enforces the 5 backtests of one user message: only the tool, or
   also port 8001.
 - How the AI assistant finds the instruments and bar periods with saved bars.

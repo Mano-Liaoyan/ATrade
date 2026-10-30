@@ -33,6 +33,8 @@ class FakeAssistantService:
     def __init__(self) -> None:
         self.run_scripts: list[list[ScriptItem]] = []
         self.runs: list[tuple[int, str, ModelSelection]] = []
+        # The system prompt of each run, in the order of runs.
+        self.system_prompts: list[str] = []
         self.steers: list[tuple[int, str]] = []
         self.aborts: list[int] = []
         self.title_requests: list[tuple[int, ModelSelection]] = []
@@ -62,9 +64,12 @@ class FakeAssistantService:
     def release(self) -> None:
         self.release_event.set()
 
-    async def run(self, conversation_id: int, text: str, selection: ModelSelection) -> AsyncIterator[RunEvent]:
+    async def run(
+        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+    ) -> AsyncIterator[RunEvent]:
         self.require_reachable()
         self.runs.append((conversation_id, text, selection))
+        self.system_prompts.append(system_prompt)
         script = self.run_scripts.pop(0) if self.run_scripts else []
         self.run_started.set()
         for item in script:
