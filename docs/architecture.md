@@ -920,9 +920,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     table has an "Owner" column, "Unattributed: <n>" with a warning icon, and
     the "Split check needed" row with "Apply split <ratio>" and "Keep
     ledger" (phase 3, sections 11 and 12).
-  - A settings page has the "Source order" list of the bar sources
-    (`docs/architecture/market_data.md`). Its route and the place of the HK
-    instrument list editor are left to the implementation.
+  - The settings page `/settings` has the "Source order" list of the bar
+    sources (`docs/architecture/market_data.md` section 8.7.3). The header
+    link "Settings" is the last page link. The place of the HK instrument
+    list editor is left to the implementation.
   - A survivorship bias warning (icon, word, and warning color) shows on HK
     screens, on HK backtest results, and on US backtest results that start
     before 2018-05-01.
@@ -1684,6 +1685,9 @@ option and records it in this document.
 - Decided (#188): the watchlist `saved_bars` items keep the first and the
   last bar start of each bar table. The backtest form shows, for one bar
   period, the earliest first bar and the latest last bar of all bar sources.
+- Decided (#189): the settings page route is `/settings`. Its header link
+  "Settings" comes after "Forward tests". `SourceOrderList` is in
+  `#lib/market_data`.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each

@@ -1,4 +1,4 @@
-// Public entry of market_data: instrument search and its panel, bars, live bars, and the bar chart.
+// Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, and the source order.
 export { default as BarChart } from './BarChart.svelte';
 export { default as InstrumentSearch } from './InstrumentSearch.svelte';
 export {
@@ -28,3 +28,12 @@ export {
   type Instrument,
   type InstrumentSearchResult,
 } from './instrument_search';
+export { default as SourceOrderList } from './SourceOrderList.svelte';
+export {
+  formatBarSource,
+  moveBarSource,
+  readSourceOrder,
+  saveSourceOrder,
+  type BarSource,
+  type MoveDirection,
+} from './source_order';
