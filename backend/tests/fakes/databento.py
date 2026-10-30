@@ -1,7 +1,7 @@
 """Databento fake: writes small hand-made DBN files, the format of a Databento batch download.
 
 `FakeDatabentoClient` has the same functions as `DatabentoClient` of the `market_data` public entry. It never calls
-Databento (docs/architecture.md section 17.3). Tests set `batch_jobs` directly and read `downloaded_job_ids`.
+Databento (docs/architecture.md section 17.3). Tests set `batch_jobs` and the EQUS.SUMMARY records, and read the downloads.
 No mock library is used.
 """
 
@@ -173,11 +173,37 @@ def write_dbn_files(directory: Path, dbn_files: list[DbnFile]) -> list[Path]:
 
 
 class FakeDatabentoClient:
-    def __init__(self, batch_jobs: dict[str, list[DbnFile]]) -> None:
-        self.batch_jobs = batch_jobs
+    """`summary_records` are the EQUS.SUMMARY daily bars that Databento has. Only the records before
+    `summary_end` are available. Tests change `summary_end` to make a bar available later."""
+
+    def __init__(
+        self,
+        batch_jobs: dict[str, list[DbnFile]] | None = None,
+        summary_records: list[DailyRecord] | None = None,
+        summary_end: date = date(2000, 1, 1),
+    ) -> None:
+        self.batch_jobs = batch_jobs or {}
+        self.summary_records = summary_records or []
+        self.summary_end = summary_end
         self.downloaded_job_ids: list[str] = []
+        self.summary_downloads: list[tuple[date, date]] = []
+        self.summary_end_reads = 0
 
     def download_batch_job(self, job_id: str, output_dir: Path) -> list[Path]:
         """Writes the files of the batch job to `<output_dir>/<job_id>/`, like `batch.download` of Databento."""
         self.downloaded_job_ids.append(job_id)
         return write_dbn_files(output_dir / job_id, self.batch_jobs[job_id])
+
+    def read_daily_summary_end_utc(self) -> datetime:
+        self.summary_end_reads += 1
+        return datetime.combine(self.summary_end, time(), tzinfo=UTC)
+
+    def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
+        """Databento refuses a range after the available end, so the fake refuses it too."""
+        if end > self.summary_end:
+            message = f"The EQUS.SUMMARY data ends on {self.summary_end}. The request ends on {end}."
+            raise ValueError(message)
+        self.summary_downloads.append((start, end))
+        records = [record for record in self.summary_records if start <= record.trading_day < end]
+        dbn_file = DbnFile("EQUS.SUMMARY", DAILY_SCHEMA, start, end, daily_records=records)
+        return write_dbn_files(output_dir, [dbn_file])[0]

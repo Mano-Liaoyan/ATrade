@@ -552,7 +552,9 @@ Table `us_universe_member`:
 Quarterly update in the `forward-test` worker:
 
 1. At 06:00 ET on the first trading day of the quarter, download the
-   EQUS.SUMMARY `ohlcv-1d` bars of the previous quarter (`ALL_SYMBOLS`).
+   EQUS.SUMMARY `ohlcv-1d` bars of the 100 calendar days to the previous
+   trading day (`ALL_SYMBOLS`). 100 days always hold 63 trading days, also
+   when the previous quarter has fewer.
 2. Calculate the members and save them in one transaction.
 3. When the bar of the previous trading day is not available, try again each
    15 minutes until 09:00 ET.
@@ -562,7 +564,27 @@ Quarterly update in the `forward-test` worker:
 5. The strategies get the new members before the market opens.
 
 - The cost is about 1.3 USD each quarter (`get_cost`: 1.23 to 1.36 USD).
-- The update needs the setting `DATABENTO_API_KEY`.
+- The update needs the setting `DATABENTO_API_KEY`. Without it, the update
+  does not run, and the `forward-test` log tells why.
+- Code (#192): `market_data/us_universe.py` (`save_us_universe`,
+  `calculate_us_universe_history`, `read_us_universe_members`),
+  `market_data/us_universe_update.py` (`UsUniverseUpdate`),
+  `market_data/us_trading_days.py`, and `market_data/us_etf_symbols.py`.
+  The Databento client gets `read_daily_summary_end_utc()`
+  (`metadata.get_dataset_range`) and `download_daily_summary()`
+  (`timeseries.get_range`). Tests: `tests/market_data/test_us_universe.py`
+  and `tests/market_data/test_us_universe_update.py`.
+- The average trading value is the sum of close × volume in the window
+  divided by 63. A day without a bar of the instrument counts as 0. The
+  same value gives the lower rank to the symbol later in alphabetical order.
+- A day of the 63-day window is a day with Databento daily bars in
+  `databento_bar`. `last_ranking_day_utc` is the last day with bars that the
+  window used. The calculation refuses a window with less than 63 days, or
+  a window that starts more than 100 calendar days before the last ranking
+  day (a gap in `databento_bar`), and saves nothing.
+- A saved quarter does not change. The history calculation adds only the
+  quarters without members, so a quarter that the update calculated with the
+  earlier window keeps it.
 
 ## 8.10 HK instrument list
 
@@ -672,6 +694,12 @@ This section has only the market data part. The forward test part is in
   for each member.
 - Multi-instrument forward tests support only daily bars, with 500
   instruments at most.
+- Implemented (#216): the fetcher gets the ranges to read from
+  `read_unsaved_ranges(*, database_url, bar_request)` of the public entry.
+  It returns the parts of the range that no bar source in the global source
+  order saved, oldest first, and never calls IBKR. The bars route uses the
+  same rule for its missing parts. The fetcher saves with
+  `save_received_bars`.
 
 ## 8.13 Stock splits in the stored bars
 
@@ -758,22 +786,38 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - How the stored day of evidence A is chosen, the tolerance for "ratio is
   1", and how ATrade finds the ex-date when evidence A comes days after the
   ex-date.
-- How the universe rule knows a common stock from an ETF without the
-  Databento `definition` schema.
-- The first quarter of `us_universe_member`. The first quarter with a full
-  63-day window after 2018-05-01 starts on 2018-10-01.
+- Decided (#192): the universe rule leaves out the symbols of
+  `market_data/us_etf_symbols.py`, a list of ETFs and ETNs with a high
+  trading value. Only the instruments with the highest trading values can be
+  members, so the list does not need all ETFs. Add a symbol when an ETF shows
+  in `us_universe_member`.
+- Decided (#192): the first quarter of `us_universe_member` starts on
+  2018-10-01, the first quarter with a full 63-day window after 2018-05-01.
+  The Databento import program calculates each quarter from 2018-10-01 that
+  has no members and a Databento bar on its previous trading day.
 - The official open of the hourly 9:30 ET bar from 2024-07-01, because the
   purchase has no `statistics` from that day.
-- Whether the quarterly update saves the downloaded EQUS.SUMMARY bars in
-  `databento_bar`.
+- Decided (#192): the quarterly update saves the downloaded EQUS.SUMMARY
+  bars in `databento_bar` with the Databento import, because the calculation
+  reads only `databento_bar`.
+- Decided (#192): the trading calendar of "first trading day of the
+  quarter" and "previous trading day" is weekdays without New Year's Day
+  (Monday 2 January when 1 January is a Sunday) and Good Friday. These are
+  the only US exchange holidays near a quarter start. "Before the market
+  opens" is 06:00 to 09:00 ET (`America/New_York`).
+- Decided (#192): no table records each calculation. The `forward-test` log
+  has the tries, the 09:00 ET fallback, and the errors. After an error, the
+  update tries again after 15 minutes.
 - The time of the daily bar update after the US close and after the Hong
   Kong close, and the trading calendars that it uses.
 - How `daily_bar_summary` decides "still trading", and how it is calculated
   again after a change of the global source order.
-- The daily bar update (`web`, client ID of the Web process) and the bar
-  fetcher (`forward-test`, client ID 20) can save the same instrument at the
-  same time. The fill lock of section 8.4 is only in the Web process. Both
-  saves use the same SQL, so a second save adds no row.
+- Decided (#216): the daily bar update (`web`, client ID of the Web
+  process) and the bar fetcher (`forward-test`, client ID 20) can save the
+  same instrument at the same time. The fill lock of section 8.4 is only in
+  the Web process. Both saves use the same SQL (`save_received_bars`), so a
+  second save adds no row. A test of the bar fetcher saves the same bars a
+  second time and finds the same bar count.
 - How symbol reuse is handled: a symbol that a different company uses later.
 - The bar start of the hourly 9:30 ET bar is not on a whole hour from the
   UNIX epoch (section 8.4). The bars route widens a range to whole bar
