@@ -193,7 +193,7 @@ rules.
 ```
 market_data   -> ibkr
 watchlist     -> market_data
-strategy      -> (foundation only)
+strategy      -> indicator
 indicator     -> (foundation only)
 screen        -> indicator, market_data, watchlist
 backtest      -> strategy, market_data, screen
@@ -205,6 +205,9 @@ app           -> all modules
 ```
 
 - `ibkr` depends on no capability.
+- `strategy -> indicator` is for the rule builder (#172): the rules check
+  reads `INDICATOR_CATALOG` and `check_indicator_reference()`, and the code
+  from the rules names the `atrade.indicator` classes.
 - `forward_test -> paper_trading` is for the paper account check
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
   start). From phase 3 (section 20.1) it is also for the owner ledger
@@ -1710,6 +1713,10 @@ option and records it in this document.
   `find_round_trips` with no change, because `select_fills` already gives
   `BacktestTrade` rows. The metrics of the forward test routes have
   `net_profit_usd` (forward test section 12.10).
+- Decided (#172): `strategy` imports `indicator` (section 6.2). The rules
+  format, the code from the rules, the empty group, the stop loss and take
+  profit reference price, and the count of "Exit after N bars" are in
+  strategy sections 9.8.2 and 9.8.3.
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1777,6 +1784,9 @@ option and records it in this document.
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.
+- Decided (#189): the "Source order" section comes after "HK instrument
+  list" on the settings page, so the HK table with its own scroll track
+  stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
