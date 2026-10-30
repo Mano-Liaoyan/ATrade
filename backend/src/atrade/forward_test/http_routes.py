@@ -5,7 +5,7 @@ The Web process writes only `desired_state` after the start. The forward-test wo
 """
 
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -25,11 +25,15 @@ from atrade.forward_test.forward_test_store import (
     StartRefusal,
     UniverseKind,
 )
+from atrade.forward_test.forward_test_universe import (
+    find_calendar_quarter_start_utc,
+    find_current_us_universe_quarter,
+    read_us_universe_instruments,
+)
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
-from atrade.market_data import read_us_universe_members, read_us_universe_quarter_starts
 from atrade.paper_trading import ManualOrderLedger, PaperAccountCheckError, PaperAccountMonitor
 from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 from atrade.watchlist import read_watchlist_instruments
@@ -253,12 +257,6 @@ def read_universe_body(request: StartForwardTestRequest) -> UniverseBody:
     return request.universe
 
 
-def find_calendar_quarter_start_utc(now_utc: datetime) -> datetime:
-    """The start of the calendar quarter that contains `now_utc`."""
-    first_month_of_quarter = 3 * ((now_utc.month - 1) // 3) + 1
-    return datetime(now_utc.year, first_month_of_quarter, 1, tzinfo=UTC)
-
-
 class ForwardTestRoutes:
     """The route functions. They share the database URL, the clock, the client ID range, and the paper account."""
 
@@ -356,20 +354,17 @@ class ForwardTestRoutes:
         if universe.kind == "rule":
             if universe.top_n is None:
                 raise refuse_request("A rule universe needs top_n.")
-            # The stored quarter starts at the first trading day of the calendar quarter (market_data.md section 8.9).
-            quarter_starts = await read_us_universe_quarter_starts(database_url=self.database_url, end_utc=now_utc)
-            current = [start_utc for start_utc in quarter_starts if start_utc >= calendar_quarter_start_utc]
-            if not current:
+            current_quarter_utc = await find_current_us_universe_quarter(
+                database_url=self.database_url, now_utc=now_utc
+            )
+            if current_quarter_utc is None:
                 raise refuse_request(
                     f"The US universe has no saved members for the quarter from {calendar_quarter_start_utc:%Y-%m-%d}."
                 )
-            quarter_start_utc = current[-1]
-            members = [
-                member.instrument
-                for member in await read_us_universe_members(
-                    database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=universe.top_n
-                )
-            ]
+            quarter_start_utc = current_quarter_utc
+            members = await read_us_universe_instruments(
+                database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=universe.top_n
+            )
         else:
             if universe.top_n is not None:
                 raise refuse_request("A list universe does not take top_n.")

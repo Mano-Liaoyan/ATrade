@@ -59,11 +59,28 @@ def describe_crash(exit_code: int) -> str:
     return f"The forward test process ended with exit code {exit_code}. The forward-test log has the reason."
 
 
+# True when the run child of the row can start. The worker app waits for the warm-up fill of a multi-instrument
+# forward test (section 12.17).
+type IsReadyToRun = Callable[[ForwardTestRow], bool]
+
+
+def is_always_ready(_row: ForwardTestRow) -> bool:
+    return True
+
+
 class ForwardTestWorker:
-    def __init__(self, *, database_url: str, clock: Clock, start_child: StartForwardTestChild) -> None:
+    def __init__(
+        self,
+        *,
+        database_url: str,
+        clock: Clock,
+        start_child: StartForwardTestChild,
+        is_ready_to_run: IsReadyToRun = is_always_ready,
+    ) -> None:
         self.database_url = database_url
         self.clock = clock
         self.start_child = start_child
+        self.is_ready_to_run = is_ready_to_run
         self.running_children: dict[int, RunningChild] = {}
 
     async def keep_comparing(self) -> None:
@@ -102,7 +119,7 @@ class ForwardTestWorker:
                 await self.start_running_child(row.id, "cancel_orders")
                 await forward_test_store.write_status(connection, forward_test_id=row.id, status="stopping")
             return
-        if row.status not in {"starting", "running", "waiting_for_gateway"}:
+        if row.status not in {"starting", "running", "waiting_for_gateway"} or not self.is_ready_to_run(row):
             return
         # A row with status "running" and no child is a forward test of an earlier worker: start it again.
         if row.status == "running":

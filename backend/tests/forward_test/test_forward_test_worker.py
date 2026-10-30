@@ -12,7 +12,13 @@ import httpx
 import psycopg
 import pytest
 
-from atrade.forward_test import GATEWAY_UNREACHABLE_EXIT_CODE, PAPER_CHECK_FAILED_EXIT_CODE, ForwardTestWorker
+from atrade.forward_test import (
+    GATEWAY_UNREACHABLE_EXIT_CODE,
+    PAPER_CHECK_FAILED_EXIT_CODE,
+    ForwardTestWorker,
+    read_running_member_lists,
+)
+from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.forward_test.test_forward_test_routes import (
@@ -20,8 +26,12 @@ from tests.forward_test.test_forward_test_routes import (
     make_start_request,
     save_test_strategy_version,
 )
+from tests.forward_test.test_universe_forward_test_detail import start_watchlist_forward_test
 
 type JsonObject = dict[str, Any]
+
+APPLE = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
+MICROSOFT = Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD")
 
 
 async def start_forward_test(web_client: httpx.AsyncClient, *, symbol: str = "AAPL") -> JsonObject:
@@ -364,3 +374,27 @@ async def test_a_stop_transfers_the_positions_and_the_cash_to_by_hand_and_keeps_
     assert [(fill["symbol"], fill["side"], fill["quantity_shares"]) for fill in detail["fills"]] == [
         ("AAPL", "BUY", "10")
     ]
+
+
+@pytest.mark.anyio
+async def test_the_child_of_a_multi_instrument_forward_test_starts_after_its_warm_up_fill(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url, ["AAPL", "MSFT"])
+    filled_ids: set[int] = set()
+    child_starter = FakeChildStarter()
+    worker = ForwardTestWorker(
+        database_url=database_url,
+        clock=clock,
+        start_child=child_starter.start_child,
+        is_ready_to_run=lambda row: row.id in filled_ids,
+    )
+
+    await worker.compare_states()
+    assert child_starter.read_started() == []
+    # The bar fetcher reads the members of the running multi-instrument forward tests.
+    assert await read_running_member_lists(database_url) == {forward_test["id"]: [APPLE, MICROSOFT]}
+
+    filled_ids.add(forward_test["id"])
+    await worker.compare_states()
+    assert child_starter.read_started() == [(forward_test["id"], "run")]

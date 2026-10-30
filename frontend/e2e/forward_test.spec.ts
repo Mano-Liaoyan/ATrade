@@ -144,6 +144,64 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(stopButton).toHaveCount(0);
 });
 
+test('starts a top N forward test on daily bars with the universe name, the Instruments tab, and its scroll track', async ({
+  page,
+}, currentTest) => {
+  test.slow();
+  const strategyName = `Top N forward test ${currentTest.project.name} ${String(Date.now() % 1_000_000)}`;
+  await createStrategy(page, strategyName);
+
+  await page.getByRole('link', { name: 'Forward tests', exact: true }).click();
+  await page.getByRole('button', { name: 'New forward test' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New forward test' });
+  await dialog.getByRole('combobox', { name: 'Strategy', exact: true }).click();
+  await page.getByRole('option', { name: strategyName }).click();
+  await expect(dialog.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
+  await dialog.getByRole('combobox', { name: 'Instruments' }).click();
+  await page.getByRole('option', { name: 'Top N by trading value', exact: true }).click();
+  await expect(dialog.getByLabel('Symbol')).toHaveCount(0);
+  // Top N runs on daily bars only (docs/architecture/forward_test.md 12.17).
+  await expect(dialog.getByRole('combobox', { name: 'Bar period' })).toHaveText('1 day');
+  await dialog.getByRole('combobox', { name: 'Bar period' }).click();
+  await expect(page.getByRole('option')).toHaveText(['1 day']);
+  await page.keyboard.press('Escape');
+  await dialog.getByLabel('N', { exact: true }).fill('30');
+  await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
+  await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
+  await dialog.getByRole('button', { name: 'Start forward test' }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/forward-tests\/\d+$/);
+  const forwardTestId = page.url().split('/').at(-1) ?? '';
+  const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
+  const heading = chartPanel.getByRole('heading', { level: 1 });
+  await expect(heading).toContainText('Top 30 by trading value');
+  await expect(heading).toContainText('1 day');
+
+  // The Instruments tab lists the 30 members of the quarter in their own scroll region.
+  const tables = page.getByRole('region', { name: 'Forward test tables' });
+  await tables.getByRole('tab', { name: 'Instruments' }).click();
+  const instruments = tables.getByRole('region', { name: 'Instruments' });
+  await expect(instruments.getByRole('columnheader')).toHaveText(['Instrument', 'Fills', 'Net profit (USD)', 'Quarters']);
+  await expect(instruments.getByRole('row')).toHaveCount(31, { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  const track = tables.getByRole('scrollbar', { name: 'Instruments scroll bar' });
+  const lastInstrument = instruments.getByRole('row').last();
+  await expect(track).toBeVisible();
+  await expect(track.locator('.scroll-thumb')).toBeVisible();
+  await expect(lastInstrument).not.toBeInViewport();
+  await track.focus();
+  await page.keyboard.press('End');
+  await expect(lastInstrument).toBeInViewport();
+  await expect(lastInstrument).toContainText('UNIV30');
+  await expectNoPageScroll(page);
+
+  // The client ID range allows 4 running forward tests: stop this one.
+  const status = chartPanel.getByRole('status', { name: 'Forward test status' });
+  await expect(status).toHaveText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await chartPanel.getByRole('button', { name: 'Stop forward test', exact: true }).click();
+  await expect(status).toHaveText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+});
+
 test('the forward test list has a visible scroll track', async ({ page }) => {
   await page.goto('/forward-tests');
 

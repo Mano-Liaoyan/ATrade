@@ -25,6 +25,7 @@ from atrade.backtest import (
     find_round_trips,
     queue_backtest,
     read_backtest_outcome,
+    summarize_instruments,
 )
 from atrade.forward_test import forward_test_records, forward_test_store
 from atrade.forward_test.backtest_comparison import FillComparisonRow, FillTotal, compare_fills
@@ -33,6 +34,7 @@ from atrade.forward_test.forward_test_store import ForwardTestInterruption, Forw
 from atrade.forward_test.http_routes import ForwardTestResponse, to_forward_test_response
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
+from atrade.foundation.instrument import Instrument
 
 
 class SamePeriodBacktestResponse(BaseModel):
@@ -105,6 +107,16 @@ class ForwardTestFillResponse(BaseModel):
     commission_usd: Decimal
 
 
+class ForwardTestInstrumentResponse(BaseModel):
+    """One member of a multi-instrument forward test: the Instruments tab (section 12.16)."""
+
+    symbol: str
+    exchange: str
+    trade_count: int
+    net_profit_usd: Decimal
+    quarter_count: int
+
+
 class ForwardTestDetailResponse(BaseModel):
     """The forward test page: the forward test, its records, and the backtests that "Backtest the same period" started,
     newest first."""
@@ -114,6 +126,8 @@ class ForwardTestDetailResponse(BaseModel):
     metrics: ComparedMetricsResponse | None
     equity_curve: list[ComparedEquityPointResponse]
     fills: list[ForwardTestFillResponse]
+    # One row for each member of a multi-instrument forward test. Empty for a single-instrument forward test.
+    instruments: list[ForwardTestInstrumentResponse]
     same_period_backtests: list[ComparedBacktestSummaryResponse]
 
 
@@ -230,6 +244,21 @@ def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> Forward
     )
 
 
+def to_instrument_responses(
+    fills: list[BacktestTrade], members: dict[datetime, list[Instrument]]
+) -> list[ForwardTestInstrumentResponse]:
+    """The fills and the recorded quarters of each member (section 12.12)."""
+    quarter_counts: dict[tuple[str, str], int] = {}
+    for quarter_members in members.values():
+        for member in quarter_members:
+            key = (member.symbol, member.exchange)
+            quarter_counts[key] = quarter_counts.get(key, 0) + 1
+    return [
+        ForwardTestInstrumentResponse(**dataclasses.asdict(instrument))
+        for instrument in summarize_instruments(fills, quarter_counts)
+    ]
+
+
 def calculate_forward_test_metrics(
     row: ForwardTestRow, equity_curve: list[EquityPoint], fills: list[BacktestTrade], now_utc: datetime
 ) -> ForwardTestMetrics | None:
@@ -334,6 +363,7 @@ class ComparisonRoutes:
             fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             backtest_ids = await forward_test_records.select_same_period_backtest_ids(connection, forward_test_id)
+            members = await forward_test_store.select_universe_members(connection, forward_test_id)
         backtests = [
             await read_backtest_outcome(database_url=self.database_url, backtest_id=backtest_id)
             for backtest_id in backtest_ids
@@ -345,6 +375,7 @@ class ComparisonRoutes:
             ),
             equity_curve=to_equity_curve_response(equity_curve),
             fills=[to_forward_test_fill_response(fill) for fill in forward_test_fills],
+            instruments=to_instrument_responses(fills, members),
             same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests if backtest is not None],
         )
 
