@@ -307,3 +307,17 @@ async def test_the_databento_import_updates_the_summary_of_each_imported_instrum
     import_databento_files(database_url=database_url, file_paths=write_dbn_files(tmp_path, files))
 
     assert await read_last_day_and_close(database_url) == [(datetime(2020, 1, 2, tzinfo=UTC), Decimal("75.5"))]
+
+
+@pytest.mark.anyio
+async def test_a_change_of_the_source_order_also_calculates_a_missing_summary(
+    client: httpx.AsyncClient, database_url: str
+) -> None:
+    """Daily bars saved before the summary table existed have no summary row. The full calculation finds them."""
+    save_source_bars(database_url, "databento", APPLE, TimeRange(day(5), day(10)), [5, 6, 7, 8, 9], DATABENTO_CLOSE)
+    assert await read_last_day_and_close(database_url) == []
+
+    response = await client.put("/api/market-data/source-order", json={"source_order": ["databento", "ibkr"]})
+
+    assert response.status_code == 200
+    assert await read_last_day_and_close(database_url) == [(day(9), DATABENTO_CLOSE)]
