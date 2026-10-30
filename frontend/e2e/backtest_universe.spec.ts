@@ -66,7 +66,7 @@ test('starts a watchlist backtest and sees each instrument and the symbol of eac
   await expect(chartPanel.getByRole('status', { name: 'Backtest status' })).toHaveText('Finished', {
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
-  await expect(chartPanel.getByRole('heading', { level: 1 })).toContainText(/Watchlist \(\d+\)/);
+  await expect(chartPanel.getByRole('heading', { level: 1 })).toContainText(/Fixed list \(\d+\)/);
 
   const tables = page.getByRole('region', { name: 'Backtest tables' });
   await tables.getByRole('tab', { name: 'Instruments' }).click();

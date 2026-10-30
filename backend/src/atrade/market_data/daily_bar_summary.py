@@ -184,6 +184,18 @@ def calculate_daily_bar_summary(instrument: Instrument, bars: list[Bar]) -> Dail
     )
 
 
+async def read_daily_bar_summaries_before(
+    *, database_url: str, instruments: list[Instrument], before_utc: datetime
+) -> list[DailyBarSummary]:
+    """The summary rows that `instruments` had with only the daily bars that start before `before_utc`, in the order
+    of `instruments`. The same calculation as the saved summary, so a point-in-time screen run gets the values that
+    the summary had at that time (docs/architecture/screen.md section 24.9). An instrument without such bars has no
+    row. One database query."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        bars_by_instrument = await select_last_daily_bars(connection, instruments, before_utc, SUMMARY_BAR_COUNT)
+    return [calculate_daily_bar_summary(instrument, bars) for instrument, bars in bars_by_instrument.items() if bars]
+
+
 UPSERT_SUMMARIES_QUERY = sql.SQL("""
     INSERT INTO daily_bar_summary (
         symbol, exchange, currency, last_day_start_utc, last_close, average_trading_value_20

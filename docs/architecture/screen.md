@@ -383,6 +383,22 @@ kinds:
 - A point-in-time run uses the rules of sections 23.1 and 24.5 with a date.
   It uses only bars that close at or before the rebalance. Its filter
   values must equal the values that the daily bar summary had at that date.
+- Done in #208: `POST /api/backtests` takes a fixed list by
+  `screen_result_id` (backtest.md section 10.10.6). The public entry of
+  `screen` exports `read_screen_result_members(*, database_url,
+  screen_result_id)`: the instruments of the screen result in position
+  order, or `None` when it does not exist.
+- Done in #208: the point-in-time kind. The public entry also exports
+  `read_saved_screen(*, database_url, screen_id)` (the copy of the start
+  route) and `run_screen_at(*, database_url, market, definition, as_of_utc)`
+  (`screen/screen_point_in_time.py`). `run_screen_at` gets the daily bar
+  summary of each start instrument from the last 20 daily bars that start
+  before `as_of_utc` (`read_daily_bar_summaries_before` of `market_data`,
+  the same calculation as the saved summary) and reads the indicator bars
+  only before `as_of_utc`. It saves no screen result. The start list of
+  `quarter_universe` is the last quarter that starts at or before
+  `as_of_utc`. The other start lists are the lists of today. The form source
+  "Screen" and the screen page buttons are in `backtest.md` section 10.10.7.
 - For a fixed list from the AI assistant, the tool result has the
   survivorship bias warning. The AI assistant must write the warning in its
   answer.
@@ -525,10 +541,13 @@ Behavior:
 - Decided (#206): `screen` sets "Still trading" from `last_day_start_utc`
   of the daily bar summary (section 24.5). Decided (#195): `market_data`
   stores no status ([`market_data.md`](market_data.md) section 8.14).
-- How the point-in-time run of a backtest uses the source order: the global
-  source order or the source order of the backtest.
-- The survivorship bias warning of a point-in-time backtest whose screen
-  starts from the watchlist or the HK instrument list.
+- Decided (#208): the point-in-time run of a backtest uses the global
+  source order, as the screen page. The source order of the backtest applies
+  to the bars of the run.
+- Decided (#208): a point-in-time backtest whose screen does not start from
+  `quarter_universe` (the watchlist, all US instruments with daily bars, or
+  the HK instrument list) has `survivorship_bias` true, and the form shows
+  the warning: these start lists are the lists of today.
 - Decided (#207): "Add to watchlist" adds many instruments with one
   `POST /api/watchlist` for each instrument, one after the other. The route
   checks each instrument with IBKR ([`market_data.md`](market_data.md)

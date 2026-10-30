@@ -42,6 +42,7 @@
   let parameterRows = $state<(SweepParameterInput & { defaultValue: string })[]>([]);
   let form: HTMLFormElement | undefined = $state();
   let fieldsRequest = $state<BacktestRequest | null>(null);
+  let missingChoice = $state('');
 
   const grid = $derived(buildSweepGrid(parameterRows));
   const runCount = $derived(countSweepRuns(grid));
@@ -82,7 +83,7 @@
       return;
     }
     if (request === null) {
-      startError = { kind: 'error', title: FAILED_TITLE, subtitle: 'Select a strategy version and an instrument.' };
+      startError = { kind: 'error', title: FAILED_TITLE, subtitle: missingChoice };
       return;
     }
     isStarting = true;
@@ -113,9 +114,10 @@
     <BacktestRequestFields
       bind:strategyVersionId
       {open}
-      onRequestChange={(request: BacktestRequest | null, reason: string | null) => {
+      onRequestChange={(request: BacktestRequest | null, reason: string | null, missing: string) => {
         fieldsRequest = request;
         fieldsBlockReason = reason;
+        missingChoice = missing;
       }}
       onError={(error: NotificationMessage | null) => {
         startError = error;

@@ -3,7 +3,7 @@
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
@@ -17,18 +17,32 @@ from atrade.market_data import BarSource
 type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out", "cancelled"]
 # The values of the parameters of a parameter sweep run, by parameter name (docs/architecture/backtest.md 10.11).
 type ParameterValues = dict[str, int | float | bool]
-# docs/architecture/backtest.md section 10.10.2. The kind `screen` is not in this version.
-type UniverseKind = Literal["single", "rule", "list"]
-type MultiInstrumentKind = Literal["rule", "list"]
+# docs/architecture/backtest.md section 10.10.2.
+type BacktestUniverseKind = Literal["single", "rule", "list", "screen"]
+type MultiInstrumentKind = Literal["rule", "list", "screen"]
+type UniverseRebalancePeriod = Literal["quarter", "month"]
+
+
+@dataclass(frozen=True)
+class UniverseScreen:
+    """The copy of the screen of a `screen` universe. A later change or delete of the screen does not change it."""
+
+    screen_id: int
+    name: str
+    market: str
+    definition: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class BacktestUniverse:
-    """The universe of a multi-instrument backtest. All members are in `currency`. `top_n` is only for `rule`."""
+    """The universe of a multi-instrument backtest. All members are in `currency`. `top_n` is only for `rule`;
+    `screen` and `rebalance_period` are only for `screen`."""
 
     kind: MultiInstrumentKind
     currency: str
     top_n: int | None = None
+    screen: UniverseScreen | None = None
+    rebalance_period: UniverseRebalancePeriod | None = None
 
 
 @dataclass(frozen=True)
@@ -58,7 +72,7 @@ class BacktestRequest:
     parameters: ParameterValues | None = None
 
     @property
-    def universe_kind(self) -> UniverseKind:
+    def universe_kind(self) -> BacktestUniverseKind:
         return "single" if self.universe is None else self.universe.kind
 
     @property
@@ -123,10 +137,12 @@ class BacktestRow:
     split_time_utc: datetime | None
     source_order: list[str] | None
     bar_count_by_source: dict[str, int] | None
-    universe_kind: UniverseKind
+    universe_kind: BacktestUniverseKind
     universe_top_n: int | None
     sweep_id: int | None
     parameters: ParameterValues | None
+    universe_screen: dict[str, Any] | None
+    universe_rebalance_period: UniverseRebalancePeriod | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -136,7 +152,7 @@ BACKTEST_COLUMNS: Final = """
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
     out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source, universe_kind,
-    universe_top_n, sweep_id, parameters
+    universe_top_n, sweep_id, parameters, universe_screen, universe_rebalance_period
 """
 
 
@@ -155,7 +171,13 @@ def read_row_instrument(row: BacktestRow) -> Instrument | None:
 def read_universe(row: BacktestRow) -> BacktestUniverse | None:
     if row.universe_kind == "single" or row.currency is None:
         return None
-    return BacktestUniverse(kind=row.universe_kind, currency=row.currency, top_n=row.universe_top_n)
+    return BacktestUniverse(
+        kind=row.universe_kind,
+        currency=row.currency,
+        top_n=row.universe_top_n,
+        screen=None if row.universe_screen is None else UniverseScreen(**row.universe_screen),
+        rebalance_period=row.universe_rebalance_period,
+    )
 
 
 def read_request(row: BacktestRow) -> BacktestRequest:
@@ -217,11 +239,12 @@ async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords 
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
                 paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, conversation_id,
-                source_order, universe_kind, universe_top_n, sweep_id, parameters)
+                source_order, universe_kind, universe_top_n, sweep_id, parameters, universe_screen,
+                universe_rebalance_period)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
                 %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
                 %(created_at_utc)s, %(conversation_id)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s,
-                %(sweep_id)s, %(parameters)s)
+                %(sweep_id)s, %(parameters)s, %(universe_screen)s, %(universe_rebalance_period)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -244,29 +267,51 @@ async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords 
                 "universe_top_n": None if request.universe is None else request.universe.top_n,
                 "sweep_id": sweep_id,
                 "parameters": None if request.parameters is None else Jsonb(request.parameters),
+                "universe_screen": None
+                if request.universe is None or request.universe.screen is None
+                else Jsonb(asdict(request.universe.screen)),
+                "universe_rebalance_period": None if request.universe is None else request.universe.rebalance_period,
             },
         )
         inserted_row = await cursor.fetchone()
         if inserted_row is None:
             message = "INSERT ... RETURNING returned no row."
             raise RuntimeError(message)
-        await cursor.executemany(
-            """
-            INSERT INTO backtest_universe_member (backtest_id, period_start_utc, symbol, exchange)
-            VALUES (%(backtest_id)s, %(period_start_utc)s, %(symbol)s, %(exchange)s)
-            """,
-            [
-                {
-                    "backtest_id": inserted_row.id,
-                    "period_start_utc": period.start_utc,
-                    "symbol": member.symbol,
-                    "exchange": member.exchange,
-                }
-                for period in universe_periods or []
-                for member in period.members
-            ],
-        )
+        await insert_universe_members(cursor, inserted_row.id, universe_periods or [])
     return inserted_row
+
+
+async def insert_universe_members(
+    cursor: psycopg.AsyncCursor[Any], backtest_id: int, universe_periods: list[UniversePeriod]
+) -> None:
+    await cursor.executemany(
+        """
+        INSERT INTO backtest_universe_member (backtest_id, period_start_utc, symbol, exchange)
+        VALUES (%(backtest_id)s, %(period_start_utc)s, %(symbol)s, %(exchange)s)
+        """,
+        [
+            {
+                "backtest_id": backtest_id,
+                "period_start_utc": period.start_utc,
+                "symbol": member.symbol,
+                "exchange": member.exchange,
+            }
+            for period in universe_periods
+            for member in period.members
+        ],
+    )
+
+
+async def replace_universe_members(
+    connection: psycopg.AsyncConnection, *, backtest_id: int, universe_periods: list[UniversePeriod]
+) -> None:
+    """The child of a `screen` universe writes the members of each period that its screen runs gave. A period with
+    no member has no row. One transaction."""
+    async with connection.transaction(), connection.cursor() as cursor:
+        await cursor.execute(
+            "DELETE FROM backtest_universe_member WHERE backtest_id = %(backtest_id)s", {"backtest_id": backtest_id}
+        )
+        await insert_universe_members(cursor, backtest_id, universe_periods)
 
 
 async def select_universe_periods(

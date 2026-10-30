@@ -2811,7 +2811,7 @@
             "title": "Version Number"
           },
           "universe_kind": {
-            "$ref": "#/components/schemas/UniverseKind"
+            "$ref": "#/components/schemas/BacktestUniverseKind"
           },
           "symbol": {
             "anyOf": [
@@ -2856,6 +2856,26 @@
               }
             ],
             "title": "Universe Top N"
+          },
+          "universe_screen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseScreenResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "universe_rebalance_period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseRebalancePeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -3057,6 +3077,8 @@
           "exchange",
           "currency",
           "universe_top_n",
+          "universe_screen",
+          "universe_rebalance_period",
           "bar_period",
           "start_utc",
           "end_utc",
@@ -3310,7 +3332,7 @@
             "title": "Version Number"
           },
           "universe_kind": {
-            "$ref": "#/components/schemas/UniverseKind"
+            "$ref": "#/components/schemas/BacktestUniverseKind"
           },
           "symbol": {
             "anyOf": [
@@ -3355,6 +3377,26 @@
               }
             ],
             "title": "Universe Top N"
+          },
+          "universe_screen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseScreenResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "universe_rebalance_period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseRebalancePeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -3522,6 +3564,8 @@
           "exchange",
           "currency",
           "universe_top_n",
+          "universe_screen",
+          "universe_rebalance_period",
           "bar_period",
           "start_utc",
           "end_utc",
@@ -3625,6 +3669,15 @@
           "failed",
           "timed_out",
           "cancelled"
+        ]
+      },
+      "BacktestUniverseKind": {
+        "type": "string",
+        "enum": [
+          "single",
+          "rule",
+          "list",
+          "screen"
         ]
       },
       "BarPeriod": {
@@ -3778,7 +3831,7 @@
             "title": "Version Number"
           },
           "universe_kind": {
-            "$ref": "#/components/schemas/UniverseKind"
+            "$ref": "#/components/schemas/BacktestUniverseKind"
           },
           "symbol": {
             "anyOf": [
@@ -3823,6 +3876,26 @@
               }
             ],
             "title": "Universe Top N"
+          },
+          "universe_screen": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseScreenResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "universe_rebalance_period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseRebalancePeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -4028,6 +4101,8 @@
           "exchange",
           "currency",
           "universe_top_n",
+          "universe_screen",
+          "universe_rebalance_period",
           "bar_period",
           "start_utc",
           "end_utc",
@@ -7254,7 +7329,7 @@
             "title": "Strategy Version Id"
           },
           "universe_kind": {
-            "$ref": "#/components/schemas/UniverseKind",
+            "$ref": "#/components/schemas/BacktestUniverseKind",
             "default": "single"
           },
           "symbol": {
@@ -7324,6 +7399,55 @@
             ],
             "title": "Instruments"
           },
+          "screen_result_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen Result Id"
+          },
+          "symbols": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbols"
+          },
+          "screen_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen Id"
+          },
+          "rebalance_period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseRebalancePeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
           },
@@ -7380,7 +7504,7 @@
           "paper_capital_usd"
         ],
         "title": "StartBacktestRequest",
-        "description": "`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and\n`list` needs `instruments` (docs/architecture/backtest.md section 10.10.6)."
+        "description": "`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and\n`list` needs `instruments` or `screen_result_id`, and `screen` needs `screen_id` (docs/architecture/backtest.md\nsection 10.10.6)."
       },
       "StartForwardTestRequest": {
         "properties": {
@@ -7531,7 +7655,7 @@
             "title": "Strategy Version Id"
           },
           "universe_kind": {
-            "$ref": "#/components/schemas/UniverseKind",
+            "$ref": "#/components/schemas/BacktestUniverseKind",
             "default": "single"
           },
           "symbol": {
@@ -7600,6 +7724,55 @@
               }
             ],
             "title": "Instruments"
+          },
+          "screen_result_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen Result Id"
+          },
+          "symbols": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbols"
+          },
+          "screen_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen Id"
+          },
+          "rebalance_period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseRebalancePeriod"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -8318,6 +8491,43 @@
           "list"
         ],
         "type": "string"
+      },
+      "UniverseRebalancePeriod": {
+        "type": "string",
+        "enum": [
+          "quarter",
+          "month"
+        ]
+      },
+      "UniverseScreenResponse": {
+        "properties": {
+          "screen_id": {
+            "type": "integer",
+            "title": "Screen Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "screen_id",
+          "name",
+          "market",
+          "definition"
+        ],
+        "title": "UniverseScreenResponse",
+        "description": "The copy of the screen that a `screen` universe saved at its start (docs/architecture/screen.md 24.9)."
       },
       "UniverseSettings": {
         "properties": {

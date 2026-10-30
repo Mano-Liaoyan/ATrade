@@ -909,7 +909,7 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
-            universe_kind: components["schemas"]["UniverseKind"];
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
             symbol: string | null;
             /** Exchange */
@@ -918,6 +918,8 @@ export interface components {
             currency: string | null;
             /** Universe Top N */
             universe_top_n: number | null;
+            universe_screen: components["schemas"]["UniverseScreenResponse"] | null;
+            universe_rebalance_period: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -1035,7 +1037,7 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
-            universe_kind: components["schemas"]["UniverseKind"];
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
             symbol: string | null;
             /** Exchange */
@@ -1044,6 +1046,8 @@ export interface components {
             currency: string | null;
             /** Universe Top N */
             universe_top_n: number | null;
+            universe_screen: components["schemas"]["UniverseScreenResponse"] | null;
+            universe_rebalance_period: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -1111,6 +1115,8 @@ export interface components {
         };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out" | "cancelled";
+        /** @enum {string} */
+        BacktestUniverseKind: "single" | "rule" | "list" | "screen";
         /**
          * BarPeriod
          * @description The bar periods that the chart offers. The values use the NautilusTrader bar specification format.
@@ -1176,7 +1182,7 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
-            universe_kind: components["schemas"]["UniverseKind"];
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
             symbol: string | null;
             /** Exchange */
@@ -1185,6 +1191,8 @@ export interface components {
             currency: string | null;
             /** Universe Top N */
             universe_top_n: number | null;
+            universe_screen: components["schemas"]["UniverseScreenResponse"] | null;
+            universe_rebalance_period: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -2326,13 +2334,14 @@ export interface components {
         /**
          * StartBacktestRequest
          * @description `universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
-         *     `list` needs `instruments` (docs/architecture/backtest.md section 10.10.6).
+         *     `list` needs `instruments` or `screen_result_id`, and `screen` needs `screen_id` (docs/architecture/backtest.md
+         *     section 10.10.6).
          */
         StartBacktestRequest: {
             /** Strategy Version Id */
             strategy_version_id: number;
             /** @default single */
-            universe_kind: components["schemas"]["UniverseKind"];
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
             symbol?: string | null;
             /** Exchange */
@@ -2343,6 +2352,13 @@ export interface components {
             top_n?: number | null;
             /** Instruments */
             instruments?: components["schemas"]["InstrumentBody"][] | null;
+            /** Screen Result Id */
+            screen_result_id?: number | null;
+            /** Symbols */
+            symbols?: string[] | null;
+            /** Screen Id */
+            screen_id?: number | null;
+            rebalance_period?: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -2406,7 +2422,7 @@ export interface components {
             /** Strategy Version Id */
             strategy_version_id: number;
             /** @default single */
-            universe_kind: components["schemas"]["UniverseKind"];
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
             symbol?: string | null;
             /** Exchange */
@@ -2417,6 +2433,13 @@ export interface components {
             top_n?: number | null;
             /** Instruments */
             instruments?: components["schemas"]["InstrumentBody"][] | null;
+            /** Screen Result Id */
+            screen_result_id?: number | null;
+            /** Symbols */
+            symbols?: string[] | null;
+            /** Screen Id */
+            screen_id?: number | null;
+            rebalance_period?: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -2687,6 +2710,24 @@ export interface components {
         };
         /** @enum {string} */
         UniverseKind: "single" | "rule" | "list";
+        /** @enum {string} */
+        UniverseRebalancePeriod: "quarter" | "month";
+        /**
+         * UniverseScreenResponse
+         * @description The copy of the screen that a `screen` universe saved at its start (docs/architecture/screen.md 24.9).
+         */
+        UniverseScreenResponse: {
+            /** Screen Id */
+            screen_id: number;
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+        };
         /**
          * UniverseSettings
          * @description The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.
