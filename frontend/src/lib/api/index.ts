@@ -219,6 +219,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description The template list in the order of section 9.9.3.
+         */
+        get: operations["list_templates_api_strategy_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -877,6 +897,8 @@ export interface components {
         CreateStrategyRequest: {
             /** Name */
             name: string;
+            /** @default blank_code */
+            start_from: components["schemas"]["StartPoint"];
         };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
@@ -1483,6 +1505,8 @@ export interface components {
             /** End Time Utc */
             end_time_utc?: string | null;
         };
+        /** @enum {string} */
+        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
         /**
          * StartRefusedResponse
          * @description The start was refused. `forward_test_id` is the forward test that already runs on the instrument.
@@ -1526,6 +1550,34 @@ export interface components {
             settings: components["schemas"]["RuleSettings"];
             entry: components["schemas"]["RuleGroup"];
             exits: components["schemas"]["RuleExits"];
+        };
+        /** StrategyTemplateResponse */
+        StrategyTemplateResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "rules" | "code";
+            /** Entry */
+            entry: string;
+            /** Exit */
+            exit: string;
+            /** Defaults */
+            defaults: string;
+            /** Market */
+            market: string;
+            /** Bar Period */
+            bar_period: string;
+            /** Evidence */
+            evidence: string;
+            /** Sources */
+            sources: components["schemas"]["TemplateSourceResponse"][];
+            /** Differs From Source */
+            differs_from_source: string;
         };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
@@ -1572,6 +1624,13 @@ export interface components {
              * @enum {string}
              */
             source: "user" | "rule_builder";
+        };
+        /** TemplateSourceResponse */
+        TemplateSourceResponse: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
@@ -2302,6 +2361,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_strategy_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyTemplateResponse"][];
                 };
             };
         };

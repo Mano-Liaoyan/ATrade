@@ -541,7 +541,6 @@ It needs the multi-instrument backtest of
 
 ### 9.8.7 Left to the implementation
 
-- The rules that "Blank rules" holds (for example the position size).
 - What the "Rules" tab shows for a strategy that has no version with rules.
 - What the "Rules" tab shows when the open version is an older version with
   rules than vM.
@@ -626,6 +625,9 @@ commissions and the open gap.
   can never cross above it.
 - S3 uses the 12-1 momentum indicator with 0 skipped days. The indicator
   accepts skip 0 (section 21.1 of [`docs/architecture.md`](../architecture.md), #162).
+  Moskowitz et al. also sell short when the past return is below 0, scale
+  each position to a volatility target, and use the excess return. S3 does
+  not sell short, does not scale, and uses the price return (#175).
 - No Hong Kong templates: tests of moving average rules in Hong Kong show
   small effects (Bessembinder & Chan 1995).
 
@@ -647,27 +649,39 @@ universe is the US top 500 of the current quarter.
 - Fundamental templates (value, quality, Piotroski) need a financial data
   source. They get their own ticket.
 
+Decided (#175):
+
+- The template list is `STRATEGY_TEMPLATES` in
+  `backend/src/atrade/strategy/strategy_templates.py`. The template IDs are
+  `s1`, `s2`, and `s3`. The `start_from` values are `blank_code`,
+  `blank_rules`, `s1`, `s2`, and `s3`.
+- "Blank rules" holds an empty "All of" entry group, no exit item, and a
+  position of 95% of equity, the same as the rule templates. Its rules have
+  no template ID.
+- `make_rules_code` writes the template docstring when the template ID of
+  the rules is in the template list. With an other template ID, or none, it
+  writes the docstring of the rule builder.
+- `strategy_template.py` keeps its name. A new name changes many files and
+  gives no new behavior.
+
 ### 9.9.4 Facts to check before the implementation
 
 The defaults come from the sources (section 9.9.2), so the implementation
 must check them first.
 
-| Fact | How to check |
-|---|---|
-| The Brock et al. range break holds for 10 days and uses the close for the break. | Read section II of the paper. |
-| Faber 2007 checks "close above the 10-month average" only at the month end. | Read the paper. |
-| Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. |
-| The IBKR instrument search returns ETFs, for example `SPY`. `backend/src/atrade/ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. | Search `SPY` on the paper account. |
-| A strategy file can import `atrade.indicator` (#136, #138). The code from the rules needs it. | Run 1 import in the backtest child process, in the implementation ticket of #136. |
+| Fact | How to check | Result (2026-10-30, #175) |
+|---|---|---|
+| The Brock et al. range break holds for 10 days and uses the close for the break. | Read section II of the paper. | Not checked. The paper is paywalled (Wiley returned 403), and no author or university copy was found. The S2 defaults (50 days, N = 10) stay as in section 9.9.3. Open in section 21. |
+| Faber 2007 checks "close above the 10-month average" only at the month end. | Read the paper. | Not checked. SSRN 962461 and the journal refused the download. Secondary sources (not the paper) say month end. Open in section 21. |
+| Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. | Moskowitz et al.: yes (section 21.1 of [`docs/architecture.md`](../architecture.md)). Blitz & van Vliet, Barroso & Santa-Clara: not checked, they are phase 3 templates. |
+| The IBKR instrument search returns ETFs, for example `SPY`. `backend/src/atrade/ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. | Search `SPY` on the paper account. | Not checked: no IB Gateway in the implementation environment. Open in section 21. The templates run on test bars. |
+| A strategy file can import `atrade.indicator` (#136, #138). The code from the rules needs it. | Run 1 import in the backtest child process, in the implementation ticket of #136. | Yes (#160, section 21.1). |
 
 ### 9.9.5 Left to the implementation
 
-- The template IDs and the file of the template list.
 - The rows of the dialog (section 9.7.1) for a code template. A code
   template has a rule, not an entry rule and an exit rule.
 - The version source of version 1 from a code template.
 - The default start point that the dialog selects when it opens.
 - The tab that the strategy page opens after "Create strategy" from a rules
   start point.
-- Whether `strategy_template.py` gets a new name. The name uses the term
-  "strategy template", but the file is the "Blank code" start point.

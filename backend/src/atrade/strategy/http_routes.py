@@ -1,7 +1,7 @@
 """HTTP routes of the strategy capability: create, list, open, save, and delete strategies and strategy versions."""
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import psycopg
 from fastapi import APIRouter, HTTPException, Response, status
@@ -15,6 +15,7 @@ from atrade.strategy.code_checks import check_strategy_code
 from atrade.strategy.rules_code import make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
+from atrade.strategy.strategy_templates import BLANK_CODE, STRATEGY_TEMPLATES, StartPoint, find_start_rules
 
 MAX_STRATEGY_NAME_LENGTH = 100
 FIRST_VERSION_NUMBER = 1
@@ -26,6 +27,35 @@ StrategyName = Annotated[
 
 class CreateStrategyRequest(BaseModel):
     name: StrategyName
+    start_from: StartPoint = BLANK_CODE
+
+    def to_first_content(self) -> strategy_store.VersionContent:
+        """Version 1 of the start point (section 9.9.1)."""
+        rules = find_start_rules(self.start_from)
+        if rules is None:
+            return strategy_store.VersionContent(code=STRATEGY_TEMPLATE, source="user", rules=None)
+        return strategy_store.VersionContent(
+            code=make_rules_code(rules), source="rule_builder", rules=rules.model_dump(mode="json")
+        )
+
+
+class TemplateSourceResponse(BaseModel):
+    label: str
+    url: str
+
+
+class StrategyTemplateResponse(BaseModel):
+    id: str
+    name: str
+    kind: Literal["rules", "code"]
+    entry: str
+    exit: str
+    defaults: str
+    market: str
+    bar_period: str
+    evidence: str
+    sources: list[TemplateSourceResponse]
+    differs_from_source: str
 
 
 class SaveVersionRequest(BaseModel):
@@ -149,7 +179,7 @@ class StrategyRoutes:
                 connection,
                 strategy_id=strategy.id,
                 version_number=FIRST_VERSION_NUMBER,
-                content=strategy_store.VersionContent(code=STRATEGY_TEMPLATE, source="user", rules=None),
+                content=request.to_first_content(),
                 created_at_utc=created_at_utc,
             )
             await connection.commit()
@@ -205,6 +235,25 @@ class StrategyRoutes:
         """Makes the code from the rules and saves nothing (section 9.8.3)."""
         return RulesCodeResponse(code=make_rules_code(request.rules))
 
+    async def list_templates(self) -> list[StrategyTemplateResponse]:
+        """The template list in the order of section 9.9.3."""
+        return [
+            StrategyTemplateResponse(
+                id=template.id,
+                name=template.name,
+                kind=template.kind,
+                entry=template.entry,
+                exit=template.exit,
+                defaults=template.defaults,
+                market=template.market,
+                bar_period=template.bar_period,
+                evidence=template.evidence,
+                sources=[TemplateSourceResponse(label=label, url=url) for label, url in template.sources],
+                differs_from_source=template.differs_from_source,
+            )
+            for template in STRATEGY_TEMPLATES
+        ]
+
     async def delete_strategy(self, strategy_id: int) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             result = await strategy_store.delete_strategy(connection, strategy_id)
@@ -221,6 +270,7 @@ def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = StrategyRoutes(database_url=database_url, clock=clock)
     router = APIRouter()
     router.add_api_route("/api/strategy-rules/code", routes.make_code, methods=["POST"])
+    router.add_api_route("/api/strategy-templates", routes.list_templates, methods=["GET"])
     router.include_router(create_strategies_router(routes))
     return router
 

@@ -649,6 +649,29 @@
         }
       }
     },
+    "/api/strategy-templates": {
+      "get": {
+        "summary": "List Templates",
+        "description": "The template list in the order of section 9.9.3.",
+        "operationId": "list_templates_api_strategy_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StrategyTemplateResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Templates Api Strategy Templates Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies": {
       "get": {
         "summary": "List Strategies",
@@ -2701,6 +2724,10 @@
             "maxLength": 100,
             "minLength": 1,
             "title": "Name"
+          },
+          "start_from": {
+            "$ref": "#/components/schemas/StartPoint",
+            "default": "blank_code"
           }
         },
         "type": "object",
@@ -4430,6 +4457,16 @@
         ],
         "title": "StartForwardTestRequest"
       },
+      "StartPoint": {
+        "type": "string",
+        "enum": [
+          "blank_code",
+          "blank_rules",
+          "s1",
+          "s2",
+          "s3"
+        ]
+      },
       "StartRefusedResponse": {
         "properties": {
           "detail": {
@@ -4538,6 +4575,76 @@
         ],
         "title": "StrategyRules"
       },
+      "StrategyTemplateResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "rules",
+              "code"
+            ],
+            "title": "Kind"
+          },
+          "entry": {
+            "type": "string",
+            "title": "Entry"
+          },
+          "exit": {
+            "type": "string",
+            "title": "Exit"
+          },
+          "defaults": {
+            "type": "string",
+            "title": "Defaults"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "bar_period": {
+            "type": "string",
+            "title": "Bar Period"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateSourceResponse"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "differs_from_source": {
+            "type": "string",
+            "title": "Differs From Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "entry",
+          "exit",
+          "defaults",
+          "market",
+          "bar_period",
+          "evidence",
+          "sources",
+          "differs_from_source"
+        ],
+        "title": "StrategyTemplateResponse"
+      },
       "StrategyVersionResponse": {
         "properties": {
           "id": {
@@ -4636,6 +4743,24 @@
           "source"
         ],
         "title": "StrategyVersionSummary"
+      },
+      "TemplateSourceResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "url"
+        ],
+        "title": "TemplateSourceResponse"
       },
       "TimeInForce": {
         "type": "string",
