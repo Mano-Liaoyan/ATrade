@@ -20,6 +20,7 @@
     findBacktestStatusKind,
     formatPercent,
     KeyMetricRow,
+    UniverseInstrumentTable,
     type TimeInterval,
   } from '#lib/backtest';
   import {
@@ -75,9 +76,10 @@
     { header: 'Return', align: 'right' },
   ];
   const EVENT_COLUMNS: TableColumn[] = [{ header: 'Time' }, { header: 'Event' }];
-  type ForwardTestTable = 'fills' | 'comparison' | 'logs';
+  type ForwardTestTable = 'fills' | 'instruments' | 'comparison' | 'logs';
   const TABLE_TABS: { value: ForwardTestTable; label: string }[] = [
     { value: 'fills', label: 'Fills' },
+    { value: 'instruments', label: 'Instruments' },
     { value: 'comparison', label: 'Comparison' },
     { value: 'logs', label: 'Logs' },
   ];
@@ -224,10 +226,10 @@
   }
 </script>
 
-{#snippet instrumentOrUniverse(forwardTest: ForwardTest)}
+{#snippet instrumentOrUniverse(forwardTest: ForwardTest, instrumentCount: number)}
   {@const instrument = readForwardTestInstrument(forwardTest)}
   {#if instrument === null}
-    <span>{describeForwardTestUniverse(forwardTest)}</span>
+    <span>{describeForwardTestUniverse(forwardTest, instrumentCount)}</span>
   {:else}
     <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
     <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
@@ -272,7 +274,7 @@
                   href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
                   >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
                 >
-                {@render instrumentOrUniverse(forwardTest)}
+                {@render instrumentOrUniverse(forwardTest, records.instruments.length)}
                 <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
               <span class="run-status" role="status" aria-label="Forward test status">
@@ -351,6 +353,8 @@
           >
             {#if selectedTable === 'fills'}
               <ForwardTestFillTable fills={records.fills} />
+            {:else if selectedTable === 'instruments'}
+              <UniverseInstrumentTable instruments={records.instruments} countHeader="Fills" />
             {:else if selectedTable === 'comparison'}
               {#if records.same_period_backtests.length === 0}
                 <EmptyText text="No backtests of the same period" />

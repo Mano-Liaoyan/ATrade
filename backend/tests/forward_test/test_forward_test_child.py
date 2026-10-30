@@ -172,6 +172,7 @@ async def test_checks_the_paper_account_then_runs_the_live_node_with_the_same_cl
     assert live_node_input.client_id == 10
     assert live_node_input.account_id == ACCOUNT_ID
     assert live_node_input.order_id_tag == f"FT{forward_test['id']}"
+    assert live_node_input.instrument is not None
     assert live_node_input.instrument.symbol == "AAPL"
     assert "class BarCountStrategy" in live_node_input.strategy_code
     # The recorder DataActor of the LiveNode starts the equity at the allocated capital (section 12.8).
@@ -215,6 +216,7 @@ async def test_the_live_node_gets_the_warm_up_bars_of_7_days_before_the_start(
     # The range ends at the start of the current 1-minute bar: the current bar is not complete.
     warm_up_end_utc = datetime(2026, 1, 2, 3, 10, tzinfo=UTC)
     [request] = gateway_connection.historical_bar_requests
+    assert live_node.inputs[0].instrument is not None
     assert request == HistoricalBarRequest(
         live_node.inputs[0].instrument,
         BarPeriod.ONE_MINUTE,

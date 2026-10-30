@@ -35,8 +35,11 @@ from atrade.backtest.sharpe_probability import (
 )
 from atrade.backtest.strategy_engine_run import write_look_back_catalog
 from atrade.backtest.sweep_routes import create_sweep_router
+from atrade.backtest.universe_instruments import UniverseInstrument, summarize_instruments
+from atrade.backtest.universe_update import UNIVERSE_UPDATE, UniverseUpdate, make_universe_update
 
 __all__ = [
+    "UNIVERSE_UPDATE",
     "BacktestMetrics",
     "BacktestOutcome",
     "BacktestRefusal",
@@ -48,6 +51,8 @@ __all__ = [
     "LookBack",
     "RoundTrip",
     "SplitMetrics",
+    "UniverseInstrument",
+    "UniverseUpdate",
     "calculate_daily_returns",
     "calculate_deflated_sharpe",
     "calculate_equity_curve",
@@ -63,10 +68,12 @@ __all__ = [
     "find_look_back",
     "find_round_trips",
     "find_sharpe_probability_status",
+    "make_universe_update",
     "queue_backtest",
     "read_backtest_outcome",
     "read_last_backtest_ids",
     "run_backtest",
     "start_backtest",
+    "summarize_instruments",
     "write_look_back_catalog",
 ]

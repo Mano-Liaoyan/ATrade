@@ -3,9 +3,11 @@
      backtest of the selected strategy version (backtest; docs/architecture/forward_test.md 12.16), and the allocated
      capital with the unallocated amount of the paper account (12.18; paper_trading gives the account check). The form id is
      START_FORWARD_TEST_FORM_ID: the command palette opens the dialog with it. With `strategyVersion`, each open selects
-     that strategy version, for example the open version of the strategy page (Start forward test). -->
+     that strategy version, for example the open version of the strategy page (Start forward test). The Instruments
+     select picks one instrument, the top N US instruments by trading value, or the watchlist; the last two run on
+     daily bars only (12.16, 12.17). The layout is the layout of the backtest form. -->
 <script lang="ts">
-  import { formatMaxDrawdown, formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
+  import { checkTopN, formatMaxDrawdown, formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
   import {
     Dialog,
     InlineNotification,
@@ -20,12 +22,14 @@
   import {
     describeUnallocated,
     findCapitalBlockReason,
+    findUniverseBarPeriods,
     isLiveBarPeriod,
     readEndTimeUtc,
     readForwardTestCapital,
     startForwardTest,
     type ForwardTest,
     type ForwardTestCapital,
+    type ForwardTestRequest,
   } from '#lib/forward_test';
   import { BAR_PERIODS, DEFAULT_BAR_PERIOD, type BarPeriod } from '#lib/market_data';
   import {
@@ -69,6 +73,17 @@
   let exchange = $state('');
   let currency = $state('USD');
   let barPeriod = $state<BarPeriod>(DEFAULT_BAR_PERIOD);
+  type UniverseChoice = 'single' | 'rule' | 'list';
+  const UNIVERSE_ITEMS: { value: UniverseChoice; label: string }[] = [
+    { value: 'single', label: 'One instrument' },
+    { value: 'rule', label: 'Top N by trading value' },
+    { value: 'list', label: 'Watchlist' },
+  ];
+  let universeChoice = $state<UniverseChoice>('single');
+  let topNText = $state('500');
+  const topNCheck = $derived(checkTopN(topNText));
+  const topNReason = $derived(universeChoice === 'rule' && topNCheck.kind === 'refused' ? topNCheck.reason : null);
+  const barPeriodItems = $derived([...findUniverseBarPeriods(universeChoice, liveBarPeriods)]);
   let allocatedCapitalUsd = $state('');
   // 'reading' until GET /api/forward-tests/capital answers, null when the backend did not answer.
   let capital = $state<ForwardTestCapital | null | 'reading'>('reading');
@@ -181,6 +196,31 @@
     strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
   }
 
+  type UniverseFields = Pick<ForwardTestRequest, 'symbol' | 'exchange' | 'currency' | 'universe'>;
+
+  // The universe fields of the request. Null when N is not valid (the Start button says why).
+  function readUniverseFields(): UniverseFields | null {
+    if (universeChoice === 'rule') {
+      return topNCheck.kind === 'ok' ? { universe: { kind: 'rule', top_n: topNCheck.value } } : null;
+    }
+    if (universeChoice === 'list') {
+      return { universe: { kind: 'list' } };
+    }
+    return {
+      symbol: symbol.trim().toUpperCase(),
+      exchange: exchange.trim().toUpperCase(),
+      currency: currency.trim().toUpperCase(),
+    };
+  }
+
+  function selectUniverse(choice: UniverseChoice): void {
+    universeChoice = choice;
+    // Top N and watchlist run on daily bars only (forward_test.md 12.17).
+    if (choice !== 'single') {
+      barPeriod = '1-DAY';
+    }
+  }
+
   async function submitForwardTest(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     // The dropdowns are not native selects, so the form checks them itself.
@@ -188,13 +228,15 @@
       startError = { kind: 'error', title: 'Forward test not started', subtitle: 'Select a strategy version.' };
       return;
     }
+    const universe = readUniverseFields();
+    if (universe === null) {
+      return;
+    }
     isStarting = true;
     startError = null;
     const result = await startForwardTest(fetch, {
       strategy_version_id: Number(strategyVersionId),
-      symbol: symbol.trim().toUpperCase(),
-      exchange: exchange.trim().toUpperCase(),
-      currency: currency.trim().toUpperCase(),
+      ...universe,
       bar_period: barPeriod,
       allocated_capital_usd: allocatedCapitalUsd.trim(),
       end_time_utc: readEndTimeUtc(endTimeLocal),
@@ -218,8 +260,12 @@
   size="md"
   primaryText={isStarting ? 'Starting…' : 'Start forward test'}
   busy={isStarting}
-  primaryDisabled={capitalBlockReason !== null}
-  primaryDescribedBy={unallocatedUsd === null ? capitalReasonId : `${capitalInputId}-error`}
+  primaryDisabled={capitalBlockReason !== null || topNReason !== null}
+  primaryDescribedBy={topNReason !== null
+    ? 'forward-test-top-n-error'
+    : unallocatedUsd === null
+      ? capitalReasonId
+      : `${capitalInputId}-error`}
   onPrimary={() => form?.requestSubmit()}
 >
   <form
@@ -258,17 +304,29 @@
         {/if}
       </section>
     {/if}
-    <TextInput label="Symbol" autocomplete="off" required maxlength={MAX_FIELD_LENGTH} bind:value={symbol} />
-    <TextInput label="Exchange" autocomplete="off" required maxlength={MAX_FIELD_LENGTH} bind:value={exchange} />
-    <TextInput label="Currency" autocomplete="off" required maxlength={MAX_FIELD_LENGTH} bind:value={currency} />
     <Select
       label="Bar period"
-      items={liveBarPeriods}
+      items={barPeriodItems}
       value={barPeriod}
       onValueChange={(period: BarPeriod) => {
         barPeriod = period;
       }}
     />
+    <Select label="Instruments" items={UNIVERSE_ITEMS} value={universeChoice} onValueChange={selectUniverse} />
+    {#if universeChoice === 'single'}
+      <TextInput label="Symbol" autocomplete="off" required maxlength={MAX_FIELD_LENGTH} bind:value={symbol} />
+      <TextInput label="Exchange" autocomplete="off" required maxlength={MAX_FIELD_LENGTH} bind:value={exchange} />
+      <TextInput label="Currency" autocomplete="off" required maxlength={MAX_FIELD_LENGTH} bind:value={currency} />
+    {:else if universeChoice === 'rule'}
+      <TextInput
+        id="forward-test-top-n"
+        label="N"
+        inputmode="numeric"
+        class="number"
+        bind:value={topNText}
+        invalidText={topNReason}
+      />
+    {/if}
     <TextInput
       id={capitalInputId}
       label="Capital (USD)"
