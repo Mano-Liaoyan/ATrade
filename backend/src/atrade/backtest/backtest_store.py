@@ -14,7 +14,9 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarSource
 
-type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out"]
+type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out", "cancelled"]
+# The values of the parameters of a parameter sweep run, by parameter name (docs/architecture/backtest.md 10.11).
+type ParameterValues = dict[str, int | float | bool]
 # docs/architecture/backtest.md section 10.10.2. The kind `screen` is not in this version.
 type UniverseKind = Literal["single", "rule", "list"]
 type MultiInstrumentKind = Literal["rule", "list"]
@@ -52,6 +54,8 @@ class BacktestRequest:
     # a saved backtest only for a row from before the source order (docs/architecture/backtest.md section 10.12).
     source_order: list[BarSource] | None = None
     universe: BacktestUniverse | None = None
+    # The parameter values of a parameter sweep run. The child gives them to the strategy configuration.
+    parameters: ParameterValues | None = None
 
     @property
     def universe_kind(self) -> UniverseKind:
@@ -121,6 +125,8 @@ class BacktestRow:
     bar_count_by_source: dict[str, int] | None
     universe_kind: UniverseKind
     universe_top_n: int | None
+    sweep_id: int | None
+    parameters: ParameterValues | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -130,7 +136,7 @@ BACKTEST_COLUMNS: Final = """
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
     out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source, universe_kind,
-    universe_top_n
+    universe_top_n, sweep_id, parameters
 """
 
 
@@ -162,6 +168,7 @@ def read_request(row: BacktestRow) -> BacktestRequest:
         out_of_sample_share=row.out_of_sample_share,
         source_order=None if row.source_order is None else [BarSource(value) for value in row.source_order],
         universe=read_universe(row),
+        parameters=row.parameters,
     )
 
 
@@ -193,13 +200,14 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
     )
 
 
-async def insert_backtest(
+async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords of a backtest or a sweep run.
     connection: psycopg.AsyncConnection,
     *,
     request: BacktestRequest,
     created_at_utc: datetime,
     universe_periods: list[UniversePeriod] | None = None,
     conversation_id: int | None = None,
+    sweep_id: int | None = None,
 ) -> BacktestRow:
     """Adds a queued backtest, and the members of each universe period of a multi-instrument backtest. One
     transaction."""
@@ -209,10 +217,11 @@ async def insert_backtest(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
                 paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, conversation_id,
-                source_order, universe_kind, universe_top_n)
+                source_order, universe_kind, universe_top_n, sweep_id, parameters)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
                 %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
-                %(created_at_utc)s, %(conversation_id)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s)
+                %(created_at_utc)s, %(conversation_id)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s,
+                %(sweep_id)s, %(parameters)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -233,6 +242,8 @@ async def insert_backtest(
                 else Jsonb([bar_source.value for bar_source in request.source_order]),
                 "universe_kind": request.universe_kind,
                 "universe_top_n": None if request.universe is None else request.universe.top_n,
+                "sweep_id": sweep_id,
+                "parameters": None if request.parameters is None else Jsonb(request.parameters),
             },
         )
         inserted_row = await cursor.fetchone()
@@ -278,9 +289,10 @@ async def select_universe_periods(
 
 
 async def select_backtests(connection: psycopg.AsyncConnection) -> list[BacktestRow]:
-    """Returns all backtests, the newest first."""
+    """Returns all backtests that are not runs of a parameter sweep, the newest first (docs/architecture/backtest.md
+    section 10.11.4)."""
     async with connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
-        await cursor.execute(f"SELECT {BACKTEST_COLUMNS} FROM backtest ORDER BY id DESC")
+        await cursor.execute(f"SELECT {BACKTEST_COLUMNS} FROM backtest WHERE sweep_id IS NULL ORDER BY id DESC")
         return await cursor.fetchall()
 
 

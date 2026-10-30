@@ -28,7 +28,7 @@ from atrade.assistant import (
     StartContextReader,
     create_assistant_router,
 )
-from atrade.backtest import BacktestRunner, create_backtest_router, read_last_backtest_ids
+from atrade.backtest import BacktestRunner, create_backtest_router, create_sweep_router, read_last_backtest_ids
 from atrade.forward_test import (
     create_forward_test_comparison_router,
     create_forward_test_router,
@@ -153,6 +153,9 @@ def create_web_app(
         create_backtest_router(
             database_url=settings.database_url, clock=clock, exchange_rate_reader=exchange_rate_reader
         )
+    )
+    app.include_router(
+        create_sweep_router(database_url=settings.database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
     )
     app.include_router(
         create_forward_test_router(

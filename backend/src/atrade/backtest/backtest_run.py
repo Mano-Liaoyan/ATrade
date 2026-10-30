@@ -255,6 +255,7 @@ def run_universe(
         starting_cash=starting_cash,
         members=universe.bars.members,
         periods=universe.periods,
+        parameters=request.parameters or {},
     )
     trades = run_universe_strategy(run, work_directory)
     equity_curve = calculate_universe_equity_curve(
