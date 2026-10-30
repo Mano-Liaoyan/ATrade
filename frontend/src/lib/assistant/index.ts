@@ -1,5 +1,6 @@
-// Public entry of the assistant capability in the frontend: the credentials (docs/architecture/assistant.md 25.8.1), and
-// the "Prompt" dialog and the prompt version requests (25.9). The assistant side column of the strategy page uses them.
+// Public entry of the assistant capability in the frontend (docs/architecture/assistant.md 25.8.1 and 25.9).
+export { default as CredentialsDialog } from './CredentialsDialog.svelte';
+export { describeCredentialKind, describeCredentialState, formatKey, type Credential, type Provider } from './credentials';
 export { default as PromptDialog } from './PromptDialog.svelte';
 export {
   addSavedVersion,
@@ -15,5 +16,38 @@ export {
   type PromptVersionItem,
   type PromptVersionList,
 } from './prompt_dialog';
-export { default as CredentialsDialog } from './CredentialsDialog.svelte';
-export { describeCredentialKind, describeCredentialState, formatKey, type Credential, type Provider } from './credentials';
+export {
+  addServerMessage,
+  addUserMessage,
+  describeToolStep,
+  EMPTY_LOG,
+  readConversationLog,
+  type ConversationLog,
+  type DiffItem,
+  type LogItem,
+  type MessageItem,
+  type MetricsItem,
+  type ServerMessage,
+  type ToolStepItem,
+} from './conversation_log';
+export {
+  createConversation,
+  deleteConversation,
+  discardStrategyVersion,
+  listConversations,
+  readConversation,
+  renameConversation,
+  type Conversation,
+  type ConversationDetail,
+} from './conversation_api';
+export { openConversationSocket, type ConversationSocket } from './conversation_socket';
+export {
+  changeProvider,
+  describeSendButton,
+  findDefaultSelection,
+  listSelectItems,
+  type ConnectionState,
+  type LastModel,
+  type ModelSelection,
+} from './model_selection';
+export { listCredentials, listProviders } from './credentials';
