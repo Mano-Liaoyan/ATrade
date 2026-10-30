@@ -311,7 +311,7 @@
                 />
               </div>
             {:else}
-              <KeyMetricRow metrics={records.metrics} startCapitalUsd={forwardTest.start_balance_usd} trades={records.fills} />
+              <KeyMetricRow metrics={records.metrics} startCapitalUsd={forwardTest.start_balance_usd} />
               <div class="chart">
                 <EquityDrawdownChart
                   curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: forwardTest.start_balance_usd }]}
