@@ -1,7 +1,8 @@
-"""Public entry of forward_test: start and stop forward tests, the forward-test worker, the child process body, and
-the ATrade execution and data clients of a LiveNode."""
+"""Public entry of forward_test: start and stop forward tests, the forward-test worker, its bar fetcher, the child
+process body, and the ATrade execution and data clients of a LiveNode."""
 
 from atrade.forward_test.atrade_live_node import add_atrade_clients
+from atrade.forward_test.bar_fetcher import BarFetcher, ReadMemberLists
 from atrade.forward_test.bar_store_data_client import (
     BAR_STORE_DATA_CLIENT_NAME,
     BarStoreDataClient,
@@ -48,6 +49,7 @@ __all__ = [
     "GATEWAY_UNREACHABLE_EXIT_CODE",
     "OWNER_LEDGER_EXECUTION_CLIENT_NAME",
     "PAPER_CHECK_FAILED_EXIT_CODE",
+    "BarFetcher",
     "BarStoreDataClient",
     "BarStoreDataClientFactory",
     "BarStoreInput",
@@ -69,6 +71,7 @@ __all__ = [
     "OwnerLedgerInput",
     "OwnerOrder",
     "OwnerPosition",
+    "ReadMemberLists",
     "RecorderInput",
     "RunLiveNode",
     "StartForwardTestChild",
