@@ -48,3 +48,10 @@ async def delete_member(connection: psycopg.AsyncConnection, member_id: int) -> 
     """Returns False when no member of the HK instrument list has this ID."""
     cursor = await connection.execute("DELETE FROM hk_instrument_list_member WHERE id = %(id)s", {"id": member_id})
     return cursor.rowcount > 0
+
+
+async def read_hk_instrument_list(*, database_url: str) -> list[Instrument]:
+    """The instruments of the HK instrument list, in the order of adding. An HK screen starts from them."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        members = await select_members(connection)
+    return [Instrument(symbol=member.symbol, exchange=member.exchange, currency=member.currency) for member in members]

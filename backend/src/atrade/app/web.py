@@ -7,7 +7,7 @@ port 8000 (the browser) and port 8001 (the assistant service, docs/architecture/
 import asyncio
 import logging
 import sys
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 
 import psycopg
@@ -32,14 +32,12 @@ from atrade.backtest import BacktestRunner, create_backtest_router, read_last_ba
 from atrade.forward_test import (
     create_forward_test_comparison_router,
     create_forward_test_router,
-    find_forward_test_on_instrument,
 )
 from atrade.foundation.clock import Clock, SystemClock
-from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
 from atrade.market_data import DailyBarUpdate, ExchangeRateReader, InstrumentLookup, create_market_data_router
-from atrade.paper_trading import BlockingForwardTest, PaperAccountMonitor, create_paper_trading_router
+from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
 from atrade.screen import create_screen_router
 from atrade.strategy import (
     STRATEGY_TEMPLATE,
@@ -60,20 +58,6 @@ DATABASE_CHECK_TIMEOUT_SECONDS = 10
 START_CONTEXT_BACKTEST_COUNT = 3
 
 logger = logging.getLogger("atrade.web")
-
-
-def create_blocking_forward_test_finder(
-    database_url: str,
-) -> Callable[[Instrument], Awaitable[BlockingForwardTest | None]]:
-    """paper_trading does not import forward_test (docs/architecture.md section 6.2), so app/ connects them."""
-
-    async def find_blocking_forward_test(instrument: Instrument) -> BlockingForwardTest | None:
-        forward_test = await find_forward_test_on_instrument(database_url=database_url, instrument=instrument)
-        if forward_test is None:
-            return None
-        return BlockingForwardTest(forward_test_id=forward_test.forward_test_id, label=forward_test.label)
-
-    return find_blocking_forward_test
 
 
 def create_start_context_reader(database_url: str) -> StartContextReader:
@@ -149,7 +133,6 @@ def create_web_app(
             paper_account_monitor=paper_account_monitor,
             database_url=settings.database_url,
             clock=clock,
-            find_blocking_forward_test=create_blocking_forward_test_finder(settings.database_url),
         )
     )
     app.include_router(
@@ -176,6 +159,7 @@ def create_web_app(
             database_url=settings.database_url,
             clock=clock,
             client_ids=range(settings.forward_test_client_id_first, settings.forward_test_client_id_last + 1),
+            paper_account_monitor=paper_account_monitor,
         )
     )
     app.include_router(create_forward_test_comparison_router(database_url=settings.database_url, clock=clock))

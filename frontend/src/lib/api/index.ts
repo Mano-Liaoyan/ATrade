@@ -428,6 +428,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/forward-tests/capital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Capital */
+        get: operations["read_capital_api_forward_tests_capital_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forward-tests": {
         parameters: {
             query?: never;
@@ -555,6 +572,43 @@ export interface paths {
          * @description Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.
          */
         delete: operations["delete_screen_api_screens__screen_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Screen
+         * @description Runs the saved screen and saves 1 screen result (section 24.5).
+         */
+        post: operations["run_screen_api_screens__screen_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screen-results/{screen_result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen Result */
+        get: operations["read_screen_result_api_screen_results__screen_result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1311,6 +1365,13 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** ExclusionCountResponse */
+        ExclusionCountResponse: {
+            /** Reason */
+            reason: string;
+            /** Count */
+            count: number;
+        };
         /** FillComparisonResponse */
         FillComparisonResponse: {
             /**
@@ -1344,6 +1405,19 @@ export interface components {
             /** Shares */
             shares: number;
         };
+        /**
+         * ForwardTestCapitalResponse
+         * @description The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not
+         *     pass or IBKR has no NetLiquidation value in USD.
+         */
+        ForwardTestCapitalResponse: {
+            /** Net Liquidation Usd */
+            net_liquidation_usd: string | null;
+            /** Allocated Usd */
+            allocated_usd: string | null;
+            /** Unallocated Usd */
+            unallocated_usd: string | null;
+        };
         /** ForwardTestComparisonResponse */
         ForwardTestComparisonResponse: {
             forward_test: components["schemas"]["ForwardTestResponse"];
@@ -1375,6 +1449,10 @@ export interface components {
         };
         /** ForwardTestFillResponse */
         ForwardTestFillResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
             /**
              * Time Utc
              * Format: date-time
@@ -1432,6 +1510,8 @@ export interface components {
             crash_count: number;
             /** Interruptions */
             interruptions: components["schemas"]["InterruptionResponse"][];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: string | null;
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
@@ -1680,16 +1760,6 @@ export interface components {
             source: components["schemas"]["OrderSourceResponse"];
             /** Can Cancel */
             can_cancel: boolean;
-        };
-        /**
-         * OrderBlockedResponse
-         * @description A forward test runs on the instrument. ATrade did not send the order (section 12.2).
-         */
-        OrderBlockedResponse: {
-            /** Detail */
-            detail: string;
-            /** Forward Test Id */
-            forward_test_id: number;
         };
         /** OrderErrorResponse */
         OrderErrorResponse: {
@@ -1960,6 +2030,59 @@ export interface components {
             /** Recent Screen Results */
             recent_screen_results: components["schemas"]["ScreenResultSummaryResponse"][];
         };
+        /** ScreenResultExclusionResponse */
+        ScreenResultExclusionResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ScreenResultResponse */
+        ScreenResultResponse: {
+            /** Id */
+            id: number;
+            /** Screen Id */
+            screen_id: number;
+            market: components["schemas"]["Market"];
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            summary: components["schemas"]["ScreenRunSummaryResponse"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Rows */
+            rows: components["schemas"]["ScreenResultRowResponse"][];
+            /** Exclusions */
+            exclusions: components["schemas"]["ScreenResultExclusionResponse"][];
+        };
+        /** ScreenResultRowResponse */
+        ScreenResultRowResponse: {
+            /** Position */
+            position: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Last Price */
+            last_price: string;
+            /** Average Trading Value 20 */
+            average_trading_value_20: number | null;
+            /** Indicator Values */
+            indicator_values: {
+                [key: string]: number;
+            };
+            /** Percentiles */
+            percentiles: {
+                [key: string]: number;
+            };
+        };
         /** ScreenResultSummaryResponse */
         ScreenResultSummaryResponse: {
             /** Id */
@@ -1971,6 +2094,30 @@ export interface components {
             run_at_utc: string;
             /** Result Count */
             result_count: number;
+        };
+        /** ScreenRunSummaryResponse */
+        ScreenRunSummaryResponse: {
+            /** Row Count */
+            row_count: number;
+            /** Start Count */
+            start_count: number;
+            /** After Filters Count */
+            after_filters_count: number;
+            /** After Indicator Conditions Count */
+            after_indicator_conditions_count: number;
+            /** Result Count */
+            result_count: number;
+            /** Exclusion Counts */
+            exclusion_counts: components["schemas"]["ExclusionCountResponse"][];
+            /** Daily Bars Date */
+            daily_bars_date: string | null;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Run Seconds */
+            run_seconds: number;
         };
         /** SendOrderRequest */
         SendOrderRequest: {
@@ -2047,6 +2194,8 @@ export interface components {
             /** Currency */
             currency: string;
             bar_period: components["schemas"]["BarPeriod"];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: number | string;
             /** End Time Utc */
             end_time_utc?: string | null;
         };
@@ -2054,13 +2203,15 @@ export interface components {
         StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
         /**
          * StartRefusedResponse
-         * @description The start was refused. `forward_test_id` is the forward test that already runs on the instrument.
+         * @description The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18).
          */
         StartRefusedResponse: {
             /** Detail */
             detail: string;
             /** Forward Test Id */
-            forward_test_id: number | null;
+            forward_test_id?: number | null;
+            /** Unallocated Usd */
+            unallocated_usd?: string | null;
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -2748,7 +2899,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderBlockedResponse"] | components["schemas"]["OrderRefusedByLedgerResponse"];
+                    "application/json": components["schemas"]["OrderRefusedByLedgerResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3676,6 +3827,26 @@ export interface operations {
             };
         };
     };
+    read_capital_api_forward_tests_capital_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestCapitalResponse"];
+                };
+            };
+        };
+    };
     list_forward_tests_api_forward_tests_get: {
         parameters: {
             query?: never;
@@ -4017,6 +4188,89 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_screen_api_screens__screen_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_result_api_screen_results__screen_result_id__get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                screen_result_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
             };
             /** @description Not Found */
             404: {

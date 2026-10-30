@@ -344,7 +344,9 @@ async def test_reports_an_unknown_order_on_cancel(
     assert cancel_response.status_code == 404
 
 
-async def start_forward_test_on(client: httpx.AsyncClient, *, symbol: str) -> JsonObject:
+async def start_forward_test_on(
+    client: httpx.AsyncClient, *, symbol: str, allocated_capital_usd: str = "1000"
+) -> JsonObject:
     # A new strategy has version 1 from the template. A forward test can use it.
     strategy = (await client.post("/api/strategies", json={"name": f"Blocker {symbol}"})).json()
     strategy_version_id = (await client.get(f"/api/strategies/{strategy['id']}/versions/1")).json()["id"]
@@ -354,14 +356,16 @@ async def start_forward_test_on(client: httpx.AsyncClient, *, symbol: str) -> Js
         "exchange": "NASDAQ",
         "currency": "USD",
         "bar_period": "1-MINUTE",
+        "allocated_capital_usd": allocated_capital_usd,
     }
     return (await client.post("/api/forward-tests", json=request)).json()
 
 
 @pytest.mark.anyio
-async def test_refuses_an_order_by_hand_on_the_instrument_of_a_running_forward_test(
+async def test_sends_an_order_by_hand_on_the_instrument_of_a_running_forward_test(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:
+    """The owners share the instruments (section 12.2). The order by hand goes to IBKR."""
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     async with open_client(
         database_url=database_url,
@@ -371,18 +375,34 @@ async def test_refuses_an_order_by_hand_on_the_instrument_of_a_running_forward_t
     ) as client:
         forward_test = await start_forward_test_on(client, symbol="AAPL")
         response = await client.post(ORDERS_PATH, json=LIMIT_ORDER)
-        manual_orders = (await client.get(MANUAL_ORDERS_PATH)).json()["manual_orders"]
+
+    assert forward_test["client_id"] == FORWARD_TEST_CLIENT_ID
+    assert response.status_code == 201
+    assert len(gateway_connection.open_orders) == 1
+
+
+@pytest.mark.anyio
+async def test_the_cash_of_by_hand_does_not_include_the_allocated_capital(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    """The ledger cash of "By hand" is 10000. A forward test takes 9000 of it (section 11.13)."""
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        await start_forward_test_on(client, symbol="MSFT", allocated_capital_usd="9000")
+        response = await client.post(ORDERS_PATH, json=LIMIT_ORDER | {"quantity": 1000, "limit_price": "2"})
 
     assert response.status_code == 409
     assert response.json() == {
         "detail": (
-            f"Forward test {forward_test['id']} (Blocker AAPL v1) trades AAPL / NASDAQ. ATrade refuses orders by hand"
-            " for this instrument until the forward test stops."
+            "By hand has 1000.00 USD cash and open buy orders for 0.00 USD. ATrade refuses a buy order for 2000.00 USD."
         ),
-        "forward_test_id": forward_test["id"],
+        "rule": "buy_more_than_cash",
     }
-    assert gateway_connection.open_orders == []
-    assert manual_orders == []
 
 
 @pytest.mark.anyio

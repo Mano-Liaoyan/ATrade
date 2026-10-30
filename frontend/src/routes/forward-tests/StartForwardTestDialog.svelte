@@ -40,6 +40,7 @@
   let exchange = $state('');
   let currency = $state('USD');
   let barPeriod = $state<BarPeriod>(DEFAULT_BAR_PERIOD);
+  let allocatedCapitalUsd = $state('');
   // The value of the datetime-local input: a local time, or '' for no end time.
   let endTimeLocal = $state('');
   let backtests: Backtest[] = $state([]);
@@ -117,6 +118,7 @@
       exchange: exchange.trim().toUpperCase(),
       currency: currency.trim().toUpperCase(),
       bar_period: barPeriod,
+      allocated_capital_usd: allocatedCapitalUsd.trim(),
       end_time_utc: readEndTimeUtc(endTimeLocal),
     });
     isStarting = false;
@@ -185,6 +187,7 @@
         barPeriod = period;
       }}
     />
+    <TextInput label="Capital (USD)" inputmode="decimal" class="number" bind:value={allocatedCapitalUsd} required />
     <TextInput label="End time (local, optional)" type="datetime-local" bind:value={endTimeLocal} />
   </form>
   {#if startError !== null}

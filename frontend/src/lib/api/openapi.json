@@ -163,15 +163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/OrderBlockedResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
-                    }
-                  ],
-                  "title": "Response 409 Send Order Api Paper Trading Orders Post"
+                  "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
                 }
               }
             }
@@ -1311,6 +1303,24 @@
         }
       }
     },
+    "/api/forward-tests/capital": {
+      "get": {
+        "summary": "Read Capital",
+        "operationId": "read_capital_api_forward_tests_capital_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestCapitalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/forward-tests": {
       "get": {
         "summary": "List Forward Tests",
@@ -1725,6 +1735,128 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens/{screen_id}/runs": {
+      "post": {
+        "summary": "Run Screen",
+        "description": "Runs the saved screen and saves 1 screen result (section 24.5).",
+        "operationId": "run_screen_api_screens__screen_id__runs_post",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResultResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      }
+    },
+    "/api/screen-results/{screen_result_id}": {
+      "get": {
+        "summary": "Read Screen Result",
+        "operationId": "read_screen_result_api_screen_results__screen_result_id__get",
+        "parameters": [
+          {
+            "name": "screen_result_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Result Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResultResponse"
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -4223,6 +4355,24 @@
         ],
         "title": "ErrorResponse"
       },
+      "ExclusionCountResponse": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason",
+          "count"
+        ],
+        "title": "ExclusionCountResponse"
+      },
       "FillComparisonResponse": {
         "properties": {
           "bar_end_utc": {
@@ -4326,6 +4476,51 @@
           "shares"
         ],
         "title": "FixedShares"
+      },
+      "ForwardTestCapitalResponse": {
+        "properties": {
+          "net_liquidation_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Liquidation Usd"
+          },
+          "allocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Usd"
+          },
+          "unallocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "net_liquidation_usd",
+          "allocated_usd",
+          "unallocated_usd"
+        ],
+        "title": "ForwardTestCapitalResponse",
+        "description": "The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not\npass or IBKR has no NetLiquidation value in USD."
       },
       "ForwardTestComparisonResponse": {
         "properties": {
@@ -4436,6 +4631,14 @@
       },
       "ForwardTestFillResponse": {
         "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
           "time_utc": {
             "type": "string",
             "format": "date-time",
@@ -4464,6 +4667,8 @@
         },
         "type": "object",
         "required": [
+          "symbol",
+          "exchange",
           "time_utc",
           "side",
           "quantity_shares",
@@ -4587,6 +4792,17 @@
             },
             "title": "Interruptions",
             "type": "array"
+          },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Capital Usd"
           }
         },
         "required": [
@@ -4608,7 +4824,8 @@
           "stopped_at_utc",
           "end_time_utc",
           "crash_count",
-          "interruptions"
+          "interruptions",
+          "allocated_capital_usd"
         ],
         "title": "ForwardTestResponse",
         "type": "object"
@@ -5266,25 +5483,6 @@
         ],
         "title": "OpenOrderResponse",
         "type": "object"
-      },
-      "OrderBlockedResponse": {
-        "properties": {
-          "detail": {
-            "type": "string",
-            "title": "Detail"
-          },
-          "forward_test_id": {
-            "type": "integer",
-            "title": "Forward Test Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detail",
-          "forward_test_id"
-        ],
-        "title": "OrderBlockedResponse",
-        "description": "A forward test runs on the instrument. ATrade did not send the order (section 12.2)."
       },
       "OrderErrorResponse": {
         "properties": {
@@ -6040,6 +6238,155 @@
         ],
         "title": "ScreenResponse"
       },
+      "ScreenResultExclusionResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency",
+          "reason"
+        ],
+        "title": "ScreenResultExclusionResponse"
+      },
+      "ScreenResultResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "screen_id": {
+            "type": "integer",
+            "title": "Screen Id"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "assistant_conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Conversation Id"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ScreenRunSummaryResponse"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultRowResponse"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultExclusionResponse"
+            },
+            "type": "array",
+            "title": "Exclusions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "screen_id",
+          "market",
+          "assistant_conversation_id",
+          "summary",
+          "definition",
+          "rows",
+          "exclusions"
+        ],
+        "title": "ScreenResultResponse"
+      },
+      "ScreenResultRowResponse": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "last_price": {
+            "type": "string",
+            "title": "Last Price"
+          },
+          "average_trading_value_20": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Trading Value 20"
+          },
+          "indicator_values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Indicator Values"
+          },
+          "percentiles": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Percentiles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "position",
+          "symbol",
+          "exchange",
+          "currency",
+          "last_price",
+          "average_trading_value_20",
+          "indicator_values",
+          "percentiles"
+        ],
+        "title": "ScreenResultRowResponse"
+      },
       "ScreenResultSummaryResponse": {
         "properties": {
           "id": {
@@ -6063,6 +6410,71 @@
           "result_count"
         ],
         "title": "ScreenResultSummaryResponse"
+      },
+      "ScreenRunSummaryResponse": {
+        "properties": {
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "start_count": {
+            "type": "integer",
+            "title": "Start Count"
+          },
+          "after_filters_count": {
+            "type": "integer",
+            "title": "After Filters Count"
+          },
+          "after_indicator_conditions_count": {
+            "type": "integer",
+            "title": "After Indicator Conditions Count"
+          },
+          "result_count": {
+            "type": "integer",
+            "title": "Result Count"
+          },
+          "exclusion_counts": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionCountResponse"
+            },
+            "type": "array",
+            "title": "Exclusion Counts"
+          },
+          "daily_bars_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Bars Date"
+          },
+          "run_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Run At Utc"
+          },
+          "run_seconds": {
+            "type": "number",
+            "title": "Run Seconds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "row_count",
+          "start_count",
+          "after_filters_count",
+          "after_indicator_conditions_count",
+          "result_count",
+          "exclusion_counts",
+          "daily_bars_date",
+          "run_at_utc",
+          "run_seconds"
+        ],
+        "title": "ScreenRunSummaryResponse"
       },
       "SendOrderRequest": {
         "properties": {
@@ -6286,6 +6698,18 @@
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
           },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Allocated Capital Usd"
+          },
           "end_time_utc": {
             "anyOf": [
               {
@@ -6305,7 +6729,8 @@
           "symbol",
           "exchange",
           "currency",
-          "bar_period"
+          "bar_period",
+          "allocated_capital_usd"
         ],
         "title": "StartForwardTestRequest"
       },
@@ -6335,15 +6760,25 @@
               }
             ],
             "title": "Forward Test Id"
+          },
+          "unallocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Usd"
           }
         },
         "type": "object",
         "required": [
-          "detail",
-          "forward_test_id"
+          "detail"
         ],
         "title": "StartRefusedResponse",
-        "description": "The start was refused. `forward_test_id` is the forward test that already runs on the instrument."
+        "description": "The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18)."
       },
       "StrategyListItem": {
         "properties": {
