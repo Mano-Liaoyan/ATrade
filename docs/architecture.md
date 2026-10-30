@@ -1700,6 +1700,16 @@ option and records it in this document.
   configuration of a multi-instrument strategy has no `instrument_id`, no
   `bar_type`, and no universe field
   ([`backtest.md`](architecture/backtest.md) section 10.10.8).
+- Decided (#188): a source order holds each `BarSource` exactly 1 time.
+  `PUT /api/market-data/source-order` refuses an order that leaves out a bar
+  source with `422`. Thus the bars route always reads the IBKR bars that it
+  saves in `ibkr_bar` (`docs/architecture/market_data.md` section 8.14).
+- Decided (#188): saved bars come only from the saved ranges. A bar in a bar
+  table outside every saved range of its bar source is not read. Tests that
+  insert bars directly also insert a saved range (`tests/saved_ranges.py`).
+- Decided (#188): the watchlist `saved_bars` items keep the first and the
+  last bar start of each bar table. The backtest form shows, for one bar
+  period, the earliest first bar and the latest last bar of all bar sources.
 - Decided (#194): the HK instrument list editor is on the settings page
   `/settings` (section 13). #194 made this page. The source order slice
   (#189) adds its "Source order" section to the same page.
