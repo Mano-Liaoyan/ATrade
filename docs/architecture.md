@@ -554,6 +554,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   overflow (section 13.1).
   The track and the thumb use Carbon tokens. With `fill` (no `maxHeight`), the
   region takes the full height of its parent, for example a workbench panel.
+  `role` is `region` (the default) or `log`. The bindable `viewport` gives
+  the scrolling element to a parent that scrolls it, for example `ChatLog`.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -916,6 +918,23 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     (Apache-2.0 header in each file, `THIRD_PARTY_NOTICES.md` in the
     repository root). `ASSISTANT_SOCKET_MESSAGE_MODELS` is the model list of
     `/ws/assistant`.
+    The components ([#187](https://github.com/Mano-Liaoyan/ATrade/issues/187)):
+    - `ChatLog` (`label`): a `ScrollRegion` with `role="log"` and `fill`
+      around an `<ol>` of messages and dividers.
+    - `ChatMessage` (`from`: `me` aligns to the end, `them` to the start;
+      `author`, which only screen readers announce; `continued`;
+      `streaming`, a caret while the text arrives; `typing`, the typing
+      indicator in place of the text; `typingText`, its screen reader text).
+    - `ChatDivider` (`label`, for example the date).
+    - `arrangeChatLog(messages)` (`chat_log.ts`) changes messages with
+      `author` and `sentAtUtc` into entries: a divider (`dateUtc`) before
+      the first message of each UTC date, and each message with
+      `continued` when the message before it on the same date has the same
+      author.
+    - The bubble colors are the Carbon v11 chat tokens
+      (`--cds-chat-bubble-user`, `--cds-chat-bubble-agent`, and their text
+      and border tokens). `@carbon/styles` 1.118.0 has no chat log styles,
+      so each component has its own CSS with Carbon tokens only.
 
 ### 13.1 Browser behavior
 
@@ -1605,6 +1624,10 @@ option and records it in this document.
   before the LiveNode starts.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#187): `ChatLog` follows new content while the end of the log is
+  at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
+  `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). The
+  divider dates are UTC dates, like the other times of the app.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
