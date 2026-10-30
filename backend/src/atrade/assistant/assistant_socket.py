@@ -26,6 +26,7 @@ from atrade.assistant import conversation_store
 from atrade.assistant.assistant_service import (
     AssistantService,
     AssistantServiceError,
+    BacktestFinished,
     LoginEnd,
     LoginEvent,
     LoginStep,
@@ -33,7 +34,9 @@ from atrade.assistant.assistant_service import (
     ModelSelection,
     RunError,
     RunEvent,
+    StrategyVersionSaved,
     TextDelta,
+    ToolStep,
 )
 from atrade.assistant.credential_routes import CredentialResponse, to_credential_response
 from atrade.assistant.system_prompt import join_system_prompt
@@ -90,6 +93,38 @@ class RunStateMessage(BaseModel):
 
     type: Literal["run_state"] = "run_state"
     state: Literal["running", "settled"]
+
+
+class ToolStepMessage(BaseModel):
+    """The start, an update, or the end of one tool call. One `tool_call_id` is one tool step of the conversation.
+
+    `status` is `running` at the start and at each update, then `succeeded` or `failed`. For `run_backtest`,
+    `backtest_id` and `backtest_status` give the queue state (`queued`) or the run state (`running`, then a final
+    status). They are null for the other tools and at the start.
+    """
+
+    type: Literal["tool_step"] = "tool_step"
+    tool_call_id: str
+    tool_name: str
+    status: Literal["running", "succeeded", "failed"]
+    backtest_id: int | None
+    backtest_status: str | None
+
+
+class StrategyVersionSavedMessage(BaseModel):
+    """The AI assistant saved a strategy version, for the diff card (25.5.2)."""
+
+    type: Literal["strategy_version_saved"] = "strategy_version_saved"
+    strategy_id: int
+    strategy_version_id: int
+    version_number: int
+
+
+class BacktestFinishedMessage(BaseModel):
+    """A backtest of `run_backtest` ended in the wait of the tool, for the metric card."""
+
+    type: Literal["backtest_finished"] = "backtest_finished"
+    backtest_id: int
 
 
 class AssistantErrorMessage(BaseModel):
@@ -161,6 +196,9 @@ ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
     MessageDeltaMessage,
     MessageEndMessage,
     RunStateMessage,
+    ToolStepMessage,
+    StrategyVersionSavedMessage,
+    BacktestFinishedMessage,
     AssistantErrorMessage,
     HeartbeatMessage,
     LoginStartMessage,
@@ -180,6 +218,22 @@ def to_socket_message(event: RunEvent) -> BaseModel:
             )
         case RunError():
             return AssistantErrorMessage(message=event.message)
+        case ToolStep():
+            return ToolStepMessage(
+                tool_call_id=event.tool_call_id,
+                tool_name=event.tool_name,
+                status=event.status,
+                backtest_id=event.backtest_id,
+                backtest_status=event.backtest_status,
+            )
+        case StrategyVersionSaved():
+            return StrategyVersionSavedMessage(
+                strategy_id=event.strategy_id,
+                strategy_version_id=event.strategy_version_id,
+                version_number=event.version_number,
+            )
+        case BacktestFinished():
+            return BacktestFinishedMessage(backtest_id=event.backtest_id)
 
 
 def to_login_message(event: LoginEvent) -> BaseModel:

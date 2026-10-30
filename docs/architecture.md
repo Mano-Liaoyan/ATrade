@@ -1948,6 +1948,10 @@ option and records it in this document.
   conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
   exchange rates of a backtest on port 8001. See section 25.14 and
   [`backtest.md`](architecture/backtest.md) section 10.13.
+- Decided (#182): the 9 tools of phase 2, the 5 backtests of a user
+  message (only the tool counts them), the `read_backtest` summary, the
+  fields of `tool_step`, `strategy_version_saved`, and `backtest_finished`,
+  and the 15-minute wait in tests. See section 25.14.
 - Decided (#183): the credential file is `/data/credentials.json` in the
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the
