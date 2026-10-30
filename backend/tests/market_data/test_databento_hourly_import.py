@@ -186,6 +186,42 @@ async def test_the_9_30_et_bar_has_the_official_open_and_the_high_and_low_from_9
 
 
 @pytest.mark.anyio
+async def test_a_summer_day_starts_the_7_bars_at_9_30_et_in_utc(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """New York is UTC-4 on 2020-06-11 (daylight saving time), so 9:30 ET is 13:30 UTC."""
+    summer_day = date(2020, 6, 11)
+    insert_member(database_url, SECOND_QUARTER_START, 1, APPLE)
+    files = [
+        *daily_files("AAPL", [summer_day], [("74", "75", 30000)]),
+        hourly_file(hourly_records("AAPL", summer_day, range(4, 20))),
+    ]
+
+    await run_import(database_url, tmp_path, gateway, files)
+
+    bars = await read_hourly_bars(database_url, APPLE, summer_day)
+    assert [bar.start_utc for bar in bars] == [
+        datetime(2020, 6, 11, 13, 30, tzinfo=UTC),
+        *(datetime(2020, 6, 11, hour, tzinfo=UTC) for hour in range(14, 20)),
+    ]
+
+
+@pytest.mark.anyio
+async def test_two_files_with_the_same_hourly_bars_save_each_bar_one_time(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """For example, a current-quarter purchase that the user buys again later from the quarter start."""
+    insert_member(database_url, FIRST_QUARTER_START, 1, APPLE)
+    records = hourly_records("AAPL", TRADING_DAY, range(9, 16))
+    later_purchase = DbnFile("XNAS.ITCH", HOURLY_SCHEMA, TRADING_DAY, HOURLY_END, hourly_records=records)
+    files = [*daily_files("AAPL", [TRADING_DAY], [("74", "75", 30000)]), hourly_file(records), later_purchase]
+
+    await run_import(database_url, tmp_path, gateway, files)
+
+    assert len(await read_hourly_bars(database_url, APPLE, TRADING_DAY)) == 7
+
+
+@pytest.mark.anyio
 async def test_the_import_keeps_only_the_quarters_in_which_the_instrument_is_in_the_universe(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:
