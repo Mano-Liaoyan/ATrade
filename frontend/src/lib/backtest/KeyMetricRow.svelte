@@ -9,9 +9,9 @@
     label?: string;
   }
 
-  const { metrics, startCapitalUsd, trades, period, label = 'Metrics' }: Props = $props();
+  const { metrics, startCapitalUsd, label = 'Metrics' }: Props = $props();
 
-  const tiles = $derived(readKeyMetrics({ metrics, startCapitalUsd, trades, period }));
+  const tiles = $derived(readKeyMetrics({ metrics, startCapitalUsd }));
 </script>
 
 <MetricRow {label}>

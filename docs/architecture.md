@@ -776,8 +776,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   error). `ComparedKeyMetrics` (`tests: ComparedTest[]`) shows one
   `KeyMetricRow` for each test, under a line with the curve line style and a
   link to the test. This line is the only key of the curves. `readKeyMetrics`
-  takes `metrics: null` (all tiles "–") and an optional `period`: only the
-  trades in the period count for the win rate.
+  takes `metrics: null` (all tiles "–"). The win rate comes from the API
+  (#168); the forward test comparison route gives the win rate of the
+  backtest period.
 - `foundation/metric_tile` has the one metric tile of all pages: `MetricTile`
   (`name`, `text`, `change`) is a Carbon tile with the name and the
   right-aligned value (tabular numbers). With `change`, the value is a
@@ -1723,6 +1724,10 @@ option and records it in this document.
   message with `from="me"` always scrolls the log to the end, also while the
   user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
+- Decided (#168): the Metrics table names the metrics CAGR, Annual
+  volatility, Sharpe ratio, Sortino ratio, Calmar ratio, Profit factor, Win
+  rate, Average win (USD), Average loss (USD), Exposure, and Turnover
+  (backtest section 10.9.6). The frontend has no win rate calculation.
 - Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
   its `storageKey`. `widthPixels` null gives the default width, and a
   double-click on the splitter sets it to null. A value stored before the

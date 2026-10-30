@@ -419,14 +419,13 @@ Phase 3 changes (#146, #149):
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
     `GET /api/forward-tests/{id}/comparison/{backtest_id}` every 2 seconds
-    until the backtest has a final status, with the forward test fills and
-    the backtest trades (for the win rates). It is a workbench (spec #99,
+    until the backtest has a final status. It is a workbench (spec #99,
     #109): the "Forward tests" side column, the comparison panel (header
     line with the backtest status, `ComparedKeyMetrics` and
     `EquityDrawdownChart` of `#lib/backtest`; no code diff: the same strategy
     version) over the Fills / Logs panel (the fill table, and the backtest
     error). The win rate of the forward test counts only the fills in the
-    backtest period.
+    backtest period (the comparison route calculates it, #170).
   - Metrics: `calculate_metrics` with `start_balance_usd`, the range from
     the forward test start to its stop (or to now while it runs), the
     recorded equity points, and the recorded fills.
@@ -448,8 +447,9 @@ Phase 3 changes (#146, #149):
     change the pairs of the later fills. Without such a
     round trip it is null with the reason
     "No round trips in the backtest period". The other metrics use all
-    fills. The forward test page shows the same values as before: the
-    frontend still calculates its win rate (#168 changes the row).
+    fills. Decided (#168): the key metric rows show `win_rate_percent` and
+    `sharpe_ratio` of the API, and the frontend has no win rate
+    calculation.
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
     or before its time, so a live fill just after a bar close and the
     backtest fill at that bar close are in one row. One row for each bar end
