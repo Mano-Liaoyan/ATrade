@@ -54,6 +54,24 @@ def test_uses_the_documented_ibkr_defaults() -> None:
     assert settings.forward_test_client_id_last == 13
 
 
+def test_reads_the_databento_api_key_without_a_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABENTO_API_KEY", "db-test-key")
+
+    settings = Settings(database_url=DATABASE_URL)
+
+    assert settings.databento_api_key is not None
+    assert settings.databento_api_key.get_secret_value() == "db-test-key"
+    assert "db-test-key" not in repr(settings)
+
+
+def test_treats_an_empty_databento_api_key_as_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABENTO_API_KEY", "")
+
+    settings = Settings(database_url=DATABASE_URL)
+
+    assert settings.databento_api_key is None
+
+
 def test_treats_an_empty_account_id_as_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ATRADE_IBKR_ACCOUNT_ID", "")
 

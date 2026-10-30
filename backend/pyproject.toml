@@ -8,6 +8,8 @@ dependencies = [
     # Code completion: each editor WebSocket connection starts 1 basedpyright language server
     # (docs/architecture/strategy.md section 9.4). The package brings Node.js (nodejs-wheel-binaries).
     "basedpyright==1.40.2",
+    # Databento history import (docs/architecture/market_data.md section 8.8). Reads DBN files and downloads batch jobs.
+    "databento==0.87.0",
     "fastapi==0.162.0",
     "ib-async==2.1.0",
     "nautilus-trader==2.0.0rc7",

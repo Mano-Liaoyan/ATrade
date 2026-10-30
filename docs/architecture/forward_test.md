@@ -1074,8 +1074,11 @@ simplest option and records it in this document.
   share the client ID with it before this choice.
 - How the ATrade data client gets the new daily bars after the bar fetcher
   saved them.
-- How the platform tells the strategy the new members at a quarter start.
-  The multi-instrument backtest makes the same choice.
+- Decided (#198): the platform tells the strategy the new members at a
+  quarter start with NautilusTrader custom data, as the multi-instrument
+  backtest does ([`backtest.md`](backtest.md) section 10.10.8): one
+  `CustomData` with `DataType("UniverseUpdate")`, which the strategy gets in
+  `on_data`. Not checked in a LiveNode: how the ATrade data client sends it.
 - Decided (#216): the bar fetcher reads the bars at the first check after
   00:30 UTC of each UTC day. A daily bar starts at 00:00 UTC of its trading
   date, so the bar of the last US trading day is complete then. The worker

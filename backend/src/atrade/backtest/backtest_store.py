@@ -172,6 +172,55 @@ async def select_equity_curve(connection: psycopg.AsyncConnection, backtest_id: 
         return await cursor.fetchall()
 
 
+@dataclass(frozen=True)
+class TrialRow:
+    """A finished backtest that can count as a trial of another backtest (docs/architecture/backtest.md 10.9.5)."""
+
+    id: int
+    strategy_version_id: int
+    paper_capital_usd: Decimal
+
+
+async def select_finished_backtests_of(
+    connection: psycopg.AsyncConnection, *, instrument: Instrument, bar_period: BarPeriod
+) -> list[TrialRow]:
+    """The finished backtests of the instrument and the bar period, for all time ranges."""
+    async with connection.cursor(row_factory=class_row(TrialRow)) as cursor:
+        await cursor.execute(
+            """
+            SELECT id, strategy_version_id, paper_capital_usd FROM backtest
+            WHERE status = 'finished' AND symbol = %(symbol)s AND exchange = %(exchange)s
+                AND currency = %(currency)s AND bar_period = %(bar_period)s
+            ORDER BY id
+            """,
+            {
+                "symbol": instrument.symbol,
+                "exchange": instrument.exchange,
+                "currency": instrument.currency,
+                "bar_period": bar_period.value,
+            },
+        )
+        return await cursor.fetchall()
+
+
+async def select_equity_curves(
+    connection: psycopg.AsyncConnection, backtest_ids: list[int]
+) -> dict[int, list[EquityPoint]]:
+    """The equity curves of the backtests, by backtest ID, with one query. A backtest without points has []."""
+    equity_curves: dict[int, list[EquityPoint]] = {backtest_id: [] for backtest_id in backtest_ids}
+    cursor = await connection.execute(
+        """
+        SELECT backtest_id, time_utc, equity_usd FROM backtest_equity_point
+        WHERE backtest_id = ANY(%(backtest_ids)s)
+        ORDER BY backtest_id, time_utc
+        """,
+        {"backtest_ids": backtest_ids},
+    )
+    for backtest_id, time_utc, equity_usd in await cursor.fetchall():
+        equity_curves[backtest_id].append(EquityPoint(time_utc=time_utc, equity_usd=equity_usd))
+    return equity_curves
+
+
 async def select_trades(connection: psycopg.AsyncConnection, backtest_id: int) -> list[BacktestTrade]:
     async with connection.cursor(row_factory=class_row(BacktestTrade)) as cursor:
         await cursor.execute(

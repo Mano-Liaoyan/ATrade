@@ -399,6 +399,21 @@ Phase 3. Sources:
 - Databento has only US stocks. Databento US data starts on 2018-05-01.
 - Databento has only prices that are not adjusted. The import adjusts them
   for stock splits before it saves them (section 8.8.3).
+- Code (#190): `market_data/databento_client.py` (`DatabentoClient`, it
+  downloads a bought batch job), `market_data/databento_import.py`
+  (`import_databento_files`), and the program `app/databento_import.py`
+  (`docs/architecture.md` section 6.4). Tests:
+  `tests/market_data/test_databento_import.py`,
+  `tests/app/test_databento_import_program.py`, and the fake
+  `tests/fakes/databento.py`, which writes small DBN files.
+- For each instrument with a daily bar in a bought time range, the import
+  writes that time range to `databento_bar_saved_range`. The daily bars
+  before 2024-07-01 use the time range that all 4 history files cover. The
+  import refuses history files without all 4 file kinds, because the high,
+  the low, and the volume need both exchanges. A second import of the same
+  files adds no row.
+- The import logs the symbols without `stat_type` 11 (they get no bar) and
+  the EQUS.SUMMARY symbols without a listing exchange (section 8.14).
 
 ### 8.8.1 Purchase list
 
@@ -450,6 +465,8 @@ Daily bars before 2024-07-01:
 
 Daily bars from 2024-07-01: the EQUS.SUMMARY `ohlcv-1d` bar. Its close is the
 official close. Its volume is the volume of the full market.
+Its listing exchange is the exchange of the latest earlier Databento daily
+bar of the same symbol (section 8.14).
 
 Hourly bars:
 
@@ -728,8 +745,16 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - The interface for the user check of detected stock splits (section 8.8.3)
   and symbol links (section 8.8.4): a page, a report file, or a command. Also
   if the import saves the bars before or after the check.
-- The program that runs the Databento import, and where the downloaded files
-  are kept.
+- Decided (#190): the program `app/databento_import.py` runs the Databento
+  import in the `web` image with `docker compose run`. The downloaded files
+  are in `data/databento/` of the repository (in `.gitignore`), one
+  directory for each batch job (`docs/architecture.md` section 22).
+- Decided (#190): the listing exchange of an EQUS.SUMMARY bar is the
+  exchange of the latest earlier Databento daily bar of the same symbol. A
+  symbol without an earlier bar gets no bar, and the import names it.
+- Decided (#190): the trading day of an official open or close is the New
+  York date of its `ts_event`. The import uses the latest new value
+  (`update_action` 1) of each day.
 - Decided (#188): the source order must hold all bar sources, each 1 time.
   The order cannot leave out `ibkr`, so the bars route always reads the IBKR
   bars that it saves for the missing parts.
