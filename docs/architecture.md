@@ -1914,6 +1914,12 @@ option and records it in this document.
   not go into the owner ledger. The next run sends fills only for its own
   orders. The position then shows the difference as "Unattributed"
   (`docs/architecture/paper_trading.md` section 11.7).
+- Decided (#221): the start dialog reads `GET /api/forward-tests/capital`
+  each time it opens and after each refused start. It does not read it again
+  when the "Capital (USD)" input changes. Without an unallocated amount, the
+  dialog reads the paper account check from `/ws/paper-trading` while it is
+  open and shows its reason (`docs/architecture/forward_test.md` section
+  12.16).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client
   calls `check_order()` before each order, `save_fill()` for each fill, and
