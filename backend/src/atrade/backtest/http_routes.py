@@ -13,7 +13,12 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_access import check_backtest_request, check_saved_bars
+from atrade.backtest.backtest_access import (
+    add_global_source_order,
+    check_backtest_request,
+    check_saved_bars,
+    has_survivorship_bias,
+)
 from atrade.backtest.backtest_exchange_rates import save_exchange_rates
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
@@ -30,7 +35,7 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import ExchangeRateReader
+from atrade.market_data import BarSource, ExchangeRateReader
 from atrade.strategy import read_strategy_version
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -48,6 +53,8 @@ class StartBacktestRequest(BaseModel):
     end_utc: AwareDatetime
     # Required, with no default: a backtest never starts with an unknown amount (docs/architecture.md section 10).
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
+    # Only for this backtest. Without it, the global source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 class BacktestLimitsBody(BaseModel):
@@ -99,6 +106,10 @@ class BacktestResponse(BaseModel):
     started_at_utc: datetime | None
     ended_at_utc: datetime | None
     metrics: BacktestMetricsResponse | None
+    # Null for a backtest from before the source order. The bar counts are null until the backtest finishes.
+    source_order: list[BarSource] | None
+    bar_count_by_source: dict[BarSource, int] | None
+    survivorship_bias: bool
 
 
 class EquityPointResponse(BaseModel):
@@ -181,6 +192,7 @@ class BacktestRoutes:
         if strategy_version is None:
             message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
             raise RuntimeError(message)
+        request = backtest_store.read_request(row)
         return BacktestResponse(
             id=row.id,
             strategy_version_id=row.strategy_version_id,
@@ -200,6 +212,11 @@ class BacktestRoutes:
             started_at_utc=row.started_at_utc,
             ended_at_utc=row.ended_at_utc,
             metrics=to_metrics_response(backtest_store.read_metrics(row)),
+            source_order=request.source_order,
+            bar_count_by_source=None
+            if row.bar_count_by_source is None
+            else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
+            survivorship_bias=has_survivorship_bias(request),
         )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
@@ -209,6 +226,7 @@ class BacktestRoutes:
             bar_period=request.bar_period,
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
+            source_order=request.source_order,
         )
         refusal = check_backtest_request(backtest_request)
         if refusal is not None:
@@ -219,6 +237,7 @@ class BacktestRoutes:
         if strategy_version is None:
             detail = f"Strategy version {request.strategy_version_id} does not exist."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        backtest_request = await add_global_source_order(database_url=self.database_url, request=backtest_request)
         # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
         missing_bars = await check_saved_bars(database_url=self.database_url, request=backtest_request)
         if missing_bars is not None:
