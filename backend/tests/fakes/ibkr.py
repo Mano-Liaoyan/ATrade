@@ -1,7 +1,7 @@
 """IBKR fake: the same functions as the GatewayConnection of the `ibkr` public entry. Data stays in memory.
 
 Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
-`instruments`, `search_error_message`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
+`instruments`, `search_error_message`, `historical_bars`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
 `cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`, `daily_exchange_rates`,
 `live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
 `historical_bar_requests`, `exchange_rate_requests`, `daily_exchange_rate_requests`, `live_bar_subscriptions`, and
@@ -123,6 +123,8 @@ class FakeGatewayConnection:
         self.next_order_id = FIRST_ORDER_ID
         # When it is set, read_historical_bars fails with this message.
         self.historical_bars_error_message: str | None = None
+        # The bars of these instruments replace the sample bars. An empty list is an instrument without bars.
+        self.historical_bars: dict[Instrument, list[Bar]] = {}
         # Each call of read_historical_bars, in order. Tests assert that only missing ranges reach IBKR.
         self.historical_bar_requests: list[HistoricalBarRequest] = []
         # When it is set, stream_live_bars fails with this message, like missing market data permissions.
@@ -266,6 +268,12 @@ class FakeGatewayConnection:
         self.historical_bar_requests.append(HistoricalBarRequest(instrument, bar_period, time_range))
         if self.historical_bars_error_message is not None:
             raise GatewayRequestError(self.historical_bars_error_message)
+        if instrument in self.historical_bars:
+            return [
+                bar
+                for bar in self.historical_bars[instrument]
+                if time_range.start_utc <= bar.start_utc < time_range.end_utc
+            ]
         bars: list[Bar] = []
         bar_start_utc = ceil_to_bar_start(time_range.start_utc, bar_period)
         while bar_start_utc < time_range.end_utc:
