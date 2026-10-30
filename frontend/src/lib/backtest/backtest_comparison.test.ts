@@ -14,6 +14,8 @@ function makeBacktest(id: number, strategyId: number, strategyName: string): Bac
     exchange: 'NASDAQ',
     currency: 'USD',
     universe_top_n: null,
+    universe_screen: null,
+    universe_rebalance_period: null,
     bar_period: '1-DAY',
     start_utc: '2025-01-01T00:00:00Z',
     end_utc: '2026-01-01T00:00:00Z',

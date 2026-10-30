@@ -18,6 +18,7 @@ from atrade.market_data.bar_store import SavedBarCoverage
 from atrade.market_data.daily_bar_summary import (
     DailyBarSummary,
     read_daily_bar_summaries,
+    read_daily_bar_summaries_before,
     read_daily_bar_summaries_of_currency,
     read_last_daily_bars,
 )
@@ -117,6 +118,7 @@ __all__ = [
     "import_databento_files_with_ibkr",
     "list_hourly_purchases",
     "read_daily_bar_summaries",
+    "read_daily_bar_summaries_before",
     "read_daily_bar_summaries_of_currency",
     "read_hk_instrument_list",
     "read_last_daily_bars",

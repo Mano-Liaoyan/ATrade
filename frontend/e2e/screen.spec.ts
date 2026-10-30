@@ -1,6 +1,6 @@
 // Screen page (#207, docs/architecture/screen.md section 24.10): the "Screens" side column, the read-only condition
 // bar with its funnel counts, the Result / Excluded switch, the batch "Add to watchlist", and the HK survivorship
-// bias warning. The tests make the screens and their screen results with the API. The bar chart saves the daily
+// bias warning, and the backtest buttons that open the New backtest form (#208). The tests make the screens and their screen results with the API. The bar chart saves the daily
 // bars of AAPL first: the IBKR fake of backend/tests/e2e_server.py has one daily bar for each day.
 import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
 
@@ -129,4 +129,61 @@ test('/screens opens the last opened screen, and a long screen list scrolls in i
   await page.keyboard.press('End');
   await expect(lastScreen).toBeInViewport();
   await expect(scrollTrack).toHaveAttribute('aria-valuenow', '100');
+});
+
+const WARNING_TEXT = 'The universe has survivorship bias';
+
+test('"Run backtest on this screen result" opens the New backtest form with the screen', async ({
+  page,
+  request,
+}, currentTest) => {
+  const name = uniqueName(currentTest, 'Backtest screen');
+  const screenId = await createScreen(request, name, 'US', {
+    start: 'quarter_universe',
+    filters: [],
+    indicator_conditions: [],
+    order: { indicator: SMA_3, direction: 'descending' },
+  });
+  await runScreen(request, screenId);
+  await page.goto(`/screens/${String(screenId)}`);
+
+  await page.getByRole('button', { name: 'Run backtest on this screen result' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'New backtest' });
+  await expect(dialog.getByRole('combobox', { name: 'Instruments' })).toHaveText('Screen');
+  await expect(dialog.getByRole('combobox', { name: 'Screen', exact: true })).toHaveText(name);
+  await expect(dialog.getByRole('combobox', { name: 'Mode' })).toHaveText('Point-in-time rule');
+  await expect(dialog.getByRole('combobox', { name: 'Rebalance' })).toHaveText('Each quarter');
+  // The US universe of each quarter is a point-in-time rule: no survivorship bias.
+  await expect(dialog.getByText(WARNING_TEXT, { exact: false })).toHaveCount(0);
+
+  await dialog.getByRole('combobox', { name: 'Mode' }).click();
+  await page.getByRole('option', { name: 'Fixed list', exact: true }).click();
+  await expect(dialog.getByText(WARNING_TEXT, { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('combobox', { name: 'Rebalance' })).toHaveCount(0);
+});
+
+test('"Run backtest on selected" opens the New backtest form with a fixed list of the selected rows', async ({
+  page,
+  request,
+}, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const name = uniqueName(currentTest, 'Selected screen');
+  const screenId = await createScreen(request, name, 'US', {
+    start: 'watchlist',
+    filters: [],
+    indicator_conditions: [],
+    order: { indicator: SMA_3, direction: 'descending' },
+  });
+  await runScreen(request, screenId);
+  await page.goto(`/screens/${String(screenId)}`);
+
+  await page.getByRole('region', { name: 'Result table' }).getByRole('checkbox', { name: 'Select AAPL' }).check();
+  await page.getByRole('button', { name: 'Run backtest on selected' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'New backtest' });
+  await expect(dialog.getByRole('combobox', { name: 'Screen', exact: true })).toHaveText(name);
+  await expect(dialog.getByRole('combobox', { name: 'Mode' })).toHaveText('Fixed list');
+  await expect(dialog.getByRole('status', { name: 'Saved bars' })).toContainText('1 instrument of the screen result');
+  await expect(dialog.getByText(WARNING_TEXT, { exact: false })).toBeVisible();
 });

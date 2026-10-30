@@ -2,10 +2,10 @@
 bars of each member (docs/architecture/backtest.md section 10.10)."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
-from atrade.backtest.backtest_store import BacktestRequest, UniversePeriod
+from atrade.backtest.backtest_store import BacktestRequest, UniversePeriod, UniverseRebalancePeriod, UniverseScreen
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import (
@@ -16,8 +16,10 @@ from atrade.market_data import (
     read_us_universe_members,
     read_us_universe_quarter_starts,
 )
+from atrade.screen import run_screen_at
 
 MAX_UNIVERSE_SIZE: Final = 500
+MONTHS_IN_PERIOD: Final[dict[UniverseRebalancePeriod, int]] = {"quarter": 3, "month": 1}
 UNIVERSE_BAR_PERIODS: Final = (BarPeriod.ONE_DAY, BarPeriod.ONE_HOUR)
 # Section 10.10.1: a multi-instrument backtest on 1-day bars reads 1 year of look-back bars (#146).
 ONE_DAY_UNIVERSE_LOOK_BACK: Final = timedelta(days=365)
@@ -73,6 +75,45 @@ async def find_rule_periods(*, database_url: str, top_n: int, time_range: TimeRa
                 members=[member.instrument for member in members],
             )
         )
+    return periods
+
+
+def find_screen_period_starts(time_range: TimeRange, rebalance_period: UniverseRebalancePeriod) -> list[datetime]:
+    """The range start, then each start of a calendar quarter (January, April, July, October) or month at 00:00 UTC
+    that is in the range."""
+    step = MONTHS_IN_PERIOD[rebalance_period]
+    start_utc = time_range.start_utc.astimezone(UTC)
+    month_index = start_utc.year * 12 + start_utc.month - 1
+    starts = [time_range.start_utc]
+    next_index = (month_index // step + 1) * step
+    while True:
+        period_start = datetime(next_index // 12, next_index % 12 + 1, 1, tzinfo=UTC)
+        if period_start >= time_range.end_utc:
+            return starts
+        starts.append(period_start)
+        next_index += step
+
+
+def find_screen_run_time(period_start_utc: datetime) -> datetime:
+    """00:00 UTC of the period start day. A daily bar starts at 00:00 UTC and closes later that day, so a range start
+    in the day must not see the bar of that day."""
+    return period_start_utc.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+async def run_screen_periods(
+    *, database_url: str, screen: UniverseScreen, rebalance_period: UniverseRebalancePeriod, time_range: TimeRange
+) -> list[UniversePeriod]:
+    """Runs the copy of the screen at each period start on the daily bars that start before it. The result rows are
+    the members of the period (docs/architecture/screen.md section 24.9). A period can have no member."""
+    periods: list[UniversePeriod] = []
+    for start_utc in find_screen_period_starts(time_range, rebalance_period):
+        outcome = await run_screen_at(
+            database_url=database_url,
+            market=screen.market,
+            definition=screen.definition,
+            as_of_utc=find_screen_run_time(start_utc),
+        )
+        periods.append(UniversePeriod(start_utc=start_utc, members=[row.instrument for row in outcome.rows]))
     return periods
 
 

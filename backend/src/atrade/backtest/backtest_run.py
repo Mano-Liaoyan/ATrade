@@ -36,6 +36,7 @@ from atrade.backtest.backtest_universe import (
     describe_missing_universe_bars,
     find_universe_look_back_length,
     read_universe_bars,
+    run_screen_periods,
 )
 from atrade.backtest.strategy_engine_run import (
     StrategyFailedError,
@@ -118,10 +119,22 @@ class BacktestInputs:
 async def read_universe_inputs(
     *, database_url: str, backtest_id: int, request: BacktestRequest, source_order: list[BarSource], look_back: LookBack
 ) -> UniverseInputs:
+    universe = request.universe
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        periods = await backtest_store.select_universe_periods(
-            connection, backtest_id=backtest_id, currency=request.currency
-        )
+        if universe is not None and universe.screen is not None and universe.rebalance_period is not None:
+            # A `screen` universe: the child runs the copy of the screen at each period start, then records the
+            # members for the Instruments tab (docs/architecture/backtest.md section 10.10.8).
+            periods = await run_screen_periods(
+                database_url=database_url,
+                screen=universe.screen,
+                rebalance_period=universe.rebalance_period,
+                time_range=request.time_range,
+            )
+            await backtest_store.replace_universe_members(connection, backtest_id=backtest_id, universe_periods=periods)
+        else:
+            periods = await backtest_store.select_universe_periods(
+                connection, backtest_id=backtest_id, currency=request.currency
+            )
     bars = await read_universe_bars(
         database_url=database_url,
         request=request,
