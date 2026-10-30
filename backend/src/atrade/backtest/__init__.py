@@ -18,7 +18,7 @@ from atrade.backtest.backtest_metrics import (
     calculate_round_trip_metrics,
     find_round_trips,
 )
-from atrade.backtest.backtest_run import find_look_back_length, run_backtest
+from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
 from atrade.backtest.http_routes import create_backtest_router
@@ -32,6 +32,7 @@ __all__ = [
     "BacktestStatus",
     "BacktestTrade",
     "EquityPoint",
+    "LookBack",
     "RoundTrip",
     "calculate_daily_returns",
     "calculate_equity_curve",
@@ -39,7 +40,7 @@ __all__ = [
     "calculate_round_trip_metrics",
     "check_backtest_request",
     "create_backtest_router",
-    "find_look_back_length",
+    "find_look_back",
     "find_round_trips",
     "queue_backtest",
     "read_backtest_outcome",

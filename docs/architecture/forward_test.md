@@ -651,9 +651,13 @@ than the worker clock.
   `__init__` of the user config class (section 9.2). The reason: the user
   `__init__` passes other keywords to `object.__init__`, which refuses them.
 - Warm-up bars: after the cancel of the old orders, on the same connection,
-  the child reads the bars of `find_look_back_length(bar_period)` of
-  `backtest` (the backtest look-back, 7 days at least) before the start of
-  the current bar, with `GatewayConnection.read_historical_bars()`. That
+  the child reads the bars of `find_look_back(bar_period,
+  warm_up_bar_count)` of `backtest` (the backtest look-back, 7 days at
+  least) before the start of the current bar, with
+  `GatewayConnection.read_historical_bars()`. For a rule builder version the
+  LiveNode gets only the last bars of the bar count of the longest indicator
+  (#164, [`backtest.md`](backtest.md) section 10.3.1). The child saves all
+  read bars. That
   function splits the range into requests of the IBKR step size of the bar
   period (1 day for 1-minute bars, `ibkr/historical_bars.py`). A failed read
   logs a warning and gives no warm-up bars. The forward test still starts.
@@ -835,8 +839,9 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
 - Warm-up: the warm-up of a multi-instrument forward test on daily bars is
   1 year, the same as the multi-instrument backtest. The reason: 12-1
   momentum and the distance to the 52-week high need about 252 daily bars.
-  The old look-back of 1-day bars is 60 days
-  (`backend/src/atrade/backtest/backtest_run.py`).
+  The default look-back of 1-day bars is 60 days; a rule builder version
+  gets the bars of its longest indicator (#164,
+  `backend/src/atrade/backtest/backtest_run.py`).
   - The child reads the warm-up bars from the bar store with the global
     source order (`ibkr_bar`, then `databento_bar`,
     [`market_data.md`](market_data.md)). It sends no request to IBKR. The

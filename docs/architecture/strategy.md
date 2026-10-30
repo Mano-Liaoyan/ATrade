@@ -111,7 +111,9 @@ New columns of `strategy_version`:
   least (`find_warm_up_length`). It is not a fixed 60 days, because 60 days of
   1-minute bars need many IBKR historical data requests. In a backtest,
   `request_bars` gets the saved bars before the start (backtest section
-  10.3.1).
+  10.3.1). For a rule builder version, the platform gives the last bars that
+  the longest indicator of the rules needs (#164), and the generated code
+  asks for them (section 9.8.3).
 - A new strategy starts from a start point as version 1 (section 9.9.1).
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
@@ -470,8 +472,10 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   compares with the values of the previous bar. A cross is false when the
   previous bar had no value. The code warms up the indicators with
   `request_bars` in `on_start`: the bar count is the largest look-back count
-  of the indicators ([`indicator.md`](indicator.md) section 23.4), and 7 days
-  at least.
+  of the indicators ([`indicator.md`](indicator.md) section 23.4). The
+  request goes `bar period × count × 6` back, and 7 days at least. The
+  platform gives only the last bars of this count (#164,
+  [`backtest.md`](backtest.md) section 10.3.1).
 
 ### 9.8.4 One-way editing
 
@@ -548,10 +552,6 @@ It needs the multi-instrument backtest of
   edits in the browser).
 - The delay between a rule change and the code request.
 - The buttons of the diff before the save.
-- The look-back length of the backtest is 60 days for daily bars
-  ([`backtest.md`](backtest.md) section 10.3.1). SMA(200) and 12-1 momentum
-  need about 252 bars. With the current look-back, these indicators have no
-  value on the first part of the range, so no rule runs there.
 - How the platform tells the strategy the universe of each quarter (phase 3,
   #142).
 
