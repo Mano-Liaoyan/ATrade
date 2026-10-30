@@ -683,12 +683,19 @@ columns behave the same (section 13).
 
 ## 25.14 Left to the implementation
 
-- The repository directory of the `assistant` service code, its Dockerfile,
-  its tests, and how `./scripts/check` checks it.
-- The port that `assistant` listens on in `atrade-assistant-internal`, and
-  the protocol between `web` and `assistant` (conversation messages, login
+- Decided (#178): the service code is in `assistant/` (`src/` and
+  `tests/`), with its own `package.json` and pnpm lock file. Node.js runs
+  `src/main.ts` directly (type stripping). The Dockerfile is
+  `deploy/assistant.Dockerfile`. `./scripts/check assistant` runs ESLint,
+  `tsc --noEmit`, and Vitest. The CI job is `assistant`. The tests use a
+  local fake OpenAI-compatible model server (`assistant/tests/fake_model_server.ts`).
+- Decided (#178): `assistant` listens on port 8002 in
+  `atrade-assistant-internal`. In #178 it has only `GET /health` for the
+  Compose health check.
+- The protocol between `web` and `assistant` (conversation messages, login
   steps, credential list, title generation, JSONL delete).
-- The fixed subnet of `atrade-assistant-internal`, and whether it is a
+- Decided (#178): the subnet of `atrade-assistant-internal` is
+  `172.31.250.0/24`. It is fixed in `deploy/compose.yaml` and is not a
   setting.
 - How port 8001 knows the conversation of a request (for example a header
   that `assistant` sends), so that it records the conversation ID.
@@ -725,7 +732,16 @@ columns behave the same (section 13).
   credential state column.
 - The UI copy of each disabled control, for example "Send" without a
   credential.
-- The code of the `tool_call` handler that refuses unknown tools.
+- Decided (#178): the `tool_call` handler that refuses unknown tools is
+  `createToolGuard` in `assistant/src/tool_guard.ts`. It returns
+  `{ block: true }` with the reason "<name> is not an ATrade assistant
+  tool." for each tool name that is not in `ASSISTANT_TOOL_NAMES`
+  (`assistant/src/assistant_tools.ts`, the tools of 25.4.1). It is an inline
+  extension factory of the `assistant` process, given to pi through
+  `DefaultResourceLoader` with `noExtensions`, `noSkills`,
+  `noPromptTemplates`, `noThemes`, and `noContextFiles`. pi loads no
+  extension file. The settings of pi are in memory (`SettingsManager.inMemory`),
+  so pi reads no `settings.json`.
 
 ## 25.15 Facts to check
 
