@@ -4,6 +4,7 @@ import { changeBacktestLimits, readBacktestLimits, startBacktest, type BacktestR
 
 const REQUEST: BacktestRequest = {
   strategy_version_id: 7,
+  universe_kind: 'single',
   symbol: 'AAPL',
   exchange: 'NASDAQ',
   currency: 'USD',
