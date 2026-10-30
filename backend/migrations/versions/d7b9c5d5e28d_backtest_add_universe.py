@@ -1,13 +1,13 @@
 """backtest: the universe of a multi-instrument backtest and the instrument of each trade
 
 Revision ID: d7b9c5d5e28d
-Revises: 20a1ab3c3c30
+Revises: bac389eabc50
 """
 
 from alembic import op
 
 revision = "d7b9c5d5e28d"
-down_revision = "20a1ab3c3c30"
+down_revision = "bac389eabc50"
 
 
 def upgrade() -> None:

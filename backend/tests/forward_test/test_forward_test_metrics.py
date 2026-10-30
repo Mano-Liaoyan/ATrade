@@ -27,28 +27,31 @@ SHORT_BACKTEST_END_UTC = datetime(2026, 1, 2, 3, 9, 5, tzinfo=UTC)
 
 
 def write_losing_round_trip(database_url: str, forward_test_id: int) -> None:
-    """A round trip with a loss after 03:09:05: it is outside the short backtest."""
+    """A round trip with a loss after 03:09:05 in the owner ledger: it is outside the short backtest."""
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
-                commission_usd)
-            VALUES (%(id)s, %(trade_id)s, %(time_utc)s, %(side)s, 10, %(price_usd)s, 1)
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD',
+                %(quantity_change)s, %(price)s, 1, %(cash_change)s, %(execution_id)s, 2)
             """,
             [
                 {
                     "id": forward_test_id,
-                    "trade_id": "T-3",
+                    "execution_id": f"E-{forward_test_id}-3",
                     "time_utc": make_minute(9, 20),
-                    "side": "BUY",
-                    "price_usd": "101.00",
+                    "quantity_change": 10,
+                    "price": "101.00",
+                    "cash_change": "-1011",
                 },
                 {
                     "id": forward_test_id,
-                    "trade_id": "T-4",
+                    "execution_id": f"E-{forward_test_id}-4",
                     "time_utc": make_minute(9, 40),
-                    "side": "SELL",
-                    "price_usd": "100.00",
+                    "quantity_change": -10,
+                    "price": "100.00",
+                    "cash_change": "999",
                 },
             ],
         )

@@ -2,7 +2,7 @@
 // instrument fields. These helpers give why the panel cannot send an order, the position of the instrument, the order
 // value, and the limit price that the panel starts with.
 import { describePaperAccountCheck, type PaperAccountMessage, type PaperPosition } from './paper_account';
-import { findOrderBlock, type BlockingForwardTest, type OrderForm } from './paper_orders';
+import type { OrderForm } from './paper_orders';
 
 export interface OrderInstrument {
   symbol: string;
@@ -27,14 +27,10 @@ const FAILED_CHECK_KINDS: Record<'disconnected' | 'failed', InstrumentOrderBlock
 };
 
 /**
- * Why the order panel cannot send an order, as a status, or null. The paper account check must pass, and no forward
- * test can trade the instrument (docs/architecture.md section 12.2). The backend checks both again.
+ * Why the order panel cannot send an order, as a status, or null. The paper account check must pass. The backend
+ * checks it again. Forward tests and orders by hand share the instruments (docs/architecture/forward_test.md 12.2).
  */
-export function findInstrumentOrderBlock(
-  account: PaperAccountMessage | null,
-  instrument: OrderInstrument,
-  blockingForwardTests: readonly BlockingForwardTest[],
-): InstrumentOrderBlock | null {
+export function findInstrumentOrderBlock(account: PaperAccountMessage | null): InstrumentOrderBlock | null {
   if (account === null) {
     return { kind: 'in-progress', text: 'Reading the paper account.' };
   }
@@ -45,8 +41,7 @@ export function findInstrumentOrderBlock(
   if (check.actual_accounts[0] === undefined) {
     return { kind: 'error', text: describePaperAccountCheck(check).title };
   }
-  const forwardTestBlock = findOrderBlock(instrument, blockingForwardTests);
-  return forwardTestBlock === null ? null : { kind: 'warning', text: forwardTestBlock };
+  return null;
 }
 
 /** The position of the instrument (symbol, exchange, and currency) in the paper account, or null. */

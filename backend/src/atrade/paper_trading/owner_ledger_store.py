@@ -166,6 +166,118 @@ async def insert_fill(connection: psycopg.AsyncConnection, fill: NewFill) -> Non
     )
 
 
+@dataclass(frozen=True)
+class LedgerFill:
+    """One fill of an owner. `commission` is in the currency of the instrument, `cash_change` in USD."""
+
+    time_utc: datetime
+    symbol: str
+    exchange: str
+    currency: str
+    quantity_change: Decimal
+    price: Decimal
+    commission: Decimal
+    cash_change: Decimal
+    ibkr_execution_id: str
+
+
+OWNER_FILLS_QUERY = """
+    SELECT time_utc, symbol, exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id
+    FROM owner_ledger_entry
+    WHERE entry_kind = 'fill' AND owner_kind = %(owner_kind)s
+        AND forward_test_id IS NOT DISTINCT FROM %(forward_test_id)s
+    ORDER BY time_utc, id
+"""
+
+
+async def select_owner_fills(connection: psycopg.AsyncConnection, owner: Owner) -> list[LedgerFill]:
+    """The fills of the owner in all accounts, oldest first."""
+    async with connection.cursor(row_factory=class_row(LedgerFill)) as cursor:
+        await cursor.execute(OWNER_FILLS_QUERY, {"owner_kind": owner.kind, "forward_test_id": owner.forward_test_id})
+        return await cursor.fetchall()
+
+
+def select_owner_fills_blocking(connection: psycopg.Connection, owner: Owner) -> list[LedgerFill]:
+    """`select_owner_fills` for a synchronous connection, for example in a NautilusTrader DataActor."""
+    with connection.cursor(row_factory=class_row(LedgerFill)) as cursor:
+        cursor.execute(OWNER_FILLS_QUERY, {"owner_kind": owner.kind, "forward_test_id": owner.forward_test_id})
+        return cursor.fetchall()
+
+
+async def select_owner_account(connection: psycopg.AsyncConnection, owner: Owner) -> str | None:
+    """The account of the first entry of the owner. None when the owner has no entry."""
+    cursor = await connection.execute(
+        """
+        SELECT account FROM owner_ledger_entry
+        WHERE owner_kind = %(owner_kind)s AND forward_test_id IS NOT DISTINCT FROM %(forward_test_id)s
+        ORDER BY id LIMIT 1
+        """,
+        {"owner_kind": owner.kind, "forward_test_id": owner.forward_test_id},
+    )
+    row = await cursor.fetchone()
+    return None if row is None else str(row[0])
+
+
+TRANSFER_INSERT = """
+    INSERT INTO owner_ledger_entry (
+        owner_kind, forward_test_id, entry_kind, time_utc, account, symbol, exchange, currency, quantity_change, price,
+        cash_change
+    ) VALUES (%s, %s, 'transfer', %s, %s, %s, %s, %s, %s, %s, %s)
+"""
+
+
+async def insert_cash_transfer(  # noqa: PLR0913 readability-exception: one keyword argument per part of a transfer.
+    connection: psycopg.AsyncConnection,
+    *,
+    account: str,
+    source: Owner,
+    target: Owner,
+    cash_usd: Decimal,
+    time_utc: datetime,
+) -> None:
+    """2 `transfer` cash rows: the source gives `cash_usd` to the target. The caller commits."""
+    async with connection.cursor() as cursor:
+        await cursor.executemany(
+            TRANSFER_INSERT,
+            [
+                (owner.kind, owner.forward_test_id, time_utc, account, None, None, LEDGER_CASH_CURRENCY, 0, None, cash)
+                for owner, cash in ((source, -cash_usd), (target, cash_usd))
+            ],
+        )
+
+
+async def insert_position_transfer(  # noqa: PLR0913 readability-exception: one keyword argument per part of a transfer.
+    connection: psycopg.AsyncConnection,
+    *,
+    account: str,
+    source: Owner,
+    target: Owner,
+    position: OwnerPosition,
+    time_utc: datetime,
+) -> None:
+    """2 `transfer` rows: the source gives the position to the target at its average cost. The caller commits."""
+    instrument = position.instrument
+    async with connection.cursor() as cursor:
+        await cursor.executemany(
+            TRANSFER_INSERT,
+            [
+                (
+                    owner.kind,
+                    owner.forward_test_id,
+                    time_utc,
+                    account,
+                    instrument.symbol,
+                    instrument.exchange,
+                    instrument.currency,
+                    quantity,
+                    position.average_cost,
+                    0,
+                )
+                for owner, quantity in ((source, -position.quantity), (target, position.quantity))
+            ],
+        )
+
+
 def find_ledger_start_utc(entries: list[LedgerEntry]) -> datetime | None:
     starts = [entry.time_utc for entry in entries if entry.entry_kind == "ledger_start"]
     return min(starts) if starts else None
