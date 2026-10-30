@@ -3,6 +3,7 @@
 The real service is tested in assistant/tests/assistant_server.test.ts with the same paths and fields.
 """
 
+import dataclasses
 import json
 
 import httpx
@@ -13,8 +14,13 @@ from atrade.assistant import (
     AssistantServiceError,
     BacktestFinished,
     ConversationMessage,
+    CredentialSummary,
+    LoginEnd,
+    LoginStep,
     MessageEnd,
     ModelSelection,
+    ProviderModel,
+    ProviderSummary,
     RunError,
     StrategyVersionSaved,
     TextDelta,
@@ -134,3 +140,71 @@ async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -
         ("POST", "/conversations/7/steer"),
         ("DELETE", "/conversations/7"),
     ]
+
+
+CREDENTIAL = CredentialSummary(
+    id="c1", name="Work", provider="anthropic", type="api_key", key_last4="7a9f", state="ready", state_message=None
+)
+CREDENTIAL_BODY = dataclasses.asdict(CREDENTIAL)
+
+
+@pytest.mark.anyio
+async def test_login_reads_the_login_steps_and_the_end() -> None:
+    lines = [
+        {
+            "type": "login_step",
+            "step": "prompt",
+            "message": "Enter API key",
+            "url": None,
+            "user_code": None,
+            "prompt_id": "p1",
+            "prompt_type": "secret",
+            "options": None,
+        },
+        {"type": "login_end", "credential": CREDENTIAL_BODY},
+    ]
+    requests: list[httpx.Request] = []
+    body = "".join(json.dumps(line) + "\n" for line in lines)
+    client = client_for(httpx.Response(200, text=body), requests)
+
+    events = [event async for event in client.login("anthropic", "api_key", "Work")]
+
+    assert events == [
+        LoginStep(step="prompt", message="Enter API key", prompt_id="p1", prompt_type="secret"),
+        LoginEnd(credential=CREDENTIAL),
+    ]
+    assert str(requests[0].url) == "http://assistant:8002/logins"
+    assert json.loads(requests[0].content) == {"provider": "anthropic", "method": "api_key", "name": "Work"}
+
+
+@pytest.mark.anyio
+async def test_answer_login_posts_the_answer() -> None:
+    requests: list[httpx.Request] = []
+    client = client_for(httpx.Response(204), requests)
+
+    assert await client.answer_login("p1", "sk-test") is True
+    assert str(requests[0].url) == "http://assistant:8002/login-answers"
+    assert json.loads(requests[0].content) == {"prompt_id": "p1", "value": "sk-test"}
+
+
+@pytest.mark.anyio
+async def test_credentials_and_providers_are_read_and_a_missing_credential_is_false() -> None:
+    requests: list[httpx.Request] = []
+    credentials = client_for(httpx.Response(200, json={"credentials": [CREDENTIAL_BODY]}), requests)
+    provider_body = {
+        "id": "google",
+        "name": "Google",
+        "login_methods": ["api_key"],
+        "models": [{"id": "gemini", "name": "Gemini"}],
+    }
+    providers = client_for(httpx.Response(200, json={"providers": [provider_body]}), requests)
+    missing = client_for(httpx.Response(404, json={"detail": "The credential c1 does not exist."}), requests)
+
+    assert await credentials.list_credentials() == [CREDENTIAL]
+    assert await providers.list_providers() == [
+        ProviderSummary(
+            id="google", name="Google", login_methods=["api_key"], models=[ProviderModel(id="gemini", name="Gemini")]
+        )
+    ]
+    assert await missing.delete_credential("c1") is False
+    assert str(requests[-1].url) == "http://assistant:8002/credentials/c1"
