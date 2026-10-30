@@ -23,11 +23,13 @@
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
+    formatUniverseLabel,
     isFinalStatus,
     KeyMetricRow,
     listBacktests,
     readBacktest,
     readBacktestInstrument,
+    UniverseInstrumentTable,
     type Backtest,
     type BacktestDetail,
     type BacktestInstrument,
@@ -56,9 +58,10 @@
     { id: 'chart', minPixels: 160 },
     { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
   ];
-  type BacktestTable = 'trades' | 'orders' | 'logs' | 'metrics' | 'bar-sources';
+  type BacktestTable = 'trades' | 'instruments' | 'orders' | 'logs' | 'metrics' | 'bar-sources';
   const TABLE_TABS: { value: BacktestTable; label: string }[] = [
     { value: 'trades', label: 'Trades' },
+    { value: 'instruments', label: 'Instruments' },
     { value: 'orders', label: 'Orders' },
     { value: 'logs', label: 'Logs' },
     { value: 'metrics', label: 'Metrics' },
@@ -237,6 +240,7 @@
   {:else}
     {@const detail = shownBacktest}
     {@const instrument = readBacktestInstrument(detail)}
+    {@const universeLabel = formatUniverseLabel(detail, detail.instruments.length)}
     <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
         {#if id === 'chart'}
@@ -250,6 +254,8 @@
                 {#if instrument !== undefined}
                   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
                   <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
+                {:else if universeLabel !== undefined}
+                  <span>{universeLabel}</span>
                 {/if}
                 <span class="run-period">{formatBarPeriod(detail.bar_period)}</span>
               </h1>
@@ -314,6 +320,8 @@
           >
             {#if selectedTable === 'trades'}
               <BacktestTradeTable trades={detail.trades} />
+            {:else if selectedTable === 'instruments'}
+              <UniverseInstrumentTable instruments={detail.instruments} />
             {:else if selectedTable === 'orders'}
               <EmptyText text="No orders" />
             {:else if selectedTable === 'metrics'}

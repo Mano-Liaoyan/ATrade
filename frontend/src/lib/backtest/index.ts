@@ -19,6 +19,7 @@ export {
   readBacktestLimits,
   readBacktest,
   readBacktestInstrument,
+  readUsUniverseRange,
   startBacktest,
   type Backtest,
   type BacktestComparison,
@@ -31,7 +32,11 @@ export {
   type BacktestTrade,
   type EquityPoint,
   type RequestResult,
+  type UniverseInstrument,
+  type UsUniverseRange,
 } from './backtest_api';
+export { checkTopN, formatUniverseLabel, formatUniverseRange, MAX_TOP_N } from './backtest_universe';
+export { default as UniverseInstrumentTable } from './UniverseInstrumentTable.svelte';
 export {
   convertDateToUtcStart,
   convertTimeoutMinutesToSeconds,
