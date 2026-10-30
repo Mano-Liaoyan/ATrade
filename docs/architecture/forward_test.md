@@ -648,7 +648,11 @@ and the status codes of the new refusals are choices of this document.
   multi-instrument child (warm-up and new daily bars from the bar store,
   the quarter change), the equity of section 12.8, and the start dialog.
   Until then the child of a `rule` or `list` row crashes, and after 3
-  crashes the status is `failed` (section 12.7).
+  crashes the status is `failed` (section 12.7). The detail of a `rule` or
+  `list` row reads its fills from the owner ledger. "Backtest the same
+  period" of a `rule` or `list` row gets `422` (`"A multi-instrument forward
+  test has no same-period backtest yet."`), and a comparison with a backtest
+  gets `422`.
 - The metrics, the Net profit, and the same-period backtest start from
   `allocated_capital_usd`. An old row without it uses `start_balance_usd`
   (`ForwardTestRow.start_capital_usd`).

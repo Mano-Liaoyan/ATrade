@@ -99,12 +99,20 @@ FORWARD_TEST_COLUMNS: Final = """
 """
 
 
+def read_single_instrument(row: ForwardTestRow) -> Instrument | None:
+    """The instrument of a single-instrument forward test, or None for a multi-instrument forward test."""
+    if row.symbol is None or row.exchange is None or row.currency is None:
+        return None
+    return Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency)
+
+
 def read_instrument(row: ForwardTestRow) -> Instrument:
     """The instrument of a single-instrument forward test. Raises ValueError for a multi-instrument forward test."""
-    if row.symbol is None or row.exchange is None or row.currency is None:
+    instrument = read_single_instrument(row)
+    if instrument is None:
         message = f"Forward test {row.id} has the universe kind {row.universe_kind} and no single instrument."
         raise ValueError(message)
-    return Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency)
+    return instrument
 
 
 async def select_allocated_usd(connection: psycopg.AsyncConnection) -> Decimal:

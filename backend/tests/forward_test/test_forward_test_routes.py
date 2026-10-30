@@ -464,3 +464,44 @@ async def test_refuses_a_top_n_forward_test_without_a_stored_current_quarter(
 
     assert response.status_code == 422
     assert response.json()["detail"] == "The US universe has no saved members for the quarter from 2026-01-01."
+
+
+async def start_watchlist_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc)
+            VALUES ('AAPL', 'NASDAQ', 'USD', now())
+            """
+        )
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+@pytest.mark.anyio
+async def test_the_detail_of_a_multi_instrument_forward_test_has_no_instrument(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["forward_test"]["universe_kind"] == "list"
+    assert response.json()["fills"] == []
+
+
+@pytest.mark.anyio
+async def test_refuses_a_same_period_backtest_of_a_multi_instrument_forward_test(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+
+    response = await web_client.post(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/same-period-backtests")
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "A multi-instrument forward test has no same-period backtest yet."
