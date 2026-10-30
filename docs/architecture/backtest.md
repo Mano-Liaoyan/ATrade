@@ -145,7 +145,7 @@ New columns are null on existing rows, except where a default is given.
 |---|---|---|
 | 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). Migration `8d4b6f2a1c93_backtest_add_metric_columns.py`. |
 | 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. Migration `2f6a9c1e4d85_backtest_add_out_of_sample_split.py`. |
-| 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
+| 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). Done (#180): migration `4a6c8e1b3d57_backtest_add_conversation_id.py`. |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2, `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
 | 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
 | 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. |
@@ -229,8 +229,26 @@ temporary NautilusTrader `ParquetDataCatalog` holds them. The child fills it
 from the saved bars in PostgreSQL. So a strategy warms up its indicators as
 in a forward test, and it can trade on the first bar of the range.
 
-- Look-back length: `find_look_back_length(bar_period)` in
-  `backtest/backtest_run.py`. It is the warm-up of the "Blank code" start
+- Look-back: `find_look_back(bar_period, warm_up_bar_count)` in
+  `backtest/backtest_run.py`. It gives a read length and an optional bar
+  count (`LookBack`).
+- Decided (#164): a rule builder version (a version with `rules`) gets the
+  last N saved bars before the start. N is the largest look-back count of
+  the indicators in its rules ([`indicator.md`](indicator.md) section 23.4,
+  `find_warm_up_bar_count()` in `strategy/rules_code.py`).
+  `read_strategy_version()` gives N as `warm_up_bar_count`. The child reads
+  the saved bars of the range `start_utc` minus `N × bar period × factor`
+  (factor 2 for 1-day bars, 6 for intraday bars, because a bar comes only
+  in the trading hours), and at least the default length below, to
+  `start_utc`. It keeps only the last N bars. So SMA(200) has a value on the
+  first bar of the range when PostgreSQL has 200 daily bars before the
+  start. The generated code asks `request_bars` for
+  `max(bar period × N × 6, 7 days)` before the start, so the request holds
+  all N bars. With the earlier 60 days, SMA(200) had no value in the first
+  months of the range (a test with 20 bars in the range made no trade).
+- A version without rules, or with rules without an indicator ("Blank code"
+  and code written by hand), keeps the default length and all bars of it.
+  The default length is the warm-up of the "Blank code" start
   point (`backend/src/atrade/strategy/strategy_template.py`,
   [`strategy.md`](strategy.md) section 9.2): 3 average periods of the
   default 20 bars of its SMA(20), and 7 days at least
@@ -246,8 +264,8 @@ in a forward test, and it can trade on the first bar of the range.
   starts earlier gets only these bars. When PostgreSQL has no saved bars
   before the start, `request_bars` gets no bars and the indicator warms up on
   the first bars of the range.
-- A forward test uses the same length and the same catalog for its warm-up
-  bars (`find_look_back_length()` and `write_look_back_catalog()` of the
+- A forward test uses the same look-back and the same catalog for its
+  warm-up bars (`find_look_back()` and `write_look_back_catalog()` of the
   public entry, [`forward_test.md`](forward_test.md) section 12.15).
 - Mechanism (`create_look_back_catalog()` in
   `backtest/strategy_engine_run.py`): the child writes the look-back bars to
@@ -271,7 +289,10 @@ in a forward test, and it can trade on the first bar of the range.
   bars) and
   `test_the_template_warms_up_on_saved_bars_before_the_start` in
   `tests/backtest/test_backtest_runs.py` (a real child process reads the
-  look-back bars from PostgreSQL).
+  look-back bars from PostgreSQL). `tests/backtest/test_rules_backtest.py`:
+  a rule builder version with SMA(200) buys on the first bar of the range
+  with 300 saved bars before the start, and SMA(3) without saved bars before
+  the start warms up on the first bars of the range.
 
 ## 10.4 Metric functions
 
@@ -334,7 +355,7 @@ Changes of later phases:
 | 1 | `GET /api/backtests`, `POST /api/backtests` | Each backtest has `out_of_sample_share` and `split_time_utc`. |
 | 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. #166 adds `split_metrics` and the two out-of-sample fields of `robustness`. `split_metrics` is also null until the backtest finishes. Without a split, both out-of-sample fields are null. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
 | 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
-| 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
+| 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. |
 | 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
@@ -1177,6 +1198,11 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
   the user deletes the conversation, the ID becomes null. The backtest stays.
 - The AI assistant cannot change the backtest limits and cannot start a
   parameter sweep.
+- Decided (#181): `POST /api/backtests` on port 8001 makes the same checks
+  as port 8000 (`start_backtest`). When the instrument is not in USD and a
+  daily exchange rate is missing, it saves the rates from IBKR (section
+  10.8), like port 8000. The rule "cannot load bars" is about bars only. A
+  backtest without saved bars gets `422` (section 10.1).
 
 Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
 

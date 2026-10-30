@@ -237,6 +237,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description The template list in the order of section 9.9.3.
+         */
+        get: operations["list_templates_api_strategy_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -290,6 +310,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard Version
+         * @description Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).
+         */
+        post: operations["discard_version_api_strategies__strategy_id__versions__version_number__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies/{strategy_id}/versions": {
         parameters: {
             query?: never;
@@ -322,25 +362,11 @@ export interface paths {
         /** List Backtests */
         get: operations["list_backtests_api_backtests_get"];
         put?: never;
-        /** Start Backtest */
+        /**
+         * Start Backtest
+         * @description The start of port 8000: a backtest without a conversation.
+         */
         post: operations["start_backtest_api_backtests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/backtests/{backtest_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Backtest */
-        get: operations["read_backtest_api_backtests__backtest_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -358,6 +384,23 @@ export interface paths {
         get: operations["read_limits_api_backtest_limits_get"];
         /** Change Limits */
         put: operations["change_limits_api_backtest_limits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Backtest */
+        get: operations["read_backtest_api_backtests__backtest_id__get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -762,6 +805,8 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -878,6 +923,8 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -1011,6 +1058,8 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -1214,6 +1263,8 @@ export interface components {
         CreateStrategyRequest: {
             /** Name */
             name: string;
+            /** @default blank_code */
+            start_from: components["schemas"]["StartPoint"];
         };
         /** CredentialListResponse */
         CredentialListResponse: {
@@ -1999,6 +2050,8 @@ export interface components {
             /** End Time Utc */
             end_time_utc?: string | null;
         };
+        /** @enum {string} */
+        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
         /**
          * StartRefusedResponse
          * @description The start was refused. `forward_test_id` is the forward test that already runs on the instrument.
@@ -2043,6 +2096,34 @@ export interface components {
             entry: components["schemas"]["RuleGroup"];
             exits: components["schemas"]["RuleExits"];
         };
+        /** StrategyTemplateResponse */
+        StrategyTemplateResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "rules" | "code";
+            /** Entry */
+            entry: string;
+            /** Exit */
+            exit: string;
+            /** Defaults */
+            defaults: string;
+            /** Market */
+            market: string;
+            /** Bar Period */
+            bar_period: string;
+            /** Evidence */
+            evidence: string;
+            /** Sources */
+            sources: components["schemas"]["TemplateSourceResponse"][];
+            /** Differs From Source */
+            differs_from_source: string;
+        };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
             /** Id */
@@ -2064,11 +2145,15 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
             /** Rules */
             rules: {
                 [key: string]: unknown;
             } | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -2087,7 +2172,18 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
+        };
+        /** TemplateSourceResponse */
+        TemplateSourceResponse: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
@@ -3080,6 +3176,26 @@ export interface operations {
             };
         };
     };
+    list_templates_api_strategy_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyTemplateResponse"][];
+                };
+            };
+        };
+    };
     list_strategies_api_strategies_get: {
         parameters: {
             query?: never;
@@ -3270,6 +3386,56 @@ export interface operations {
             };
         };
     };
+    discard_version_api_strategies__strategy_id__versions__version_number__discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_version_api_strategies__strategy_id__versions_post: {
         parameters: {
             query?: never;
@@ -3376,46 +3542,6 @@ export interface operations {
             };
         };
     };
-    read_backtest_api_backtests__backtest_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                backtest_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestDetailResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_limits_api_backtest_limits_get: {
         parameters: {
             query?: never;
@@ -3456,6 +3582,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_backtest_api_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

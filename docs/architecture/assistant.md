@@ -127,6 +127,19 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - So `assistant` cannot call a route of port 8000.
 - A unit test checks the allow-list: the port 8001 app has exactly the
   routes of 25.3.3.
+- Done (#181): `app/assistant_port.py` builds the port 8001 app
+  (`create_assistant_port_app`) from `create_strategy_assistant_router` and
+  `create_backtest_assistant_router`. The app has no OpenAPI document and no
+  `/docs` page. A route that is not in the allow-list gets `404`, or `405`
+  when an allowed route has the same path.
+- Done (#181): each request of `assistant` to port 8001 sends the header
+  `X-ATrade-Conversation-Id` with the conversation ID. The 2 routes that
+  record the conversation (`POST /api/strategies/{strategy_id}/versions` and
+  `POST /api/backtests`) need it. Without the header, or with a value that is
+  not a positive integer, the answer is FastAPI's `422` validation body. When
+  the conversation does not exist, the answer is `422` with
+  `{"detail": "Conversation <id> does not exist."}`. The read routes ignore
+  the header.
 
 ### 25.3.3 Allow-list
 
@@ -276,15 +289,17 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 | Table | New column | Meaning |
 |---|---|---|
-| `strategy_version` | source | `user`, `assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
+| `strategy_version` | `source` | `user`, `ai_assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
 | `strategy_version` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant saved the version. |
-| `strategy_version` | discarded mark | Set when the user discards the version. |
+| `strategy_version_discard` | `strategy_version_id`, `discarded_at_utc` | The discarded mark: one row for each discarded version. Added when the user discards the version. |
 | `backtest` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant started the backtest. |
 
 - A discarded strategy version is never deleted. Its backtests stay.
 - The trigger `strategy_version_append_only` refuses each `UPDATE`
   (strategy section 9.1.1). The discarded mark cannot be an `UPDATE` of the
-  version row. See 25.14.
+  version row, so it is a row of `strategy_version_discard` (#180). The
+  trigger lets through only the `ON DELETE SET NULL` of `conversation_id`
+  (strategy section 9.1.1).
 
 ### 25.5.2 Diff card
 
@@ -302,8 +317,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 - The version `Select` of the strategy page hides discarded strategy
   versions by default.
-- A toggle "Show discarded versions" below the `Select` shows them. Each
+- A toggle "Show discarded versions" next to the `Select` shows them. Each
   shows the tag "Discarded" after its version number.
+- Decided (#180): the toggle is in the toolbar line after the `Select`,
+  because the toolbar has one line. It shows only when the strategy has a
+  discarded version. When the open version is discarded, the `Select` also
+  lists it with the toggle off, so that the `Select` names the open
+  version. Without a version address, the strategy page opens the latest
+  version that is not discarded.
 - The backtest list shows the backtests of discarded strategy versions as
   usual.
 
@@ -758,7 +779,7 @@ below are choices of this document. The implementation can change them.
 | Delete a credential | `DELETE /api/assistant/credentials/{credential_id}` | 2 |
 | List prompt versions | `GET /api/assistant/prompt-versions` | 2 |
 | Save a prompt version | `POST /api/assistant/prompt-versions` | 2 |
-| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` | 2 |
+| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (done, #180, strategy section 9.6) | 2 |
 | Keep a screen of the AI assistant | `POST /api/screens/{screen_id}/keep` | 3 |
 | Discard a screen of the AI assistant | `DELETE /api/screens/{screen_id}` (the user route) | 3 |
 
@@ -969,17 +990,30 @@ columns behave the same (section 13).
 - Decided (#178): the subnet of `atrade-assistant-internal` is
   `172.31.250.0/24`. It is fixed in `deploy/compose.yaml` and is not a
   setting.
-- How port 8001 knows the conversation of a request (for example a header
-  that `assistant` sends), so that it records the conversation ID.
-- How the `web` process runs 2 uvicorn listeners in 1 process.
-- Where the discarded mark is kept. The trigger
-  `strategy_version_append_only` refuses each `UPDATE` of
-  `strategy_version`, so a separate table or a narrower trigger is
-  necessary.
-- The column names and types of the version source. Decided (#179): the
-  title state and the last provider, model, and credential name (25.8.1).
-- Whether Keep of a diff card is recorded on the server, so a reload shows
-  "Kept".
+- Decided (#181): port 8001 knows the conversation of a request from the
+  header `X-ATrade-Conversation-Id` (25.3.2). The constant is
+  `CONVERSATION_HEADER` in `backend/src/atrade/foundation/assistant_conversation.py`.
+  A missing header gets `422` (FastAPI validation), and an unknown
+  conversation gets `422` with a text `detail`. The check of the
+  conversation is `conversation_exists` of the `assistant` public entry.
+  `app/` gives it to the routers, so `strategy` and `backtest` do not import
+  `assistant`.
+- Decided (#181): `app/web.py` runs 2 `uvicorn.Server` objects in 1 event
+  loop (`serve_both`): port 8000 with the lifespan, and port 8001 with
+  `lifespan="off"`. When one server stops, the other stops too.
+- Decided (#180): the discarded mark is a row of the table
+  `strategy_version_discard` (25.5.1). The trigger
+  `strategy_version_append_only` still refuses each `UPDATE` statement.
+- Decided (#180): the version source is the `text` column `source` with
+  the CHECK constraint `strategy_version_source_check` (`user`,
+  `rule_builder`, `ai_assistant`). Decided (#179): the title state and the
+  last provider, model, and credential name (25.8.1).
+- Decided (#180): Keep of a diff card is not recorded on the server. Only
+  Discard changes a version (25.5.2), so a reload shows a version without
+  the discarded mark as kept.
+- Decided (#180): the discard route answers `409` for a version that the AI
+  assistant did not save, and `200` for a version that is already
+  discarded (25.11).
 - How the server records that the user kept a screen, so `update_screen`
   returns `403` after Keep.
 - Decided (#179): a delete of the strategy deletes its conversation rows
@@ -995,9 +1029,9 @@ columns behave the same (section 13).
   also port 8001.
 - How the AI assistant finds the instruments and bar periods with saved bars.
   No tool reads the watchlist.
-- Whether `POST /api/backtests` from port 8001 may save daily exchange rates
-  from IBKR (backtest section 10.8). The AI assistant "cannot download
-  bars", and the rates come from IBKR.
+- Decided (#181): `POST /api/backtests` from port 8001 saves the daily
+  exchange rates from IBKR like port 8000 (backtest section 10.13). Rates
+  are not bars.
 - The phase 3 message for the condition card. Decided (#179): the field
   names of the other `/ws/assistant` messages (25.10).
 - Decided (#205): the field that names the position of a condition in a

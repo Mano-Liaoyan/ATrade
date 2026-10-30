@@ -27,6 +27,7 @@ export { default as OverflowMenu, type OverflowMenuItem } from './OverflowMenu.s
 export { default as InlineNotification } from './InlineNotification.svelte';
 export type { NotificationKind, NotificationMessage } from './notification_message';
 export { default as Checkbox } from './Checkbox.svelte';
+export { default as Toggle } from './Toggle.svelte';
 export { default as StatusIndicator, type StatusKind } from './StatusIndicator.svelte';
 export { default as ChatLog } from './ChatLog.svelte';
 export { default as ChatMessage } from './ChatMessage.svelte';
