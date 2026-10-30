@@ -246,6 +246,30 @@ The backup holds the credentials. Keep it like `.env`: not in git, not in a
 shared folder, and readable only by you. When the volume is lost, log in and
 enter the API keys again in the "Credentials" dialog.
 
+### Import the Databento history
+
+The user buys the Databento daily bars and `statistics` one time
+(`docs/architecture/market_data.md` section 8.8.1). Then the import program
+saves them in `databento_bar`. It runs in the `web` image. Keep the files in
+`data/databento/` (not in git).
+
+```sh
+mkdir -p data/databento
+# Download the bought batch jobs (needs DATABENTO_API_KEY in .env) and import all DBN files.
+# --user lets the program write to data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/data/databento:/databento" web \
+  python -m atrade.app.databento_import /databento --job-id <batch job ID> --job-id <batch job ID>
+# Or import the DBN files that are already in data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm \
+  -v "$PWD/data/databento:/databento:ro" web \
+  python -m atrade.app.databento_import /databento
+```
+
+The import writes the symbols without an official close and the
+EQUS.SUMMARY symbols without a listing exchange to its log. A second import
+of the same files adds no row.
+
 ### Old data
 
 The rewrite migrates no old data. The new database uses the new volume
