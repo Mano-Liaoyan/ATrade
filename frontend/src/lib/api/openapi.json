@@ -1519,6 +1519,212 @@
         }
       }
     },
+    "/api/screens": {
+      "get": {
+        "summary": "List Screens",
+        "operationId": "list_screens_api_screens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenListItemResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Screens Api Screens Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Screen",
+        "operationId": "create_screen_api_screens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens/{screen_id}": {
+      "get": {
+        "summary": "Read Screen",
+        "operationId": "read_screen_api_screens__screen_id__get",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change Screen",
+        "description": "Overwrites the name and the definition. A screen has no versions (section 24.1).",
+        "operationId": "change_screen_api_screens__screen_id__put",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeScreenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Screen",
+        "description": "Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.",
+        "operationId": "delete_screen_api_screens__screen_id__delete",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/watchlist": {
       "get": {
         "summary": "List Instruments",
@@ -2990,6 +3196,23 @@
         ],
         "title": "BarsResponse"
       },
+      "ChangeScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "ChangeScreenRequest"
+      },
       "CodeCheckFailedResponse": {
         "properties": {
           "problems": {
@@ -3815,6 +4038,28 @@
         ],
         "title": "CreateConversationRequest"
       },
+      "CreateScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "market",
+          "definition"
+        ],
+        "title": "CreateScreenRequest"
+      },
       "CreateStrategyRequest": {
         "properties": {
           "name": {
@@ -4639,6 +4884,7 @@
         "title": "InterruptionResponse",
         "type": "object"
       },
+      "JsonValue": {},
       "LedgerRule": {
         "type": "string",
         "enum": [
@@ -4856,6 +5102,13 @@
         ],
         "title": "ManualOrderWithFillsResponse",
         "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
+      },
+      "Market": {
+        "type": "string",
+        "enum": [
+          "US",
+          "HK"
+        ]
       },
       "Number": {
         "anyOf": [
@@ -5616,6 +5869,172 @@
         ],
         "title": "SavedBarsResponse",
         "description": "The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."
+      },
+      "ScreenCheckFailedResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems"
+        ],
+        "title": "ScreenCheckFailedResponse"
+      },
+      "ScreenListItemResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "updated_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "market",
+          "kept",
+          "updated_at_utc"
+        ],
+        "title": "ScreenListItemResponse"
+      },
+      "ScreenProblemResponse": {
+        "properties": {
+          "location": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "message"
+        ],
+        "title": "ScreenProblemResponse"
+      },
+      "ScreenResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "assistant_conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Conversation Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "updated_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At Utc"
+          },
+          "recent_screen_results": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultSummaryResponse"
+            },
+            "type": "array",
+            "title": "Recent Screen Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "market",
+          "definition",
+          "kept",
+          "assistant_conversation_id",
+          "created_at_utc",
+          "updated_at_utc",
+          "recent_screen_results"
+        ],
+        "title": "ScreenResponse"
+      },
+      "ScreenResultSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "run_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Run At Utc"
+          },
+          "result_count": {
+            "type": "integer",
+            "title": "Result Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_at_utc",
+          "result_count"
+        ],
+        "title": "ScreenResultSummaryResponse"
       },
       "SendOrderRequest": {
         "properties": {

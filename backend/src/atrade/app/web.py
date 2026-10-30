@@ -38,6 +38,7 @@ from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
 from atrade.market_data import ExchangeRateReader, InstrumentLookup, create_market_data_router
 from atrade.paper_trading import BlockingForwardTest, PaperAccountMonitor, create_paper_trading_router
+from atrade.screen import create_screen_router
 from atrade.strategy import (
     STRATEGY_TEMPLATE,
     create_strategy_language_server_router,
@@ -169,6 +170,7 @@ def create_web_app(
     instrument_lookup = InstrumentLookup(
         gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
     )
+    app.include_router(create_screen_router(database_url=settings.database_url, clock=clock))
     app.include_router(
         create_watchlist_router(database_url=settings.database_url, clock=clock, instrument_lookup=instrument_lookup)
     )
