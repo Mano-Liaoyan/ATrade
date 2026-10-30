@@ -19,6 +19,7 @@ from atrade.indicator.indicator_catalog import (
     IndicatorDefinition,
     IndicatorParameter,
     ParameterOrder,
+    ScreenLookBack,
 )
 from atrade.indicator.indicator_reference import IndicatorProblem, check_indicator_reference, create_indicator
 from atrade.indicator.moving_averages import EMA, MACD, SMA
@@ -43,6 +44,7 @@ __all__ = [
     "Momentum12_1",
     "ParameterOrder",
     "RealizedVolatility",
+    "ScreenLookBack",
     "check_indicator_reference",
     "create_indicator",
 ]

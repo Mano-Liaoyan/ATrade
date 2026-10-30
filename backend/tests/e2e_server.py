@@ -54,6 +54,14 @@ E2E_COMPARED_FILL_COUNT = 40
 # An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
+# A failed HK backtest and a failed US backtest of 2026: only the HK backtest shows the survivorship bias warning
+# (docs/architecture/backtest.md section 10.12). They never run, so their strategy version needs no real code.
+E2E_SURVIVORSHIP_STRATEGY_NAME = "E2E survivorship bias"
+E2E_SURVIVORSHIP_STRATEGY_CODE = "# The strategy version of the e2e survivorship bias backtests.\n"
+E2E_SURVIVORSHIP_INSTRUMENTS = [
+    Instrument(symbol="700", exchange="SEHK", currency="HKD"),
+    Instrument(symbol="SBUS", exchange="ARCA", currency="USD"),
+]
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
@@ -235,6 +243,33 @@ def add_compared_forward_test(database_url: str) -> None:
         add_compared_records(connection, int(forward_test_row[0]))
 
 
+def add_survivorship_bias_backtests(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection, name=E2E_SURVIVORSHIP_STRATEGY_NAME, code=E2E_SURVIVORSHIP_STRATEGY_CODE
+        )
+        if version_id is None:
+            return
+        for instrument in E2E_SURVIVORSHIP_INSTRUMENTS:
+            connection.execute(
+                """
+                INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                    paper_capital_usd, status, error_message, created_at_utc, ended_at_utc, source_order)
+                VALUES (%(version_id)s, %(symbol)s, %(exchange)s, %(currency)s, '1-DAY', %(start_utc)s, %(end_utc)s,
+                    10000, 'failed', 'E2E backtest without a run.', %(now)s, %(now)s, '["ibkr", "databento"]')
+                """,
+                {
+                    "version_id": version_id,
+                    "symbol": instrument.symbol,
+                    "exchange": instrument.exchange,
+                    "currency": instrument.currency,
+                    "start_utc": datetime(2026, 3, 2, tzinfo=UTC),
+                    "end_utc": datetime(2026, 4, 1, tzinfo=UTC),
+                    "now": FIXED_NOW_UTC,
+                },
+            )
+
+
 async def serve_with_forward_test_worker(server: uvicorn.Server, worker: ForwardTestWorker) -> None:
     # The forward-test service of Compose runs the worker. Here it runs in the same process, with fake children.
     worker_task = asyncio.create_task(worker.keep_comparing())
@@ -282,6 +317,7 @@ def main() -> None:
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
     add_owner_ledger_start(database_url)
+    add_survivorship_bias_backtests(database_url)
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )
