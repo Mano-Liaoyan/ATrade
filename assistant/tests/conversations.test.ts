@@ -216,7 +216,7 @@ describe('a run of a conversation', () => {
         await gate.promise;
         return openModel(selection);
       },
-      customTools: [],
+      createTools: () => [],
     });
 
     const run = runOnce(conversations, 'Hi.');
