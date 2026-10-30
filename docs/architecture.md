@@ -1674,6 +1674,9 @@ option and records it in this document.
   message with `from="me"` always scrolls the log to the end, also while the
   user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
 - Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
   its `storageKey`. `widthPixels` null gives the default width, and a
   double-click on the splitter sets it to null. A value stored before the
