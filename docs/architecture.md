@@ -1672,7 +1672,7 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). Synthetic tables give 14 to 16 seconds (section 21.1). Not measured on the real bar tables (#206): the local database has no real daily bars. | Run `read_last_daily_bars` for all instruments of `daily_bar_summary` with `bar_count` 260 on the server and time it. |
 | A US screen keeps 1000 to 2000 instruments after step 1 (estimate, #136). Not counted (#206): the local database has no real daily bars. | Run a screen with the start `all_with_daily_bars` and the filters of the example of `screen.md` section 24.4.1, and read `after_filters_count`. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
-| The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
+| The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. Not measured (#208): the local database has no real daily bars. Each period start makes 2 bulk daily bar reads (the summary bars and the indicator bars) for the start instruments. |
 | The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. Estimate (#209): 500 rows with 3 indicator values and 1 percentile are about 128,000 characters of JSON, about 32,000 to 43,000 tokens (3 to 4 characters for each token). 50 rows are about 3,200 to 4,300 tokens, so the default page of 50 rows stays. Not counted with a real tokenizer and real data. |
 | Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). Not measured in #199: there are no saved real hourly bars of 500 instruments locally. | Run one with real data and measure the peak memory and the time. |
 | The PostgreSQL read time and the Arrow conversion time of each backtest child with a universe (#142). Not measured in #199 (no real bars locally). | Time one real `rule` backtest child. |
@@ -2051,6 +2051,19 @@ option and records it in this document.
   screen has no default order: "Save as new screen" copies the order.
   `docs/architecture/screen.md` sections 24.7, 24.10.1, and 24.13 have the
   details.
+- Decided (#208): the child of a `screen` backtest, not the start route, runs
+  the copy of the screen at each universe period start and writes
+  `backtest_universe_member`, because the start route must not wait for 34
+  screen runs. The periods start at the range start and at each calendar
+  quarter or month start (00:00 UTC) in the range. A run uses only the daily
+  bars that start before the period start, in the global source order. The
+  start route does no saved-bar check for a `screen` universe; the child
+  fails when no member has a bar. A `screen` universe has survivorship bias
+  when its screen does not start from the US universe of each quarter. The
+  header line says "Screen <name>, each quarter" (or "each month"), a `list`
+  universe says "Fixed list (N)", and the Instruments tab counts "Months" for
+  a monthly `screen` universe. `docs/architecture/backtest.md` sections
+  10.10.6 to 10.10.8 have the details.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

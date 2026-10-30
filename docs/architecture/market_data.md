@@ -744,6 +744,11 @@ Table `daily_bar_summary`: one row for each instrument.
   with saved daily bars in one currency, #206), and the HK instrument list
   with `read_hk_instrument_list` (#206). All 3 are in the `market_data`
   public entry.
+- `read_daily_bar_summaries_before(*, database_url, instruments,
+  before_utc)` (#208) calculates the summary that each instrument had with
+  only the daily bars that start before `before_utc`, with the calculation of
+  the saved summary. The point-in-time screen run of a backtest uses it
+  (`screen.md` section 24.9). It saves nothing.
 - Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
   summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
   `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and

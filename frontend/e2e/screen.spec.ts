@@ -1,7 +1,8 @@
 // Screen page (#207, docs/architecture/screen.md section 24.10): the "Screens" side column, the read-only condition
 // bar with its funnel counts, the Result / Excluded switch, the batch "Add to watchlist", and the HK survivorship
-// bias warning. The tests make the screens and their screen results with the API. The bar chart saves the daily
-// bars of AAPL first: the IBKR fake of backend/tests/e2e_server.py has one daily bar for each day.
+// bias warning, the backtest buttons that open the New backtest form (#208), and the edits of the condition bar
+// (#212). The tests make the screens and their screen results with the API. The bar chart saves the daily bars of AAPL
+// first: the IBKR fake of backend/tests/e2e_server.py has one daily bar for each day.
 import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
 
 interface ScreenResultSummary {
@@ -288,4 +289,119 @@ test('shows a 422 problem at its tag, removes conditions, keeps the saved screen
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${name} copy`);
   await expect(page.getByRole('region', { name: 'Screen list' })).toContainText(`${name} copy`);
   await expect(page.getByText('The universe has survivorship bias', { exact: false })).toBeVisible();
+});
+
+const WARNING_TEXT = 'The universe has survivorship bias';
+
+test('"Run backtest on this screen result" opens the New backtest form with the screen', async ({
+  page,
+  request,
+}, currentTest) => {
+  const name = uniqueName(currentTest, 'Backtest screen');
+  const screenId = await createScreen(request, name, 'US', {
+    start: 'quarter_universe',
+    filters: [],
+    indicator_conditions: [],
+    order: { indicator: SMA_3, direction: 'descending' },
+  });
+  await runScreen(request, screenId);
+  await page.goto(`/screens/${String(screenId)}`);
+
+  await page.getByRole('button', { name: 'Run backtest on this screen result' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'New backtest' });
+  await expect(dialog.getByRole('combobox', { name: 'Instruments' })).toHaveText('Screen');
+  await expect(dialog.getByRole('combobox', { name: 'Screen', exact: true })).toHaveText(name);
+  await expect(dialog.getByRole('combobox', { name: 'Mode' })).toHaveText('Point-in-time rule');
+  await expect(dialog.getByRole('combobox', { name: 'Rebalance' })).toHaveText('Each quarter');
+  // The US universe of each quarter is a point-in-time rule: no survivorship bias.
+  await expect(dialog.getByText(WARNING_TEXT, { exact: false })).toHaveCount(0);
+
+  await dialog.getByRole('combobox', { name: 'Mode' }).click();
+  await page.getByRole('option', { name: 'Fixed list', exact: true }).click();
+  await expect(dialog.getByText(WARNING_TEXT, { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('combobox', { name: 'Rebalance' })).toHaveCount(0);
+});
+
+test('"Run backtest on selected" opens the New backtest form with a fixed list of the selected rows', async ({
+  page,
+  request,
+}, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const name = uniqueName(currentTest, 'Selected screen');
+  const screenId = await createScreen(request, name, 'US', {
+    start: 'watchlist',
+    filters: [],
+    indicator_conditions: [],
+    order: { indicator: SMA_3, direction: 'descending' },
+  });
+  await runScreen(request, screenId);
+  await page.goto(`/screens/${String(screenId)}`);
+
+  await page.getByRole('region', { name: 'Result table' }).getByRole('checkbox', { name: 'Select AAPL' }).check();
+  await page.getByRole('button', { name: 'Run backtest on selected' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'New backtest' });
+  await expect(dialog.getByRole('combobox', { name: 'Screen', exact: true })).toHaveText(name);
+  await expect(dialog.getByRole('combobox', { name: 'Mode' })).toHaveText('Fixed list');
+  await expect(dialog.getByRole('status', { name: 'Saved bars' })).toContainText('1 instrument of the screen result');
+  await expect(dialog.getByText(WARNING_TEXT, { exact: false })).toBeVisible();
+});
+
+test('adds Close, changes Avg trading value (20) and Exchange, removes each other kind, and warns for an HK draft', async ({
+  page,
+  request,
+}, currentTest) => {
+  // 9 changes, each with a run of the screen: slow when all browser projects run at the same time.
+  test.slow();
+  await openNewScreen(page, request, uniqueName(currentTest, 'Kinds'), {
+    start: 'watchlist',
+    filters: [
+      { field: 'still_trading' },
+      { field: 'average_trading_value_20', operator: '>=', value: '20000000' },
+      { field: 'exchange', values: ['NASDAQ', 'NYSE'] },
+    ],
+    indicator_conditions: [
+      { kind: 'close_versus_line', indicator: { indicator: 'sma', parameters: { period: 200 }, output: 'value' }, side: 'above' },
+      {
+        kind: 'rank',
+        indicator: { indicator: 'momentum_12_1', parameters: { look_back: 252, skip: 21 }, output: 'value' },
+        end: 'top',
+        percent: 20,
+      },
+    ],
+    order: { indicator: SMA_3, direction: 'descending' },
+  });
+  const bar = conditionBar(page);
+
+  await addCondition(page, 'Close');
+  await expect(page.getByRole('button', { name: 'Edit Close ≥ 5', exact: true })).toBeVisible();
+  await expectRunDone(page);
+
+  let popover = await editTag(page, 'Avg trading value (20) ≥ 20,000,000');
+  await popover.getByLabel('Value').fill('1');
+  await applyAndWait(page, popover, 'Avg trading value (20) ≥ 1');
+
+  popover = await editTag(page, 'Exchange in NASDAQ, NYSE');
+  await popover.getByRole('checkbox', { name: 'NYSE' }).uncheck();
+  await applyAndWait(page, popover, 'Exchange in NASDAQ');
+
+  for (const tag of [
+    'Still trading',
+    'Close ≥ 5',
+    'Avg trading value (20) ≥ 1',
+    'Close above SMA(200)',
+    '12-1 momentum(252, 21) top 20%',
+  ]) {
+    await page.getByRole('button', { name: `Remove ${tag}`, exact: true }).click();
+    await expect(page.getByRole('button', { name: `Edit ${tag}`, exact: true })).toHaveCount(0);
+    await expectRunDone(page);
+  }
+  await expect(bar.getByRole('button', { name: /^Edit / })).toHaveCount(3);
+
+  // The HK draft runs HK instruments, so the survivorship bias warning shows before a save.
+  await expect(page.getByText(WARNING_TEXT, { exact: false })).toHaveCount(0);
+  await page.getByRole('tablist', { name: 'Market' }).getByRole('tab', { name: 'HK' }).click();
+  await expectRunDone(page);
+  await expect(page.getByText(WARNING_TEXT, { exact: false })).toBeVisible();
 });

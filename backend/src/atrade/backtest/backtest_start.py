@@ -76,6 +76,9 @@ async def prepare_backtest(
     # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
     if request.universe is None:
         missing_bars = await check_saved_bars(database_url=database_url, request=request)
+    elif request.universe.kind == "screen":
+        # The members come from the screen runs of the child, so the child checks the bars (section 10.10.8).
+        missing_bars = None
     else:
         missing_bars = await check_universe_bars(
             database_url=database_url,

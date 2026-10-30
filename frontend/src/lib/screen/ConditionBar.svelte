@@ -106,7 +106,7 @@
             >
           {/if}
         </span>
-        {#each tagProblems as problem (problem)}
+        {#each tagProblems as problem, problemIndex (problemIndex)}
           <span class="problem-text" role="alert">{problem}</span>
         {/each}
       {/each}

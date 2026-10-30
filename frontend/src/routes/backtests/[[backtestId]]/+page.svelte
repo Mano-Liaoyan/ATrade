@@ -23,6 +23,7 @@
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
+    formatPeriodCountHeader,
     formatUniverseLabel,
     isFinalStatus,
     KeyMetricRow,
@@ -321,7 +322,7 @@
             {#if selectedTable === 'trades'}
               <BacktestTradeTable trades={detail.trades} />
             {:else if selectedTable === 'instruments'}
-              <UniverseInstrumentTable instruments={detail.instruments} />
+              <UniverseInstrumentTable instruments={detail.instruments} periodHeader={formatPeriodCountHeader(detail)} />
             {:else if selectedTable === 'orders'}
               <EmptyText text="No orders" />
             {:else if selectedTable === 'metrics'}

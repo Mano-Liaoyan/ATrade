@@ -146,7 +146,7 @@ New columns are null on existing rows, except where a default is given.
 | 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). Migration `8d4b6f2a1c93_backtest_add_metric_columns.py`. |
 | 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. Migration `2f6a9c1e4d85_backtest_add_out_of_sample_split.py`. |
 | 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). Done (#180): migration `4a6c8e1b3d57_backtest_add_conversation_id.py`. |
-| 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2 (done in #199: `universe_top_n`, migration `d7b9c5d5e28d_backtest_add_universe.py`; a multi-instrument backtest has null `symbol` and `exchange`, and `currency` holds the currency of all members), `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
+| 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2 (done in #199: `universe_top_n`, migration `d7b9c5d5e28d_backtest_add_universe.py`; a multi-instrument backtest has null `symbol` and `exchange`, and `currency` holds the currency of all members), `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). Done in #208 (migration `4dbfcca36529_backtest_add_screen_universe.py`): `universe_screen` (`jsonb`, the copy `{"screen_id", "name", "market", "definition"}`, no foreign key) and `universe_rebalance_period` (`quarter` or `month`). Both are set only for `universe_kind` `screen` (CHECK). |
 | 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
 | 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. Done in #199. |
 | 3 | `backtest_trade` | Add `symbol` and `exchange`. The exchange is the real exchange, not the simulated venue `SMART` ([ADR 0003](../adr/0003-one-simulated-venue-per-currency.md)). Done in #199: a single-instrument backtest writes its instrument too. Trades from before the migration have null. |
@@ -833,8 +833,8 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 |---|---|---|---|
 | `single` | One instrument. The existing backtest. | None | `symbol`, `exchange`, `currency` |
 | `rule` | Point-in-time rule: the top N instruments by trading value of each quarter (`us_universe_member` with `rank` ≤ N, [`market_data.md`](market_data.md) section 8.9). N is 500 at most. US only. | Quarter | `universe_top_n` |
-| `list` | Fixed list: the watchlist, a screen result, or the selected rows of a screen result. The list does not change in the range. The form warns of survivorship bias. | The full range | The members (`backtest_universe_member` with `period_start_utc` = `start_utc`) |
-| `screen` | Point-in-time rule: at each universe period start, the platform runs a copy of the screen again on the daily bars known at that date. The result is the new list. | Quarter (default) or month | `universe_screen` (JSON copy of the screen), `universe_rebalance_period` (`quarter` or `month`) |
+| `list` | Fixed list: the watchlist, a screen result, or the selected rows of a screen result. The list does not change in the range. The form and the API (`survivorship_bias`) warn of survivorship bias. | The full range | The members (`backtest_universe_member` with `period_start_utc` = `start_utc`) |
+| `screen` | Point-in-time rule: at each universe period start, the platform runs a copy of the screen again on the daily bars that start before 00:00 UTC of that date. The result is the new list. | Quarter (default) or month | `universe_screen` (JSON copy of the screen), `universe_rebalance_period` (`quarter` or `month`) |
 
 - The backtest saves a copy of the screen. A later change of the screen does
   not change the backtest ([#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)).
@@ -941,10 +941,23 @@ look-back bars of a later member cannot give a strategy future bars. Tests:
 The field names are choices of this document. The implementation can change
 them.
 
-Done in #199 for `single`, `rule`, and `list` with `instruments`. The
-`screen` kind and `screen_result_id` are
-[#208](https://github.com/Mano-Liaoyan/ATrade/issues/208): the route refuses
-`universe_kind=screen` with `422` until then. The first `rule` period starts
+Done in #199 for `single`, `rule`, and `list` with `instruments`. Done in
+[#208](https://github.com/Mano-Liaoyan/ATrade/issues/208) for `list` with
+`screen_result_id`: the members are the rows of the screen result in position
+order, or only the rows of `symbols`. `422` (no row) when the screen result
+does not exist, when a symbol of `symbols` is not in the screen result, when
+`symbols` comes without `screen_result_id`, or when the body has both
+`instruments` and `screen_result_id`. A `list` backtest always has
+`survivorship_bias` true (section 10.12): its members are chosen at the end
+of the range. Done in #208 for `screen`: `screen_id` and `rebalance_period`
+(default `quarter`). The route saves a copy of the screen and writes no
+members (section 10.10.8). `422` (no row) when the screen does not exist,
+when `screen_id` is missing, or when `screen_id` or `rebalance_period` comes
+with another kind. Each backtest of `GET /api/backtests` and
+`GET /api/backtests/{backtest_id}` has `universe_screen` (the copy, null for
+the other kinds) and `universe_rebalance_period`. `survivorship_bias` is true
+for a `screen` universe whose screen does not start from `quarter_universe`
+(`screen.md` section 24.13). The first `rule` period starts
 at `start_utc` and holds the members of the last quarter that starts at or
 before `start_utc`. Each later quarter that starts before `end_utc` is one
 more period. When no quarter starts at or before `start_utc`, the route
@@ -992,6 +1005,23 @@ with universe data from the new route `GET /api/us-universe/range`
   `backtest/universe_instruments.py`. Tests:
   `backend/tests/backtest/test_universe_instruments.py`,
   `frontend/src/lib/backtest/backtest_universe.test.ts`.
+- Done in #208: the Instruments option "Screen" has the selects Screen, Mode
+  ("Point-in-time rule", the default, or "Fixed list"), and Rebalance ("Each
+  quarter" or "Each month", only for the point-in-time rule). The fixed list
+  is the screen result of the screen page, else the last run of the screen,
+  and the status line gives its instrument count and run time. The form shows
+  the survivorship bias warning for a fixed list and for a point-in-time rule
+  that does not start from the US universe of each quarter. On the screen
+  page, "Run backtest on this screen result" (primary, at the end of the
+  table toolbar) opens the form with the point-in-time rule, and "Run backtest
+  on selected" (a batch action) opens it with a fixed list of the selected
+  rows. A started backtest opens on the backtest page. The header line of a
+  `list` universe changes to "Fixed list (N)" (the list can be a screen
+  result), and of a `screen` universe it is "Screen <name>, each quarter" (or
+  "each month"). Code: `StartBacktestDialog.svelte`,
+  `backtest/backtest_universe.ts` (`makeScreenUniverseFields`,
+  `formatUniverseLabel`, `formatPeriodCountHeader`), and the screen page.
+  e2e: `frontend/e2e/screen.spec.ts`.
 
 ### 10.10.8 Left to the implementation
 
@@ -1024,6 +1054,16 @@ with universe data from the new route `GET /api/us-universe/range`
 - Decided (#199): the start route writes `backtest_universe_member` in the
   transaction that adds the backtest row. A `screen` universe (#208) can
   decide again, because it needs the daily bars of each date.
+- Decided (#208): the child of a `screen` universe runs the copy of the
+  screen (`run_screen_at` of `screen`) at each period start and writes
+  `backtest_universe_member` before it reads the bars. The periods are the
+  range start and each start of a calendar quarter (January, April, July,
+  October) or month at 00:00 UTC in the range. A period without a member has
+  no row; the strategy gets an empty `UniverseUpdate` for it. The start route
+  does no saved-bar check, because the members are not known yet. Tests:
+  `tests/backtest/test_screen_universe_routes.py`,
+  `tests/backtest/test_screen_universe_runs.py`, and
+  `tests/screen/test_screen_point_in_time.py`.
 - The decision names the member column "quarter start". This document uses
   `period_start_utc`, because a `screen` universe can change each month.
 - Decided (#199): the bar check of section 10.1 for a universe needs one
@@ -1037,8 +1077,10 @@ with universe data from the new route `GET /api/us-universe/range`
   a currency that is not USD. A strategy that sells a member at the period
   start in which it leaves gets a fill at the last close of that member: the
   child reads no bars of the member after its last period.
-- The header line text of a `screen` universe, and the Instruments tab
-  column for a monthly `screen` universe (quarters or months).
+- Decided (#208): the header line text of a `screen` universe is
+  "Screen <name>, each quarter" (or "each month"). The Instruments tab column
+  of a monthly `screen` universe is "Months"; it counts the periods of the
+  member.
 - The `universe_kind` value of the same-period backtest of a
   multi-instrument forward test.
 - Decided (#199): the round trips count for each instrument
