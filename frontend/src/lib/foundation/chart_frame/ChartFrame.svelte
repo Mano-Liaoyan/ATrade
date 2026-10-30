@@ -2,7 +2,7 @@
      under it. Every chart of ATrade uses this frame, so all charts show the same attribution (spec #99).
      With `fill`, the frame fills the height of its parent and the canvas takes the rest of the height. The chart then
      needs `autoSize`: lightweight-charts follows the size of the canvas container, for example after a side column
-     collapses or the window changes.
+     is minimized or resized, or the window changes.
 
      Attribution notice of lightweight-charts (Apache License 2.0):
      TradingView Lightweight Charts™

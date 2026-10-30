@@ -570,7 +570,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   TradingView Lightweight Charts™"), so all charts show the same attribution.
   With `fill`, the frame fills the height of its parent, and the chart
   (`autoSize`) follows each size change of its container, for example after a
-  side column collapses. Without `fill`, `height` and `minHeight` set the
+  side column is minimized or resized. Without `fill`, `height` and `minHeight` set the
   canvas height. `readChartThemeOptions(container)` and
   `readChartColor(container, token)` of `foundation/chart_frame` read the
   Carbon tokens for each chart. The price scales use the number formats of
