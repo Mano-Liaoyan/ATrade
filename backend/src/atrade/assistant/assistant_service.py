@@ -17,7 +17,7 @@ The assistant service listens on port 8002 in the network atrade-assistant-inter
 """
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
@@ -234,6 +234,21 @@ def to_login_event(event: dict[str, Any]) -> LoginEvent | None:
             return None
 
 
+def read_event_line[T](line: str, convert: Callable[[dict[str, Any]], T | None], kind: str) -> T | None:
+    """The event of one JSON line of the assistant service. A line that is not valid raises AssistantServiceError."""
+    if not line:
+        return None
+    try:
+        return convert(json.loads(line))
+    except ValueError, KeyError, TypeError, AttributeError:
+        message = f"The assistant service sent a line that is not a {kind} event: {line[:200]}"
+        raise AssistantServiceError(message) from None
+
+
+def not_reachable(error: httpx.HTTPError) -> AssistantServiceError:
+    return AssistantServiceError(f"The assistant service is not reachable: {error}")
+
+
 def read_detail(response: httpx.Response) -> str:
     try:
         return str(response.json()["detail"])
@@ -261,10 +276,9 @@ class AssistantServiceClient:
             async with self.open_client(read_timeout_seconds=REQUEST_TIMEOUT_SECONDS) as client:
                 return await client.request(method, path, json=body)
         except httpx.HTTPError as error:
-            message = f"The assistant service is not reachable: {error}"
-            raise AssistantServiceError(message) from error
+            raise not_reachable(error) from error
 
-    async def stream_lines(self, path: str, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
+    async def stream_lines(self, path: str, body: dict[str, Any]) -> AsyncIterator[str]:
         """The JSON lines of a streamed answer. No read timeout: a run or a login waits for the user or a tool."""
         try:
             async with (
@@ -275,17 +289,15 @@ class AssistantServiceClient:
                     await response.aread()
                     raise AssistantServiceError(read_detail(response))
                 async for line in response.aiter_lines():
-                    if line:
-                        yield json.loads(line)
+                    yield line
         except httpx.HTTPError as error:
-            message = f"The assistant service is not reachable: {error}"
-            raise AssistantServiceError(message) from error
+            raise not_reachable(error) from error
 
     async def run(self, conversation_id: int, text: str, selection: ModelSelection) -> AsyncIterator[RunEvent]:
         # A tool can wait 15 minutes for a backtest (25.4.2).
         body = {"text": text, **selection_body(selection)}
         async for line in self.stream_lines(f"/conversations/{conversation_id}/runs", body):
-            event = to_run_event(line)
+            event = read_event_line(line, to_run_event, "run")
             if event is not None:
                 yield event
 
@@ -346,7 +358,7 @@ class AssistantServiceClient:
     async def login(self, provider: str, method: LoginMethod, name: str) -> AsyncIterator[LoginEvent]:
         body = {"provider": provider, "method": method, "name": name}
         async for line in self.stream_lines("/logins", body):
-            event = to_login_event(line)
+            event = read_event_line(line, to_login_event, "login")
             if event is not None:
                 yield event
 

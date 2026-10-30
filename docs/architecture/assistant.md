@@ -471,6 +471,7 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 | Table | Columns |
 |---|---|
 | `assistant_conversation` | `id`, `title`, `title_state`, `strategy_id`, `created_at_utc`, `prompt_version_id` (foreign key to `assistant_prompt_version`, added by #184), `last_provider`, `last_model`, `last_credential_name` |
+| `assistant_prompt_version` | See 25.9. |
 
 Implemented (#179):
 
@@ -488,7 +489,6 @@ Implemented (#179):
   custom entry `atrade_credential` with the credential name. So each AI
   assistant message of the file has its model (from pi) and its credential
   name.
-| `assistant_prompt_version` | See 25.9. |
 
 - A conversation belongs to at most one strategy.
 - The strategy page lists only the conversations of the open strategy.

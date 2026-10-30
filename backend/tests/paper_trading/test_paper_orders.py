@@ -14,7 +14,13 @@ import pytest
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection, make_execution, make_forward_test_order
+from tests.fakes.ibkr import (
+    FakeGatewayConnection,
+    make_balance_values,
+    make_execution,
+    make_forward_test_order,
+    make_stock_position,
+)
 
 ACCOUNT_ID = "DU1234567"
 ORDERS_PATH = "/api/paper-trading/orders"
@@ -46,8 +52,15 @@ MARKET_ORDER: JsonObject = {
 
 
 def make_connected_gateway(managed_accounts: list[str]) -> FakeGatewayConnection:
+    """The owner ledger starts with 10000.00 USD cash and 100 shares of 700 / SEHK for "By hand"."""
     gateway_connection = FakeGatewayConnection(managed_accounts=managed_accounts)
     gateway_connection.connected = True
+    gateway_connection.account_values = make_balance_values(ACCOUNT_ID, net_liquidation_usd="12000", cash_usd="10000")
+    gateway_connection.portfolio = [
+        make_stock_position(
+            ACCOUNT_ID, symbol="700", quantity="100", market_price="400", exchange="SEHK", currency="HKD"
+        )
+    ]
     return gateway_connection
 
 
