@@ -26,7 +26,13 @@ afterEach(async () => {
 async function runOneMessage(script: ModelStep[], customTools: Parameters<typeof createAssistantSession>[0]['customTools'] = []) {
   server = await startFakeModelServer(script);
   const { modelRuntime, model } = await openFakeModel(server.baseUrl, workDir);
-  const session = await createAssistantSession({ modelRuntime, model, piDir: workDir, customTools });
+  const session = await createAssistantSession({
+    modelRuntime,
+    model,
+    piDir: workDir,
+    customTools,
+    systemPrompt: 'You are the ATrade strategy assistant.',
+  });
   try {
     await session.prompt('Start.');
   } finally {

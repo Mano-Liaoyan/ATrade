@@ -1,10 +1,11 @@
-"""Reads one strategy version by its ID, for the capabilities that run strategy versions (backtest, forward test)."""
+"""Reads strategy versions for the capabilities that run them (backtest, forward test), and the outline of a
+strategy for the start context of an AI assistant conversation (app/)."""
 
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
-from psycopg.rows import dict_row
+from psycopg.rows import class_row, dict_row
 
 from atrade.strategy.rules_code import find_warm_up_bar_count
 from atrade.strategy.strategy_rules import StrategyRules
@@ -58,3 +59,31 @@ async def read_strategy_versions(*, database_url: str, strategy_version_ids: lis
             {"strategy_version_ids": strategy_version_ids},
         )
         return {version.id: version for version in map(to_strategy_version, await cursor.fetchall())}
+
+
+@dataclass(frozen=True)
+class StrategyOutline:
+    """The name of a strategy and the IDs of its versions."""
+
+    id: int
+    name: str
+    version_ids: list[int]
+
+
+async def read_strategy_outline(*, database_url: str, strategy_id: int) -> StrategyOutline | None:
+    """Returns None when the strategy does not exist."""
+    async with (
+        await psycopg.AsyncConnection.connect(database_url) as connection,
+        connection.cursor(row_factory=class_row(StrategyOutline)) as cursor,
+    ):
+        await cursor.execute(
+            """
+            SELECT strategy.id, strategy.name,
+                ARRAY(SELECT strategy_version.id FROM strategy_version WHERE strategy_version.strategy_id = strategy.id)
+                    AS version_ids
+            FROM strategy
+            WHERE strategy.id = %(strategy_id)s
+            """,
+            {"strategy_id": strategy_id},
+        )
+        return await cursor.fetchone()
