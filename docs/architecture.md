@@ -140,7 +140,10 @@ frontend/
   src/lib/             # one directory per capability, plus foundation/
   src/routes/          # pages, the only place that combines capabilities
   e2e/                 # Playwright tests
-assistant/             # TypeScript pi SDK service (section 25); path left to the implementation
+assistant/             # TypeScript pi SDK service (section 25)
+  src/                 # Node.js runs these files directly (type stripping); no build step
+  tests/               # Vitest tests, with a fake OpenAI-compatible model server
+  package.json         # own pnpm project, run with Vite+ like frontend/
 deploy/                # compose.yaml, web.Dockerfile, assistant.Dockerfile
 scripts/check          # the quality gate: the same checks as CI (section 17.7)
 scripts/deploy         # deploys one commit of main on the server (section 14.2)
@@ -229,6 +232,10 @@ app           -> all modules
 - `indicator` imports `nautilus_trader` for the built-in indicators. Strategy
   code imports `atrade.indicator` at run time in the backtest child and the
   forward test child. import-linter does not check user code.
+- import-linter puts `indicator` in one layer with `ibkr`, just above
+  `foundation`. So `indicator` can import only `foundation`, and `indicator`
+  and `ibkr` do not import each other. A contract keeps the internal files
+  of `indicator` private (#160).
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
   (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
@@ -570,7 +577,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   TradingView Lightweight Charts™"), so all charts show the same attribution.
   With `fill`, the frame fills the height of its parent, and the chart
   (`autoSize`) follows each size change of its container, for example after a
-  side column collapses. Without `fill`, `height` and `minHeight` set the
+  side column is minimized or resized. Without `fill`, `height` and `minHeight` set the
   canvas height. `readChartThemeOptions(container)` and
   `readChartColor(container, token)` of `foundation/chart_frame` read the
   Carbon tokens for each chart. The price scales use the number formats of
@@ -640,10 +647,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     or its status bar.
   - `PanelHeader` (`end` snippet): the 32px header line with the class
     `atrade-panel-header`. `Splitter` (`label`, `controls`, `value`, `min`,
-    `max`, `onValueChange`): a `role="separator"` (WAI-ARIA window splitter)
-    with `aria-controls` on the panel below it; its value is the height of
-    that panel, Arrow Up and Arrow Down move it 16px, Home gives the panel its
-    minimum height, and End its maximum height.
+    `max`, `grow`, `onValueChange`, `ondblclick`): a `role="separator"`
+    (WAI-ARIA window splitter) with `aria-controls` on the region that it
+    resizes. `grow` is the direction in which the splitter moves to make that
+    region bigger. With `up` (the default) the splitter is horizontal above a
+    panel: its value is the height of that panel, and Arrow Up and Arrow Down
+    move it 16px. With `left` or `right` the splitter is vertical on the inner
+    edge of a `SideColumn`: its value is the column width, and Arrow Left and
+    Arrow Right move it 16px. Home gives the region its minimum size, and End
+    its maximum size. The splitter of a `SideColumn` has the name
+    "Resize <label>" and no visible text.
   - The browser keeps each layout in `localStorage` (`readStoredLayout`,
     `writeStoredLayout`). Blocked storage gives the default layout.
 - `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
@@ -658,7 +671,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   state, so the color is never the only sign. `Select` takes `size` (`sm`)
   and `hideLabel`. `Tabs` (and `Panel` `tabs`) take `itemLabel`, a snippet
   that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
-  header line before the Collapse button. `Tabs` takes `size` (`sm` gives the 32px
+  header line before the Minimize button. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
   `panelClass`.
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
@@ -952,7 +965,7 @@ One Docker Compose project on the user's own server runs all services:
 | `ib-gateway` | `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest, `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`. |
 | `web` | `app/web.py`, backtest child processes, basedpyright processes. Memory limit, read-only root file system, writable `/tmp`. |
 | `forward-test` | `app/forward_test_worker.py` and the forward test child processes. |
-| `assistant` | The Node.js process with the pi SDK (section 25). Read-only root file system, `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}` (default `1g`), volume `atrade-assistant-pi`, networks `atrade-assistant-internal` and `atrade-assistant-egress`. No published port, no `DATABASE_URL`, and no IBKR settings. |
+| `assistant` | The Node.js process with the pi SDK (section 25). Image from `deploy/assistant.Dockerfile`. Read-only root file system, writable `/tmp`, `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}` (default `1g`), volume `atrade-assistant-pi` on `/data`, networks `atrade-assistant-internal` and `atrade-assistant-egress`. No published port, no `env_file`, no `DATABASE_URL`, and no IBKR settings. |
 
 External access (#73). The user's existing network already has these parts.
 ATrade adds no Compose service for them:
@@ -1044,10 +1057,19 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   Web 1, forward tests 10 to 13, bar fetcher 20, contract tests 98 and 99.
   The limit is 32.
 - The AI assistant (phase 2, section 25) adds 2 networks.
-  `atrade-assistant-internal` has `internal: true` and a fixed subnet, and
-  only `web` and `assistant` are in it. `atrade-assistant-egress` has only
-  `assistant`. `web` also listens on port 8001 in
-  `atrade-assistant-internal`. Compose does not publish port 8001.
+  `atrade-assistant-internal` has `internal: true` and the fixed subnet
+  `172.31.250.0/24`, and only `web` and `assistant` are in it.
+  `atrade-assistant-egress` has only `assistant`. `assistant` is not on the
+  default network, so it cannot connect to `postgres` or `ib-gateway`. `web`
+  is on the default network and on `atrade-assistant-internal`. `web` also
+  listens on port 8001 in `atrade-assistant-internal`. Compose does not
+  publish port 8001.
+- `assistant` uses the image of `deploy/assistant.Dockerfile`: a Vite+ stage
+  installs the production dependencies of `assistant/`, and a
+  `node:24.13.0-slim` stage runs `node src/main.ts` as the user `node`.
+  `assistant` listens on port 8002 in `atrade-assistant-internal`. Its
+  Compose health check calls `GET /health` on that port. `assistant` has no
+  `depends_on`: it starts also when `web` is not ready.
 - Disk: plan about 4 GB more in PostgreSQL for the Databento daily bars and
   the universe hourly bars (estimate, #141).
 
@@ -1140,7 +1162,9 @@ The backtest timeout and concurrency are not in `settings`. PostgreSQL stores
 them (section 10).
 
 `ATRADE_WEB_MEMORY_LIMIT` and `ATRADE_ASSISTANT_MEMORY_LIMIT` are not
-settings: only Compose reads them (section 14.1).
+settings: only Compose reads them (section 14.1). `.env.example` lists both.
+The `assistant` container gets neither of them, and no other value of
+`.env`.
 
 Exception ([ADR 0005](adr/0005-assistant-credentials-outside-postgresql.md)):
 AI assistant credentials (subscription logins and API keys) come from the
@@ -1405,7 +1429,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - End to end: Playwright with 4 projects.
 - Not in CI: `ibkr_paper`.
 - `.github/workflows/ci.yml` runs `./scripts/check backend`,
-  `./scripts/check frontend`, and `./scripts/check e2e` as 3 jobs. The backend
+  `./scripts/check frontend`, `./scripts/check assistant`, and
+  `./scripts/check e2e` as 4 jobs. The backend
   and end-to-end jobs use a `postgres:18.3` service container. Local runs use
   the same script. Without `ATRADE_TEST_DATABASE_URL`, the script starts a
   temporary PostgreSQL container.
@@ -1413,9 +1438,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - The test PostgreSQL fixture runs the migrations one time per session and
   truncates all tables except `alembic_version` before each test.
 
-- The `assistant` service checks (lint, type check, tests) run in
-  `./scripts/check` from phase 2. The job name is left to the
-  implementation.
+- The `assistant` service checks run in `./scripts/check assistant` (also
+  in `./scripts/check` without a scope): ESLint with the readability rules,
+  `tsc --noEmit`, and Vitest. The CI job is `assistant`.
 
 ### 17.8 Release checklist
 
@@ -1548,8 +1573,6 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 
 | Fact | How to check |
 |---|---|
-| A Python indicator class written by ATrade registers with `register_indicator_for_bars` (#131 read the source only). | Write a minimal class and run 1 backtest before the indicator work. |
-| Strategy code can import `atrade.indicator` (#136, #138). | Import the module in a backtest child. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Check the parameter in the indicator implementation. |
 | The default parameters of the template sources (#139). | Read the method section of each paper. |
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
@@ -1586,6 +1609,10 @@ implementation" list.
 | Live bars with keepUpToDate (`stream_live_bars`, 1 minute and 1 day) on a real Gateway. | Yes. On Tuesday 2026-10-27 at about 10:00 UTC, outside the US trading hours, the first `AAPL` bar came within 60 seconds for both periods (contract test `test_streams_the_current_live_bar`). |
 | `NetLiquidation` in USD on the paper account of the owner. | No. On 2026-10-27 the paper account had the base currency EUR, and the owner cannot change it. IBKR sent `NetLiquidation` and `TotalCashValue` only in EUR, and `$LEDGER-ExchangeRate` only for `BASE` and `EUR` (`1.00`): no USD ledger, so no USD rate from the account. Decided: ATrade converts the balance to USD (section 11.9 of `paper_trading.md`) with the account `ExchangeRate` for USD when IBKR sends it, else with the IBKR forex rate (`read_exchange_rate`, last 1 hour `MIDPOINT` bar of IDEALPRO `EUR.USD`). Checked on 2026-10-27 against the real Gateway with read-only queries: `PaperAccountMonitor.read_balance()` returned base currency EUR, rate source `ibkr_forex`, and a USD net liquidation; the `ibkr_paper` cases `test_reads_the_balance_and_the_positions_of_the_paper_account` and `test_reads_the_forex_rate_for_the_paper_account_balance` pass. The account `ExchangeRate` path is checked only with the fake. |
 | Editor input latency and completion latency in the browser. | On 2026-10-27, Playwright 1.64.1 (headless Chromium and Firefox) against `tests.e2e_server` on the same machine, basedpyright 1.40.2 (#69). Input latency (key press to the next painted frame, 50 keys): Chromium median 9.8 ms, p95 16.6 ms; Firefox median 3.0 ms, p95 6.0 ms. Completion latency (Ctrl+Space to the visible list for `self.subscribe_ba` in a `Strategy` subclass): first request after the page opens 782 ms (Chromium) and 808 ms (Firefox); next 10 requests 74 to 76 ms (Chromium) and 81 to 86 ms (Firefox). Not measured through Cloudflare. |
+| A Python indicator class written by ATrade registers with `register_indicator_for_bars` (#131 read the source only). | Yes. On 2026-10-30 with NautilusTrader 2.0.0rc7 (#160), the minimal class `atrade.indicator.BarClose` ran in the backtest engine. The class does not subclass a NautilusTrader class: rc7 exports no `Indicator` base class, and `register_indicator_for_bars` accepts any object with `handle_bar(bar)` and `initialized`. NautilusTrader called `handle_bar` before `on_bar`, so `on_bar` read the close of the current bar on each of 3 bars (`tests/indicator/test_indicator_registration.py`). |
+| Strategy code can import `atrade.indicator` (#136, #138). | Yes. On 2026-10-30 (#160), a strategy version that imports `atrade.indicator` passed the checks before save (section 9.3, `ruff --select F` included) and ran in a real backtest child with the status `finished`. The indicator value in `on_bar` was the close of each of the 20 bars (`tests/indicator/test_indicator_registration.py`). |
+| The default smoothing (`ma_type`) of `RelativeStrengthIndex` and `AverageTrueRange` in NautilusTrader 2.0.0rc7. | On 2026-10-30 (#160), in the backend environment: both defaults are Wilder. `AverageTrueRange(14).ma_type` is `MovingAverageType.Wilder`. `RelativeStrengthIndex` has no `ma_type` property, so the check compared values: on 200 test closes, RSI(14) with the default gave 34.832627, the same as `ma_type=MovingAverageType.Wilder` and as a Wilder RSI written by hand; `Exponential` gave 14.769989 and `Simple` gave 5.270742. The value scale is 0 to 100. `MovingAverageConvergenceDivergence` defaults to `Exponential`. The indicator library does not need to pass `MovingAverageType.Wilder` for RSI and ATR. |
+| The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1603,11 +1630,26 @@ option and records it in this document.
   client ID of the forward test. The child connects it with `connect()` for
   the paper account check and again for the stop steps, and disconnects it
   before the LiveNode starts.
+- Decided (#160): the minimal indicator class is `BarClose` (the close of
+  the last bar) in `indicator/bar_close.py`. The indicator tests are in
+  `backend/tests/indicator/`. Their test strategy
+  `tests/indicator/strategies/record_bar_close.py` registers the class and
+  writes the value of each `on_bar` to a file.
+- Decided (#160): an ATrade indicator class does not subclass a
+  NautilusTrader class. It has `handle_bar(bar)` and an `initialized`
+  property (section 21.1).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - Decided (#171): a named CHECK constraint holds the values of
   `strategy_version.source`, and `read_strategy_version` does not return
   `source` and `rules` (strategy section 9.1.1).
+- Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
+  its `storageKey`. `widthPixels` null gives the default width, and a
+  double-click on the splitter sets it to null. A value stored before the
+  splitter (`{isCollapsed}` only) reads as `isMinimized` with the default
+  width. The shown width is the stored width in the range of section 25.13,
+  so a smaller window makes the column narrower without a change of the
+  stored width.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
@@ -1616,6 +1658,18 @@ option and records it in this document.
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
     momentum need about 252 bars. The look-back must follow the longest
     indicator of the strategy, or this effect is accepted.
+- Decided (#178): the `assistant` service code is in `assistant/`, an own
+  pnpm project that Vite+ runs like `frontend/`. Node.js runs the
+  TypeScript files directly (type stripping), so there is no build step. The
+  image is `deploy/assistant.Dockerfile`. The checks are
+  `./scripts/check assistant` and the CI job `assistant` (section 17.7).
+- Decided (#178): the subnet of `atrade-assistant-internal` is fixed in
+  `deploy/compose.yaml` as `172.31.250.0/24`. It is not a setting.
+  `assistant` listens on port 8002 in this network. In #178 it has only
+  `GET /health`.
+- Decided (#178): the `tool_call` handler is `createToolGuard` in
+  `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
+  the `assistant` process (section 25.14).
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

@@ -82,14 +82,14 @@ test('a sent paper order shows in the open orders panel', async ({ page }) => {
   await expect(orderRow).toHaveCount(0);
 });
 
-test('the chart rescales when the order column collapses and opens', async ({ page }) => {
+test('the chart rescales when the order column minimizes and opens', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openWorkbench(page);
   const chart = page.getByRole('img', { name: CHART_NAME });
   const readWidth = async (): Promise<number> => (await chart.boundingBox())?.width ?? 0;
   const firstWidth = await readWidth();
 
-  await page.getByRole('button', { name: 'Collapse paper order' }).click();
+  await page.getByRole('button', { name: 'Minimize paper order' }).click();
   await expect(orderPanel(page)).toBeHidden();
   await expect.poll(readWidth).toBeGreaterThan(firstWidth + 100);
 
