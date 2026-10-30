@@ -8,10 +8,32 @@ the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 Sources: [Forward test design](https://github.com/Mano-Liaoyan/ATrade/issues/41),
 [Start and stop forward tests](https://github.com/Mano-Liaoyan/ATrade/issues/76),
 [Forward test recovery and end time](https://github.com/Mano-Liaoyan/ATrade/issues/77),
-[Forward test records and the comparison with a backtest](https://github.com/Mano-Liaoyan/ATrade/issues/78).
+[Forward test records and the comparison with a backtest](https://github.com/Mano-Liaoyan/ATrade/issues/78),
+[Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[How the owner ledger changes at a stock split](https://github.com/Mano-Liaoyan/ATrade/issues/149),
+[Scope of metrics and robustness checks](https://github.com/Mano-Liaoyan/ATrade/issues/137),
+[Merge the terms and ADRs of the second decision batch](https://github.com/Mano-Liaoyan/ATrade/issues/151)
+(Net profit uses the allocated capital).
+ADRs: [0007 owner ledger](../adr/0007-owner-ledger-for-shared-paper-account.md),
+[0008 stock splits](../adr/0008-stock-splits-from-ibkr-evidence.md),
+[0003 one simulated venue per currency](../adr/0003-one-simulated-venue-per-currency.md).
 
 The NautilusTrader facts in this section come from the `v2.0.0rc7` source and
 documents. Nobody ran them.
+
+### Implementation phases of this section
+
+The planning map [Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129)
+adds work to this section in 3 phases. A part without a phase mark is the
+current implementation and stays true.
+
+| Phase | Parts of this section |
+|---|---|
+| Phase 1 | The new metrics on the forward test page (section 12.16). Net profit of a forward test (section 12.10). |
+| Phase 2 | No change. The AI assistant never starts a forward test (section 12.11). |
+| Phase 3 | The multi-instrument forward test (section 12.17). The owner ledger and the allocated capital (sections 12.2, 12.18). The ATrade execution client and data client (section 12.19). The bar fetcher (section 12.20). The quarterly universe (section 12.21). The stock split check (section 12.22). |
+
+Until Phase 3 is done, the rules marked "until Phase 3" stay in force.
 
 ## 12.1 Input and process
 
@@ -37,15 +59,29 @@ documents. Nobody ran them.
   - 1, 2, 3, 5, 10, 15, 20, or 30 minutes
   - 1, 2, 3, 4, or 8 hours
   - 1 day, 1 week, or 1 month
-- A forward test does not use paper capital. It uses the real paper account
-  balance and records the balance at start.
+- Until Phase 3: a forward test does not use paper capital. It uses the real
+  paper account balance and records the balance at start
+  (`start_balance_usd`).
+- Phase 3 (#146): a forward test does not use paper capital. The user types
+  its allocated capital in USD at start (section 12.18). The forward test
+  trades only with this amount and its own fills. The allocated capital
+  replaces the balance at start in all records, metrics, and comparisons.
+- Phase 3 (#146): the input "1 instrument" becomes a universe with 3 kinds,
+  the same as the backtest form ([`backtest.md`](backtest.md)):
+  - one instrument (`single`)
+  - the top N instruments by trading value (`rule`), N 500 at most
+  - the watchlist (`list`)
+  A forward test with the kind `rule` or `list` is a multi-instrument forward
+  test (section 12.17). It uses only the bar period 1 day.
 - A forward test does not need a backtest first. The start form shows the
   metrics of the latest backtest of the strategy version, or "no backtest
   result".
 - The strategy version is fixed at start. To use a new version, stop the
   forward test and start a new one.
 
-## 12.2 One forward test per instrument
+## 12.2 One forward test per instrument (until Phase 3), then shared instruments
+
+Until Phase 3:
 
 - NautilusTrader reconciles by account, not by client ID. With two position
   sources on one instrument, NautilusTrader generates synthetic fills to align
@@ -57,6 +93,33 @@ documents. Nobody ran them.
   and a position there. The instrument is `symbol` and `exchange`. A partial
   unique index (`forward_test_one_per_instrument`) is the second guard.
 
+Phase 3 (#146, [ADR 0007](../adr/0007-owner-ledger-for-shared-paper-account.md)).
+This replaces the rules above:
+
+- Single-instrument forward tests, multi-instrument forward tests, and paper
+  orders by hand run at the same time on the one paper account. They can
+  trade the same instruments.
+- Each order, fill, position, and cash amount belongs to one owner: a forward
+  test, or "By hand". The owner ledger records them
+  ([`paper_trading.md`](paper_trading.md) section 11.10).
+- The paper account position of an instrument is the sum of the owner
+  positions.
+- The old conflict has 2 causes in `live_node_run.py`:
+  - `external_order_instrument_ids=[instrument]` claims all external orders
+    on the instrument, also the orders by hand.
+  - The reconciliation aligns the strategy position with the account
+    position by synthetic fills (`crates/live/src/execution/manager.rs`,
+    `handle_external_order`, `adjust_mass_status_fills`).
+- The LiveNode of a forward test uses the ATrade execution client
+  (section 12.19), not the IB execution client. The execution client reports
+  the owner position and the owner cash for reconciliation, not the account
+  values.
+- The migration drops the partial unique index
+  `forward_test_one_per_instrument`. `find_forward_test_on_instrument()` and
+  the `409` "already runs on" refusal of `POST /api/forward-tests` go away.
+- The order rules of the owner ledger (long only) protect each owner from the
+  other owners ([`paper_trading.md`](paper_trading.md) section 11.10).
+
 ## 12.3 Web and worker
 
 - The forward test table has a `desired_state` column (`running` or
@@ -65,6 +128,11 @@ documents. Nobody ran them.
   It starts or stops child processes and writes the actual state back.
 - Every 2 seconds, the Web process reads the actual state and pushes it on
   `/ws/forward-tests`.
+- Phase 3 (#146, #149): the worker also runs 3 jobs. They are not child
+  processes of a forward test.
+  - The bar fetcher (section 12.20).
+  - The quarterly universe calculation (section 12.21).
+  - The daily stock split check (section 12.22).
 
 ## 12.4 Client IDs
 
@@ -78,6 +146,24 @@ documents. Nobody ran them.
   ends.
 - When no ID is free, the start is refused. The UI shows "limit of running
   forward tests reached".
+- Phase 3 (#146): a multi-instrument forward test takes 1 ID of the same
+  range, as a single-instrument forward test does. It counts toward the
+  same limit of 4.
+- Phase 3 (#146): the bar fetcher has 1 fixed client ID,
+  `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID` (default `20`). At start, the worker
+  checks that this ID is not in the forward test range and is not equal to
+  the Web client ID. When the check fails, the worker does not start and
+  writes the reason.
+- The reason for a separate fetcher ID: one client ID cannot have 2
+  connections. The LiveNode of a forward test child already holds its client
+  ID (section 12.15).
+
+| Client ID | User |
+|---|---|
+| `1` | Web process |
+| `10`–`13` | Forward test children |
+| `20` | Bar fetcher (Phase 3) |
+| `98`, `99` | `ibkr_paper` contract tests |
 
 ## 12.5 Paper account check
 
@@ -89,7 +175,8 @@ documents. Nobody ran them.
   4. Starts the `LiveNode` with the same client ID.
 - The Web process does not repeat the check.
 - The child passes `settings.ibkr_account_id` to the IB execution client
-  `account_id`.
+  `account_id`. Phase 3: the child passes it to the ATrade execution client
+  (section 12.19) instead.
 - When the check fails, the status is "failed". There is no retry.
 - When the Gateway is not reachable, the child retries every 30 seconds. The
   UI shows "waiting for IB Gateway". This does not count toward the 3-crash
@@ -110,6 +197,12 @@ documents. Nobody ran them.
 5. The child exits.
 
 - Positions stay open. The user handles them by hand.
+- Phase 3 (#146): the stop steps do not change. After the stop ends with the
+  status `stopped`, the worker transfers the positions and the remaining cash
+  of the forward test to "By hand" in the owner ledger
+  ([`paper_trading.md`](paper_trading.md) section 11.10). The records of the
+  forward test (fills, equity points) do not change. The user can then sell
+  the positions with paper orders by hand.
 - Do not use `manage_stop`. It closes positions. `LiveNode.stop()` does not
   cancel orders.
 - When a cancellation fails, the status is "stop failed". The client ID stays
@@ -134,6 +227,18 @@ documents. Nobody ran them.
      on this instrument belongs to this strategy (section 12.2).
   3. The strategy indicators start from zero. NautilusTrader does not save
      strategy state without Redis.
+- Phase 3 (#146): restart step 2 changes. The child does not set
+  `external_order_instrument_ids` and does not reconcile with the account
+  position. The ATrade execution client reports the owner position of each
+  instrument from the owner ledger. NautilusTrader restores the strategy
+  position from these reports.
+- Phase 3 (#146): a multi-instrument forward test gets 1 year of warm-up
+  daily bars from the bar store (section 12.17). When the quarter changed
+  during an interruption, the restarted strategy gets the members of the
+  current quarter.
+- Phase 3 (#149): the stock split check restarts the forward tests that trade
+  an instrument after it changes the owner ledger for a stock split
+  (section 12.22). This restart does not count toward the 3-crash limit.
 - An event table records the start and the end of each interruption.
 
 Implementation (#77):
@@ -228,11 +333,38 @@ Implementation (#77):
 | `forward_test_fill` | `forward_test_id`, `trade_id` (NautilusTrader `TradeId`), `time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`. Primary key `(forward_test_id, trade_id)`. |
 | `forward_test_equity_point` | `forward_test_id`, `time_utc` (bar end), `equity_usd`. Primary key `(forward_test_id, time_utc)`. |
 
+Phase 3 changes (#146, #149):
+
+- The ATrade execution client writes each fill of the forward test into the
+  owner ledger ([`paper_trading.md`](paper_trading.md) section 11.10). The
+  recorder no longer reads fills from `self.cache`. It still writes 1 equity
+  point at the end of each bar.
+- The equity is the sum of 4 parts:
+  - the allocated capital
+  - the cash of all fills of the forward test
+  - the cash in lieu of its stock split adjustments
+  - each position at the close of the bar The recorder does not read the IBKR
+  `NetLiquidation`. Other positions and other currencies of the paper
+  account do not change the equity.
+- For a multi-instrument forward test, "each position" means each instrument
+  that the forward test holds. The close is the daily close of that
+  instrument in the bar store.
+- The fill records get `symbol` and `exchange`, because a forward test can
+  trade more than one instrument.
+- A stock split adjustment is a ledger record, not a fill (section 12.22). The
+  "Fills" table shows it as a row (section 12.16).
+- The forward test routes read the fills of the forward test from the owner
+  ledger. Whether `forward_test_fill` stays, and what happens to its old
+  rows, is left to the implementation (section 12.24).
+
 ## 12.9 Order source
 
 - The forward test sets `order_id_tag` to `FT<forward test ID>`.
 - The IB execution client writes the `ClientOrderId` into `orderRef`. User code
   cannot change it.
+- Phase 3 (#146): the ATrade execution client sends the orders. It also
+  writes the `ClientOrderId` into `orderRef`, so the `orderRef` still holds
+  `FT<ID>`. The order source rule below does not change.
 - `foundation/order_ref.py` holds the format rule. `forward_test` writes it.
   `paper_trading` reads it.
   - `format_forward_test_order_tag(forward_test_id)` returns `FT<ID>`.
@@ -256,6 +388,22 @@ Implementation (#77):
   difference.
 - The chart marks interruptions in grey.
 - Forward test metrics use the same metric functions that `backtest` exports.
+- Phase 1 (#137): the forward test metrics include the new metrics of
+  [`backtest.md`](backtest.md) section 10.4. They come from the same
+  functions. A forward test has no in-sample and out-of-sample split, because
+  a forward test is out-of-sample.
+- Phase 1 (#151): the Net profit of a forward test is its final equity minus
+  its start capital. Until Phase 3, the start capital is `start_balance_usd`.
+  From Phase 3, it is the allocated capital.
+- Phase 3 (#146): the same-period backtest uses:
+  - the allocated capital as `paper_capital_usd`
+  - for a multi-instrument forward test, the members that the forward test
+    recorded for each quarter (`forward_test_universe_member`, section
+    12.12). The backtest gets the universe source "forward test record"
+    ([`backtest.md`](backtest.md)). So both tests have the same members, and
+    a difference comes only from the fills and the bars.
+- Phase 3: the `422` "no start balance" refusal goes away, because each new
+  forward test has an allocated capital.
 - Implementation (#78):
   - `POST /api/forward-tests/{id}/same-period-backtests` queues the backtest
     with `queue_backtest` of `backtest` (section 10.4). It records the
@@ -319,6 +467,23 @@ The public entry `atrade.forward_test` exports:
   The `forward-test` service has no IBKR user name or password.
 - The child loads the strategy code with `load_strategy_classes()` of
   `strategy` (section 9). `backtest` uses the same function.
+- Phase 2 (#140, #150): the AI assistant has no tool that starts or stops a
+  forward test. Its tool allow list has no forward test route.
+
+Phase 3 additions to the public entry (#146, #149). The names are choices of
+this document. The implementation can change them.
+
+| Name | Purpose |
+|---|---|
+| `OwnerLedgerExecutionClient` | The ATrade NautilusTrader execution client of section 12.19. |
+| `BarStoreDataClient` | The ATrade NautilusTrader data client of section 12.19. |
+| `BarFetcher(*, database_url, clock, gateway_connection)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. |
+| `QuarterlyUniverseJob(*, database_url, clock, databento_client)` | The quarterly universe calculation of section 12.21. |
+| `StockSplitCheck(*, database_url, clock, gateway_connection)` | The daily stock split check of section 12.22. |
+| `read_allocated_capital(*, database_url)` | The sum of the allocated capital of the forward tests that hold a client ID. `paper_trading` gets it from `app/web.py` for the "By hand" capital (section 11.10 of [`paper_trading.md`](paper_trading.md)). |
+
+- Phase 3: `find_forward_test_on_instrument()` goes away with the rule of
+  section 12.2.
 
 ## 12.12 Table
 
@@ -341,6 +506,24 @@ for each "Backtest the same period". Migration
 (null while the interruption lasts). A partial unique index allows only one
 open interruption for each forward test. A second start of an open
 interruption does nothing.
+
+Phase 3 table changes (#146). The column names are choices of this document.
+
+| Table | Change |
+|---|---|
+| `forward_test` | Add `universe_kind` (`single`, `rule`, `list`), `universe_top_n` (null unless `rule`), and `allocated_capital_usd` (not null for a new row). `symbol`, `exchange`, and `currency` can be null (null unless `single`). Drop the partial unique index `forward_test_one_per_instrument`. `start_balance_usd` stays for the old rows. |
+| `forward_test_universe_member` (new) | `forward_test_id`, `quarter_start_utc`, `symbol`, `exchange`, `currency`. Primary key `(forward_test_id, quarter_start_utc, symbol, exchange)`. `ON DELETE CASCADE` from `forward_test`. One row for each member that the forward test gave the strategy in that quarter. The same-period backtest reads it (section 12.10). |
+| `quarterly_universe` (new) | `quarter_start_date`, `rank` (1 to 500), `symbol`, `exchange`, `average_trading_value_usd`, `window_end_date` (the last trading day of the 63-day window that the calculation used). Primary key `(quarter_start_date, rank)`. Section 12.21 writes it. |
+| `quarterly_universe_run` (new) | `quarter_start_date` (primary key), `started_at_utc`, `ended_at_utc`, `window_end_date`, `status` (`running`, `done`, `failed`), `error_message`. One row for each calculation. |
+
+- The watchlist kind (`list`) records the watchlist members at start in
+  `forward_test_universe_member`. Whether a later change of the watchlist
+  changes the members of a running forward test is left to the
+  implementation (section 12.24).
+- The owner ledger tables and the split check state belong to
+  `paper_trading` ([`paper_trading.md`](paper_trading.md) sections 11.10 and
+  11.11). The table of stock split events and the change of the stored bars
+  are in [`market_data.md`](market_data.md) section 8.4.
 
 | Status | Meaning |
 |---|---|
@@ -380,6 +563,16 @@ interruption does nothing.
 | `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
 | `/ws/forward-tests` | `{"type": "forward_tests", "forward_tests": [...]}` at once and after each change. The server reads the table every 2 seconds, with a fixed number of database connections for the full list (not connections for each row). `{"type": "heartbeat"}` after 10 seconds without a change. The browser sends nothing. |
 
+Phase 3 route changes (#146, #149). The field names, the new route path,
+and the status codes of the new refusals are choices of this document.
+
+| Route | Change |
+|---|---|
+| `POST /api/forward-tests` | `StartForwardTestRequest` gets `universe` (`kind`: `single`, `rule`, or `list`, then `symbol`, `exchange`, and `currency` for `single`, or `top_n` from 1 to 500 for `rule`) and `allocated_capital_usd` (decimal text, larger than 0). `422` for a `rule` or `list` universe with a bar period other than `1-DAY`, for `top_n` out of range, for an empty watchlist, or for an `allocated_capital_usd` that is not larger than 0. `409` with `StartRefusedResponse` (`detail`, `forward_test_id` null, `unallocated_usd`) when the allocated capital is larger than the unallocated amount, for example `"The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD."`. `409` when the paper account check did not pass or IBKR sent no `NetLiquidation` in USD, because ATrade cannot calculate the unallocated amount. The "already runs on" `409` goes away (section 12.2). |
+| `GET /api/forward-tests/capital` (new) | `200` with `{"net_liquidation_usd", "allocated_usd", "unallocated_usd"}`. `allocated_usd` is the sum of `allocated_capital_usd` of the forward tests that hold a client ID. `unallocated_usd` is `net_liquidation_usd` minus `allocated_usd`. All 3 are `null` when the paper account check did not pass or no USD value is available. The start dialog reads it. |
+| `GET /api/forward-tests`, `GET /api/forward-tests/{id}` | `ForwardTestResponse` gets `universe_kind`, `universe_top_n`, `allocated_capital_usd`, and `split_checks_needed` (a list of `symbol`, `exchange` of the instruments of the forward test in the "Split check needed" state). `ForwardTestDetailResponse` gets `instruments` (section 12.16) and `fills` rows with `symbol`, `exchange`, and `kind` (`fill` or `split_adjustment`). |
+| `POST /api/forward-tests/{id}/same-period-backtests` | Uses `allocated_capital_usd` and the recorded members (section 12.10). |
+
 - All periods of `BarPeriod` (1, 5, 15, 30 minutes, 1 hour, 1 day) are IB
   live bar periods. `LIVE_BAR_PERIODS` in `http_routes.py` and
   `isLiveBarPeriod()` in the frontend hold the rule of section 12.1.
@@ -395,6 +588,8 @@ than the worker clock.
 1. A child of the row ended: the worker writes the result. A stop (a
    `cancel_orders` child, or a `run` child after the stop request) with exit
    code 0 is `stopped`, frees the client ID, and ends an open interruption.
+   Phase 3: then the worker transfers the positions and the remaining cash
+   of the forward test to "By hand" (section 12.6).
    A stop with another exit code is `stop_failed`. Exit code 3 of a `run`
    child is `failed` and frees the client ID. Exit code 4 is
    `waiting_for_gateway`. Each other end of a `run` child is a crash
@@ -455,6 +650,13 @@ than the worker clock.
   seconds (`calculate_duration_segments`). For `now - 7 days` with 1-minute
   bars, IBKR refuses the request (error 321), and the strategy gets no bars.
   The live bars of `subscribe_bars` still come from the IB data client.
+- Phase 3 (#146): the LiveNode has the ATrade execution client (section
+  12.19) instead of the IB execution client. A multi-instrument forward test
+  has the ATrade data client instead of the IB data client. Its warm-up bars
+  come from the bar store, not from `read_historical_bars()` (section
+  12.17). The instrument IDs are `SYMBOL.<primary exchange>`, for example
+  `AAPL.NASDAQ`, as now. The single-instrument data client is left to the
+  implementation (section 12.24).
 - The stop request stops the LiveNode with `LiveNode.handle().stop()`. A CI
   test runs the real LiveNode without IB Gateway and stops it while it waits
   for the connection (`tests/forward_test/test_live_node_run.py`).
@@ -510,6 +712,45 @@ than the worker clock.
   and `"gateway_lost"` with a short `GatewayWatch`).
 - The list shows the status ("Waiting for IB Gateway", "Stop failed",
   "Failed").
+- Phase 1 (#137): the forward test page shows the key metrics in the order
+  and with the functions of [`backtest.md`](backtest.md) section 10.6, because
+  it uses the same `KeyMetricRow`. The Net profit uses the start capital of
+  section 12.10. The page has no in-sample and out-of-sample split.
+- Phase 3 (#146): changes of the start dialog. The layout is the layout of
+  the backtest form ([`backtest.md`](backtest.md)).
+  - "Instrument" becomes "Instruments" with 3 choices: one instrument, top N
+    by trading value, and watchlist.
+  - For top N and watchlist, the bar period list has only "1 day".
+  - A "Capital (USD)" number input. Under it, the unallocated amount from
+    `GET /api/forward-tests/capital`, for example
+    "Unallocated: 61,250.00 USD". This line is data that the user needs to
+    act, so rule one of the frontend design rules allows it.
+  - When the capital is larger than the unallocated amount, the
+    "Start forward test" button is disabled and the dialog says why, for
+    example "Capital is larger than the unallocated 61,250.00 USD".
+  - When the unallocated amount is not available, the button is disabled and
+    the dialog gives the reason of the paper account check.
+- Phase 3 (#146): changes of the forward test page. The layout is the layout
+  of the backtest page. There is no new page.
+  - The header line shows the universe name instead of the symbol for a
+    multi-instrument forward test, for example "Top 500 by trading value" or
+    "Watchlist (12)".
+  - The header line shows the allocated capital, for example
+    "Capital 20,000.00 USD".
+  - The lower panel gets an "Instruments" tab (`ScrollRegion` "Instruments"),
+    the same as the backtest page: symbol, fill count, Net profit (USD), and
+    the number of quarters in the universe. Number columns are right aligned
+    with tabular numbers.
+  - The "Fills" table gets a "Symbol" column.
+  - A stock split adjustment is a row of the "Fills" table (#149): "Side"
+    shows the split, for example "Split 4:1". The quantity column shows the
+    change of the share count. The price column is empty. The amount column
+    shows the cash in lieu.
+- Phase 3 (#149): when an instrument of the forward test is in the
+  "Split check needed" state, the header line shows a warning icon, the
+  words "Split check needed", and the instrument, for example
+  "Split check needed: AAPL". The paper trading page has the actions
+  ([`paper_trading.md`](paper_trading.md) section 11.7).
 - `test_forward_test_paper_contract.py` (`ibkr_paper`, by hand): a real
   LiveNode sends a buy limit order for 1 AAPL at 1.00 USD. The Web side
   (`reqAllOpenOrders`, client ID 98) sees it with the forward test ID from
@@ -539,3 +780,283 @@ than the worker clock.
   scroll track. It also checks the key metrics, the chart, the Fills tab, and
   the Logs tab of the forward test page.
 
+
+## 12.17 Multi-instrument forward test (Phase 3)
+
+Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146).
+
+- A multi-instrument forward test runs 1 strategy version on a universe.
+- The universe kind is `rule` (the top N instruments by trading value, N 500
+  at most) or `list` (the watchlist). The kinds are the same as in the
+  multi-instrument backtest ([`backtest.md`](backtest.md)).
+- The bar period is 1 day only. Hourly bars are later work (section 12.23).
+- Members:
+  - `rule`: the first N ranks of the quarterly universe of the current
+    quarter (section 12.21). A forward test that starts in the middle of a
+    quarter uses the stored universe of that quarter.
+  - `list`: the watchlist members at start.
+- The platform gives the strategy only the members of the current quarter.
+  At each quarter start, the platform tells the strategy the new members and
+  gives it the bars of the new members. The mechanism is the same as in the
+  multi-instrument backtest ([`backtest.md`](backtest.md)).
+- The forward test records the members of each quarter in
+  `forward_test_universe_member` (section 12.12).
+- Instrument IDs are `SYMBOL.<primary exchange>`, for example `AAPL.NASDAQ`.
+  This is the default of the IB adapter, and the paper contract test used
+  it. The strategy uses only the instrument IDs that the platform gives. It
+  does not write a venue in its code. The strategy templates and the rule
+  builder generate code by this rule
+  ([ADR 0003](../adr/0003-one-simulated-venue-per-currency.md)).
+- Bars: the bar fetcher saves the daily bars of the members in `ibkr_bar`
+  after each close (section 12.20). The ATrade data client reads them from
+  the bar store and gives them to the strategy. The strategy uses `on_bar`
+  as in a backtest (section 12.19).
+- Warm-up: the warm-up of a multi-instrument forward test on daily bars is
+  1 year, the same as the multi-instrument backtest. The reason: 12-1
+  momentum and the distance to the 52-week high need about 252 daily bars.
+  The old look-back of 1-day bars is 60 days
+  (`backend/src/atrade/backtest/backtest_run.py`).
+  - The child reads the warm-up bars from the bar store with the global
+    source order (`ibkr_bar`, then `databento_bar`,
+    [`market_data.md`](market_data.md)). It sends no request to IBKR. The
+    cost is 0 USD.
+  - Before the start, the bar fetcher reads the missing ranges from IBKR.
+  - 500 instruments for 1 year are about 126,000 daily bars. The read time is
+    not measured.
+- The ATrade execution client checks each order against the owner ledger
+  (section 12.19).
+- The equity and the metrics are in USD (section 12.8).
+
+## 12.18 Allocated capital (Phase 3)
+
+Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[ADR 0007](../adr/0007-owner-ledger-for-shared-paper-account.md).
+
+- The user types the allocated capital in USD in the start dialog
+  ("Capital (USD)").
+- The sum of the allocated capital of the running forward tests must not be
+  larger than the `NetLiquidation` of the paper account in USD
+  ([`paper_trading.md`](paper_trading.md) section 11.9). A running forward
+  test is a forward test that holds a client ID (section 12.2).
+- When the new amount is larger than the unallocated amount, the start is
+  refused. The refusal gives the unallocated amount (section 12.13).
+- The unallocated amount is `NetLiquidation` (USD) minus the sum of the
+  allocated capital. This is also the capital of "By hand".
+- The allocated capital does not change while the forward test runs.
+- The cash of a forward test owner is its allocated capital, plus the cash of
+  its fills, plus its cash in lieu. The ATrade execution client reports this
+  cash as the account state of the strategy. The strategy calculates its
+  order quantities from this cash. The strategy code does not change.
+- The allocated capital is the start capital of the equity curve, of the
+  metrics, and of the Net profit (#151). It is the paper capital of the
+  same-period backtest (section 12.10).
+- No owner uses margin. So one owner cannot use the buying power of another
+  owner.
+
+## 12.19 ATrade execution client and data client (Phase 3)
+
+Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[ADR 0007](../adr/0007-owner-ledger-for-shared-paper-account.md).
+
+ATrade writes its own NautilusTrader `ExecutionClient` and `DataClient` in
+Python with `nautilus_trader.live.clients`. ATrade does not change the
+NautilusTrader code and does not fork it.
+
+Execution client (`OwnerLedgerExecutionClient`):
+
+- It implements `_submit_order`, `_cancel_order`, and the 4 reconciliation
+  hooks, including `_generate_position_status_reports`
+  (`docs/developer_guide/python_adapters.md` of NautilusTrader).
+- It sends the orders with `ib_async` and the client ID of the forward test.
+  The `orderRef` is `FT<ID>` (section 12.9).
+- Before each order, it checks the owner ledger with the order rules of
+  [`paper_trading.md`](paper_trading.md) section 11.10. When a rule fails,
+  the strategy gets `OrderDenied` with the reason. ATrade sends nothing.
+- An order on an instrument in the "Split check needed" state also gets
+  `OrderDenied` ([`paper_trading.md`](paper_trading.md) section 11.11).
+- It reports only the orders and the fills of its own client ID.
+- It writes each fill into the owner ledger, with the forward test as the
+  owner.
+- For reconciliation, it reports the owner position of each instrument
+  (`PositionStatusReport` with `quantity` and `avg_px_open`) and the owner
+  cash (section 12.18). It does not report the account positions or the
+  account cash.
+- After a restart, NautilusTrader restores the strategy position from these
+  reports. Thus the strategy knows its position and does not buy again.
+- Each order adds 1 PostgreSQL query. The time is not measured.
+
+Data client (`BarStoreDataClient`):
+
+- It implements `_subscribe_bars` and `_request_bars`.
+- It gives the strategy the bars from the bar store. The strategy uses
+  `on_bar` and `request_bars` as before.
+- A multi-instrument forward test uses it (section 12.17).
+
+Rules for both clients:
+
+- With its own Python clients, a LiveNode cannot use a database cache. ATrade
+  does not use a database cache, so this limit has no effect.
+- `nautilus_trader.live.clients` is new in NautilusTrader 2.0. Each
+  NautilusTrader upgrade must run the tests of both clients.
+- Before the implementation, a LiveNode test must run both clients with a
+  fake IBKR connection: send an order, fill it, restart, and check the
+  strategy position. The test also gets a stock split step (section 12.22).
+
+## 12.20 Bar fetcher (Phase 3)
+
+Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146).
+
+- The `forward-test` worker runs 1 bar fetcher.
+- It uses the fixed client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID` (default
+  `20`, section 12.4).
+- After each daily close, it reads the daily bars of the members of all
+  running multi-instrument forward tests. It reads each instrument one time,
+  also when more than one forward test has it.
+- It uses `reqHistoricalData` without `keepUpToDate`
+  (`GatewayConnection.read_historical_bars()`). It saves the bars and their
+  ranges in `ibkr_bar` with `save_received_bars()` of `market_data`.
+- Before a multi-instrument forward test starts, it reads the missing ranges
+  of the 1-year warm-up (section 12.17).
+- Each bar read from IBKR also reads 1 stored daily bar, for the stock split
+  evidence A ([`market_data.md`](market_data.md) section 8.4,
+  [ADR 0008](../adr/0008-stock-splits-from-ibkr-evidence.md)). So each
+  instrument can need 1 more request each day.
+- The reason for the fetcher: the IB adapter subscribes to 1-hour and 1-day
+  bars with `reqHistoricalData` and `keepUpToDate`. 500 members need 500 open
+  requests. IBKR allows 50 open historical data requests at most.
+- The requests are 0.5 seconds apart ([`market_data.md`](market_data.md)
+  section 8.4). So 500 instruments take about 250 seconds at least. The real
+  time is not measured.
+- The cost is 0 USD.
+
+## 12.21 Quarterly universe (Phase 3)
+
+Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[Decision on the screen data sources](https://github.com/Mano-Liaoyan/ATrade/issues/141).
+
+- The rule is the rule of the backtest universe. On the first trading day of
+  each quarter, the universe is the top 500 common stocks (no ETFs). The
+  rank is the average daily trading value of the previous 63 trading days. The trading value is the
+  close times the volume.
+- The data is Databento EQUS.SUMMARY `ohlcv-1d` for all symbols. The backtest
+  universe uses the same data source after 2024-07, so the ranks agree. IBKR
+  is not used, because 5000 candidate instruments need about 5000 IBKR
+  requests (about 42 minutes), and IBKR filters the volume of historical
+  bars.
+- The worker downloads the data and calculates the universe at 06:00 ET on
+  the first trading day of the quarter.
+- When the daily bar of the previous trading day is not available yet, the
+  worker tries again every 15 minutes until 09:00 ET.
+- When the bar is still missing at 09:00 ET, the worker uses the 63 trading
+  days that end 1 trading day earlier. It records the actual end date in
+  `window_end_date`.
+- The new universe goes to the strategies before the market opens.
+- The worker stores each result in `quarterly_universe` and each calculation
+  in `quarterly_universe_run` (section 12.12).
+- Cost: about 1.30 USD for each quarter. On 2026-10-30, `metadata.get_cost`
+  gave 1.23 USD to 1.36 USD for one quarter. After the free credit, the
+  Databento account pays.
+- The setting `DATABENTO_API_KEY` holds the key (`.env.example`).
+- The download time and the calculation time are not measured. The estimate
+  is a few minutes.
+
+## 12.22 Stock split check (Phase 3)
+
+Sources: [How the owner ledger changes at a stock split](https://github.com/Mano-Liaoyan/ATrade/issues/149),
+[ADR 0008](../adr/0008-stock-splits-from-ibkr-evidence.md).
+
+This section has the check and the restart of the forward tests.
+[`paper_trading.md`](paper_trading.md) section 11.11 has the ledger change
+and the "Split check needed" state. [`market_data.md`](market_data.md)
+section 8.4 has the stock split table and the change of the stored bars.
+
+- Scope: forward splits, reverse splits, and bonus issues, for US and HK
+  instruments. A bonus issue uses its ratio, for example 1.1 for 1 new share
+  for each 10 shares.
+- The check runs before the market opens on each trading day: 08:00 ET for
+  US instruments, 08:30 HKT for HK instruments.
+- It checks each instrument that has a paper account position or an owner
+  position.
+- Evidence A: the ratio between a stored daily close and the new IBKR
+  `TRADES` close of the same day. IBKR adjusts `TRADES` bars for stock splits,
+  not for dividends.
+- Evidence B: the ratio between the paper account position and the sum of
+  the owner positions.
+- When both ratios agree, the stock split is confirmed. An instrument
+  without a position has only evidence A. `market_data` finds it when it
+  reads bars ([`market_data.md`](market_data.md) section 8.4).
+- When the evidence is not complete, the check tries again every 15 minutes
+  until 5 minutes before the market opens.
+- After a confirmed stock split:
+  1. Cancel the open orders of all owners on the instrument. IBKR also
+     cancels GTC orders at a stock split, but only as best effort.
+  2. Change the owner ledger in one transaction
+     ([`paper_trading.md`](paper_trading.md) section 11.11).
+  3. Restart the child processes of the forward tests that trade the
+     instrument. The restart cancels their open orders (section 12.7) and
+     restores the strategy positions from the new ledger.
+- The restart avoids a position report with a new quantity in a running
+  LiveNode. Nobody checked what a running LiveNode does with it.
+- The restart time is not measured. The estimate is 1 minute or less for
+  each forward test.
+- When the 2 ratios do not agree, the instrument goes to the
+  "Split check needed" state ([`paper_trading.md`](paper_trading.md)
+  section 11.11).
+- The `forward-test` worker runs the check, because the check restarts
+  forward test children. This is a choice of this document.
+- The cost is 0 USD.
+
+## 12.23 Limits and later work
+
+- Version 1 does not handle cash dividends. A cash dividend changes the
+  paper account cash without a fill. The paper trading page shows the
+  difference as "Unattributed" ([`paper_trading.md`](paper_trading.md)
+  section 11.12). Cash dividends are in the "Not yet specified" list of the
+  planning map.
+- Spin-offs, mergers, symbol changes, and delistings are not handled. The
+  paper trading page shows the difference as "Unattributed".
+- The owner ledger is long only (section 12.18).
+- Later work: a multi-instrument forward test on hourly bars. First measure
+  the time that the bar fetcher needs to read the hourly bars of 500
+  instruments. 500 instruments need 500 requests each hour.
+
+## 12.24 Left to the implementation
+
+The decisions do not name these details. The implementation picks the
+simplest option and records it in this document.
+
+- The data client of a single-instrument forward test. The IB data client of
+  the adapter, or the ATrade data client. One client ID cannot have 2
+  connections. The ATrade execution client holds an `ib_async` connection
+  with the client ID of the forward test. Check if the IB data client can
+  share the client ID with it before this choice.
+- How the ATrade data client gets the new daily bars after the bar fetcher
+  saved them.
+- How the platform tells the strategy the new members at a quarter start.
+  The multi-instrument backtest makes the same choice.
+- The time after the daily close at which the bar fetcher reads the bars,
+  and what it does when IB Gateway is not reachable.
+- Whether the bar fetcher and the daily bar update of `web`
+  ([Screen page prototype](https://github.com/Mano-Liaoyan/ATrade/issues/145))
+  share one job.
+- The status code of a `rule` start when no universe of the current quarter
+  is stored, and what the calculation does without `DATABENTO_API_KEY`.
+- How ATrade maps a Databento symbol to the IBKR primary exchange.
+- The trading day calendar for "first trading day of the quarter" and
+  "before the market opens".
+- Whether the downloaded EQUS.SUMMARY bars go into `databento_bar`.
+- Which capability owns `quarterly_universe`. The screen page also uses the
+  universe of the current quarter.
+- Whether a change of the watchlist changes the members of a running
+  `list` forward test.
+- Whether `forward_test_fill` stays as a copy of the ledger fills, and the
+  migration of the old rows and of `start_balance_usd`.
+- Whether a stock split restart opens an interruption.
+- What the stock split check does when IB Gateway is not reachable until
+  5 minutes before the open.
+- How the stock split check cancels the orders of other client IDs. IBKR lets
+  a client cancel only its own orders. The forward test restart cancels the
+  forward test orders. The Web client can cancel the orders by hand.
+- Market orders and limit orders that a strategy sends after the daily close.
+  Check how IBKR handles a DAY order that ATrade sends outside the trading
+  hours.

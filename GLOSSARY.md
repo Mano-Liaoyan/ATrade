@@ -38,11 +38,35 @@ the IBKR forex rate. In Chinese, write 汇率. A backtest of an instrument that
 is not in USD uses it.
 _Avoid_: FX price, conversion factor
 
+**Trading value**:
+The close price times the volume of one bar, in the currency of the
+instrument. In Chinese, write 成交额.
+_Avoid_: turnover, dollar volume
+
+**Daily bar summary**:
+The latest values from the daily bars of each instrument (the last close,
+the average trading value, and whether it is still trading) that a screen
+reads first to filter instruments. ATrade updates it when it saves daily
+bars. In Chinese, write 日线摘要.
+_Avoid_: snapshot, quote table
+
+**Bar fetcher**:
+The part of the forward-test service that reads the daily bars of all
+instruments of the multi-instrument forward tests from IBKR each day, with
+its own client ID. In Chinese, write K 线拉取器.
+_Avoid_: downloader, crawler
+
 **Indicator**:
 One number that describes an instrument at one time, calculated from its bars
 or its financial data, for example RSI(14) or the price to earnings ratio. In
 Chinese, write 指标.
 _Avoid_: metric, signal, factor (in user copy)
+
+**No value**:
+The state of an indicator at a time when the instrument does not have
+enough bars to calculate it. It is not 0. A screen excludes the instrument
+with this reason. In Chinese, write 无值.
+_Avoid_: null, NaN, empty, 0
 
 **Screen**:
 A saved set of conditions on the instruments of one market, and an order. It
@@ -70,7 +94,8 @@ _Avoid_: HK universe, HK watchlist, HK pool
 ## Strategies
 
 **Strategy**:
-A set of trading rules that the user writes as code in the browser. The same
+A set of trading rules, kept as code. The user writes the code in the
+browser, or the rule builder or the AI assistant writes it. The same
 strategy runs in a backtest and in a forward test.
 _Avoid_: algorithm, bot, script
 
@@ -79,6 +104,17 @@ One saved copy of the code of a strategy. A strategy version does not change
 after it is saved. Each backtest and each forward test records the strategy
 version that it used.
 _Avoid_: revision, snapshot, commit
+
+**Version source**:
+What wrote one strategy version: the user, the rule builder, or the AI
+assistant. In Chinese, write 版本来源.
+_Avoid_: author, origin
+
+**Start point**:
+What version 1 of a new strategy comes from: "Blank code" (a short code
+example), "Blank rules" (empty rule builder rules), or a strategy template.
+In Chinese, write 起点.
+_Avoid_: template (for Blank code or Blank rules), starter
 
 **Rule builder**:
 The form that writes a strategy version from entry conditions, exit
@@ -106,13 +142,20 @@ in the queue.
 _Avoid_: backtest settings, quota
 
 **Universe**:
-The instruments that one backtest can trade at each time. A point-in-time rule
+The instruments that one backtest or one forward test can trade at each
+time. One instrument is the smallest universe. A point-in-time rule
 (for example the top instruments by trading value of each quarter) or a fixed
 list gives it. A point-in-time rule uses only data known at that time, so it
 includes instruments that stopped trading later. A screen that runs again at
 each rebalance on the data known at that date is a point-in-time rule. A screen
 result used for the full time range is a fixed list. In Chinese, write 品种池.
 _Avoid_: index members, stock pool, basket, symbol list, portfolio
+
+**Rebalance**:
+A time at which a multi-instrument strategy gets the universe again and
+changes its positions to match, for example on the first trading day of each
+month. In Chinese, write 调仓.
+_Avoid_: reshuffle, reconstitution
 
 **Parameter sweep**:
 A set of backtests of one strategy version on the same universe and time
@@ -126,7 +169,7 @@ quantity, and the price.
 _Avoid_: deal, execution
 
 **Equity curve**:
-The cash plus the value of the position at the end of each bar of a test.
+The cash plus the value of the positions at the end of each bar of a test.
 _Avoid_: balance curve, PnL curve
 
 **Metric**:
@@ -162,7 +205,8 @@ _Avoid_: holdout, validation set
 
 **Trial count**:
 The number of finished backtests of the same strategy (all strategy
-versions), instrument, and bar period. It tells how many tries a result was
+versions), instrument or universe, and bar period. Each run of a parameter
+sweep counts. It tells how many tries a result was
 selected from. In Chinese, write 尝试次数.
 _Avoid_: number of tries, N
 
@@ -298,11 +342,12 @@ a chart a pane, for example the drawdown pane, and keep the storage key
 
 **Side column**:
 A column at the left or right side of a workbench, for example the watchlist
-or the paper order form. The user can collapse it to a 32px rail. In Chinese,
-write 侧栏.
+or the paper order form. The user can change its width with a splitter and
+minimize it to a 32px rail. In Chinese, write 侧栏.
 _Avoid_: sidebar, drawer
 
 **Splitter**:
-The bar between 2 panels. The user drags it, or moves it with the arrow keys,
-to change the panel heights. In Chinese, write 分隔条.
+The bar between 2 panels, or at the inner edge of a side column. The user
+drags it, or moves it with the arrow keys, to change the panel heights or
+the side column width. In Chinese, write 分隔条.
 _Avoid_: divider, resizer

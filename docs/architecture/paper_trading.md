@@ -8,7 +8,25 @@ the meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
 Sources: [Order module design](https://github.com/Mano-Liaoyan/ATrade/issues/40),
 [Paper account check and account panel](https://github.com/Mano-Liaoyan/ATrade/issues/74),
 [Paper orders sent by hand](https://github.com/Mano-Liaoyan/ATrade/issues/75),
-[Start and stop forward tests](https://github.com/Mano-Liaoyan/ATrade/issues/76).
+[Start and stop forward tests](https://github.com/Mano-Liaoyan/ATrade/issues/76),
+[Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[How the owner ledger changes at a stock split](https://github.com/Mano-Liaoyan/ATrade/issues/149).
+ADRs: [0007 owner ledger](../adr/0007-owner-ledger-for-shared-paper-account.md),
+[0008 stock splits](../adr/0008-stock-splits-from-ibkr-evidence.md).
+
+### Implementation phases of this section
+
+The planning map [Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129)
+adds work to this section. A part without a phase mark is the current
+implementation and stays true.
+
+| Phase | Parts of this section |
+|---|---|
+| Phase 1 | No change. |
+| Phase 2 | No change. The AI assistant never sends a paper order (section 11.5). |
+| Phase 3 | The owner ledger (section 11.10), the stock split changes of the ledger (section 11.11), the Owner column and the "Unattributed" difference (section 11.7), the new refusals of orders by hand (sections 11.3, 11.8), and the limits (section 11.12). |
+
+Until Phase 3 is done, the rules marked "until Phase 3" stay in force.
 
 ## 11.1 Live order switch
 
@@ -50,8 +68,8 @@ orders only when all 4 conditions are true:
   cancel it and send a new one.
 - Before sending, a confirmation dialog shows the instrument, side, quantity,
   order type, price, account number, and a clear `PAPER` mark.
-- When a forward test runs on an instrument, the Web process refuses paper
-  orders by hand for that instrument. It shows which forward test blocks it
+- Until Phase 3: when a forward test runs on an instrument, the Web process
+  refuses paper orders by hand for that instrument. It shows which forward test blocks it
   (#76). "Runs" means that the forward test holds a client ID
   ([`forward_test.md`](forward_test.md) section 12.2). The refusal is `409`
   with `OrderBlockedResponse` (`detail`, `forward_test_id`), for example
@@ -59,6 +77,15 @@ orders only when all 4 conditions are true:
   hand for this instrument until the forward test stops." It comes after the
   paper account check. ATrade sends nothing and stores nothing. Cancels of
   orders by hand are not blocked.
+- Phase 3 (#146, [ADR 0007](../adr/0007-owner-ledger-for-shared-paper-account.md)):
+  the refusal above goes away. A paper order by hand belongs to the owner
+  "By hand". Before it sends the order, the Web process checks the order
+  rules of the owner ledger (section 11.10) for "By hand". When a rule
+  fails, the response is `409` with the reason. ATrade sends nothing and
+  stores nothing.
+- Phase 3 (#149): an order by hand on an instrument in the
+  "Split check needed" state is refused with `409` and the reason
+  (section 11.11). Cancels are not blocked.
 - Positions, balance, and order status go to the browser on
   `/ws/paper-trading`.
 - Each order and each cancel calls `require_checked_paper_account()` first
@@ -81,6 +108,8 @@ orders only when all 4 conditions are true:
   forward test orders.
 - The list marks the source of each order: "by hand" or "forward test 42". The
   source comes from `orderRef` (section 12.9).
+- Phase 3 (#146): the source of an order is also its owner. "by hand" is the
+  owner "By hand". "forward test 42" is the owner "Forward test 42".
 - Only orders sent by hand can be cancelled in the order list. To cancel
   forward test orders, stop the forward test.
 - An order can be cancelled (`can_cancel`) when its source is "by hand" and
@@ -100,6 +129,8 @@ orders only when all 4 conditions are true:
   (`FilledManualOrderList.svelte`, `ScrollRegion` with the same label): the
   rows with `filled_quantity` larger than 0, newest first. It reads the route
   again after each "orders" message, because a fill changes the open orders.
+- Phase 3 (#149): a stock split adjustment is not a fill. "Filled today" does
+  not show it.
 - The local table is `manual_order`: `created_at_utc`, `account`, `symbol`,
   `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`,
   `time_in_force`, `ibkr_order_id`. It has no status column. ATrade writes
@@ -107,6 +138,9 @@ orders only when all 4 conditions are true:
 - The list has only the orders of the checked paper account. It is empty when
   the check did not pass.
 - Positions and balance belong to the account, not to a client ID.
+- Phase 3 (#146): each position and each cash amount of the account also
+  belongs to owners in the owner ledger (section 11.10). The IBKR position
+  stays the source of the account position.
 
 ## 11.5 The `paper_trading` module
 
@@ -121,6 +155,26 @@ The public entry `atrade.paper_trading` exports:
 | `fetch_paper_capital_usd(paper_account_monitor)` | Async. The `NetLiquidation` value of the paper account in USD (section 11.9) after a passed check. Otherwise, and when no exchange rate is available, `settings.local_paper_capital_usd`. |
 | `create_paper_trading_router(*, paper_account_monitor, database_url, clock, find_blocking_forward_test)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. `find_blocking_forward_test(instrument)` returns a `BlockingForwardTest` (`forward_test_id`, `label`) or `None`. `app/web.py` makes it from `forward_test.find_forward_test_on_instrument()`, because `paper_trading` does not import `forward_test`. |
 | `PAPER_TRADING_SOCKET_MESSAGE_MODELS` | The models of `/ws/paper-trading` (`PaperAccountMessage`, `OpenOrdersMessage`, `HeartbeatMessage`) for the OpenAPI document. The frontend uses their generated types. |
+
+Phase 3 changes of the public entry (#146, #149). The names are choices of
+this document. The implementation can change them.
+
+| Name | Purpose |
+|---|---|
+| `check_owner_order(*, database_url, owner, order)` | Checks the order rules of section 11.10 and the "Split check needed" state of section 11.11 for one owner. Returns `None` or the reason of the refusal. The Web process uses it for orders by hand. The ATrade execution client of `forward_test` uses it for each forward test order. |
+| `record_owner_fill(*, database_url, owner, fill)` | Writes one fill into the owner ledger. Idempotent on the IBKR execution ID. |
+| `read_owner_positions(*, database_url, owner)` | The positions and the cash of one owner, for the reconciliation reports of the ATrade execution client. |
+| `transfer_owner_to_by_hand(*, database_url, forward_test_id)` | Moves the positions and the remaining cash of a stopped forward test to "By hand" (section 11.10). |
+| `apply_stock_split(*, database_url, stock_split)` | Changes the owner ledger for a stock split in one transaction (section 11.11). |
+| `Owner` | `kind` (`by_hand`, `forward_test`) and `forward_test_id` (null for `by_hand`). |
+
+- Phase 3: `create_paper_trading_router` loses `find_blocking_forward_test`,
+  because the refusal of section 11.3 goes away. It gets
+  `read_allocated_capital` from `app/web.py`, which calls
+  `forward_test.read_allocated_capital()`. `paper_trading` still does not
+  import `forward_test`.
+- Phase 2 (#140, #150): the AI assistant has no tool that sends or cancels a
+  paper order. Its tool allow list has no paper order route.
 
 `GET /api/paper-trading/paper-capital` returns `200` with
 `{"paper_capital_usd": "<amount>"}`, the value of
@@ -165,6 +219,13 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 - Each position has `symbol`, `security_type`, `exchange`, `currency`,
   `quantity`, `average_cost`, `market_price`, `market_value`,
   `unrealized_pnl`. The list is empty when the check did not pass.
+- Phase 3 (#146, #149): each position also has `owners` (a list of `owner`,
+  `quantity`, `average_cost` from the owner ledger), `unattributed_quantity`
+  (the IBKR quantity minus the sum of the owner quantities), and
+  `split_check` (null, or `stock_split_id`, `split_ratio`,
+  `account_quantity_before`, `account_quantity_after`). The `account`
+  message also gets `unattributed_cash_usd` (section 11.12). The field names
+  are choices of this document.
 - Each order has the fields of `OpenOrderResponse` (section 11.8). When IB
   Gateway does not answer, the server keeps the last list and tries again.
 - Amounts and quantities are decimal text, for example `"101234.50"`.
@@ -217,6 +278,26 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   is enabled only when `can_cancel` is true. A disabled item says why, for
   example "Stop forward test 42 to cancel". It uses
   `foundation/scroll_region` with the label "Open orders".
+- Phase 3 (#146): the Positions table gets an "Owner" column. Each owner of
+  an instrument has its own row, for example "By hand" or "Forward test 3".
+  The frontend changes the forward test ID into "Forward test <ID>" in
+  `routes/`.
+- Phase 3 (#146): when the IBKR position of an instrument is not the sum of
+  the owner positions, the row of that instrument shows a warning icon and
+  the difference, for example "Unattributed: 50". The icon and the word
+  together show the state, not only the color.
+- Phase 3 (#149): an instrument in the "Split check needed" state has a row
+  with a warning icon, "Split check needed", the detected ratio, and the
+  IBKR share count before and after. The row has 2 buttons:
+  "Apply split 4:1" (the ratio of the row) and "Keep ledger". Each button
+  says what it does. The row has no other help text.
+- Phase 3 (#146): when the ledger refuses an order by hand, the review button
+  stays enabled, and the `409` reason shows as an inline error notification.
+  When the instrument is in the "Split check needed" state, the review button
+  is disabled and the panel says why, for example "AAPL needs a split check.
+  Apply the split or keep the ledger on the paper trading page.".
+- Phase 3: the review button no longer depends on `/ws/forward-tests`, because
+  the forward test block of section 11.3 goes away.
 - The result of the order and cancel routes shows in the form or the order
   list as an inline
   notification that the user can close: "Order N sent", "Cancel request sent
@@ -230,8 +311,13 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 | `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `409` (`OrderBlockedResponse`: `detail`, `forward_test_id`) when a forward test runs on the instrument (section 11.3). `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
 | `GET /api/paper-trading/orders` | `200` with `{"orders": [OpenOrderResponse]}`: the open orders of the checked account. Each order has `order_id`, `account`, `symbol`, `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`, `time_in_force`, `status` (IBKR text), `filled_quantity`, `source` (`kind`: `by_hand` or `forward_test`, `forward_test_id`), `can_cancel`. `502` when IB Gateway does not answer. |
 | `DELETE /api/paper-trading/orders/{order_id}` | `202` after ATrade sends the cancel request. IBKR confirms it later in the order list. `403` as for `POST`. `404` when no open order of the account has this ID, or when ATrade did not send it by hand. `409` for an order of a forward test or of another client. `502` when IB Gateway does not answer. |
+| Phase 3: `POST /api/paper-trading/orders` | The `409` with `OrderBlockedResponse` for a forward test goes away. New `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when an order rule of section 11.10 fails (`rule`: `sell_more_than_position`, `buy_more_than_cash`) or the instrument is in the "Split check needed" state (`rule`: `split_check_needed`). Example `detail`: "By hand holds 40 AAPL and has open sell orders for 10. ATrade refuses a sell order for 50.". |
+| Phase 3: `POST /api/paper-trading/stock-splits/{id}/apply` (new) | Applies the stock split of the "Split check needed" state to the owner ledger (section 11.11). `200` with the changed owner positions. `404` for an unknown ID. `409` when the instrument is not in the "Split check needed" state for this stock split. |
+| Phase 3: `POST /api/paper-trading/stock-splits/{id}/keep-ledger` (new) | Ends the "Split check needed" state without a ledger change. The difference stays as "Unattributed". `200`. `404` and `409` as for `apply`. |
 | `GET /api/paper-trading/manual-orders` | `200` with `{"manual_orders": [ManualOrderWithFillsResponse]}`: the rows of `manual_order`, oldest first, each with `filled_quantity` and `average_fill_price` (section 11.4). |
 
+- The Phase 3 route names, the response names, and the `rule` values are
+  choices of this document.
 - The backend tests (`backend/tests/paper_trading/test_paper_orders.py`) go
   through these routes with the IBKR fake and real PostgreSQL.
 - The Playwright test `frontend/e2e/paper_orders.spec.ts` sends an order
@@ -272,3 +358,167 @@ the base currency EUR, and IBKR does not let the owner change it. IBKR sends
   block them.
 - The balance shows the base currency values and the rate, so the user sees
   what ATrade converted (section 11.7).
+
+## 11.10 Owner ledger (Phase 3)
+
+Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[ADR 0007](../adr/0007-owner-ledger-for-shared-paper-account.md).
+
+- Single-instrument forward tests, multi-instrument forward tests, and paper
+  orders by hand run at the same time on the one paper account. They can
+  trade the same instruments. They do not change the records of each other.
+- An owner is a forward test, or "By hand". Each order, fill, position, and
+  cash amount of the paper account belongs to one owner.
+- The owner ledger is the record of the fills, positions, and cash of each
+  owner in PostgreSQL. `paper_trading` owns its tables.
+- For each instrument, the IBKR position minus the sum of the owner
+  positions must be 0. When it is not 0, the paper trading page shows the
+  difference as "Unattributed" (section 11.7).
+
+Owners and their cash:
+
+| Owner | Position | Cash |
+|---|---|---|
+| Forward test | The sum of its fills and its stock split adjustments. | Its allocated capital ([`forward_test.md`](forward_test.md) section 12.18), plus the cash of its fills, plus its cash in lieu. |
+| "By hand" | The sum of the orders sent by hand, the positions at the ledger start, the transfers from stopped forward tests, and its stock split adjustments. | The capital of "By hand" is `NetLiquidation` (USD) minus the sum of the allocated capital of the running forward tests. |
+
+Order rules. Version 1 is long only. Each order of each owner must pass all
+3 rules:
+
+1. A sell order must not be larger than the owner position minus the open
+   sell orders of the owner on the instrument.
+2. The amount of a buy order must not be larger than the owner cash minus
+   the amount of the open buy orders of the owner.
+3. An owner cannot sell short.
+
+- When a rule fails, the strategy of a forward test gets `OrderDenied`
+  ([`forward_test.md`](forward_test.md) section 12.19). An order by hand gets
+  `409` with the reason (section 11.8).
+- No owner uses margin. So the shared buying power of the paper account
+  cannot go to one owner.
+
+Records:
+
+- The ATrade execution client writes each fill of a forward test, with the
+  forward test as the owner.
+- The fills of orders sent by hand belong to "By hand".
+- Orders from outside ATrade (TWS, the IBKR website, the phone app) belong to
+  "By hand". ATrade cannot refuse them.
+- The positions of the paper account at the ledger start belong to
+  "By hand".
+- When a forward test stops, its positions and its remaining cash go to
+  "By hand" ([`forward_test.md`](forward_test.md) section 12.6). The
+  records of the forward test do not change.
+- A stock split adds 1 "split adjustment" record for each owner that holds
+  the instrument (section 11.11). It is not a fill.
+
+Table (the names are choices of this document):
+
+| Table | Columns |
+|---|---|
+| `owner_ledger_entry` | `id`, `owner_kind` (`by_hand`, `forward_test`), `forward_test_id` (null for `by_hand`), `entry_kind` (`fill`, `split_adjustment`, `transfer`, `ledger_start`), `time_utc`, `account`, `symbol`, `exchange`, `currency`, `quantity_change` (signed shares), `price` (null for `split_adjustment` and `transfer` of cash), `commission`, `cash_change`, `ibkr_execution_id` (unique when not null), `ibkr_order_id`, `stock_split_id` (null unless `split_adjustment`). |
+
+- An insert of a fill has `ON CONFLICT DO NOTHING` on `ibkr_execution_id`, so
+  a fill that ATrade reads again adds no row.
+- The position of an owner is the sum of `quantity_change`. The cost of the
+  position follows from the fills and the stock split adjustments.
+
+## 11.11 Stock splits in the owner ledger (Phase 3)
+
+Sources: [How the owner ledger changes at a stock split](https://github.com/Mano-Liaoyan/ATrade/issues/149),
+[ADR 0008](../adr/0008-stock-splits-from-ibkr-evidence.md).
+
+[`forward_test.md`](forward_test.md) section 12.22 has the daily check and
+the restart of the forward tests. [`market_data.md`](market_data.md)
+section 8.4 has the stock split table and the change of the stored bars.
+
+The ledger change. For each owner that holds the instrument:
+
+1. New shares = old shares times the split ratio, rounded down to a whole
+   number.
+2. The total cost does not change. The new average cost is the old average
+   cost divided by the split ratio.
+3. Cash in lieu = the part of a new share below 1, times the last close
+   before the ex-date, divided by the split ratio. It goes to the cash of the
+   owner and to its realized profit.
+4. The difference between the IBKR position and the sum of the owner
+   positions goes to "By hand". The difference between the IBKR cash in lieu
+   and the sum of the owner cash in lieu also goes to "By hand".
+
+- So the sum of the owner positions always equals the IBKR position.
+- A strategy never gets shares that it did not buy.
+- "By hand" can get 1 more share, and its cash then goes down by the same
+  value.
+- One transaction writes all records of one stock split.
+
+Examples:
+
+| Stock split | Before | After |
+|---|---|---|
+| 3-for-2 (split ratio 1.5) | Forward test A 3 shares, forward test B 5 shares. Account 8 shares. | Account 12 shares. A 4 shares and cash in lieu for 0.5 share. B 7 shares and cash in lieu for 0.5 share. "By hand" 1 share. |
+| 1-for-10 (split ratio 0.1) | A 15 shares, B 7 shares. Account 22 shares. | Account 2 shares and cash in lieu for 0.2 share. A 1 share and cash in lieu for 0.5 share. B 0 shares and cash in lieu for 0.7 share. "By hand" 1 share. |
+
+The "Split check needed" state:
+
+- An instrument goes to this state when:
+  - only evidence A shows a ratio, and the IBKR position did not change
+  - the IBKR position changed, and evidence A shows no ratio
+  - the 2 ratios are not the same
+  - the IBKR share count is not the share count of the ledger change above
+  - the ratio is not a usual split ratio (a whole number, 1 divided by a
+    whole number, or a ratio like 3/2)
+- While an instrument is in this state, no owner can send an order on it.
+  The strategy of a forward test gets `OrderDenied`. An order by hand gets
+  `409` with the reason. Other instruments trade as usual.
+- The paper trading page shows the state in the Positions table
+  (section 11.7). The forward test page shows it in the header line
+  ([`forward_test.md`](forward_test.md) section 12.16).
+- "Apply split 4:1" writes the ledger change above
+  (`POST /api/paper-trading/stock-splits/{id}/apply`).
+- "Keep ledger" makes no ledger change
+  (`POST /api/paper-trading/stock-splits/{id}/keep-ledger`). The difference
+  stays as "Unattributed".
+- Each button ends the state.
+
+Table (the names are choices of this document):
+
+| Table | Columns |
+|---|---|
+| `split_check` | `id`, `stock_split_id` (the stock split event of `market_data`), `symbol`, `exchange`, `currency`, `detected_ratio`, `evidence` (`bar_ratio_only`, `position_only`, `ratios_differ`, `share_count_differs`, `unusual_ratio`), `account_quantity_before`, `account_quantity_after`, `status` (`needed`, `applied`, `kept`), `created_at_utc`, `resolved_at_utc`. |
+
+## 11.12 Limits of the owner ledger (Phase 3)
+
+- Version 1 does not handle cash dividends. A cash dividend changes the
+  paper account cash without a fill. The paper trading page shows it as an
+  "Unattributed" difference. Cash dividends are in the "Not yet specified"
+  list of the planning map.
+- Spin-offs, mergers, symbol changes, and delistings are not handled. The
+  page shows the difference as "Unattributed".
+- Version 1 is long only. No owner sells short or uses margin.
+- Nobody checked if IBKR refuses opposite orders of 2 owners on one
+  instrument (self-trade prevention).
+
+## 11.13 Left to the implementation
+
+The decisions do not name these details. The implementation picks the
+simplest option and records it in this document.
+
+- The cash of "By hand" for order rule 2. The decision gives the capital of
+  "By hand" (`NetLiquidation` minus the allocated capital). The buy check
+  needs a cash value. A cash dividend must show as "Unattributed", so the
+  cash of "By hand" cannot be only "the account cash minus the forward test
+  cash".
+- How the page calculates the "Unattributed" cash, with the USD conversion
+  of section 11.9.
+- The amount of a market buy order for rule 2 (the order has no price), and
+  whether rule 2 includes the commission.
+- The cash rule for an instrument that is not in USD. The allocated capital
+  is in USD.
+- When the Web process records the fills of orders by hand. `reqExecutions`
+  returns only the executions of the current day (section 11.4).
+- How ATrade records fills from outside ATrade, if it can read them
+  (`reqExecutions` of other client IDs is not checked, section 21).
+- How ATrade gets the IBKR cash in lieu of a stock split.
+- The tolerance when ATrade compares the 2 ratios of a stock split.
+- Whether "Apply split" and "Keep ledger" also change the stored bars and
+  restart the forward tests, and how the worker sees the result.

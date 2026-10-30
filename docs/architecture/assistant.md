@@ -1,0 +1,741 @@
+# AI strategy assistant
+
+This document is section 25 of the architecture specification
+([`docs/architecture.md`](../architecture.md)). It is in its own file to keep
+the specification shorter than 1000 lines (section 18). Terms have the
+meaning that [`GLOSSARY.md`](../../GLOSSARY.md) gives them.
+
+Sources: [pi integration](https://github.com/Mano-Liaoyan/ATrade/issues/133),
+[AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140),
+[How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150).
+ADRs: [0004 The AI assistant saves strategy versions directly](../adr/0004-ai-assistant-saves-strategy-versions.md),
+[0005 AI assistant credentials stay in the assistant service](../adr/0005-assistant-credentials-outside-postgresql.md).
+Planning map: [Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129).
+
+The AI assistant is a language model that works with the user on the
+strategy page. It reads and writes strategy versions, runs and compares
+backtests, and (in phase 3) reads, runs, and creates screens. It uses pi
+(the pi coding agent) as its agent runtime. It can call only the ATrade
+routes of an allow-list.
+
+This section is the target. Nothing in it is implemented. The tickets name
+facts that nobody ran. Section 25.15 lists them.
+
+## 25.1 Phases
+
+| Part | Phase |
+|---|---|
+| `assistant` Compose service, networks, and port 8001 (25.2, 25.3) | 2 |
+| Strategy and backtest tools (25.4) | 2 |
+| Strategy versions saved by the AI assistant, Keep and Discard (25.5) | 2 |
+| Credentials and provider login (25.7) | 2 |
+| Conversations, titles, and prompt versions (25.8, 25.9) | 2 |
+| `/ws/assistant` and the browser routes (25.10, 25.11) | 2 |
+| Assistant side column on the strategy page (25.12) | 2 |
+| Width splitter and Maximize for each `SideColumn` (25.13) | 2 |
+| Screen tools, screens made by the AI assistant, condition card (25.4, 25.6, 25.12.4) | 3 |
+| `run_backtest` with a universe (`universe_kind` `screen` or `list`) (25.4.2) | 3 |
+
+Phase 1 has no part of the AI assistant. Phase 1 adds the version source
+"rule builder" ([ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)).
+Phase 2 adds the second value "AI assistant" to the same column (25.5).
+
+## 25.2 The `assistant` service
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q1, Q2, Q5),
+[pi integration](https://github.com/Mano-Liaoyan/ATrade/issues/133).
+
+- `assistant` is a new Compose service. It runs one small Node.js process
+  written in TypeScript. The process uses the pi SDK.
+- The npm package is `@earendil-works/pi-coding-agent`. Pin the exact
+  version (`1.4.0` when the tickets were written). Do not use the deprecated
+  package `@mariozechner/pi-coding-agent`.
+- pi needs Node.js 22.19 or later.
+- One process serves all conversations.
+- pi does not run in the `web` container, because `web` holds the database
+  URL and the IBKR settings.
+- ATrade uses the SDK, not `pi --mode rpc`. The RPC mode has no login
+  command, and the web page must do each login (25.7).
+- The browser never connects to `assistant`. The browser connects only to
+  `/ws/assistant` of `web` (25.10). `web` forwards the messages to
+  `assistant`.
+
+### 25.2.1 What pi can do
+
+- All built-in pi tools are off (`noTools` with `customTools`). pi has no
+  `bash`, `read`, `edit`, or `write` tool. #133 ran this: with the built-in
+  tools off, a `bash` call returns "Tool bash not found".
+- The process also has a `tool_call` handler. It refuses each tool that is
+  not in the tool list of section 25.4. This is the second guard.
+- pi does not load `AGENTS.md`, skills, or project files.
+- pi loads no extension. It does not load a third-party extension, and the
+  AI assistant cannot write an extension. A later ticket designs "the AI
+  writes an extension and the user reviews it".
+- Strategy code goes to ATrade as a tool argument. pi writes no file outside
+  its volume.
+- The main control is in ATrade, not in pi: the allow-list of port 8001
+  (25.3).
+
+### 25.2.2 Container
+
+| Item | Value |
+|---|---|
+| Root file system | Read-only. |
+| Memory limit | `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}`, default `1g`. |
+| Environment | No `DATABASE_URL`, no IBKR setting, no other secret of `.env`. |
+| Volume | `atrade-assistant-pi`: the credential file (25.7) and the pi conversation files (JSONL, 25.8). |
+| Networks | `atrade-assistant-internal` and `atrade-assistant-egress` (25.3). |
+| Published ports | None. |
+
+- ATrade never makes an automatic backup of `atrade-assistant-pi`. README
+  gives one manual backup command, for example
+  `docker run --rm -v atrade-assistant-pi:/data ... tar`.
+- The volume holds credentials. Keep each backup of it like `.env`.
+- When the volume is lost, the conversation messages and the credentials are
+  lost. The user logs in and enters the API keys again.
+
+## 25.3 Networks and the assistant port
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q2, Q9),
+[How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) (A8, B3).
+
+### 25.3.1 Networks
+
+| Network | Settings | Members | Use |
+|---|---|---|---|
+| `atrade-assistant-internal` | `internal: true`, fixed subnet | `web`, `assistant` | `assistant` calls port 8001 of `web`. `web` forwards `/ws/assistant` to `assistant`. |
+| `atrade-assistant-egress` | Not internal | `assistant` only | `assistant` connects to the model providers. |
+
+- `web`, `postgres`, and `ib-gateway` are not on `atrade-assistant-egress`.
+- `assistant` cannot connect to `postgres` or `ib-gateway`.
+
+### 25.3.2 Port 8001
+
+- The `web` process starts a second uvicorn listener on port 8001. Compose
+  does not publish this port to the host.
+- Port 8001 has its own FastAPI app. This app mounts only the routes of the
+  allow-list (25.3.3). It has no `/ws/` route and no frontend files.
+- The app of port 8000 refuses each request that arrives on an address of
+  the `atrade-assistant-internal` subnet with `403`. The check reads the
+  local address of the request (ASGI `scope["server"]`).
+- So `assistant` cannot call a route of port 8000.
+- A unit test checks the allow-list: the port 8001 app has exactly the
+  routes of 25.3.3.
+
+### 25.3.3 Allow-list
+
+The screen paths come from #150. They are proposals. The ticket that
+implements the screen routes names the final paths.
+
+| Route on port 8001 | Tool | Phase | Limit on port 8001 |
+|---|---|---|---|
+| `GET /api/strategies` | `list_strategies` | 2 | None. |
+| `GET /api/strategies/{strategy_id}` | `read_strategy` | 2 | None. |
+| `GET /api/strategies/{strategy_id}/versions/{version_number}` | `read_strategy_version` | 2 | None. |
+| `POST /api/strategies` | `create_strategy` | 2 | None. |
+| `POST /api/strategies/{strategy_id}/versions` | `save_strategy_version` | 2 | The version records the source "AI assistant" and the conversation ID (25.5). |
+| `POST /api/backtests` | `run_backtest` | 2 (single instrument), 3 (universe fields) | The backtest records the conversation ID. |
+| `GET /api/backtests` | `list_backtests` | 2 | None. |
+| `GET /api/backtests/{backtest_id}` | `read_backtest`, `run_backtest` (wait) | 2 | None. |
+| `GET /api/backtests/{first_id}/comparison/{second_id}` | `compare_backtests` | 2 | None. |
+| `GET /api/screens` | `list_screens` | 3 | None. |
+| `GET /api/screens/{screen_id}` | `read_screen` | 3 | None. |
+| `POST /api/screens` | `create_screen` | 3 | The screen records the conversation ID. Its name is "<name> (AI)" (25.6). |
+| `PUT /api/screens/{screen_id}` | `update_screen` | 3 | Only a screen that the same conversation created and that the user has not kept. Else `403`. |
+| `POST /api/screens/{screen_id}/runs` | `run_screen` | 3 | The screen result records the conversation ID. |
+| `GET /api/screen-results/{screen_result_id}` (with page parameters) | `read_screen_result` | 3 | None. |
+
+These routes are not on port 8001:
+
+- the paper order routes (`/api/paper-trading/...`)
+- the forward test routes (`/api/forward-tests/...`), so the AI assistant
+  cannot start or stop a forward test
+- `PUT /api/backtest-limits`
+- `POST /api/watchlist` and `DELETE /api/watchlist` (this includes "Add to
+  watchlist")
+- `DELETE /api/strategies/{strategy_id}`
+- `DELETE /api/screens/{screen_id}`
+- the HK instrument list changes
+- the daily bar update
+- the parameter sweep routes
+- all `/ws/` routes
+
+## 25.4 Tools
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q2, Q10),
+[How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) (A1–A6, B3, B5),
+[Rule builder prototype](https://github.com/Mano-Liaoyan/ATrade/issues/138).
+
+The `assistant` process registers each tool as a pi custom tool. Each tool
+calls the routes of 25.3.3 on port 8001. pi sends the name, the
+description, and the parameters of each tool to the model, so the system
+prompt does not list the tools.
+
+### 25.4.1 Strategy and backtest tools (phase 2)
+
+| Tool | Does | Result to the model |
+|---|---|---|
+| `list_strategies` | Lists the strategies. | The answer of `GET /api/strategies`. |
+| `read_strategy` | Reads one strategy and its version list. | The answer of `GET /api/strategies/{strategy_id}`. |
+| `read_strategy_version` | Reads the code of one strategy version. | The code. When the rule builder saved the version, also its rules JSON (#138). |
+| `create_strategy` | Creates a strategy with version 1 from the template. | The new strategy. |
+| `save_strategy_version` | Saves code as a new strategy version (25.5). | The new version. On `422`, the problem list `{"problems": [{"line", "message"}]}` of the checks before save (strategy section 9.3). |
+| `run_backtest` | Queues a backtest of a saved strategy version and waits for its end (25.4.2). | The backtest ID and its status. When it finished, the same content as `read_backtest`. |
+| `list_backtests` | Lists the backtests. | The answer of `GET /api/backtests`. |
+| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, and a summary of the trades. |
+| `compare_backtests` | Compares 2 backtests. | The answer of the comparison route. |
+
+- The AI assistant does not change the rules of the rule builder. It changes
+  only code. ATrade treats a code change of the AI assistant like a code
+  change by hand (#138, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)).
+
+### 25.4.2 `run_backtest`
+
+- The tool calls `POST /api/backtests`. Then it waits at most 15 minutes for
+  the end of the backtest.
+- While it waits, the tool sends the queue state and the run state with the
+  pi `onUpdate` call. The browser shows them as a tool step (25.10).
+- After 15 minutes, the tool returns "still running" and the backtest ID.
+  The AI assistant can read the result later with `read_backtest`.
+- The backtests of the AI assistant and of the user use one queue and the
+  same backtest limits.
+- The AI assistant can backtest only an instrument and a bar period with
+  saved bars. It cannot download bars. `POST /api/backtests` refuses a range
+  without saved bars with `422` (backtest section 10.1).
+- One user message can start at most 5 backtests. At the sixth, the tool
+  returns an error. The error tells the AI assistant to ask the user first.
+- Phase 3: the tool takes a universe, with the same choices as the backtest
+  form ([#142](https://github.com/Mano-Liaoyan/ATrade/issues/142),
+  [#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)):
+
+| `universe_kind` | Parameters | Default |
+|---|---|---|
+| `single` | One instrument (phase 2 behavior). | — |
+| `screen` | Screen ID and rebalance period (each quarter or each month). The screen runs again at each rebalance (a point-in-time rule). | Yes, for a backtest from a screen. |
+| `list` | Screen result ID, and optionally a subset of its instruments. The screen result is a fixed list. | No. |
+
+- With `list`, the tool result has a survivorship bias warning. The AI
+  assistant must write this warning in its answer.
+- One multi-instrument backtest counts as 1 of the 5 backtests of a user
+  message. The 15 minute wait is the same.
+
+### 25.4.3 Screen tools (phase 3)
+
+| Tool | Does | Result to the model |
+|---|---|---|
+| `list_screens` | Lists the screens. | The screen list. |
+| `read_screen` | Reads one screen. | The conditions of the screen. |
+| `create_screen` | Saves a new screen (25.6). | The new screen. On `422`, the problem list. |
+| `update_screen` | Changes a screen that the same conversation created and that the user has not kept. | The changed screen. `403` for each other screen. On `422`, the problem list. |
+| `run_screen` | Runs a screen and saves its screen result. | The screen result ID and the summary of `read_screen_result`. On `422`, the problem list. |
+| `read_screen_result` | Reads one screen result. | See below. |
+
+`read_screen_result`:
+
+- By default it returns the first 50 rows and a summary. The AI assistant
+  can read more rows page by page.
+- The summary has these values:
+  - the total row count
+  - the count of instruments left after each condition group (the funnel
+    counts)
+  - the count of each exclusion reason
+  - the date of the daily bars
+- Each row has all columns of the screen result table.
+
+Problem list of the screen tools (#150 B5):
+
+- `create_screen`, `update_screen`, and `run_screen` return `422` with a
+  problem list when a condition is not correct. Examples: the indicator does
+  not exist, the base instruments do not belong to the market, or a percent
+  is not in 1–100.
+- The body has the same form as `CodeCheckFailedResponse`
+  (`{"problems": [...]}`). Each problem names the position of the condition
+  and the reason.
+- The AI assistant corrects the conditions and tries again, like the save
+  loop of a strategy version.
+
+## 25.5 Strategy versions saved by the AI assistant
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q2, Q12),
+[ADR 0004](../adr/0004-ai-assistant-saves-strategy-versions.md).
+
+- The AI assistant saves each code change as a new strategy version through
+  `save_strategy_version`. It does not wait for the user.
+- The checks before save run as usual (strategy section 9.3). The AI
+  assistant gets the `422` problem list.
+- The AI assistant can backtest the new version at once, read the result,
+  and change the code again.
+
+### 25.5.1 Columns
+
+| Table | New column | Meaning |
+|---|---|---|
+| `strategy_version` | source | `user`, `assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
+| `strategy_version` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant saved the version. |
+| `strategy_version` | discarded mark | Set when the user discards the version. |
+| `backtest` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant started the backtest. |
+
+- A discarded strategy version is never deleted. Its backtests stay.
+- The trigger `strategy_version_append_only` refuses each `UPDATE`
+  (strategy section 9.1.1). The discarded mark cannot be an `UPDATE` of the
+  version row. See 25.14.
+
+### 25.5.2 Diff card
+
+- The conversation shows each code change as a diff card. The diff compares
+  the new version with the version before it.
+- The card has the buttons Keep and Discard.
+- A click on the card opens `CodeDiff` in the editor panel.
+- Keep: the editor opens the new version.
+- Discard: the editor stays on the version that was open before. The new
+  version gets the discarded mark.
+- When the user clicks neither button, the version stays like a kept
+  version. Only Discard changes a version.
+
+### 25.5.3 Version list
+
+- The version `Select` of the strategy page hides discarded strategy
+  versions by default.
+- A toggle "Show discarded versions" below the `Select` shows them. Each
+  shows the tag "Discarded" after its version number.
+- The backtest list shows the backtests of discarded strategy versions as
+  usual.
+
+## 25.6 Screens made by the AI assistant (phase 3)
+
+Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) (A1–A3, A7, B2–B4).
+
+- The AI assistant can read, run, and create screens. It never deletes a
+  screen.
+- It never overwrites a screen that the user saved. To change a screen, it
+  saves a new screen.
+- Name of the new screen: the old name plus " (AI)". When the name is in
+  use, a number follows, for example "Momentum leaders (AI 2)". The user can
+  rename it.
+- The AI assistant can change a screen only when the same conversation
+  created it and the user has not clicked Keep (`update_screen`). Then the
+  old condition card links to the latest state.
+- Screens stay without versions ([#145](https://github.com/Mano-Liaoyan/ATrade/issues/145) Q6).
+- Each backtest keeps a copy of the screen conditions that it used. So a
+  later change or delete of a screen does not change an old backtest.
+- The conversation shows each new or changed screen as a condition card
+  (25.12.4).
+  - Keep: the screen stays in the "Screens" side column. After Keep, the AI
+    assistant cannot change it.
+  - Discard: ATrade deletes this screen.
+  - When the user clicks neither button, the screen stays. The user can
+    delete it later by hand.
+- The new screen shows in the "Screens" side column before the user keeps
+  it.
+- Deleting a conversation does not delete a screen.
+
+Screen results:
+
+- Each run of the AI assistant saves one screen result. The screen result
+  records the conversation ID.
+- When the user deletes the conversation, the screen result stays and its
+  conversation ID becomes null.
+- The recent runs in the side column include the runs of the AI assistant.
+
+Place:
+
+- The user discusses screens with the AI assistant only in the assistant
+  side column of the strategy page. The screen page `/screens/<id>` has no
+  assistant.
+- The condition card has "Open screen". It opens `/screens/<id>`.
+
+## 25.7 Credentials and provider login
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (user decisions of 2026-10-28, Q3, Q4),
+[ADR 0005](../adr/0005-assistant-credentials-outside-postgresql.md).
+
+### 25.7.1 Providers and methods
+
+- The web page offers each access method that pi supports: each
+  subscription login and each API key.
+- The page reads the providers from pi (`ModelRuntime.getProviders()`). It
+  does not have a fixed list.
+- pi 1.4.0 has subscription logins for `anthropic`, `openai` (ChatGPT
+  subscription), `openai-codex`, `github-copilot`, `xai`, `kimi-coding`, and
+  `meta`. `openrouter` and `radius` have OAuth, but not a subscription.
+- The user takes the risk of each provider's terms of service. ATrade does
+  not take away a provider because of its terms.
+- Google: API key only. pi 1.4.0 has no Google Gemini or Antigravity login.
+- The user selects, for each conversation: the provider, the model, a
+  subscription or an API key, and which credential.
+- The model list of a provider comes from pi
+  (`ModelRuntime.getAvailable(provider)` gives only the models with a
+  credential).
+
+### 25.7.2 Storage
+
+- The `assistant` service keeps the credentials in one file in the volume
+  `atrade-assistant-pi`. The file mode is `0600`.
+- Credentials never go to PostgreSQL, to `.env`, or to git. This is a
+  deliberate exception to section 15 ([ADR 0005](../adr/0005-assistant-credentials-outside-postgresql.md)).
+- pi's own `auth.json` keeps only 1 credential for each provider. So ATrade
+  keeps its own credential store with many credentials for one provider.
+- For each conversation, `assistant` creates a `ModelRuntime` with a
+  `CredentialStore` that holds only the selected credential.
+- After an OAuth refresh, `assistant` writes the new token back to the same
+  file.
+- `web` does not keep a credential. The secret value goes from the browser
+  through `/ws/assistant` to `assistant`.
+
+### 25.7.3 Login
+
+- `assistant` calls `ModelRuntime.login(providerId, "oauth" | "api_key",
+  interaction)`. The `interaction` object connects pi to the web page.
+- pi sends `auth_url`, `device_code`, `progress`, and `info` events through
+  `notify()`. `web` sends each as a `login_step` message (25.10).
+- pi asks for `text`, `secret`, `select`, and `manual_code` input through
+  `prompt()`. The page shows the field. The browser answers with
+  `login_answer`.
+- A subscription login shows the authorization link, the device code, and a
+  field to paste a code, as pi asks for them.
+- A new API key uses a password field.
+
+### 25.7.4 Credentials dialog
+
+- The "Credentials" icon button of the assistant side column opens a
+  `Dialog`.
+- The dialog lists the credentials in a `DataTable`: name, provider, kind
+  (subscription or API key), and state.
+- An API key shows only its last 4 characters.
+- A credential has a name, for example "Anthropic API key · personal".
+- The dialog has the steps to add a subscription login and to add an API
+  key (25.7.3).
+
+## 25.8 Conversations
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q4, Q12, Q14).
+
+### 25.8.1 Storage
+
+- The new capability `assistant` has a backend module
+  (`backend/src/atrade/assistant/`) and a frontend directory
+  (`frontend/src/lib/assistant/`).
+- PostgreSQL holds the conversation metadata in `assistant_conversation`.
+- pi keeps the messages of each conversation in one JSONL file in the
+  volume `atrade-assistant-pi`. The file has all messages, tool arguments,
+  and tool results. PostgreSQL does not hold the messages.
+
+| Table | Columns |
+|---|---|
+| `assistant_conversation` | `id`, `title`, the title state (generated or renamed by the user), `strategy_id`, `created_at_utc`, `prompt_version_id` (foreign key to `assistant_prompt_version`), the last provider, the last model, the last credential name |
+| `assistant_prompt_version` | See 25.9. |
+
+- A conversation belongs to at most one strategy.
+- The strategy page lists only the conversations of the open strategy.
+- These records keep the conversation ID:
+  - the strategy versions that the AI assistant saved
+  - the backtests that it started
+  - (phase 3) the screens and the screen results that it made
+
+### 25.8.2 Model change in a conversation
+
+- The user can change the provider, the model, or the credential in the
+  middle of a conversation.
+- Each AI assistant message shows its model and its credential name.
+- So the answers of 2 models in one conversation are easy to compare.
+
+### 25.8.3 Title
+
+- ATrade generates the title after the first AI assistant answer ends
+  (`run_state` becomes `settled`).
+- It uses the current model and credential of the conversation.
+- This model call has no tools. It is not saved in the JSONL file of the
+  conversation.
+- Input: the first user message and the first 2000 characters of the first
+  AI assistant answer.
+- The title has the language of the user message. A Chinese title has at
+  most 20 characters. An English title has at most 8 words.
+- Before the title exists, the title is "New conversation" and the creation
+  time in UTC.
+- When the generation fails, the title stays "New conversation" and the
+  creation time. The Output tab of the "Problems and output" panel records
+  the error. ATrade does not try again.
+- The user can rename a conversation. After a rename, ATrade never changes
+  the title again.
+- The model call costs a small amount on the credential that the user
+  selected.
+
+### 25.8.4 Delete
+
+- Delete opens a danger `Dialog` first.
+- A delete deletes the `assistant_conversation` row and the JSONL file.
+- The strategy versions, backtests, screens, and screen results stay. Their
+  conversation ID becomes null (`ON DELETE SET NULL`).
+
+## 25.9 System prompt and prompt versions
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q11, Q13).
+
+The system prompt has 2 parts. The code adds the fixed part after the
+editable part.
+
+| Part | Content | The user can edit it |
+|---|---|---|
+| Editable part | The role of the AI assistant, how to write a strategy (the file format and the template of strategy section 9.2), and the answer rules. One answer rule: an answer about a backtest result names the metrics. It also names the out-of-sample result. | Yes. Each save makes a prompt version. |
+| Fixed part | The forbidden actions: no paper order, no forward test start, no promise of returns. The context of the conversation start: the ID and name of the open strategy, the open version number, and the IDs of the last 3 backtests. | No. The page shows it read-only. |
+
+- The default editable part is in English and is in the code.
+- The forbidden actions in the prompt only tell the model. They are not a
+  security control. The allow-list of port 8001 is the control (25.3).
+
+### 25.9.1 `assistant_prompt_version`
+
+| Table | Columns |
+|---|---|
+| `assistant_prompt_version` | `id`, `version_number`, `text` (the editable part), `created_at_utc` |
+
+- Each save makes a new prompt version. A prompt version does not change
+  after it is saved.
+- A new prompt version applies only to new conversations. A new
+  conversation uses the latest prompt version.
+- Each conversation records its prompt version. The top of the conversation
+  shows it, for example "Prompt v3".
+- So all answers in one conversation use the same prompt and are easy to
+  compare. To use a new prompt, the user starts a new conversation.
+
+### 25.9.2 Prompt dialog
+
+- The "Prompt" icon button of the assistant side column opens a `Dialog`.
+- The dialog has: a version `Select`, a text area, the fixed part
+  (read-only), the "Restore default" button, and the "Save as new version"
+  button.
+- "Restore default" puts the default text in the text area. It saves
+  nothing. The user must click "Save as new version".
+
+## 25.10 `/ws/assistant`
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q8).
+
+- `/ws/assistant` is the WebSocket path of the `assistant` capability on
+  port 8000.
+- `web` changes the pi events into a small set of ATrade messages. The
+  frontend depends only on these message types. When pi changes, only
+  `assistant` and the change code in `web` change.
+- The `assistant` capability exports its message models for the OpenAPI
+  document, like the other capabilities (section 13), for example
+  `ASSISTANT_SOCKET_MESSAGE_MODELS`. The list has `HeartbeatMessage`.
+
+Server to browser:
+
+| `type` | Content |
+|---|---|
+| `message_delta` | A part of the streamed text of an AI assistant message. |
+| `message_end` | The end of one AI assistant message, with its model and credential name. |
+| `tool_step` | The start or the end of one tool call, with its status. For `run_backtest`, the queue state and the run state. |
+| `strategy_version_saved` | The strategy version ID, for the diff card. |
+| `backtest_finished` | The backtest ID, for the metric card. |
+| `run_state` | `running` or `settled`. |
+| `error` | An error of the conversation. |
+| `login_step` | One login step: `auth_url`, `device_code`, `prompt`, or `progress`. |
+
+Browser to server:
+
+| `type` | Content |
+|---|---|
+| `prompt` | A new user message. |
+| `steer` | A user message while the AI assistant runs. |
+| `abort` | Stop the current run (the "Stop" button). |
+| `login_answer` | The answer to a `login_step` of kind `prompt`. |
+
+- Phase 3 adds a message for the condition card (a screen ID), like
+  `strategy_version_saved`. See 25.14.
+
+## 25.11 Browser routes on port 8000
+
+The tickets decide the operations. They do not decide the paths. The paths
+below are choices of this document. The implementation can change them.
+
+| Operation | Proposed route | Phase |
+|---|---|---|
+| List the conversations of a strategy | `GET /api/assistant/conversations?strategy_id=...` | 2 |
+| Create a conversation | `POST /api/assistant/conversations` | 2 |
+| Read the messages of a conversation | `GET /api/assistant/conversations/{conversation_id}` | 2 |
+| Rename a conversation | `PATCH /api/assistant/conversations/{conversation_id}` | 2 |
+| Delete a conversation | `DELETE /api/assistant/conversations/{conversation_id}` | 2 |
+| List providers and models | `GET /api/assistant/providers` | 2 |
+| List credentials | `GET /api/assistant/credentials` | 2 |
+| Delete a credential | `DELETE /api/assistant/credentials/{credential_id}` | 2 |
+| List prompt versions | `GET /api/assistant/prompt-versions` | 2 |
+| Save a prompt version | `POST /api/assistant/prompt-versions` | 2 |
+| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` | 2 |
+| Keep a screen of the AI assistant | `POST /api/screens/{screen_id}/keep` | 3 |
+| Discard a screen of the AI assistant | `DELETE /api/screens/{screen_id}` (the user route) | 3 |
+
+- None of these routes is on port 8001.
+- The login itself runs on `/ws/assistant` (25.7.3), because it asks
+  questions and waits for answers.
+- The routes declare their error bodies with `responses=`
+  (`ErrorResponse`), like the other routes (section 13).
+
+## 25.12 Assistant side column on the strategy page
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q6, Q7),
+[UI reference: screens, rule builder, and AI assistant](https://github.com/Mano-Liaoyan/ATrade/issues/135).
+
+The strategy page has a right `SideColumn` with the name "AI assistant".
+The default width is 28rem.
+
+### 25.12.1 Layout
+
+| Area | Content |
+|---|---|
+| Top | Conversation `Select`, "New conversation" button, "Credentials" icon button, "Prompt" icon button. The prompt version of the open conversation, for example "Prompt v3". |
+| Middle | The conversation messages (`role="log"`) in a `ScrollRegion`. Tool steps, diff cards, metric cards, and (phase 3) condition cards. |
+| Bottom | Provider, model, and credential `Select`s in one row. Below them, the message input and the "Send" button. While the AI assistant runs, "Send" becomes "Stop". |
+
+- A tool step is one `StatusIndicator` line, for example
+  "Backtest #42 running".
+- A diff card shows a code change (25.5.2).
+- A metric card shows the `KeyMetricRow` of a finished backtest. It links to
+  the backtest.
+- Each AI assistant message shows its model and its credential name
+  (25.8.2).
+- Copy uses the terms of `GLOSSARY.md`: "conversation", not "chat",
+  "thread", or "session".
+- The Frontend Design Rules of `AGENTS.md` apply. A heading is a name only.
+  The side column has no helper text under its name. A disabled control
+  says why it is disabled.
+
+### 25.12.2 Message components
+
+- ATrade does not add the package `carbon-components-svelte` (section 13).
+- `foundation/carbon` gets new components that follow the HTML structure
+  and the behavior of `ChatLog`, `ChatMessage`, and `ChatDivider` of
+  `carbon-components-svelte` (GitHub `main`, `src/Chat/`). They use Bits UI
+  and `@carbon/styles` v11 (`cds--` classes).
+- Behavior:
+  - messages align by author
+  - consecutive messages of one author form a group
+  - a divider shows each new date
+  - the answer streams in
+  - a typing indicator shows while the AI assistant writes
+  - at the end of the log, the log scrolls to each new message
+  - while the user reads older messages, the log does not scroll
+  - the log has `role="log"`
+- License: the source repository uses Apache-2.0. Each file that copies or
+  adapts its code has a header with the source link and the Apache-2.0
+  copyright notice.
+- The repository root gets `THIRD_PARTY_NOTICES.md`: the component source,
+  the copyright line, and a link to the full license text. `LICENSE` does
+  not change.
+
+### 25.12.3 Width, Minimize, and Maximize
+
+- The assistant side column has the width splitter of each `SideColumn`
+  (25.13).
+- Minimize makes it a 32px rail. The rail has the assistant icon. The rail
+  button restores the width from before Minimize.
+- The assistant side column also has Maximize. Maximize gives it all the
+  width of the workbench except the left side column. The center area then
+  shows only a 32px rail.
+- A second click on Maximize, or Escape, restores the earlier width. This
+  is the same as Maximize of a `Panel`.
+
+### 25.12.4 Condition card (phase 3)
+
+Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) (B1).
+
+- The card shows the full condition strip of the screen. The style is the
+  style of the screen page ([#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)):
+  4 groups (base instruments › filters › indicator conditions › order),
+  neutral colors, and the count of instruments left at the end of each
+  group.
+- The card marks each change:
+
+| Change | Mark |
+|---|---|
+| Added condition | A + icon and a dark border. |
+| Removed condition | A − icon, a dashed border, and a line through the text. |
+| Changed value | The old value with a line through it, then the new value. |
+
+- The card ends with the buttons "Open screen", "Discard", and "Keep".
+- After a click, the buttons change into a state: "Kept" (green check icon)
+  or "Discarded" (an icon, and the conditions fade).
+- The prototype of #150 is private. The real page must obey the first
+  Frontend Design Rule.
+
+## 25.13 Side column width splitter (all pages)
+
+Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q7).
+
+This changes `SideColumn` of `foundation/workbench` on all pages
+(watchlist, paper order, strategies, backtests, forward tests), so all side
+columns behave the same (section 13).
+
+- Each `SideColumn` gets a vertical `Splitter` on its inner edge:
+  `role="separator"`, `aria-orientation="vertical"`.
+- The user drags it with the mouse, or moves it 16px with Arrow Left and
+  Arrow Right. Home sets the minimum width. End sets the maximum width.
+- A double-click on the splitter restores the default width.
+- Minimum width: 16rem. Maximum width: 60% of the workbench width. The
+  center area keeps at least 24rem.
+- The browser keeps the width in `localStorage` under the `storageKey` of
+  the side column.
+- The Collapse button becomes Minimize. A minimized side column is a 32px
+  rail. The rail button restores the width from before Minimize.
+- The existing `SideColumn` tests must change.
+- Only the assistant side column has Maximize (25.12.3).
+
+## 25.14 Left to the implementation
+
+- The repository directory of the `assistant` service code, its Dockerfile,
+  its tests, and how `./scripts/check` checks it.
+- The port that `assistant` listens on in `atrade-assistant-internal`, and
+  the protocol between `web` and `assistant` (conversation messages, login
+  steps, credential list, title generation, JSONL delete).
+- The fixed subnet of `atrade-assistant-internal`, and whether it is a
+  setting.
+- How port 8001 knows the conversation of a request (for example a header
+  that `assistant` sends), so that it records the conversation ID.
+- How the `web` process runs 2 uvicorn listeners in 1 process.
+- Where the discarded mark is kept. The trigger
+  `strategy_version_append_only` refuses each `UPDATE` of
+  `strategy_version`, so a separate table or a narrower trigger is
+  necessary.
+- The column names and types of the version source, the title state, and the
+  last provider, model, and credential name.
+- Whether Keep of a diff card is recorded on the server, so a reload shows
+  "Kept".
+- How the server records that the user kept a screen, so `update_screen`
+  returns `403` after Keep.
+- What happens to the conversations of a strategy when the user deletes the
+  strategy.
+- Whether the default prompt is saved as prompt version 1, or only exists in
+  code until the first save.
+- Which part enforces the 5 backtests of one user message: only the tool, or
+  also port 8001.
+- How the AI assistant finds the instruments and bar periods with saved bars.
+  No tool reads the watchlist.
+- Whether `POST /api/backtests` from port 8001 may save daily exchange rates
+  from IBKR (backtest section 10.8). The AI assistant "cannot download
+  bars", and the rates come from IBKR.
+- The field names of each `/ws/assistant` message, and the phase 3 message
+  for the condition card.
+- The field that names the position of a condition in a screen problem
+  (25.4.3).
+- The pages of `read_screen_result` (page size and parameter names).
+- The summaries in the `read_backtest` result (how many points of the
+  equity curve and which trade fields).
+- The credential delete and rename behavior, and the meaning of the
+  credential state column.
+- The UI copy of each disabled control, for example "Send" without a
+  credential.
+- The code of the `tool_call` handler that refuses unknown tools.
+
+## 25.15 Facts to check
+
+| Ticket | Fact | How to check |
+|---|---|---|
+| #133 | The real subscription logins and model calls of each provider. Only a fake OpenAI-compatible model server was used. | Log in through the Credentials dialog with each provider that the user has, and send one message. |
+| #140, #133 | OpenAI may count a self-hosted single-user server as "remotely hosted" for the ChatGPT subscription login. | Read the OpenAI "Preview limitations" page. |
+| #140 | Community Antigravity extensions may not work in pi 1.4.0. Not needed in this stage. | Only for the later extension ticket: install the extension in a temporary container, and let the user log in one time. |
+| #140 | `ModelRuntime.login()` with an `AuthInteraction` object does each login step from a web page. Read from the 1.4.0 source, not run with a real provider. | The first login in the Credentials dialog. |
+| #140 | `ModelRuntime.create({ credentials })` accepts ATrade's own `CredentialStore`, and an OAuth refresh writes back through it. Read from the source. | A test with 2 credentials of one provider. Then wait for an OAuth token refresh and read the file. |
+| #150 | The run time of a point-in-time backtest from a screen (34 quarters, a screen of 500 instruments, and a multi-instrument backtest). It can be longer than the 15 minute wait. | After the implementation, run one with real data and measure the time. |
+| #150 | The token count of a screen result with 500 rows. | After the implementation, count the tokens of one real result. |
+| #140 | The VS Code secondary side bar resize and Maximize behavior, which the side column follows. | Read `src/vs/workbench/browser/layout.ts` of VS Code. |

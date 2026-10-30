@@ -10,13 +10,47 @@ Sources: [Strategy editing and run isolation](https://github.com/Mano-Liaoyan/AT
 [Run a backtest and see the result](https://github.com/Mano-Liaoyan/ATrade/issues/70),
 [Backtest list and version comparison](https://github.com/Mano-Liaoyan/ATrade/issues/72),
 [Backtest isolation controls](https://github.com/Mano-Liaoyan/ATrade/issues/71),
-[Backtests of instruments that are not in USD](https://github.com/Mano-Liaoyan/ATrade/issues/80).
+[Backtests of instruments that are not in USD](https://github.com/Mano-Liaoyan/ATrade/issues/80),
+[NautilusTrader 2.0 indicators, multi-instrument backtests, and batch backtests](https://github.com/Mano-Liaoyan/ATrade/issues/131),
+[Strategy robustness check methods](https://github.com/Mano-Liaoyan/ATrade/issues/132),
+[Scope of metrics and robustness checks](https://github.com/Mano-Liaoyan/ATrade/issues/137),
+[Content of the strategy template library](https://github.com/Mano-Liaoyan/ATrade/issues/139),
+[Design of the AI strategy assistant](https://github.com/Mano-Liaoyan/ATrade/issues/140),
+[Decision on the screen data sources](https://github.com/Mano-Liaoyan/ATrade/issues/141),
+[Design of the multi-instrument backtest and the parameter sweep](https://github.com/Mano-Liaoyan/ATrade/issues/142),
+[Screen page prototype](https://github.com/Mano-Liaoyan/ATrade/issues/145),
+[Forward tests of multi-instrument strategies](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+[How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150).
+
+### Implementation phases of this section
+
+The planning map
+[Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129)
+puts the new parts of this section in phases.
+
+| Phase | Parts |
+|---|---|
+| Existing | Sections 10.1 to 10.8, without the parts marked with a phase. |
+| Phase 1 | The new metrics, the win rate in the backend, the in-sample and out-of-sample split, the probabilistic and deflated Sharpe ratio, and their display (section 10.9). They use only the existing single-instrument backtest. |
+| Phase 2 | The `run_backtest` tool of the AI assistant for single-instrument backtests, and the conversation ID of a backtest (section 10.13). |
+| Phase 3 | The bar sources of a backtest and the survivorship bias warning (section 10.12), the multi-instrument backtest with a universe (section 10.10), the parameter sweep with the walk-forward check, the parameter sensitivity check, and the probability of backtest overfitting (section 10.11), the universe parameters of `run_backtest` (section 10.13), and the memory limit default `8g` (section 10.1). |
 
 ## 10.1 Decisions
 
 - A backtest request contains the strategy version, the instrument, the bar
   type, the time range, and `paper_capital_usd`. `paper_capital_usd` is
   required.
+- Phase 1: the request also contains `out_of_sample_share` (section 10.9.4).
+- Phase 3: the request names a universe in place of the instrument
+  (section 10.10), and it can contain a source order (section 10.12).
+- Backtests do not include cash dividends. The bars are adjusted for stock
+  splits only: IBKR `TRADES` bars are adjusted for stock splits and not for
+  dividends, and ATrade adjusts the Databento bars in the same way
+  ([#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
+  [#149](https://github.com/Mano-Liaoyan/ATrade/issues/149),
+  [ADR 0008](../adr/0008-stock-splits-from-ibkr-evidence.md)). Thus the total
+  return of an instrument that pays dividends is lower than its real total
+  return. This version does not handle cash dividends.
 - The paper capital, the equity curve, the trades, and the metrics are in
   USD for all instruments. A backtest of an instrument that is not in USD
   converts with daily exchange rates (section 10.8).
@@ -76,9 +110,13 @@ Implementation of the controls:
   `/proc/self/oom_score_adj` and calls `os.nice(10)` before it imports the
   strategy. Any process can make its own priority lower, so this needs no
   privilege.
-- The memory limit of the `web` container is `ATRADE_WEB_MEMORY_LIMIT`
-  (default `4g`). Tests cannot check the out-of-memory order. Section 17.8
-  has the manual check.
+- The memory limit of the `web` container is `ATRADE_WEB_MEMORY_LIMIT`.
+  Phase 3 changes the default from `4g` to `8g`
+  ([#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)): a
+  multi-instrument backtest of 500 instruments on 1-hour bars can need 4 to
+  5 GB (estimate, section 10.10.3). The server has 16 GB. With concurrency 2,
+  two such backtests can reach the 8 GB limit. Tests cannot check the
+  out-of-memory order. Section 17.8 has the manual check.
 
 ## 10.2 Tables
 
@@ -96,6 +134,29 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
   backtest uses cannot be deleted (section 9.1).
 - Rows of the result tables are deleted with their backtest
   (`ON DELETE CASCADE`). This stage has no route that deletes a backtest.
+
+### 10.2.1 New columns and tables
+
+Each phase adds its columns in a new migration. Existing rows do not change.
+New columns are null on existing rows, except where a default is given.
+
+| Phase | Table | Change |
+|---|---|---|
+| 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). |
+| 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. |
+| 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
+| 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2, `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
+| 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. |
+| 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. |
+| 3 | `backtest_trade` | Add `symbol` and `exchange`. The exchange is the real exchange, not the simulated venue `SMART` ([ADR 0003](../adr/0003-one-simulated-venue-per-currency.md)). |
+| 3 | `parameter_sweep` | New. `id`, `strategy_version_id` (foreign key to `strategy_version` with no `ON DELETE` action), the universe columns of `backtest`, `bar_period`, `start_utc`, `end_utc`, `paper_capital_usd`, `out_of_sample_share`, `parameter_grid` (JSON, section 10.11.1), `created_at_utc`. |
+
+- Phase 3 adds the status `cancelled` for the queued runs of a cancelled
+  parameter sweep (section 10.11.2).
+- The decisions name the `backtest` columns `universe_kind`, `sweep_id`, and
+  `parameters`, and the tables `backtest_universe_member` and
+  `parameter_sweep`. The other new names are choices of this document. The
+  implementation can change them.
 
 ## 10.3 Run flow
 
@@ -127,7 +188,8 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
    and a zero commission (`FixedFeeModel`).
 6. The child calculates the equity curve and the metrics with the metric
    functions (section 10.4), and writes them, the trades, and the status
-   `finished` in one transaction.
+   `finished` in one transaction. Phase 1: the metrics include the metrics of
+   section 10.9.2.
 7. When the child ends, the parent ends a backtest that is still `running`:
    `timed_out` after the timeout (the parent kills the child), else `failed`
    with the end of the child error output.
@@ -153,6 +215,10 @@ Limits of this stage:
 - The commission is zero.
 - `request_bars` gets only the look-back bars of the backtest bar type
   (section 10.3.1).
+- Cash dividends are not in the backtest (section 10.1).
+
+Phase 3 changes steps 1, 3, and 5 for a backtest with a universe (section
+10.10.4) and for the source order (section 10.12).
 
 ### 10.3.1 Look-back bars
 
@@ -163,9 +229,17 @@ from the saved bars in PostgreSQL. So a strategy warms up its indicators as
 in a forward test, and it can trade on the first bar of the range.
 
 - Look-back length: `find_look_back_length(bar_period)` in
-  `backtest/backtest_run.py`. It is the warm-up of the strategy template:
-  3 average periods of the default 20 bars, and 7 days at least
-  (`max(bar period × 60, 7 days)`). For daily bars this is 60 days. The child
+  `backtest/backtest_run.py`. It is the warm-up of the "Blank code" start
+  point (`backend/src/atrade/strategy/strategy_template.py`,
+  [`strategy.md`](strategy.md) section 9.2): 3 average periods of the
+  default 20 bars of its SMA(20), and 7 days at least
+  (`max(bar period × 60, 7 days)`). For daily bars this is 60 days. The
+  "Blank code" start point is not a strategy template: it only shows the
+  strategy file format and is not in the template library
+  ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139)). Phase 3: a
+  multi-instrument backtest on 1-day bars has a look-back length of 1 year,
+  the same as a multi-instrument forward test
+  ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146)). The child
   reads the saved bars from `start_utc` minus this length to `start_utc`
   (not included). A strategy chooses its own request start. A request that
   starts earlier gets only these bars. When PostgreSQL has no saved bars
@@ -190,9 +264,10 @@ in a forward test, and it can trade on the first bar of the range.
   the trades start at the first bar of the range.
 - The catalog has no bars of the range. A request during the run gets only
   look-back bars, so a strategy cannot read bars from after the engine time.
-- Tests: `tests/backtest/test_strategy_template_backtest.py` (the template
-  buys on the first bar of the range with look-back bars, and does not
-  without them; it trades on 120 daily bars without look-back bars) and
+- Tests: `tests/backtest/test_strategy_template_backtest.py` (the "Blank
+  code" start point buys on the first bar of the range with look-back bars,
+  and does not without them; it trades on 120 daily bars without look-back
+  bars) and
   `test_the_template_warms_up_on_saved_bars_before_the_start` in
   `tests/backtest/test_backtest_runs.py` (a real child process reads the
   look-back bars from PostgreSQL).
@@ -208,6 +283,16 @@ use the same functions for the comparison (section 12.10).
 | `EquityPoint` | `time_utc`, `equity_usd`. |
 | `calculate_equity_curve(*, start_cash, bars, bar_period, trades)` | One point at the end of each bar: the cash plus the position at the bar close price. A trade counts in the first point at or after its time. `start_cash`, the trades, and the bars are in one currency, and the points are in that currency. |
 | `calculate_metrics(*, paper_capital_usd, equity_curve, trade_count)` | `BacktestMetrics`: `final_equity_usd`, `total_return_percent`, `max_drawdown_percent` (the largest fall from a peak, as a percent of the peak; the paper capital is the first peak), and `trade_count`. Percents have 2 decimal places. |
+| Phase 1: `calculate_daily_returns(*, start_capital_usd, equity_curve)` | The daily returns of section 10.9.1. |
+| Phase 1: `find_round_trips(trades)` | The round trips of a test, with the profit after commissions and the entry amount of each. The win rate, the profit factor, the average win, and the average loss use it. |
+| Phase 1: `calculate_metrics` | Also gives the metrics of section 10.9.2 and the win rate. It takes the trades and the bars in place of `trade_count`, because the round trip metrics, the exposure, and the turnover need them. |
+| Phase 1: `calculate_split_metrics(*, ..., split_time_utc)` | The metrics of the in-sample part and of the out-of-sample part (section 10.9.4). |
+| Phase 1: `calculate_probabilistic_sharpe(*, daily_returns)` and `calculate_deflated_sharpe(*, daily_returns, trial_sharpe_ratios)` | Section 10.9.5. |
+
+Phase 1: forward tests use the new metric functions too. A forward test has
+no in-sample and out-of-sample split, because a forward test is out of
+sample ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)). The
+function names of this phase are choices of this document.
 
 For other capabilities (#78), the public entry exports
 `BacktestRequest`, `BacktestStatus`, `check_backtest_request(request)` (the
@@ -239,6 +324,22 @@ A backtest has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`,
 `created_at_utc`, `started_at_utc`, `ended_at_utc`, and `metrics` (null until
 the backtest finishes). Money values and percents are decimal strings.
 
+Changes of later phases:
+
+| Phase | Route | Change |
+|---|---|---|
+| 1 | `POST /api/backtests` | The body can contain `out_of_sample_share` (integer percent). Without it, the route uses 30. `422` when it is not from 0 to 50. The route calculates `split_time_utc` (section 10.9.4). |
+| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 and `win_rate_percent`, `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. |
+| 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
+| 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
+| 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12). |
+| 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. |
+| 3 | `/api/sweeps` | New routes, section 10.11.3. |
+
+The JSON names of the Phase 1 and Phase 3 fields are choices of this
+document. The implementation can change them.
+
 ## 10.6 Frontend
 
 - `frontend/src/lib/backtest/` holds the HTTP client (`startBacktest`,
@@ -255,6 +356,12 @@ the backtest finishes). Money values and percents are decimal strings.
     rate comes from the trades: the share of round trips (from position 0
     back to 0) with a profit after commissions; "–" without a round trip. The
     API has no Sharpe ratio, so the row has none.
+  - Phase 1 changes the row
+    ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)). The order
+    is: Total return, Net profit (USD), Max drawdown, Sharpe ratio, Win rate,
+    Trades, Final equity (USD). The Sharpe ratio and the win rate come from
+    the API (section 10.9.2). The frontend no longer calculates the win rate.
+    Under the row, the robustness row of section 10.9.6 shows.
   - `EquityDrawdownChart` (`curves`, `label`, `interruptions`, `fill`): the
     equity curves and, under them, the drawdown curves
     (`computeDrawdownCurve()`, a negative percent from the highest equity so
@@ -281,7 +388,9 @@ the backtest finishes). Money values and percents are decimal strings.
     status in the body instead.
   - The "Backtest tables" panel has the tabs Trades (32px rows), Orders, and
     Logs. The API has no orders, so Orders shows "No orders". Logs shows the
-    strategy error of a failed backtest, or "No logs".
+    strategy error of a failed backtest, or "No logs". Phase 1 adds the tab
+    Metrics (section 10.9.6). Phase 3 adds the tab Instruments and the
+    Symbol column of Trades (section 10.10.7).
   - The page reads the open backtest each second until its status is final,
     and the list every 2 seconds while a backtest in it is queued or running.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
@@ -300,6 +409,9 @@ the backtest finishes). Money values and percents are decimal strings.
   (`describeSavedBars()`). When no watchlist instrument has saved bars of the
   bar period, the select is disabled and the status links to the watchlist
   on the home page: the bar chart of a watchlist instrument saves its bars.
+- Phase 1: the form has the number input "Out-of-sample share" (section
+  10.9.4). Phase 3: "Instrument" becomes "Instruments" (section 10.10.7),
+  and the form can change the source order (section 10.12).
 - The "Backtest limits" dialog (a passive Carbon modal) has the "Limits" form
   (`BacktestLimitsForm`). It shows
   the timeout in minutes (`formatTimeoutMinutes`) and takes only whole
@@ -363,6 +475,12 @@ section 9.5.
   tab shows the status "Same strategy version: no code difference." in place
   of the diff. A closed "Show the code" disclosure shows the full code
   without collapsed lines.
+- Phase 1 ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)):
+  under the `KeyMetricRow` of each backtest, the comparison panel shows the
+  robustness row of that backtest (section 10.9.6). The "Comparison tables"
+  panel adds the tab Metrics: the Metrics table of section 10.9.6 with the
+  columns Metric and one value column for each backtest (the values of the
+  full range).
 
 ## 10.8 Instruments that are not in USD
 
@@ -414,3 +532,553 @@ Rules:
   without rates; a real child process converts an HKD backtest with two
   rates, and the test asserts the exact USD trades, equity curve, and
   metrics).
+
+## 10.9 Metrics and robustness checks
+
+Phase 1. Sources: [#132](https://github.com/Mano-Liaoyan/ATrade/issues/132),
+[#137](https://github.com/Mano-Liaoyan/ATrade/issues/137). The owner
+accepted all recommended options on 2026-10-29. The checks use only the
+saved data of one backtest and of the earlier backtests. They need no new
+backtest run and no new data source.
+
+### 10.9.1 Daily returns
+
+- All metrics that need a return series use daily returns, for all bar
+  periods.
+- A daily return is the change of the last equity point of a trading day
+  from the last equity point of the trading day before. The first trading
+  day uses the paper capital in place of the day before. A backtest on
+  1-hour bars thus also has daily returns.
+- The annual factor `A` is 252.
+- The risk-free rate is 0.
+- Reason: a 1-hour backtest and a 1-day backtest give results that the user
+  can compare, and `A` does not depend on the trading hours. A backtest
+  with about 90 days of 1-hour bars has about 60 daily returns.
+- The values differ from TradingView, which uses monthly returns and a
+  risk-free rate of 2 %.
+
+### 10.9.2 New metrics
+
+The backend calculates the metrics. Backtests and forward tests save them
+and use the same functions (section 10.4). `E_0` is the paper capital.
+`E_end` is the final equity. `years` is the number of calendar days of the
+range divided by 365.25.
+
+| Metric | Definition |
+|---|---|
+| CAGR | `(E_end / E_0)^(1 / years) − 1`. |
+| Annual volatility | `stdev(daily returns) × sqrt(A)`. `stdev` is the sample standard deviation. |
+| Sharpe ratio | `mean(daily returns) / stdev(daily returns) × sqrt(A)`. |
+| Sortino ratio | `mean(daily returns) / DD × sqrt(A)`, with `DD = sqrt(Σ min(0, daily return)² / n)`. `n` is the number of all days, not only of the days with a loss. The minimum acceptable return is 0. This is the definition of Sortino and Price (1994). QuantConnect LEAN uses a different `DD`, and its value is about 8 % higher in a test with synthetic data. |
+| Calmar ratio | `CAGR / abs(max drawdown)`, on the full range. |
+| Profit factor | The sum of the profits of the round trips with a profit, divided by the absolute sum of the profits of the round trips with a loss. Profits are after commissions. |
+| Average win | The mean profit (USD) of the round trips with a profit. It also shows as a percent of the entry amount. |
+| Average loss | The mean profit (USD, a negative number) of the round trips with a loss. |
+| Exposure | The number of bars with a position that is not 0, divided by the number of bars in the range. |
+| Turnover | The sum of the amounts of all fills (buy and sell), divided by the mean equity, divided by `years`. The page shows it as a multiple each year, for example "3.2× per year". |
+| Win rate | The share of round trips with a profit after commissions. It moves from the frontend to the backend. The profit factor and the win rate use the same round trips (`find_round_trips`). |
+
+### 10.9.3 Short data
+
+When a metric has no meaning, it shows "–". Its tooltip gives the reason.
+
+| Condition | Metrics that show "–" |
+|---|---|
+| Fewer than 2 daily returns, or a standard deviation of 0 | The ratio metrics (Sharpe ratio, Sortino ratio) |
+| The range is shorter than 90 days | CAGR and Calmar ratio |
+| The max drawdown is 0 | Calmar ratio |
+| No round trip with a loss | Profit factor |
+| Fewer than 60 daily returns | The probabilistic and the deflated Sharpe ratio (section 10.9.5), with the reason "Fewer than 60 daily returns" |
+
+Reason for 90 days: a return of 10 % in 3 months gives a CAGR of about
+46 %, which misleads. A 1-hour backtest of only the bars that a chart loads
+(about 90 days) is at this limit. To see the CAGR, the user must save
+longer bars first.
+
+### 10.9.4 In-sample and out-of-sample split
+
+- The "New backtest" form has the number input "Out-of-sample share", in %.
+  The default is 30. The range is 0 to 50. 0 means no split.
+- The out-of-sample part is the last `out_of_sample_share` percent of the
+  backtest range. The split time is the start of the out-of-sample part.
+- The start route calculates `split_time_utc`. After the start, nobody can
+  change it. To use a different share, the user starts a new backtest.
+  Reason: the user must not move the split time after the user sees the
+  result.
+- The metric functions calculate all metrics of section 10.9.2 three times:
+  for the full range ("All"), for the in-sample part, and for the
+  out-of-sample part.
+- Out-of-sample use count: ATrade counts the finished backtests of the same
+  strategy (all strategy versions), the same instrument, and the same bar
+  period. It counts only the backtests whose out-of-sample part overlaps
+  the out-of-sample part of this backtest. The count includes this
+  backtest. A count above 1 means that
+  the user saw this out-of-sample part before. ATrade does not refuse such
+  a backtest.
+- A forward test has no split.
+
+### 10.9.5 Probabilistic and deflated Sharpe ratio
+
+- The probabilistic Sharpe ratio PSR(0) is the probability that the real
+  Sharpe ratio is above 0. The deflated Sharpe ratio DSR is the PSR with a
+  threshold that grows with the trial count
+  (Bailey and López de Prado, 2012 and 2014).
+- The trial count `N` is the number of finished backtests of the same
+  strategy (all strategy versions), the same instrument, and the same bar
+  period. The time range does not matter. A change of the code and a change
+  of a parameter both count. Phase 3: each run of a parameter sweep counts.
+- ATrade calculates `N` when it reads a backtest. Thus a later backtest
+  makes the DSR of an earlier backtest lower.
+- When `N` is 1, the page shows PSR(0). When `N` is above 1, the page shows
+  the DSR.
+- The functions use the daily Sharpe ratio (not annualized) of each trial.
+  Each backtest has a saved equity curve, so the daily Sharpe ratio of each
+  trial comes from the saved data, with no new run.
+- Formulas. `SR` is the daily Sharpe ratio of this backtest. `n` is its
+  number of daily returns. `γ3` is the skewness and `γ4` the kurtosis (not
+  the excess kurtosis) of its daily returns. `Φ` is the standard normal
+  distribution.
+  - `PSR(SR*) = Φ((SR − SR*) × sqrt(n − 1) / sqrt(1 − γ3 × SR + (γ4 − 1) / 4 × SR²))`.
+  - PSR(0) uses `SR* = 0`.
+  - DSR uses `SR* = sqrt(V) × ((1 − γ) × Φ⁻¹(1 − 1 / N) + γ × Φ⁻¹(1 − 1 / (N × e)))`.
+    `V` is the variance of the daily Sharpe ratios of the `N` trials. `γ` is
+    the Euler–Mascheroni constant (about 0.5772). `V` needs at least 2
+    trials.
+- The backend has no numpy and no scipy. `statistics.NormalDist` of the
+  Python standard library has `cdf` and `inv_cdf`. These are sufficient.
+
+| Value | Status | Look |
+|---|---|---|
+| 95 % or more | "Likely real" | Green, checkmark icon |
+| 50 % to below 95 % | "Uncertain" | Yellow, warning icon |
+| Below 50 % | "Likely luck" | Red, error icon |
+| Fewer than 60 daily returns | "–" and the reason "Fewer than 60 daily returns" | No status |
+
+- 95 % is the example value of the source paper. It is strict. Most short
+  1-hour backtests show "Uncertain" or "–".
+- Not added: a Monte Carlo reorder of the round trips (it measures the path
+  risk, not overfitting), White's Reality Check, Hansen's SPA, purged
+  cross-validation, and CPCV.
+
+### 10.9.6 Display
+
+- Robustness row: under the `KeyMetricRow`, one `MetricRow` with 3
+  `MetricTile`s:
+  - "Deflated Sharpe": the percent, the status of section 10.9.5 (icon,
+    word, and color), and "<N> backtests counted".
+  - "Out-of-sample Sharpe / in-sample Sharpe": a percent.
+  - "Out-of-sample used": the count, for example "3 times". A count above 1
+    adds a warning icon.
+  - Without a split (`out_of_sample_share` 0), the row has only "Deflated
+    Sharpe".
+- Metrics tab of the "Backtest tables" panel: a Carbon data table with 32px
+  rows. The columns are Metric, All, In-sample, and Out-of-sample. Without a
+  split, the columns are Metric and All. The number columns are right
+  aligned and use tabular numbers.
+- Each metric name in the Metrics table has a tooltip with its definition
+  and "Risk-free rate: 0". A "–" value has a tooltip with its reason.
+- `EquityDrawdownChart` draws one vertical line at the split time. The two
+  parts have no names.
+- The comparison page shows a robustness row under the `KeyMetricRow` of each
+  backtest, and a Metrics table with one value column for each backtest
+  (section 10.7).
+- The page adds no other label or description (AGENTS.md, frontend rule
+  one).
+
+### 10.9.7 Left to the implementation
+
+- The English names of the new metrics in the UI. The decisions name
+  "Sharpe ratio", "Sortino ratio", "Calmar ratio", and "Profit factor" only.
+- The tile name and the tooltip when the tile shows PSR(0) (trial count 1).
+- Whether the out-of-sample share is a share of the calendar time or of the
+  bars, and how the split time aligns to a bar end.
+- Whether the backend saves the in-sample and out-of-sample metrics or
+  calculates them at each read from the saved equity curve and trades.
+- The trading day of a daily return: the UTC date or the exchange date.
+- The calendar days of `years` (from `start_utc` and `end_utc`, or from the
+  first and the last equity point), and the equity values of the mean
+  equity of the turnover.
+- The value of "Out-of-sample Sharpe / in-sample Sharpe" when the in-sample
+  Sharpe ratio is 0, below 0, or "–".
+- How the API gives the reason of a "–" value.
+- The default 30 of `out_of_sample_share` in the API when the body has no
+  such field. This is a choice of this document.
+
+## 10.10 Multi-instrument backtest
+
+Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
+[#142](https://github.com/Mano-Liaoyan/ATrade/issues/142),
+[#145](https://github.com/Mano-Liaoyan/ATrade/issues/145),
+[#146](https://github.com/Mano-Liaoyan/ATrade/issues/146). Decision record:
+[ADR 0003](../adr/0003-one-simulated-venue-per-currency.md).
+
+### 10.10.1 Decisions
+
+- A backtest can trade a universe in place of one instrument.
+- The platform gives the strategy only the universe of the current time. At
+  the start of each universe period, the platform tells the strategy the new
+  list and gives it the bars of the new members. The strategy cannot read a
+  later list. Reason: a list of all quarters in the strategy configuration
+  lets the code read future lists (look-ahead bias), and the platform cannot
+  check that.
+- The strategy code does the ranking, sets the rebalance period, and sends
+  the orders. The multi-instrument code templates show a monthly rebalance:
+  sell first, then buy after the sell orders fill
+  ([`strategy.md`](strategy.md) section 9.9.3).
+- All instruments of one currency go on one simulated venue (`SMART` for US
+  instruments). The strategy gets the instrument IDs `SYMBOL.SMART`. All
+  instruments share one cash account. The trade table records the real
+  exchange. A single-instrument backtest keeps the exchange as the venue.
+- A multi-instrument backtest has one currency. The equity curve and the
+  metrics change to USD as in section 10.8.
+- The bar period is 1 day or 1 hour. One backtest uses one bar period.
+- The child reads the bars of each instrument only for the universe periods
+  in which it is a member, plus its look-back bars.
+- The look-back length of a multi-instrument backtest on 1-day bars is
+  1 year ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146)).
+
+### 10.10.2 Universe kinds
+
+| `universe_kind` | Source | Universe period | Universe parameters |
+|---|---|---|---|
+| `single` | One instrument. The existing backtest. | None | `symbol`, `exchange`, `currency` |
+| `rule` | Point-in-time rule: the top N instruments by trading value of each quarter (`us_universe_member` with `rank` ≤ N, [`market_data.md`](market_data.md) section 8.9). N is 500 at most. US only. | Quarter | `universe_top_n` |
+| `list` | Fixed list: the watchlist, a screen result, or the selected rows of a screen result. The list does not change in the range. The form warns of survivorship bias. | The full range | The members (`backtest_universe_member` with `period_start_utc` = `start_utc`) |
+| `screen` | Point-in-time rule: at each universe period start, the platform runs a copy of the screen again on the daily bars known at that date. The result is the new list. | Quarter (default) or month | `universe_screen` (JSON copy of the screen), `universe_rebalance_period` (`quarter` or `month`) |
+
+- The backtest saves a copy of the screen. A later change of the screen does
+  not change the backtest ([#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)).
+- A `screen` backtest calculates the indicators of all instruments of the
+  base universe at each universe period start (for example 34 quarters × 500
+  instruments).
+- `backtest_universe_member` holds the members of each universe period. The
+  Instruments tab and the same-period backtest read it.
+- The same-period backtest of a multi-instrument forward test uses the
+  allocated capital as paper capital and the members that the forward test
+  recorded for each quarter
+  ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146),
+  [`forward_test.md`](forward_test.md) section 12.10).
+
+### 10.10.3 Engine facts
+
+Checked with NautilusTrader 2.0.0rc7 and synthetic bars
+([#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
+[#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)):
+
+- One `BacktestEngine` can hold many instruments. A strategy can subscribe
+  to the bars of each instrument and rank them on a timer
+  (`clock.set_timer`).
+- NautilusTrader makes one cash account for each venue. `routing=True` does
+  not merge the venues: the engine refuses an instrument whose venue was
+  not added.
+- In one multi-currency account, USD cash cannot pay for an HKD instrument.
+  The engine does not convert cash, also with a USD/HKD pair in the account.
+- A market order fills at the open of the next bar. The cash of a sell is
+  free only after its fill. A buy that the strategy sends at the same time
+  as a sell can use only the cash from before the sell.
+- One fill uses at most 1/4 of the bar volume. The engine fills the rest of
+  the order in one more fill, at a price 1 tick different. All orders end as
+  `FILLED`. Thus a test can have more trades than orders (29 trades for 23
+  orders).
+- 500 instruments × 2,500 daily bars: `run()` takes 2.45 seconds, with a
+  peak memory of about 2 GB.
+- Estimate, not checked: a universe of 500 instruments on 1-hour bars has
+  about 7.35 million bars (about 2,100 trading days × 7 bars). One run then
+  takes about 15 seconds, with a peak memory of 4 to 5 GB.
+
+### 10.10.4 Run flow changes
+
+1. `POST /api/backtests` checks the universe (section 10.10.6). For a
+   universe that is not in USD, it saves the missing exchange rates as in
+   section 10.8.
+2. The runner does not change.
+3. The child reads the saved bars of each member for its universe periods,
+   plus the look-back bars, through the source order (section 10.12).
+4. The child converts the bars of all members to Arrow bytes.
+5. The child runs the engine with one simulated venue for the currency, one
+   `CASH` account with the paper capital in that currency, one `Equity`
+   instrument for each member, `NETTING` positions, and a zero commission.
+6. The equity curve is the cash plus the value of all positions at the bar
+   close prices. The metric functions take trades of many instruments.
+7. The child writes the trades with `symbol` and the real `exchange`.
+
+### 10.10.5 Metrics
+
+- A multi-instrument backtest uses the metric functions of section 10.4 and
+  section 10.9.
+- The key metrics and the equity curve do not change.
+
+### 10.10.6 HTTP
+
+`POST /api/backtests` has the field `universe_kind`. Without it, the kind is
+`single`, and the body is the body of section 10.5.
+
+| `universe_kind` | Fields |
+|---|---|
+| `single` | `symbol`, `exchange`, `currency` |
+| `rule` | `top_n` |
+| `list` | `instruments` (`[{"symbol", "exchange", "currency"}]`), or `screen_result_id` with an optional `symbols` list (a part of that screen result) |
+| `screen` | `screen_id`, `rebalance_period` (`quarter` or `month`, default `quarter`) |
+
+`422` (no row) in these cases, in addition to the cases of section 10.5:
+
+- `universe_kind` is not a known value.
+- `top_n` is not from 1 to 500.
+- The list has no instrument, or its instruments have more than one
+  currency.
+- The bar period of a universe that is not `single` is not 1 day or 1 hour.
+- The screen or the screen result does not exist.
+- No universe data covers the range (`rule`).
+
+The field names are choices of this document. The implementation can change
+them.
+
+### 10.10.7 Frontend
+
+- The "Instrument" select of the "New backtest" form becomes "Instruments".
+  It has these options:
+  - One instrument (the existing select).
+  - Top N by trading value, with a number input for N. The form shows the
+    first and the last day with universe data.
+  - Watchlist. The form shows a survivorship bias warning.
+  - Screen ([#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)): a
+    screen and a mode. The mode is the point-in-time rerun (the default,
+    with the period Quarter or Month), or the fixed list of one screen
+    result. The fixed list shows a survivorship bias warning.
+- On the screen page, "Run backtest on this screen result" and "Run backtest
+  on selected" open the "New backtest" form with the screen filled in.
+- The backtest panel header line of a multi-instrument backtest shows the
+  universe in place of the instrument symbol, for example "Top 500 by
+  trading value" or "Watchlist (12)". Example header line:
+  "#42 Momentum v3 · Top 500 by trading value · 1 day · Finished".
+- The "Backtest tables" panel adds the tab Instruments: one row for each
+  instrument. The columns are the instrument, the trade count, the net
+  profit (USD), and the number of quarters in the universe. The number
+  columns are right aligned and use tabular numbers.
+- The Trades table adds the column Symbol.
+- The `KeyMetricRow` and the `EquityDrawdownChart` do not change.
+
+### 10.10.8 Left to the implementation
+
+- How the platform tells the strategy the new list at a universe period
+  start: NautilusTrader custom data or a platform timer. Make a small test
+  before the implementation.
+- How the strategy configuration gets the universe in place of
+  `instrument_id` and `bar_type`.
+- When the start route or the child writes `backtest_universe_member`
+  (a `screen` universe needs the daily bars of each date).
+- The decision names the member column "quarter start". This document uses
+  `period_start_utc`, because a `screen` universe can change each month.
+- The bar check of section 10.1 for a universe (all members, or one saved
+  bar of one member).
+- The look-back length of a multi-instrument backtest on 1-hour bars.
+- The maximum number of instruments of a `list` universe.
+- The header line text of a `screen` universe, and the Instruments tab
+  column for a monthly `screen` universe (quarters or months).
+- The `universe_kind` value of the same-period backtest of a
+  multi-instrument forward test.
+- How the round trips, the exposure, and the profit factor count with many
+  instruments (for example the round trips of each instrument, and the bars
+  with any position).
+- Whether `run_backtest` of the AI assistant also accepts `rule` and the
+  watchlist (section 10.13).
+
+## 10.11 Parameter sweep
+
+Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
+[#132](https://github.com/Mano-Liaoyan/ATrade/issues/132),
+[#137](https://github.com/Mano-Liaoyan/ATrade/issues/137),
+[#142](https://github.com/Mano-Liaoyan/ATrade/issues/142).
+
+### 10.11.1 Parameters
+
+- A parameter is a field of the `StrategyConfig` subclass with an `int`,
+  `float`, or `bool` type annotation and a default value. `instrument_id`,
+  `bar_type`, and the universe are not parameters.
+- ATrade reads the parameters from the `__init__` of the `StrategyConfig`
+  subclass with the Python AST. It does not import the user code (the same
+  rule as the checks before save, [`strategy.md`](strategy.md) section 9.3).
+  A field without a type annotation cannot be in a sweep.
+- For an `int` or `float` parameter, the user gives a start, an end, and a
+  step. For a `bool` parameter, the sweep uses both values.
+- ATrade makes a grid of all combinations.
+- Limits: 3 parameters at most. 200 runs at most for each sweep.
+- `parameter_grid` (JSON) holds the grid:
+  `[{"name", "type", "start", "end", "step"}]`, or
+  `{"name", "type": "bool", "values": [false, true]}` for a `bool`
+  parameter.
+- The child gives the `parameters` of a run to the strategy configuration.
+  The other fields keep their default values.
+- Each run counts in the trial count of the DSR (section 10.9.5).
+- Not in this phase: a random search or an optimizer (for example a
+  Bayesian optimizer).
+
+### 10.11.2 Runs and the backtest limits
+
+- Each combination is one `backtest` row with `sweep_id` and `parameters`.
+  It waits in the same queue as other backtests.
+- Each run has its own child process and its own timeout. The sweep has no
+  timeout of its own. The concurrency of the backtest limits applies.
+- The user can cancel a sweep. The queued runs get the status `cancelled`.
+- A run opens on the backtest page like any other backtest.
+- Cost, measured on 2026-10-29 with synthetic daily bars, a rotation
+  strategy, and one `SMART` venue
+  ([#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)):
+
+| Instruments × bars × runs | One engine with `reset()` | One child for each run | Peak memory |
+|---|---|---|---|
+| 50 × 1,000 × 20 | 1.98 s (0.094 s each run) | 5.43 s (0.272 s each run) | 324 MB / 302 MB |
+| 500 × 2,500 × 5 | 13.37 s (2.40 s each run) | 19.57 s (3.91 s each run) | 1,696 MB / 1,986 MB |
+| 500 × 10,000 × 1 | 10.0 s | — | 3,274 MB |
+
+- Both methods give the same result for each run. ATrade uses one child for
+  each run. A sweep of 200 runs on the daily bars of 500 instruments takes
+  about 13 minutes with concurrency 1 (estimate).
+- `BacktestNode` of NautilusTrader 2.0.0rc7 accepts only 1 run
+  configuration. It cannot run a sweep.
+
+### 10.11.3 HTTP routes
+
+| Route | Behavior |
+|---|---|
+| `GET /api/sweeps/parameters?strategy_version_id=<id>` | `200` with `{"parameters": [{"name", "type", "default"}]}`, the parameters of section 10.11.1. `404` when the strategy version does not exist. |
+| `POST /api/sweeps` | Body: the fields of `POST /api/backtests` (strategy version, universe, bar period, range, `paper_capital_usd`, `out_of_sample_share`) and `parameters` (the grid of section 10.11.1). `201` with the sweep. The route queues all runs. `422` (no row) in these cases: a backtest field has an error (the cases of `POST /api/backtests`). The grid has no parameter or more than 3. A name is not a parameter of the strategy version. A step is not above 0. An end is before its start. The grid has more than 200 runs. |
+| `GET /api/sweeps` | `200` with all sweeps, the newest first. Each sweep has `id`, the strategy version fields, the universe, the bar period, the range, `run_count`, and the number of runs in each status. |
+| `GET /api/sweeps/{sweep_id}` | `200` with the sweep and `runs` (`[{"backtest_id", "parameters", "status", "metrics"}]`). `404` when the sweep does not exist. |
+| `POST /api/sweeps/{sweep_id}/cancel` | `200` with the sweep. The queued runs get `cancelled`. `404` when the sweep does not exist. |
+
+- `strategy` exports the function that reads the parameters with the AST.
+  `backtest` already imports `strategy`.
+- The AI assistant port does not allow these routes
+  ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)).
+- The route paths and the JSON names are choices of this document. The
+  implementation can change them.
+
+### 10.11.4 Sweep page
+
+`/sweeps/<id>` is the sweep workbench. It has the layout of the backtest page.
+Most products with parameter optimization (QuantConnect, MetaTrader 5,
+NinjaTrader 8) show the result in a separate view with a sorted result table
+and a parameter chart. ATrade uses a heat map, not a 3D chart, because a 3D
+chart is hard to read on flat Carbon surfaces.
+
+- The "Parameter sweeps" `SideColumn` has the "New parameter sweep" icon
+  button and the sweep list. Each row has the number, the strategy version,
+  the status, and the finished runs / all runs.
+- Top panel:
+  - A status line with the number of finished, failed, running, and queued
+    runs.
+  - With 1 parameter: a point chart. With 2 or 3 parameters: a heat map.
+  - A "Metric" select. The default is Total return. With 3 parameters, a
+    second select chooses the value of the third parameter.
+  - Each heat map cell shows its value as text. The cell color is a Carbon
+    sequential color.
+- Bottom panel "Runs": one row for each run. The columns are the parameter
+  values and the key metrics. The user can sort each column. A click on a
+  row opens its backtest.
+- The backtest list does not show sweep runs by default. The backtest panel
+  header line of a sweep run has a link to its sweep.
+- The "New parameter sweep" dialog has the fields of the "New backtest"
+  form. It also has one row for each parameter. A row has the name, the
+  default value, a check box that adds the parameter to the sweep, and the
+  start, end, and step inputs. The dialog
+  shows the run count while the user types. When the grid has more than 200
+  runs or more than 3 parameters, "Start parameter sweep" is disabled, and
+  the dialog says why.
+- Prototype: a heat map of 8 × 12 cells for `roc_period` (5 to 40) and
+  `rebalance_days` (5 to 60), and the Runs table sorted by Total return,
+  highest first.
+- The page adds no other label or description (AGENTS.md, frontend rule
+  one).
+
+### 10.11.5 Robustness checks of a sweep
+
+These checks come with the parameter sweep
+([#132](https://github.com/Mano-Liaoyan/ATrade/issues/132),
+[#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)):
+
+- Parameter sensitivity: the point chart and the heat map of section
+  10.11.4. They show if the near parameter values give similar results.
+- Walk-forward check.
+- Probability of backtest overfitting (PBO), with combinatorially symmetric
+  cross-validation (CSCV).
+
+Each run has a saved equity curve, so these checks can use the daily
+returns of all runs of a sweep.
+
+### 10.11.6 Left to the implementation
+
+- The method, the windows, and the display of the walk-forward check.
+- The partitions, the input, and the display of the PBO.
+- What happens to a running run when the user cancels its sweep, and the
+  status of a sweep.
+- The header link to `/sweeps`, and the page that `/sweeps` without an ID
+  opens.
+- The chart library of the point chart and the heat map.
+- The grid values of a `float` step that does not divide the range.
+- How the backtest list shows sweep runs when the user asks for them.
+- Whether a sweep has an out-of-sample share (this document adds it to
+  `parameter_sweep`).
+
+## 10.12 Bar sources and survivorship bias
+
+Phase 3. Sources: [#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
+[ADR 0002](../adr/0002-one-bar-table-per-bar-source.md),
+[`market_data.md`](market_data.md) section 8.7.
+
+- The child reads the bars and the look-back bars through a source order.
+  By default, it is the global source order. The "New backtest" form can
+  change it for one backtest.
+- For each time range, the first bar source in the source order that saved
+  the range gives all bars of the range. Another bar source does not fill a
+  holiday.
+- Each backtest saves the source order that it used (`source_order`) and
+  the bar count of each bar source (`bar_count_by_source`). The backtest
+  page shows both.
+- The backtest page shows a survivorship bias warning for these backtests:
+  - an HK backtest,
+  - a US backtest that starts before 2018-05-01 (the start of the Databento
+    history).
+- The warning text is "The universe has survivorship bias: instruments that
+  stopped trading are missing." It is a Carbon warning with an icon.
+- Left to the implementation: where the backtest page shows the source
+  order and the bar counts, and whether a `list` universe also shows the
+  warning on the backtest page. The English warning text is a translation
+  of the decided Chinese text.
+
+## 10.13 Backtests of the AI assistant
+
+Sources: [#140](https://github.com/Mano-Liaoyan/ATrade/issues/140),
+[#150](https://github.com/Mano-Liaoyan/ATrade/issues/150).
+
+Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
+
+- The AI assistant tool `run_backtest` calls `POST /api/backtests` on the
+  assistant port.
+- `run_backtest` waits at most 15 minutes after it queues the backtest, and
+  sends the status while it waits. After 15 minutes, it returns "still
+  running" and the backtest ID. The AI assistant reads the result later
+  with `read_backtest`.
+- The backtests of the AI assistant and of the user share one queue and one
+  set of backtest limits.
+- The AI assistant can run a backtest only on instruments and bar periods
+  with saved bars. It cannot load bars.
+- Each user message can start 5 backtests at most. At the limit, the tool
+  returns an error, and the AI assistant must ask the user first.
+- A backtest that the AI assistant starts records the conversation ID. When
+  the user deletes the conversation, the ID becomes null. The backtest stays.
+- The AI assistant cannot change the backtest limits and cannot start a
+  parameter sweep.
+
+Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
+
+- `run_backtest` accepts 2 kinds of universe from a screen. The default is
+  the point-in-time rerun:
+  - Point-in-time rerun: a screen ID and the rebalance period (quarter or
+    month). `universe_kind` is `screen`.
+  - Fixed list: a screen result ID, and optionally a part of its
+    instruments. `universe_kind` is `list`. The tool result has a
+    survivorship bias warning. The AI assistant must write this warning in
+    its reply.
+- One multi-instrument backtest counts as 1 of the 5 backtests of a user
+  message. The 15-minute wait does not change.
