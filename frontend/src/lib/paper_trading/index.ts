@@ -18,4 +18,4 @@ export {
 } from './paper_account';
 export type { BalanceMetric, PaperAccountBalance, PaperAccountCheck, PaperAccountMessage, PaperPosition } from './paper_account';
 export { readPaperCapital } from './paper_capital';
-export type { BlockingForwardTest, ManualOrder, OpenOrder, OrderForm, OrderSource, SendOrderRequest } from './paper_orders';
+export type { ManualOrder, OpenOrder, OrderForm, OrderSource, SendOrderRequest } from './paper_orders';

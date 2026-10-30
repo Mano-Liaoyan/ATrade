@@ -28,9 +28,7 @@ from atrade.forward_test.forward_test_worker import (
 )
 from atrade.forward_test.http_routes import (
     FORWARD_TEST_SOCKET_MESSAGE_MODELS,
-    ForwardTestOnInstrument,
     create_forward_test_router,
-    find_forward_test_on_instrument,
 )
 from atrade.forward_test.live_node_run import GatewayWatch, run_live_node
 from atrade.forward_test.owner_ledger import OwnerFill, OwnerLedger, OwnerOrder, OwnerPosition
@@ -53,7 +51,6 @@ __all__ = [
     "BarStoreInput",
     "ChildMode",
     "ForwardTestChild",
-    "ForwardTestOnInstrument",
     "ForwardTestRecorder",
     "ForwardTestWorker",
     "GatewayWatch",
@@ -75,7 +72,6 @@ __all__ = [
     "add_atrade_clients",
     "create_forward_test_comparison_router",
     "create_forward_test_router",
-    "find_forward_test_on_instrument",
     "run_forward_test_child",
     "run_live_node",
 ]

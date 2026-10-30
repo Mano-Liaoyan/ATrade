@@ -98,6 +98,16 @@ async def start_forward_test(web_client: httpx.AsyncClient) -> JsonObject:
     return (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
 
 
+async def start_old_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
+    """A forward test from the time before the allocated capital: its equity starts at the start balance."""
+    forward_test = await start_forward_test(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE forward_test SET allocated_capital_usd = NULL WHERE id = %(id)s", {"id": forward_test["id"]}
+        )
+    return forward_test
+
+
 @dataclass(frozen=True)
 class ChildRunOptions:
     # IB Gateway is not reachable for this number of connections.
@@ -163,14 +173,14 @@ async def test_checks_the_paper_account_then_runs_the_live_node_with_the_same_cl
     assert live_node_input.order_id_tag == f"FT{forward_test['id']}"
     assert live_node_input.instrument.symbol == "AAPL"
     assert "class BarCountStrategy" in live_node_input.strategy_code
-    # The recorder DataActor of the LiveNode writes the records with the balance at the start (section 12.8).
+    # The recorder DataActor of the LiveNode starts the equity at the allocated capital (section 12.8).
     assert live_node_input.database_url == database_url
-    assert live_node_input.start_balance_usd == Decimal("98765.40")
+    assert live_node_input.start_balance_usd == Decimal(10000)
     # The check connection closes before the LiveNode connects with the same client ID.
     assert not live_node.was_check_connection_open_at_start
     assert opened_client_ids == [10, 10]
     listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["start_balance_usd"] == "98765.40"
+    assert listed["start_balance_usd"] is None
 
 
 @pytest.mark.anyio
@@ -286,7 +296,7 @@ async def test_a_failed_paper_account_check_starts_no_live_node(
 async def test_a_paper_account_without_a_usd_balance_starts_no_live_node(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
-    forward_test = await start_forward_test(web_client)
+    forward_test = await start_old_forward_test(web_client, database_url)
     gateway_connection = make_forward_test_gateway()
     gateway_connection.account_values = []
     live_node = FakeLiveNode(gateway_connection)
@@ -315,7 +325,7 @@ def make_eur_account_values() -> list[AccountValue]:
 async def test_a_eur_paper_account_starts_with_the_balance_converted_to_usd(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
-    forward_test = await start_forward_test(web_client)
+    forward_test = await start_old_forward_test(web_client, database_url)
     gateway_connection = make_forward_test_gateway()
     gateway_connection.account_values = make_eur_account_values()
     gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
@@ -336,7 +346,7 @@ async def test_a_eur_paper_account_starts_with_the_balance_converted_to_usd(
 async def test_a_eur_paper_account_without_an_exchange_rate_starts_no_live_node(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
-    forward_test = await start_forward_test(web_client)
+    forward_test = await start_old_forward_test(web_client, database_url)
     gateway_connection = make_forward_test_gateway()
     gateway_connection.account_values = make_eur_account_values()
     gateway_connection.exchange_rate_error_message = "No market data permissions."

@@ -35,11 +35,11 @@ async def start_forward_test(web_client: httpx.AsyncClient, *, currency: str = "
 
 
 def write_forward_test_end(database_url: str, forward_test_id: int, *, is_stopped: bool = True) -> None:
-    """The child writes the start balance. The worker writes the stop (test_forward_test_worker.py)."""
+    """The worker writes the stop (test_forward_test_worker.py). The allocated capital of the start is 10000."""
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            UPDATE forward_test SET start_balance_usd = 10000, status = %(status)s, desired_state = %(desired_state)s,
+            UPDATE forward_test SET status = %(status)s, desired_state = %(desired_state)s,
                 client_id = %(client_id)s, stopped_at_utc = %(stopped_at_utc)s
             WHERE id = %(id)s
             """,
@@ -54,29 +54,33 @@ def write_forward_test_end(database_url: str, forward_test_id: int, *, is_stoppe
 
 
 def write_forward_test_records(database_url: str, forward_test_id: int) -> None:
-    """Rows like the DataActor writes them, and an interruption like the worker writes it (section 12.7). No equity
-    point at 03:07 and 03:08: the LiveNode did not run."""
+    """Fills like the ATrade execution client writes them into the owner ledger, equity points like the DataActor
+    writes them, and an interruption like the worker writes it (section 12.7). No equity point at 03:07 and 03:08:
+    the LiveNode did not run."""
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
-                commission_usd)
-            VALUES (%(id)s, %(trade_id)s, %(time_utc)s, %(side)s, 10, %(price_usd)s, 1)
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD',
+                %(quantity_change)s, %(price)s, 1, %(cash_change)s, %(execution_id)s, 1)
             """,
             [
                 {
                     "id": forward_test_id,
-                    "trade_id": "T-1",
+                    "execution_id": f"E-{forward_test_id}-1",
                     "time_utc": make_minute(5, 2),
-                    "side": "BUY",
-                    "price_usd": "100.05",
+                    "quantity_change": 10,
+                    "price": "100.05",
+                    "cash_change": "-1001.5",
                 },
                 {
                     "id": forward_test_id,
-                    "trade_id": "T-2",
+                    "execution_id": f"E-{forward_test_id}-2",
                     "time_utc": make_minute(9, 1),
-                    "side": "SELL",
-                    "price_usd": "101.00",
+                    "quantity_change": -10,
+                    "price": "101.00",
+                    "cash_change": "1009",
                 },
             ],
         )
@@ -171,8 +175,15 @@ async def test_the_same_period_backtest_of_a_running_forward_test_ends_now(
 
 
 @pytest.mark.anyio
-async def test_the_same_period_backtest_is_refused_without_a_start_balance(web_client: httpx.AsyncClient) -> None:
+async def test_the_same_period_backtest_of_an_old_forward_test_is_refused_without_a_start_balance(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
     forward_test = await start_forward_test(web_client)
+    # A forward test from the time before the allocated capital uses its start balance (section 12.24).
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE forward_test SET allocated_capital_usd = NULL WHERE id = %(id)s", {"id": forward_test["id"]}
+        )
 
     response = await start_same_period_backtest(web_client, forward_test["id"])
 
@@ -366,6 +377,8 @@ async def test_the_forward_test_page_has_the_records_and_links_each_same_period_
     assert detail["metrics"]["trade_count"] == 2
     assert [point["equity_usd"] for point in detail["equity_curve"]] == ["10000", "10010", "10020", "10006"]
     assert detail["fills"][0] == {
+        "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "time_utc": "2026-01-02T03:05:02Z",
         "side": "BUY",
         "quantity_shares": "10",
@@ -385,12 +398,8 @@ async def test_a_new_forward_test_page_has_no_records_and_no_backtests(web_clien
 
     detail = (await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")).json()
 
-    assert (detail["metrics"], detail["equity_curve"], detail["fills"], detail["same_period_backtests"]) == (
-        None,
-        [],
-        [],
-        [],
-    )
+    assert detail["metrics"]["trade_count"] == 0
+    assert (detail["equity_curve"], detail["fills"], detail["same_period_backtests"]) == ([], [], [])
 
 
 @pytest.mark.anyio

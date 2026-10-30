@@ -99,7 +99,7 @@ async def write_error_message(job: ChildJob, error_message: str) -> None:
 @dataclass(frozen=True)
 class CheckedAccount:
     account_id: str
-    # The first start balance of the forward test. A restart keeps it (section 12.1).
+    # The start of the equity: the allocated capital, or the first start balance of an old forward test.
     start_balance_usd: Decimal
     warm_up_bars: tuple[Bar, ...]
 
@@ -177,6 +177,12 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         warm_up_bars = await read_warm_up_bars(job, gateway_connection)
     finally:
         gateway_connection.disconnect()
+    if job.row.allocated_capital_usd is not None:
+        # The equity starts at the allocated capital (section 12.8). The child does not need NetLiquidation.
+        return CheckedAccount(
+            account_id=account_id, start_balance_usd=job.row.allocated_capital_usd, warm_up_bars=warm_up_bars
+        )
+    # A forward test from the time before the allocated capital keeps its first start balance (section 12.24).
     start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
     if start_balance_usd is None:
         # The equity of the records starts at the balance (section 12.8). This child sent no order.

@@ -13,10 +13,11 @@ import pytest
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection
+from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values
 
 TEST_STRATEGY_FILE = Path(__file__).parents[1] / "backtest" / "strategies" / "buy_and_sell_by_bar_count.py"
 FORWARD_TESTS_PATH = "/api/forward-tests"
+FAKE_ACCOUNT_ID = "DU1234567"
 
 type JsonObject = dict[str, Any]
 
@@ -29,14 +30,26 @@ async def save_test_strategy_version(web_client: httpx.AsyncClient) -> int:
     return version["id"]
 
 
-def make_start_request(strategy_version_id: int, *, symbol: str = "AAPL") -> JsonObject:
+def make_start_request(
+    strategy_version_id: int, *, symbol: str = "AAPL", allocated_capital_usd: str = "10000"
+) -> JsonObject:
     return {
         "strategy_version_id": strategy_version_id,
         "symbol": symbol,
         "exchange": "NASDAQ",
         "currency": "USD",
         "bar_period": "1-MINUTE",
+        "allocated_capital_usd": allocated_capital_usd,
     }
+
+
+def make_paper_gateway(net_liquidation_usd: str = "100000") -> FakeGatewayConnection:
+    gateway_connection = FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID])
+    gateway_connection.connected = True
+    gateway_connection.account_values = make_balance_values(
+        FAKE_ACCOUNT_ID, net_liquidation_usd=net_liquidation_usd, cash_usd=net_liquidation_usd
+    )
+    return gateway_connection
 
 
 @pytest.mark.anyio
@@ -56,6 +69,7 @@ async def test_starts_a_forward_test_with_the_lowest_free_client_id(web_client: 
     assert forward_test["status"] == "starting"
     assert forward_test["client_id"] == 10
     assert forward_test["start_balance_usd"] is None
+    assert forward_test["allocated_capital_usd"] == "10000"
     assert forward_test["created_at_utc"] == "2026-01-02T03:04:05Z"
 
 
@@ -119,21 +133,104 @@ async def test_refuses_start_when_no_client_id_is_free(web_client: httpx.AsyncCl
     response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol="AMD"))
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "limit of running forward tests reached", "forward_test_id": None}
+    assert response.json() == {"detail": "limit of running forward tests reached", "forward_test_id": None, "unallocated_usd": None}
 
 
 @pytest.mark.anyio
-async def test_refuses_a_second_forward_test_on_the_same_instrument(web_client: httpx.AsyncClient) -> None:
+async def test_two_forward_tests_can_run_on_the_same_instrument(web_client: httpx.AsyncClient) -> None:
     strategy_version_id = await save_test_strategy_version(web_client)
-    first = (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
+    first = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
 
-    response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+    second = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+
+    assert (first.status_code, second.status_code) == (201, 201)
+    assert (first.json()["client_id"], second.json()["client_id"]) == (10, 11)
+
+
+@pytest.mark.anyio
+async def test_refuses_an_allocated_capital_larger_than_the_unallocated_amount(
+    web_client: httpx.AsyncClient,
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd="78750")
+    )
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd="30000")
+    )
 
     assert response.status_code == 409
     assert response.json() == {
-        "detail": f"Forward test {first['id']} (Bar count v2) already runs on AAPL / NASDAQ.",
-        "forward_test_id": first["id"],
+        "detail": "The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD.",
+        "forward_test_id": None,
+        "unallocated_usd": "21250",
     }
+
+
+@pytest.mark.parametrize("allocated_capital_usd", ["0", "-5"])
+@pytest.mark.anyio
+async def test_refuses_an_allocated_capital_that_is_not_larger_than_0(
+    web_client: httpx.AsyncClient, allocated_capital_usd: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd=allocated_capital_usd)
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_the_capital_route_gives_the_allocated_and_the_unallocated_amounts(
+    web_client: httpx.AsyncClient,
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd="30000")
+    )
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/capital")
+
+    assert response.status_code == 200
+    assert response.json() == {"net_liquidation_usd": "100000", "allocated_usd": "30000", "unallocated_usd": "70000"}
+
+
+@pytest.mark.anyio
+async def test_without_a_passed_check_the_capital_is_unknown_and_the_start_is_refused(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir)
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=make_paper_gateway())
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        strategy_version_id = await save_test_strategy_version(client)
+        capital = await client.get(f"{FORWARD_TESTS_PATH}/capital")
+        start = await client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+
+    assert capital.json() == {"net_liquidation_usd": None, "allocated_usd": None, "unallocated_usd": None}
+    assert start.status_code == 409
+    assert start.json()["detail"].startswith("The paper account check failed:")
+
+
+@pytest.mark.anyio
+async def test_refuses_the_start_without_a_net_liquidation_value_in_usd(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    settings = Settings(
+        database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
+    )
+    gateway_connection = make_paper_gateway()
+    gateway_connection.account_values = []
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        strategy_version_id = await save_test_strategy_version(client)
+        capital = await client.get(f"{FORWARD_TESTS_PATH}/capital")
+        start = await client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+
+    assert capital.json() == {"net_liquidation_usd": None, "allocated_usd": None, "unallocated_usd": None}
+    assert start.status_code == 409
+    assert start.json()["detail"].startswith("The paper account has no NetLiquidation value in USD.")
 
 
 @pytest.mark.anyio
@@ -183,10 +280,11 @@ async def test_uses_the_client_id_range_of_the_settings(
     settings = Settings(
         database_url=database_url,
         frontend_build_dir=frontend_build_dir,
+        ibkr_account_id=FAKE_ACCOUNT_ID,
         forward_test_client_id_first=21,
         forward_test_client_id_last=21,
     )
-    app = create_web_app(settings=settings, clock=clock, gateway_connection=FakeGatewayConnection(managed_accounts=[]))
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=make_paper_gateway())
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         strategy_version_id = await save_test_strategy_version(client)
         first = await client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol="AAPL"))

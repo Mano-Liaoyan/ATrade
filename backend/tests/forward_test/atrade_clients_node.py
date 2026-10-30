@@ -21,6 +21,7 @@ from nautilus_trader.trading import Strategy
 from atrade.forward_test import (
     BarStoreDataClientFactory,
     BarStoreInput,
+    OwnerLedger,
     OwnerLedgerExecutionClientFactory,
     OwnerLedgerInput,
     add_atrade_clients,
@@ -29,6 +30,8 @@ from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import format_forward_test_order_tag
 from atrade.market_data import BarRequest, save_received_bars
+from atrade.paper_trading import ForwardTestLedger
+from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
 from tests.fakes.owner_ledger import FakeOwnerLedger
 
@@ -93,10 +96,10 @@ class BuyOnceStrategy(Strategy):
 
 
 @dataclass
-class ClientsWorld:
+class ClientsWorld[LedgerT: OwnerLedger = FakeOwnerLedger]:
     database_url: str
     gateway: FakeGatewayConnection
-    ledger: FakeOwnerLedger
+    ledger: LedgerT
     data_factories: list[BarStoreDataClientFactory] = field(default_factory=list)
 
 
@@ -105,7 +108,22 @@ def make_world(database_url: str) -> ClientsWorld:
     return ClientsWorld(database_url, gateway, FakeOwnerLedger(cash_usd=Decimal(10000)))
 
 
-def build_node(world: ClientsWorld, run_number: int) -> tuple[LiveNodeBuilder, BarStoreDataClientFactory]:
+def make_world_with_owner_ledger(database_url: str) -> ClientsWorld[ForwardTestLedger]:
+    """The real owner ledger of `paper_trading` in PostgreSQL, with the IBKR fake (section 12.19)."""
+    gateway = FakeGatewayConnection(managed_accounts=[ACCOUNT_ID], client_id=CLIENT_ID)
+    ledger = ForwardTestLedger(
+        database_url=database_url,
+        account=ACCOUNT_ID,
+        forward_test_id=FORWARD_TEST_ID,
+        gateway_connection=gateway,
+        clock=FixedClock(datetime.now(UTC)),
+    )
+    return ClientsWorld(database_url, gateway, ledger)
+
+
+def build_node[LedgerT: OwnerLedger](
+    world: ClientsWorld[LedgerT], run_number: int
+) -> tuple[LiveNodeBuilder, BarStoreDataClientFactory]:
     """The strategy sets `external_order_instrument_ids` (section 12.7 Phase 3). A test without them shows that the
     restored position then belongs to `EXTERNAL`."""
     config = LiveNodeConfig(
@@ -148,8 +166,8 @@ async def wait_until(condition: Callable[[], bool]) -> None:
 
 
 @asynccontextmanager
-async def run_node(
-    world: ClientsWorld, strategy: BuyOnceStrategy, run_number: int
+async def run_node[LedgerT: OwnerLedger](
+    world: ClientsWorld[LedgerT], strategy: BuyOnceStrategy, run_number: int
 ) -> AsyncGenerator[BarStoreDataClientFactory]:
     builder, data_factory = build_node(world, run_number)
     live_node = builder.build()
@@ -180,7 +198,9 @@ def today_start_utc() -> datetime:
     return floor_to_bar_start(datetime.now(UTC), BarPeriod.ONE_DAY)
 
 
-async def send_today_bar(world: ClientsWorld, data_factory: BarStoreDataClientFactory, close: str) -> None:
+async def send_today_bar[LedgerT: OwnerLedger](
+    world: ClientsWorld[LedgerT], data_factory: BarStoreDataClientFactory, close: str
+) -> None:
     """Saves the bar of today, like the bar fetcher, and sends it to the strategy (section 12.24)."""
     await save_day_bars(world.database_url, [make_day_bar(today_start_utc(), close)])
     assert data_factory.client is not None
