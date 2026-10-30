@@ -485,6 +485,123 @@
         }
       }
     },
+    "/api/market-data/hk-instrument-list": {
+      "get": {
+        "summary": "List Instruments",
+        "operationId": "list_instruments_api_market_data_hk_instrument_list_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Instruments",
+        "description": "Checks all new symbols through IBKR first. On a 502 or 503, the list does not change.",
+        "operationId": "add_instruments_api_market_data_hk_instrument_list_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddHkInstrumentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddHkInstrumentsResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/hk-instrument-list/{member_id}": {
+      "delete": {
+        "summary": "Delete Instrument",
+        "operationId": "delete_instrument_api_market_data_hk_instrument_list__member_id__delete",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Member Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies": {
       "get": {
         "summary": "List Strategies",
@@ -1391,6 +1508,58 @@
           "logout_url"
         ],
         "title": "AccessSessionResponse"
+      },
+      "AddHkInstrumentsRequest": {
+        "properties": {
+          "symbols": {
+            "items": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Symbols"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbols"
+        ],
+        "title": "AddHkInstrumentsRequest"
+      },
+      "AddHkInstrumentsResponse": {
+        "properties": {
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "not_found": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Found"
+          },
+          "already_in_list": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Already In List"
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "not_found",
+          "already_in_list"
+        ],
+        "title": "AddHkInstrumentsResponse",
+        "description": "The pasted symbols in their order. A symbol that is pasted 2 times is in already_in_list the second time."
       },
       "AddInstrumentRequest": {
         "properties": {
@@ -2662,6 +2831,69 @@
           "time_utc"
         ],
         "title": "HealthResponse"
+      },
+      "HkInstrumentListErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "HkInstrumentListErrorResponse"
+      },
+      "HkInstrumentListResponse": {
+        "properties": {
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/HkInstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instruments"
+        ],
+        "title": "HkInstrumentListResponse"
+      },
+      "HkInstrumentResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "added_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "currency",
+          "added_at_utc"
+        ],
+        "title": "HkInstrumentResponse"
       },
       "InstrumentResponse": {
         "properties": {
