@@ -1677,9 +1677,17 @@ option and records it in this document.
   23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#170): the exposure of a forward test counts its recorded equity
+  points (one at each bar end) as its bars. The recorded fills go to
+  `find_round_trips` with no change, because `select_fills` already gives
+  `BacktestTrade` rows. The metrics of the forward test routes have
+  `net_profit_usd` (forward test section 12.10).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1701,6 +1709,16 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#188): a source order holds each `BarSource` exactly 1 time.
+  `PUT /api/market-data/source-order` refuses an order that leaves out a bar
+  source with `422`. Thus the bars route always reads the IBKR bars that it
+  saves in `ibkr_bar` (`docs/architecture/market_data.md` section 8.14).
+- Decided (#188): saved bars come only from the saved ranges. A bar in a bar
+  table outside every saved range of its bar source is not read. Tests that
+  insert bars directly also insert a saved range (`tests/saved_ranges.py`).
+- Decided (#188): the watchlist `saved_bars` items keep the first and the
+  last bar start of each bar table. The backtest form shows, for one bar
+  period, the earliest first bar and the latest last bar of all bar sources.
 - Decided (#194): the HK instrument list editor is on the settings page
   `/settings` (section 13). #194 made this page. The source order slice
   (#189) adds its "Source order" section to the same page.
@@ -1731,6 +1749,11 @@ option and records it in this document.
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#214): the owner ledger of "By hand" (the ledger start at the
+  first passed check, the cash of rule 2, the price of a market buy, the
+  USD conversion, and when the Web process records fills) is in
+  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
+  11.13.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

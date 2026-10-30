@@ -11,12 +11,14 @@ import httpx
 import psycopg
 import pytest
 
+from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
 from tests.forward_test.test_forward_test_routes import (
     FORWARD_TESTS_PATH,
     make_start_request,
     save_test_strategy_version,
 )
+from tests.saved_ranges import save_ibkr_saved_range
 
 type JsonObject = dict[str, Any]
 
@@ -223,13 +225,29 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
     assert comparison["backtest"]["id"] == backtest_id
     assert comparison["backtest"]["status"] == "finished"
     # The metric functions of backtest: 10000 -> 10006, the peak 10020 falls to 10006 (0.1397 %).
-    assert comparison["forward_test_metrics"] == {
+    # The other metrics: test_forward_test_metrics.py.
+    forward_test_metrics = comparison["forward_test_metrics"]
+    assert {
+        name: forward_test_metrics[name]
+        for name in (
+            "final_equity_usd",
+            "net_profit_usd",
+            "total_return_percent",
+            "max_drawdown_percent",
+            "trade_count",
+        )
+    } == {
         "final_equity_usd": "10006",
+        "net_profit_usd": "6",
         "total_return_percent": "0.06",
         "max_drawdown_percent": "0.14",
         "trade_count": 2,
     }
-    assert comparison["backtest"]["metrics"]["trade_count"] == 3
+    # The Net profit of the backtest uses its paper capital: 10050 - 10000.
+    assert (comparison["backtest"]["metrics"]["trade_count"], comparison["backtest"]["metrics"]["net_profit_usd"]) == (
+        3,
+        "50",
+    )
     assert [point["time_utc"] for point in comparison["forward_test_equity_curve"]] == [
         "2026-01-02T03:05:00Z",
         "2026-01-02T03:06:00Z",
@@ -317,11 +335,12 @@ async def test_a_backtest_of_another_instrument_is_refused(web_client: httpx.Asy
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('MSFT', 'NASDAQ', 'USD', '1-MINUTE', %(start_utc)s, 100, 101, 99, 100, 1000)
             """,
             {"start_utc": make_minute(5)},
         )
+        save_ibkr_saved_range(connection, Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD"), "1-MINUTE")
     other_backtest = await web_client.post(
         "/api/backtests",
         json={

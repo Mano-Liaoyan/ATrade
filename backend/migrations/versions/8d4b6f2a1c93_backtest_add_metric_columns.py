@@ -1,13 +1,13 @@
 """backtest: add the metric columns of docs/architecture/backtest.md section 10.9.2
 
 Revision ID: 8d4b6f2a1c93
-Revises: 6c3e9a1f2b80
+Revises: 8d4b1e7c2a90
 """
 
 from alembic import op
 
 revision = "8d4b6f2a1c93"
-down_revision = "6c3e9a1f2b80"
+down_revision = "8d4b1e7c2a90"
 
 
 def upgrade() -> None:
