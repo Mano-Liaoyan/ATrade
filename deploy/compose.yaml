@@ -61,6 +61,8 @@ services:
       ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
       ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
       ATRADE_LOCAL_PAPER_CAPITAL_USD: ${ATRADE_LOCAL_PAPER_CAPITAL_USD:-100000}
+      # The Databento import program runs in this service with "docker compose run" (README.md).
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

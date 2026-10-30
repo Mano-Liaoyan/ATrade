@@ -181,7 +181,7 @@ async def select_saved_ranges(
 
 
 # One statement for all bars of a range: a row-by-row insert of a few thousand bars took seconds on a loaded host.
-# Only IBKR bars are saved here: the bars route, forward tests, and the other IBKR readers write ibkr_bar.
+# The bars route, forward tests, and the other IBKR readers write ibkr_bar. The Databento import has its own SQL.
 INSERT_BARS_QUERY = sql.SQL("""
     INSERT INTO {bar_table} (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
     SELECT %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, new_bar.*
@@ -195,7 +195,7 @@ INSERT_BARS_QUERY = sql.SQL("""
 """).format(bar_table=bar_table(BarSource.IBKR))
 
 # Join the new range with each saved range that overlaps or touches it, so the table stays small.
-JOIN_SAVED_RANGE_QUERY = sql.SQL("""
+JOIN_SAVED_RANGE_TEMPLATE = sql.SQL("""
     WITH joined AS (
         DELETE FROM {saved_range_table}
         WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
@@ -206,7 +206,8 @@ JOIN_SAVED_RANGE_QUERY = sql.SQL("""
     SELECT %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s,
         least(%(start_utc)s, min(joined.start_utc)), greatest(%(end_utc)s, max(joined.end_utc))
     FROM joined
-""").format(saved_range_table=saved_range_table(BarSource.IBKR))
+""")
+JOIN_SAVED_RANGE_QUERY = JOIN_SAVED_RANGE_TEMPLATE.format(saved_range_table=saved_range_table(BarSource.IBKR))
 
 
 def create_bars_parameters(key_parameters: dict[str, str], bars: list[Bar]) -> dict[str, object]:
