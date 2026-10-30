@@ -143,7 +143,7 @@ New columns are null on existing rows, except where a default is given.
 
 | Phase | Table | Change |
 |---|---|---|
-| 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). |
+| 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). Migration `8d4b6f2a1c93_backtest_add_metric_columns.py`. |
 | 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. |
 | 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2, `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
@@ -284,11 +284,12 @@ use the same functions for the comparison (section 12.10).
 | `EquityPoint` | `time_utc`, `equity_usd`. |
 | `calculate_equity_curve(*, start_cash, bars, bar_period, trades)` | One point at the end of each bar: the cash plus the position at the bar close price. A trade counts in the first point at or after its time. `start_cash`, the trades, and the bars are in one currency, and the points are in that currency. |
 | `calculate_metrics(*, paper_capital_usd, equity_curve, trade_count)` | `BacktestMetrics`: `final_equity_usd`, `total_return_percent`, `max_drawdown_percent` (the largest fall from a peak, as a percent of the peak; the paper capital is the first peak), and `trade_count`. Percents have 2 decimal places. |
-| Phase 1: `calculate_daily_returns(*, start_capital_usd, equity_curve)` | The daily returns of section 10.9.1. |
-| Phase 1: `find_round_trips(trades)` | The round trips of a test, with the profit after commissions and the entry amount of each. The win rate, the profit factor, the average win, and the average loss use it. |
-| Phase 1: `calculate_metrics` | Also gives the metrics of section 10.9.2 and the win rate. It takes the trades and the bars in place of `trade_count`, because the round trip metrics, the exposure, and the turnover need them. |
+| Phase 1: `calculate_daily_returns(*, start_capital_usd, equity_curve)` | The daily returns of section 10.9.1, as fractions (0.02 is 2 %). |
+| Phase 1: `find_round_trips(trades)` | `RoundTrip` list: `start_utc`, `end_utc`, `profit_usd` (after commissions), and `entry_amount_usd` (the amount of the fills on the side of the first fill). A round trip goes from a position of 0 back to a position of 0. A position that is still open is not a round trip. The win rate, the profit factor, the average win, and the average loss use it. |
+| Phase 1: `calculate_metrics(*, paper_capital_usd, time_range, equity_curve, trades)` | Also gives the metrics of section 10.9.2 and the win rate, and `missing_reasons` (section 10.9.3). It takes the trades in place of `trade_count` (`trade_count` is the number of trades), and the time range for `years`. It takes no bars: the equity curve has one point at the end of each bar, so the exposure counts the points. Thus a forward test, which has no saved bars, uses the same function. Ratios, percents, and money have 2 decimal places. |
 | Phase 1: `calculate_split_metrics(*, ..., split_time_utc)` | The metrics of the in-sample part and of the out-of-sample part (section 10.9.4). |
 | Phase 1: `calculate_probabilistic_sharpe(*, daily_returns)` and `calculate_deflated_sharpe(*, daily_returns, trial_sharpe_ratios)` | Section 10.9.5. |
+| Phase 1: `find_sharpe_probability_status(percent)` | The status of a PSR or DSR percent: `likely_real`, `uncertain`, `likely_luck`, or None without a value (section 10.9.5). |
 
 Phase 1: forward tests use the new metric functions too. A forward test has
 no in-sample and out-of-sample split, because a forward test is out of
@@ -330,7 +331,7 @@ Changes of later phases:
 | Phase | Route | Change |
 |---|---|---|
 | 1 | `POST /api/backtests` | The body can contain `out_of_sample_share` (integer percent). Without it, the route uses 30. `422` when it is not from 0 to 50. The route calculates `split_time_utc` (section 10.9.4). |
-| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 and `win_rate_percent`, `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. |
+| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
 | 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12). |
@@ -557,13 +558,19 @@ backtest run and no new data source.
   with about 90 days of 1-hour bars has about 60 daily returns.
 - The values differ from TradingView, which uses monthly returns and a
   risk-free rate of 2 %.
+- Decided (#165): the trading day of a daily return is the UTC date of the
+  equity point. Reason: it is the simplest, and the bars of one US trading
+  session end on one UTC date. A day after an equity of 0 has no daily
+  return, because a change from 0 has no value.
 
 ### 10.9.2 New metrics
 
 The backend calculates the metrics. Backtests and forward tests save them
 and use the same functions (section 10.4). `E_0` is the paper capital.
 `E_end` is the final equity. `years` is the number of calendar days of the
-range divided by 365.25.
+range divided by 365.25. Decided (#165): the range goes from `start_utc` to
+`end_utc` of the backtest request. A forward test uses its start and its stop
+(or now). The mean equity of the turnover is the mean of all equity points.
 
 | Metric | Definition |
 |---|---|
@@ -590,6 +597,27 @@ When a metric has no meaning, it shows "–". Its tooltip gives the reason.
 | The max drawdown is 0 | Calmar ratio |
 | No round trip with a loss | Profit factor |
 | Fewer than 60 daily returns | The probabilistic and the deflated Sharpe ratio (section 10.9.5), with the reason "Fewer than 60 daily returns" |
+
+Decided (#165): the API gives each "–" value as `null`, and
+`metrics.missing_reasons` gives its reason by the field name, for example
+`{"sharpe_ratio": "Fewer than 2 daily returns"}`. The reasons come from the
+saved values, so the table needs no reason column. These are the reasons:
+
+| Field | Reason |
+|---|---|
+| `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio` | "Fewer than 2 daily returns" |
+| `sharpe_ratio`, `sortino_ratio` | "The standard deviation of the daily returns is 0" |
+| `sortino_ratio` | "No daily return with a loss" (the `DD` is 0) |
+| `cagr_percent`, `calmar_ratio` | "The range is shorter than 90 days", or "The final equity is not above 0" |
+| `calmar_ratio` | "The max drawdown is 0" |
+| `win_rate_percent` and the round trip metrics | "No round trips" |
+| `average_win_usd`, `average_win_percent` | "No round trip with a profit" |
+| `profit_factor`, `average_loss_usd` | "No round trip with a loss" |
+| `turnover_per_year` | "The mean equity is not above 0, or the range has no length" |
+| All 12 new fields | "The test has no equity points, or it ended before ATrade calculated this metric" (a backtest that finished before the migration) |
+
+The average win in percent is the mean of the percents of the round trips
+with a profit.
 
 Reason for 90 days: a return of 10 % in 3 months gives a CAGR of about
 46 %, which misleads. A 1-hour backtest of only the bars that a chart loads
@@ -647,6 +675,24 @@ longer bars first.
     trials.
 - The backend has no numpy and no scipy. `statistics.NormalDist` of the
   Python standard library has `cdf` and `inv_cdf`. These are sufficient.
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read (`backtest_robustness.py`). It
+  saves no Sharpe ratio. Reason: it is the simplest, it needs no migration,
+  and the trial count changes at each read too.
+- Decided (#167): the daily Sharpe ratio of a trial is the mean of its daily
+  returns divided by their sample standard deviation. A trial with fewer
+  than 2 daily returns, or with a standard deviation of 0, has no daily
+  Sharpe ratio. `V` and the `N` of the formula use only the trials that have
+  a daily Sharpe ratio. The trial count of the response counts all trials.
+- Decided (#167): when fewer than 2 trials have a daily Sharpe ratio, `V` is
+  0. Then `SR*` is 0 and the DSR is equal to PSR(0). The kind stays
+  `deflated` when the trial count is above 1.
+- Decided (#167): `γ3` and `γ4` use the population moments of the daily
+  returns. The functions return a percent with 2 decimal places. The status
+  uses this rounded percent.
+- Decided (#167): daily returns with a standard deviation of 0 give no PSR
+  and no DSR, with the reason "The standard deviation of the daily returns
+  is 0".
 
 | Value | Status | Look |
 |---|---|---|
@@ -695,13 +741,8 @@ longer bars first.
   bars, and how the split time aligns to a bar end.
 - Whether the backend saves the in-sample and out-of-sample metrics or
   calculates them at each read from the saved equity curve and trades.
-- The trading day of a daily return: the UTC date or the exchange date.
-- The calendar days of `years` (from `start_utc` and `end_utc`, or from the
-  first and the last equity point), and the equity values of the mean
-  equity of the turnover.
 - The value of "Out-of-sample Sharpe / in-sample Sharpe" when the in-sample
   Sharpe ratio is 0, below 0, or "–".
-- How the API gives the reason of a "–" value.
 - The default 30 of `out_of_sample_share` in the API when the body has no
   such field. This is a choice of this document.
 

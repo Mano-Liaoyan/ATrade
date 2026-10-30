@@ -247,11 +247,14 @@ saves them in `databento_bar`. It runs in the `web` image. Keep the files in
 
 ```sh
 mkdir -p data/databento
-# Download the bought batch jobs (needs DATABENTO_API_KEY in .env) and import all DBN files:
-docker compose -f deploy/compose.yaml run --rm -v "$PWD/data/databento:/databento" web \
+# Download the bought batch jobs (needs DATABENTO_API_KEY in .env) and import all DBN files.
+# --user lets the program write to data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/data/databento:/databento" web \
   python -m atrade.app.databento_import /databento --job-id <batch job ID> --job-id <batch job ID>
 # Or import the DBN files that are already in data/databento/:
-docker compose -f deploy/compose.yaml run --rm -v "$PWD/data/databento:/databento:ro" web \
+docker compose --file deploy/compose.yaml --env-file .env run --rm \
+  -v "$PWD/data/databento:/databento:ro" web \
   python -m atrade.app.databento_import /databento
 ```
 
