@@ -14,7 +14,8 @@ from atrade.backtest.backtest_access import (
     queue_backtest,
 )
 from atrade.backtest.backtest_exchange_rates import save_exchange_rates
-from atrade.backtest.backtest_store import BacktestRequest
+from atrade.backtest.backtest_store import BacktestRequest, UniversePeriod
+from atrade.backtest.backtest_universe import check_universe_bars
 from atrade.market_data import ExchangeRateReader
 from atrade.strategy import read_strategy_version
 
@@ -26,15 +27,17 @@ class BacktestRefusal:
     detail: str
 
 
-async def start_backtest(
+async def start_backtest(  # noqa: PLR0913 readability-exception: the keywords of a start from either port.
     *,
     database_url: str,
     exchange_rate_reader: ExchangeRateReader,
     request: BacktestRequest,
     created_at_utc: datetime,
+    universe_periods: list[UniversePeriod] | None = None,
     conversation_id: int | None = None,
 ) -> int | BacktestRefusal:
-    """Queues the backtest and returns its ID, or returns why it cannot start."""
+    """Queues the backtest and returns its ID, or returns why it cannot start. A multi-instrument backtest also needs
+    the members of each universe period (docs/architecture/backtest.md 10.10.6)."""
     refusal = check_backtest_request(request)
     if refusal is not None:
         return BacktestRefusal(refusal)
@@ -45,7 +48,15 @@ async def start_backtest(
         return BacktestRefusal(f"Strategy version {request.strategy_version_id} does not exist.")
     request = await add_global_source_order(database_url=database_url, request=request)
     # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
-    missing_bars = await check_saved_bars(database_url=database_url, request=request)
+    if request.universe is None:
+        missing_bars = await check_saved_bars(database_url=database_url, request=request)
+    else:
+        missing_bars = await check_universe_bars(
+            database_url=database_url,
+            request=request,
+            periods=universe_periods or [],
+            source_order=request.source_order or [],
+        )
     if missing_bars is not None:
         return BacktestRefusal(missing_bars)
     # The child never calls IBKR, so the rates of an instrument that is not in USD are saved first (section 10.8).
@@ -55,5 +66,9 @@ async def start_backtest(
     if missing_rates is not None:
         return BacktestRefusal(missing_rates)
     return await queue_backtest(
-        database_url=database_url, request=request, created_at_utc=created_at_utc, conversation_id=conversation_id
+        database_url=database_url,
+        request=request,
+        created_at_utc=created_at_utc,
+        universe_periods=universe_periods,
+        conversation_id=conversation_id,
     )

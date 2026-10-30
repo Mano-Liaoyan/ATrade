@@ -2587,17 +2587,52 @@
             "type": "integer",
             "title": "Version Number"
           },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind"
+          },
           "symbol": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Symbol"
           },
           "exchange": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Exchange"
           },
           "currency": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency"
+          },
+          "universe_top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe Top N"
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -2766,9 +2801,11 @@
           "strategy_id",
           "strategy_name",
           "version_number",
+          "universe_kind",
           "symbol",
           "exchange",
           "currency",
+          "universe_top_n",
           "bar_period",
           "start_utc",
           "end_utc",
@@ -3018,17 +3055,52 @@
             "type": "integer",
             "title": "Version Number"
           },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind"
+          },
           "symbol": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Symbol"
           },
           "exchange": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Exchange"
           },
           "currency": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency"
+          },
+          "universe_top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe Top N"
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -3170,9 +3242,11 @@
           "strategy_id",
           "strategy_name",
           "version_number",
+          "universe_kind",
           "symbol",
           "exchange",
           "currency",
+          "universe_top_n",
           "bar_period",
           "start_utc",
           "end_utc",
@@ -3425,17 +3499,52 @@
             "type": "integer",
             "title": "Version Number"
           },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind"
+          },
           "symbol": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Symbol"
           },
           "exchange": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Exchange"
           },
           "currency": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency"
+          },
+          "universe_top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe Top N"
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -3608,9 +3717,11 @@
           "strategy_id",
           "strategy_name",
           "version_number",
+          "universe_kind",
           "symbol",
           "exchange",
           "currency",
+          "universe_top_n",
           "bar_period",
           "start_utc",
           "end_utc",
@@ -5050,6 +5161,35 @@
         ],
         "title": "InnerRuleGroup",
         "description": "A group in a group. It holds conditions only, so the maximum depth is 1 nested group."
+      },
+      "InstrumentBody": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency"
+        ],
+        "title": "InstrumentBody"
       },
       "InstrumentResponse": {
         "properties": {
@@ -6593,23 +6733,76 @@
             "type": "integer",
             "title": "Strategy Version Id"
           },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind",
+            "default": "single"
+          },
           "symbol": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Symbol"
           },
           "exchange": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Exchange"
           },
           "currency": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency"
+          },
+          "top_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N"
+          },
+          "instruments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InstrumentBody"
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruments"
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -6661,15 +6854,13 @@
         "type": "object",
         "required": [
           "strategy_version_id",
-          "symbol",
-          "exchange",
-          "currency",
           "bar_period",
           "start_utc",
           "end_utc",
           "paper_capital_usd"
         ],
-        "title": "StartBacktestRequest"
+        "title": "StartBacktestRequest",
+        "description": "`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and\n`list` needs `instruments` (docs/architecture/backtest.md section 10.10.6)."
       },
       "StartForwardTestRequest": {
         "properties": {
@@ -7128,6 +7319,28 @@
           "commission_usd": {
             "type": "string",
             "title": "Commission Usd"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
           }
         },
         "type": "object",
@@ -7136,9 +7349,19 @@
           "side",
           "quantity_shares",
           "price_usd",
-          "commission_usd"
+          "commission_usd",
+          "symbol",
+          "exchange"
         ],
         "title": "TradeResponse"
+      },
+      "UniverseKind": {
+        "type": "string",
+        "enum": [
+          "single",
+          "rule",
+          "list"
+        ]
       },
       "ValidationError": {
         "properties": {

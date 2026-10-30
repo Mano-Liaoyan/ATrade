@@ -36,7 +36,7 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
-  import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput, Toggle } from '#lib/foundation/carbon';
+  import { Dialog, Icon, IconButton, InlineNotification, Select, Toggle } from '#lib/foundation/carbon';
   import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
@@ -57,7 +57,6 @@
     clearDraft,
     clearRulesDraft,
     connectStrategyLanguageServer,
-    createStrategy,
     deleteStrategy,
     describeRulesWarning,
     findRulesVersionNumber,
@@ -79,6 +78,7 @@
     type StrategyVersion,
     type StrategyVersionKey,
   } from '#lib/strategy';
+  import NewStrategyDialog from './NewStrategyDialog.svelte';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
   import AssistantColumn from './AssistantColumn.svelte';
@@ -121,8 +121,6 @@
     versionNumber: addressVersionNumber = null,
   }: { strategyId: number | null; versionNumber?: number | null } = $props();
 
-  // The backend refuses a longer name.
-  const STRATEGY_NAME_MAX_LENGTH = 100;
   const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
   const FILE_TABS = [
     { value: 'rules', label: 'Rules' },
@@ -160,16 +158,12 @@
   let paneOrder = $state<PaneOrder>(readPaneOrder(readStoredLayout(PANE_ORDER_STORAGE_KEY)));
   let isStoppingForwardTest = $state(false);
   let isNewStrategyDialogOpen = $state(false);
-  let newStrategyName = $state('');
-  let createMessage = $state('');
-  let isCreating = $state(false);
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
   let isBacktestDialogOpen = $state(false);
   let isForwardTestDialogOpen = $state(false);
   // The new code of the rules while the diff dialog before a rules save is open (section 9.8.4), else null.
   let replacingCode = $state<string | null>(null);
-  let newStrategyForm: HTMLFormElement | undefined = $state();
   // The diff tab of a diff card. fileTab keeps the file tab to go back to.
   const assistantDiff = new AssistantDiff();
   let isAssistantMaximized = $state(false);
@@ -544,23 +538,13 @@
   }
 
   function openNewStrategyDialog(): void {
-    newStrategyName = '';
-    createMessage = '';
     isNewStrategyDialogOpen = true;
   }
 
-  async function submitNewStrategy(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    isCreating = true;
-    const result = await createStrategy(fetch, newStrategyName);
-    isCreating = false;
-    if (result.kind === 'failed') {
-      createMessage = result.message;
-      return;
-    }
+  async function openCreatedStrategy(created: StrategyDetail): Promise<void> {
     isNewStrategyDialogOpen = false;
     listReadCount += 1;
-    await goto(resolve('/strategies/[strategyId]', { strategyId: String(result.strategy.id) }));
+    await goto(resolve('/strategies/[strategyId]', { strategyId: String(created.id) }));
   }
 
   async function removeStrategy(): Promise<void> {
@@ -825,23 +809,15 @@
   {/if}
 </Workbench>
 
-<Dialog
+<NewStrategyDialog
   open={isNewStrategyDialogOpen}
   onOpenChange={(open: boolean) => {
     isNewStrategyDialogOpen = open;
   }}
-  title="New strategy"
-  primaryText={isCreating ? 'Creating…' : 'Create strategy'}
-  busy={isCreating}
-  onPrimary={() => newStrategyForm?.requestSubmit()}
->
-  <form class="new-strategy-form" aria-label="New strategy" bind:this={newStrategyForm} onsubmit={submitNewStrategy}>
-    <TextInput label="Strategy name" name="name" bind:value={newStrategyName} required maxlength={STRATEGY_NAME_MAX_LENGTH} />
-  </form>
-  {#if createMessage !== ''}
-    <InlineNotification kind="error" lowContrast title="Strategy not created" subtitle={createMessage} />
-  {/if}
-</Dialog>
+  onCreated={(created: StrategyDetail) => {
+    void openCreatedStrategy(created);
+  }}
+/>
 
 {#if strategy !== null}
   <Dialog
@@ -992,7 +968,4 @@
     fill: var(--cds-support-warning);
   }
 
-  .new-strategy-form {
-    margin-block-end: var(--cds-spacing-05);
-  }
 </style>
