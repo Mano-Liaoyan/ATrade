@@ -461,6 +461,7 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
 | `format_version` | `1`. |
 | `position_size` | `{"type": "fixed_shares", "shares": <int, 1 or more>}` or `{"type": "percent_of_equity", "percent": <number, more than 0, at most 100>}`. |
 | `template_id` | A string of 1 to 100 characters, or null. #175 sets the template IDs. |
+| `universe` | Only in the universe mode (section 9.8.6). `{"rank_indicator": <indicator operand>, "rank_direction": "high_to_low" or "low_to_high", "hold_count": <int, 1 or more>, "rebalance_period": "weekly", "monthly", or "quarterly"}`. Single-instrument rules do not have the field. |
 | Group | `{"type": "group", "match": "all_of" or "any_of", "items": [...]}`. The items of the top group are conditions and groups. The items of a group in a group are conditions only. |
 | Condition | `{"type": "condition", "left", "comparison", "right"}`. `comparison` is `above`, `below`, `at_or_above`, `at_or_below`, `crosses_above`, or `crosses_below`. |
 | Operand | `{"type": "price", "price": "close" / "open" / "high" / "low"}`, `{"type": "number", "value": <int or float>}` (right side only), or `{"type": "indicator", ...}` with the fields of a stored indicator reference ([`indicator.md`](indicator.md) section 23.6). `check_indicator_reference` checks the reference. |
@@ -469,7 +470,8 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
 - A rules body that does not match the format gets the FastAPI `422`
   validation body (`{"detail": [{"loc", "msg", ...}]}`). `loc` is the path
   of the wrong part in the rules.
-- An empty group is false. Empty entry rules never buy.
+- An empty group is false. Empty entry rules never buy. Exception: in the
+  universe mode, an empty entry group (the filter) passes all members.
 - The reference price of the stop loss and the take profit is the average
   fill price of the entry (`Position.avg_px_open`). The stop loss is true
   when the close is at or below `avg_px_open × (1 − percent / 100)`. The
@@ -616,9 +618,41 @@ It needs the multi-instrument backtest of
   fill (#142).
 - The exit items are checked on each bar, for each instrument.
 
+Decided (#201):
+
+- The rules hold the universe mode in `settings.universe` (section 9.8.2).
+  When it is set, `make_rules_code` makes multi-instrument code, and
+  `settings.position_size` is not used.
+- The rank indicator is an indicator operand (one of the 11 indicators).
+  A wrong indicator, `hold_count` less than 1, or an unknown direction or
+  period gives `422`.
+- The code gets the members from `UniverseUpdate` (section 9.8.7). Each
+  member has its own indicator objects and warms them up on the look-back
+  bars.
+- The period of a bar is its ISO week, its month, or its quarter in UTC. At
+  the first bar time of a new period, the strategy marks a rebalance. It
+  ranks at the next bar time, on the complete bars of all members, so it does
+  not see a later bar. It waits for the first bar of a new member, at most 5
+  bar times.
+- The strategy sells the positions that are not in the new targets. It buys
+  only when no order of the strategy is open and no position outside the
+  targets is open.
+- Equal weight: each buy gets equity × 0.95 / `hold_count` at the last close.
+  The equity is the cash plus the open positions at the last close. The 5%
+  stays as cash, as in the rule templates (section 9.9.3).
+- The exit items run on each bar of each member, when no order of that member
+  waits for its fill. "Exit after N bars" counts the bars of that member.
+- The "Rules" tab shows the settings of the prototype in place of the
+  position size: "Rebalance", "Hold … instruments", and "Rank by" (an
+  indicator and "Highest first" or "Lowest first"). The entry block is
+  "Entry filter". The tab has no control that turns the mode on or off: the
+  rules of the version hold it.
+
 ### 9.8.7 Left to the implementation
 
 - The rules that "Blank rules" holds (for example the position size).
+- Decided (#201): the JSON field of the universe mode is `settings.universe`
+  (section 9.8.6).
 - Decided (#198): the platform tells the strategy the universe of each
   universe period with NautilusTrader custom data. The strategy calls
   `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
