@@ -231,13 +231,20 @@ limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
 values.
 
 The volume `atrade-assistant-pi` holds the files of the AI assistant: one
-JSONL file of messages for each conversation in `conversations/`. Later it
-also holds the AI assistant credentials, so keep each backup of it like
-`.env`. ATrade makes no automatic backup. A manual backup:
+JSONL file of messages for each conversation in `conversations/`, and the
+AI assistant credentials in `credentials.json` (mode `0600`): the
+subscription login tokens and the API keys. The credentials are not in
+PostgreSQL, `.env`, or git. ATrade makes no automatic backup. A manual
+backup:
 
 ```sh
 docker run --rm -v atrade-assistant-pi:/data:ro -v "$PWD":/backup busybox tar czf /backup/atrade-assistant-pi.tar.gz -C /data .
+chmod 600 atrade-assistant-pi.tar.gz
 ```
+
+The backup holds the credentials. Keep it like `.env`: not in git, not in a
+shared folder, and readable only by you. When the volume is lost, log in and
+enter the API keys again in the "Credentials" dialog.
 
 ### Import the Databento history
 
