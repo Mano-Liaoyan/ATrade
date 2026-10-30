@@ -674,7 +674,8 @@ export interface paths {
         put?: never;
         /**
          * Run Screen
-         * @description Runs the saved screen and saves 1 screen result (section 24.5).
+         * @description Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and
+         *     definition in place of the saved ones and keeps the saved screen (section 24.13).
          */
         post: operations["run_screen_api_screens__screen_id__runs_post"];
         delete?: never;
@@ -692,6 +693,26 @@ export interface paths {
         };
         /** Read Screen Result */
         get: operations["read_screen_result_api_screen_results__screen_result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screen-indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Screen Indicators
+         * @description The indicator catalog in its own order (section 24.7).
+         */
+        get: operations["list_screen_indicators_api_screen_indicators_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2124,6 +2145,15 @@ export interface components {
             /** Code */
             code: string;
         };
+        /**
+         * RunScreenRequest
+         * @description A run of a changed screen (section 24.13). The run does not change the saved screen.
+         */
+        RunScreenRequest: {
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
+        };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
@@ -2175,6 +2205,38 @@ export interface components {
             indicator_conditions: string[];
             /** Order */
             order: string;
+        };
+        /** ScreenIndicatorParameterResponse */
+        ScreenIndicatorParameterResponse: {
+            /** Name */
+            name: string;
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "int" | "float";
+            /** Default */
+            default: number;
+            /** Minimum */
+            minimum: number;
+            /** Maximum */
+            maximum: number;
+            /** Is In Name */
+            is_in_name: boolean;
+        };
+        /**
+         * ScreenIndicatorResponse
+         * @description One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page.
+         */
+        ScreenIndicatorResponse: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters: components["schemas"]["ScreenIndicatorParameterResponse"][];
+            /** Outputs */
+            outputs: string[];
         };
         /** ScreenListItemResponse */
         ScreenListItemResponse: {
@@ -4883,7 +4945,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RunScreenRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -4953,6 +5019,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screen_indicators_api_screen_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenIndicatorResponse"][];
                 };
             };
         };

@@ -245,3 +245,43 @@ async def test_the_run_of_a_saved_screen_that_fails_the_check_gives_the_problem_
     assert [problem["location"] for problem in problems] == [
         ["definition", "order", "indicator", "parameters", "period"]
     ]
+
+
+@pytest.mark.anyio
+async def test_a_run_with_a_changed_definition_and_market_keeps_the_saved_screen(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    apple, microsoft, tencent = stock("AAPL"), stock("MSFT"), stock("700", "SEHK", "HKD")
+    await save_daily_bars(database_url, apple, "30")
+    await save_daily_bars(database_url, microsoft, "20")
+    await save_daily_bars(database_url, tencent, "40")
+    add_to_watchlist(database_url, apple, microsoft, tencent)
+    saved = make_definition()
+    screen_id = await create_screen(web_client, saved)
+    changed = make_definition(filters=[{"field": "last_price", "operator": ">", "value": "25"}])
+
+    us_run = await web_client.post(f"/api/screens/{screen_id}/runs", json={"market": "US", "definition": changed})
+    hk_run = await web_client.post(f"/api/screens/{screen_id}/runs", json={"market": "HK", "definition": saved})
+    screen = await web_client.get(f"/api/screens/{screen_id}")
+
+    assert us_run.status_code == httpx.codes.CREATED, us_run.text
+    assert symbols(us_run.json()) == ["AAPL"]
+    assert us_run.json()["definition"] == changed
+    assert hk_run.json()["market"] == "HK"
+    assert symbols(hk_run.json()) == ["700"]
+    assert screen.json()["definition"] == saved
+    assert screen.json()["market"] == "US"
+
+
+@pytest.mark.anyio
+async def test_a_run_with_a_changed_definition_that_fails_the_check_gives_the_problem_list(
+    web_client: httpx.AsyncClient,
+) -> None:
+    screen_id = await create_screen(web_client, make_definition())
+    changed = make_definition(filters=[{"field": "last_price", "operator": "?", "value": "25"}])
+
+    response = await web_client.post(f"/api/screens/{screen_id}/runs", json={"market": "US", "definition": changed})
+
+    assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY
+    locations = [problem["location"] for problem in response.json()["problems"]]
+    assert ["definition", "filters", 0, "operator"] in locations

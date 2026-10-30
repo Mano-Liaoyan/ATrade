@@ -12,12 +12,33 @@ export {
   type ScreenDefinition,
 } from './condition_bar';
 export { describeExclusionReason, listResultColumns, sortResultRows, type ScreenResultRow } from './result_table';
+export { default as ConditionEditor } from './ConditionEditor.svelte';
 export {
+  addCondition,
+  groupProblems,
+  isDraftChanged,
+  nameDefinitionIndicators,
+  newCondition,
+  readTarget,
+  removeCondition,
+  switchMarket,
+  writeTarget,
+  type ConditionKind,
+  type ConditionTarget,
+  type ScreenMarket,
+} from './screen_draft';
+export {
+  createScreen,
+  listScreenIndicators,
   listScreens,
   readScreen,
   readScreenResult,
+  runScreenDraft,
+  saveScreen,
   type Screen,
   type ScreenListItem,
   type ScreenResult,
+  type ScreenIndicator,
+  type ScreenProblem,
   type ScreenResultExclusion,
 } from './screen_api';

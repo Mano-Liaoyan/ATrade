@@ -31,7 +31,8 @@ export interface ConditionTag {
 export interface ConditionGroup {
   label: string;
   tags: ConditionTag[];
-  count: number;
+  // Null while the bar shows a changed definition that has no screen result.
+  count: number | null;
 }
 
 type Item = Record<string, unknown>;
@@ -96,10 +97,14 @@ function describeOrder(order: Item, name: string): ConditionTag {
   };
 }
 
+function countOf(counts: FunnelCounts | null, key: keyof FunnelCounts): number | null {
+  return counts === null ? null : counts[key];
+}
+
 export function buildConditionGroups(
   definition: ScreenDefinition,
   indicatorNames: IndicatorNames,
-  counts: FunnelCounts,
+  counts: FunnelCounts | null,
 ): ConditionGroup[] {
   const start = text(definition.start);
   const order = (definition.order ?? {}) as Item;
@@ -107,16 +112,16 @@ export function buildConditionGroups(
     {
       label: 'Start instruments',
       tags: [{ subject: START_NAMES[start] ?? start, operation: '', value: '' }],
-      count: counts.start_count,
+      count: countOf(counts, 'start_count'),
     },
-    { label: 'Filters', tags: readItems(definition.filters).map(describeFilter), count: counts.after_filters_count },
+    { label: 'Filters', tags: readItems(definition.filters).map(describeFilter), count: countOf(counts, 'after_filters_count') },
     {
       label: 'Indicator conditions',
       tags: readItems(definition.indicator_conditions).map((condition, index) =>
         describeCondition(condition, indicatorNames.indicator_conditions[index] ?? ''),
       ),
-      count: counts.after_indicator_conditions_count,
+      count: countOf(counts, 'after_indicator_conditions_count'),
     },
-    { label: 'Order', tags: [describeOrder(order, indicatorNames.order)], count: counts.result_count },
+    { label: 'Order', tags: [describeOrder(order, indicatorNames.order)], count: countOf(counts, 'result_count') },
   ];
 }

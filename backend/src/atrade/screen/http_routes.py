@@ -1,6 +1,7 @@
 """HTTP routes of the screen capability: list, read, create, change, delete, and run screens, and read screen results
 (screen.md section 24.7)."""
 
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -13,6 +14,7 @@ from pydantic import BaseModel, JsonValue
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
+from atrade.indicator import INDICATOR_CATALOG
 from atrade.screen import screen_store
 from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
 from atrade.screen.screen_run import name_indicator
@@ -27,6 +29,13 @@ type Market = Literal["US", "HK"]
 class CreateScreenRequest(BaseModel):
     # The check of section 24.6 checks the market and the definition, so a problem gives its location.
     name: str
+    market: str
+    definition: JsonValue
+
+
+class RunScreenRequest(BaseModel):
+    """A run of a changed screen (section 24.13). The run does not change the saved screen."""
+
     market: str
     definition: JsonValue
 
@@ -120,6 +129,48 @@ class ScreenIndicatorNamesResponse(BaseModel):
     # One name for each indicator condition, in the order of the definition.
     indicator_conditions: list[str]
     order: str
+
+
+class ScreenIndicatorParameterResponse(BaseModel):
+    name: str
+    value_type: Literal["int", "float"]
+    default: int | float
+    minimum: int | float
+    maximum: int | float
+    # False for a parameter that the UI name does not show (bars_per_year).
+    is_in_name: bool
+
+
+class ScreenIndicatorResponse(BaseModel):
+    """One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page."""
+
+    key: str
+    name: str
+    parameters: list[ScreenIndicatorParameterResponse]
+    outputs: list[str]
+
+
+def list_screen_indicators() -> list[ScreenIndicatorResponse]:
+    """The indicator catalog in its own order (section 24.7)."""
+    return [
+        ScreenIndicatorResponse(
+            key=definition.key,
+            name=definition.name,
+            parameters=[
+                ScreenIndicatorParameterResponse(
+                    name=parameter.name,
+                    value_type="int" if parameter.value_type is int else "float",
+                    default=parameter.default,
+                    minimum=parameter.minimum,
+                    maximum=parameter.maximum,
+                    is_in_name=parameter.is_in_name,
+                )
+                for parameter in definition.parameters
+            ],
+            outputs=list(definition.outputs),
+        )
+        for definition in INDICATOR_CATALOG.values()
+    ]
 
 
 def name_definition_indicators(definition: dict[str, Any]) -> ScreenIndicatorNamesResponse:
@@ -363,16 +414,26 @@ class ScreenRoutes:
         if not is_deleted:
             raise screen_not_found(screen_id)
 
-    async def run_screen(self, screen_id: int) -> ScreenResultResponse | JSONResponse:
-        """Runs the saved screen and saves 1 screen result (section 24.5)."""
-        return await self.run_screen_of(screen_id, None)
+    async def run_screen(
+        self, screen_id: int, request: RunScreenRequest | None = None
+    ) -> ScreenResultResponse | JSONResponse:
+        """Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and
+        definition in place of the saved ones and keeps the saved screen (section 24.13)."""
+        return await self.run_screen_of(screen_id, None, request)
 
-    async def run_screen_of(self, screen_id: int, conversation_id: int | None) -> ScreenResultResponse | JSONResponse:
+    async def run_screen_of(
+        self, screen_id: int, conversation_id: int | None, request: RunScreenRequest | None = None
+    ) -> ScreenResultResponse | JSONResponse:
         """Port 8001 gives the conversation. The screen result records it."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.select_screen(connection, screen_id)
         if screen is None:
             raise screen_not_found(screen_id)
+        if request is not None:
+            problems = check_screen(name=screen.name, market=request.market, definition=request.definition)
+            if problems:
+                return check_failed(problems)
+            screen = replace(screen, market=request.market, definition=request.definition)
         problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
         if problems:
             return check_failed(problems)
@@ -498,4 +559,5 @@ def create_screen_router(*, database_url: str, clock: Clock) -> APIRouter:
     router.add_api_route(
         "/api/screen-results/{screen_result_id}", routes.read_screen_result, methods=["GET"], responses=not_found
     )
+    router.add_api_route("/api/screen-indicators", list_screen_indicators, methods=["GET"])
     return router

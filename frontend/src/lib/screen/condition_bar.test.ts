@@ -67,4 +67,14 @@ describe('buildConditionGroups', () => {
     expect(names).toEqual(['All with daily bars', 'Watchlist', 'HK instrument list']);
     expect(order).toEqual({ subject: 'SMA(50)', operation: 'ascending', value: '' });
   });
+
+  it('has no funnel counts for a changed definition that has no screen result', () => {
+    const groups = buildConditionGroups(
+      { start: 'watchlist', filters: [], indicator_conditions: [], order: { direction: 'ascending' } },
+      { indicator_conditions: [], order: 'SMA(50)' },
+      null,
+    );
+
+    expect(groups.map((group) => group.count)).toEqual([null, null, null, null]);
+  });
 });
