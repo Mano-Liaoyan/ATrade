@@ -892,6 +892,37 @@ The default width is 28rem.
   The side column has no helper text under its name. A disabled control
   says why it is disabled.
 
+Implemented (#185):
+
+- `AssistantColumn` (`frontend/src/routes/strategies/`) puts the side column
+  together. The header line of the column has the icon buttons
+  "Credentials", "Prompt", "Maximize AI assistant", and "Minimize AI
+  assistant". The rail has the `ai-agent` icon.
+- Top line: the conversation `Select` (the titles, the newest first), the
+  icon buttons "New conversation", "Rename conversation" (a `Dialog` with
+  the title), and "Delete conversation" (a danger `Dialog`), and the text
+  "Prompt v<n>".
+- `AssistantLog` shows the log with `ChatLog`. A message of the AI assistant
+  ends with a line "<model> · <credential name>". The log of
+  `frontend/src/lib/assistant/conversation_log.ts` keeps one line for each
+  `tool_call_id`. The line text is "Backtest #<id> <state>" for
+  `run_backtest` with a backtest, else the tool name and its state, for
+  example "Save strategy version succeeded".
+- A diff card has the link button "v<n-1> → v<n>" and the buttons "Keep" and
+  "Discard". After a click, the card shows "Kept" or "Discarded" with a
+  `StatusIndicator`.
+- A metric card has the link "Backtest #<id>" to the backtest page and the
+  `KeyMetricRow` of the backtest.
+- Bottom: the Selects "Provider" (only the providers with a credential),
+  "Model", and "Credential" in one row. A conversation starts with its last
+  model and credential, else with the first credential and the first model
+  of its provider. Enter sends; Shift Enter adds a line.
+- The browser opens one `/ws/assistant` socket for the open conversation
+  (`conversation_socket.ts`). The socket does not connect again after a
+  close. Each `error` message goes to the Output tab of the "Problems and
+  output" panel with the UTC time. After `run_state` `settled`, the page
+  reads the conversation list again after 1 second for the generated title.
+
 ### 25.12.2 Message components
 
 - ATrade does not add the package `carbon-components-svelte` (section 13).
@@ -1086,8 +1117,24 @@ columns behave the same (section 13).
   meaning of the credential state column (25.7.2). Delete removes the entry
   from the file. There is no rename. The state is `ready` or `failed` (the
   last OAuth refresh failed).
-- The UI copy of each disabled control, for example "Send" without a
-  credential.
+- Decided (#185): the copy of the disabled controls. "Send" is disabled with
+  a helper text under the input: "Start a new conversation to send.", "Add a
+  credential to send.", or "Connecting to the AI assistant.". "Rename
+  conversation" and "Delete conversation" are "No conversation to rename" and
+  "No conversation to delete" without a conversation. A Select without items
+  shows "No credential" or "No model".
+- Decided (#185): rename and delete are icon buttons in the top line of the
+  side column, after "New conversation".
+- Decided (#185): the messages route gives only the text messages (25.11).
+  So a reopened conversation shows no tool step, diff card, or metric card.
+  Keep is not recorded (#180). A discarded version shows in the version
+  `Select` with the toggle "Show discarded versions" (25.5.3).
+- Decided (#185): the e2e server (`backend/tests/e2e_server.py`) gives
+  `create_web_app` the fake `E2EAssistantService`
+  (`backend/tests/fakes/e2e_assistant.py`). The prompt text selects the
+  answer: "wait" waits for the abort, "change" saves a version of the AI
+  assistant, "backtest" adds a finished backtest, "notitle" makes the title
+  generation fail. No real model provider.
 - Decided (#178): the `tool_call` handler that refuses unknown tools is
   `createToolGuard` in `assistant/src/tool_guard.ts`. It returns
   `{ block: true }` with the reason "<name> is not an ATrade assistant

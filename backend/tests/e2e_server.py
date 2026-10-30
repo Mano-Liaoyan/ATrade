@@ -20,6 +20,7 @@ from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
+from tests.fakes.e2e_assistant import E2EAssistantService
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.fakes.ibkr import (
     SAMPLE_INSTRUMENTS,
@@ -245,10 +246,21 @@ def add_discarded_version(database_url: str) -> None:
         )
         if version_1_id is None:
             return
+        # A conversation needs a prompt version (docs/architecture/assistant.md 25.9.1).
+        connection.execute(
+            """
+            INSERT INTO assistant_prompt_version (version_number, text, created_at_utc)
+            VALUES (1, 'You are the ATrade strategy assistant.', %(now)s)
+            ON CONFLICT (version_number) DO NOTHING
+            """,
+            {"now": FIXED_NOW_UTC},
+        )
         conversation_row = connection.execute(
             """
-            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc)
-            SELECT strategy_id, 'E2E conversation', %(now)s FROM strategy_version WHERE id = %(version_id)s
+            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id)
+            SELECT strategy_id, 'E2E conversation', %(now)s,
+                (SELECT id FROM assistant_prompt_version ORDER BY version_number LIMIT 1)
+            FROM strategy_version WHERE id = %(version_id)s
             RETURNING id, strategy_id
             """,
             {"version_id": version_1_id, "now": FIXED_NOW_UTC},
@@ -376,7 +388,12 @@ def main() -> None:
         for number in range(1, E2E_FORWARD_TEST_ORDER_COUNT + 1)
     ]
     clock = FixedClock(FIXED_NOW_UTC)
-    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    app = create_web_app(
+        settings=settings,
+        clock=clock,
+        gateway_connection=gateway_connection,
+        assistant_service=E2EAssistantService(database_url),
+    )
     # Each fake child stops at once, like a stop that cancelled all orders (section 17.5).
     child_starter = FakeChildStarter(is_ending_children_at_once=True)
     worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=child_starter.start_child)
