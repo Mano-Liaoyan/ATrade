@@ -53,6 +53,20 @@ test('the order panel shows the position of the instrument', async ({ page }) =>
   await expect(keyNumber(panel, 'Unrealized P&L')).toHaveText('0.00');
 });
 
+test('a refusal of the owner ledger shows as an error notification and keeps the button enabled', async ({ page }) => {
+  await page.goto('/instruments/NASDAQ/TEST01?currency=USD');
+  const panel = orderPanel(page, 'TEST01');
+  await panel.getByRole('tab', { name: 'Sell' }).click();
+  await panel.getByLabel('Quantity').fill('1000');
+  await panel.getByRole('button', { name: 'Review sell order' }).click();
+  await page.getByRole('dialog', { name: 'Sell 1000 TEST01' }).getByRole('button', { name: 'Send paper order' }).click();
+
+  const notification = panel.getByRole('alert').filter({ hasText: 'Order not sent' });
+  await expect(notification).toContainText('By hand holds 10 TEST01');
+  await expect(notification).toContainText('ATrade refuses a sell order for 1000.');
+  await expect(panel.getByRole('button', { name: 'Review sell order' })).toBeEnabled();
+});
+
 test('a sent paper order shows in the open orders panel', async ({ page }) => {
   await openWorkbench(page);
   const panel = orderPanel(page);
