@@ -58,6 +58,22 @@ async function sendAndCancelPaperOrderByHand(page: Page, symbol: string): Promis
   await page.getByRole('menuitem', { name: 'Cancel order' }).click();
 }
 
+/**
+ * Fills "Capital (USD)" of the start dialog, first with a capital larger than the unallocated amount. The e2e server
+ * has NetLiquidation 101,234.50 USD. The other browser projects run forward tests at the same time, so the unallocated
+ * amount can change.
+ */
+async function fillCapitalBelowTheUnallocatedAmount(dialog: Locator, capitalUsd: string): Promise<void> {
+  const capitalInput = dialog.getByLabel('Capital (USD)');
+  const startButton = dialog.getByRole('button', { name: 'Start forward test' });
+  await expect(dialog.getByText(/^Unallocated: \d{1,3}(,\d{3})*\.\d{2} USD$/)).toBeVisible();
+  await capitalInput.fill('999999999');
+  await expect(startButton).toBeDisabled();
+  await expect(startButton).toHaveAccessibleDescription(/^Capital is larger than the unallocated [\d,]+\.\d{2} USD$/);
+  await capitalInput.fill(capitalUsd);
+  await expect(startButton).toBeEnabled();
+}
+
 test('starts a forward test in the New forward test dialog, sees it running, and stops it from the header line', async ({
   page,
 }, currentTest) => {
@@ -81,10 +97,11 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await dialog.getByLabel('Exchange').fill('ARCA');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
   await page.getByRole('option', { name: '1 minute', exact: true }).click();
-  await dialog.getByLabel('Capital (USD)').fill('1000');
+  await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
+  const startButton = dialog.getByRole('button', { name: 'Start forward test' });
   // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
   await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
-  await dialog.getByRole('button', { name: 'Start forward test' }).click();
+  await startButton.click();
 
   // The page opens the new forward test.
   await expect(dialog).toHaveCount(0);
@@ -96,6 +113,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   await expect(heading).toContainText('1 min');
+  await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
   await expect(status).toHaveText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });

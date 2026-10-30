@@ -802,6 +802,16 @@ than the worker clock.
     example "Capital is larger than the unallocated 61,250.00 USD".
   - When the unallocated amount is not available, the button is disabled and
     the dialog gives the reason of the paper account check.
+  - Implemented (#221): `#lib/forward_test` has `readForwardTestCapital()`,
+    `describeUnallocated()`, and `findCapitalBlockReason()`. The dialog reads
+    the capital route when it opens and after a refused start. The reason
+    "Capital is larger than the unallocated ..." is the invalid message of
+    the input. Without an unallocated amount, the reason line below the
+    form gives the paper account check of `/ws/paper-trading` (for example
+    "Paper account not checked. IB Gateway is not connected."), or "The
+    paper account has no NetLiquidation value in USD." when the check
+    passed. The disabled button refers to the reason with
+    `aria-describedby`. A refused start shows the `detail` of the `409`.
 - Phase 3 (#146): changes of the forward test page. The layout is the layout
   of the backtest page. There is no new page.
   - The header line shows the universe name instead of the symbol for a
@@ -809,6 +819,8 @@ than the worker clock.
     "Watchlist (12)".
   - The header line shows the allocated capital, for example
     "Capital 20,000.00 USD".
+    Implemented (#221). An old row without `allocated_capital_usd` does not
+    show it.
   - The lower panel gets an "Instruments" tab (`ScrollRegion` "Instruments"),
     the same as the backtest page: symbol, fill count, Net profit (USD), and
     the number of quarters in the universe. Number columns are right aligned
