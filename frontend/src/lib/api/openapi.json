@@ -1823,7 +1823,7 @@
             ]
           },
           "robustness": {
-            "$ref": "#/components/schemas/RobustnessResponse"
+            "$ref": "#/components/schemas/BacktestRobustnessResponse"
           }
         },
         "type": "object",
@@ -2205,6 +2205,79 @@
         ],
         "title": "BacktestResponse"
       },
+      "BacktestRobustnessResponse": {
+        "properties": {
+          "trial_count": {
+            "type": "integer",
+            "title": "Trial Count"
+          },
+          "sharpe_probability_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Probability Percent"
+          },
+          "sharpe_probability_kind": {
+            "$ref": "#/components/schemas/SharpeProbabilityKind"
+          },
+          "sharpe_probability_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharpeProbabilityStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Missing Reasons"
+          },
+          "out_of_sample_to_in_sample_sharpe_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample To In Sample Sharpe Percent"
+          },
+          "out_of_sample_use_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample Use Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trial_count",
+          "sharpe_probability_percent",
+          "sharpe_probability_kind",
+          "sharpe_probability_status",
+          "missing_reasons",
+          "out_of_sample_to_in_sample_sharpe_percent",
+          "out_of_sample_use_count"
+        ],
+        "title": "BacktestRobustnessResponse",
+        "description": "The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A\nvalue without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."
+      },
       "BacktestStatus": {
         "type": "string",
         "enum": [
@@ -2471,7 +2544,7 @@
             ]
           },
           "robustness": {
-            "$ref": "#/components/schemas/RobustnessResponse"
+            "$ref": "#/components/schemas/BacktestRobustnessResponse"
           },
           "code": {
             "type": "string",
@@ -3881,39 +3954,6 @@
         "title": "PaperCapitalResponse",
         "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
       },
-      "RobustnessResponse": {
-        "properties": {
-          "out_of_sample_to_in_sample_sharpe_percent": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Out Of Sample To In Sample Sharpe Percent"
-          },
-          "out_of_sample_use_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Out Of Sample Use Count"
-          }
-        },
-        "type": "object",
-        "required": [
-          "out_of_sample_to_in_sample_sharpe_percent",
-          "out_of_sample_use_count"
-        ],
-        "title": "RobustnessResponse",
-        "description": "The robustness checks of docs/architecture/backtest.md section 10.9. The route calculates them at each read."
-      },
       "SamePeriodBacktestResponse": {
         "properties": {
           "backtest_id": {
@@ -4031,6 +4071,21 @@
           "time_in_force"
         ],
         "title": "SendOrderRequest"
+      },
+      "SharpeProbabilityKind": {
+        "type": "string",
+        "enum": [
+          "probabilistic",
+          "deflated"
+        ]
+      },
+      "SharpeProbabilityStatus": {
+        "type": "string",
+        "enum": [
+          "likely_real",
+          "uncertain",
+          "likely_luck"
+        ]
       },
       "SourceOrderBody": {
         "properties": {

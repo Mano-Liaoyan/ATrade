@@ -31,7 +31,9 @@ from atrade.backtest.backtest_metrics import (
     calculate_split_metrics,
     round_value,
 )
+from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
+from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
@@ -118,15 +120,6 @@ class SplitMetricsResponse(BaseModel):
     out_of_sample: BacktestMetricsResponse
 
 
-class RobustnessResponse(BaseModel):
-    """The robustness checks of docs/architecture/backtest.md section 10.9. The route calculates them at each read."""
-
-    # Null without a split, when a Sharpe ratio is null, or when the in-sample Sharpe ratio is 0 or below.
-    out_of_sample_to_in_sample_sharpe_percent: Decimal | None
-    # Null without a split.
-    out_of_sample_use_count: int | None
-
-
 class EquityPointResponse(BaseModel):
     time_utc: datetime
     equity_usd: Decimal
@@ -140,11 +133,26 @@ class TradeResponse(BaseModel):
     commission_usd: Decimal
 
 
+class BacktestRobustnessResponse(BaseModel):
+    """The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+    value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."""
+
+    trial_count: int
+    sharpe_probability_percent: Decimal | None
+    sharpe_probability_kind: SharpeProbabilityKind
+    sharpe_probability_status: SharpeProbabilityStatus | None
+    missing_reasons: dict[str, str]
+    # Null without a split, when a Sharpe ratio is null, or when the in-sample Sharpe ratio is 0 or below.
+    out_of_sample_to_in_sample_sharpe_percent: Decimal | None
+    # Null without a split.
+    out_of_sample_use_count: int | None
+
+
 class BacktestDetailResponse(BacktestResponse):
     equity_curve: list[EquityPointResponse]
     trades: list[TradeResponse]
     split_metrics: SplitMetricsResponse | None
-    robustness: RobustnessResponse
+    robustness: BacktestRobustnessResponse
 
 
 class ComparedBacktestResponse(BacktestDetailResponse):
@@ -332,8 +340,20 @@ class BacktestRoutes:
             out_of_sample_use_count = await self.count_out_of_sample_uses(connection, row)
         backtest = await self.to_backtest_response(row)
         split_metrics = calculate_finished_split_metrics(row, equity_curve, trades)
+        robustness = await read_robustness(
+            database_url=self.database_url, row=row, strategy_id=backtest.strategy_id, equity_curve=equity_curve
+        )
         return BacktestDetailResponse(
             **backtest.model_dump(),
+            robustness=BacktestRobustnessResponse(
+                trial_count=robustness.trial_count,
+                sharpe_probability_percent=robustness.sharpe_probability_percent,
+                sharpe_probability_kind=robustness.sharpe_probability_kind,
+                sharpe_probability_status=robustness.sharpe_probability_status,
+                missing_reasons=robustness.missing_reasons,
+                out_of_sample_to_in_sample_sharpe_percent=calculate_sharpe_percent(split_metrics),
+                out_of_sample_use_count=out_of_sample_use_count,
+            ),
             equity_curve=[
                 EquityPointResponse(time_utc=point.time_utc, equity_usd=point.equity_usd) for point in equity_curve
             ],
@@ -354,10 +374,6 @@ class BacktestRoutes:
                     in_sample=to_present_metrics_response(split_metrics.in_sample),
                     out_of_sample=to_present_metrics_response(split_metrics.out_of_sample),
                 )
-            ),
-            robustness=RobustnessResponse(
-                out_of_sample_to_in_sample_sharpe_percent=calculate_sharpe_percent(split_metrics),
-                out_of_sample_use_count=out_of_sample_use_count,
             ),
         )
 
