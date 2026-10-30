@@ -223,13 +223,29 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
     assert comparison["backtest"]["id"] == backtest_id
     assert comparison["backtest"]["status"] == "finished"
     # The metric functions of backtest: 10000 -> 10006, the peak 10020 falls to 10006 (0.1397 %).
-    assert comparison["forward_test_metrics"] == {
+    # The other metrics: test_forward_test_metrics.py.
+    forward_test_metrics = comparison["forward_test_metrics"]
+    assert {
+        name: forward_test_metrics[name]
+        for name in (
+            "final_equity_usd",
+            "net_profit_usd",
+            "total_return_percent",
+            "max_drawdown_percent",
+            "trade_count",
+        )
+    } == {
         "final_equity_usd": "10006",
+        "net_profit_usd": "6",
         "total_return_percent": "0.06",
         "max_drawdown_percent": "0.14",
         "trade_count": 2,
     }
-    assert comparison["backtest"]["metrics"]["trade_count"] == 3
+    # The Net profit of the backtest uses its paper capital: 10050 - 10000.
+    assert (comparison["backtest"]["metrics"]["trade_count"], comparison["backtest"]["metrics"]["net_profit_usd"]) == (
+        3,
+        "50",
+    )
     assert [point["time_utc"] for point in comparison["forward_test_equity_curve"]] == [
         "2026-01-02T03:05:00Z",
         "2026-01-02T03:06:00Z",
