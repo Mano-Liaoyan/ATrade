@@ -16,7 +16,7 @@ from atrade.strategy.code_checks import CodeProblem
 from atrade.strategy.rules_code import make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
-from atrade.strategy.strategy_templates import BLANK_CODE, STRATEGY_TEMPLATES, StartPoint, find_start_rules
+from atrade.strategy.strategy_templates import BLANK_CODE, STRATEGY_TEMPLATES, StartPoint, find_start_code, find_start_rules
 from atrade.strategy.version_saving import save_ai_assistant_version, save_checked_version
 
 MAX_STRATEGY_NAME_LENGTH = 100
@@ -35,7 +35,9 @@ class CreateStrategyRequest(BaseModel):
         """Version 1 of the start point (section 9.9.1)."""
         rules = find_start_rules(self.start_from)
         if rules is None:
-            return strategy_store.VersionContent(code=STRATEGY_TEMPLATE, source="user", rules=None)
+            # A code template makes version 1 with its code and the source `user` (section 9.9.5).
+            code = find_start_code(self.start_from) or STRATEGY_TEMPLATE
+            return strategy_store.VersionContent(code=code, source="user", rules=None)
         return strategy_store.VersionContent(
             code=make_rules_code(rules), source="rule_builder", rules=rules.model_dump(mode="json")
         )
