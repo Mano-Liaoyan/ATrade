@@ -10,7 +10,7 @@ from atrade.market_data.bar_reading import (
     save_received_bars,
     save_received_bars_blocking,
 )
-from atrade.market_data.bar_source import BarSource, read_source_order
+from atrade.market_data.bar_source import BarSource, check_source_order, read_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
 from atrade.market_data.exchange_rate_reading import (
     ExchangeRateReader,
@@ -40,6 +40,7 @@ __all__ = [
     "SavedBarCoverage",
     "SavedBars",
     "SavedExchangeRate",
+    "check_source_order",
     "create_market_data_router",
     "has_saved_bars",
     "read_saved_bar_coverage",

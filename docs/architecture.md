@@ -1684,6 +1684,14 @@ option and records it in this document.
 - Decided (#188): the watchlist `saved_bars` items keep the first and the
   last bar start of each bar table. The backtest form shows, for one bar
   period, the earliest first bar and the latest last bar of all bar sources.
+- Decided (#197): the request field of the backtest source order is
+  `source_order`. It holds each `BarSource` exactly 1 time, like the global
+  source order (`422` otherwise). `bar_count_by_source` counts only the bars
+  of the backtest range, not the look-back bars. The backtest page shows the
+  source order and the bar counts in the "Bar sources" tab. A backtest has
+  survivorship bias when its currency is `HKD`, or its currency is `USD` and
+  it starts before 2018-05-01 (`docs/architecture/backtest.md` section
+  10.12).
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each

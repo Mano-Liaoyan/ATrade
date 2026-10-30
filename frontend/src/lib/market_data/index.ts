@@ -1,6 +1,15 @@
-// Public entry of market_data: instrument search and its panel, bars, live bars, and the bar chart.
+// Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, the bar sources and
+// the source order, and the survivorship bias warning.
 export { default as BarChart } from './BarChart.svelte';
 export { default as InstrumentSearch } from './InstrumentSearch.svelte';
+export { default as SurvivorshipBiasWarning } from './SurvivorshipBiasWarning.svelte';
+export {
+  formatBarSource,
+  formatSourceOrder,
+  listSourceOrders,
+  readSourceOrder,
+  type BarSource,
+} from './source_order';
 export {
   BAR_PERIODS,
   DEFAULT_BAR_PERIOD,

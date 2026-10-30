@@ -7,10 +7,12 @@ from typing import Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.market_data import BarSource
 
 type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out"]
 
@@ -22,6 +24,9 @@ class BacktestRequest:
     bar_period: BarPeriod
     time_range: TimeRange
     paper_capital_usd: Decimal
+    # The source order of the bars and the look-back bars. None in a new request: the global source order. None in
+    # a saved backtest only for a row from before the source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 @dataclass(frozen=True)
@@ -29,6 +34,8 @@ class BacktestResult:
     equity_curve: list[EquityPoint]
     trades: list[BacktestTrade]
     metrics: BacktestMetrics
+    # The bar count of each bar source in the backtest range, without the look-back bars.
+    bar_count_by_source: dict[BarSource, int]
 
 
 @dataclass(frozen=True)
@@ -51,12 +58,14 @@ class BacktestRow:
     total_return_percent: Decimal | None
     max_drawdown_percent: Decimal | None
     trade_count: int | None
+    source_order: list[str] | None
+    bar_count_by_source: dict[str, int] | None
 
 
 BACKTEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc, paper_capital_usd,
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
-    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count
+    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count, source_order, bar_count_by_source
 """
 
 
@@ -67,6 +76,7 @@ def read_request(row: BacktestRow) -> BacktestRequest:
         bar_period=BarPeriod(row.bar_period),
         time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
         paper_capital_usd=row.paper_capital_usd,
+        source_order=None if row.source_order is None else [BarSource(value) for value in row.source_order],
     )
 
 
@@ -93,9 +103,9 @@ async def insert_backtest(
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, status, created_at_utc)
+                paper_capital_usd, status, created_at_utc, source_order)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s)
+                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s, %(source_order)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -108,6 +118,9 @@ async def insert_backtest(
                 "end_utc": request.time_range.end_utc,
                 "paper_capital_usd": request.paper_capital_usd,
                 "created_at_utc": created_at_utc,
+                "source_order": None
+                if request.source_order is None
+                else Jsonb([bar_source.value for bar_source in request.source_order]),
             },
         )
         inserted_row = await cursor.fetchone()
@@ -254,7 +267,7 @@ async def save_result(
             """
             UPDATE backtest SET status = 'finished', ended_at_utc = %(ended_at_utc)s, final_equity_usd = %(final_equity_usd)s,
                 total_return_percent = %(total_return_percent)s, max_drawdown_percent = %(max_drawdown_percent)s,
-                trade_count = %(trade_count)s
+                trade_count = %(trade_count)s, bar_count_by_source = %(bar_count_by_source)s
             WHERE id = %(backtest_id)s
             """,
             {
@@ -263,6 +276,9 @@ async def save_result(
                 "total_return_percent": result.metrics.total_return_percent,
                 "max_drawdown_percent": result.metrics.max_drawdown_percent,
                 "trade_count": result.metrics.trade_count,
+                "bar_count_by_source": Jsonb(
+                    {bar_source.value: count for bar_source, count in result.bar_count_by_source.items()}
+                ),
                 "ended_at_utc": ended_at_utc,
             },
         )
