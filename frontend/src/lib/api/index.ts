@@ -1896,6 +1896,10 @@ export interface components {
             /** Models */
             models: components["schemas"]["ProviderModelResponse"][];
         };
+        /** @enum {string} */
+        RankDirection: "high_to_low" | "low_to_high";
+        /** @enum {string} */
+        RebalancePeriod: "weekly" | "monthly" | "quarterly";
         /** RenameConversationRequest */
         RenameConversationRequest: {
             /** Title */
@@ -1940,12 +1944,16 @@ export interface components {
             /** Items */
             items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
         };
-        /** RuleSettings */
+        /**
+         * RuleSettings
+         * @description `position_size` is not used in the universe mode: each member gets equity / `hold_count`.
+         */
         RuleSettings: {
             /** Position Size */
             position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
             /** Template Id */
             template_id?: string | null;
+            universe?: components["schemas"]["UniverseSettings"] | null;
         };
         /** RulesCodeRequest */
         RulesCodeRequest: {
@@ -2393,6 +2401,20 @@ export interface components {
         };
         /** @enum {string} */
         UniverseKind: "single" | "rule" | "list";
+        /**
+         * UniverseSettings
+         * @description The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.
+         *
+         *     The strategy holds the `hold_count` members with the best rank, with equal weight, and ranks again at the start of
+         *     each `rebalance_period`.
+         */
+        UniverseSettings: {
+            rank_indicator: components["schemas"]["IndicatorOperand"];
+            rank_direction: components["schemas"]["RankDirection"];
+            /** Hold Count */
+            hold_count: number;
+            rebalance_period: components["schemas"]["RebalancePeriod"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
