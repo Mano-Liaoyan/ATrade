@@ -153,7 +153,9 @@ This replaces the rules above:
   `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID` (default `20`). At start, the worker
   checks that this ID is not in the forward test range and is not equal to
   the Web client ID. When the check fails, the worker does not start and
-  writes the reason.
+  writes the reason. Implemented (#216): `Settings` makes the check, and
+  `app/forward_test_worker.py` logs "The forward-test worker does not start"
+  with the reason and exits with code 1.
 - The reason for a separate fetcher ID: one client ID cannot have 2
   connections. The LiveNode of a forward test child already holds its client
   ID (section 12.15).
@@ -502,7 +504,8 @@ this document. The implementation can change them.
 | `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition` | The owner ledger interface of the execution client (#213). |
 | `BarStoreDataClient`, `BarStoreDataClientFactory(bar_store_input)`, `BarStoreInput` | The ATrade NautilusTrader data client of section 12.19 (#213). `BarStoreInput` has `database_url` and `instruments`. The factory keeps the created client in `client`, for `send_new_bars()`. |
 | `add_atrade_clients(builder, data_client_factory, execution_client_factory)` | Adds both clients to a `LiveNodeBuilder` as the default route. Without a data client factory, it adds only the execution client (#213). |
-| `BarFetcher(*, database_url, clock, gateway_connection)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. |
+| `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
+| `ReadMemberLists` | The type of `read_member_lists`: it returns the members of each running multi-instrument forward test. |
 | `StockSplitCheck(*, database_url, clock, gateway_connection)` | The daily stock split check of section 12.22. |
 | `read_allocated_capital(*, database_url)` | The sum of the allocated capital of the forward tests that hold a client ID. `paper_trading` gets it from `app/web.py` for the "By hand" capital (section 11.10 of [`paper_trading.md`](paper_trading.md)). |
 
@@ -963,6 +966,24 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
   section 8.4). So 500 instruments take about 250 seconds at least. The real
   time is not measured.
 - The cost is 0 USD.
+- Implementation (#216): `BarFetcher` in `forward_test/bar_fetcher.py`.
+  - `fetch_when_due()`: the daily read. It reads the union of the member
+    lists, each instrument 1 time, for the year before the current UTC day.
+  - `fill_warm_up(instruments, start_utc)`: the warm-up fill before a start.
+    It reads the year before the UTC day of `start_utc`.
+    No start path calls it before the multi-instrument forward test
+    ([#217](https://github.com/Mano-Liaoyan/ATrade/issues/217)).
+  - Both ask IBKR only for the ranges that no bar source in the global
+    source order saved (`read_unsaved_ranges` of `market_data`). So the daily
+    read asks only for the days after the last saved day. A day that is not
+    complete (section 8.4 of [`market_data.md`](market_data.md)) is not read.
+  - The fetcher waits 0.5 seconds before each request after the first one.
+  - The member lists come from a function argument. Until the
+    multi-instrument forward test
+    ([#217](https://github.com/Mano-Liaoyan/ATrade/issues/217)), the worker
+    passes a function that returns no list.
+  - Stock split evidence A comes later with the `market_data` read path
+    ([#196](https://github.com/Mano-Liaoyan/ATrade/issues/196)).
 
 ## 12.21 Quarterly universe (Phase 3)
 
@@ -1075,11 +1096,17 @@ simplest option and records it in this document.
   backtest does ([`backtest.md`](backtest.md) section 10.10.8): one
   `CustomData` with `DataType("UniverseUpdate")`, which the strategy gets in
   `on_data`. Not checked in a LiveNode: how the ATrade data client sends it.
-- The time after the daily close at which the bar fetcher reads the bars,
-  and what it does when IB Gateway is not reachable.
-- Whether the bar fetcher and the daily bar update of `web`
+- Decided (#216): the bar fetcher reads the bars at the first check after
+  00:30 UTC of each UTC day. A daily bar starts at 00:00 UTC of its trading
+  date, so the bar of the last US trading day is complete then. The worker
+  checks every 5 minutes. When IB Gateway is not reachable, or the
+  connection is lost during the read, the fetcher logs the reason and reads
+  again at the next check. The worker does not crash. A failed request of
+  one instrument on a working connection is logged and not saved, so the
+  next daily read asks IBKR again.
+- Decided (#216): the bar fetcher and the daily bar update of `web`
   ([Screen page prototype](https://github.com/Mano-Liaoyan/ATrade/issues/145))
-  share one job.
+  are 2 jobs. They run in different processes with different client IDs.
 - The status code of a `rule` start when no universe of the current quarter
   is stored.
 - Decided (#192): without `DATABENTO_API_KEY`, the quarterly update does not
