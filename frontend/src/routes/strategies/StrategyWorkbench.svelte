@@ -82,6 +82,7 @@
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
   import AssistantColumn from './AssistantColumn.svelte';
+  import { AssistantDiff, DIFF_TAB_VALUE } from './assistant_diff.svelte';
   import StrategyList from './StrategyList.svelte';
   import StrategyOutput from './StrategyOutput.svelte';
   import RulesTab from './RulesTab.svelte';
@@ -127,7 +128,6 @@
     { value: 'rules', label: 'Rules' },
     { value: 'strategy', label: 'strategy.py' },
   ];
-  const DIFF_TAB_VALUE = 'diff';
   const isMac = isMacPlatform(navigator);
 
   let strategies: StrategyListItem[] = $state([]);
@@ -170,10 +170,8 @@
   // The new code of the rules while the diff dialog before a rules save is open (section 9.8.4), else null.
   let replacingCode = $state<string | null>(null);
   let newStrategyForm: HTMLFormElement | undefined = $state();
-  // The diff of a diff card of the AI assistant: the new version and the version before it.
-  let diff = $state<{ versionNumber: number; firstCode: string; secondCode: string } | null>(null);
-  // The diff tab of the editor panel is selected. fileTab keeps the file tab to go back to.
-  let isDiffTab = $state(false);
+  // The diff tab of a diff card. fileTab keeps the file tab to go back to.
+  const assistantDiff = new AssistantDiff();
   let isAssistantMaximized = $state(false);
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
@@ -210,11 +208,7 @@
   const openVersionKey = $derived<StrategyVersionKey | null>(
     openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id },
   );
-  const fileTabs = $derived(
-    diff === null
-      ? FILE_TABS
-      : [...FILE_TABS, { value: DIFF_TAB_VALUE, label: `v${String(diff.versionNumber - 1)} → v${String(diff.versionNumber)}` }],
-  );
+  const fileTabs = $derived(assistantDiff.tab === null ? FILE_TABS : [...FILE_TABS, assistantDiff.tab]);
   const problemCounts = $derived(describeProblemCounts(problems));
   const swapButton = $derived(describeSwapButton(paneOrder));
   const panels = $derived(listWorkbenchPanels(paneOrder));
@@ -285,8 +279,7 @@
     rules = null;
     problems = [];
     selection = { tab: null, backtestId: null };
-    diff = null;
-    isDiffTab = false;
+    assistantDiff.close();
     // The AI assistant column leaves the page with the strategy, so it cannot restore the center area itself.
     isAssistantMaximized = false;
     if (id !== null) {
@@ -442,24 +435,11 @@
     if (strategy === null) {
       return;
     }
-    const id = strategy.id;
-    const [before, after] = await Promise.all([
-      readStrategyVersion(fetch, id, versionNumber - 1),
-      readStrategyVersion(fetch, id, versionNumber),
-    ]);
-    if (before.kind === 'failed' || after.kind === 'failed') {
-      writeOutputError(`Diff not read: ${before.kind === 'failed' ? before.message : after.kind === 'failed' ? after.message : ''}`);
-      return;
-    }
-    diff = { versionNumber, firstCode: before.value.code, secondCode: after.value.code };
-    isDiffTab = true;
-    panelSplit?.openPanel('editor');
-  }
-
-  function closeDiff(versionNumber: number): void {
-    if (diff?.versionNumber === versionNumber) {
-      diff = null;
-      isDiffTab = false;
+    const error = await assistantDiff.open(fetch, strategy.id, versionNumber);
+    if (error === null) {
+      panelSplit?.openPanel('editor');
+    } else {
+      writeOutputError(`Diff not read: ${error}`);
     }
   }
 
@@ -468,7 +448,7 @@
     if (strategy === null) {
       return;
     }
-    closeDiff(versionNumber);
+    assistantDiff.close(versionNumber);
     await loadStrategy(strategy.id, versionNumber);
     writeOutput(`Kept ${formatVersionLabel(strategy.name, versionNumber)}.`);
   }
@@ -478,7 +458,7 @@
     if (strategy === null) {
       return;
     }
-    closeDiff(versionNumber);
+    assistantDiff.close(versionNumber);
     const label = formatVersionLabel(strategy.name, versionNumber);
     const result = await readStrategy(fetch, strategy.id);
     if (result.kind === 'ok') {
@@ -737,16 +717,17 @@
               tabs={{
                 label: 'Files',
                 items: fileTabs,
-                value: isDiffTab ? DIFF_TAB_VALUE : fileTab,
+                value: assistantDiff.isSelected ? DIFF_TAB_VALUE : fileTab,
                 onValueChange: (value: string) => {
-                  isDiffTab = value === DIFF_TAB_VALUE;
-                  if (!isDiffTab) {
+                  assistantDiff.isSelected = value === DIFF_TAB_VALUE;
+                  if (!assistantDiff.isSelected) {
                     fileTab = value === 'rules' ? 'rules' : 'strategy';
                   }
                 },
               }}
             >
-              {#if diff !== null && isDiffTab}
+              {#if assistantDiff.diff !== null && assistantDiff.isSelected}
+                {@const diff = assistantDiff.diff}
                 <CodeDiff
                   firstCode={diff.firstCode}
                   secondCode={diff.secondCode}
@@ -755,14 +736,14 @@
                   fill
                 />
               {/if}
-              {#if fileTab === 'rules' && !isDiffTab}
+              {#if fileTab === 'rules' && !assistantDiff.isSelected}
                 {#if rules !== null}
                   {#key `${String(shownStrategy.id)}.${String(rulesVersionNumber)}`}
                     <RulesTab {rules} onRulesChange={changeRules} warning={rulesWarning} />
                   {/key}
                 {/if}
               {:else if openVersion !== null}
-                <div class="editor" hidden={isDiffTab || fileTab === 'rules'}>
+                <div class="editor" hidden={assistantDiff.isSelected || fileTab === 'rules'}>
                   {#key shownStrategy.id}
                     <CodeEditor
                       bind:this={codeEditor}
