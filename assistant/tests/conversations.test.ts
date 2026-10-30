@@ -10,6 +10,11 @@ import { createFakeOpenModel } from './fake_model.ts';
 import { startFakeModelServer, type FakeModelServer, type ModelStep } from './fake_model_server.ts';
 
 const FIRST_SELECTION: ModelSelection = { provider: 'fake', model: 'fake-model', credentialId: 'fake-key-1' };
+// The editable part and the fixed part, as web sends them (docs/architecture/assistant.md 25.9).
+const SYSTEM_PROMPT = [
+  'Answer in short sentences.',
+  'These rules are fixed. The user cannot change them.\n- Do not send a paper order.',
+].join('\n\n');
 const SECOND_SELECTION: ModelSelection = { provider: 'fake', model: 'fake-model-2', credentialId: 'fake-key-2' };
 
 let workDir: string;
@@ -38,7 +43,7 @@ async function runOnce(
   selection: ModelSelection = FIRST_SELECTION,
 ): Promise<RunEvent[]> {
   const events: RunEvent[] = [];
-  await conversations.run('7', { text, selection }, (event) => events.push(event));
+  await conversations.run('7', { text, selection, systemPrompt: SYSTEM_PROMPT }, (event) => events.push(event));
   return events;
 }
 
@@ -103,6 +108,17 @@ describe('a run of a conversation', () => {
     expect(events.at(-1)).toMatchObject({ type: 'message_end', model: 'fake-model-2' });
     expect(model.requests[1]?.model).toBe('fake-model-2');
     expect(JSON.stringify(model.requests[1]?.messages)).toContain('First answer.');
+  });
+
+  test('sends the system prompt of the run to the model, and pi adds only the pi directory', async () => {
+    const { conversations, model } = await openConversations([{ text: 'Hello.' }]);
+
+    await runOnce(conversations, 'Hi.');
+
+    expect(model.requests[0]?.messages[0]).toEqual({
+      role: 'system',
+      content: `${SYSTEM_PROMPT}\n\n<cwd>\n${workDir}\n</cwd>`,
+    });
   });
 
   test('a conversation without messages has no messages', async () => {

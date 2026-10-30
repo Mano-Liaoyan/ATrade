@@ -57,7 +57,7 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
     body = "".join(json.dumps(line) + "\n" for line in lines)
     client = client_for(httpx.Response(200, text=body), requests)
 
-    events = [event async for event in client.run(7, "Hi.", SELECTION)]
+    events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
     assert events == [
         TextDelta(text="Hel"),
@@ -65,7 +65,7 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
         RunError(message="Bad key"),
     ]
     assert str(requests[0].url) == "http://assistant:8002/conversations/7/runs"
-    assert json.loads(requests[0].content) == {"text": "Hi.", **SELECTION_BODY}
+    assert json.loads(requests[0].content) == {"text": "Hi.", **SELECTION_BODY, "system_prompt": "Be short."}
 
 
 @pytest.mark.anyio
@@ -99,7 +99,7 @@ async def test_a_refused_run_raises_the_reason() -> None:
     client = client_for(httpx.Response(400, json={"detail": "The field text must be a text that is not empty."}), [])
 
     with pytest.raises(AssistantServiceError, match="The field text must be a text"):
-        _ = [event async for event in client.run(7, "Hi.", SELECTION)]
+        _ = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
 
 @pytest.mark.anyio

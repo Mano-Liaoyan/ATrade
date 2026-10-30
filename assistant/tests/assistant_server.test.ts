@@ -93,7 +93,7 @@ describe('the conversation routes', () => {
   test('POST runs streams the run events as JSON lines', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }]);
 
-    const response = await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION });
+    const response = await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' });
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/x-ndjson');
@@ -116,7 +116,7 @@ describe('the conversation routes', () => {
 
   test('GET messages reads the messages of the JSONL file', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }]);
-    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION })).text();
+    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' })).text();
 
     const response = await fetch(`${baseUrl}/conversations/3/messages`);
 
@@ -152,7 +152,7 @@ describe('the conversation routes', () => {
 
   test('POST title answers the title', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }, { text: 'Greeting' }]);
-    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION })).text();
+    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' })).text();
 
     const response = await postJson(`${baseUrl}/conversations/3/title`, SELECTION);
 
@@ -170,7 +170,7 @@ describe('the conversation routes', () => {
 
   test('DELETE removes the messages', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }]);
-    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION })).text();
+    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' })).text();
 
     const response = await fetch(`${baseUrl}/conversations/3`, { method: 'DELETE' });
 

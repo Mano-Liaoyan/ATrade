@@ -2,9 +2,9 @@
 
 The assistant service listens on port 8002 in the network atrade-assistant-internal. web calls it over HTTP:
 
-- `POST /conversations/{id}/runs` with the user message and the model selection. The answer is one JSON line for each
-  pi event that web needs: `text_delta`, `message_end` (with the model and the credential name), `error`, and the tool
-  events `tool_step`, `strategy_version_saved`, and `backtest_finished` (25.10).
+- `POST /conversations/{id}/runs` with the user message, the model selection, and the system prompt. The answer is one
+  JSON line for each pi event that web needs: `text_delta`, `message_end` (with the model and the credential name),
+  `error`, and the tool events `tool_step`, `strategy_version_saved`, and `backtest_finished` (25.10).
 - `POST /conversations/{id}/steer`, `POST /conversations/{id}/abort`.
 - `POST /conversations/{id}/title`: one model call without tools. `502` with `detail` when it fails.
 - `GET /conversations/{id}/messages`: the messages of the JSONL file.
@@ -169,8 +169,10 @@ class ConversationMessage:
 
 
 class AssistantService(Protocol):
-    def run(self, conversation_id: int, text: str, selection: ModelSelection) -> AsyncIterator[RunEvent]:
-        """Runs one user message. The iterator ends when the run is settled."""
+    def run(
+        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+    ) -> AsyncIterator[RunEvent]:
+        """Runs one user message with the system prompt of the conversation. The iterator ends at the settled run."""
         ...
 
     async def steer(self, conversation_id: int, text: str) -> bool:
@@ -334,9 +336,11 @@ class AssistantServiceClient:
             message = f"The assistant service is not reachable: {error}"
             raise AssistantServiceError(message) from error
 
-    async def run(self, conversation_id: int, text: str, selection: ModelSelection) -> AsyncIterator[RunEvent]:
+    async def run(
+        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+    ) -> AsyncIterator[RunEvent]:
         # A tool can wait 15 minutes for a backtest (25.4.2).
-        body = {"text": text, **selection_body(selection)}
+        body = {"text": text, **selection_body(selection), "system_prompt": system_prompt}
         async for line in self.stream_lines(f"/conversations/{conversation_id}/runs", body):
             event = to_run_event(line)
             if event is not None:

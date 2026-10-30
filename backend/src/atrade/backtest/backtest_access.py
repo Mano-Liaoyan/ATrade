@@ -93,3 +93,13 @@ async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> Backt
         equity_curve=equity_curve,
         trades=trades,
     )
+
+
+async def read_last_backtest_ids(*, database_url: str, strategy_version_ids: list[int], count: int) -> list[int]:
+    """The IDs of the last backtests of these strategy versions, the newest first. At most `count`."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        cursor = await connection.execute(
+            "SELECT id FROM backtest WHERE strategy_version_id = ANY(%(ids)s) ORDER BY id DESC LIMIT %(count)s",
+            {"ids": strategy_version_ids, "count": count},
+        )
+        return [backtest_id for (backtest_id,) in await cursor.fetchall()]
