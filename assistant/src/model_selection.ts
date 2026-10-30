@@ -16,7 +16,3 @@ export interface OpenedModel {
 
 /** Opens the selected model. Rejects when the credential or the model does not exist. */
 export type OpenModel = (selection: ModelSelection) => Promise<OpenedModel>;
-
-/** The OpenModel of the service until the credential store exists (#183): no credential exists. */
-export const openNoModel: OpenModel = (selection) =>
-  Promise.reject(new Error(`The credential ${selection.credentialId} does not exist.`));
