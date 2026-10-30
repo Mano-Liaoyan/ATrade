@@ -336,7 +336,9 @@ Decided (#209): the port 8001 routes read the conversation from the header
 `X-ATrade-Conversation-Id` (assistant section 25.3.2). A missing header or
 an unknown conversation gets `422`. The new screen has `kept` false. The
 store tries "<name> (AI)", then "<name> (AI 2)", "<name> (AI 3)", and so
-on, until a name is free. `PUT` answers `404` for a screen that does not
+on, until a name is free. Because of the suffix, the name in the request
+has at most 95 characters. When no free name fits in 100 characters, the
+answer is `422` with a `name` problem. `PUT` answers `404` for a screen that does not
 exist, and `403` when the screen has `kept` true or another
 `assistant_conversation_id`. A delete of the conversation sets
 `assistant_conversation_id` to null on its screens and screen results

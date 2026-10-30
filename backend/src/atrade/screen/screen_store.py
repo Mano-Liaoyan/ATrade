@@ -86,10 +86,18 @@ def ai_assistant_names(name: str) -> Iterator[str]:
 
 
 async def insert_ai_assistant_screen(
-    connection: psycopg.AsyncConnection, screen: NewScreen, *, now_utc: datetime, assistant_conversation_id: int
+    connection: psycopg.AsyncConnection,
+    screen: NewScreen,
+    *,
+    now_utc: datetime,
+    assistant_conversation_id: int,
+    max_name_length: int,
 ) -> ScreenRecord:
-    """A screen of the AI assistant with the first free name of `ai_assistant_names`."""
+    """A screen of the AI assistant with the first free name of `ai_assistant_names`. Raises NameInUseError when no
+    free name has at most `max_name_length` characters."""
     for candidate in ai_assistant_names(screen.name):
+        if len(candidate) > max_name_length:
+            raise NameInUseError
         try:
             return await insert_screen(
                 connection,

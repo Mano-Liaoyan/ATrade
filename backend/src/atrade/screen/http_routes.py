@@ -14,7 +14,7 @@ from atrade.foundation.assistant_conversation import ConversationCheck, create_c
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.screen import screen_store
-from atrade.screen.screen_check import ScreenProblem, check_screen
+from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
 from atrade.screen.screen_running import run_saved_screen
 
 DEFAULT_PAGE_SIZE = 50
@@ -207,6 +207,17 @@ def name_in_use(name: str) -> JSONResponse:
     return check_failed([ScreenProblem(("name",), f"A screen with the name {name!r} exists.")])
 
 
+# Port 8001 adds " (AI)" to the name of a new screen (section 24.8).
+MAX_AI_ASSISTANT_NAME_LENGTH = MAX_NAME_LENGTH - len(" (AI)")
+
+
+def ai_assistant_name_too_long(length: int) -> ScreenProblem:
+    return ScreenProblem(
+        ("name",),
+        f'The name must have 1 to {MAX_AI_ASSISTANT_NAME_LENGTH} characters, not {length}: port 8001 adds " (AI)".',
+    )
+
+
 def screen_not_found(screen_id: int) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, detail=f"The screen {screen_id} does not exist.")
 
@@ -273,15 +284,22 @@ class ScreenRoutes:
     ) -> ScreenResponse | JSONResponse:
         """Not kept, with the conversation, and the name with " (AI)" or " (AI N)" (section 24.8)."""
         problems = check_screen(name=request.name, market=request.market, definition=request.definition)
+        if len(request.name) > MAX_AI_ASSISTANT_NAME_LENGTH:
+            problems = [problem for problem in problems if problem.location != ("name",)]
+            problems.insert(0, ai_assistant_name_too_long(len(request.name)))
         if problems:
             return check_failed(problems)
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            screen = await screen_store.insert_ai_assistant_screen(
-                connection,
-                to_new_screen(request),
-                now_utc=self.clock.read_now_utc(),
-                assistant_conversation_id=conversation_id,
-            )
+            try:
+                screen = await screen_store.insert_ai_assistant_screen(
+                    connection,
+                    to_new_screen(request),
+                    now_utc=self.clock.read_now_utc(),
+                    assistant_conversation_id=conversation_id,
+                    max_name_length=MAX_NAME_LENGTH,
+                )
+            except screen_store.NameInUseError:
+                return name_in_use(f"{request.name} (AI)")
             await connection.commit()
         return to_screen_response(screen, [])
 

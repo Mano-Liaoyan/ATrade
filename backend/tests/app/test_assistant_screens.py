@@ -173,3 +173,22 @@ async def test_a_delete_of_the_conversation_keeps_its_screens_and_screen_results
     assert deleted.status_code == httpx.codes.NO_CONTENT
     assert (screen["name"], screen["assistant_conversation_id"]) == ("Watchlist (AI)", None)
     assert read["assistant_conversation_id"] is None
+
+
+@pytest.mark.anyio
+async def test_a_new_screen_on_port_8001_with_no_room_for_the_ai_suffix_gives_a_name_problem(
+    database_url: str, clock: FixedClock, frontend_build_dir: Any
+) -> None:
+    async with open_both_clients(database_url, clock, frontend_build_dir) as (browser, assistant):
+        headers = await start_conversation(browser)
+
+        too_long = await assistant.post("/api/screens", json=screen_body("M" * 96), headers=headers)
+        fits = await assistant.post("/api/screens", json=screen_body("M" * 95), headers=headers)
+        no_room_for_number = await assistant.post("/api/screens", json=screen_body("M" * 95), headers=headers)
+
+    assert too_long.status_code == httpx.codes.UNPROCESSABLE_ENTITY, too_long.text
+    assert [problem["location"] for problem in too_long.json()["problems"]] == [["name"]]
+    assert fits.status_code == httpx.codes.CREATED, fits.text
+    assert fits.json()["name"] == "M" * 95 + " (AI)"
+    assert no_room_for_number.status_code == httpx.codes.UNPROCESSABLE_ENTITY, no_room_for_number.text
+    assert [problem["location"] for problem in no_room_for_number.json()["problems"]] == [["name"]]
