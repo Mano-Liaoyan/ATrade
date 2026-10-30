@@ -5,14 +5,19 @@
      minimized column is a 32px wide rail with the Open button, and it opens with the width from before. The body stays
      in the page while the column is minimized, so a form keeps its values. The browser keeps the width and the
      minimized state under `storageKey`. The button names use the lower-case `label`, for example "Minimize watchlist"
-     and "Open watchlist". `actions` adds icon buttons before the Minimize button. -->
+     and "Open watchlist". `actions` adds icon buttons before the Minimize button. `railIcon` is the icon of the Open
+     button of the rail. With `maximizable`, the column has a Maximize button: the column gets all the width of the
+     workbench except the other side columns and a 32px rail of the center area. A second click or Escape restores
+     the width from before. `onMaximizedChange` tells the page, so the center area can show only its rail. -->
 <script lang="ts">
+  import Maximize16 from '@carbon/icons/es/maximize/16.js';
+  import Minimize16 from '@carbon/icons/es/minimize/16.js';
   import RightPanelClose16 from '@carbon/icons/es/right-panel--close/16.js';
   import RightPanelOpen16 from '@carbon/icons/es/right-panel--open/16.js';
   import SidePanelClose16 from '@carbon/icons/es/side-panel--close/16.js';
   import SidePanelOpen16 from '@carbon/icons/es/side-panel--open/16.js';
   import { untrack, type Snippet } from 'svelte';
-  import { IconButton } from '#lib/foundation/carbon';
+  import { IconButton, type CarbonIconNode } from '#lib/foundation/carbon';
   import PanelHeader from './PanelHeader.svelte';
   import Splitter from './Splitter.svelte';
   import {
@@ -34,10 +39,27 @@
     width?: string;
     /** Icon buttons of the column (IconButton) in its header line, before the Minimize button. */
     actions?: Snippet;
+    /** The icon of the Open button of the rail. Default: the side panel icon. */
+    railIcon?: CarbonIconNode;
+    /** The name in the button names. Default: the lower-case label. */
+    buttonName?: string;
+    maximizable?: boolean;
+    onMaximizedChange?: (isMaximized: boolean) => void;
     children: Snippet;
   }
 
-  const { label, side, storageKey, width = '17.5rem', actions, children }: Props = $props();
+  const {
+    label,
+    side,
+    storageKey,
+    width = '17.5rem',
+    actions,
+    railIcon,
+    buttonName,
+    maximizable = false,
+    onMaximizedChange,
+    children,
+  }: Props = $props();
 
   const id = $props.id();
 
@@ -49,6 +71,21 @@
   $effect(() => {
     writeStoredLayout(storageKey, { isMinimized, widthPixels });
   });
+
+  // Maximize is not stored: a reload shows the width from before.
+  let isMaximized = $state(false);
+  function setMaximized(value: boolean): void {
+    if (value !== isMaximized) {
+      isMaximized = value;
+      onMaximizedChange?.(value);
+    }
+  }
+
+  function restoreOnEscape(event: KeyboardEvent): void {
+    if (isMaximized && event.key === 'Escape' && !event.defaultPrevented) {
+      setMaximized(false);
+    }
+  }
 
   // The workbench measures: zero until the column is in the page.
   let column: HTMLElement | undefined = $state();
@@ -91,22 +128,29 @@
     return widthPixels === null ? width : `${String(widthPixels)}px`;
   });
 
-  const name = $derived(label.toLowerCase());
+  const name = $derived(buttonName ?? label.toLowerCase());
+  // All the width except the other side columns and the 32px rail of the center area.
+  const maximizedWidth = $derived(
+    `calc(${String(workbenchPixels - otherColumnsPixels)}px - var(--cds-spacing-07))`,
+  );
+  const shownWidth = $derived(isMinimized ? 'var(--cds-spacing-07)' : isMaximized ? maximizedWidth : openWidth);
   const isStart = $derived(side === 'start');
 </script>
+
+<svelte:window onkeydown={restoreOnEscape} />
 
 <aside
   {id}
   bind:this={column}
   class={['side-column', `side-column--${side}`, isMinimized && 'side-column--rail']}
   aria-label={label}
-  style:inline-size={isMinimized ? 'var(--cds-spacing-07)' : openWidth}
+  style:inline-size={shownWidth}
 >
   <div class="side-column-content">
     {#if isMinimized}
       <IconButton
         label={`Open ${name}`}
-        icon={isStart ? SidePanelOpen16 : RightPanelOpen16}
+        icon={railIcon ?? (isStart ? SidePanelOpen16 : RightPanelOpen16)}
         align={isStart ? 'right' : 'left'}
         onclick={() => {
           isMinimized = false;
@@ -117,11 +161,21 @@
         <h2>{label}</h2>
         {#snippet end()}
           {@render actions?.()}
+          {#if maximizable}
+            <IconButton
+              label={isMaximized ? `Restore ${name}` : `Maximize ${name}`}
+              icon={isMaximized ? Minimize16 : Maximize16}
+              onclick={() => {
+                setMaximized(!isMaximized);
+              }}
+            />
+          {/if}
           <IconButton
             label={`Minimize ${name}`}
             icon={isStart ? SidePanelClose16 : RightPanelClose16}
             align="bottom-end"
             onclick={() => {
+              setMaximized(false);
               isMinimized = true;
             }}
           />
@@ -132,7 +186,7 @@
       {@render children()}
     </div>
   </div>
-  {#if !isMinimized}
+  {#if !isMinimized && !isMaximized}
     <Splitter
       label={`Resize ${name}`}
       controls={id}
