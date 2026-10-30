@@ -306,6 +306,8 @@ def add_discarded_version(database_url: str) -> None:
                 "conversation_id": conversation_id,
             },
         )
+
+
 def add_survivorship_bias_backtests(database_url: str) -> None:
     with psycopg.connect(database_url, autocommit=True) as connection:
         version_id = insert_strategy_version(
