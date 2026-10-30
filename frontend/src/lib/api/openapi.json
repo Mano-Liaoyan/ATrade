@@ -1627,6 +1627,7 @@
       },
       "post": {
         "summary": "Create Conversation",
+        "description": "The conversation records the latest prompt version and the fixed part of the system prompt (25.9).",
         "operationId": "create_conversation_api_assistant_conversations_post",
         "requestBody": {
           "required": true,
@@ -1825,6 +1826,61 @@
               }
             },
             "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/prompt-versions": {
+      "get": {
+        "summary": "List Prompt Versions",
+        "description": "When no version exists, saves the default text as version 1, so the list is never empty.",
+        "operationId": "list_prompt_versions_api_assistant_prompt_versions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptVersionListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Prompt Version",
+        "operationId": "save_prompt_version_api_assistant_prompt_versions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePromptVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptVersionResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -3344,6 +3400,14 @@
             ],
             "title": "Last Credential Name"
           },
+          "prompt_version_id": {
+            "type": "integer",
+            "title": "Prompt Version Id"
+          },
+          "prompt_version_number": {
+            "type": "integer",
+            "title": "Prompt Version Number"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ConversationMessageResponse"
@@ -3362,6 +3426,8 @@
           "last_provider",
           "last_model",
           "last_credential_name",
+          "prompt_version_id",
+          "prompt_version_number",
           "messages"
         ],
         "title": "ConversationDetailResponse"
@@ -3494,6 +3560,14 @@
               }
             ],
             "title": "Last Credential Name"
+          },
+          "prompt_version_id": {
+            "type": "integer",
+            "title": "Prompt Version Id"
+          },
+          "prompt_version_number": {
+            "type": "integer",
+            "title": "Prompt Version Number"
           }
         },
         "type": "object",
@@ -3505,7 +3579,9 @@
           "created_at_utc",
           "last_provider",
           "last_model",
-          "last_credential_name"
+          "last_credential_name",
+          "prompt_version_id",
+          "prompt_version_number"
         ],
         "title": "ConversationResponse"
       },
@@ -3514,6 +3590,18 @@
           "strategy_id": {
             "type": "integer",
             "title": "Strategy Id"
+          },
+          "version_number": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Number"
           }
         },
         "type": "object",
@@ -4884,6 +4972,61 @@
         ],
         "title": "PriceOperand"
       },
+      "PromptVersionListResponse": {
+        "properties": {
+          "prompt_versions": {
+            "items": {
+              "$ref": "#/components/schemas/PromptVersionResponse"
+            },
+            "type": "array",
+            "title": "Prompt Versions"
+          },
+          "default_text": {
+            "type": "string",
+            "title": "Default Text"
+          },
+          "fixed_part": {
+            "type": "string",
+            "title": "Fixed Part"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt_versions",
+          "default_text",
+          "fixed_part"
+        ],
+        "title": "PromptVersionListResponse"
+      },
+      "PromptVersionResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_number",
+          "text",
+          "created_at_utc"
+        ],
+        "title": "PromptVersionResponse"
+      },
       "ProviderListResponse": {
         "properties": {
           "providers": {
@@ -5196,6 +5339,21 @@
           "backtest_id"
         ],
         "title": "SamePeriodBacktestResponse"
+      },
+      "SavePromptVersionRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SavePromptVersionRequest"
       },
       "SaveVersionRequest": {
         "properties": {
