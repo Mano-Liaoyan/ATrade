@@ -41,7 +41,7 @@
     /** The last price of the instrument. The limit price starts with it. */
     lastPrice: number | null;
     account: PaperAccountMessage | null;
-    /** False while a live socket of the account or of the forward tests is not connected. */
+    /** False while the live socket of the account is not connected. */
     isConnected: boolean;
   }
 

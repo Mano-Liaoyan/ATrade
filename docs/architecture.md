@@ -1749,10 +1749,6 @@ option and records it in this document.
   back (`docs/architecture/paper_trading.md` section 11.13).
   `forward_test_fill` keeps only the fills of the old forward tests
   (`forward_test.md` section 12.24).
-- Decided (#215): the owner ledger migration has the revision
-  `c7a3e1f95b24`, because the migration of #171 also had the revision
-  `8d4f2a6c1e93`. Migration `b5e2c8a4d716` joins the 2 Alembic heads
-  (`8d4f2a6c1e93` and `c7a3e1f95b24`).
 - Decided (#215): an execution that IBKR makes after the stop of a run does
   not go into the owner ledger. The next run sends fills only for its own
   orders. The position then shows the difference as "Unattributed"

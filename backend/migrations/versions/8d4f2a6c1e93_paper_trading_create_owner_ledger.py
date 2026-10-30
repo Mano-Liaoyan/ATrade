@@ -1,12 +1,12 @@
 """paper_trading: create the owner_ledger_entry table
 
-Revision ID: c7a3e1f95b24
+Revision ID: 8d4f2a6c1e93
 Revises: 6c3e9a1f2b80
 """
 
 from alembic import op
 
-revision = "c7a3e1f95b24"
+revision = "8d4f2a6c1e93"
 down_revision = "6c3e9a1f2b80"
 
 

@@ -120,7 +120,7 @@ This replaces the rules above:
 - The order rules of the owner ledger (long only) protect each owner from the
   other owners ([`paper_trading.md`](paper_trading.md) section 11.10).
 - Implemented (#215) for the single-instrument forward test: migration
-  `b5e2c8a4d716` drops the index, the start has no instrument check, and
+  `bac389eabc50` drops the index, the start has no instrument check, and
   `POST /api/paper-trading/orders` and the paper order panel do not block an
   instrument of a forward test. The rules "until Phase 3" above are not in
   force any more.
@@ -560,10 +560,9 @@ Phase 3 table changes (#146). The column names are choices of this document.
 | `quarterly_universe` (new) | `quarter_start_date`, `rank` (1 to 500), `symbol`, `exchange`, `average_trading_value_usd`, `window_end_date` (the last trading day of the 63-day window that the calculation used). Primary key `(quarter_start_date, rank)`. Section 12.21 writes it. |
 | `quarterly_universe_run` (new) | `quarter_start_date` (primary key), `started_at_utc`, `ended_at_utc`, `window_end_date`, `status` (`running`, `done`, `failed`), `error_message`. One row for each calculation. |
 
-- Implemented (#215, migration `b5e2c8a4d716`): `allocated_capital_usd`
+- Implemented (#215, migration `bac389eabc50`): `allocated_capital_usd`
   (`numeric`, `CHECK > 0`) is null for the old rows. The Web process writes
-  it for each new row, so the column has no `NOT NULL`. The migration also
-  joins the 2 Alembic heads before it (`docs/architecture.md` section 22). The universe columns come
+  it for each new row, so the column has no `NOT NULL`. The universe columns come
   with the multi-instrument forward test (#217).
 - The watchlist kind (`list`) records the watchlist members at start in
   `forward_test_universe_member`. Whether a later change of the watchlist
