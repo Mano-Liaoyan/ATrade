@@ -3009,6 +3009,27 @@
             "type": "boolean",
             "title": "Survivorship Bias"
           },
+          "sweep_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sweep Id"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParameterValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -3074,6 +3095,8 @@
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
+          "sweep_id",
+          "parameters",
           "equity_curve",
           "trades",
           "instruments",
@@ -3506,6 +3529,27 @@
           "survivorship_bias": {
             "type": "boolean",
             "title": "Survivorship Bias"
+          },
+          "sweep_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sweep Id"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParameterValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3537,7 +3581,9 @@
           "conversation_id",
           "source_order",
           "bar_count_by_source",
-          "survivorship_bias"
+          "survivorship_bias",
+          "sweep_id",
+          "parameters"
         ],
         "title": "BacktestResponse"
       },
@@ -3983,6 +4029,27 @@
             "type": "boolean",
             "title": "Survivorship Bias"
           },
+          "sweep_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sweep Id"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParameterValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -4052,6 +4119,8 @@
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
+          "sweep_id",
+          "parameters",
           "equity_curve",
           "trades",
           "instruments",
@@ -8110,6 +8179,18 @@
             "type": "integer",
             "title": "Strategy Version Id"
           },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
           "grid": {
             "items": {
               "additionalProperties": true,
@@ -8146,6 +8227,9 @@
         "required": [
           "id",
           "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
           "grid",
           "created_at_utc",
           "run_count",
@@ -8163,6 +8247,18 @@
           "strategy_version_id": {
             "type": "integer",
             "title": "Strategy Version Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
           },
           "grid": {
             "items": {
@@ -8193,6 +8289,9 @@
         "required": [
           "id",
           "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
           "grid",
           "created_at_utc",
           "run_count",

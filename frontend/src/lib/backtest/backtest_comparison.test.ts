@@ -32,6 +32,8 @@ function makeBacktest(id: number, strategyId: number, strategyName: string): Bac
     source_order: ['ibkr', 'databento'],
     bar_count_by_source: null,
     survivorship_bias: false,
+    sweep_id: null,
+    parameters: null,
   };
 }
 

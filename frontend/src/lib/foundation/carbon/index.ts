@@ -23,6 +23,8 @@ export type { CarbonIcon, CarbonIconNode } from './carbon_icon';
 export { default as Combobox } from './Combobox.svelte';
 export type { ComboboxItem } from './combobox_classes';
 export { default as DataTable, type TableColumn } from './DataTable.svelte';
+export { default as SortHeader } from './SortHeader.svelte';
+export { readSequentialColor } from './sequential_color';
 export { default as OverflowMenu, type OverflowMenuItem } from './OverflowMenu.svelte';
 export { default as InlineNotification } from './InlineNotification.svelte';
 export type { NotificationKind, NotificationMessage } from './notification_message';

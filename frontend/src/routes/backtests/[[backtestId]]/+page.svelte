@@ -259,6 +259,11 @@
                   <span>{universeLabel}</span>
                 {/if}
                 <span class="run-period">{formatBarPeriod(detail.bar_period)}</span>
+                {#if detail.sweep_id !== null}
+                  <a class="cds--link" href={resolve('/sweeps/[[sweepId]]', { sweepId: String(detail.sweep_id) })}
+                    >Parameter sweep #{detail.sweep_id}</a
+                  >
+                {/if}
               </h1>
               <span class="run-status" role="status" aria-label="Backtest status">
                 <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />

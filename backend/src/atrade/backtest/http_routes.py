@@ -40,6 +40,7 @@ from atrade.backtest.backtest_store import (
     BacktestStatus,
     BacktestUniverse,
     BacktestUniverseKind,
+    ParameterValues,
     UniversePeriod,
     UniverseRebalancePeriod,
     UniverseScreen,
@@ -176,6 +177,9 @@ class BacktestResponse(BaseModel):
     source_order: list[BarSource] | None
     bar_count_by_source: dict[BarSource, int] | None
     survivorship_bias: bool
+    # The parameter sweep of a sweep run and its parameter values (section 10.11). Null for another backtest.
+    sweep_id: int | None
+    parameters: ParameterValues | None
 
 
 class SplitMetricsResponse(BaseModel):
@@ -368,6 +372,8 @@ def make_backtest_response(row: BacktestRow, strategy_version: StrategyVersion |
         if row.bar_count_by_source is None
         else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
         survivorship_bias=has_survivorship_bias(request),
+        sweep_id=row.sweep_id,
+        parameters=row.parameters,
     )
 
 

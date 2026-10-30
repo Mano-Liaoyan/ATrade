@@ -960,6 +960,9 @@ export interface components {
             } | null;
             /** Survivorship Bias */
             survivorship_bias: boolean;
+            /** Sweep Id */
+            sweep_id: number | null;
+            parameters: components["schemas"]["ParameterValues"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -1085,6 +1088,9 @@ export interface components {
             } | null;
             /** Survivorship Bias */
             survivorship_bias: boolean;
+            /** Sweep Id */
+            sweep_id: number | null;
+            parameters: components["schemas"]["ParameterValues"] | null;
         };
         /**
          * BacktestRobustnessResponse
@@ -1227,6 +1233,9 @@ export interface components {
             } | null;
             /** Survivorship Bias */
             survivorship_bias: boolean;
+            /** Sweep Id */
+            sweep_id: number | null;
+            parameters: components["schemas"]["ParameterValues"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -2594,6 +2603,12 @@ export interface components {
             id: number;
             /** Strategy Version Id */
             strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
             /** Grid */
             grid: {
                 [key: string]: unknown;
@@ -2618,6 +2633,12 @@ export interface components {
             id: number;
             /** Strategy Version Id */
             strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
             /** Grid */
             grid: {
                 [key: string]: unknown;

@@ -43,6 +43,8 @@
 @use '@carbon/styles/scss/components/data-table';
 // The table toolbar and its batch action bar (backtest list, #104).
 @use '@carbon/styles/scss/components/data-table/action';
+// The sortable headers of the Runs table of the sweep page (#204).
+@use '@carbon/styles/scss/components/data-table/sort';
 @use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/tile';

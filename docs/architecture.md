@@ -507,7 +507,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `carbon_icons.d.ts` declares these modules with the type `CarbonIcon`.
 - The app shell header (`src/routes/+layout.svelte`) is the Carbon UI shell
   header in a `cds--g100` zone in all themes. It shows the product name, the
-  page links (Home, Screens, Strategies, Backtests, Forward tests) with
+  page links (Home, Screens, Strategies, Backtests, Parameter sweeps,
+  Forward tests) with
   `aria-current="page"` on the current page, the backend status, the IB
   Gateway status, the server time, and the Paper tag. The Paper tag is a
   Carbon operational tag with a tooltip. The tooltip shows the checked paper
@@ -958,7 +959,15 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the structure of the backtest page: the "Parameter sweeps" `SideColumn`,
     a top panel with the status line and the point chart or the heat map,
     and the "Runs" panel. Heat map cells use a Carbon sequential color and
-    show their value as text.
+    show their value as text. Done in #204: the header link "Parameter
+    sweeps" after "Backtests" opens `/sweeps`, which opens the newest sweep,
+    like `/backtests`. The heat map is a Carbon data table. Its cell colors
+    are the Carbon data visualization sequential palette Blue 10 to Blue 100
+    (`@carbon/colors`, `foundation/carbon` `readSequentialColor`): the Carbon
+    themes have no tokens for it. The point chart is an SVG with Carbon
+    tokens. Neither chart uses a chart library. The sortable headers of the
+    "Runs" table are the Carbon `cds--table-sort` structure
+    (`foundation/carbon` `SortHeader`).
   - The forward test start dialog has "Instruments" (one instrument, top N by
     trading value, watchlist), "Capital (USD)", and "Unallocated: <amount>
     USD". The forward test page has an "Instruments" tab, a "Symbol" column
