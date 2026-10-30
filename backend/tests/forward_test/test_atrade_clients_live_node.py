@@ -164,7 +164,7 @@ async def test_the_client_reports_only_the_orders_and_fills_of_its_own_client_id
 
 @pytest.mark.anyio
 async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledger(database_url: str) -> None:
-    """The execId tells the executions apart. The 2 executions have the same quantity, price, and time."""
+    """The execution ID tells the executions apart. The 2 executions have the same quantity, price, and time."""
     world = make_world(database_url)
 
     strategy = make_strategy(claims_external_orders=True)
@@ -175,9 +175,14 @@ async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledge
         half = str(open_order.quantity / 2)
         world.gateway.executions.extend(
             make_execution(
-                ACCOUNT_ID, order_id=open_order.order_id, quantity=half, price=FILL_PRICE, client_id=CLIENT_ID
+                ACCOUNT_ID,
+                order_id=open_order.order_id,
+                quantity=half,
+                price=FILL_PRICE,
+                client_id=CLIENT_ID,
+                execution_id=f"0000e0d5.{number}",
             )
-            for _ in range(2)
+            for number in range(2)
         )
         await wait_until(lambda: len(world.ledger.fills) == 2)
 

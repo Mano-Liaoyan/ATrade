@@ -1774,11 +1774,6 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
-- Decided (#214): the owner ledger of "By hand" (the ledger start at the
-  first passed check, the cash of rule 2, the price of a market buy, the
-  USD conversion, and when the Web process records fills) is in
-  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
-  11.13.
 - Decided (#215): the forward test child uses the ATrade execution client
   with `ForwardTestLedger` of `paper_trading` and keeps the IB data client
   with the client ID of the forward test plus 100
@@ -1799,7 +1794,7 @@ option and records it in this document.
   give the real ledger.
 - Decided (#213): the ATrade execution client gets its fills from
   `reqExecutions` (`read_executions()`) every second. It sends a fill only
-  for a new execution (new IBKR `execId`) of its own client ID and of an
+  for a new execution (new IBKR `execId`, `execution_id`) of its own client ID and of an
   order that it sent in the same run. A cancel does not remove the order
   from this list. It reads the executions once more at the stop. When
   `save_fill()` fails, the next read tries the execution again. Its fill
@@ -1813,6 +1808,11 @@ option and records it in this document.
 - Decided (#213): the ATrade data client sends the new saved bars when its
   caller calls `send_new_bars()`. Only the tests call it now. #217 decides
   the production caller (`forward_test.md` section 12.24).
+- Decided (#214): the owner ledger of "By hand" (the ledger start at the
+  first passed check, the cash of rule 2, the price of a market buy, the
+  USD conversion, and when the Web process records fills) is in
+  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
+  11.13.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

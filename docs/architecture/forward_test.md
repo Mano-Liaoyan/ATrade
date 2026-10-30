@@ -983,8 +983,9 @@ Data client (`BarStoreDataClient`,
 `backend/src/atrade/forward_test/bar_store_data_client.py`):
 
 - It implements `_subscribe_bars` and `_request_bars`.
-- It gives the strategy the bars from the bar store. The strategy uses
-  `on_bar` and `request_bars` as before.
+- It gives the strategy the bars from the bar store, merged by the global
+  source order as in a backtest (`market_data.md` section 8.7.2). The
+  strategy uses `on_bar` and `request_bars` as before.
 - A multi-instrument forward test uses it (section 12.17).
 
 Rules for both clients:
