@@ -23,6 +23,7 @@ from atrade.foundation.instrument import Instrument
 from atrade.market_data import databento_import_sql
 from atrade.market_data.bar_source import BarSource, saved_range_table
 from atrade.market_data.bar_store import JOIN_SAVED_RANGE_TEMPLATE, create_key_parameters
+from atrade.market_data.daily_bar_summary import update_daily_bar_summaries_blocking
 
 NEW_YORK = ZoneInfo("America/New_York")
 NANOSECONDS_PER_SECOND = 10**9
@@ -188,7 +189,7 @@ def save_bars(connection: psycopg.Connection, query: LiteralString, time_range: 
     return cursor.rowcount
 
 
-def save_saved_ranges(connection: psycopg.Connection, time_range: TimeRange) -> None:
+def save_saved_ranges(connection: psycopg.Connection, time_range: TimeRange) -> list[Instrument]:
     """Records the bought time range for each instrument with a daily bar in it. A day without a bar in the range is
     a day without trading, so the bars route does not ask IBKR for it."""
     rows = connection.execute(
@@ -208,6 +209,7 @@ def save_saved_ranges(connection: psycopg.Connection, time_range: TimeRange) -> 
                 for instrument in instruments
             ],
         )
+    return instruments
 
 
 def read_file_kinds(connection: psycopg.Connection, file_paths: list[Path]) -> dict[tuple[str, str], TimeRange]:
@@ -220,27 +222,30 @@ def read_file_kinds(connection: psycopg.Connection, file_paths: list[Path]) -> d
 
 def import_databento_files(*, database_url: str, file_paths: list[Path]) -> DatabentoImportReport:
     """Imports the DBN files of the daily bar purchase (section 8.8.1). A second import of the same files adds no
-    row: a saved bar gets the same values, and the saved ranges join."""
+    row: a saved bar gets the same values, and the saved ranges join. The daily bar summary of each imported instrument
+    changes in the same transaction."""
     with psycopg.connect(database_url) as connection, connection.transaction():
         connection.execute(databento_import_sql.CREATE_TEMPORARY_TABLES)
         kind_ranges = read_file_kinds(connection, file_paths)
         saved_bar_count = 0
         symbols_without_official_close: list[str] = []
         symbols_without_listing_exchange: list[str] = []
+        saved_instruments: list[Instrument] = []
         history_range = find_history_range(kind_ranges)
         if history_range is not None:
             saved_bar_count += save_bars(connection, databento_import_sql.INSERT_HISTORY_BARS, history_range)
             symbols_without_official_close = read_symbols(
                 connection, databento_import_sql.SELECT_SYMBOLS_WITHOUT_OFFICIAL_CLOSE, history_range
             )
-            save_saved_ranges(connection, history_range)
+            saved_instruments += save_saved_ranges(connection, history_range)
         if SUMMARY_FILE_KIND in kind_ranges:
             summary_range = to_whole_days(kind_ranges[SUMMARY_FILE_KIND])
             saved_bar_count += save_bars(connection, databento_import_sql.INSERT_SUMMARY_BARS, summary_range)
             symbols_without_listing_exchange = read_symbols(
                 connection, databento_import_sql.SELECT_SYMBOLS_WITHOUT_LISTING_EXCHANGE, summary_range
             )
-            save_saved_ranges(connection, summary_range)
+            saved_instruments += save_saved_ranges(connection, summary_range)
+        update_daily_bar_summaries_blocking(connection, saved_instruments)
     return DatabentoImportReport(
         saved_bar_count=saved_bar_count,
         symbols_without_official_close=symbols_without_official_close,

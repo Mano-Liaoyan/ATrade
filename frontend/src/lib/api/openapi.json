@@ -951,6 +951,75 @@
         }
       }
     },
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+      "post": {
+        "summary": "Discard Version",
+        "description": "Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).",
+        "operationId": "discard_version_api_strategies__strategy_id__versions__version_number__discard_post",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          },
+          {
+            "name": "version_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies/{strategy_id}/versions": {
       "post": {
         "summary": "Save Version",
@@ -1044,6 +1113,7 @@
       },
       "post": {
         "summary": "Start Backtest",
+        "description": "The start of port 8000: a backtest without a conversation.",
         "operationId": "start_backtest_api_backtests_post",
         "requestBody": {
           "content": {
@@ -1072,55 +1142,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/backtests/{backtest_id}": {
-      "get": {
-        "summary": "Read Backtest",
-        "operationId": "read_backtest_api_backtests__backtest_id__get",
-        "parameters": [
-          {
-            "name": "backtest_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Backtest Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BacktestDetailResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1168,6 +1189,55 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtests/{backtest_id}": {
+      "get": {
+        "summary": "Read Backtest",
+        "operationId": "read_backtest_api_backtests__backtest_id__get",
+        "parameters": [
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -1459,6 +1529,212 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens": {
+      "get": {
+        "summary": "List Screens",
+        "operationId": "list_screens_api_screens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenListItemResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Screens Api Screens Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Screen",
+        "operationId": "create_screen_api_screens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screens/{screen_id}": {
+      "get": {
+        "summary": "Read Screen",
+        "operationId": "read_screen_api_screens__screen_id__get",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change Screen",
+        "description": "Overwrites the name and the definition. A screen has no versions (section 24.1).",
+        "operationId": "change_screen_api_screens__screen_id__put",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeScreenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Screen",
+        "description": "Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.",
+        "operationId": "delete_screen_api_screens__screen_id__delete",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -2277,6 +2553,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "source_order": {
             "anyOf": [
               {
@@ -2362,6 +2649,7 @@
           "out_of_sample_share",
           "split_time_utc",
           "metrics",
+          "conversation_id",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
@@ -2696,6 +2984,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "source_order": {
             "anyOf": [
               {
@@ -2754,6 +3053,7 @@
           "out_of_sample_share",
           "split_time_utc",
           "metrics",
+          "conversation_id",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias"
@@ -2920,6 +3220,23 @@
         ],
         "title": "BarsResponse"
       },
+      "ChangeScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "ChangeScreenRequest"
+      },
       "CodeCheckFailedResponse": {
         "properties": {
           "problems": {
@@ -3074,6 +3391,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "source_order": {
             "anyOf": [
               {
@@ -3163,6 +3491,7 @@
           "out_of_sample_share",
           "split_time_utc",
           "metrics",
+          "conversation_id",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
@@ -3732,6 +4061,28 @@
           "strategy_id"
         ],
         "title": "CreateConversationRequest"
+      },
+      "CreateScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "market",
+          "definition"
+        ],
+        "title": "CreateScreenRequest"
       },
       "CreateStrategyRequest": {
         "properties": {
@@ -4561,6 +4912,7 @@
         "title": "InterruptionResponse",
         "type": "object"
       },
+      "JsonValue": {},
       "LedgerRule": {
         "type": "string",
         "enum": [
@@ -4778,6 +5130,13 @@
         ],
         "title": "ManualOrderWithFillsResponse",
         "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
+      },
+      "Market": {
+        "type": "string",
+        "enum": [
+          "US",
+          "HK"
+        ]
       },
       "Number": {
         "anyOf": [
@@ -5539,6 +5898,172 @@
         "title": "SavedBarsResponse",
         "description": "The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."
       },
+      "ScreenCheckFailedResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems"
+        ],
+        "title": "ScreenCheckFailedResponse"
+      },
+      "ScreenListItemResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "updated_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "market",
+          "kept",
+          "updated_at_utc"
+        ],
+        "title": "ScreenListItemResponse"
+      },
+      "ScreenProblemResponse": {
+        "properties": {
+          "location": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "message"
+        ],
+        "title": "ScreenProblemResponse"
+      },
+      "ScreenResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "market": {
+            "$ref": "#/components/schemas/Market"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "assistant_conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Conversation Id"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "updated_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At Utc"
+          },
+          "recent_screen_results": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResultSummaryResponse"
+            },
+            "type": "array",
+            "title": "Recent Screen Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "market",
+          "definition",
+          "kept",
+          "assistant_conversation_id",
+          "created_at_utc",
+          "updated_at_utc",
+          "recent_screen_results"
+        ],
+        "title": "ScreenResponse"
+      },
+      "ScreenResultSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "run_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Run At Utc"
+          },
+          "result_count": {
+            "type": "integer",
+            "title": "Result Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_at_utc",
+          "result_count"
+        ],
+        "title": "ScreenResultSummaryResponse"
+      },
       "SendOrderRequest": {
         "properties": {
           "symbol": {
@@ -6003,7 +6528,8 @@
             "type": "string",
             "enum": [
               "user",
-              "rule_builder"
+              "rule_builder",
+              "ai_assistant"
             ],
             "title": "Source"
           },
@@ -6018,6 +6544,21 @@
               }
             ],
             "title": "Rules"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "discarded": {
+            "type": "boolean",
+            "title": "Discarded"
           }
         },
         "type": "object",
@@ -6029,7 +6570,9 @@
           "code_sha256",
           "created_at_utc",
           "source",
-          "rules"
+          "rules",
+          "conversation_id",
+          "discarded"
         ],
         "title": "StrategyVersionResponse"
       },
@@ -6056,9 +6599,25 @@
             "type": "string",
             "enum": [
               "user",
-              "rule_builder"
+              "rule_builder",
+              "ai_assistant"
             ],
             "title": "Source"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "discarded": {
+            "type": "boolean",
+            "title": "Discarded"
           }
         },
         "type": "object",
@@ -6067,7 +6626,9 @@
           "version_number",
           "code_sha256",
           "created_at_utc",
-          "source"
+          "source",
+          "conversation_id",
+          "discarded"
         ],
         "title": "StrategyVersionSummary"
       },

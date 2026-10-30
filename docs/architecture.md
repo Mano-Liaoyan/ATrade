@@ -239,6 +239,11 @@ app           -> all modules
   `foundation`. So `indicator` can import only `foundation`, and `indicator`
   and `ibkr` do not import each other. A contract keeps the internal files
   of `indicator` private (#160).
+- import-linter puts `screen` in its own layer below `backtest` and
+  `paper_trading` and above `watchlist`, so `backtest` can import `screen`
+  and `screen` can import `watchlist`. A forbidden contract keeps `screen`
+  from `strategy`, `ibkr`, and `assistant`, and a contract keeps the
+  internal files of `screen` private (#205).
 - import-linter puts `assistant` in the same layer as `ibkr` and
   `indicator`, so `assistant` can import only `foundation` (#179). A
   contract keeps the internal files of `assistant` private.
@@ -287,7 +292,7 @@ app           -> all modules
 
 | Entry point | Runs in | Purpose |
 |---|---|---|
-| `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second listener on port 8001 has only the allow-list routes for the `assistant` service (section 25). Runs the daily bar update after the close of each trading day (section 8). |
+| `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second uvicorn server on port 8001 runs in the same event loop (`serve_both`) and has only the allow-list routes for the `assistant` service (`app/assistant_port.py`, section 25). When one server stops, the other stops too. Only port 8000 has a lifespan (IB Gateway connection, paper account check, backtest runner). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
 | `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. From #191 it also writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
@@ -306,8 +311,12 @@ A restart of `web` does not stop forward tests.
 | `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
 | `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
 
-Port 8000 refuses with `403` each request that comes from an address of the
-`atrade-assistant-internal` subnet (section 25).
+Port 8000 refuses with `403` each request that arrives on a local address
+(ASGI `scope["server"]`) of the `atrade-assistant-internal` subnet
+`172.31.250.0/24` (section 25). The middleware is `RefuseAssistantSubnet` in
+`app/assistant_port.py`. The body is `{"detail": "Port 8000 does not answer
+requests from the assistant network."}`. A WebSocket from this subnet is
+closed before accept, so uvicorn answers `403`.
 
 ## 7. IBKR access
 
@@ -1096,7 +1105,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   default network, so it cannot connect to `postgres` or `ib-gateway`. `web`
   is on the default network and on `atrade-assistant-internal`. `web` also
   listens on port 8001 in `atrade-assistant-internal`. Compose does not
-  publish port 8001.
+  publish port 8001. `web` has no `ports` or `expose` entry for 8001: the
+  `assistant` service reaches it on the shared network. A test reads
+  `deploy/compose.yaml` and asserts this (#181).
 - `assistant` uses the image of `deploy/assistant.Dockerfile`: a Vite+ stage
   installs the production dependencies of `assistant/`, and a
   `node:24.13.0-slim` stage runs `node src/main.ts` as the user `node`.
@@ -1404,7 +1415,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Port 8001 app (phase 2): a unit test asserts that its routes are exactly
   the allow-list of section 25. A test asserts `403` on port 8000 for a
   request from the assistant subnet. A test asserts that a save on port 8001
-  records the source `assistant` and the conversation ID.
+  records the source `ai_assistant` and the conversation ID, and that a
+  backtest on port 8001 records the conversation ID or gets `422` without
+  saved bars (`backend/tests/app/test_assistant_port.py`).
 - Market data (phase 3): the source order merge rule, the Databento import
   (price rules, 7 regular-hours hourly bars, split and symbol link
   detection), the quarterly universe (63-day ranking, retry and fallback
@@ -1743,6 +1756,11 @@ option and records it in this document.
   message with `from="me"` always scrolls the log to the end, also while the
   user reads older messages (as in the Carbon `ChatLog`). The
   divider dates are UTC dates, like the other times of the app.
+- Decided (#180): the table `strategy_version_discard` holds the discarded
+  mark, the source value of the AI assistant is `ai_assistant`, Keep of a
+  diff card is not recorded, and the discard route answers `409` for a
+  version that the AI assistant did not save (strategy sections 9.1.1 and
+  9.6, assistant section 25.14).
 - Decided (#168): the Metrics table names the metrics CAGR, Annual
   volatility, Sharpe ratio, Sortino ratio, Calmar ratio, Profit factor, Win
   rate, Average win (USD), Average loss (USD), Exposure, and Turnover
@@ -1777,6 +1795,10 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#205): the `screen` tables, the definition keys, the comparison
+  operators, the `422` problem `location`, and the final paths of the screen
+  routes are in [`screen.md`](architecture/screen.md) sections 24.4, 24.4.1,
+  24.6, and 24.7. A delete of a screen deletes its screen results.
 - Decided (#197): the request field of the backtest source order is
   `source_order`. It holds each `BarSource` exactly 1 time, like the global
   source order (`422` otherwise). `bar_count_by_source` counts only the bars
@@ -1808,6 +1830,11 @@ option and records it in this document.
   and imports the file into `databento_bar`. The Databento import program
   calculates the quarters without members after each import. The other
   #192 choices are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#195): the daily bar update is `DailyBarUpdate` of the
+  `market_data` public entry. `app/web.py` runs it and gives it the
+  watchlist read (`read_watchlist_instruments` of `watchlist`), because
+  `market_data` does not import `watchlist`. The time, the calendar, and
+  "still trading" are in `docs/architecture/market_data.md` section 8.14.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
@@ -1874,6 +1901,10 @@ option and records it in this document.
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#181): the 2 uvicorn servers of the `web` process, the
+  conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
+  exchange rates of a backtest on port 8001. See section 25.14 and
+  [`backtest.md`](architecture/backtest.md) section 10.13.
 - Decided (#183): the credential file is `/data/credentials.json` in the
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the
