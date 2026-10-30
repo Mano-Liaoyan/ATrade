@@ -29,10 +29,10 @@ from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
-from atrade.market_data import ExchangeRateReader, InstrumentLookup, create_market_data_router
+from atrade.market_data import DailyBarUpdate, ExchangeRateReader, InstrumentLookup, create_market_data_router
 from atrade.paper_trading import BlockingForwardTest, PaperAccountMonitor, create_paper_trading_router
 from atrade.strategy import create_strategy_language_server_router, create_strategy_router
-from atrade.watchlist import create_watchlist_router
+from atrade.watchlist import create_watchlist_router, read_watchlist_instruments
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -66,6 +66,13 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
         clock=clock,
         process_command=BACKTEST_PROCESS_COMMAND,
     )
+    daily_bar_update = DailyBarUpdate(
+        database_url=settings.database_url,
+        clock=clock,
+        gateway_connection=gateway_connection,
+        # market_data does not import watchlist (docs/architecture.md section 6.2), so app/ connects them.
+        read_watchlist_instruments=lambda: read_watchlist_instruments(database_url=settings.database_url),
+    )
 
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
@@ -74,8 +81,9 @@ def create_web_app(*, settings: Settings, clock: Clock, gateway_connection: Gate
         # The paper account check runs after each connection, also when no browser is open.
         check_task = asyncio.create_task(paper_account_monitor.keep_checking())
         backtest_task = asyncio.create_task(backtest_runner.keep_running())
+        daily_bar_task = asyncio.create_task(daily_bar_update.keep_updating())
         yield
-        for task in (backtest_task, check_task, connection_task):
+        for task in (daily_bar_task, backtest_task, check_task, connection_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

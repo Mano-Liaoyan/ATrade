@@ -1751,6 +1751,11 @@ option and records it in this document.
   and imports the file into `databento_bar`. The Databento import program
   calculates the quarters without members after each import. The other
   #192 choices are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#195): the daily bar update is `DailyBarUpdate` of the
+  `market_data` public entry. `app/web.py` runs it and gives it the
+  watchlist read (`read_watchlist_instruments` of `watchlist`), because
+  `market_data` does not import `watchlist`. The time, the calendar, and
+  "still trading" are in `docs/architecture/market_data.md` section 8.14.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1

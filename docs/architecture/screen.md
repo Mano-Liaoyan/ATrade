@@ -389,7 +389,9 @@ Behavior:
 - How many recent runs the side column and `GET /api/screens/{id}` show.
 - Whether `screen` saves the full excluded list of a run with all US
   instruments (about 10000).
-- How `market_data` sets "Still trading" from the saved data.
+- How `screen` sets "Still trading" from `last_day_start_utc` of the
+  daily bar summary. Decided (#195): `market_data` stores no status
+  ([`market_data.md`](market_data.md) section 8.14).
 - How the point-in-time run of a backtest uses the source order: the global
   source order or the source order of the backtest.
 - The survivorship bias warning of a point-in-time backtest whose screen

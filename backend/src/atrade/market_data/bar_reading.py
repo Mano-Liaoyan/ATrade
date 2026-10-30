@@ -15,6 +15,7 @@ from atrade.ibkr import GatewayConnection
 from atrade.market_data import bar_store
 from atrade.market_data.bar_source import BarSource, select_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
+from atrade.market_data.daily_bar_summary import update_daily_bar_summaries, update_daily_bar_summaries_blocking
 
 
 class GatewayNotConnectedError(Exception):
@@ -160,6 +161,8 @@ class BarReader:
                 for missing_range in missing_ranges:
                     bars = await self.gateway_connection.read_historical_bars(instrument, bar_period, missing_range)
                     await bar_store.save_bars_of_range(connection, instrument, bar_period, missing_range, bars)
+                if missing_ranges and bar_period == BarPeriod.ONE_DAY:
+                    await update_daily_bar_summaries(connection, [instrument])
             return (await select_merged_bars(connection, source_order, complete_request)).bars
 
 
@@ -174,12 +177,15 @@ async def save_received_bars(*, database_url: str, bar_request: BarRequest, bars
     """Saves complete bars that a caller received from IBKR for `bar_request.time_range` in ibkr_bar, and records the
     range as saved. A forward test saves its warm-up bars with it, so a backtest of the same period finds them.
 
-    A bar that is already saved gets the new values: a second save of the same bars adds no row.
+    A bar that is already saved gets the new values: a second save of the same bars adds no row. A save of daily
+    bars updates the daily bar summary of the instrument.
     """
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         await bar_store.save_bars_of_range(
             connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
         )
+        if bar_request.bar_period == BarPeriod.ONE_DAY:
+            await update_daily_bar_summaries(connection, [bar_request.instrument])
 
 
 def save_received_bars_blocking(*, database_url: str, bar_request: BarRequest, bars: list[Bar]) -> None:
@@ -188,6 +194,8 @@ def save_received_bars_blocking(*, database_url: str, bar_request: BarRequest, b
         bar_store.save_bars_of_range_blocking(
             connection, bar_request.instrument, bar_request.bar_period, bar_request.time_range, bars
         )
+        if bar_request.bar_period == BarPeriod.ONE_DAY:
+            update_daily_bar_summaries_blocking(connection, [bar_request.instrument])
 
 
 async def has_saved_bars(*, database_url: str, bar_request: BarRequest, source_order: list[BarSource]) -> bool:

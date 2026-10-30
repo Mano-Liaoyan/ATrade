@@ -1,5 +1,6 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
-source order, saved bars, received bars to save, the Databento import, the quarterly US universe, live bars, and daily exchange
+source order, saved bars, received bars to save, the daily bars of many instruments, the daily
+bar summary and the daily bar update, the Databento import, the quarterly US universe, live bars, and daily exchange
 rates in USD."""
 
 from atrade.market_data.bar_reading import (
@@ -13,6 +14,8 @@ from atrade.market_data.bar_reading import (
 )
 from atrade.market_data.bar_source import BarSource, read_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
+from atrade.market_data.daily_bar_summary import DailyBarSummary, read_daily_bar_summaries, read_last_daily_bars
+from atrade.market_data.daily_bar_update import DailyBarUpdate
 from atrade.market_data.databento_client import DatabentoClient, DatabentoHistoricalClient
 from atrade.market_data.databento_import import (
     DatabentoImportError,
@@ -47,6 +50,8 @@ __all__ = [
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
     "BarRequest",
     "BarSource",
+    "DailyBarSummary",
+    "DailyBarUpdate",
     "DatabentoClient",
     "DatabentoHistoricalClient",
     "DatabentoImportError",
@@ -69,6 +74,8 @@ __all__ = [
     "find_previous_trading_day",
     "has_saved_bars",
     "import_databento_files",
+    "read_daily_bar_summaries",
+    "read_last_daily_bars",
     "read_saved_bar_coverage",
     "read_saved_bars",
     "read_saved_exchange_rates",

@@ -674,6 +674,18 @@ Table `daily_bar_summary`: one row for each instrument.
 - The summary reads the daily bars through the global source order.
 - Screens use the summary for step 1 (still trading, last price, average
   trading value (20), exchange).
+- `average_trading_value_20` is `double precision`. The class
+  `AverageTradingValue(20)` of `atrade.indicator` calculates it from the
+  same merged bars, so it is the value of the indicator (ADR 0001). It is
+  NULL when the instrument has fewer than 20 daily bars.
+- `read_last_daily_bars` of the `market_data` public entry reads the last n
+  daily bars before a date for a list of instruments in one SQL statement.
+  The statement reads the global source order too and applies the merge
+  rule of section 8.7.2. Screens (section 24.5) and the summary use it.
+- Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
+  summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
+  `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and
+  `tests/market_data/test_daily_bar_update.py`.
 
 ## 8.12 Bar fetcher of multi-instrument forward tests
 
@@ -801,14 +813,29 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Decided (#192): no table records each calculation. The `forward-test` log
   has the tries, the 09:00 ET fallback, and the errors. After an error, the
   update tries again after 15 minutes.
-- The time of the daily bar update after the US close and after the Hong
-  Kong close, and the trading calendars that it uses.
-- How `daily_bar_summary` decides "still trading", and how it is calculated
-  again after a change of the global source order.
-- The daily bar update (`web`, client ID of the Web process) and the bar
-  fetcher (`forward-test`, client ID 20) can save the same instrument at the
-  same time. The fill lock of section 8.4 is only in the Web process. Both
-  saves use the same SQL, so a second save adds no row.
+- Decided (#195): the daily bar update runs 1 time at 18:00 ET
+  (`America/New_York`) on each US trading day of `market_data/us_trading_days.py`
+  (weekdays without New Year's Day and Good Friday). 18:00 ET is after the
+  US close and after the Hong Kong close of the same day, so 1 run reads
+  all instruments. On another holiday, IBKR returns no new bar. A Hong Kong
+  trading day that is not a US trading day comes with the next run. The
+  `web` process runs the update after a start when 18:00 ET of the day has
+  passed. After an IBKR error for one instrument, the update logs it and
+  reads the next instrument.
+- Decided (#195): for each instrument, the update reads from the start of
+  its last IBKR daily bar (read again, section 8.13) to the start of the
+  current UTC day. An instrument without an IBKR daily bar gets 366 days.
+  When IB Gateway is not reachable at 18:00 ET, the update of that day does
+  not run and the log names the day.
+- Decided (#195): `daily_bar_summary` has no status column. "Still trading"
+  is a rule of `screen` on `last_day_start_utc`. After a change of the
+  global source order, `PUT /api/market-data/source-order` calculates all
+  summary rows again in the same transaction.
+- Decided (#195): the daily bar update (`web`, client ID of the Web process)
+  and the bar fetcher (`forward-test`, client ID 20) can save the same
+  instrument at the same time. Both use the same SQL, so a second save adds
+  no row, and each save calculates the summary row again from all saved
+  bars.
 - How symbol reuse is handled: a symbol that a different company uses later.
 - The bar start of the hourly 9:30 ET bar is not on a whole hour from the
   UNIX epoch (section 8.4). The bars route widens a range to whole bar
