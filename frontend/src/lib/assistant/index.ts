@@ -16,3 +16,37 @@ export {
   type PromptVersionItem,
   type PromptVersionList,
 } from './prompt_dialog';
+export {
+  addServerMessage,
+  addUserMessage,
+  describeToolStep,
+  EMPTY_LOG,
+  readConversationLog,
+  type ConversationLog,
+  type DiffItem,
+  type LogItem,
+  type MessageItem,
+  type MetricsItem,
+  type ServerMessage,
+  type ToolStepItem,
+} from './conversation_log';
+export {
+  createConversation,
+  deleteConversation,
+  discardStrategyVersion,
+  listConversations,
+  readConversation,
+  renameConversation,
+  type Conversation,
+  type ConversationDetail,
+} from './conversation_api';
+export { openConversationSocket, type ConversationSocket } from './conversation_socket';
+export {
+  changeProvider,
+  describeSendButton,
+  findDefaultSelection,
+  listSelectItems,
+  type LastModel,
+  type ModelSelection,
+} from './model_selection';
+export { listCredentials, listProviders } from './credentials';

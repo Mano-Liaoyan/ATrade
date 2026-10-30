@@ -11,7 +11,11 @@
      Below the two panels is the problems and output panel (ticket #107, like the VS Code panel). It starts minimized
      to its 24px status bar: the error and warning counts open the Problems tab, "Output" opens the Output tab. A click
      on the selected tab minimizes it again. A save that the code checks refuse opens Problems; a click on a problem goes
-     to its line in the editor. Output lists the events and errors of saves, backtests, and forward tests. -->
+     to its line in the editor. Output lists the events and errors of saves, backtests, forward tests, and the AI
+     assistant.
+     Right: the "AI assistant" side column (AssistantColumn, docs/architecture/assistant.md 25.12). A click on a diff
+     card opens a diff tab in the editor panel; Keep opens the new version, Discard keeps the open version. Maximize of
+     the side column hides the center area: it shows only a 32px rail. -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import ErrorFilled16 from '@carbon/icons/es/error--filled/16.js';
@@ -30,7 +34,7 @@
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
   import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput, Toggle } from '#lib/foundation/carbon';
-  import { CodeEditor } from '#lib/foundation/code_editor';
+  import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { startPolling } from '#lib/foundation/polling';
@@ -65,6 +69,7 @@
   } from '#lib/strategy';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
+  import AssistantColumn from './AssistantColumn.svelte';
   import StrategyList from './StrategyList.svelte';
   import StrategyOutput from './StrategyOutput.svelte';
   import StrategyResults from './StrategyResults.svelte';
@@ -105,7 +110,8 @@
   // The backend refuses a longer name.
   const STRATEGY_NAME_MAX_LENGTH = 100;
   const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
-  const FILE_TABS = [{ value: 'strategy', label: 'strategy.py' }];
+  const FILE_TAB = { value: 'strategy', label: 'strategy.py' };
+  const DIFF_TAB_VALUE = 'diff';
   const isMac = isMacPlatform(navigator);
 
   let strategies: StrategyListItem[] = $state([]);
@@ -141,6 +147,10 @@
   let isBacktestDialogOpen = $state(false);
   let isForwardTestDialogOpen = $state(false);
   let newStrategyForm: HTMLFormElement | undefined = $state();
+  // The diff of a diff card of the AI assistant: the new version and the version before it.
+  let diff = $state<{ versionNumber: number; firstCode: string; secondCode: string } | null>(null);
+  let editorTab = $state(FILE_TAB.value);
+  let isAssistantMaximized = $state(false);
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
   $effect(() => forwardTestFeed.start(window.location));
@@ -169,6 +179,11 @@
   const hasDiscardedVersion = $derived((strategy?.versions ?? []).some((version) => version.discarded));
   const openVersionKey = $derived<StrategyVersionKey | null>(
     openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id },
+  );
+  const fileTabs = $derived(
+    diff === null
+      ? [FILE_TAB]
+      : [FILE_TAB, { value: DIFF_TAB_VALUE, label: `v${String(diff.versionNumber - 1)} → v${String(diff.versionNumber)}` }],
   );
   const problemCounts = $derived(describeProblemCounts(problems));
   const swapButton = $derived(describeSwapButton(paneOrder));
@@ -235,6 +250,8 @@
     openVersion = null;
     problems = [];
     selection = { tab: null, backtestId: null };
+    diff = null;
+    editorTab = FILE_TAB.value;
     if (id !== null) {
       // The address gives the first version only. A later version change writes the address (openStrategyVersion).
       void loadStrategy(
@@ -321,6 +338,55 @@
     await loadStrategy(id, result.version.version_number);
     listReadCount += 1;
     writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
+  }
+
+  async function openDiff(versionNumber: number): Promise<void> {
+    if (strategy === null) {
+      return;
+    }
+    const id = strategy.id;
+    const [before, after] = await Promise.all([
+      readStrategyVersion(fetch, id, versionNumber - 1),
+      readStrategyVersion(fetch, id, versionNumber),
+    ]);
+    if (before.kind === 'failed' || after.kind === 'failed') {
+      writeOutputError(`Diff not read: ${before.kind === 'failed' ? before.message : after.kind === 'failed' ? after.message : ''}`);
+      return;
+    }
+    diff = { versionNumber, firstCode: before.value.code, secondCode: after.value.code };
+    editorTab = DIFF_TAB_VALUE;
+    panelSplit?.openPanel('editor');
+  }
+
+  function closeDiff(versionNumber: number): void {
+    if (diff?.versionNumber === versionNumber) {
+      diff = null;
+      editorTab = FILE_TAB.value;
+    }
+  }
+
+  // Keep: the editor opens the new version (docs/architecture/assistant.md 25.5.2).
+  async function keepVersion(versionNumber: number): Promise<void> {
+    if (strategy === null) {
+      return;
+    }
+    closeDiff(versionNumber);
+    await loadStrategy(strategy.id, versionNumber);
+    writeOutput(`Kept ${formatVersionLabel(strategy.name, versionNumber)}.`);
+  }
+
+  // Discard: the editor stays on the open version. The version list reads the discarded mark again.
+  async function showDiscardedVersion(versionNumber: number): Promise<void> {
+    if (strategy === null) {
+      return;
+    }
+    closeDiff(versionNumber);
+    const label = formatVersionLabel(strategy.name, versionNumber);
+    const result = await readStrategy(fetch, strategy.id);
+    if (result.kind === 'ok') {
+      strategy = result.value;
+    }
+    writeOutput(`Discarded ${label}.`);
   }
 
   function writeOutput(text: string): void {
@@ -458,7 +524,7 @@
     <StrategyList {strategies} errorMessage={listMessage} openStrategyId={activeStrategyId} />
   </SideColumn>
 
-  <div class="main">
+  <div class={['main', isAssistantMaximized && 'main--rail']}>
     {#if strategy !== null}
       {@const shownStrategy = strategy}
       <PanelHeader>
@@ -570,10 +636,26 @@
             <Panel
               {...state}
               label="Editor"
-              tabs={{ label: 'Files', items: FILE_TABS, value: 'strategy', onValueChange: () => {} }}
+              tabs={{
+                label: 'Files',
+                items: fileTabs,
+                value: editorTab,
+                onValueChange: (value: string) => {
+                  editorTab = value;
+                },
+              }}
             >
+              {#if diff !== null && editorTab === DIFF_TAB_VALUE}
+                <CodeDiff
+                  firstCode={diff.firstCode}
+                  secondCode={diff.secondCode}
+                  firstLabel={`v${String(diff.versionNumber - 1)}`}
+                  secondLabel={`v${String(diff.versionNumber)}`}
+                  fill
+                />
+              {/if}
               {#if openVersion !== null}
-                <div class="editor">
+                <div class="editor" hidden={diff !== null && editorTab === DIFF_TAB_VALUE}>
                   {#key shownStrategy.id}
                     <CodeEditor
                       bind:this={codeEditor}
@@ -639,6 +721,20 @@
       <EmptyText text="No strategies" />
     {/if}
   </div>
+
+  {#if strategy !== null}
+    <AssistantColumn
+      strategyId={strategy.id}
+      openVersionNumber={openVersion?.version_number ?? null}
+      onOpenDiff={(versionNumber: number) => void openDiff(versionNumber)}
+      onKeep={(versionNumber: number) => void keepVersion(versionNumber)}
+      onDiscarded={(versionNumber: number) => void showDiscardedVersion(versionNumber)}
+      onError={writeOutputError}
+      onMaximizedChange={(isMaximized: boolean) => {
+        isAssistantMaximized = isMaximized;
+      }}
+    />
+  {/if}
 </Workbench>
 
 <Dialog
@@ -711,6 +807,22 @@
     flex-direction: column;
     min-inline-size: 0;
     min-block-size: 0;
+  }
+
+  /* Maximize of the AI assistant: the center area is a 32px rail, and its content stays in the page. */
+  .main--rail {
+    flex: none;
+    inline-size: var(--cds-spacing-07);
+    border-inline-end: 1px solid var(--cds-border-subtle-01);
+    overflow: hidden;
+  }
+
+  .main--rail > :global(*) {
+    display: none;
+  }
+
+  .editor[hidden] {
+    display: none;
   }
 
   .strategy-name {
