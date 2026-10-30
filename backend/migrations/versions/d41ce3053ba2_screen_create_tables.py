@@ -1,13 +1,13 @@
 """screen: create the screen, screen_result, screen_result_row, and screen_result_exclusion tables
 
 Revision ID: d41ce3053ba2
-Revises: 8d4b2e6f1a90
+Revises: 2f6b8d1c4e97
 """
 
 from alembic import op
 
 revision = "d41ce3053ba2"
-down_revision = "8d4b2e6f1a90"
+down_revision = "2f6b8d1c4e97"
 
 
 def upgrade() -> None:
