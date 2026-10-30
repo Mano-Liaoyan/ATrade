@@ -123,6 +123,11 @@ document.
   `assistant_conversation_id` becomes null (#150 A3, B4).
 - PostgreSQL deletes the rows and the excluded list of a screen result with
   the screen result (`ON DELETE CASCADE`).
+- Decided (#205): the migration `d41ce3053ba2_screen_create_tables.py` makes
+  the 4 tables with these column names. `screen_result.screen_id` is
+  `ON DELETE CASCADE`: a delete of a screen deletes its screen results. A
+  backtest keeps its own copy of the screen (section 24.1). `result_count`
+  and `screen_result_row.position` are at most 500.
 
 ### 24.4.1 Screen definition
 
@@ -151,6 +156,18 @@ The definition is JSON. The indicator reference is the reference of section
   (US), or `hk_instrument_list`, `watchlist` (HK).
 - Numbers are decimal strings, as in the other routes.
 - `keep_first` is optional.
+- Decided (#205): the JSON has exactly these keys. All 4 top-level keys are
+  required. The `filters` and `indicator_conditions` lists can be empty.
+
+  | Part | Keys | Values |
+  |---|---|---|
+  | Filter `still_trading` | `field` | |
+  | Filter `last_price`, `average_trading_value_20` | `field`, `operator`, `value` | `operator`: `<`, `<=`, `>`, `>=`. `value`: a decimal string. |
+  | Filter `exchange` | `field`, `values` | A list of 1 or more exchanges. |
+  | Condition `compare` | `kind`, `indicator`, `operator`, `value` | As the number filters. |
+  | Condition `close_versus_line` | `kind`, `indicator`, `side` | `indicator`: `sma` or `ema` with the output `value`, or `donchian_channel` with the output `upper`. `side`: `above` or `below`. |
+  | Condition `rank` | `kind`, `indicator`, `end`, `percent` | `end`: `top` or `bottom`. `percent`: an integer from 1 to 100. |
+  | `order` | `indicator`, `direction`, optional `keep_first` | `direction`: `ascending` or `descending`. `keep_first`: an integer from 1 to 500. |
 
 ## 24.5 Run flow
 
@@ -199,18 +216,28 @@ gives the location of the condition and the reason. The checks:
 - Each operator and each field is known.
 - The name is 1 to 100 characters.
 
+Decided (#205): the check is `check_screen` in `screen/screen_check.py`. The
+`422` body is `{"problems": [{"location", "message"}]}`. `location` is the
+path in the request body, a list of keys and list indexes, for example
+`["definition", "indicator_conditions", 0, "indicator", "parameters", "period"]`.
+The indicator problems of section 23.6 get the location of their condition
+before their own location. A name that another screen has gives the
+problem `["name"]` with the reason "A screen with the name '<name>' exists.".
+The market is a problem `["market"]` when it is not `US` or `HK`.
+
 ## 24.7 HTTP routes
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) A8 and B3.
-The paths are proposals of #150. The implementation sets them.
+Decided (#205): the paths and the field names of this table are final.
+`screen/http_routes.py` has the first 5 routes.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/screens` | `200` with `[{"id", "name", "market", "kept", "updated_at_utc"}]`. |
-| `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and its recent screen results (`id`, `run_at_utc`, `result_count`). `404` when the screen does not exist. |
-| `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen. `422` with the problem list (section 24.6). |
+| `GET /api/screens` | `200` with `[{"id", "name", "market", "kept", "updated_at_utc"}]`, the last changed screen first. |
+| `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and `recent_screen_results`: the last 10 screen results (`id`, `run_at_utc`, `result_count`), the last run first. `404` when the screen does not exist. |
+| `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen, as `GET /api/screens/{screen_id}` gives it. A screen of the user has `kept` true and `assistant_conversation_id` null. `422` with the problem list (section 24.6). |
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
-| `DELETE /api/screens/{screen_id}` | `204`. `404` when the screen does not exist. Not on the AI assistant port. |
+| `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. |
 | `POST /api/screens/{screen_id}/runs` | Runs the saved screen. `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
@@ -371,8 +398,10 @@ Behavior:
 
 ## 24.13 Left to the implementation
 
-- The final route paths and the field names (#150 calls them proposals).
-- The form of the problem location in the `422` list.
+- Decided (#205): the final route paths and the field names (section
+  24.7).
+- Decided (#205): the form of the problem location in the `422` list
+  (section 24.6).
 - The route for Keep. Discard can use `DELETE /api/screens/{id}` on the Web
   port.
 - How a run of a screen with unsaved changes works: the run route takes a
@@ -382,11 +411,14 @@ Behavior:
 - What the result does when more than 500 instruments pass. #145 and #150
   give at most 500 rows.
 - The rank method for ties in a percentile.
-- The operators of a comparison (the tickets show `<` and `≥`).
+- Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
+  `>=` (section 24.4.1).
 - The default order of a new screen.
 - Where `/screens` stores the last opened screen.
-- What happens to the screen results when the user deletes a screen.
-- How many recent runs the side column and `GET /api/screens/{id}` show.
+- Decided (#205): a delete of a screen deletes its screen results (section
+  24.4).
+- Decided (#205): `GET /api/screens/{id}` shows the last 10 runs. The side
+  column is left to the screen page.
 - Whether `screen` saves the full excluded list of a run with all US
   instruments (about 10000).
 - How `market_data` sets "Still trading" from the saved data.
