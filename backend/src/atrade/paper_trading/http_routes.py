@@ -16,6 +16,7 @@ from atrade.paper_trading.paper_orders import (
     ManualOrderResponse,
     OrderBlockedResponse,
     OrderErrorResponse,
+    OrderRefusedByLedgerResponse,
     OrderRefusedResponse,
     PaperOrderRoutes,
 )
@@ -38,7 +39,10 @@ def add_order_routes(router: APIRouter, routes: PaperOrderRoutes) -> None:
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=ManualOrderResponse,
-        responses={**refused_or_failed, status.HTTP_409_CONFLICT: {"model": OrderBlockedResponse}},
+        responses={
+            **refused_or_failed,
+            status.HTTP_409_CONFLICT: {"model": OrderBlockedResponse | OrderRefusedByLedgerResponse},
+        },
     )
     router.add_api_route(
         "/api/paper-trading/orders",
@@ -82,6 +86,8 @@ def create_paper_trading_router(
     async def read_paper_capital() -> PaperCapitalResponse:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
         return PaperCapitalResponse(paper_capital_usd=await fetch_paper_capital_usd(paper_account_monitor))
 
-    router.include_router(create_account_socket_router(paper_account_monitor=paper_account_monitor))
+    router.include_router(
+        create_account_socket_router(paper_account_monitor=paper_account_monitor, ledger=routes.ledger)
+    )
 
     return router

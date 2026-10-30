@@ -346,15 +346,17 @@ def make_balance_values(account_id: str, *, net_liquidation_usd: str, cash_usd: 
     ]
 
 
-def make_stock_position(account_id: str, *, symbol: str, quantity: str, market_price: str) -> PortfolioPosition:
+def make_stock_position(  # noqa: PLR0913 readability-exception: one keyword argument per field of a position.
+    account_id: str, *, symbol: str, quantity: str, market_price: str, exchange: str = "NASDAQ", currency: str = "USD"
+) -> PortfolioPosition:
     price = Decimal(market_price)
     position_quantity = Decimal(quantity)
     return PortfolioPosition(
         account=account_id,
         symbol=symbol,
         security_type="STK",
-        exchange="NASDAQ",
-        currency="USD",
+        exchange=exchange,
+        currency=currency,
         quantity=position_quantity,
         average_cost=price,
         market_price=price,
@@ -384,16 +386,25 @@ def make_forward_test_order(
     )
 
 
-def make_execution(
-    account_id: str, *, order_id: int, quantity: str, price: str, client_id: int = WEB_CLIENT_ID
+def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument per field of a fill.
+    account_id: str,
+    *,
+    order_id: int,
+    quantity: str,
+    price: str,
+    client_id: int = WEB_CLIENT_ID,
+    side: str = "BOT",
+    commission: str = "0",
 ) -> Execution:
-    """One fill from reqExecutions."""
+    """One fill from reqExecutions. The execution ID is unique for the order, the quantity, and the price."""
     return Execution(
+        execution_id=f"0000e0d5.{order_id}.{quantity}.{price}",
         order_id=order_id,
         client_id=client_id,
         account=account_id,
         time_utc=LIVE_BAR_NOW_UTC,
-        side="BOT",
+        side=side,
         quantity=Decimal(quantity),
         price=Decimal(price),
+        commission=Decimal(commission),
     )

@@ -340,7 +340,7 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
 | `databento_bar_saved_range` | The columns of `ibkr_bar_saved_range`. | The Databento import writes the time range that it bought for each instrument and bar period. |
 | `source_order` | 1 row: `bar_sources` (ordered list of `BarSource` values), `changed_at_utc`. | `PUT /api/market-data/source-order`. |
 
-- One migration (`8d4f2a6c1e93`) renames `bar` to `ibkr_bar` and
+- One migration (`b7e3c9a4d158`) renames `bar` to `ibkr_bar` and
   `bar_saved_range` to `ibkr_bar_saved_range`. The data does not change. All
   SQL that uses the old names changes in the same PR.
 - The default source order is `ibkr`, then `databento`. The migration writes
@@ -621,6 +621,27 @@ Phase 3. Sources:
 | | `502` with `{"detail": "The instrument check failed: <reason>"}`. |
 | `DELETE /api/market-data/hk-instrument-list/{id}` | `204`. `404` with `{"detail": "This instrument is not in the HK instrument list."}`. |
 
+- The table is in the migration
+  `8d4b1e7c2a90_market_data_create_hk_instrument_list.py`. The routes are in
+  `market_data/hk_instrument_list_routes.py`. `create_market_data_router`
+  includes them. Listing and deleting do not need IB Gateway.
+- The add route checks each new symbol as `<symbol> / SEHK / HKD` before
+  it saves one. On `502` or `503`, the list does not change. A symbol that is
+  already in the list is not checked again. A symbol that the request has 2
+  times is in `already_in_list` the second time.
+- Frontend: `#lib/market_data` has the HTTP client (`hk_instrument_list.ts`)
+  and `HkInstrumentListEditor.svelte`. The editor is the section "HK
+  instrument list" of the settings page `/settings` (`docs/architecture.md`
+  section 13). It has the text input "Symbols" (spaces, tabs, commas, and
+  line ends separate the symbols) and the button "Add to HK instrument
+  list". After an add, the list "Add results" shows each symbol with a
+  `StatusIndicator`: "<symbol> added" (success), "<symbol> not found"
+  (error), and "<symbol> already in list" (warning). On `502` or `503`, an
+  error notification shows the `detail` text. The table (Symbol, Added,
+  Delete) is a Carbon `sm` data table in a `ScrollRegion` named "HK
+  instrument list table". Each row has the Delete icon button "Delete
+  <symbol> from the HK instrument list".
+
 - Some pages show a survivorship bias warning with an icon, a word, and the
   warning color. The warning says that the universe has no instruments that
   stopped trading. It does not stop the run. These pages show it:
@@ -748,7 +769,6 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 
 ## 8.14 Left to the implementation
 
-- The exact name of the settings page route and its place in the header.
 - Decided (#191): the enum values of `stock_split.source` and
   `stock_split.confirmation` are in section 8.13.1.
 - Decided (#191): the user checks the detections with the command
