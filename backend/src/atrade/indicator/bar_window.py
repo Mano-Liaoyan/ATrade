@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from nautilus_trader.model import Bar as NautilusBar
 
 from atrade.foundation.bar import Bar
-from atrade.indicator.wrapped_indicator import to_nautilus_bar
+from atrade.indicator.wrapped_indicator import make_nautilus_bar
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class BarWindowIndicator:
 
     def update(self, bar: Bar) -> None:
         """The screen path: the same update as `handle_bar` for one saved bar."""
-        self.handle_bar(to_nautilus_bar(bar))
+        self.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._window.clear()

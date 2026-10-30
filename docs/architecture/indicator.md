@@ -115,6 +115,10 @@ of #130 (A is the strongest, D is practitioner use only).
   current bar included, so the value is at most 1.
 - The Donchian `middle` is the mean of `upper` and `lower`. The MACD
   `histogram` is `value` − `signal`. RSI is on a scale of 0 to 100.
+- The wrapped ATR and RSI use the Wilder average (#130). The NautilusTrader
+  2.0.0rc7 default of both is Wilder, so the classes do not pass
+  `MovingAverageType.Wilder` (#160, section 21.1 of
+  [`docs/architecture.md`](../architecture.md)).
 - Average trading value is in the currency of the instrument (USD for US
   instruments, HKD for Hong Kong instruments).
 - RSI, MACD, and Bollinger Bands are entry timing tools only. #130 found no
@@ -295,7 +299,5 @@ indicator reference in JSON:
 
 ## 23.8 Left to the implementation
 
-- Decided (#160): the wrapped ATR and RSI use the Wilder average (#130).
-  The NautilusTrader 2.0.0rc7 default of both is Wilder, so the classes do
-  not pass `MovingAverageType.Wilder` (section 21.1 of
-  [`docs/architecture.md`](../architecture.md)).
+
+Nothing is left. Section 23.2 has the #160 decision about the Wilder average.

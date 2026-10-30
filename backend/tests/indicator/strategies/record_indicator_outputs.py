@@ -1,7 +1,7 @@
 """Test strategy: registers one `atrade.indicator` class and records its outputs in each `on_bar`.
 
-The indicator tests replace the 4 settings lines before they run this file as strategy code. Each line of the record
-file is a JSON list with the output values of one bar (null is "no value").
+The indicator tests replace the record file line, the indicator line, and the outputs line before they run this file
+as strategy code. Each line of the record file is a JSON list with the outputs of one bar (null is "no value").
 """
 
 # The NautilusTrader 2.0 stubs type some parameters as a bare dict (docs/architecture.md section 16 G).
@@ -17,9 +17,6 @@ from nautilus_trader.trading import Strategy
 import atrade.indicator
 
 RECORD_FILE = "/tmp/indicator_records.txt"
-INDICATOR_NAME = "SMA"
-PARAMETERS: dict[str, object] = {}
-OUTPUT_NAMES = ["value"]
 
 
 class RecordIndicatorOutputsConfig(StrategyConfig):
@@ -33,13 +30,13 @@ class RecordIndicatorOutputsStrategy(Strategy):
     def __init__(self, config: RecordIndicatorOutputsConfig) -> None:
         super().__init__(config)
         self.settings = config
-        self.indicator: object = getattr(atrade.indicator, INDICATOR_NAME)(**PARAMETERS)
+        self.indicator = atrade.indicator.SMA()
 
     def on_start(self) -> None:
-        self.register_indicator_for_bars(self.settings.bar_type, self.indicator)  # pyright: ignore[reportArgumentType]
+        self.register_indicator_for_bars(self.settings.bar_type, self.indicator)
         self.subscribe_bars(self.settings.bar_type)
 
     def on_bar(self, bar: Bar) -> None:
-        outputs: list[object] = [getattr(self.indicator, name) for name in OUTPUT_NAMES]
+        outputs = [self.indicator.value]
         with Path(RECORD_FILE).open("a") as record_file:
             record_file.write(json.dumps(outputs) + "\n")
