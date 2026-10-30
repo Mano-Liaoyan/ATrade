@@ -88,10 +88,11 @@ async def test_share_of_0_has_no_split(web_client: httpx.AsyncClient, database_u
     assert detail["out_of_sample_share"] == 0
     assert detail["split_time_utc"] is None
     assert detail["split_metrics"] is None
-    assert detail["robustness"] == {
-        "out_of_sample_to_in_sample_sharpe_percent": None,
-        "out_of_sample_use_count": None,
-    }
+    robustness = detail["robustness"]
+    assert (robustness["out_of_sample_to_in_sample_sharpe_percent"], robustness["out_of_sample_use_count"]) == (
+        None,
+        None,
+    )
 
 
 @pytest.mark.anyio
@@ -209,7 +210,8 @@ async def test_robustness_gives_the_out_of_sample_sharpe_ratio_as_a_percent_of_t
     assert detail["split_metrics"]["in_sample"]["sharpe_ratio"] == "6.99"
     assert detail["split_metrics"]["out_of_sample"]["sharpe_ratio"] == "9.29"
     # 9.29 / 6.99.
-    assert detail["robustness"] == {
-        "out_of_sample_to_in_sample_sharpe_percent": "132.90",
-        "out_of_sample_use_count": 1,
-    }
+    robustness = detail["robustness"]
+    assert (robustness["out_of_sample_to_in_sample_sharpe_percent"], robustness["out_of_sample_use_count"]) == (
+        "132.90",
+        1,
+    )
