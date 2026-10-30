@@ -1750,6 +1750,14 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#197): the request field of the backtest source order is
+  `source_order`. It holds each `BarSource` exactly 1 time, like the global
+  source order (`422` otherwise). `bar_count_by_source` counts only the bars
+  of the backtest range, not the look-back bars. The backtest page shows the
+  source order and the bar counts in the "Bar sources" tab. A backtest has
+  survivorship bias when its currency is `HKD`, or its currency is `USD` and
+  it starts before 2018-05-01 (`docs/architecture/backtest.md` section
+  10.12).
 - Decided (#190): the Databento import program is `app/databento_import.py`.
   The user runs it in the `web` image with `docker compose run`. The bought
   files are in `data/databento/` of the repository (in `.gitignore`). The

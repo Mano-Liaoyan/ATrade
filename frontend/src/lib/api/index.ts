@@ -640,6 +640,14 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -743,6 +751,14 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
         };
         /**
          * BacktestRobustnessResponse
@@ -854,6 +870,14 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -1639,6 +1663,8 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
         };
         /** StartForwardTestRequest */
         StartForwardTestRequest: {
