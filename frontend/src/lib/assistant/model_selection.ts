@@ -68,10 +68,13 @@ export function listSelectItems(
   };
 }
 
+/** The socket of the open conversation. It does not connect again after a close (conversation_socket.ts). */
+export type ConnectionState = 'connecting' | 'open' | 'closed';
+
 export interface SendState {
   hasConversation: boolean;
   hasCredential: boolean;
-  isConnected: boolean;
+  connection: ConnectionState;
   isRunning: boolean;
 }
 
@@ -91,8 +94,10 @@ export function describeSendButton(state: SendState): SendButton {
     ? 'Start a new conversation to send.'
     : !state.hasCredential
       ? 'Add a credential to send.'
-      : !state.isConnected
+      : state.connection === 'connecting'
         ? 'Connecting to the AI assistant.'
-        : null;
+        : state.connection === 'closed'
+          ? 'The connection to the AI assistant closed. Reload the page to send.'
+          : null;
   return { action: 'send', label: 'Send', disabledReason };
 }

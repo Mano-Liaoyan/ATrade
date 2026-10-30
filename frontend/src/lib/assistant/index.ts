@@ -46,6 +46,7 @@ export {
   describeSendButton,
   findDefaultSelection,
   listSelectItems,
+  type ConnectionState,
   type LastModel,
   type ModelSelection,
 } from './model_selection';

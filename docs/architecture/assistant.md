@@ -1120,7 +1120,9 @@ columns behave the same (section 13).
   last OAuth refresh failed).
 - Decided (#185): the copy of the disabled controls. "Send" is disabled with
   a helper text under the input: "Start a new conversation to send.", "Add a
-  credential to send.", or "Connecting to the AI assistant.". "Rename
+  credential to send.", "Connecting to the AI assistant.", or (after the
+  socket closed) "The connection to the AI assistant closed. Reload the page
+  to send.". "Rename
   conversation" and "Delete conversation" are "No conversation to rename" and
   "No conversation to delete" without a conversation. A Select without items
   shows "No credential" or "No model".

@@ -252,6 +252,8 @@
     selection = { tab: null, backtestId: null };
     diff = null;
     editorTab = FILE_TAB.value;
+    // The AI assistant column leaves the page with the strategy, so it cannot restore the center area itself.
+    isAssistantMaximized = false;
     if (id !== null) {
       // The address gives the first version only. A later version change writes the address (openStrategyVersion).
       void loadStrategy(

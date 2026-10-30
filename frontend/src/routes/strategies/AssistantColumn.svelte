@@ -34,6 +34,7 @@
     readConversation,
     readConversationLog,
     renameConversation,
+    type ConnectionState,
     type Conversation,
     type ConversationLog,
     type ConversationSocket,
@@ -69,7 +70,7 @@
   let conversations: Conversation[] = $state([]);
   let conversationId = $state<number | null>(null);
   let log = $state<ConversationLog>(EMPTY_LOG);
-  let isConnected = $state(false);
+  let connection = $state<ConnectionState>('connecting');
   let socket: ConversationSocket | null = null;
   let providers: Provider[] = $state([]);
   let credentials: Credential[] = $state([]);
@@ -89,13 +90,18 @@
     describeSendButton({
       hasConversation: conversation !== null,
       hasCredential: selection.credentialId !== '',
-      isConnected,
+      connection,
       isRunning: log.isRunning,
     }),
   );
 
   async function readConversations(selectId: number | null): Promise<void> {
-    const result = await listConversations(fetch, strategyId);
+    const readStrategyId = strategyId;
+    const result = await listConversations(fetch, readStrategyId);
+    // An answer for a strategy that is not open any more does not change the column.
+    if (readStrategyId !== strategyId) {
+      return;
+    }
     if (result.kind === 'failed') {
       onError(`Conversations not read: ${result.message}`);
       return;
@@ -150,6 +156,8 @@
       return;
     }
     let isCurrent = true;
+    let titleTimer: ReturnType<typeof setTimeout> | undefined;
+    connection = 'connecting';
     void readConversation(fetch, id).then((result) => {
       if (!isCurrent) {
         return;
@@ -165,20 +173,21 @@
       onMessage: (message) => {
         log = addServerMessage(log, message, new Date().toISOString());
         if (message.type === 'run_state' && message.state === 'settled') {
-          setTimeout(() => void readConversations(id), TITLE_READ_DELAY_MILLISECONDS);
+          clearTimeout(titleTimer);
+          titleTimer = setTimeout(() => void readConversations(id), TITLE_READ_DELAY_MILLISECONDS);
         }
       },
       onError,
       onConnectionChange: (connected) => {
-        isConnected = connected;
+        connection = connected ? 'open' : 'closed';
       },
     });
     socket = opened;
     return () => {
       isCurrent = false;
+      clearTimeout(titleTimer);
       opened.close();
       socket = null;
-      isConnected = false;
     };
   });
 

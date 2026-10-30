@@ -58,7 +58,7 @@ describe('the model selection of the assistant side column', () => {
 });
 
 describe('the Send button', () => {
-  const ready = { hasConversation: true, hasCredential: true, isConnected: true, isRunning: false };
+  const ready = { hasConversation: true, hasCredential: true, connection: 'open' as const, isRunning: false };
 
   it('sends when a conversation, a credential, and the connection are ready', () => {
     expect(describeSendButton(ready)).toEqual({ action: 'send', label: 'Send', disabledReason: null });
@@ -71,6 +71,9 @@ describe('the Send button', () => {
   it('says why it is disabled', () => {
     expect(describeSendButton({ ...ready, hasConversation: false }).disabledReason).toBe('Start a new conversation to send.');
     expect(describeSendButton({ ...ready, hasCredential: false }).disabledReason).toBe('Add a credential to send.');
-    expect(describeSendButton({ ...ready, isConnected: false }).disabledReason).toBe('Connecting to the AI assistant.');
+    expect(describeSendButton({ ...ready, connection: 'connecting' }).disabledReason).toBe('Connecting to the AI assistant.');
+    expect(describeSendButton({ ...ready, connection: 'closed' }).disabledReason).toBe(
+      'The connection to the AI assistant closed. Reload the page to send.',
+    );
   });
 });

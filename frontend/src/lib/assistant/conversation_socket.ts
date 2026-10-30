@@ -37,11 +37,16 @@ export function openConversationSocket(
 ): ConversationSocket {
   const socket = new WebSocket(buildSocketUrl(`/ws/assistant?conversation_id=${String(conversationId)}`, location));
   let isClosed = false;
+  // After close(), the page has a new socket: the events of this one do not change the page.
   socket.addEventListener('open', () => {
-    events.onConnectionChange(true);
+    if (!isClosed) {
+      events.onConnectionChange(true);
+    }
   });
   socket.addEventListener('close', () => {
-    events.onConnectionChange(false);
+    if (!isClosed) {
+      events.onConnectionChange(false);
+    }
   });
   socket.addEventListener('message', (event: MessageEvent<unknown>) => {
     if (isClosed || typeof event.data !== 'string') {
