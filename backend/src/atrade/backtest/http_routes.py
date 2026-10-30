@@ -57,7 +57,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
-from atrade.strategy import read_strategy_version, read_strategy_versions
+from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 DEFAULT_OUT_OF_SAMPLE_SHARE = 30
@@ -304,6 +304,44 @@ def calculate_sharpe_percent(split_metrics: SplitMetrics | None) -> Decimal | No
     return round_value(out_of_sample_sharpe / in_sample_sharpe * PERCENT)
 
 
+def make_backtest_response(row: BacktestRow, strategy_version: StrategyVersion | None) -> BacktestResponse:
+    """The response of a backtest row. `strategy_version` is the version of the row. A missing version is an error."""
+    if strategy_version is None:
+        message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
+        raise RuntimeError(message)
+    request = backtest_store.read_request(row)
+    return BacktestResponse(
+        id=row.id,
+        strategy_version_id=row.strategy_version_id,
+        strategy_id=strategy_version.strategy_id,
+        strategy_name=strategy_version.strategy_name,
+        version_number=strategy_version.version_number,
+        universe_kind=row.universe_kind,
+        symbol=row.symbol,
+        exchange=row.exchange,
+        currency=row.currency,
+        universe_top_n=row.universe_top_n,
+        bar_period=BarPeriod(row.bar_period),
+        start_utc=row.start_utc,
+        end_utc=row.end_utc,
+        paper_capital_usd=row.paper_capital_usd,
+        status=row.status,
+        error_message=row.error_message,
+        created_at_utc=row.created_at_utc,
+        started_at_utc=row.started_at_utc,
+        ended_at_utc=row.ended_at_utc,
+        out_of_sample_share=row.out_of_sample_share,
+        split_time_utc=row.split_time_utc,
+        metrics=to_metrics_response(backtest_store.read_metrics(row)),
+        conversation_id=row.conversation_id,
+        source_order=request.source_order,
+        bar_count_by_source=None
+        if row.bar_count_by_source is None
+        else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
+        survivorship_bias=has_survivorship_bias(request),
+    )
+
+
 class BacktestRoutes:
     """The route functions. They share the database URL and the clock."""
 
@@ -316,40 +354,16 @@ class BacktestRoutes:
         strategy_version = await read_strategy_version(
             database_url=self.database_url, strategy_version_id=row.strategy_version_id
         )
-        if strategy_version is None:
-            message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
-            raise RuntimeError(message)
-        request = backtest_store.read_request(row)
-        return BacktestResponse(
-            id=row.id,
-            strategy_version_id=row.strategy_version_id,
-            strategy_id=strategy_version.strategy_id,
-            strategy_name=strategy_version.strategy_name,
-            version_number=strategy_version.version_number,
-            universe_kind=row.universe_kind,
-            symbol=row.symbol,
-            exchange=row.exchange,
-            currency=row.currency,
-            universe_top_n=row.universe_top_n,
-            bar_period=BarPeriod(row.bar_period),
-            start_utc=row.start_utc,
-            end_utc=row.end_utc,
-            paper_capital_usd=row.paper_capital_usd,
-            status=row.status,
-            error_message=row.error_message,
-            created_at_utc=row.created_at_utc,
-            started_at_utc=row.started_at_utc,
-            ended_at_utc=row.ended_at_utc,
-            out_of_sample_share=row.out_of_sample_share,
-            split_time_utc=row.split_time_utc,
-            metrics=to_metrics_response(backtest_store.read_metrics(row)),
-            conversation_id=row.conversation_id,
-            source_order=request.source_order,
-            bar_count_by_source=None
-            if row.bar_count_by_source is None
-            else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
-            survivorship_bias=has_survivorship_bias(request),
+        return make_backtest_response(row, strategy_version)
+
+    async def list_backtests(self) -> list[BacktestResponse]:
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            rows = await backtest_store.select_backtests(connection)
+        # One connection and one query for the versions of all rows: the pages read the list each 2 seconds.
+        versions = await read_strategy_versions(
+            database_url=self.database_url, strategy_version_ids=sorted({row.strategy_version_id for row in rows})
         )
+        return [make_backtest_response(row, versions.get(row.strategy_version_id)) for row in rows]
 
     async def find_universe_periods(self, request: StartBacktestRequest, time_range: TimeRange) -> list[UniversePeriod]:
         """The universe periods of a multi-instrument request. Raises a 422 HTTPException when it has no members."""
@@ -424,11 +438,6 @@ class BacktestRoutes:
             message = f"Backtest {started} is missing after its start."
             raise RuntimeError(message)
         return await self.to_backtest_response(row)
-
-    async def list_backtests(self) -> list[BacktestResponse]:
-        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            rows = await backtest_store.select_backtests(connection)
-        return [await self.to_backtest_response(row) for row in rows]
 
     async def compare_backtests(self, first_backtest_id: int, second_backtest_id: int) -> BacktestComparisonResponse:
         """Compare two backtests of the same strategy: two versions, or one version with other request fields."""
