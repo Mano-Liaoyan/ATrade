@@ -11,11 +11,14 @@ import pytest
 from atrade.assistant import (
     AssistantServiceClient,
     AssistantServiceError,
+    BacktestFinished,
     ConversationMessage,
     MessageEnd,
     ModelSelection,
     RunError,
+    StrategyVersionSaved,
     TextDelta,
+    ToolStep,
 )
 
 SELECTION = ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1")
@@ -57,6 +60,32 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
     ]
     assert str(requests[0].url) == "http://assistant:8002/conversations/7/runs"
     assert json.loads(requests[0].content) == {"text": "Hi.", **SELECTION_BODY}
+
+
+@pytest.mark.anyio
+async def test_run_reads_the_tool_events() -> None:
+    step = {"type": "tool_step", "tool_call_id": "call_1", "tool_name": "run_backtest", "status": "running"}
+    lines = [
+        {**step, "backtest_id": None, "backtest_status": None},
+        {**step, "backtest_id": 11, "backtest_status": "queued"},
+        {"type": "strategy_version_saved", "strategy_id": 3, "strategy_version_id": 103, "version_number": 3},
+        {"type": "backtest_finished", "backtest_id": 11},
+    ]
+    body = "".join(json.dumps(line) + "\n" for line in lines)
+    client = client_for(httpx.Response(200, text=body), [])
+
+    events = [event async for event in client.run(7, "Hi.", SELECTION)]
+
+    assert events == [
+        ToolStep(
+            tool_call_id="call_1", tool_name="run_backtest", status="running", backtest_id=None, backtest_status=None
+        ),
+        ToolStep(
+            tool_call_id="call_1", tool_name="run_backtest", status="running", backtest_id=11, backtest_status="queued"
+        ),
+        StrategyVersionSaved(strategy_id=3, strategy_version_id=103, version_number=3),
+        BacktestFinished(backtest_id=11),
+    ]
 
 
 @pytest.mark.anyio

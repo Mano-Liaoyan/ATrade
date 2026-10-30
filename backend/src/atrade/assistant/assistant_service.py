@@ -3,7 +3,8 @@
 The assistant service listens on port 8002 in the network atrade-assistant-internal. web calls it over HTTP:
 
 - `POST /conversations/{id}/runs` with the user message and the model selection. The answer is one JSON line for each
-  pi event that web needs: `text_delta`, `message_end` (with the model and the credential name), and `error`.
+  pi event that web needs: `text_delta`, `message_end` (with the model and the credential name), `error`, and the tool
+  events `tool_step`, `strategy_version_saved`, and `backtest_finished` (25.10).
 - `POST /conversations/{id}/steer`, `POST /conversations/{id}/abort`.
 - `POST /conversations/{id}/title`: one model call without tools. `502` with `detail` when it fails.
 - `GET /conversations/{id}/messages`: the messages of the JSONL file.
@@ -57,7 +58,37 @@ class RunError:
     message: str
 
 
-type RunEvent = TextDelta | MessageEnd | RunError
+@dataclass(frozen=True)
+class ToolStep:
+    """The start, an update (onUpdate), or the end of one tool call."""
+
+    tool_call_id: str
+    tool_name: str
+    status: Literal["running", "succeeded", "failed"]
+    # run_backtest only: the backtest and its queue state or run state.
+    backtest_id: int | None
+    backtest_status: str | None
+
+
+@dataclass(frozen=True)
+class StrategyVersionSaved:
+    strategy_id: int
+    strategy_version_id: int
+    version_number: int
+
+
+@dataclass(frozen=True)
+class BacktestFinished:
+    backtest_id: int
+
+
+type RunEvent = TextDelta | MessageEnd | RunError | ToolStep | StrategyVersionSaved | BacktestFinished
+
+TOOL_STEP_STATUSES: dict[str, Literal["running", "succeeded", "failed"]] = {
+    "running": "running",
+    "succeeded": "succeeded",
+    "failed": "failed",
+}
 
 
 @dataclass(frozen=True)
@@ -101,8 +132,30 @@ def to_run_event(event: dict[str, Any]) -> RunEvent | None:
             )
         case "error":
             return RunError(message=str(event["message"]))
+        case "tool_step":
+            return to_tool_step(event)
+        case "strategy_version_saved":
+            return StrategyVersionSaved(
+                strategy_id=int(event["strategy_id"]),
+                strategy_version_id=int(event["strategy_version_id"]),
+                version_number=int(event["version_number"]),
+            )
+        case "backtest_finished":
+            return BacktestFinished(backtest_id=int(event["backtest_id"]))
         case _:
             return None
+
+
+def to_tool_step(event: dict[str, Any]) -> ToolStep:
+    backtest_id = event.get("backtest_id")
+    backtest_status = event.get("backtest_status")
+    return ToolStep(
+        tool_call_id=str(event["tool_call_id"]),
+        tool_name=str(event["tool_name"]),
+        status=TOOL_STEP_STATUSES[str(event["status"])],
+        backtest_id=None if backtest_id is None else int(backtest_id),
+        backtest_status=None if backtest_status is None else str(backtest_status),
+    )
 
 
 def read_detail(response: httpx.Response) -> str:

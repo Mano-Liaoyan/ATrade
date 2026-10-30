@@ -14,7 +14,15 @@ import httpx
 import pytest
 from httpx_ws import AsyncWebSocketSession, aconnect_ws
 
-from atrade.assistant import AssistantServiceError, MessageEnd, ModelSelection, TextDelta
+from atrade.assistant import (
+    AssistantServiceError,
+    BacktestFinished,
+    MessageEnd,
+    ModelSelection,
+    StrategyVersionSaved,
+    TextDelta,
+    ToolStep,
+)
 from tests.assistant.assistant_app import create_conversation, create_strategy, open_assistant_client
 from tests.fakes.assistant import HOLD, FakeAssistantService
 from tests.fakes.clock import FixedClock
@@ -117,6 +125,60 @@ async def test_a_prompt_streams_the_answer_between_running_and_settled(
             "Hi.",
             ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1"),
         )
+    ]
+
+
+@pytest.mark.anyio
+async def test_the_tool_events_reach_the_browser_as_tool_steps_and_cards(
+    connection: AssistantConnection, assistant_service: FakeAssistantService
+) -> None:
+    def backtest_step(status: str, backtest_status: str | None) -> ToolStep:
+        backtest_id = None if backtest_status is None else 11
+        return ToolStep(
+            tool_call_id="call_2",
+            tool_name="run_backtest",
+            status="running" if status == "running" else "succeeded",
+            backtest_id=backtest_id,
+            backtest_status=backtest_status,
+        )
+
+    assistant_service.run_scripts = [
+        [
+            ToolStep(
+                tool_call_id="call_1",
+                tool_name="save_strategy_version",
+                status="succeeded",
+                backtest_id=None,
+                backtest_status=None,
+            ),
+            StrategyVersionSaved(strategy_id=3, strategy_version_id=103, version_number=3),
+            backtest_step("running", None),
+            backtest_step("running", "queued"),
+            backtest_step("running", "running"),
+            backtest_step("succeeded", "finished"),
+            BacktestFinished(backtest_id=11),
+        ]
+    ]
+
+    await connection.prompt("Improve it.", FIRST_MODEL)
+
+    messages = await connection.receive_until_settled()
+    step = {"type": "tool_step", "tool_call_id": "call_2", "tool_name": "run_backtest"}
+    assert messages[1:-1] == [
+        {
+            "type": "tool_step",
+            "tool_call_id": "call_1",
+            "tool_name": "save_strategy_version",
+            "status": "succeeded",
+            "backtest_id": None,
+            "backtest_status": None,
+        },
+        {"type": "strategy_version_saved", "strategy_id": 3, "strategy_version_id": 103, "version_number": 3},
+        {**step, "status": "running", "backtest_id": None, "backtest_status": None},
+        {**step, "status": "running", "backtest_id": 11, "backtest_status": "queued"},
+        {**step, "status": "running", "backtest_id": 11, "backtest_status": "running"},
+        {**step, "status": "succeeded", "backtest_id": 11, "backtest_status": "finished"},
+        {"type": "backtest_finished", "backtest_id": 11},
     ]
 
 

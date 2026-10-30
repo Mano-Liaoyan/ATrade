@@ -1751,6 +1751,10 @@ option and records it in this document.
   conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
   exchange rates of a backtest on port 8001. See section 25.14 and
   [`backtest.md`](architecture/backtest.md) section 10.13.
+- Decided (#182): the 9 tools of phase 2, the 5 backtests of a user
+  message (only the tool counts them), the `read_backtest` summary, the
+  fields of `tool_step`, `strategy_version_saved`, and `backtest_finished`,
+  and the 15-minute wait in tests. See section 25.14.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in

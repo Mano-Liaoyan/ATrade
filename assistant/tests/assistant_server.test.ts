@@ -30,7 +30,7 @@ afterEach(async () => {
 async function startOnFreePort(script: ModelStep[] = []): Promise<string> {
   model = await startFakeModelServer(script);
   const openModel = await createFakeOpenModel(model.baseUrl, workDir);
-  const conversations = new Conversations({ piDir: workDir, openModel, customTools: [] });
+  const conversations = new Conversations({ piDir: workDir, openModel, createTools: () => [] });
   const server = await startAssistantServer({ host: '127.0.0.1', port: 0 }, conversations);
   close = () =>
     new Promise((resolve) => {
