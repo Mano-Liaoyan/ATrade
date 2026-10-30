@@ -152,7 +152,8 @@ test('the Rules tab shows the universe mode settings and makes multi-instrument 
   const code = page.getByRole('region', { name: 'Code from the rules' });
   await expect(page.getByRole('heading', { name: 'Entry filter' })).toBeVisible();
   await expect(page.getByText('Position size')).toHaveCount(0);
-  await expect(code).toContainText('class MemberIndicators');
+  // The editor draws only the lines in view. The first line names the universe mode.
+  await expect(code).toContainText('Strategy from the rule builder in the universe mode');
 
   await page.getByRole('spinbutton', { name: 'Hold' }).fill('3');
   await expect(code).toContainText('hold_count: int = 3');
