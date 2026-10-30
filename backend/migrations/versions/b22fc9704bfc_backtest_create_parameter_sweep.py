@@ -15,7 +15,7 @@ def upgrade() -> None:
     -- docs/architecture/backtest.md sections 10.2.1 and 10.11.
     CREATE TABLE parameter_sweep (
         id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-        strategy_version_id bigint NOT NULL,
+        strategy_version_id bigint NOT NULL REFERENCES strategy_version (id),
         grid jsonb NOT NULL,
         created_at_utc timestamptz NOT NULL
     );
