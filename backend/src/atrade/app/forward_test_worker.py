@@ -16,9 +16,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from atrade.app.forward_test_process import FORWARD_TEST_PROCESS_COMMAND
-from atrade.forward_test import BarFetcher, ChildMode, ForwardTestWorker
+from atrade.forward_test import BarFetcher, ChildMode, ForwardTestRow, ForwardTestWorker, read_running_member_lists
 from atrade.foundation.clock import Clock, SystemClock
-from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
 from atrade.market_data import DatabentoHistoricalClient, UsUniverseUpdate
@@ -63,15 +62,8 @@ def create_us_universe_update(settings: Settings, clock: Clock) -> UsUniverseUpd
     )
 
 
-async def read_multi_instrument_member_lists() -> list[list[Instrument]]:
-    """The members of each running multi-instrument forward test. There are none until multi-instrument forward tests
-    exist (https://github.com/Mano-Liaoyan/ATrade/issues/217)."""
-    return []
-
-
 async def run_worker(settings: Settings) -> None:
     clock = SystemClock()
-    worker = ForwardTestWorker(database_url=settings.database_url, clock=clock, start_child=start_forward_test_process)
     universe_update = create_us_universe_update(settings, clock)
 
     def open_bar_fetcher_connection() -> GatewayConnection:
@@ -83,7 +75,18 @@ async def run_worker(settings: Settings) -> None:
         database_url=settings.database_url,
         clock=clock,
         open_gateway_connection=open_bar_fetcher_connection,
-        read_member_lists=read_multi_instrument_member_lists,
+        read_member_lists=lambda: read_running_member_lists(settings.database_url),
+    )
+
+    def is_ready_to_run(row: ForwardTestRow) -> bool:
+        # A multi-instrument child starts after the bar fetcher filled its 1-year warm-up (section 12.17).
+        return row.universe_kind == "single" or bar_fetcher.is_warm_up_filled(row.id)
+
+    worker = ForwardTestWorker(
+        database_url=settings.database_url,
+        clock=clock,
+        start_child=start_forward_test_process,
+        is_ready_to_run=is_ready_to_run,
     )
     async with asyncio.TaskGroup() as task_group:
         task_group.create_task(worker.keep_comparing())

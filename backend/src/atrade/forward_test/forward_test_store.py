@@ -258,6 +258,29 @@ async def select_universe_members(
     return members
 
 
+async def select_running_member_lists(connection: psycopg.AsyncConnection) -> dict[int, list[Instrument]]:
+    """The members of the last recorded quarter of each multi-instrument forward test that holds a client ID."""
+    cursor = await connection.execute(
+        """
+        SELECT member.forward_test_id, member.symbol, member.exchange, member.currency
+        FROM forward_test_universe_member AS member
+        JOIN forward_test ON forward_test.id = member.forward_test_id
+        WHERE forward_test.client_id IS NOT NULL
+          AND member.quarter_start_utc = (
+              SELECT max(quarter_start_utc) FROM forward_test_universe_member
+              WHERE forward_test_id = member.forward_test_id
+          )
+        ORDER BY member.forward_test_id, member.symbol, member.exchange
+        """
+    )
+    member_lists: dict[int, list[Instrument]] = {}
+    for forward_test_id, symbol, exchange, currency in await cursor.fetchall():
+        member_lists.setdefault(forward_test_id, []).append(
+            Instrument(symbol=symbol, exchange=exchange, currency=currency)
+        )
+    return member_lists
+
+
 async def select_forward_tests(connection: psycopg.AsyncConnection) -> list[ForwardTestRow]:
     async with connection.cursor(row_factory=class_row(ForwardTestRow)) as cursor:
         await cursor.execute(f"SELECT {FORWARD_TEST_COLUMNS} FROM forward_test ORDER BY id DESC")

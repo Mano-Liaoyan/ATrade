@@ -13,6 +13,7 @@
   const COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
     { header: 'Time' },
+    { header: 'Symbol' },
     { header: 'Side' },
     { header: 'Quantity', align: 'right' },
     { header: 'Price (USD)', align: 'right' },
@@ -30,6 +31,7 @@
           <tr>
             <th scope="row" align="right">{fillIndex + 1}</th>
             <td>{formatUtcTime(fill.time_utc)}</td>
+            <td>{fill.symbol}</td>
             <td>{fill.side}</td>
             <td align="right">{fill.quantity_shares}</td>
             <td align="right">{formatAmount(fill.price_usd)}</td>

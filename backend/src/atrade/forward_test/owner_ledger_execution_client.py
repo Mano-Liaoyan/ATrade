@@ -154,6 +154,11 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         self.sent_orders: dict[int, SentOrder] = {}
         self.fill_check_task: asyncio.Task[None] | None = None
 
+    def add_instruments(self, instruments: tuple[Instrument, ...]) -> None:
+        """The new members of a quarter of a multi-instrument forward test (section 12.17)."""
+        for instrument in instruments:
+            self.instruments.setdefault(str(create_instrument_id(instrument)), instrument)
+
     @override
     async def _connect(self) -> None:
         await self.gateway.connect()
@@ -381,11 +386,13 @@ class OwnerLedgerExecutionClientFactory(ExecutionClientFactory):
         self.ledger_input = ledger_input
         self.ledger = ledger
         self.gateway = gateway
+        # The created client, for the universe poller of a multi-instrument forward test.
+        self.client: OwnerLedgerExecutionClient | None = None
 
     def create(  # pyright: ignore[reportIncompatibleMethodOverride] - an instance factory (python_adapters.md)
         self, *, name: str, config: ExecutionClientConfig, cache: ClientCache, clock: Clock, trader_id: TraderId
     ) -> OwnerLedgerExecutionClient:
-        return OwnerLedgerExecutionClient(
+        self.client = OwnerLedgerExecutionClient(
             name=name,
             config=config,
             cache=cache,
@@ -395,3 +402,4 @@ class OwnerLedgerExecutionClientFactory(ExecutionClientFactory):
             ledger=self.ledger,
             gateway=self.gateway,
         )
+        return self.client

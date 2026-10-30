@@ -26,6 +26,7 @@ from atrade.forward_test.forward_test_child import LiveNodeEnd, LiveNodeInput
 from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
 from atrade.forward_test.owner_ledger_execution_client import OwnerLedgerExecutionClientFactory, OwnerLedgerInput
 from atrade.foundation.clock import SystemClock
+from atrade.foundation.instrument import Instrument
 from atrade.ibkr import IbAsyncGatewayConnection
 from atrade.paper_trading import ForwardTestLedger
 from atrade.strategy import load_strategy_classes
@@ -76,9 +77,17 @@ async def wait_for_gateway_loss(live_node_input: LiveNodeInput, gateway_watch: G
         await asyncio.sleep(gateway_watch.check_interval_seconds)
 
 
+def read_node_instrument(live_node_input: LiveNodeInput) -> Instrument:
+    """The instrument of a single-instrument forward test. Raises ValueError for a multi-instrument forward test."""
+    if live_node_input.instrument is None:
+        message = f"Forward test {live_node_input.forward_test_id} has no single instrument."
+        raise ValueError(message)
+    return live_node_input.instrument
+
+
 def create_instrument_id(live_node_input: LiveNodeInput) -> InstrumentId:
     # The IB instrument provider uses the simplified symbology: SYMBOL.PRIMARY_EXCHANGE, for example AAPL.NASDAQ.
-    instrument = live_node_input.instrument
+    instrument = read_node_instrument(live_node_input)
     return InstrumentId(Symbol(instrument.symbol), Venue(instrument.exchange))
 
 
@@ -121,7 +130,7 @@ def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedg
         forward_test_id=live_node_input.forward_test_id,
         client_id=live_node_input.client_id,
         account_id=live_node_input.account_id,
-        instruments=(live_node_input.instrument,),
+        instruments=(read_node_instrument(live_node_input),),
     )
     return OwnerLedgerExecutionClientFactory(ledger_input, ledger, gateway_connection)
 
@@ -153,7 +162,7 @@ def create_recorder(live_node_input: LiveNodeInput, instrument_id: InstrumentId)
         RecorderInput(
             database_url=live_node_input.database_url,
             forward_test_id=live_node_input.forward_test_id,
-            instrument=live_node_input.instrument,
+            instrument=read_node_instrument(live_node_input),
             instrument_id=instrument_id,
             bar_type=create_bar_type(live_node_input, instrument_id),
             bar_period=live_node_input.bar_period,
@@ -202,7 +211,10 @@ async def run_live_node(
     with tempfile.TemporaryDirectory(prefix=f"atrade-forward-test-{live_node_input.forward_test_id}-") as directory:
         strategy_class, config_class = load_strategy_classes(live_node_input.strategy_code, Path(directory))
         warm_up_catalog = write_look_back_catalog(
-            list(live_node_input.warm_up_bars), live_node_input.instrument, live_node_input.bar_period, Path(directory)
+            list(live_node_input.warm_up_bars),
+            read_node_instrument(live_node_input),
+            live_node_input.bar_period,
+            Path(directory),
         )
         live_node = build_live_node(live_node_input, instrument_id, warm_up_catalog)
         live_node.add_strategy(strategy_class(create_strategy_config(config_class, live_node_input, instrument_id)))

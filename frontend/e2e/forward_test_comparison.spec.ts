@@ -150,6 +150,9 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
   const fills = tables.getByRole('region', { name: 'Fills' });
   const track = tables.getByRole('scrollbar', { name: 'Fills scroll bar' });
   const lastFill = fills.getByRole('row').last();
+  // The Symbol column names the instrument of each fill (docs/architecture/forward_test.md 12.16).
+  await expect(fills.getByRole('columnheader', { name: 'Symbol', exact: true })).toBeVisible();
+  await expect(fills.getByRole('row').nth(1)).toContainText('FTCMP');
   await expect(track).toBeVisible();
   await expect(lastFill).not.toBeInViewport();
   await track.focus();

@@ -1689,6 +1689,9 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The IB data client and the `ib_async` connection of the ATrade execution client share 1 client ID in 1 LiveNode (`forward_test.md` section 12.24) (#213). | `uv run pytest -m ibkr_paper -k share_the_client_id tests/forward_test`. |
 | A running LiveNode that gets a position report with a new quantity (`forward_test.md` section 12.22). The restart avoids it, so #213 did not check it. | A LiveNode test that changes the fake ledger position while the node runs. |
 | IBKR does or does not refuse opposite orders of 2 owners on one instrument (self-trade prevention) (#146). | 2 client IDs on the paper account place an AAPL buy and a sell, first with prices that do not cross, then with prices that cross. |
+| The listing exchange of `us_universe_member` (`NASDAQ` or `NYSE`, from Databento) is the IBKR primary exchange, so the instrument IDs `SYMBOL.<primary exchange>` of a `rule` forward test match IBKR (#217, `forward_test.md` section 12.24). Checked only with the IBKR fake. | On the paper account, request the contract details of 10 `rule` members and compare `primaryExchange`. |
+| How IBKR handles a DAY order that ATrade sends outside the trading hours: a daily strategy sends its orders after the close (#217, `forward_test.md` section 12.24). 未确认（本地没有IBKR）. | On the paper account, after the close, send a DAY limit order far from the market price, read the order status, then cancel it. |
+| The time to read 1 year of warm-up daily bars of 500 instruments (about 126,000 bars) from the bar store, and the time of the PostgreSQL query of each order (#217, `forward_test.md` sections 12.17 and 12.19). Not measured: the implementation environment has no real bar table of 500 instruments. | Run the read on the server bar table and time it; time `check_order` of the owner ledger. |
 | Real subscription logins and model calls through the pi SDK `ModelRuntime.login()` (#133, #140). Only a fake model server was run. | Log in with each provider and send one message. |
 | A real OAuth token refresh through the ATrade `CredentialStore` writes the new token to `/data/credentials.json` (#140). A fake refresh does (section 21.1). | Wait for a real token refresh of one provider, and read the file. |
 | OpenAI can count a self-hosted single-user server as "remotely hosted" (#133). Not settled by the OpenAI pages (section 21.1). | Ask OpenAI, or read their terms again when they name self-hosted servers. |
@@ -2006,8 +2009,16 @@ option and records it in this document.
   (`RoutingConfig(default=True)`), so they handle all primary exchanges.
   The instruments, bars, and fills use 4 price decimal places.
 - Decided (#213): the ATrade data client sends the new saved bars when its
-  caller calls `send_new_bars()`. Only the tests call it now. #217 decides
-  the production caller (`forward_test.md` section 12.24).
+  caller calls `send_new_bars()`. Decided (#217): the universe poller of a
+  multi-instrument child calls it every 60 seconds
+  (`forward_test.md` section 12.24).
+- Decided (#217): a multi-instrument forward test gets its members as
+  `UniverseUpdate` custom data from the ATrade data client, after the
+  strategy start and at each new quarter. The worker starts its child only
+  after the bar fetcher filled the 1-year warm-up. The update of a new
+  quarter waits for the warm-up of the new members (at most 30 minutes). See
+  [`forward_test.md`](architecture/forward_test.md) sections 12.17, 12.20,
+  and 12.24.
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
