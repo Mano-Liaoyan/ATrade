@@ -1605,6 +1605,9 @@ option and records it in this document.
   before the LiveNode starts.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#165): the daily returns use the UTC date as the trading day,
+  `years` comes from the request range, and `metrics.missing_reasons` gives
+  the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
