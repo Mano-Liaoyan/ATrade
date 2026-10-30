@@ -1,4 +1,5 @@
 """Forward-test worker entry point: compares the forward test states every 2 seconds and runs the child processes.
+It also runs the quarterly US universe update (docs/architecture/market_data.md section 8.9).
 
 Run with `python -m atrade.app.forward_test_worker`. The Compose service `forward-test` runs this module, so a
 restart of `web` does not stop forward tests (docs/architecture.md section 6.4).
@@ -9,15 +10,19 @@ import logging
 import signal
 import sys
 from contextlib import suppress
+from pathlib import Path
 
 from pydantic import ValidationError
 
 from atrade.app.forward_test_process import FORWARD_TEST_PROCESS_COMMAND
 from atrade.forward_test import ChildMode, ForwardTestWorker
-from atrade.foundation.clock import SystemClock
+from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
+from atrade.market_data import DatabentoHistoricalClient, UsUniverseUpdate
 
 logger = logging.getLogger("atrade.forward_test_worker")
+# The service is read-only with a tmpfs on /tmp (deploy/compose.yaml). The import reads the file, so it can go.
+UNIVERSE_DOWNLOAD_DIR = Path("/tmp/databento")
 
 
 class ForwardTestProcess:
@@ -42,6 +47,26 @@ async def start_forward_test_process(forward_test_id: int, mode: ChildMode) -> F
     return ForwardTestProcess(process)
 
 
+def create_us_universe_update(settings: Settings, clock: Clock) -> UsUniverseUpdate | None:
+    """None without DATABENTO_API_KEY: the quarterly update does not run, and the log tells why."""
+    if settings.databento_api_key is None:
+        logger.warning("The quarterly US universe update does not run. DATABENTO_API_KEY is empty.")
+        return None
+    return UsUniverseUpdate(
+        database_url=settings.database_url,
+        clock=clock,
+        client=DatabentoHistoricalClient(settings.databento_api_key.get_secret_value()),
+        download_dir=UNIVERSE_DOWNLOAD_DIR,
+    )
+
+
+async def run_worker(worker: ForwardTestWorker, universe_update: UsUniverseUpdate | None) -> None:
+    async with asyncio.TaskGroup() as task_group:
+        task_group.create_task(worker.keep_comparing())
+        if universe_update is not None:
+            task_group.create_task(universe_update.keep_updating())
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     try:
@@ -49,10 +74,9 @@ def main() -> None:
     except ValidationError as error:
         logger.error("The forward-test worker does not start. The settings are not valid:\n%s", error)
         sys.exit(1)
-    worker = ForwardTestWorker(
-        database_url=settings.database_url, clock=SystemClock(), start_child=start_forward_test_process
-    )
-    asyncio.run(worker.keep_comparing())
+    clock = SystemClock()
+    worker = ForwardTestWorker(database_url=settings.database_url, clock=clock, start_child=start_forward_test_process)
+    asyncio.run(run_worker(worker, create_us_universe_update(settings, clock)))
 
 
 if __name__ == "__main__":
