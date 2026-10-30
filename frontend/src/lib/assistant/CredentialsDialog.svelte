@@ -123,6 +123,13 @@
       opened.send(JSON.stringify({ type: 'login_start', provider: providerId, method, name: name.trim() }));
     });
     opened.addEventListener('message', receive);
+    // A socket that closes before login_end or error (for example web restarts) ends the login, so the form comes back.
+    opened.addEventListener('close', () => {
+      if (socket === opened) {
+        socket = null;
+        login = addLoginMessage(login, { type: 'error', message: 'The login connection closed. Start the login again.' });
+      }
+    });
     socket = opened;
   }
 
@@ -137,8 +144,12 @@
   }
 
   async function removeCredential(credential: Credential): Promise<void> {
-    loadError = await deleteCredential(fetch, credential.id);
+    const deleteError = await deleteCredential(fetch, credential.id);
     await load();
+    // load() clears the error, so the delete error comes after it.
+    if (deleteError !== null) {
+      loadError = deleteError;
+    }
   }
 
   /** A change of the kind also stops a login that runs. */

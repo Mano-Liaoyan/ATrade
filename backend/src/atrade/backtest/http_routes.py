@@ -13,6 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_access import (
+    has_survivorship_bias,
+)
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -21,14 +24,16 @@ from atrade.backtest.backtest_limits import (
     save_backtest_limits,
 )
 from atrade.backtest.backtest_metrics import BacktestMetrics
+from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
 from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
+from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import ExchangeRateReader
+from atrade.market_data import BarSource, ExchangeRateReader
 from atrade.strategy import read_strategy_version
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -46,6 +51,8 @@ class StartBacktestRequest(BaseModel):
     end_utc: AwareDatetime
     # Required, with no default: a backtest never starts with an unknown amount (docs/architecture.md section 10).
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
+    # Only for this backtest. Without it, the global source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 class BacktestLimitsBody(BaseModel):
@@ -99,6 +106,10 @@ class BacktestResponse(BaseModel):
     metrics: BacktestMetricsResponse | None
     # The conversation of the AI assistant that started the backtest. Null for a backtest of the user.
     conversation_id: int | None
+    # Null for a backtest from before the source order. The bar counts are null until the backtest finishes.
+    source_order: list[BarSource] | None
+    bar_count_by_source: dict[BarSource, int] | None
+    survivorship_bias: bool
 
 
 class EquityPointResponse(BaseModel):
@@ -114,9 +125,21 @@ class TradeResponse(BaseModel):
     commission_usd: Decimal
 
 
+class BacktestRobustnessResponse(BaseModel):
+    """The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
+    a meaning is null, and `missing_reasons` gives its reason by its field name."""
+
+    trial_count: int
+    sharpe_probability_percent: Decimal | None
+    sharpe_probability_kind: SharpeProbabilityKind
+    sharpe_probability_status: SharpeProbabilityStatus | None
+    missing_reasons: dict[str, str]
+
+
 class BacktestDetailResponse(BacktestResponse):
     equity_curve: list[EquityPointResponse]
     trades: list[TradeResponse]
+    robustness: BacktestRobustnessResponse
 
 
 class ComparedBacktestResponse(BacktestDetailResponse):
@@ -169,6 +192,7 @@ class BacktestRoutes:
         if strategy_version is None:
             message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
             raise RuntimeError(message)
+        request = backtest_store.read_request(row)
         return BacktestResponse(
             id=row.id,
             strategy_version_id=row.strategy_version_id,
@@ -189,6 +213,11 @@ class BacktestRoutes:
             ended_at_utc=row.ended_at_utc,
             metrics=to_metrics_response(backtest_store.read_metrics(row)),
             conversation_id=row.conversation_id,
+            source_order=request.source_order,
+            bar_count_by_source=None
+            if row.bar_count_by_source is None
+            else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
+            survivorship_bias=has_survivorship_bias(request),
         )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
@@ -205,6 +234,7 @@ class BacktestRoutes:
             bar_period=request.bar_period,
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
+            source_order=request.source_order,
         )
         started = await start_backtest(
             database_url=self.database_url,
@@ -267,8 +297,18 @@ class BacktestRoutes:
             equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
             trades = await backtest_store.select_trades(connection, backtest_id)
         backtest = await self.to_backtest_response(row)
+        robustness = await read_robustness(
+            database_url=self.database_url, row=row, strategy_id=backtest.strategy_id, equity_curve=equity_curve
+        )
         return BacktestDetailResponse(
             **backtest.model_dump(),
+            robustness=BacktestRobustnessResponse(
+                trial_count=robustness.trial_count,
+                sharpe_probability_percent=robustness.sharpe_probability_percent,
+                sharpe_probability_kind=robustness.sharpe_probability_kind,
+                sharpe_probability_status=robustness.sharpe_probability_status,
+                missing_reasons=robustness.missing_reasons,
+            ),
             equity_curve=[
                 EquityPointResponse(time_utc=point.time_utc, equity_usd=point.equity_usd) for point in equity_curve
             ],

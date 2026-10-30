@@ -89,6 +89,8 @@ class MessageEndMessage(BaseModel):
 
 
 class RunStateMessage(BaseModel):
+    """The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run."""
+
     type: Literal["run_state"] = "run_state"
     state: Literal["running", "settled"]
 
@@ -366,8 +368,8 @@ class ConversationSocket:
                 await self.send(to_socket_message(event))
         except AssistantServiceError as error:
             await self.send_error(str(error))
-        finally:
-            self.is_running = False
+        # Only a run that ends here is settled. After a cancellation, is_running stays True, so stop_active_run stops it.
+        self.is_running = False
         await self.send(RunStateMessage(state="settled"))
         if has_answer:
             await self.generate_title_once(selection)
@@ -386,13 +388,19 @@ class ConversationSocket:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             if not await conversation_store.claim_title_generation(connection, self.conversation_id):
                 return
-            title: str | None = None
-            try:
-                title = await self.assistant_service.generate_title(self.conversation_id, selection)
-            except AssistantServiceError as error:
-                await self.send_error(f"The title was not generated. {error}")
-            finally:
-                await conversation_store.end_title_generation(connection, self.conversation_id, title)
+        title: str | None = None
+        try:
+            title = await self.assistant_service.generate_title(self.conversation_id, selection)
+        except AssistantServiceError as error:
+            await self.send_error(f"The title was not generated. {error}")
+        finally:
+            # The browser can leave during the model call. The state must not stay `generating` (25.8.3).
+            with anyio.CancelScope(shield=True):
+                await self.end_title_generation(title)
+
+    async def end_title_generation(self, title: str | None) -> None:
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            await conversation_store.end_title_generation(connection, self.conversation_id, title)
 
     async def stop_active_run(self) -> None:
         if not self.is_running or self.socket_conversation_id is None:
@@ -418,14 +426,18 @@ async def serve_conversation(socket: ConversationSocket) -> None:
         await socket.send_error(f"The conversation {socket.socket_conversation_id} does not exist.")
         await socket.websocket.close(code=POLICY_VIOLATION_CODE)
         return
-    async with anyio.create_task_group() as task_group:
-        task_group.start_soon(socket.send_heartbeats)
-        try:
-            while True:
-                await socket.receive(await socket.websocket.receive_text(), task_group)
-        except WebSocketDisconnect:
-            await socket.stop_active_run()
-        task_group.cancel_scope.cancel()
+    try:
+        async with anyio.create_task_group() as task_group:
+            task_group.start_soon(socket.send_heartbeats)
+            try:
+                while True:
+                    await socket.receive(await socket.websocket.receive_text(), task_group)
+            except WebSocketDisconnect:
+                pass
+            task_group.cancel_scope.cancel()
+    finally:
+        # Also when a send to the closed socket ends the task group first (25.10: web stops the run).
+        await socket.stop_active_run()
 
 
 def create_assistant_socket_router(*, database_url: str, assistant_service: AssistantService) -> APIRouter:
