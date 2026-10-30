@@ -13,9 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_access import (
-    has_survivorship_bias,
-)
+from atrade.backtest.backtest_access import has_survivorship_bias
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,

@@ -110,8 +110,8 @@ export class Conversations {
       })
       .finally(() => {
         this.sessions.delete(conversationId);
-        this.abortedRuns.delete(conversationId);
         this.budgets.delete(conversationId);
+        this.abortedRuns.delete(conversationId);
         this.activeRuns.delete(conversationId);
       });
     this.activeRuns.set(conversationId, run);

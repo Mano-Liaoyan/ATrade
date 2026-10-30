@@ -7,7 +7,7 @@ port 8000 (the browser) and port 8001 (the assistant service, docs/architecture/
 import asyncio
 import logging
 import sys
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 
 import psycopg
@@ -32,21 +32,20 @@ from atrade.backtest import BacktestRunner, create_backtest_router, read_last_ba
 from atrade.forward_test import (
     create_forward_test_comparison_router,
     create_forward_test_router,
-    find_forward_test_on_instrument,
 )
 from atrade.foundation.clock import Clock, SystemClock
-from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
-from atrade.market_data import ExchangeRateReader, InstrumentLookup, create_market_data_router
-from atrade.paper_trading import BlockingForwardTest, PaperAccountMonitor, create_paper_trading_router
+from atrade.market_data import DailyBarUpdate, ExchangeRateReader, InstrumentLookup, create_market_data_router
+from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
+from atrade.screen import create_screen_router
 from atrade.strategy import (
     STRATEGY_TEMPLATE,
     create_strategy_language_server_router,
     create_strategy_router,
     read_strategy_outline,
 )
-from atrade.watchlist import create_watchlist_router
+from atrade.watchlist import create_watchlist_router, read_watchlist_instruments
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -59,20 +58,6 @@ DATABASE_CHECK_TIMEOUT_SECONDS = 10
 START_CONTEXT_BACKTEST_COUNT = 3
 
 logger = logging.getLogger("atrade.web")
-
-
-def create_blocking_forward_test_finder(
-    database_url: str,
-) -> Callable[[Instrument], Awaitable[BlockingForwardTest | None]]:
-    """paper_trading does not import forward_test (docs/architecture.md section 6.2), so app/ connects them."""
-
-    async def find_blocking_forward_test(instrument: Instrument) -> BlockingForwardTest | None:
-        forward_test = await find_forward_test_on_instrument(database_url=database_url, instrument=instrument)
-        if forward_test is None:
-            return None
-        return BlockingForwardTest(forward_test_id=forward_test.forward_test_id, label=forward_test.label)
-
-    return find_blocking_forward_test
 
 
 def create_start_context_reader(database_url: str) -> StartContextReader:
@@ -110,6 +95,13 @@ def create_web_app(
         clock=clock,
         process_command=BACKTEST_PROCESS_COMMAND,
     )
+    daily_bar_update = DailyBarUpdate(
+        database_url=settings.database_url,
+        clock=clock,
+        gateway_connection=gateway_connection,
+        # market_data does not import watchlist (docs/architecture.md section 6.2), so app/ connects them.
+        read_watchlist_instruments=lambda: read_watchlist_instruments(database_url=settings.database_url),
+    )
 
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
@@ -118,8 +110,9 @@ def create_web_app(
         # The paper account check runs after each connection, also when no browser is open.
         check_task = asyncio.create_task(paper_account_monitor.keep_checking())
         backtest_task = asyncio.create_task(backtest_runner.keep_running())
+        daily_bar_task = asyncio.create_task(daily_bar_update.keep_updating())
         yield
-        for task in (backtest_task, check_task, connection_task):
+        for task in (daily_bar_task, backtest_task, check_task, connection_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
@@ -140,7 +133,6 @@ def create_web_app(
             paper_account_monitor=paper_account_monitor,
             database_url=settings.database_url,
             clock=clock,
-            find_blocking_forward_test=create_blocking_forward_test_finder(settings.database_url),
         )
     )
     app.include_router(
@@ -167,12 +159,14 @@ def create_web_app(
             database_url=settings.database_url,
             clock=clock,
             client_ids=range(settings.forward_test_client_id_first, settings.forward_test_client_id_last + 1),
+            paper_account_monitor=paper_account_monitor,
         )
     )
     app.include_router(create_forward_test_comparison_router(database_url=settings.database_url, clock=clock))
     instrument_lookup = InstrumentLookup(
         gateway_connection=gateway_connection, host=settings.ibkr_host, port=settings.ibkr_paper_port
     )
+    app.include_router(create_screen_router(database_url=settings.database_url, clock=clock))
     app.include_router(
         create_watchlist_router(database_url=settings.database_url, clock=clock, instrument_lookup=instrument_lookup)
     )

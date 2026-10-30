@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { createAssistantTools } from '../src/assistant_tools.ts';
-import { summarizeBacktest, type BacktestWait } from '../src/backtest_tools.ts';
+import { runBacktest, summarizeBacktest, type BacktestWait } from '../src/backtest_tools.ts';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
 import { WebPortClient } from '../src/web_port_client.ts';
 import { createFakeOpenModel } from './fake_model.ts';
@@ -64,7 +64,7 @@ async function openConversations(script: ModelStep[], wait: BacktestWait = QUICK
 
 async function runOnce(conversations: Conversations, text = 'Start.'): Promise<RunEvent[]> {
   const events: RunEvent[] = [];
-  await conversations.run(CONVERSATION_ID, { text, selection: SELECTION, systemPrompt: 'You are the ATrade strategy assistant.' }, (event) => events.push(event));
+  await conversations.run(CONVERSATION_ID, { text, selection: SELECTION, systemPrompt: 'You help with strategies.' }, (event) => events.push(event));
   return events;
 }
 
@@ -248,6 +248,29 @@ describe('run_backtest', () => {
       'This user message already started 5 backtests. No backtest started. Ask the user before you start more backtests.',
     );
     expect(web.requests.filter((request) => request.method === 'POST')).toHaveLength(6);
+  });
+
+  test('starts at most 5 backtests when one model turn calls run_backtest 6 times in parallel', async () => {
+    web.backtestStatuses = ['finished'];
+    const budget = { startedBacktests: 0 };
+    const client = new WebPortClient(web.baseUrl, CONVERSATION_ID);
+
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () => runBacktest(client, BACKTEST_ARGUMENTS, { budget, wait: QUICK_WAIT })),
+    );
+
+    expect(web.requests.filter((request) => request.method === 'POST')).toHaveLength(5);
+    expect(results.filter((result) => result.isError === true)).toHaveLength(1);
+    expect(budget.startedBacktests).toBe(5);
+  });
+
+  test('a backtest that port 8001 refuses does not count', async () => {
+    web.hasNoSavedBars = true;
+    const budget = { startedBacktests: 0 };
+
+    await runBacktest(new WebPortClient(web.baseUrl, CONVERSATION_ID), BACKTEST_ARGUMENTS, { budget, wait: QUICK_WAIT });
+
+    expect(budget.startedBacktests).toBe(0);
   });
 
   test('gives the 422 of a range without saved bars to the model', async () => {

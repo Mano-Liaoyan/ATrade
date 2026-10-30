@@ -6,7 +6,6 @@ import {
   describeOrderSource,
   describeOrderForConfirmation,
   describeOrderTitle,
-  findOrderBlock,
   readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
@@ -103,21 +102,6 @@ describe('describeOrderTitle', () => {
 
     expect(describeOrderTitle(result.request)).toBe('Buy 50 AAPL');
     expect(describeOrderTitle({ ...result.request, side: 'SELL' })).toBe('Sell 50 AAPL');
-  });
-});
-
-describe('findOrderBlock', () => {
-  const runningForwardTest = { label: 'Forward test 7 (Bar count v1)', symbol: 'SPY', exchange: 'ARCA' };
-
-  it('names the forward test that trades the instrument of the form', () => {
-    expect(findOrderBlock({ ...limitForm, symbol: ' spy ', exchange: 'arca' }, [runningForwardTest])).toBe(
-      'Forward test 7 (Bar count v1) trades SPY / ARCA. Stop the forward test to send an order by hand.',
-    );
-  });
-
-  it('blocks no order on another instrument', () => {
-    expect(findOrderBlock({ ...limitForm, symbol: 'SPY', exchange: 'NASDAQ' }, [runningForwardTest])).toBeNull();
-    expect(findOrderBlock(limitForm, [])).toBeNull();
   });
 });
 

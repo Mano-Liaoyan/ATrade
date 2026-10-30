@@ -16,9 +16,11 @@ import uvicorn
 
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.web import create_web_app
+from atrade.assistant.system_prompt import make_default_text
 from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
+from atrade.strategy import STRATEGY_TEMPLATE
 from tests.fakes.clock import FixedClock
 from tests.fakes.e2e_assistant import E2EAssistantService
 from tests.fakes.forward_test_child import FakeChildStarter
@@ -254,20 +256,19 @@ def add_discarded_version(database_url: str) -> None:
         )
         if version_1_id is None:
             return
-        # A conversation needs a prompt version (docs/architecture/assistant.md 25.9.1).
+        # A conversation needs a prompt version and a fixed prompt (#184). Version 1 is the default prompt, as the app saves it.
         connection.execute(
             """
             INSERT INTO assistant_prompt_version (version_number, text, created_at_utc)
-            VALUES (1, 'You are the ATrade strategy assistant.', %(now)s)
-            ON CONFLICT (version_number) DO NOTHING
+            SELECT 1, %(text)s, %(now)s WHERE NOT EXISTS (SELECT 1 FROM assistant_prompt_version)
             """,
-            {"now": FIXED_NOW_UTC},
+            {"text": make_default_text(STRATEGY_TEMPLATE), "now": FIXED_NOW_UTC},
         )
         conversation_row = connection.execute(
             """
             INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id, fixed_prompt)
             SELECT strategy_id, 'E2E conversation', %(now)s,
-                (SELECT id FROM assistant_prompt_version ORDER BY version_number LIMIT 1), ''
+                (SELECT id FROM assistant_prompt_version ORDER BY version_number DESC LIMIT 1), 'E2E fixed prompt.'
             FROM strategy_version WHERE id = %(version_id)s
             RETURNING id, strategy_id
             """,

@@ -21,6 +21,9 @@
     secondaryText?: string;
     // True while the primary action runs: the buttons do not react.
     busy?: boolean;
+    // True when the primary action cannot run. The element with the id `primaryDescribedBy` says why.
+    primaryDisabled?: boolean;
+    primaryDescribedBy?: string;
     size?: 'xs' | 'sm' | 'md' | 'lg';
     // The element that gets focus when the dialog closes, for example the button that opened the dialog from code.
     returnFocus?: HTMLElement | null;
@@ -37,6 +40,8 @@
     primaryKind = 'primary',
     secondaryText = 'Cancel',
     busy = false,
+    primaryDisabled = false,
+    primaryDescribedBy,
     size = 'sm',
     returnFocus = null,
     onPrimary,
@@ -104,7 +109,13 @@
                     </button>
                   {/snippet}
                 </Dialog.Close>
-                <button type="button" class={buttonClasses({ kind: primaryKind, size: 'lg' })} disabled={busy} onclick={onPrimary}>
+                <button
+                  type="button"
+                  class={buttonClasses({ kind: primaryKind, size: 'lg' })}
+                  disabled={busy || primaryDisabled}
+                  aria-describedby={primaryDisabled ? primaryDescribedBy : undefined}
+                  onclick={onPrimary}
+                >
                   {primaryText}
                 </button>
               </div>

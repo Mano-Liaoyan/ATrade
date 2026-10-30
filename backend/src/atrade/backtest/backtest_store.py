@@ -73,9 +73,9 @@ class BacktestRow:
     exposure_percent: Decimal | None
     turnover_per_year: Decimal | None
     win_rate_percent: Decimal | None
+    conversation_id: int | None
     out_of_sample_share: int
     split_time_utc: datetime | None
-    conversation_id: int | None
     source_order: list[str] | None
     bar_count_by_source: dict[str, int] | None
 

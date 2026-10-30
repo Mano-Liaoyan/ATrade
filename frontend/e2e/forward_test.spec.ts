@@ -38,10 +38,46 @@ async function expectNoPageScroll(page: Page): Promise<void> {
   expect(sizes.scrollHeight).toBeLessThanOrEqual(sizes.clientHeight);
 }
 
+/** Sends a paper order by hand of 1 share on the instrument page, then cancels it: the e2e server keeps its orders. */
+async function sendAndCancelPaperOrderByHand(page: Page, symbol: string): Promise<void> {
+  await page.goto(`/instruments/ARCA/${symbol}?currency=USD`);
+  const ticket = page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
+  const reviewButton = ticket.getByRole('button', { name: 'Review buy order' });
+  await ticket.getByLabel('Quantity').fill('1');
+  await ticket.getByLabel('Limit price').fill('1.25');
+  await expect(reviewButton).toBeEnabled({ timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await reviewButton.click();
+  const orderDialog = page.getByRole('dialog', { name: `Buy 1 ${symbol}` });
+  await orderDialog.getByRole('button', { name: 'Send paper order' }).click();
+  await expect(orderDialog).toBeHidden();
+  const sentNotification = ticket.getByRole('status').filter({ hasText: /Order \d+ sent/ });
+  await expect(sentNotification).toBeVisible();
+  const orderId = /Order (\d+) sent/.exec((await sentNotification.textContent()) ?? '')?.[1] ?? '';
+  await page.getByRole('region', { name: 'Paper account' }).getByRole('tab', { name: /^Open orders/ }).click();
+  await page.getByRole('button', { name: `Actions for order ${orderId}` }).click();
+  await page.getByRole('menuitem', { name: 'Cancel order' }).click();
+}
+
+/**
+ * Fills "Capital (USD)" of the start dialog, first with a capital larger than the unallocated amount. The e2e server
+ * has NetLiquidation 101,234.50 USD. The other browser projects run forward tests at the same time, so the unallocated
+ * amount can change.
+ */
+async function fillCapitalBelowTheUnallocatedAmount(dialog: Locator, capitalUsd: string): Promise<void> {
+  const capitalInput = dialog.getByLabel('Capital (USD)');
+  const startButton = dialog.getByRole('button', { name: 'Start forward test' });
+  await expect(dialog.getByText(/^Unallocated: \d{1,3}(,\d{3})*\.\d{2} USD$/)).toBeVisible();
+  await capitalInput.fill('999999999');
+  await expect(startButton).toBeDisabled();
+  await expect(startButton).toHaveAccessibleDescription(/^Capital is larger than the unallocated [\d,]+\.\d{2} USD$/);
+  await capitalInput.fill(capitalUsd);
+  await expect(startButton).toBeEnabled();
+}
+
 test('starts a forward test in the New forward test dialog, sees it running, and stops it from the header line', async ({
   page,
 }, currentTest) => {
-  // The test waits for 5 server cycles (Running in the header and in the list, the order block, Stopped in the header and
+  // The test waits for 5 server cycles (Running in the header and in the list, the order panel, Stopped in the header and
   // in the list), each up to STATUS_TIMEOUT_MILLISECONDS under the load of the full suite: more than the default 30 s.
   test.slow();
   // The e2e database is not cleared between tests and browser projects, so the names are unique.
@@ -61,9 +97,11 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await dialog.getByLabel('Exchange').fill('ARCA');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
   await page.getByRole('option', { name: '1 minute', exact: true }).click();
+  await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
+  const startButton = dialog.getByRole('button', { name: 'Start forward test' });
   // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
   await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
-  await dialog.getByRole('button', { name: 'Start forward test' }).click();
+  await startButton.click();
 
   // The page opens the new forward test.
   await expect(dialog).toHaveCount(0);
@@ -75,6 +113,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   await expect(heading).toContainText('1 min');
+  await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
   await expect(status).toHaveText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
@@ -90,17 +129,9 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(tables.getByRole('row', { name: /Planned stop/ })).toBeVisible();
   await expectNoPageScroll(page);
 
-  // The order panel of the instrument page does not send a paper order by hand on the instrument of the running
-  // forward test, and says why.
-  await page.goto(`/instruments/ARCA/${symbol}?currency=USD`);
-  const ticket = page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
-  const reviewButton = ticket.getByRole('button', { name: 'Review buy order' });
-  // The page reads the running forward tests from /ws/forward-tests after it opens.
-  await expect(reviewButton).toHaveAccessibleDescription(
-    `Forward test ${forwardTestId} (${strategyName} v1) trades ${symbol} / ARCA. Stop the forward test to send an order by hand.`,
-    { timeout: STATUS_TIMEOUT_MILLISECONDS },
-  );
-  await expect(reviewButton).toBeDisabled();
+  // The order panel of the instrument page sends a paper order by hand on the instrument of the running forward test:
+  // the owners share the instruments (docs/architecture/forward_test.md section 12.2).
+  await sendAndCancelPaperOrderByHand(page, symbol);
 
   await page.goBack();
   const stopButton = chartPanel.getByRole('button', { name: 'Stop forward test', exact: true });

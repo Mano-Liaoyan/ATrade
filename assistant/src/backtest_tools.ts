@@ -6,7 +6,7 @@
 // - read_backtest returns the backtest with a summary of the equity curve and of the trades.
 import type { AgentToolUpdateCallback } from '@earendil-works/pi-coding-agent';
 import { answerResult, errorResult, isSuccess, textResult, type ToolDetails, type ToolResult } from './tool_results.ts';
-import type { WebPortClient } from './web_port_client.ts';
+import type { WebPortAnswer, WebPortClient } from './web_port_client.ts';
 
 export const MAX_BACKTESTS_PER_USER_MESSAGE = 5;
 export const MAX_EQUITY_POINTS = 50;
@@ -135,11 +135,19 @@ export async function runBacktest(
         'No backtest started. Ask the user before you start more backtests.',
     );
   }
-  const answer = await client.request('POST', '/api/backtests', request, context.signal);
+  // Count the backtest before the POST: pi runs the tool calls of one model turn in parallel.
+  context.budget.startedBacktests += 1;
+  let answer: WebPortAnswer;
+  try {
+    answer = await client.request('POST', '/api/backtests', request, context.signal);
+  } catch (error) {
+    context.budget.startedBacktests -= 1;
+    throw error;
+  }
   if (!isSuccess(answer)) {
+    context.budget.startedBacktests -= 1;
     return answerResult(answer);
   }
-  context.budget.startedBacktests += 1;
   const body = answer.body as { id: number; status: string };
   return waitForEnd(client, { id: body.id, status: body.status }, context.wait, context);
 }
