@@ -713,6 +713,11 @@ Table `daily_bar_summary`: one row for each instrument.
   daily bars before a date for a list of instruments in one SQL statement.
   The statement reads the global source order too and applies the merge
   rule of section 8.7.2. Screens (section 24.5) and the summary use it.
+- Screens read the summary rows with `read_daily_bar_summaries` (a list of
+  instruments) and `read_daily_bar_summaries_of_currency` (all instruments
+  with saved daily bars in one currency, #206), and the HK instrument list
+  with `read_hk_instrument_list` (#206). All 3 are in the `market_data`
+  public entry.
 - Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
   summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
   `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and

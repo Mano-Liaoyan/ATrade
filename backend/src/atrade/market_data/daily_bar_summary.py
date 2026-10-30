@@ -9,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, LiteralString
 
 import psycopg
 from psycopg import sql
@@ -273,22 +274,13 @@ async def update_all_daily_bar_summaries(connection: psycopg.AsyncConnection) ->
     await update_daily_bar_summaries(connection, instruments)
 
 
-async def read_daily_bar_summaries(*, database_url: str, instruments: list[Instrument]) -> list[DailyBarSummary]:
-    """The summary rows of `instruments`, in the order of `instruments`. An instrument without daily bars has no
-    row."""
-    async with await psycopg.AsyncConnection.connect(database_url) as connection, connection.cursor() as cursor:
-        await cursor.execute(
-            """
-            SELECT summary.symbol, summary.exchange, summary.currency, summary.last_day_start_utc,
-                summary.last_close, summary.average_trading_value_20
-            FROM unnest(%(symbols)s::text[], %(exchanges)s::text[], %(currencies)s::text[])
-                    WITH ORDINALITY AS instrument (symbol, exchange, currency, position)
-                JOIN daily_bar_summary AS summary USING (symbol, exchange, currency)
-            ORDER BY instrument.position
-            """,
-            create_instrument_parameters(instruments),
-        )
-        rows = await cursor.fetchall()
+SUMMARY_COLUMNS: LiteralString = """
+    summary.symbol, summary.exchange, summary.currency, summary.last_day_start_utc, summary.last_close,
+    summary.average_trading_value_20
+"""
+
+
+def to_summaries(rows: list[tuple[Any, ...]]) -> list[DailyBarSummary]:
     return [
         DailyBarSummary(
             instrument=Instrument(symbol=str(row[0]), exchange=str(row[1]), currency=str(row[2])),
@@ -298,3 +290,35 @@ async def read_daily_bar_summaries(*, database_url: str, instruments: list[Instr
         )
         for row in rows
     ]
+
+
+async def read_daily_bar_summaries(*, database_url: str, instruments: list[Instrument]) -> list[DailyBarSummary]:
+    """The summary rows of `instruments`, in the order of `instruments`. An instrument without daily bars has no
+    row."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection, connection.cursor() as cursor:
+        await cursor.execute(
+            f"""
+            SELECT {SUMMARY_COLUMNS}
+            FROM unnest(%(symbols)s::text[], %(exchanges)s::text[], %(currencies)s::text[])
+                    WITH ORDINALITY AS instrument (symbol, exchange, currency, position)
+                JOIN daily_bar_summary AS summary USING (symbol, exchange, currency)
+            ORDER BY instrument.position
+            """,
+            create_instrument_parameters(instruments),
+        )
+        return to_summaries(await cursor.fetchall())
+
+
+async def read_daily_bar_summaries_of_currency(*, database_url: str, currency: str) -> list[DailyBarSummary]:
+    """The summary rows of all instruments with saved daily bars in `currency`, by symbol. A screen that starts from
+    all US instruments with saved daily bars reads them (docs/architecture/screen.md section 24.2)."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection, connection.cursor() as cursor:
+        await cursor.execute(
+            f"""
+            SELECT {SUMMARY_COLUMNS} FROM daily_bar_summary AS summary
+            WHERE summary.currency = %(currency)s
+            ORDER BY summary.symbol, summary.exchange
+            """,
+            {"currency": currency},
+        )
+        return to_summaries(await cursor.fetchall())
