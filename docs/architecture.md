@@ -244,7 +244,10 @@ app           -> all modules
   contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
-  (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
+  (`docs/architecture/assistant.md`). `app/` also gives `assistant` the
+  start context of a conversation (`strategy.read_strategy_outline()`,
+  `backtest.read_last_backtest_ids()`) and the strategy template for the
+  default system prompt (#184). The `conversation_id` foreign keys of
   `strategy_version`, `backtest`, and the screen tables point at
   `assistant_conversation` (section 6.3 allows a foreign key).
 - `paper_trading` does not import `forward_test`. Since #215 the owner
@@ -1718,6 +1721,11 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#166): the out-of-sample share is a share of the calendar time
+  of the request range, and the split time does not align to a bar end. The
+  route calculates the split metrics at each read from the saved equity
+  curve and trades. The out-of-sample Sharpe percent is null when the
+  in-sample Sharpe ratio is 0, below 0, or null (backtest section 10.9.4).
 - Decided (#167): the route calculates the daily Sharpe ratio of each trial
   from its saved equity curve at each read. When fewer than 2 trials have a
   daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
@@ -1851,6 +1859,11 @@ option and records it in this document.
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the
   login and credential routes of `assistant`. See section 25.14.
+- Decided (#184): the default prompt is saved as prompt version 1 when no
+  version exists. The browser sends the open version number when it creates
+  a conversation. A trigger refuses each `UPDATE` of
+  `assistant_prompt_version`. `app/` gives `assistant` the start context
+  reader and the strategy template. See section 25.9.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in

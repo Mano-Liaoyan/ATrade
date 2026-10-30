@@ -1637,6 +1637,7 @@
       },
       "post": {
         "summary": "Create Conversation",
+        "description": "The conversation records the latest prompt version and the fixed part of the system prompt (25.9).",
         "operationId": "create_conversation_api_assistant_conversations_post",
         "requestBody": {
           "required": true,
@@ -1835,6 +1836,61 @@
               }
             },
             "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/prompt-versions": {
+      "get": {
+        "summary": "List Prompt Versions",
+        "description": "When no version exists, saves the default text as version 1, so the list is never empty.",
+        "operationId": "list_prompt_versions_api_assistant_prompt_versions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptVersionListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save Prompt Version",
+        "operationId": "save_prompt_version_api_assistant_prompt_versions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavePromptVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptVersionResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2182,6 +2238,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2241,6 +2313,16 @@
             "type": "array",
             "title": "Trades"
           },
+          "split_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           }
@@ -2264,12 +2346,15 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "split_metrics",
           "robustness"
         ],
         "title": "BacktestDetailResponse"
@@ -2572,6 +2657,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2637,6 +2738,8 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "source_order",
           "bar_count_by_source",
@@ -2680,6 +2783,28 @@
             },
             "type": "object",
             "title": "Missing Reasons"
+          },
+          "out_of_sample_to_in_sample_sharpe_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample To In Sample Sharpe Percent"
+          },
+          "out_of_sample_use_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample Use Count"
           }
         },
         "type": "object",
@@ -2688,10 +2813,12 @@
           "sharpe_probability_percent",
           "sharpe_probability_kind",
           "sharpe_probability_status",
-          "missing_reasons"
+          "missing_reasons",
+          "out_of_sample_to_in_sample_sharpe_percent",
+          "out_of_sample_use_count"
         ],
         "title": "BacktestRobustnessResponse",
-        "description": "The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without\na meaning is null, and `missing_reasons` gives its reason by its field name."
+        "description": "The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A\nvalue without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."
       },
       "BacktestStatus": {
         "type": "string",
@@ -2908,6 +3035,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2967,6 +3110,16 @@
             "type": "array",
             "title": "Trades"
           },
+          "split_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           },
@@ -2994,12 +3147,15 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "source_order",
           "bar_count_by_source",
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "split_metrics",
           "robustness",
           "code"
         ],
@@ -3354,6 +3510,14 @@
             ],
             "title": "Last Credential Name"
           },
+          "prompt_version_id": {
+            "type": "integer",
+            "title": "Prompt Version Id"
+          },
+          "prompt_version_number": {
+            "type": "integer",
+            "title": "Prompt Version Number"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/ConversationMessageResponse"
@@ -3372,6 +3536,8 @@
           "last_provider",
           "last_model",
           "last_credential_name",
+          "prompt_version_id",
+          "prompt_version_number",
           "messages"
         ],
         "title": "ConversationDetailResponse"
@@ -3504,6 +3670,14 @@
               }
             ],
             "title": "Last Credential Name"
+          },
+          "prompt_version_id": {
+            "type": "integer",
+            "title": "Prompt Version Id"
+          },
+          "prompt_version_number": {
+            "type": "integer",
+            "title": "Prompt Version Number"
           }
         },
         "type": "object",
@@ -3515,7 +3689,9 @@
           "created_at_utc",
           "last_provider",
           "last_model",
-          "last_credential_name"
+          "last_credential_name",
+          "prompt_version_id",
+          "prompt_version_number"
         ],
         "title": "ConversationResponse"
       },
@@ -3524,6 +3700,18 @@
           "strategy_id": {
             "type": "integer",
             "title": "Strategy Id"
+          },
+          "version_number": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Number"
           }
         },
         "type": "object",
@@ -4942,6 +5130,61 @@
         ],
         "title": "PriceOperand"
       },
+      "PromptVersionListResponse": {
+        "properties": {
+          "prompt_versions": {
+            "items": {
+              "$ref": "#/components/schemas/PromptVersionResponse"
+            },
+            "type": "array",
+            "title": "Prompt Versions"
+          },
+          "default_text": {
+            "type": "string",
+            "title": "Default Text"
+          },
+          "fixed_part": {
+            "type": "string",
+            "title": "Fixed Part"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt_versions",
+          "default_text",
+          "fixed_part"
+        ],
+        "title": "PromptVersionListResponse"
+      },
+      "PromptVersionResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_number",
+          "text",
+          "created_at_utc"
+        ],
+        "title": "PromptVersionResponse"
+      },
       "ProviderListResponse": {
         "properties": {
           "providers": {
@@ -5255,6 +5498,21 @@
         ],
         "title": "SamePeriodBacktestResponse"
       },
+      "SavePromptVersionRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 50000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "SavePromptVersionRequest"
+      },
       "SaveVersionRequest": {
         "properties": {
           "code": {
@@ -5407,6 +5665,22 @@
         "title": "SourceOrderBody",
         "description": "The global source order: the first bar source that saved a time range gives all bars of the range."
       },
+      "SplitMetricsResponse": {
+        "properties": {
+          "in_sample": {
+            "$ref": "#/components/schemas/BacktestMetricsResponse"
+          },
+          "out_of_sample": {
+            "$ref": "#/components/schemas/BacktestMetricsResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "in_sample",
+          "out_of_sample"
+        ],
+        "title": "SplitMetricsResponse"
+      },
       "StartBacktestRequest": {
         "properties": {
           "strategy_version_id": {
@@ -5455,6 +5729,13 @@
               }
             ],
             "title": "Paper Capital Usd"
+          },
+          "out_of_sample_share": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Out Of Sample Share",
+            "default": 30
           },
           "source_order": {
             "anyOf": [
