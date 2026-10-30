@@ -1,13 +1,13 @@
 """forward_test: the universe of a multi-instrument forward test and its members of each quarter
 
 Revision ID: 4ae1ad32c14d
-Revises: d7b9c5d5e28d
+Revises: b22fc9704bfc
 """
 
 from alembic import op
 
 revision = "4ae1ad32c14d"
-down_revision = "d7b9c5d5e28d"
+down_revision = "b22fc9704bfc"
 
 
 def upgrade() -> None:
