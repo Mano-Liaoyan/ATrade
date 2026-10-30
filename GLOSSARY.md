@@ -72,6 +72,12 @@ after it is saved. Each backtest and each forward test records the strategy
 version that it used.
 _Avoid_: revision, snapshot, commit
 
+**Rule builder**:
+The form that writes a strategy version from entry conditions, exit
+conditions, and a position size. It writes code in one direction only: it
+does not read code back into conditions. In Chinese, write 规则构建器.
+_Avoid_: no-code editor, visual editor, wizard, strategy generator
+
 ## Strategy testing
 
 **Backtest**:
