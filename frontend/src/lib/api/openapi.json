@@ -1609,6 +1609,258 @@
           }
         }
       }
+    },
+    "/api/assistant/conversations": {
+      "get": {
+        "summary": "List Conversations",
+        "operationId": "list_conversations_api_assistant_conversations_get",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Conversation",
+        "operationId": "create_conversation_api_assistant_conversations_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/conversations/{conversation_id}": {
+      "get": {
+        "summary": "Read Conversation",
+        "operationId": "read_conversation_api_assistant_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Rename Conversation",
+        "operationId": "rename_conversation_api_assistant_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameConversationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Conversation",
+        "description": "Deletes the JSONL file first. When the assistant service is not reachable, the row stays for a new try.",
+        "operationId": "delete_conversation_api_assistant_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1844,6 +2096,41 @@
               }
             ]
           },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -1882,6 +2169,9 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias",
           "equity_curve",
           "trades",
           "robustness"
@@ -2195,6 +2485,41 @@
                 "type": "null"
               }
             ]
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
           }
         },
         "type": "object",
@@ -2216,7 +2541,10 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
-          "metrics"
+          "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias"
         ],
         "title": "BacktestResponse"
       },
@@ -2494,6 +2822,41 @@
               }
             ]
           },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -2536,6 +2899,9 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias",
           "equity_curve",
           "trades",
           "robustness",
@@ -2836,6 +3202,239 @@
           "crosses_above",
           "crosses_below"
         ]
+      },
+      "ConversationDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "title_state": {
+            "$ref": "#/components/schemas/TitleState"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "last_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Provider"
+          },
+          "last_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Model"
+          },
+          "last_credential_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Credential Name"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageResponse"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_id",
+          "title",
+          "title_state",
+          "created_at_utc",
+          "last_provider",
+          "last_model",
+          "last_credential_name",
+          "messages"
+        ],
+        "title": "ConversationDetailResponse"
+      },
+      "ConversationListResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationResponse"
+            },
+            "type": "array",
+            "title": "Conversations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversations"
+        ],
+        "title": "ConversationListResponse"
+      },
+      "ConversationMessageResponse": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "credential_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "text",
+          "provider",
+          "model",
+          "credential_name"
+        ],
+        "title": "ConversationMessageResponse"
+      },
+      "ConversationResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "title_state": {
+            "$ref": "#/components/schemas/TitleState"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "last_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Provider"
+          },
+          "last_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Model"
+          },
+          "last_credential_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Credential Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_id",
+          "title",
+          "title_state",
+          "created_at_utc",
+          "last_provider",
+          "last_model",
+          "last_credential_name"
+        ],
+        "title": "ConversationResponse"
+      },
+      "CreateConversationRequest": {
+        "properties": {
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_id"
+        ],
+        "title": "CreateConversationRequest"
       },
       "CreateStrategyRequest": {
         "properties": {
@@ -4122,6 +4721,21 @@
         ],
         "title": "PriceOperand"
       },
+      "RenameConversationRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RenameConversationRequest"
+      },
       "RightOperand": {
         "oneOf": [
           {
@@ -4548,6 +5162,20 @@
               }
             ],
             "title": "Paper Capital Usd"
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
           }
         },
         "type": "object",
@@ -4925,6 +5553,16 @@
           "GTC"
         ]
       },
+      "TitleState": {
+        "type": "string",
+        "enum": [
+          "new",
+          "generating",
+          "generated",
+          "not_generated",
+          "renamed"
+        ]
+      },
       "TradeResponse": {
         "properties": {
           "time_utc": {
@@ -5074,6 +5712,39 @@
         ],
         "title": "WatchlistResponse"
       },
+      "AbortMessage": {
+        "description": "Browser to server: stop the active run (the \"Stop\" button).",
+        "properties": {
+          "type": {
+            "const": "abort",
+            "default": "abort",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "AbortMessage",
+        "type": "object"
+      },
+      "AssistantErrorMessage": {
+        "description": "An error of the conversation, for the Output tab of the \"Problems and output\" panel.",
+        "properties": {
+          "type": {
+            "const": "error",
+            "default": "error",
+            "title": "Type",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "AssistantErrorMessage",
+        "type": "object"
+      },
       "ForwardTestsMessage": {
         "properties": {
           "type": {
@@ -5144,6 +5815,61 @@
           "bar"
         ],
         "title": "LiveBarMessage",
+        "type": "object"
+      },
+      "MessageDeltaMessage": {
+        "description": "A part of the streamed text of an AI assistant message.",
+        "properties": {
+          "type": {
+            "const": "message_delta",
+            "default": "message_delta",
+            "title": "Type",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "MessageDeltaMessage",
+        "type": "object"
+      },
+      "MessageEndMessage": {
+        "description": "The end of one AI assistant message: its full text, its model, and its credential name.",
+        "properties": {
+          "type": {
+            "const": "message_end",
+            "default": "message_end",
+            "title": "Type",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "credential_name": {
+            "title": "Credential Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "provider",
+          "model",
+          "credential_name"
+        ],
+        "title": "MessageEndMessage",
         "type": "object"
       },
       "OpenOrdersMessage": {
@@ -5502,6 +6228,90 @@
           "unattributed_quantity"
         ],
         "title": "PositionMessage",
+        "type": "object"
+      },
+      "PromptMessage": {
+        "description": "Browser to server: a new user message, with the provider, the model, and the credential of this message.",
+        "properties": {
+          "type": {
+            "const": "prompt",
+            "default": "prompt",
+            "title": "Type",
+            "type": "string"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          },
+          "provider": {
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "model": {
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "credential_id": {
+            "minLength": 1,
+            "title": "Credential Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "provider",
+          "model",
+          "credential_id"
+        ],
+        "title": "PromptMessage",
+        "type": "object"
+      },
+      "RunStateMessage": {
+        "description": "The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.",
+        "properties": {
+          "type": {
+            "const": "run_state",
+            "default": "run_state",
+            "title": "Type",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "settled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "RunStateMessage",
+        "type": "object"
+      },
+      "SteerMessage": {
+        "description": "Browser to server: a user message while the AI assistant runs.",
+        "properties": {
+          "type": {
+            "const": "steer",
+            "default": "steer",
+            "title": "Type",
+            "type": "string"
+          },
+          "text": {
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "SteerMessage",
         "type": "object"
       }
     }

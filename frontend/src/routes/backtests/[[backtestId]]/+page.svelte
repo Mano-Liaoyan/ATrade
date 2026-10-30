@@ -3,7 +3,9 @@
      Left: the "Backtests" side column (BacktestList) with the "New backtest" and "Backtest limits" buttons. Center:
      the panel of the open backtest (header line: number, strategy version, instrument, bar period, status, and the
      "Start forward test" button; then the key metric row and the equity and drawdown curves on one time axis) over the
-     Trades / Orders / Logs panel. The API has no orders, so Orders is an empty state. Logs shows the strategy error.
+     Trades / Orders / Logs / Bar sources panel. The API has no orders, so Orders is an empty state. Logs shows the
+     strategy error. Bar sources shows the source order and the bar counts. An HK backtest and a US backtest before the
+     Databento history show the survivorship bias warning over the key metrics.
      The list reads again while a backtest in it is queued or running; the open backtest reads again until its status
      is final. The address #start-backtest (command palette) opens the New backtest dialog. -->
 <script lang="ts">
@@ -33,10 +35,12 @@
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
+  import { SurvivorshipBiasWarning } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
   import BacktestList from '../BacktestList.svelte';
+  import BarSourceTable from '../BarSourceTable.svelte';
   import StartBacktestDialog from '../StartBacktestDialog.svelte';
 
   // A backtest of a few years of daily bars ends in seconds. One read each second is enough.
@@ -48,11 +52,12 @@
     { id: 'chart', minPixels: 160 },
     { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
   ];
-  type BacktestTable = 'trades' | 'orders' | 'logs';
+  type BacktestTable = 'trades' | 'orders' | 'logs' | 'bar-sources';
   const TABLE_TABS: { value: BacktestTable; label: string }[] = [
     { value: 'trades', label: 'Trades' },
     { value: 'orders', label: 'Orders' },
     { value: 'logs', label: 'Logs' },
+    { value: 'bar-sources', label: 'Bar sources' },
   ];
 
   const routeBacktestId = $derived(page.params['backtestId']);
@@ -259,6 +264,9 @@
                 }}
               />
             {/if}
+            {#if detail.survivorship_bias}
+              <SurvivorshipBiasWarning />
+            {/if}
             {#if detail.metrics === null}
               <div class="state-area">
                 <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
@@ -291,6 +299,8 @@
               <BacktestTradeTable trades={detail.trades} />
             {:else if selectedTable === 'orders'}
               <EmptyText text="No orders" />
+            {:else if selectedTable === 'bar-sources'}
+              <BarSourceTable sourceOrder={detail.source_order} barCountBySource={detail.bar_count_by_source} />
             {:else if detail.error_message === null}
               <EmptyText text="No logs" />
             {:else}

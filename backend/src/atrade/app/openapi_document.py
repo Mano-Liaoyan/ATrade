@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from pydantic.json_schema import models_json_schema
 
 from atrade.app.web import create_web_app
+from atrade.assistant import ASSISTANT_SOCKET_MESSAGE_MODELS
 from atrade.forward_test import FORWARD_TEST_SOCKET_MESSAGE_MODELS
 from atrade.foundation.clock import SystemClock
 from atrade.foundation.settings import Settings
@@ -33,6 +34,7 @@ SOCKET_MESSAGE_MODEL_LISTS: list[list[type[BaseModel]]] = [
     MARKET_DATA_SOCKET_MESSAGE_MODELS,
     FORWARD_TEST_SOCKET_MESSAGE_MODELS,
     PAPER_TRADING_SOCKET_MESSAGE_MODELS,
+    ASSISTANT_SOCKET_MESSAGE_MODELS,
 ]
 SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = list(
     dict.fromkeys(model for models in SOCKET_MESSAGE_MODEL_LISTS for model in models)
