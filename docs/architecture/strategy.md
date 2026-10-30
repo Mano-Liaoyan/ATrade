@@ -536,6 +536,14 @@ Source: [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md).
   The new code replaces the code changes of vN.
 - In the warning case, ATrade shows the diff (`CodeDiff`) of the vN code and
   the new code before the save.
+- Decided (#174): the tab shows the warning as a Carbon inline notification
+  (warning icon and color) above the Settings block. The tab of a version
+  with rules shows its own rules with no warning, also when it is older than
+  vM. When no version has rules, there is no warning.
+- Decided (#174): the diff is in the dialog "Replace code changes of vN".
+  The left side is the vN code, the right side is "Code from the rules".
+  The buttons are "Cancel" (no save) and "Save rules as new version". When
+  the code request fails, the save runs at once and shows the problems.
 - In phase 2, the AI assistant does not change rules. Its code changes count
   as code changes by hand. The AI assistant tool that reads a version also
   returns the rules JSON.
@@ -610,7 +618,6 @@ It needs the multi-instrument backtest of
 ### 9.8.7 Left to the implementation
 
 - The rules that "Blank rules" holds (for example the position size).
-- The buttons of the diff before the save.
 - Decided (#198): the platform tells the strategy the universe of each
   universe period with NautilusTrader custom data. The strategy calls
   `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
