@@ -11,7 +11,6 @@
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
-  import { ForwardTestsOnInstrumentsFeed } from '#lib/forward_test';
   import {
     BAR_PERIODS,
     BarChart,
@@ -128,11 +127,9 @@
   const shownDayQuote = $derived(dayQuote?.instrumentKey === instrumentKey ? dayQuote.quote : null);
   const lastPrice = $derived(liveBar?.close ?? shownDayQuote?.last ?? chartBars.at(-1)?.close ?? null);
 
-  // The paper account and the running forward tests (they block paper orders by hand on their instruments).
+  // The paper account. Forward tests and orders by hand share the instruments (forward_test.md section 12.2).
   const accountFeed = new PaperAccountFeed();
   $effect(() => accountFeed.start(fetch, window.location));
-  const forwardTestsFeed = new ForwardTestsOnInstrumentsFeed();
-  $effect(() => forwardTestsFeed.start(window.location));
   const account = $derived(accountFeed.account);
 
   const PANELS: PanelSpec[] = [
@@ -274,11 +271,10 @@
 
     <SideColumn label="Paper order" side="end" width="20rem" storageKey="atrade.instrument-page.order-column">
       <InstrumentOrderPanel
-        isConnected={accountFeed.isConnected && forwardTestsFeed.isConnected}
+        isConnected={accountFeed.isConnected}
         instrument={chartRequest.instrument}
         {lastPrice}
         {account}
-        blockingForwardTests={forwardTestsFeed.onInstruments}
       />
     </SideColumn>
   </Workbench>

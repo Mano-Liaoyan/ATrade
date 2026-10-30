@@ -1,47 +1,15 @@
 """The owner ledger as the ATrade execution client sees it (docs/architecture/forward_test.md section 12.19).
 
-The real ledger is in `paper_trading` (paper_trading.md sections 11.10 and 11.11, #214 and #215). Until then, this
-module is only the interface. The tests give an in-memory fake ledger.
+The real ledger is `ForwardTestLedger` of `paper_trading` (paper_trading.md section 11.10). The tests can give an
+in-memory fake ledger.
 """
 
-from dataclasses import dataclass
-from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 
-from atrade.foundation.instrument import Instrument
-from atrade.ibkr import OrderSide
+from atrade.paper_trading import OwnerFill, OwnerOrder, OwnerPosition
 
-
-@dataclass(frozen=True)
-class OwnerOrder:
-    """An order that a forward test wants to send. The ledger checks it with the order rules of section 11.10."""
-
-    forward_test_id: int
-    instrument: Instrument
-    side: OrderSide
-    quantity: Decimal
-    # None for a market order.
-    limit_price: Decimal | None
-
-
-@dataclass(frozen=True)
-class OwnerFill:
-    forward_test_id: int
-    instrument: Instrument
-    side: OrderSide
-    quantity: Decimal
-    price: Decimal
-    time_utc: datetime
-    # The IBKR orderRef of the order: the NautilusTrader ClientOrderId, which holds `FT<ID>` (section 12.9).
-    order_ref: str
-
-
-@dataclass(frozen=True)
-class OwnerPosition:
-    instrument: Instrument
-    quantity: Decimal
-    average_price: Decimal
+__all__ = ["OwnerFill", "OwnerLedger", "OwnerOrder", "OwnerPosition"]
 
 
 class OwnerLedger(Protocol):

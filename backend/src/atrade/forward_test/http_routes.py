@@ -4,7 +4,6 @@ The Web process writes only `desired_state` after the start. The forward-test wo
 (docs/architecture.md section 12.3). The socket reads the table every 2 seconds and sends the list after a change.
 """
 
-from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -12,7 +11,7 @@ from typing import Annotated, Literal
 import psycopg
 from fastapi import APIRouter, HTTPException, WebSocket, status
 from fastapi.responses import JSONResponse
-from pydantic import AwareDatetime, BaseModel, StringConstraints, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator
 
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import (
@@ -28,6 +27,7 @@ from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
+from atrade.paper_trading import ManualOrderLedger, PaperAccountCheckError, PaperAccountMonitor
 from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -48,6 +48,8 @@ class StartForwardTestRequest(BaseModel):
     exchange: InstrumentField
     currency: InstrumentField
     bar_period: BarPeriod
+    # The capital of the forward test in USD (section 12.18). It cannot change after the start.
+    allocated_capital_usd: Annotated[Decimal, Field(gt=0)]
     # Optional. The worker stops the forward test at this time (section 12.1). It cannot change after the start.
     end_time_utc: AwareDatetime | None = None
 
@@ -87,13 +89,26 @@ class ForwardTestResponse(BaseModel):
     # The crashes in a row. At 3 the status is "failed" and the worker stops the restarts (section 12.7).
     crash_count: int
     interruptions: list[InterruptionResponse]
+    # None for a forward test of the time before the allocated capital (section 12.18).
+    allocated_capital_usd: Decimal | None
 
 
 class StartRefusedResponse(BaseModel):
-    """The start was refused. `forward_test_id` is the forward test that already runs on the instrument."""
+    """The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18)."""
 
     detail: str
-    forward_test_id: int | None
+    # Always None since the forward tests share the instruments (section 12.2). The field stays for the clients.
+    forward_test_id: int | None = None
+    unallocated_usd: Decimal | None = None
+
+
+class ForwardTestCapitalResponse(BaseModel):
+    """The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not
+    pass or IBKR has no NetLiquidation value in USD."""
+
+    net_liquidation_usd: Decimal | None
+    allocated_usd: Decimal | None
+    unallocated_usd: Decimal | None
 
 
 class ForwardTestsMessage(BaseModel):
@@ -154,6 +169,7 @@ def build_forward_test_response(
         stopped_at_utc=row.stopped_at_utc,
         end_time_utc=row.end_time_utc,
         crash_count=row.crash_count,
+        allocated_capital_usd=row.allocated_capital_usd,
         interruptions=[
             InterruptionResponse(reason=item.reason, started_at_utc=item.started_at_utc, ended_at_utc=item.ended_at_utc)
             for item in interruptions
@@ -167,11 +183,22 @@ async def list_forward_tests(database_url: str) -> list[ForwardTestResponse]:
     return await to_forward_test_responses(database_url, rows)
 
 
-async def describe_refusal(database_url: str, refusal: StartRefusal, instrument: Instrument) -> str:
-    if refusal.forward_test_id is None:
+def format_usd(amount: Decimal) -> str:
+    return f"{amount:,.2f} USD"
+
+
+def describe_refusal(refusal: StartRefusal, allocated_capital_usd: Decimal) -> str:
+    if refusal.unallocated_usd is None:
         return NO_FREE_CLIENT_ID_MESSAGE
-    label = await describe_forward_test(database_url=database_url, forward_test_id=refusal.forward_test_id)
-    return f"{label} already runs on {instrument.symbol} / {instrument.exchange}."
+    return (
+        f"The allocated capital {format_usd(allocated_capital_usd)} is larger than the unallocated "
+        f"{format_usd(refusal.unallocated_usd)}."
+    )
+
+
+def refuse_start(detail: str, unallocated_usd: Decimal | None = None) -> JSONResponse:
+    refused = StartRefusedResponse(detail=detail, unallocated_usd=unallocated_usd)
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=refused.model_dump(mode="json"))
 
 
 async def describe_forward_test(*, database_url: str, forward_test_id: int) -> str:
@@ -184,31 +211,45 @@ async def describe_forward_test(*, database_url: str, forward_test_id: int) -> s
     return f"Forward test {response.id} ({response.strategy_name} v{response.version_number})"
 
 
-@dataclass(frozen=True)
-class ForwardTestOnInstrument:
-    forward_test_id: int
-    label: str
-
-
-async def find_forward_test_on_instrument(
-    *, database_url: str, instrument: Instrument
-) -> ForwardTestOnInstrument | None:
-    """The forward test that holds a client ID on the instrument. Paper orders by hand on it are refused (12.2)."""
-    async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        row = await forward_test_store.select_forward_test_on_instrument(connection, instrument)
-    if row is None:
-        return None
-    label = await describe_forward_test(database_url=database_url, forward_test_id=row.id)
-    return ForwardTestOnInstrument(forward_test_id=row.id, label=label)
-
-
 class ForwardTestRoutes:
-    """The route functions. They share the database URL, the clock, and the client ID range."""
+    """The route functions. They share the database URL, the clock, the client ID range, and the paper account."""
 
-    def __init__(self, *, database_url: str, clock: Clock, client_ids: range) -> None:
+    def __init__(
+        self, *, database_url: str, clock: Clock, client_ids: range, paper_account_monitor: PaperAccountMonitor
+    ) -> None:
         self.database_url = database_url
         self.clock = clock
         self.client_ids = client_ids
+        self.paper_account_monitor = paper_account_monitor
+        self.ledger = ManualOrderLedger(
+            paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock
+        )
+
+    async def read_net_liquidation_usd(self) -> tuple[str, Decimal] | str:
+        """The checked account and its NetLiquidation in USD, or the reason why they are not known."""
+        try:
+            account = self.paper_account_monitor.require_checked_paper_account()
+        except PaperAccountCheckError as error:
+            return f"The paper account check failed: {error.check.message}"
+        balance = await self.paper_account_monitor.read_balance()
+        if balance is None or balance.net_liquidation_usd is None:
+            reason = None if balance is None else balance.message
+            message = "The paper account has no NetLiquidation value in USD."
+            return message if reason is None else f"{message} {reason}"
+        return account, balance.net_liquidation_usd
+
+    async def read_capital(self) -> ForwardTestCapitalResponse:
+        net_liquidation = await self.read_net_liquidation_usd()
+        if isinstance(net_liquidation, str):
+            return ForwardTestCapitalResponse(net_liquidation_usd=None, allocated_usd=None, unallocated_usd=None)
+        _, net_liquidation_usd = net_liquidation
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            allocated_usd = await forward_test_store.select_allocated_usd(connection)
+        return ForwardTestCapitalResponse(
+            net_liquidation_usd=net_liquidation_usd,
+            allocated_usd=allocated_usd,
+            unallocated_usd=net_liquidation_usd - allocated_usd,
+        )
 
     async def start_forward_test(self, request: StartForwardTestRequest) -> ForwardTestResponse | JSONResponse:
         strategy_version = await read_strategy_version(
@@ -225,21 +266,27 @@ class ForwardTestRoutes:
             strategy_version_id=request.strategy_version_id,
             instrument=instrument,
             bar_period=request.bar_period,
+            allocated_capital_usd=request.allocated_capital_usd,
             end_time_utc=request.end_time_utc,
         )
+        net_liquidation = await self.read_net_liquidation_usd()
+        if isinstance(net_liquidation, str):
+            return refuse_start(net_liquidation)
+        account, net_liquidation_usd = net_liquidation
+        # The allocated capital moves from the cash of "By hand", so the owner ledger must have its start.
+        if await self.ledger.read_entries(account) is None:
+            return refuse_start("The owner ledger has no start: the paper account has no cash value in USD yet.")
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             result = await forward_test_store.start_forward_test(
                 connection,
                 request=forward_test_request,
                 client_ids=self.client_ids,
                 created_at_utc=self.clock.read_now_utc(),
+                net_liquidation_usd=net_liquidation_usd,
+                account=account,
             )
         if isinstance(result, StartRefusal):
-            refused = StartRefusedResponse(
-                detail=await describe_refusal(self.database_url, result, instrument),
-                forward_test_id=result.forward_test_id,
-            )
-            return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=refused.model_dump())
+            return refuse_start(describe_refusal(result, request.allocated_capital_usd), result.unallocated_usd)
         return await to_forward_test_response(self.database_url, result)
 
     async def list_forward_tests(self) -> list[ForwardTestResponse]:
@@ -261,9 +308,15 @@ async def push_forward_test_changes(websocket: WebSocket, database_url: str) -> 
         await sender.wait(STATE_READ_INTERVAL_SECONDS)
 
 
-def create_forward_test_router(*, database_url: str, clock: Clock, client_ids: range) -> APIRouter:
-    routes = ForwardTestRoutes(database_url=database_url, clock=clock, client_ids=client_ids)
+def create_forward_test_router(
+    *, database_url: str, clock: Clock, client_ids: range, paper_account_monitor: PaperAccountMonitor
+) -> APIRouter:
+    routes = ForwardTestRoutes(
+        database_url=database_url, clock=clock, client_ids=client_ids, paper_account_monitor=paper_account_monitor
+    )
     router = APIRouter()
+    # Before /api/forward-tests/{forward_test_id} routes of the comparison router.
+    router.add_api_route("/api/forward-tests/capital", routes.read_capital, methods=["GET"])
     router.add_api_route(
         "/api/forward-tests",
         routes.start_forward_test,

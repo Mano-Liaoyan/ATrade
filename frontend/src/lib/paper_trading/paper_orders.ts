@@ -30,14 +30,6 @@ export type OrderFormResult = { kind: 'valid'; request: SendOrderRequest } | { k
 export type SendOrderResult = { kind: 'sent'; ibkrOrderId: number } | { kind: 'failed'; message: string };
 export type CancelOrderResult = { kind: 'cancel_sent' } | { kind: 'failed'; message: string };
 
-// A forward test that holds a client ID on an instrument. src/routes/ makes the list from the forward tests.
-export interface BlockingForwardTest {
-  // For example "Forward test 7 (Bar count v1)".
-  label: string;
-  symbol: string;
-  exchange: string;
-}
-
 export interface ConfirmationLine {
   label: string;
   value: string;
@@ -97,23 +89,6 @@ export function describeOrderForConfirmation(request: SendOrderRequest): Confirm
     { label: 'Order type', value: `${ORDER_TYPE_NAMES[request.order_type]}, ${request.time_in_force}` },
     { label: 'Price', value: price },
   ];
-}
-
-/**
- * Why ATrade refuses an order by hand on the instrument of the form, or null. A forward test that holds a client ID on
- * the instrument blocks the orders by hand on it (docs/architecture.md section 12.2). The backend checks it again.
- */
-export function findOrderBlock(
-  form: Pick<OrderForm, 'symbol' | 'exchange'>,
-  blockingForwardTests: readonly BlockingForwardTest[],
-): string | null {
-  const symbol = form.symbol.trim().toUpperCase();
-  const exchange = form.exchange.trim().toUpperCase();
-  const blocking = blockingForwardTests.find((forwardTest) => forwardTest.symbol === symbol && forwardTest.exchange === exchange);
-  if (blocking === undefined) {
-    return null;
-  }
-  return `${blocking.label} trades ${symbol} / ${exchange}. Stop the forward test to send an order by hand.`;
 }
 
 export function describeOrderSource(source: OrderSource): string {

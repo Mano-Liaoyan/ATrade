@@ -256,12 +256,14 @@ app           -> all modules
   default system prompt (#184). The `conversation_id` foreign keys of
   `strategy_version`, `backtest`, and the screen tables point at
   `assistant_conversation` (section 6.3 allows a foreign key).
-- `paper_trading` does not import `forward_test`. Until phase 3, the refusal
-  of paper orders by hand on the instrument of a running forward test
-  (section 12.2) gets a function from `app/web.py`, which calls
-  `forward_test.find_forward_test_on_instrument()`. From phase 3, the owner
-  ledger replaces this refusal, and `app/web.py` gives `paper_trading` the
-  function `forward_test.read_allocated_capital()` for the "By hand" capital.
+- `paper_trading` does not import `forward_test`. Since #215 the owner
+  ledger replaces the refusal of paper orders by hand on the instrument of a
+  running forward test (section 12.2), and `app/web.py` gives
+  `paper_trading` no forward test function. The start of a forward test
+  moves the allocated capital from "By hand" in the owner ledger, so
+  `paper_trading` does not read the allocated capital
+  (`docs/architecture/paper_trading.md` section 11.13). `forward_test` calls
+  the public owner ledger functions of `paper_trading`.
 - `forward_test -> backtest` is only for the comparison, the metric
   functions, and the look-back of `request_bars` (`find_look_back()`,
   `write_look_back_catalog()`).
@@ -1392,7 +1394,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   comes in as an argument. Tests pass a fake.
 - Record `DataActor`: CI runs it with the test strategy in the NautilusTrader
   backtest engine on the small bar files. Assert the exact table content.
-- IB execution client (`ibkr_paper` contract test, by hand):
+- ATrade execution client in the forward test child (`ibkr_paper` contract
+  test, by hand; before #215 it was the IB execution client):
   - Send a limit order far from the market price.
   - Assert that the Web `reqAllOpenOrders` sees it and reads the forward test
     ID from `orderRef`.
@@ -1622,9 +1625,11 @@ ran them. The implementation must check them.
 | The paper Gateway needs a manual login or approval each week. | Watch the first week of operation. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |
 | Orders on the real paper account: the order cases of section 7.5 and both forward test cases of section 17.4. On 2026-10-27 they did not run to the end: the Gateway API was read-only, so IBKR refused the test order (warning 321, no open order left) and refused `reqOpenOrders` (section 7.4). The forward test cases need a `NetLiquidation` value in USD: the EUR paper account now gets it through the IBKR `EUR.USD` rate (section 21.1). | Recreate `ib-gateway` with `READ_ONLY_API: "no"`, then `uv run pytest -m ibkr_paper`. |
-| The forward test LiveNode of section 12.15: the IB data client and the IB execution client use the same client ID; the venue of `SYMBOL.EXCHANGE` matches the primary exchange of IBKR; the `ClientOrderId` with `order_id_tag = FT<ID>` reaches `orderRef`; `reqOpenOrders` returns the orders of the LiveNode on a new connection with the same client ID (#76). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it`). |
+| The forward test LiveNode of section 12.15 until #215: the IB data client and the IB execution client use the same client ID; the venue of `SYMBOL.EXCHANGE` matches the primary exchange of IBKR; the `ClientOrderId` with `order_id_tag = FT<ID>` reaches `orderRef`; `reqOpenOrders` returns the orders of the LiveNode on a new connection with the same client ID (#76). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it`). |
 | The forward test recovery of section 12.7 (#77): after `kill -9` of the child, the worker restarts it with the same client ID, the restart cancels the old order, and the stop cancels the new one. The child detects a lost IB execution client with a TCP probe of the Gateway port, because the rc7 `LiveNode` does not show the client connection state to Python. A daily Gateway restart was not watched. | `uv run pytest -m ibkr_paper tests/forward_test` (`test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_cancels_the_old_order`). |
-| The forward test records of section 12.8 (#78) in a real `LiveNode`: the IB bar `ts_event` is the bar end, the `DataActor` gets the bars of the strategy bar type, and `self.cache.orders(instrument_id=...)` holds the `OrderFilled` events of the IB execution client with stable `trade_id` values after a restart. Only the backtest engine run is checked (`test_forward_test_recorder.py`). | Run a forward test on the paper account, then compare `forward_test_equity_point` times with the bar ends and `forward_test_fill` with the IBKR executions. |
+| The forward test records of section 12.8 (#78) in a real `LiveNode`: the IB bar `ts_event` is the bar end, and the `DataActor` gets the bars of the strategy bar type. Since #215 the recorder reads the fills from the owner ledger, not from `self.cache`. Only the backtest engine run is checked (`test_forward_test_recorder.py`). | Run a forward test on the paper account, then compare `forward_test_equity_point` times with the bar ends and the `owner_ledger_entry` fills with the IBKR executions. |
+| The forward test LiveNode since #215 (`forward_test.md` sections 12.15 and 12.19): the IB data client with the client ID plus 100 and the ATrade execution client with the client ID of the forward test in 1 LiveNode; the reconciliation from the owner reports in a real LiveNode; no second buy after a restart; the price precision of the IB instrument for the fills. Only the IBKR fake and a LiveNode with the ATrade data client were used (`test_forward_test_owner_ledger.py`). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_forward_test_paper_contract.py` inserts the allocated capital), then a forward test on the paper account with a restart. |
+| IBKR refuses opposite orders of 2 owners on 1 instrument (self-trade prevention, `paper_trading.md` section 11.12). | On the paper account, send an AAPL buy and an AAPL sell with 2 client IDs: first with prices that do not cross, then with prices that cross. |
 | `reqExecutions` returns the executions of the current day only. The filled orders by hand (section 11.4) show only those fills. | The `ibkr_paper` contract tests, during US market hours. |
 | Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. Checked on a weekday outside the trading hours (section 21.1). Not checked on a weekend. | `uv run pytest -m ibkr_paper -k live_bar` on a Saturday or Sunday. |
 | The account `ExchangeRate` for USD (section 11.9 of `paper_trading.md`, step 3): IBKR sends it only when the ledger holds USD, as base currency units for 1 USD. Checked only with the fake; the paper account of the owner holds only EUR. | `uv run pytest -m ibkr_paper -k balance_and_the_positions` after the account holds USD cash, and compare the panel rate with the IBKR `EUR.USD` rate. |
@@ -1635,7 +1640,8 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 |---|---|
 | The default parameters of the template sources (#139). Brock, Lakonishok & LeBaron 1992 (S1, S2: range break of 10 days, break by the close) and Faber 2007 (S1: check only at the month end) were not read on 2026-10-30 (#175): both papers are paywalled. The phase 3 sources (Blitz & van Vliet 2007, Barroso & Santa-Clara 2015) were not read. | Read section II of Brock et al. and the Faber paper with library access (strategy section 9.9.4). |
 | The IBKR instrument search returns ETFs, for example `SPY` (#175, templates S1 to S3). `ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. Not checked: no IB Gateway in the implementation environment. | Search `SPY` on the paper account. |
-| The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
+| The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). Synthetic tables give 14 to 16 seconds (section 21.1). Not measured on the real bar tables (#206): the local database has no real daily bars. | Run `read_last_daily_bars` for all instruments of `daily_bar_summary` with `bar_count` 260 on the server and time it. |
+| A US screen keeps 1000 to 2000 instruments after step 1 (estimate, #136). Not counted (#206): the local database has no real daily bars. | Run a screen with the start `all_with_daily_bars` and the filters of the example of `screen.md` section 24.4.1, and read `after_filters_count`. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
 | The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
 | The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. |
@@ -1680,6 +1686,7 @@ implementation" list.
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
 | The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | Yes, with changes. On 2026-10-30 with NautilusTrader 2.0.0rc7 (#213), the Python `ExecutionClient` and `DataClient` of `nautilus_trader.live.clients` ran in a `LiveNode` with the IBKR fake and the owner ledger fake (`tests/forward_test/test_atrade_clients_live_node.py`). 2 or more LiveNodes can run one after the other in 1 process. After a restart, NautilusTrader made an external order with an inferred fill from the `PositionStatusReport` (`quantity`, `avg_px_open`): it does make a synthetic fill. With `external_order_instrument_ids` set to the instrument, the strategy got the position with the reported average price and did not buy again. Without it, the position belonged to the strategy `EXTERNAL`. After a 2-for-1 split in the fake ledger and a restart, the strategy got the new quantity and the new average price. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
+| The time of the bulk daily bar read for a screen run (`read_last_daily_bars`, #136), on synthetic tables. | On 2026-10-30 (#206), PostgreSQL 18.3 in Docker on the development machine, only `ibkr_bar` filled: 10000 instruments × 260 daily bars, 1 saved range for each instrument, after `ANALYZE`. One read of the last 260 daily bars of all instruments: 13.9 and 15.6 seconds (2 runs, 2600000 bars). 2000 instruments: 3.5 and 3.7 seconds. A run from `all_with_daily_bars` without filters reads the longest look-back of its indicators, so the read is most of its run time. The real bar tables are not measured (section 21). |
 | Moskowitz, Ooi & Pedersen 2012 use a 12-month look-back and a 1-month hold (#139, template S3). | Yes. On 2026-10-30 (#175), from the published paper (JFE 104, 228–250, author copy at `pages.stern.nyu.edu/~lpederse`): section 4 (p. 237) uses k = 12 months and h = 1 month as the main strategy. Eq. (5) uses the return from t − 12 to t, so no month is skipped (only the cross-sectional strategy of footnote 10 skips 1 month): S3 uses skip 0. The signal is the sign of the past excess return: long above 0, short below 0. Each position is scaled to 40% annual ex ante volatility. S3 differs: no short sale, no volatility scaling, price return (strategy section 9.9.3). |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
@@ -1802,6 +1809,15 @@ option and records it in this document.
   operators, the `422` problem `location`, and the final paths of the screen
   routes are in [`screen.md`](architecture/screen.md) sections 24.4, 24.4.1,
   24.6, and 24.7. A delete of a screen deletes its screen results.
+- Decided (#206): a screen run follows [`screen.md`](architecture/screen.md)
+  section 24.5. "Still trading" is true when the last daily bar of the
+  instrument is at most 7 calendar days older than the daily bars date of
+  the run (the newest last daily bar of the start instruments). When more
+  than 500 instruments pass, the result keeps the first 500 of the order.
+  The percentile of a rank condition is 100 × the share of the values that
+  are lower or equal, so equal values get the same percentile. A run saves
+  the full excluded list, also for all US instruments. The result has no
+  instrument name: `market_data` has no name source (section 24.5).
 - Decided (#197): the request field of the backtest source order is
   `source_order`. It holds each `BarSource` exactly 1 time, like the global
   source order (`422` otherwise). `bar_count_by_source` counts only the bars
@@ -1894,6 +1910,25 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#215): the forward test child uses the ATrade execution client
+  with `ForwardTestLedger` of `paper_trading` and keeps the IB data client
+  with the client ID of the forward test plus 100
+  (`docs/architecture/forward_test.md` sections 12.15 and 12.24).
+- Decided (#215): the allocated capital is a ledger `transfer` from
+  "By hand" at the start, and the stop transfers the positions and the cash
+  back (`docs/architecture/paper_trading.md` section 11.13).
+  `forward_test_fill` keeps only the fills of the old forward tests
+  (`forward_test.md` section 12.24).
+- Decided (#215): an execution that IBKR makes after the stop of a run does
+  not go into the owner ledger. The next run sends fills only for its own
+  orders. The position then shows the difference as "Unattributed"
+  (`docs/architecture/paper_trading.md` section 11.7).
+- Decided (#221): the start dialog reads `GET /api/forward-tests/capital`
+  each time it opens and after each refused start. It does not read it again
+  when the "Capital (USD)" input changes. Without an unallocated amount, the
+  dialog reads the paper account check from `/ws/paper-trading` while it is
+  open and shows its reason (`docs/architecture/forward_test.md` section
+  12.16).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client
   calls `check_order()` before each order, `save_fill()` for each fill, and
@@ -1922,6 +1957,10 @@ option and records it in this document.
   conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
   exchange rates of a backtest on port 8001. See section 25.14 and
   [`backtest.md`](architecture/backtest.md) section 10.13.
+- Decided (#182): the 9 tools of phase 2, the 5 backtests of a user
+  message (only the tool counts them), the `read_backtest` summary, the
+  fields of `tool_step`, `strategy_version_saved`, and `backtest_finished`,
+  and the 15-minute wait in tests. See section 25.14.
 - Decided (#183): the credential file is `/data/credentials.json` in the
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the

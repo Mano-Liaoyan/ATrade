@@ -12,8 +12,6 @@ from pathlib import Path
 from nautilus_trader.adapters.interactive_brokers import (
     InteractiveBrokersDataClientConfig,
     InteractiveBrokersDataClientFactory,
-    InteractiveBrokersExecutionClientConfig,
-    InteractiveBrokersExecutionClientFactory,
     InteractiveBrokersInstrumentProviderConfig,
 )
 from nautilus_trader.common import Environment
@@ -23,11 +21,19 @@ from nautilus_trader.model import BarType, InstrumentId, Symbol, TraderId, Venue
 from nautilus_trader.persistence import DataCatalogConfig
 
 from atrade.backtest import write_look_back_catalog
+from atrade.forward_test.atrade_live_node import add_atrade_clients
 from atrade.forward_test.forward_test_child import LiveNodeEnd, LiveNodeInput
 from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
+from atrade.forward_test.owner_ledger_execution_client import OwnerLedgerExecutionClientFactory, OwnerLedgerInput
+from atrade.foundation.clock import SystemClock
+from atrade.ibkr import IbAsyncGatewayConnection
+from atrade.paper_trading import ForwardTestLedger
 from atrade.strategy import load_strategy_classes
 
 IB_CLIENT_NAME = "IB"
+# The ATrade execution client holds the client ID of the forward test, and one client ID cannot have 2 connections.
+# So the IB data client uses this client ID plus the offset: 110-113 for the default range (section 12.24).
+DATA_CLIENT_ID_OFFSET = 100
 # The trader ID has the form NAME-TAG. NautilusTrader writes the tag into each ClientOrderId.
 TRADER_ID_PREFIX = "ATRADE"
 GATEWAY_PROBE_TIMEOUT_SECONDS = 5.0
@@ -85,7 +91,7 @@ def create_live_node_builder(
     The reason: the IB data client of NautilusTrader 2.0.0rc7 splits a long request into a part in days and a rest
     in seconds. IBKR refuses a rest shorter than the bar (error 321), so a 7-day request of 1-minute bars fails.
     """
-    # The account position on the instrument belongs to this forward test (section 12.2).
+    # The ATrade execution client reports the owner position of the forward test (sections 12.2, 12.19).
     execution_engine_config = LiveExecutionEngineConfig(
         reconciliation=True, reconciliation_instrument_ids=[str(instrument_id)]
     )
@@ -99,29 +105,41 @@ def create_live_node_builder(
     return LiveNodeBuilder.from_config(f"forward-test-{live_node_input.forward_test_id}", config)  # pyright: ignore[reportUnknownMemberType]
 
 
+def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedgerExecutionClientFactory:
+    """The ATrade execution client with the client ID of the forward test and the owner ledger (section 12.19)."""
+    gateway_connection = IbAsyncGatewayConnection(
+        host=live_node_input.gateway_host, port=live_node_input.gateway_port, client_id=live_node_input.client_id
+    )
+    ledger = ForwardTestLedger(
+        database_url=live_node_input.database_url,
+        account=live_node_input.account_id,
+        forward_test_id=live_node_input.forward_test_id,
+        gateway_connection=gateway_connection,
+        clock=SystemClock(),
+    )
+    ledger_input = OwnerLedgerInput(
+        forward_test_id=live_node_input.forward_test_id,
+        client_id=live_node_input.client_id,
+        account_id=live_node_input.account_id,
+        instruments=(live_node_input.instrument,),
+    )
+    return OwnerLedgerExecutionClientFactory(ledger_input, ledger, gateway_connection)
+
+
 def build_live_node(
     live_node_input: LiveNodeInput, instrument_id: InstrumentId, warm_up_catalog: DataCatalogConfig
 ) -> LiveNode:
-    """IB data and execution clients with the client ID of the forward test, for this 1 instrument."""
+    """The IB data client for the live bars of this 1 instrument, and the ATrade execution client (section 12.24)."""
     instrument_provider = InteractiveBrokersInstrumentProviderConfig(load_ids={instrument_id})
     data_client_config = InteractiveBrokersDataClientConfig(
         host=live_node_input.gateway_host,
         port=live_node_input.gateway_port,
-        client_id=live_node_input.client_id,
-        instrument_provider=instrument_provider,
-    )
-    execution_client_config = InteractiveBrokersExecutionClientConfig(
-        host=live_node_input.gateway_host,
-        port=live_node_input.gateway_port,
-        client_id=live_node_input.client_id,
-        account_id=live_node_input.account_id,
+        client_id=live_node_input.client_id + DATA_CLIENT_ID_OFFSET,
         instrument_provider=instrument_provider,
     )
     builder = create_live_node_builder(live_node_input, instrument_id, warm_up_catalog)
     builder = builder.add_data_client(IB_CLIENT_NAME, InteractiveBrokersDataClientFactory(), data_client_config)
-    builder = builder.add_exec_client(
-        IB_CLIENT_NAME, InteractiveBrokersExecutionClientFactory(), execution_client_config
-    )
+    builder = add_atrade_clients(builder, None, create_execution_client_factory(live_node_input))
     return builder.build()
 
 

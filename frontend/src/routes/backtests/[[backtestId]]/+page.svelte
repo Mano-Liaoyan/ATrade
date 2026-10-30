@@ -181,6 +181,8 @@
       exchange: detail.exchange,
       currency: detail.currency,
       bar_period: detail.bar_period,
+      // The paper capital of the backtest is the allocated capital of the forward test (forward_test.md 12.18).
+      allocated_capital_usd: detail.paper_capital_usd,
     });
     isStartingForwardTest = false;
     if (result.kind === 'failed') {
