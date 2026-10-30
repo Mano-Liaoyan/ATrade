@@ -13,6 +13,7 @@ from atrade.assistant.assistant_service import (
     AssistantService,
     AssistantServiceClient,
     AssistantServiceError,
+    BacktestFinished,
     ConversationMessage,
     CredentialSummary,
     LoginEnd,
@@ -25,7 +26,9 @@ from atrade.assistant.assistant_service import (
     ProviderSummary,
     RunError,
     RunEvent,
+    StrategyVersionSaved,
     TextDelta,
+    ToolStep,
 )
 from atrade.assistant.assistant_socket import ASSISTANT_SOCKET_MESSAGE_MODELS, create_assistant_socket_router
 from atrade.assistant.credential_routes import create_credential_router
@@ -79,6 +82,7 @@ __all__ = [
     "AssistantService",
     "AssistantServiceClient",
     "AssistantServiceError",
+    "BacktestFinished",
     "ConversationMessage",
     "CredentialSummary",
     "LoginEnd",
@@ -93,7 +97,9 @@ __all__ = [
     "RunEvent",
     "StartContext",
     "StartContextReader",
+    "StrategyVersionSaved",
     "TextDelta",
+    "ToolStep",
     "conversation_exists",
     "create_assistant_router",
 ]

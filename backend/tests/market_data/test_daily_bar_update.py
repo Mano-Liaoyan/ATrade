@@ -15,6 +15,7 @@ from atrade.market_data import (
     DailyBarUpdate,
     read_daily_bar_summaries,
     read_saved_bars,
+    read_stock_split_candidates,
     save_received_bars,
 )
 from tests.fakes.clock import FixedClock
@@ -80,7 +81,7 @@ async def test_reads_the_daily_bars_of_the_universe_the_hk_list_and_the_watchlis
     await save_received_bars(
         database_url=database_url,
         bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(DECEMBER_2_UTC, DECEMBER_3_UTC)),
-        bars=[Bar(DECEMBER_2_UTC, Decimal(1), Decimal(1), Decimal(1), Decimal(1), Decimal(1))],
+        bars=[Bar(DECEMBER_2_UTC, Decimal(1), Decimal(125), Decimal(1), Decimal("124.5"), Decimal(1))],
     )
     update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
 
@@ -155,3 +156,26 @@ async def test_a_failed_read_of_one_instrument_does_not_stop_the_update(
 
     assert len(gateway_connection.historical_bar_requests) == 3
     assert await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE, TENCENT, TESLA]) == []
+
+
+@pytest.mark.anyio
+async def test_the_day_that_is_read_again_gives_evidence_a_and_keeps_its_stored_close(
+    database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    # The stored close of 2 December is 249. The fake IBKR close is 124.5: a stock split of 2 on 3 December.
+    stored_close = Decimal(249)
+    await save_received_bars(
+        database_url=database_url,
+        bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(DECEMBER_2_UTC, DECEMBER_3_UTC)),
+        bars=[Bar(DECEMBER_2_UTC, stored_close, stored_close, stored_close, stored_close, Decimal(1))],
+    )
+    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
+
+    assert await update.update_if_due() is True
+
+    candidates = await read_stock_split_candidates(database_url=database_url)
+    assert [(item.instrument, item.ex_date_utc, item.split_ratio) for item in candidates] == [
+        (APPLE, DECEMBER_3_UTC, Decimal(2))
+    ]
+    summaries = await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE])
+    assert [summary.last_close for summary in summaries] == [stored_close]

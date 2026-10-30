@@ -277,12 +277,21 @@ them by ID. A missing ID is not in the result. The forward test list uses it
   CodeMirror base themes also use their dark variants.
 - `CodeEditor` takes more CodeMirror extensions in its `extensions` property.
   The editor page passes the language server extension.
+- With `readOnly`, `CodeEditor` does not accept changes, wraps long lines,
+  and takes the height of its code, so a parent `ScrollRegion` scrolls it.
+  `highlightedLines` gives lines a neutral background
+  (`--cds-layer-selected-01`). `scrollLineIntoRegion(line, region)` scrolls
+  only that region. The "Rules" tab uses these (section 9.8.5).
 - `frontend/src/lib/strategy/` holds the HTTP client of the strategy routes,
   the version label (`formatVersionLabel`), the drafts in `localStorage`, and
   the language server connection (`connectStrategyLanguageServer`).
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
   draft of the version that the user edited.
+- Unsaved rules of the "Rules" tab (section 9.8.5) have their own draft. The
+  key is `atrade.strategy-rules-draft.<strategy id>.v<version number>`, with
+  the number of the version that the rules come from (0 for the blank
+  rules). A save of the rules removes it.
 - Pages: `/strategies/<id>` is the strategy workbench (list, new strategy,
   editor, version list, save, delete, Run backtest, Start forward test, and
   the backtest results; docs/architecture.md section 13). `/strategies` shows
@@ -513,6 +522,14 @@ Source: [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md).
   The new code replaces the code changes of vN.
 - In the warning case, ATrade shows the diff (`CodeDiff`) of the vN code and
   the new code before the save.
+- Decided (#174): the tab shows the warning as a Carbon inline notification
+  (warning icon and color) above the Settings block. The tab of a version
+  with rules shows its own rules with no warning, also when it is older than
+  vM. When no version has rules, there is no warning.
+- Decided (#174): the diff is in the dialog "Replace code changes of vN".
+  The left side is the vN code, the right side is "Code from the rules".
+  The buttons are "Cancel" (no save) and "Save rules as new version". When
+  the code request fails, the save runs at once and shows the problems.
 - In phase 2, the AI assistant does not change rules. Its code changes count
   as code changes by hand. The AI assistant tool that reads a version also
   returns the rules JSON.
@@ -543,6 +560,31 @@ Source: [Rule builder prototype](https://github.com/Mano-Liaoyan/ATrade/issues/1
   - status tags, for example "Generated · read-only"
   - an information line or a status list below the code.
 - Colors are neutral Carbon tokens only.
+- Decided (#173): the components are `RulesTab.svelte`,
+  `RuleGroupEditor.svelte`, `RuleOperand.svelte`, and
+  `RuleNumberInput.svelte` in `frontend/src/routes/strategies/`. The
+  operand choices and the indicator parameters are in
+  `frontend/src/lib/strategy/strategy_rules.ts`. They copy the catalog of
+  `atrade.indicator` (section 23.3 of [`indicator.md`](indicator.md)): no
+  route gives the catalog yet. A parameter that the catalog keeps out of the
+  name (`bars_per_year` of realized volatility) is not shown and keeps its
+  default.
+- Decided (#173): the tab opens the rules of the open version when it has
+  rules. Else it opens the rules of vM. A strategy without a version with
+  rules opens the blank rules: no conditions, no exit items, and 10 fixed
+  shares (`BLANK_RULES`).
+- Decided (#173): the line highlight compares the new code with the code
+  before the last rule change. The first code of the tab has no highlight.
+- Decided (#173): while the "Rules" tab is open, the save button of the
+  toolbar is "Save rules as new version", and it and Ctrl S save the rules
+  (`{"rules": ...}`). While `strategy.py` is open, they save the code.
+- Decided (#173): unsaved rules stay in a `localStorage` draft (section
+  9.7).
+- Decided (#173): each rule change asks for the code at once, with no delay.
+  The tab drops the answer to an older request. A number field reports only
+  a complete number. When the code request fails (for example a parameter
+  out of its range), the code stays as it was; a save shows the format
+  problems in Problems.
 
 ### 9.8.6 Universe mode (phase 3)
 
@@ -561,16 +603,7 @@ It needs the multi-instrument backtest of
 
 ### 9.8.7 Left to the implementation
 
-- What the "Rules" tab shows for a strategy that has no version with rules.
-- What the "Rules" tab shows when the open version is an older version with
-  rules than vM.
-- The code that the line highlight compares with (the code before the last
-  rule change, or the code of the open version).
-- How Save version and Ctrl S act while the "Rules" tab is open.
-- The `localStorage` draft of unsaved rules (section 9.1 keeps all unsaved
-  edits in the browser).
-- The delay between a rule change and the code request.
-- The buttons of the diff before the save.
+- The rules that "Blank rules" holds (for example the position size).
 - Decided (#198): the platform tells the strategy the universe of each
   universe period with NautilusTrader custom data. The strategy calls
   `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
