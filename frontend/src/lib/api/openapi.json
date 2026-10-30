@@ -1303,6 +1303,211 @@
         }
       }
     },
+    "/api/sweeps/parameters": {
+      "get": {
+        "summary": "Read Parameters",
+        "operationId": "read_parameters_api_sweeps_parameters_get",
+        "parameters": [
+          {
+            "name": "strategy_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametersResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sweeps": {
+      "get": {
+        "summary": "List Sweeps",
+        "operationId": "list_sweeps_api_sweeps_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SweepResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Sweeps Api Sweeps Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Start Sweep",
+        "operationId": "start_sweep_api_sweeps_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSweepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sweeps/{sweep_id}": {
+      "get": {
+        "summary": "Read Sweep",
+        "operationId": "read_sweep_api_sweeps__sweep_id__get",
+        "parameters": [
+          {
+            "name": "sweep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sweep Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sweeps/{sweep_id}/cancel": {
+      "post": {
+        "summary": "Cancel Sweep",
+        "operationId": "cancel_sweep_api_sweeps__sweep_id__cancel_post",
+        "parameters": [
+          {
+            "name": "sweep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sweep Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/forward-tests/capital": {
       "get": {
         "summary": "Read Capital",
@@ -3346,7 +3551,8 @@
           "running",
           "finished",
           "failed",
-          "timed_out"
+          "timed_out",
+          "cancelled"
         ]
       },
       "BarPeriod": {
@@ -4980,6 +5186,63 @@
         ],
         "title": "GatewayStatusResponse"
       },
+      "GridEntry": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GridEntry",
+        "description": "One parameter of the grid. An `int` or `float` parameter needs `start`, `end`, and `step`. A `bool` parameter\ntakes no values: the grid uses false and true."
+      },
       "GroupMatch": {
         "type": "string",
         "enum": [
@@ -5745,6 +6008,71 @@
         ],
         "title": "PaperCapitalResponse",
         "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
+      },
+      "ParameterResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "default"
+        ],
+        "title": "ParameterResponse"
+      },
+      "ParameterValues": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "type": "object"
+      },
+      "ParametersResponse": {
+        "properties": {
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameters"
+        ],
+        "title": "ParametersResponse"
       },
       "PercentOfEquity": {
         "properties": {
@@ -6971,6 +7299,149 @@
         "title": "StartRefusedResponse",
         "description": "The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18)."
       },
+      "StartSweepRequest": {
+        "properties": {
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind",
+            "default": "single"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "top_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N"
+          },
+          "instruments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InstrumentBody"
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instruments"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "paper_capital_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Paper Capital Usd"
+          },
+          "out_of_sample_share": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Out Of Sample Share",
+            "default": 30
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "grid": {
+            "items": {
+              "$ref": "#/components/schemas/GridEntry"
+            },
+            "type": "array",
+            "title": "Grid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_version_id",
+          "bar_period",
+          "start_utc",
+          "end_utc",
+          "paper_capital_usd",
+          "grid"
+        ],
+        "title": "StartSweepRequest",
+        "description": "The fields of a backtest start and the grid of 1 to 3 parameters."
+      },
       "StrategyListItem": {
         "properties": {
           "id": {
@@ -7257,6 +7728,138 @@
           "discarded"
         ],
         "title": "StrategyVersionSummary"
+      },
+      "SweepDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "grid": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Grid"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Status Counts"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/SweepRunResponse"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_version_id",
+          "grid",
+          "created_at_utc",
+          "run_count",
+          "status_counts",
+          "runs"
+        ],
+        "title": "SweepDetailResponse"
+      },
+      "SweepResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "grid": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Grid"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "run_count": {
+            "type": "integer",
+            "title": "Run Count"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Status Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_version_id",
+          "grid",
+          "created_at_utc",
+          "run_count",
+          "status_counts"
+        ],
+        "title": "SweepResponse"
+      },
+      "SweepRunResponse": {
+        "properties": {
+          "backtest_id": {
+            "type": "integer",
+            "title": "Backtest Id"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/ParameterValues"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BacktestStatus"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BacktestMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "backtest_id",
+          "parameters",
+          "status",
+          "metrics"
+        ],
+        "title": "SweepRunResponse"
       },
       "TemplateSourceResponse": {
         "properties": {
