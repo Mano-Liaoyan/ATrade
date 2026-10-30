@@ -3,14 +3,16 @@
 Real PostgreSQL. No real Databento call (docs/architecture.md section 17.3).
 """
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+import anyio.to_thread
 import psycopg
 import pytest
 
 from atrade.app.databento_import import main, run_databento_import
+from atrade.market_data import read_us_universe_members
 from tests.fakes.databento import (
     CLOSE_PRICE,
     DAILY_SCHEMA,
@@ -23,6 +25,7 @@ from tests.fakes.databento import (
     write_dbn_files,
 )
 from tests.fakes.ibkr import FakeGatewayConnection
+from tests.us_universe_bars import insert_daily_bars, nasdaq, weekdays
 
 TRADING_DAY = date(2020, 1, 2)
 START = date(2018, 5, 1)
@@ -117,3 +120,26 @@ def test_the_program_does_not_download_without_a_databento_api_key(
 
     assert stop.value.code == 1
     assert "DATABENTO_API_KEY is empty" in caplog.text
+
+
+@pytest.mark.anyio
+async def test_the_program_calculates_the_us_universe_of_the_quarters_after_the_import(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    insert_daily_bars(database_url, nasdaq("AAPL"), weekdays(START, date(2018, 9, 28)), "10", 100)
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("DATABENTO_API_KEY", "")
+    monkeypatch.setattr(
+        "atrade.app.databento_import.IbAsyncGatewayConnection",
+        lambda **_: FakeGatewayConnection(managed_accounts=["DU1234567"]),
+    )
+    caplog.set_level("INFO")
+
+    # main runs its own event loop, so it runs in a worker thread.
+    await anyio.to_thread.run_sync(lambda: main([str(tmp_path)]))
+
+    members = await read_us_universe_members(
+        database_url=database_url, quarter_start_utc=datetime(2018, 10, 1, tzinfo=UTC), top_n=500
+    )
+    assert [member.instrument.symbol for member in members] == ["AAPL"]
+    assert "Calculated the US universe of 1 quarters." in caplog.text

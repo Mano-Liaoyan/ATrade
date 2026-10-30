@@ -6,6 +6,7 @@ With `--job-id`, the program first downloads the files of each batch job to `<di
 `DATABENTO_API_KEY`. Then it imports all DBN files (`*.dbn`, `*.dbn.zst`) below `<directory>` into databento_bar.
 The import reads the IBKR daily closes of the instruments that still trade to find their stock splits, so it needs
 IB Gateway (market_data.md section 8.8.3). It connects with its own client ID, default 30.
+At the end, it calculates the quarterly US universe of each quarter without members (market_data.md section 8.9).
 """
 
 import argparse
@@ -24,6 +25,8 @@ from atrade.market_data import (
     DatabentoHistoricalClient,
     DatabentoImportError,
     DatabentoImportReport,
+    UsUniverseCalculationError,
+    calculate_us_universe_history,
     import_databento_files_with_ibkr,
 )
 
@@ -127,6 +130,12 @@ def main(arguments: Sequence[str] | None = None) -> None:
         logger.error("The Databento import saved nothing. %s", error)
         sys.exit(1)
     log_report(report)
+    try:
+        quarter_count = calculate_us_universe_history(database_url=settings.database_url)
+    except UsUniverseCalculationError as error:
+        logger.error("The quarterly US universe saved nothing. %s", error)
+        sys.exit(1)
+    logger.info("Calculated the US universe of %d quarters.", quarter_count)
 
 
 if __name__ == "__main__":

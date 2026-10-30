@@ -1,5 +1,6 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
-source order, saved bars, received bars to save, the Databento import and its user check, live bars, and daily exchange rates in USD."""
+source order, saved bars, received bars to save, the Databento import and its user check, the quarterly US universe, live
+bars, and daily exchange rates in USD."""
 
 from atrade.market_data.bar_reading import (
     BarRequest,
@@ -43,6 +44,15 @@ from atrade.market_data.instrument_lookup import (
     InstrumentLookupFailedError,
 )
 from atrade.market_data.live_bar_socket import MARKET_DATA_SOCKET_MESSAGE_MODELS
+from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
+from atrade.market_data.us_universe import (
+    UsUniverseCalculationError,
+    UsUniverseMember,
+    calculate_us_universe_history,
+    read_us_universe_members,
+    save_us_universe,
+)
+from atrade.market_data.us_universe_update import UsUniverseUpdate
 
 __all__ = [
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
@@ -66,10 +76,16 @@ __all__ = [
     "SavedExchangeRate",
     "SymbolLink",
     "UncheckedLink",
+    "UsUniverseCalculationError",
+    "UsUniverseMember",
+    "UsUniverseUpdate",
     "WaitingSplit",
+    "calculate_us_universe_history",
     "check_import_detections",
     "check_source_order",
     "create_market_data_router",
+    "find_first_trading_day_of_quarter",
+    "find_previous_trading_day",
     "has_saved_bars",
     "import_databento_files",
     "import_databento_files_with_ibkr",
@@ -79,6 +95,8 @@ __all__ = [
     "read_source_order",
     "read_unchecked_import_detections",
     "read_unsaved_ranges",
+    "read_us_universe_members",
     "save_received_bars",
     "save_received_bars_blocking",
+    "save_us_universe",
 ]
