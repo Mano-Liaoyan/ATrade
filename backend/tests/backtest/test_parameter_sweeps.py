@@ -113,6 +113,21 @@ async def test_read_and_cancel_of_a_missing_sweep_are_404(web_client: httpx.Asyn
 
 
 @pytest.mark.anyio
+async def test_a_run_names_its_sweep_and_the_sweep_names_its_strategy_version(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    run = (await web_client.get(f"/api/backtests/{sweep['runs'][0]['backtest_id']}")).json()
+    listed = (await web_client.get("/api/sweeps")).json()[0]
+
+    assert (run["sweep_id"], run["parameters"]) == (sweep["id"], {"trade_quantity_shares": 5})
+    assert (sweep["strategy_name"], sweep["version_number"]) == ("Bar count", run["version_number"])
+    assert (listed["strategy_name"], listed["version_number"]) == ("Bar count", run["version_number"])
+
+
+@pytest.mark.anyio
 async def test_a_run_gives_its_parameters_to_the_strategy_and_counts_as_a_trial(
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
 ) -> None:

@@ -34,7 +34,7 @@ from atrade.backtest.parameter_sweep import (
 )
 from atrade.foundation.clock import Clock
 from atrade.market_data import ExchangeRateReader
-from atrade.strategy import StrategyParameter, read_strategy_parameters, read_strategy_version
+from atrade.strategy import StrategyParameter, StrategyVersion, read_strategy_parameters, read_strategy_version
 
 SWEEP_NOT_FOUND = "Parameter sweep not found."
 
@@ -65,6 +65,9 @@ class SweepRunResponse(BaseModel):
 class SweepResponse(BaseModel):
     id: int
     strategy_version_id: int
+    strategy_id: int
+    strategy_name: str
+    version_number: int
     grid: list[dict[str, object]]
     created_at_utc: datetime
     run_count: int
@@ -76,10 +79,15 @@ class SweepDetailResponse(SweepResponse):
     runs: list[SweepRunResponse]
 
 
-def to_sweep_response(sweep: SweepRow, runs: list[backtest_store.BacktestRow]) -> SweepResponse:
+def to_sweep_response(
+    sweep: SweepRow, version: StrategyVersion, runs: list[backtest_store.BacktestRow]
+) -> SweepResponse:
     return SweepResponse(
         id=sweep.id,
         strategy_version_id=sweep.strategy_version_id,
+        strategy_id=version.strategy_id,
+        strategy_name=version.strategy_name,
+        version_number=version.version_number,
         grid=sweep.grid,
         created_at_utc=sweep.created_at_utc,
         run_count=len(runs),
@@ -95,6 +103,15 @@ class SweepRoutes:
         self.backtest_routes = BacktestRoutes(
             database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader
         )
+
+    async def read_version_of(self, sweep: SweepRow) -> StrategyVersion:
+        version = await read_strategy_version(
+            database_url=self.database_url, strategy_version_id=sweep.strategy_version_id
+        )
+        if version is None:
+            message = f"Sweep {sweep.id} refers to strategy version {sweep.strategy_version_id}, which is missing."
+            raise RuntimeError(message)
+        return version
 
     async def read_parameters_of(self, strategy_version_id: int) -> list[StrategyParameter] | None:
         version = await read_strategy_version(database_url=self.database_url, strategy_version_id=strategy_version_id)
@@ -143,7 +160,12 @@ class SweepRoutes:
     async def list_sweeps(self) -> list[SweepResponse]:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             sweeps = await select_sweeps(connection)
-            return [to_sweep_response(sweep, await select_sweep_runs(connection, sweep.id)) for sweep in sweeps]
+            return [
+                to_sweep_response(
+                    sweep, await self.read_version_of(sweep), await select_sweep_runs(connection, sweep.id)
+                )
+                for sweep in sweeps
+            ]
 
     async def read_sweep(self, sweep_id: int) -> SweepDetailResponse:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
@@ -152,7 +174,7 @@ class SweepRoutes:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=SWEEP_NOT_FOUND)
             runs = await select_sweep_runs(connection, sweep_id)
         return SweepDetailResponse(
-            **to_sweep_response(sweep, runs).model_dump(),
+            **to_sweep_response(sweep, await self.read_version_of(sweep), runs).model_dump(),
             runs=[
                 SweepRunResponse(
                     backtest_id=run.id,
