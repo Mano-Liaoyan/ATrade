@@ -1,8 +1,6 @@
-"""The probabilistic Sharpe ratio PSR(0) and the deflated Sharpe ratio DSR (docs/architecture/backtest.md section
-10.9.5; Bailey and López de Prado, 2012 and 2014).
+"""PSR(0) and DSR (docs/architecture/backtest.md section 10.9.5; Bailey and López de Prado, 2012 and 2014).
 
-The functions use the daily Sharpe ratio, not annualized. Only the Python standard library: `statistics.NormalDist`
-gives `Φ` and `Φ⁻¹`.
+They use the daily Sharpe ratio, not annualized, and `statistics.NormalDist` for `Φ` and `Φ⁻¹` (no numpy, no scipy).
 """
 
 import math

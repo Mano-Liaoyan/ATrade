@@ -288,6 +288,7 @@ use the same functions for the comparison (section 12.10).
 | Phase 1: `calculate_metrics(*, paper_capital_usd, time_range, equity_curve, trades)` | Also gives the metrics of section 10.9.2 and the win rate, and `missing_reasons` (section 10.9.3). It takes the trades in place of `trade_count` (`trade_count` is the number of trades), and the time range for `years`. It takes no bars: the equity curve has one point at the end of each bar, so the exposure counts the points. Thus a forward test, which has no saved bars, uses the same function. Ratios, percents, and money have 2 decimal places. |
 | Phase 1: `calculate_split_metrics(*, ..., split_time_utc)` | The metrics of the in-sample part and of the out-of-sample part (section 10.9.4). |
 | Phase 1: `calculate_probabilistic_sharpe(*, daily_returns)` and `calculate_deflated_sharpe(*, daily_returns, trial_sharpe_ratios)` | Section 10.9.5. |
+| Phase 1: `find_sharpe_probability_status(percent)` | The status of a PSR or DSR percent: `likely_real`, `uncertain`, `likely_luck`, or None without a value (section 10.9.5). |
 
 Phase 1: forward tests use the new metric functions too. A forward test has
 no in-sample and out-of-sample split, because a forward test is out of

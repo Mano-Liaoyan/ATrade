@@ -21,7 +21,11 @@ from atrade.backtest.backtest_run import find_look_back_length, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
 from atrade.backtest.http_routes import create_backtest_router
-from atrade.backtest.sharpe_probability import calculate_deflated_sharpe, calculate_probabilistic_sharpe
+from atrade.backtest.sharpe_probability import (
+    calculate_deflated_sharpe,
+    calculate_probabilistic_sharpe,
+    find_sharpe_probability_status,
+)
 from atrade.backtest.strategy_engine_run import write_look_back_catalog
 
 __all__ = [
@@ -41,6 +45,7 @@ __all__ = [
     "check_backtest_request",
     "create_backtest_router",
     "find_look_back_length",
+    "find_sharpe_probability_status",
     "find_round_trips",
     "queue_backtest",
     "read_backtest_outcome",

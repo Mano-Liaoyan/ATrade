@@ -11,8 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from atrade.backtest import calculate_deflated_sharpe, calculate_probabilistic_sharpe
-from atrade.backtest.sharpe_probability import find_sharpe_probability_status
+from atrade.backtest import (
+    calculate_deflated_sharpe,
+    calculate_probabilistic_sharpe,
+    find_sharpe_probability_status,
+)
 
 # 30 days of +2 % and 30 days of -1 %.
 #   mean = (30 × 0.02 − 30 × 0.01) / 60 = 0.005
