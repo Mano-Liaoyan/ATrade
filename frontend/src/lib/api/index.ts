@@ -161,6 +161,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/hk-instrument-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instruments */
+        get: operations["list_instruments_api_market_data_hk_instrument_list_get"];
+        put?: never;
+        /**
+         * Add Instruments
+         * @description Checks all new symbols through IBKR first. On a 502 or 503, the list does not change.
+         */
+        post: operations["add_instruments_api_market_data_hk_instrument_list_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/hk-instrument-list/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Instrument */
+        delete: operations["delete_instrument_api_market_data_hk_instrument_list__member_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -434,6 +472,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assistant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Conversations */
+        get: operations["list_conversations_api_assistant_conversations_get"];
+        put?: never;
+        /** Create Conversation */
+        post: operations["create_conversation_api_assistant_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Conversation */
+        get: operations["read_conversation_api_assistant_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Deletes the JSONL file first. When the assistant service is not reachable, the row stays for a new try.
+         */
+        delete: operations["delete_conversation_api_assistant_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -442,6 +520,23 @@ export interface components {
         AccessSessionResponse: {
             /** Logout Url */
             logout_url: string | null;
+        };
+        /** AddHkInstrumentsRequest */
+        AddHkInstrumentsRequest: {
+            /** Symbols */
+            symbols: string[];
+        };
+        /**
+         * AddHkInstrumentsResponse
+         * @description The pasted symbols in their order. A symbol that is pasted 2 times is in already_in_list the second time.
+         */
+        AddHkInstrumentsResponse: {
+            /** Added */
+            added: string[];
+            /** Not Found */
+            not_found: string[];
+            /** Already In List */
+            already_in_list: string[];
         };
         /** AddInstrumentRequest */
         AddInstrumentRequest: {
@@ -520,7 +615,11 @@ export interface components {
             /** Concurrency */
             concurrency: number;
         };
-        /** BacktestMetricsResponse */
+        /**
+         * BacktestMetricsResponse
+         * @description The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and
+         *     `missing_reasons` gives its reason by its field name (section 10.9.3). The page shows "–" with the reason.
+         */
         BacktestMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
@@ -530,6 +629,34 @@ export interface components {
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
         };
         /** BacktestResponse */
         BacktestResponse: {
@@ -717,16 +844,120 @@ export interface components {
              */
             end_utc: string;
         };
-        /** ComparedMetricsResponse */
+        /**
+         * ComparedMetricsResponse
+         * @description The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the
+         *     final equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10).
+         */
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
+            /** Net Profit Usd */
+            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
+        };
+        /** ConversationDetailResponse */
+        ConversationDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+            /** Messages */
+            messages: components["schemas"]["ConversationMessageResponse"][];
+        };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations: components["schemas"]["ConversationResponse"][];
+        };
+        /** ConversationMessageResponse */
+        ConversationMessageResponse: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string | null;
+            /** Model */
+            model: string | null;
+            /** Credential Name */
+            credential_name: string | null;
+        };
+        /** ConversationResponse */
+        ConversationResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+        };
+        /** CreateConversationRequest */
+        CreateConversationRequest: {
+            /** Strategy Id */
+            strategy_id: number;
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -899,6 +1130,32 @@ export interface components {
              */
             time_utc: string;
         };
+        /** HkInstrumentListErrorResponse */
+        HkInstrumentListErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /** HkInstrumentListResponse */
+        HkInstrumentListResponse: {
+            /** Instruments */
+            instruments: components["schemas"]["HkInstrumentResponse"][];
+        };
+        /** HkInstrumentResponse */
+        HkInstrumentResponse: {
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Added At Utc
+             * Format: date-time
+             */
+            added_at_utc: string;
+        };
         /** InstrumentResponse */
         InstrumentResponse: {
             /** Symbol */
@@ -926,6 +1183,8 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        /** @enum {string} */
+        LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -1049,6 +1308,15 @@ export interface components {
             detail: string;
         };
         /**
+         * OrderRefusedByLedgerResponse
+         * @description An order rule of the owner ledger failed for "By hand". ATrade did not send the order (section 11.10).
+         */
+        OrderRefusedByLedgerResponse: {
+            /** Detail */
+            detail: string;
+            rule: components["schemas"]["LedgerRule"];
+        };
+        /**
          * OrderRefusedResponse
          * @description The paper account check did not pass. ATrade did not send the order.
          */
@@ -1081,6 +1349,11 @@ export interface components {
         PaperCapitalResponse: {
             /** Paper Capital Usd */
             paper_capital_usd: string;
+        };
+        /** RenameConversationRequest */
+        RenameConversationRequest: {
+            /** Title */
+            title: string;
         };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
@@ -1213,6 +1486,15 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
+            /** Rules */
+            rules: {
+                [key: string]: unknown;
+            } | null;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1227,9 +1509,16 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
+        /** @enum {string} */
+        TitleState: "new" | "generating" | "generated" | "not_generated" | "renamed";
         /** TradeResponse */
         TradeResponse: {
             /**
@@ -1290,6 +1579,32 @@ export interface components {
             /** Instruments */
             instruments: components["schemas"]["WatchlistInstrumentResponse"][];
         };
+        /**
+         * AbortMessage
+         * @description Browser to server: stop the active run (the "Stop" button).
+         */
+        AbortMessage: {
+            /**
+             * Type
+             * @default abort
+             * @constant
+             */
+            type: "abort";
+        };
+        /**
+         * AssistantErrorMessage
+         * @description An error of the conversation, for the Output tab of the "Problems and output" panel.
+         */
+        AssistantErrorMessage: {
+            /**
+             * Type
+             * @default error
+             * @constant
+             */
+            type: "error";
+            /** Message */
+            message: string;
+        };
         /** ForwardTestsMessage */
         ForwardTestsMessage: {
             /**
@@ -1334,6 +1649,40 @@ export interface components {
             type: "bar";
             bar: components["schemas"]["BarResponse"];
         };
+        /**
+         * MessageDeltaMessage
+         * @description A part of the streamed text of an AI assistant message.
+         */
+        MessageDeltaMessage: {
+            /**
+             * Type
+             * @default message_delta
+             * @constant
+             */
+            type: "message_delta";
+            /** Text */
+            text: string;
+        };
+        /**
+         * MessageEndMessage
+         * @description The end of one AI assistant message: its full text, its model, and its credential name.
+         */
+        MessageEndMessage: {
+            /**
+             * Type
+             * @default message_end
+             * @constant
+             */
+            type: "message_end";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Name */
+            credential_name: string;
+        };
         /** OpenOrdersMessage */
         OpenOrdersMessage: {
             /**
@@ -1344,6 +1693,25 @@ export interface components {
             type: "orders";
             /** Orders */
             orders: components["schemas"]["OpenOrderResponse"][];
+        };
+        /** @enum {string} */
+        OwnerKind: "by_hand" | "forward_test";
+        /** OwnerMessage */
+        OwnerMessage: {
+            kind: components["schemas"]["OwnerKind"];
+            /** Forward Test Id */
+            forward_test_id: number | null;
+        };
+        /**
+         * OwnerPositionMessage
+         * @description The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).
+         */
+        OwnerPositionMessage: {
+            owner: components["schemas"]["OwnerMessage"];
+            /** Quantity */
+            quantity: string;
+            /** Average Cost */
+            average_cost: string | null;
         };
         /**
          * PaperAccountBalanceMessage
@@ -1393,6 +1761,8 @@ export interface components {
             balance: components["schemas"]["PaperAccountBalanceMessage"] | null;
             /** Positions */
             positions: components["schemas"]["PositionMessage"][];
+            /** Unattributed Cash Usd */
+            unattributed_cash_usd: string | null;
         };
         /** PositionMessage */
         PositionMessage: {
@@ -1414,6 +1784,61 @@ export interface components {
             market_value: string;
             /** Unrealized Pnl */
             unrealized_pnl: string;
+            /** Owners */
+            owners: components["schemas"]["OwnerPositionMessage"][];
+            /** Unattributed Quantity */
+            unattributed_quantity: string;
+        };
+        /**
+         * PromptMessage
+         * @description Browser to server: a new user message, with the provider, the model, and the credential of this message.
+         */
+        PromptMessage: {
+            /**
+             * Type
+             * @default prompt
+             * @constant
+             */
+            type: "prompt";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Id */
+            credential_id: string;
+        };
+        /**
+         * RunStateMessage
+         * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
+         */
+        RunStateMessage: {
+            /**
+             * Type
+             * @default run_state
+             * @constant
+             */
+            type: "run_state";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "settled";
+        };
+        /**
+         * SteerMessage
+         * @description Browser to server: a user message while the AI assistant runs.
+         */
+        SteerMessage: {
+            /**
+             * Type
+             * @default steer
+             * @constant
+             */
+            type: "steer";
+            /** Text */
+            text: string;
         };
     };
     responses: never;
@@ -1561,7 +1986,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderBlockedResponse"];
+                    "application/json": components["schemas"]["OrderBlockedResponse"] | components["schemas"]["OrderRefusedByLedgerResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1790,6 +2215,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_instruments_api_market_data_hk_instrument_list_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListResponse"];
+                };
+            };
+        };
+    };
+    add_instruments_api_market_data_hk_instrument_list_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddHkInstrumentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddHkInstrumentsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_instrument_api_market_data_hk_instrument_list__member_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2525,6 +3059,219 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WatchlistErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_assistant_conversations_get: {
+        parameters: {
+            query: {
+                strategy_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_api_assistant_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_conversation_api_assistant_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_assistant_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_assistant_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

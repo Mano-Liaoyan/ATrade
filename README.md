@@ -230,8 +230,9 @@ limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
 `ATRADE_ASSISTANT_MEMORY_LIMIT=0` in `.env`. Only Compose reads these 2
 values.
 
-The volume `atrade-assistant-pi` holds the files of the AI assistant. Later
-it also holds the AI assistant credentials, so keep each backup of it like
+The volume `atrade-assistant-pi` holds the files of the AI assistant: one
+JSONL file of messages for each conversation in `conversations/`. Later it
+also holds the AI assistant credentials, so keep each backup of it like
 `.env`. ATrade makes no automatic backup. A manual backup:
 
 ```sh

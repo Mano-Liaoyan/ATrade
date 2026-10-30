@@ -180,7 +180,7 @@ counts from `atrade/`.
 | `backtest/` | Run backtests and parameter sweeps. Save and read backtest results. Provide the metric functions and the robustness checks (in-sample and out-of-sample split, probabilistic and deflated Sharpe ratio). |
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, the paper account check, the owner ledger, the ledger changes at a stock split, and the "Split check needed" state. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, the quarterly universe job, and the daily stock split check. |
-| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It holds no credential. |
+| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It calls the `assistant` service over HTTP (`AssistantServiceClient`, section 25.14). It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
 | `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
@@ -236,6 +236,9 @@ app           -> all modules
   `foundation`. So `indicator` can import only `foundation`, and `indicator`
   and `ibkr` do not import each other. A contract keeps the internal files
   of `indicator` private (#160).
+- import-linter puts `assistant` in the same layer as `ibkr` and
+  `indicator`, so `assistant` can import only `foundation` (#179). A
+  contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
   (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
@@ -539,8 +542,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
   of each WebSocket message model to `components.schemas`. A capability
   exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`,
-  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`, and
-  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`. Each list has `HeartbeatMessage` of
+  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`,
+  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`, and
+  `ASSISTANT_SOCKET_MESSAGE_MODELS` (the messages of both directions). Each list has `HeartbeatMessage` of
   `foundation/socket_push`. A message schema must not have the name of a
   different schema. Routes declare their error bodies with `responses=`
   (`ErrorResponse` of `foundation/error_response`), so the frontend does not
@@ -921,8 +925,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the "Split check needed" row with "Apply split <ratio>" and "Keep
     ledger" (phase 3, sections 11 and 12).
   - A settings page has the "Source order" list of the bar sources
-    (`docs/architecture/market_data.md`). Its route and the place of the HK
-    instrument list editor are left to the implementation.
+    (`docs/architecture/market_data.md`). The settings page is `/settings`
+    with the header link "Settings" after "Forward tests". It is a document
+    page with the heading "Settings" and one section for each setting. The
+    HK instrument list editor is the section "HK instrument list" of this
+    page (#194, `docs/architecture/market_data.md` section 8.10).
   - A survivorship bias warning (icon, word, and warning color) shows on HK
     screens, on HK backtest results, and on US backtest results that start
     before 2018-05-01.
@@ -1346,6 +1353,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Databento call in CI.
 - Model providers: the `assistant` service tests use a local fake
   OpenAI-compatible model server. No real provider in CI.
+- The `assistant` service: the `web` tests use a hand-written fake of
+  `AssistantService` in `tests/fakes/assistant.py`. The HTTP client has a
+  test with an `httpx.MockTransport`.
 
 ### 17.4 Tests for specific parts
 
@@ -1682,6 +1692,17 @@ option and records it in this document.
   [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
+- Decided (#165): the daily returns use the UTC date as the trading day,
+  `years` comes from the request range, and `metrics.missing_reasons` gives
+  the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#170): the exposure of a forward test counts its recorded equity
+  points (one at each bar end) as its bars. The recorded fills go to
+  `find_round_trips` with no change, because `select_fills` already gives
+  `BacktestTrade` rows. The metrics of the forward test routes have
+  `net_profit_usd` (forward test section 12.10).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1695,6 +1716,13 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#194): the HK instrument list editor is on the settings page
+  `/settings` (section 13). #194 made this page. The source order slice
+  (#189) adds its "Source order" section to the same page.
+- Decided (#194): the add route of the HK instrument list checks all new
+  symbols with `InstrumentLookup` before it saves one. On `502` or `503`
+  the list does not change. A symbol that the request has 2 times is in
+  `already_in_list` the second time.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
@@ -1715,6 +1743,14 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#179): the protocol between `web` and `assistant`, the
+  `/ws/assistant` field names, the columns of `assistant_conversation`, and
+  the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#214): the owner ledger of "By hand" (the ledger start at the
+  first passed check, the cash of rule 2, the price of a market buy, the
+  USD conversion, and when the Web process records fills) is in
+  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
+  11.13.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

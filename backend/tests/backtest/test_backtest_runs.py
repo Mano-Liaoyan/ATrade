@@ -65,6 +65,27 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
         "total_return_percent": "1.60",
         "max_drawdown_percent": "0.40",
         "trade_count": 3,
+        # The range has 31 days: no CAGR and no Calmar ratio. The one round trip has a profit of 20 on 1040.
+        "cagr_percent": None,
+        "annual_volatility_percent": "2.15",
+        "sharpe_ratio": "9.32",
+        "sortino_ratio": "20.05",
+        "calmar_ratio": None,
+        "profit_factor": None,
+        "average_win_usd": "20.00",
+        "average_win_percent": "1.92",
+        "average_loss_usd": None,
+        # 13 of the 20 bar ends have a position.
+        "exposure_percent": "65.00",
+        # Fills of 1040 + 1060 + 960 = 3060, mean equity 10049, 31 / 365.25 years.
+        "turnover_per_year": "3.59",
+        "win_rate_percent": "100.00",
+        "missing_reasons": {
+            "cagr_percent": "The range is shorter than 90 days",
+            "calmar_ratio": "The range is shorter than 90 days",
+            "profit_factor": "No round trip with a loss",
+            "average_loss_usd": "No round trip with a loss",
+        },
     }
     equity_curve = backtest["equity_curve"]
     assert [point["equity_usd"] for point in equity_curve] == [

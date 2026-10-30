@@ -35,6 +35,7 @@ class StrategyVersionSummary(BaseModel):
     version_number: int
     code_sha256: str
     created_at_utc: datetime
+    source: strategy_store.VersionSource
 
 
 class StrategyResponse(BaseModel):
@@ -57,6 +58,8 @@ class StrategyVersionResponse(BaseModel):
     code: str
     code_sha256: str
     created_at_utc: datetime
+    source: strategy_store.VersionSource
+    rules: dict[str, Any] | None
 
 
 class CodeProblemResponse(BaseModel):
@@ -76,6 +79,8 @@ def to_version_response(version: strategy_store.StrategyVersionRecord) -> Strate
         code=version.code,
         code_sha256=version.code_sha256,
         created_at_utc=version.created_at_utc,
+        source=version.source,
+        rules=version.rules,
     )
 
 
@@ -90,6 +95,7 @@ async def read_strategy_response(connection: psycopg.AsyncConnection, strategy_i
             version_number=version.version_number,
             code_sha256=version.code_sha256,
             created_at_utc=version.created_at_utc,
+            source=version.source,
         )
         for version in versions
     ]
@@ -117,7 +123,7 @@ class StrategyRoutes:
                 connection,
                 strategy_id=strategy.id,
                 version_number=FIRST_VERSION_NUMBER,
-                code=STRATEGY_TEMPLATE,
+                content=strategy_store.VersionContent(code=STRATEGY_TEMPLATE, source="user", rules=None),
                 created_at_utc=created_at_utc,
             )
             await connection.commit()
