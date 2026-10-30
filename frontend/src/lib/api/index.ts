@@ -590,6 +590,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
          * BacktestLimitsBody
@@ -697,6 +698,23 @@ export interface components {
             /** Survivorship Bias */
             survivorship_bias: boolean;
         };
+        /**
+         * BacktestRobustnessResponse
+         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
+         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         */
+        BacktestRobustnessResponse: {
+            /** Trial Count */
+            trial_count: number;
+            /** Sharpe Probability Percent */
+            sharpe_probability_percent: string | null;
+            sharpe_probability_kind: components["schemas"]["SharpeProbabilityKind"];
+            sharpe_probability_status: components["schemas"]["SharpeProbabilityStatus"] | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
+        };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
         /**
@@ -802,6 +820,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
         };
@@ -1332,6 +1351,10 @@ export interface components {
             limit_price: number | string | null;
             time_in_force: components["schemas"]["TimeInForce"];
         };
+        /** @enum {string} */
+        SharpeProbabilityKind: "probabilistic" | "deflated";
+        /** @enum {string} */
+        SharpeProbabilityStatus: "likely_real" | "uncertain" | "likely_luck";
         /**
          * SourceOrderBody
          * @description The global source order: the first bar source that saved a time range gives all bars of the range.
