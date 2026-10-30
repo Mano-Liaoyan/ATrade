@@ -262,7 +262,7 @@ app           -> all modules
   ledger replaces this refusal, and `app/web.py` gives `paper_trading` the
   function `forward_test.read_allocated_capital()` for the "By hand" capital.
 - `forward_test -> backtest` is only for the comparison, the metric
-  functions, and the look-back of `request_bars` (`find_look_back_length()`,
+  functions, and the look-back of `request_bars` (`find_look_back()`,
   `write_look_back_catalog()`).
 - `backtest` does not depend on `paper_trading`. A backtest request carries
   `paper_capital_usd` as an input.
@@ -1852,10 +1852,14 @@ option and records it in this document.
   both check the same value. The worker then does not start and logs the
   reason.
 - The open points of the map #129 are in the "Left to the implementation"
-  lists of sections 8 to 12 and 23 to 25. One of them:
-  - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
-    momentum need about 252 bars. The look-back must follow the longest
-    indicator of the strategy, or this effect is accepted.
+  lists of sections 8 to 12 and 23 to 25.
+- Decided (#164): the backtest and the forward test give a rule builder
+  version the last N saved bars before the start, where N is the largest
+  look-back count of the indicators in its `rules` (option 1 of the issue).
+  The look-back is a bar count; the read range converts it to calendar time
+  with factor 2 for 1-day bars and 6 for intraday bars. A version without
+  rules keeps the default length (`max(bar period × 60, 7 days)`)
+  (`docs/architecture/backtest.md` section 10.3.1).
 - Decided (#178): the `assistant` service code is in `assistant/`, an own
   pnpm project that Vite+ runs like `frontend/`. Node.js runs the
   TypeScript files directly (type stripping), so there is no build step. The
