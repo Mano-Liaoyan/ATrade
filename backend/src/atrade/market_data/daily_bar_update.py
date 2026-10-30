@@ -14,13 +14,14 @@ from zoneinfo import ZoneInfo
 
 import psycopg
 
-from atrade.foundation.bar import BarPeriod, TimeRange, floor_to_bar_start
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError
 from atrade.market_data import bar_store, hk_instrument_list_store
 from atrade.market_data.bar_source import BarSource
-from atrade.market_data.daily_bar_summary import update_daily_bar_summaries
+from atrade.market_data.daily_bar_summary import select_last_daily_bars, update_daily_bar_summaries
+from atrade.market_data.stock_split_evidence import record_evidence, to_stored_form
 from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, is_trading_day
 from atrade.market_data.us_universe import MEMBER_COUNT, read_us_universe_members, to_utc_day
 
@@ -103,6 +104,15 @@ class DailyBarUpdate:
         start_utc = daily_coverage[0].last_start_utc if daily_coverage else end_utc - FIRST_READ_LENGTH
         return TimeRange(start_utc, end_utc) if start_utc < end_utc else None
 
+    async def record_evidence_a(
+        self, connection: psycopg.AsyncConnection, instrument: Instrument, ibkr_bars: list[Bar]
+    ) -> None:
+        """The read range starts at the last saved IBKR daily bar, so the IBKR bars hold that day again. No extra IBKR
+        request."""
+        stored_bars = (await select_last_daily_bars(connection, [instrument], None, 1))[instrument]
+        if stored_bars:
+            await record_evidence(connection, instrument, stored_bars[-1], ibkr_bars, self.clock.read_now_utc())
+
     async def update(self, day: date) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             instruments = await self.read_update_instruments(connection, day)
@@ -116,7 +126,11 @@ class DailyBarUpdate:
                 except GatewayRequestError:
                     logger.exception("The daily bar update did not read the daily bars of %s.", instrument)
                     continue
-                await bar_store.save_bars_of_range(connection, instrument, BarPeriod.ONE_DAY, time_range, bars)
+                await self.record_evidence_a(connection, instrument, bars)
+                stored_form_bars = await to_stored_form(connection, instrument, bars)
+                await bar_store.save_bars_of_range(
+                    connection, instrument, BarPeriod.ONE_DAY, time_range, stored_form_bars
+                )
                 updated_instruments.append(instrument)
             await update_daily_bar_summaries(connection, updated_instruments)
         logger.info("The daily bar update of %s saved the daily bars of %d instruments.", day, len(updated_instruments))

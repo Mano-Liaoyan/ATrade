@@ -225,7 +225,8 @@ app           -> all modules
   backtest finds them (`docs/architecture/forward_test.md` sections 12.8 and
   12.15). From phase 3 it is also for the bar fetcher, the quarterly
   universe update, the warm-up reads in the source order, and the change of
-  the stored bars at a stock split (`docs/architecture/market_data.md`).
+  the stored bars at a stock split (`read_stock_split_candidates()` and
+  `apply_stock_split()`, `docs/architecture/market_data.md` section 8.13).
 - `market_data` holds the Databento client. `ibkr` stays IBKR only.
 - `backtest -> screen` is only for the point-in-time screen runs of a
   backtest universe (`docs/architecture/screen.md` section 24.9).
@@ -1873,6 +1874,14 @@ option and records it in this document.
   watchlist read (`read_watchlist_instruments` of `watchlist`), because
   `market_data` does not import `watchlist`. The time, the calendar, and
   "still trading" are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#196): evidence A of a stock split is in the bars route and in
+  the daily bar update. A candidate is a `stock_split` row with the source
+  `ibkr_evidence` and no confirmation. The stock split check reads the
+  candidates with `read_stock_split_candidates()` and confirms one with
+  `apply_stock_split()` of the `market_data` public entry. The caller gives
+  the confirmation, because `market_data` cannot read positions (section
+  6.2). The stored day, the tolerance, and the ex-date are in
+  `docs/architecture/market_data.md` section 8.14.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
