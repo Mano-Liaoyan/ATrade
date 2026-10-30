@@ -136,7 +136,7 @@ This replaces the rules above:
 - Phase 3 (#146, #149): the worker also runs 3 jobs. They are not child
   processes of a forward test.
   - The bar fetcher (section 12.20).
-  - The quarterly universe calculation (section 12.21).
+  - The quarterly universe update of `market_data` (section 12.21).
   - The daily stock split check (section 12.22).
 
 ## 12.4 Client IDs
@@ -521,7 +521,6 @@ this document. The implementation can change them.
 | `add_atrade_clients(builder, data_client_factory, execution_client_factory)` | Adds both clients to a `LiveNodeBuilder` as the default route. Without a data client factory, it adds only the execution client (#213). |
 | `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
 | `ReadMemberLists` | The type of `read_member_lists`: it returns the members of each running multi-instrument forward test. |
-| `QuarterlyUniverseJob(*, database_url, clock, databento_client)` | The quarterly universe calculation of section 12.21. |
 | `StockSplitCheck(*, database_url, clock, gateway_connection)` | The daily stock split check of section 12.22. |
 
 - Implemented (#215): `find_forward_test_on_instrument()` is gone. There is
@@ -560,8 +559,6 @@ Phase 3 table changes (#146). The column names are choices of this document.
 |---|---|
 | `forward_test` | Add `universe_kind` (`single`, `rule`, `list`), `universe_top_n` (null unless `rule`), and `allocated_capital_usd` (not null for a new row). `symbol`, `exchange`, and `currency` can be null (null unless `single`). Drop the partial unique index `forward_test_one_per_instrument`. `start_balance_usd` stays for the old rows. |
 | `forward_test_universe_member` (new) | `forward_test_id`, `quarter_start_utc`, `symbol`, `exchange`, `currency`. Primary key `(forward_test_id, quarter_start_utc, symbol, exchange)`. `ON DELETE CASCADE` from `forward_test`. One row for each member that the forward test gave the strategy in that quarter. The same-period backtest reads it (section 12.10). |
-| `quarterly_universe` (new) | `quarter_start_date`, `rank` (1 to 500), `symbol`, `exchange`, `average_trading_value_usd`, `window_end_date` (the last trading day of the 63-day window that the calculation used). Primary key `(quarter_start_date, rank)`. Section 12.21 writes it. |
-| `quarterly_universe_run` (new) | `quarter_start_date` (primary key), `started_at_utc`, `ended_at_utc`, `window_end_date`, `status` (`running`, `done`, `failed`), `error_message`. One row for each calculation. |
 
 - Implemented (#215, migration `bac389eabc50`): `allocated_capital_usd`
   (`numeric`, `CHECK > 0`) is null for the old rows. The Web process writes
@@ -702,9 +699,13 @@ than the worker clock.
   `__init__` of the user config class (section 9.2). The reason: the user
   `__init__` passes other keywords to `object.__init__`, which refuses them.
 - Warm-up bars: after the cancel of the old orders, on the same connection,
-  the child reads the bars of `find_look_back_length(bar_period)` of
-  `backtest` (the backtest look-back, 7 days at least) before the start of
-  the current bar, with `GatewayConnection.read_historical_bars()`. That
+  the child reads the bars of `find_look_back(bar_period,
+  warm_up_bar_count)` of `backtest` (the backtest look-back, 7 days at
+  least) before the start of the current bar, with
+  `GatewayConnection.read_historical_bars()`. For a rule builder version the
+  LiveNode gets only the last bars of the bar count of the longest indicator
+  (#164, [`backtest.md`](backtest.md) section 10.3.1). The child saves all
+  read bars. That
   function splits the range into requests of the IBKR step size of the bar
   period (1 day for 1-minute bars, `ibkr/historical_bars.py`). A failed read
   logs a warning and gives no warm-up bars. The forward test still starts.
@@ -888,8 +889,9 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
 - Warm-up: the warm-up of a multi-instrument forward test on daily bars is
   1 year, the same as the multi-instrument backtest. The reason: 12-1
   momentum and the distance to the 52-week high need about 252 daily bars.
-  The old look-back of 1-day bars is 60 days
-  (`backend/src/atrade/backtest/backtest_run.py`).
+  The default look-back of 1-day bars is 60 days; a rule builder version
+  gets the bars of its longest indicator (#164,
+  `backend/src/atrade/backtest/backtest_run.py`).
   - The child reads the warm-up bars from the bar store with the global
     source order (`ibkr_bar`, then `databento_bar`,
     [`market_data.md`](market_data.md)). It sends no request to IBKR. The
@@ -1071,11 +1073,14 @@ Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-
 - When the daily bar of the previous trading day is not available yet, the
   worker tries again every 15 minutes until 09:00 ET.
 - When the bar is still missing at 09:00 ET, the worker uses the 63 trading
-  days that end 1 trading day earlier. It records the actual end date in
-  `window_end_date`.
+  days that end 1 trading day earlier. It records the actual last day in
+  `last_ranking_day_utc`.
 - The new universe goes to the strategies before the market opens.
-- The worker stores each result in `quarterly_universe` and each calculation
-  in `quarterly_universe_run` (section 12.12).
+- `market_data` holds the rule, the update, and the table
+  `us_universe_member` ([`market_data.md`](market_data.md) section 8.9).
+  The worker runs `UsUniverseUpdate` of the `market_data` public entry.
+  Backtests and forward tests read the members with
+  `read_us_universe_members`.
 - Cost: about 1.30 USD for each quarter. On 2026-10-30, `metadata.get_cost`
   gave 1.23 USD to 1.36 USD for one quarter. After the free credit, the
   Databento account pays.
@@ -1176,13 +1181,17 @@ simplest option and records it in this document.
   ([Screen page prototype](https://github.com/Mano-Liaoyan/ATrade/issues/145))
   are 2 jobs. They run in different processes with different client IDs.
 - The status code of a `rule` start when no universe of the current quarter
-  is stored, and what the calculation does without `DATABENTO_API_KEY`.
+  is stored.
+- Decided (#192): without `DATABENTO_API_KEY`, the quarterly update does not
+  run, and the `forward-test` log tells why.
 - How ATrade maps a Databento symbol to the IBKR primary exchange.
-- The trading day calendar for "first trading day of the quarter" and
-  "before the market opens".
-- Whether the downloaded EQUS.SUMMARY bars go into `databento_bar`.
-- Which capability owns `quarterly_universe`. The screen page also uses the
-  universe of the current quarter.
+- Decided (#192): the trading day calendar for "first trading day of the
+  quarter" and "before the market opens" is in
+  [`market_data.md`](market_data.md) section 8.14.
+- Decided (#192): the downloaded EQUS.SUMMARY bars go into `databento_bar`.
+- Decided (#192): `market_data` owns the quarterly universe
+  (`us_universe_member`). The screen page also uses the universe of the
+  current quarter.
 - Whether a change of the watchlist changes the members of a running
   `list` forward test.
 - Whether `forward_test_fill` stays as a copy of the ledger fills, and the

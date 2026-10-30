@@ -40,6 +40,7 @@ from tests.forward_test.test_forward_test_routes import (
     make_start_request,
     save_test_strategy_version,
 )
+from tests.strategy.rules_examples import condition, group, indicator, make_rules, price
 
 ACCOUNT_ID = "DU1234567"
 CHILD_NOW_UTC = datetime(2026, 1, 2, 3, 10, 30, tzinfo=UTC)
@@ -228,6 +229,31 @@ async def test_the_live_node_gets_the_warm_up_bars_of_7_days_before_the_start(
         assert connection.execute("SELECT start_utc, end_utc FROM ibkr_bar_saved_range").fetchall() == [
             (warm_up_end_utc - timedelta(days=7), warm_up_end_utc)
         ]
+
+
+@pytest.mark.anyio
+async def test_the_warm_up_of_rules_has_the_bars_of_the_longest_indicator(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    # A rule builder version with SMA(200) on daily bars: the same look-back as a backtest. The child reads 400 days
+    # (2 calendar days for each daily bar), and the LiveNode gets the last 200 bars for its look-back catalog.
+    strategy = (await web_client.post("/api/strategies", json={"name": "Rules"})).json()
+    rules = make_rules(group("all_of", condition(price(), "above", indicator("sma", period=200))))
+    version = (await web_client.post(f"/api/strategies/{strategy['id']}/versions", json={"rules": rules})).json()
+    start_request = make_start_request(version["id"]) | {"bar_period": "1-DAY"}
+    forward_test = (await web_client.post(FORWARD_TESTS_PATH, json=start_request)).json()
+    gateway_connection = make_forward_test_gateway()
+    live_node = FakeLiveNode(gateway_connection)
+
+    await run_child(make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node)
+
+    warm_up_end_utc = datetime(2026, 1, 2, tzinfo=UTC)
+    [request] = gateway_connection.historical_bar_requests
+    assert request.time_range == TimeRange(start_utc=warm_up_end_utc - timedelta(days=400), end_utc=warm_up_end_utc)
+    warm_up_bars = live_node.inputs[0].warm_up_bars
+    assert len(warm_up_bars) == 200
+    assert warm_up_bars[0].start_utc == warm_up_end_utc - timedelta(days=200)
+    assert warm_up_bars[-1].start_utc == warm_up_end_utc - timedelta(days=1)
 
 
 @pytest.mark.anyio

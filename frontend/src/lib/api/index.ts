@@ -290,6 +290,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard Version
+         * @description Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).
+         */
+        post: operations["discard_version_api_strategies__strategy_id__versions__version_number__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies/{strategy_id}/versions": {
         parameters: {
             query?: never;
@@ -322,25 +342,11 @@ export interface paths {
         /** List Backtests */
         get: operations["list_backtests_api_backtests_get"];
         put?: never;
-        /** Start Backtest */
+        /**
+         * Start Backtest
+         * @description The start of port 8000: a backtest without a conversation.
+         */
         post: operations["start_backtest_api_backtests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/backtests/{backtest_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Backtest */
-        get: operations["read_backtest_api_backtests__backtest_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -358,6 +364,23 @@ export interface paths {
         get: operations["read_limits_api_backtest_limits_get"];
         /** Change Limits */
         put: operations["change_limits_api_backtest_limits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Backtest */
+        get: operations["read_backtest_api_backtests__backtest_id__get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -486,6 +509,49 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens */
+        get: operations["list_screens_api_screens_get"];
+        put?: never;
+        /** Create Screen */
+        post: operations["create_screen_api_screens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen */
+        get: operations["read_screen_api_screens__screen_id__get"];
+        /**
+         * Change Screen
+         * @description Overwrites the name and the definition. A screen has no versions (section 24.1).
+         */
+        put: operations["change_screen_api_screens__screen_id__put"];
+        post?: never;
+        /**
+         * Delete Screen
+         * @description Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.
+         */
+        delete: operations["delete_screen_api_screens__screen_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -736,6 +802,8 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -852,6 +920,8 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -919,6 +989,12 @@ export interface components {
             /** Bars */
             bars: components["schemas"]["BarResponse"][];
         };
+        /** ChangeScreenRequest */
+        ChangeScreenRequest: {
+            /** Name */
+            name: string;
+            definition: components["schemas"]["JsonValue"];
+        };
         /** CodeCheckFailedResponse */
         CodeCheckFailedResponse: {
             /** Problems */
@@ -979,6 +1055,8 @@ export interface components {
             /** Split Time Utc */
             split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Source Order */
             source_order: components["schemas"]["BarSource"][] | null;
             /** Bar Count By Source */
@@ -1169,6 +1247,14 @@ export interface components {
             strategy_id: number;
             /** Version Number */
             version_number?: number | null;
+        };
+        /** CreateScreenRequest */
+        CreateScreenRequest: {
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -1486,6 +1572,7 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        JsonValue: unknown;
         /** @enum {string} */
         LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
         LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
@@ -1561,6 +1648,8 @@ export interface components {
             /** Average Fill Price */
             average_fill_price: string | null;
         };
+        /** @enum {string} */
+        Market: "US" | "HK";
         Number: number;
         /** NumberOperand */
         NumberOperand: {
@@ -1820,6 +1909,73 @@ export interface components {
              */
             last_start_utc: string;
         };
+        /** ScreenCheckFailedResponse */
+        ScreenCheckFailedResponse: {
+            /** Problems */
+            problems: components["schemas"]["ScreenProblemResponse"][];
+        };
+        /** ScreenListItemResponse */
+        ScreenListItemResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Kept */
+            kept: boolean;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+        };
+        /** ScreenProblemResponse */
+        ScreenProblemResponse: {
+            /** Location */
+            location: (string | number)[];
+            /** Message */
+            message: string;
+        };
+        /** ScreenResponse */
+        ScreenResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Kept */
+            kept: boolean;
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+            /** Recent Screen Results */
+            recent_screen_results: components["schemas"]["ScreenResultSummaryResponse"][];
+        };
+        /** ScreenResultSummaryResponse */
+        ScreenResultSummaryResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Result Count */
+            result_count: number;
+        };
         /** SendOrderRequest */
         SendOrderRequest: {
             /** Symbol */
@@ -1967,11 +2123,15 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
             /** Rules */
             rules: {
                 [key: string]: unknown;
             } | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1990,7 +2150,11 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
@@ -3173,6 +3337,56 @@ export interface operations {
             };
         };
     };
+    discard_version_api_strategies__strategy_id__versions__version_number__discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_version_api_strategies__strategy_id__versions_post: {
         parameters: {
             query?: never;
@@ -3279,46 +3493,6 @@ export interface operations {
             };
         };
     };
-    read_backtest_api_backtests__backtest_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                backtest_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestDetailResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_limits_api_backtest_limits_get: {
         parameters: {
             query?: never;
@@ -3359,6 +3533,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_backtest_api_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3607,6 +3821,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ForwardTestComparisonResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screens_api_screens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenListItemResponse"][];
+                };
+            };
+        };
+    };
+    create_screen_api_screens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_api_screens__screen_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_screen_api_screens__screen_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    delete_screen_api_screens__screen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

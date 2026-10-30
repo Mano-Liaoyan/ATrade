@@ -1,13 +1,13 @@
 """forward_test: add allocated_capital_usd and drop forward_test_one_per_instrument
 
 Revision ID: bac389eabc50
-Revises: 2f6a9c1e4d85
+Revises: 4a6c8e1b3d57
 """
 
 from alembic import op
 
 revision = "bac389eabc50"
-down_revision = "2f6a9c1e4d85"
+down_revision = "4a6c8e1b3d57"
 
 
 def upgrade() -> None:

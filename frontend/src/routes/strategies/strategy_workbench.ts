@@ -4,7 +4,7 @@
 import { formatPercent, isFinalStatus, type Backtest } from '#lib/backtest';
 import type { ForwardTest } from '#lib/forward_test';
 import type { PanelSpec } from '#lib/foundation/workbench';
-import type { CodeProblem } from '#lib/strategy';
+import type { CodeProblem, StrategyVersionSummary } from '#lib/strategy';
 
 export type PaneOrder = 'results-on-top' | 'editor-on-top';
 export type ResultTab = `backtest-${string}` | 'trades' | 'orders' | 'logs';
@@ -192,4 +192,32 @@ export function readWorkbenchShortcut(
     return 'save';
   }
   return key === 'b' ? 'backtest' : null;
+}
+
+/** A version in the version Select. A discarded version has the tag "Discarded" after its version number. */
+export interface VersionItem {
+  value: string;
+  label: string;
+  tag?: string;
+}
+
+type VersionFlags = Pick<StrategyVersionSummary, 'version_number' | 'discarded'>;
+
+/** The items of the version Select (docs/architecture/assistant.md 25.5.3). Without "Show discarded versions", the
+ * only discarded version in the list is the open version, so that the Select always names the open version. */
+export function listVersionItems(
+  versions: readonly VersionFlags[],
+  { showDiscarded, openVersionNumber }: { showDiscarded: boolean; openVersionNumber: number | null },
+): VersionItem[] {
+  return versions
+    .filter((version) => showDiscarded || !version.discarded || version.version_number === openVersionNumber)
+    .map((version) => {
+      const item = { value: String(version.version_number), label: `v${String(version.version_number)}` };
+      return version.discarded ? { ...item, tag: 'Discarded' } : item;
+    });
+}
+
+/** The version that opens without a version address: the latest version that is not discarded. */
+export function findDefaultVersionNumber(versions: readonly VersionFlags[]): number | undefined {
+  return (versions.findLast((version) => !version.discarded) ?? versions.at(-1))?.version_number;
 }
