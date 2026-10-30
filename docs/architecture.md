@@ -1815,6 +1815,11 @@ option and records it in this document.
   and imports the file into `databento_bar`. The Databento import program
   calculates the quarters without members after each import. The other
   #192 choices are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#195): the daily bar update is `DailyBarUpdate` of the
+  `market_data` public entry. `app/web.py` runs it and gives it the
+  watchlist read (`read_watchlist_instruments` of `watchlist`), because
+  `market_data` does not import `watchlist`. The time, the calendar, and
+  "still trading" are in `docs/architecture/market_data.md` section 8.14.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
