@@ -6,8 +6,9 @@
      splitter between them. The swap button puts the editor on top or at the bottom; the browser keeps the choice.
      Run backtest and Start forward test open the dialogs of the backtest page and the forward test page with the
      open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
-     and Logs. A backtest that ends opens in its tab. The editor panel has the file tab and the code editor. Unsaved
-     edits stay in localStorage (drafts of the strategy capability).
+     and Logs. A backtest that ends opens in its tab. The editor panel has the "Rules" tab (the rule builder, RulesTab) and
+     the `strategy.py` tab (the code editor). While "Rules" is open, the save button and Ctrl S save the rules as a new
+     version. Unsaved edits of the code and of the rules stay in localStorage (drafts of the strategy capability).
      Below the two panels is the problems and output panel (ticket #107, like the VS Code panel). It starts minimized
      to its 24px status bar: the error and warning counts open the Problems tab, "Output" opens the Output tab. A click
      on the selected tab minimizes it again. A save that the code checks refuse opens Problems; a click on a problem goes
@@ -46,20 +47,27 @@
   } from '#lib/foundation/workbench';
   import { ForwardTestsOnInstrumentsFeed, stopForwardTest, type ForwardTest } from '#lib/forward_test';
   import {
+    BLANK_RULES,
     clearDraft,
+    clearRulesDraft,
     connectStrategyLanguageServer,
     createStrategy,
     deleteStrategy,
+    findRulesVersionNumber,
     formatVersionLabel,
     listStrategies,
     readDraft,
     readStrategy,
+    readRulesDraft,
     readStrategyVersion,
+    saveStrategyRules,
     saveStrategyVersion,
     writeDraft,
+    writeRulesDraft,
     type CodeProblem,
     type StrategyDetail,
     type StrategyListItem,
+    type StrategyRules,
     type StrategyVersion,
     type StrategyVersionKey,
   } from '#lib/strategy';
@@ -67,6 +75,7 @@
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
   import StrategyList from './StrategyList.svelte';
   import StrategyOutput from './StrategyOutput.svelte';
+  import RulesTab from './RulesTab.svelte';
   import StrategyResults from './StrategyResults.svelte';
   import {
     createBacktestTab,
@@ -105,7 +114,10 @@
   // The backend refuses a longer name.
   const STRATEGY_NAME_MAX_LENGTH = 100;
   const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
-  const FILE_TABS = [{ value: 'strategy', label: 'strategy.py' }];
+  const FILE_TABS = [
+    { value: 'rules', label: 'Rules' },
+    { value: 'strategy', label: 'strategy.py' },
+  ];
   const isMac = isMacPlatform(navigator);
 
   let strategies: StrategyListItem[] = $state([]);
@@ -119,6 +131,11 @@
   // "Show discarded versions": the version Select hides the discarded versions until the user turns it on.
   let showDiscarded = $state(false);
   let editorCode = $state('');
+  let fileTab = $state<'rules' | 'strategy'>('strategy');
+  // The rules of the "Rules" tab, and the version that they come from (0: the blank rules, no version has rules).
+  let rules = $state<StrategyRules | null>(null);
+  let savedRules = $state<StrategyRules | null>(null);
+  let rulesVersionNumber = $state(0);
   let problems: CodeProblem[] = $state([]);
   let outputLines: string[] = $state([]);
   let outputTab = $state<OutputTab>('problems');
@@ -159,7 +176,10 @@
     selectStrategyBacktests(backtests, activeStrategyId).find((backtest) => !isFinalStatus(backtest.status)) ?? null,
   );
   const runningForwardTest = $derived(findRunningForwardTest(forwardTestFeed.forwardTests, activeStrategyId));
-  const hasUnsavedChanges = $derived(openVersion !== null && editorCode !== openVersion.code);
+  const hasUnsavedCode = $derived(openVersion !== null && editorCode !== openVersion.code);
+  const hasUnsavedRules = $derived(rules !== null && JSON.stringify(rules) !== JSON.stringify(savedRules));
+  const hasUnsavedChanges = $derived(fileTab === 'rules' ? hasUnsavedRules : hasUnsavedCode);
+  const saveLabel = $derived(fileTab === 'rules' ? 'Save rules as new version' : 'Save version');
   const versionItems = $derived(
     listVersionItems(strategy?.versions ?? [], {
       showDiscarded,
@@ -233,6 +253,7 @@
     strategy = null;
     strategyMessage = '';
     openVersion = null;
+    rules = null;
     problems = [];
     selection = { tab: null, backtestId: null };
     if (id !== null) {
@@ -266,6 +287,7 @@
       return;
     }
     const draft = readDraft(localStorage, { strategyId: id, versionNumber });
+    await loadRules(id, result.value);
     openVersion = result.value;
     editorCode = draft ?? result.value.code;
     problems = [];
@@ -279,6 +301,39 @@
       if (page.url.pathname !== href) {
         await goto(href, { state: page.state, shallow: true, replace: true });
       }
+    }
+  }
+
+  // Decided (#173): the "Rules" tab opens the rules of the open version when it has rules, or else of the latest
+  // version with rules (vM), or else the blank rules. A rules draft of that version replaces them.
+  async function loadRules(id: number, version: StrategyVersion): Promise<void> {
+    const versionNumber = findRulesVersionNumber(strategy?.versions ?? [], version.version_number);
+    let versionRules: StrategyRules = BLANK_RULES;
+    if (versionNumber === version.version_number && version.rules !== null) {
+      versionRules = version.rules as StrategyRules;
+    } else if (versionNumber !== null) {
+      const result = await readStrategyVersion(fetch, id, versionNumber);
+      if (result.kind === 'failed') {
+        writeOutputError(`Rules not read: ${result.message}`);
+        return;
+      }
+      versionRules = (result.value.rules ?? BLANK_RULES) as StrategyRules;
+    }
+    rulesVersionNumber = versionNumber ?? 0;
+    savedRules = versionRules;
+    rules = readRulesDraft(localStorage, { strategyId: id, versionNumber: rulesVersionNumber }) ?? versionRules;
+  }
+
+  function changeRules(changed: StrategyRules): void {
+    rules = changed;
+    if (strategy === null) {
+      return;
+    }
+    const draftKey = { strategyId: strategy.id, versionNumber: rulesVersionNumber };
+    if (JSON.stringify(changed) === JSON.stringify(savedRules)) {
+      clearRulesDraft(localStorage, draftKey);
+    } else {
+      writeRulesDraft(localStorage, draftKey, changed);
     }
   }
 
@@ -302,8 +357,13 @@
     const id = strategy.id;
     const name = strategy.name;
     const baseVersionNumber = openVersion.version_number;
+    const savedRulesVersionNumber = rulesVersionNumber;
+    const rulesToSave = fileTab === 'rules' ? rules : null;
     isSaving = true;
-    const result = await saveStrategyVersion(fetch, id, editorCode);
+    const result =
+      rulesToSave === null
+        ? await saveStrategyVersion(fetch, id, editorCode)
+        : await saveStrategyRules(fetch, id, rulesToSave);
     isSaving = false;
     problems = [];
     if (result.kind === 'check_failed') {
@@ -316,7 +376,11 @@
       writeOutputError(`Version not saved: ${result.message}`);
       return;
     }
-    clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
+    if (rulesToSave === null) {
+      clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
+    } else {
+      clearRulesDraft(localStorage, { strategyId: id, versionNumber: savedRulesVersionNumber });
+    }
     const label = formatVersionLabel(name, result.version.version_number);
     await loadStrategy(id, result.version.version_number);
     listReadCount += 1;
@@ -500,7 +564,7 @@
             onclick={swapPanels}
           />
           <IconButton
-            label={isSaving ? 'Saving version…' : hasUnsavedChanges ? 'Save version, unsaved changes' : 'Save version'}
+            label={isSaving ? 'Saving version…' : hasUnsavedChanges ? `${saveLabel}, unsaved changes` : saveLabel}
             icon={Save16}
             tone="neutral"
             shortcut={describeShortcut('save', isMac)}
@@ -570,9 +634,22 @@
             <Panel
               {...state}
               label="Editor"
-              tabs={{ label: 'Files', items: FILE_TABS, value: 'strategy', onValueChange: () => {} }}
+              tabs={{
+                label: 'Files',
+                items: FILE_TABS,
+                value: fileTab,
+                onValueChange: (value: string) => {
+                  fileTab = value === 'rules' ? 'rules' : 'strategy';
+                },
+              }}
             >
-              {#if openVersion !== null}
+              {#if fileTab === 'rules'}
+                {#if rules !== null}
+                  {#key `${String(shownStrategy.id)}.${String(rulesVersionNumber)}`}
+                    <RulesTab {rules} onRulesChange={changeRules} />
+                  {/key}
+                {/if}
+              {:else if openVersion !== null}
                 <div class="editor">
                   {#key shownStrategy.id}
                     <CodeEditor

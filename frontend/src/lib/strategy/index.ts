@@ -5,7 +5,9 @@ export {
   deleteStrategy,
   listStrategies,
   readStrategy,
+  generateRulesCode,
   readStrategyVersion,
+  saveStrategyRules,
   saveStrategyVersion,
   type CodeProblem,
   type DeleteResult,
@@ -18,6 +20,9 @@ export {
 } from './strategy_api';
 export {
   clearDraft,
+  clearRulesDraft,
+  readRulesDraft,
+  writeRulesDraft,
   formatVersionLabel,
   readDraft,
   writeDraft,
@@ -25,3 +30,28 @@ export {
   type StrategyVersionKey,
 } from './strategy_drafts';
 export { connectStrategyLanguageServer, type LanguageServerConnection } from './strategy_language_server';
+export {
+  BLANK_RULES,
+  COMPARISON_CHOICES,
+  createCondition,
+  createGroup,
+  createOperand,
+  findChangedLines,
+  findIndicatorChoice,
+  findRulesVersionNumber,
+  listOperandChoices,
+  readOperandChoice,
+  type Comparison,
+  type GroupMatch,
+  type IndicatorChoice,
+  type IndicatorOperand,
+  type InnerRuleGroup,
+  type LeftOperand,
+  type OperandChoice,
+  type PositionSize,
+  type RightOperand,
+  type RuleCondition,
+  type RuleExits,
+  type RuleGroup,
+  type StrategyRules,
+} from './strategy_rules';

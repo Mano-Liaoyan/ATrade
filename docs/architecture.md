@@ -889,7 +889,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A backtest
   of the strategy that ends opens in its tab. While the forward test socket is
   not connected, `LiveUpdatesNotification` shows under the toolbar. The editor panel has the file
-  tab `strategy.py` and the `CodeEditor`. Below the two panels is the
+  tabs "Rules" (the rule builder and the read-only code from the rules,
+  strategy section 9.8.5) and `strategy.py` (the `CodeEditor`). While
+  "Rules" is open, the save button is "Save rules as new version", and it
+  and Ctrl S save the rules. Below the two panels is the
   "Problems and output" panel (ticket
   [#107](https://github.com/Mano-Liaoyan/ATrade/issues/107)), always the
   last panel of the split. By default it is minimized to its 24px status
@@ -1759,6 +1762,11 @@ option and records it in this document.
   format, the code from the rules, the empty group, the stop loss and take
   profit reference price, and the count of "Exit after N bars" are in
   strategy sections 9.8.2 and 9.8.3.
+- Decided (#173): the "Rules" tab opens the rules of the open version, else
+  of vM, else the blank rules; the line highlight compares with the code
+  before the last rule change; Save version and Ctrl S save the rules while
+  the tab is open; unsaved rules have a `localStorage` draft; and the code
+  request has no delay. The details are in strategy sections 9.7 and 9.8.5.
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1919,6 +1927,12 @@ option and records it in this document.
   not go into the owner ledger. The next run sends fills only for its own
   orders. The position then shows the difference as "Unattributed"
   (`docs/architecture/paper_trading.md` section 11.7).
+- Decided (#221): the start dialog reads `GET /api/forward-tests/capital`
+  each time it opens and after each refused start. It does not read it again
+  when the "Capital (USD)" input changes. Without an unallocated amount, the
+  dialog reads the paper account check from `/ws/paper-trading` while it is
+  open and shows its reason (`docs/architecture/forward_test.md` section
+  12.16).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client
   calls `check_order()` before each order, `save_fill()` for each fill, and
@@ -1947,6 +1961,10 @@ option and records it in this document.
   conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
   exchange rates of a backtest on port 8001. See section 25.14 and
   [`backtest.md`](architecture/backtest.md) section 10.13.
+- Decided (#182): the 9 tools of phase 2, the 5 backtests of a user
+  message (only the tool counts them), the `read_backtest` summary, the
+  fields of `tool_step`, `strategy_version_saved`, and `backtest_finished`,
+  and the 15-minute wait in tests. See section 25.14.
 - Decided (#183): the credential file is `/data/credentials.json` in the
   volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
   rename, the state column, the login messages of `/ws/assistant`, and the

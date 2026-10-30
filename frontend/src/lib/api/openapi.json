@@ -7284,6 +7284,26 @@
         "title": "AssistantErrorMessage",
         "type": "object"
       },
+      "BacktestFinishedMessage": {
+        "description": "A backtest of `run_backtest` ended in the wait of the tool, for the metric card.",
+        "properties": {
+          "type": {
+            "const": "backtest_finished",
+            "default": "backtest_finished",
+            "title": "Type",
+            "type": "string"
+          },
+          "backtest_id": {
+            "title": "Backtest Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "backtest_id"
+        ],
+        "title": "BacktestFinishedMessage",
+        "type": "object"
+      },
       "ForwardTestsMessage": {
         "properties": {
           "type": {
@@ -8058,6 +8078,95 @@
           "text"
         ],
         "title": "SteerMessage",
+        "type": "object"
+      },
+      "StrategyVersionSavedMessage": {
+        "description": "The AI assistant saved a strategy version, for the diff card (25.5.2).",
+        "properties": {
+          "type": {
+            "const": "strategy_version_saved",
+            "default": "strategy_version_saved",
+            "title": "Type",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "integer"
+          },
+          "strategy_version_id": {
+            "title": "Strategy Version Id",
+            "type": "integer"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "strategy_id",
+          "strategy_version_id",
+          "version_number"
+        ],
+        "title": "StrategyVersionSavedMessage",
+        "type": "object"
+      },
+      "ToolStepMessage": {
+        "description": "The start, an update, or the end of one tool call. One `tool_call_id` is one tool step of the conversation.\n\n`status` is `running` at the start and at each update, then `succeeded` or `failed`. For `run_backtest`,\n`backtest_id` and `backtest_status` give the queue state (`queued`) or the run state (`running`, then a final\nstatus). They are null for the other tools and at the start.",
+        "properties": {
+          "type": {
+            "const": "tool_step",
+            "default": "tool_step",
+            "title": "Type",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "backtest_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Id"
+          },
+          "backtest_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backtest Status"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name",
+          "status",
+          "backtest_id",
+          "backtest_status"
+        ],
+        "title": "ToolStepMessage",
         "type": "object"
       }
     }
