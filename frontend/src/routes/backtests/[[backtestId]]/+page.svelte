@@ -27,8 +27,10 @@
     KeyMetricRow,
     listBacktests,
     readBacktest,
+    readBacktestInstrument,
     type Backtest,
     type BacktestDetail,
+    type BacktestInstrument,
   } from '#lib/backtest';
   import { Dialog, IconButton, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
@@ -169,7 +171,7 @@
     void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(started.id) }));
   }
 
-  async function startForwardTestFromBacktest(detail: BacktestDetail): Promise<void> {
+  async function startForwardTestFromBacktest(detail: BacktestDetail, instrument: BacktestInstrument): Promise<void> {
     if (isStartingForwardTest) {
       return;
     }
@@ -177,9 +179,9 @@
     forwardTestMessage = '';
     const result = await startForwardTest(fetch, {
       strategy_version_id: detail.strategy_version_id,
-      symbol: detail.symbol,
-      exchange: detail.exchange,
-      currency: detail.currency,
+      symbol: instrument.symbol,
+      exchange: instrument.exchange,
+      currency: instrument.currency,
       bar_period: detail.bar_period,
       // The paper capital of the backtest is the allocated capital of the forward test (forward_test.md 12.18).
       allocated_capital_usd: detail.paper_capital_usd,
@@ -192,7 +194,10 @@
     await goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(result.forwardTest.id) }));
   }
 
-  function describeForwardTestButton(detail: BacktestDetail): string {
+  function describeForwardTestButton(detail: BacktestDetail, instrument: BacktestInstrument | undefined): string {
+    if (instrument === undefined) {
+      return 'Start forward test: not available for a multi-instrument backtest';
+    }
     if (!hasLiveBarPeriod) {
       return `Start forward test: not available for ${formatBarPeriod(detail.bar_period)} bars`;
     }
@@ -231,6 +236,7 @@
     </div>
   {:else}
     {@const detail = shownBacktest}
+    {@const instrument = readBacktestInstrument(detail)}
     <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
         {#if id === 'chart'}
@@ -241,8 +247,10 @@
                 <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
                   >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
                 >
-                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                <a class="cds--link" href={createInstrumentHref(detail)}>{detail.symbol}</a>
+                {#if instrument !== undefined}
+                  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                  <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
+                {/if}
                 <span class="run-period">{formatBarPeriod(detail.bar_period)}</span>
               </h1>
               <span class="run-status" role="status" aria-label="Backtest status">
@@ -250,11 +258,15 @@
               </span>
               <span class="run-actions">
                 <IconButton
-                  label={describeForwardTestButton(detail)}
+                  label={describeForwardTestButton(detail, instrument)}
                   icon={ConnectionSignal16}
                   tone="interactive"
-                  disabled={!hasLiveBarPeriod || isStartingForwardTest}
-                  onclick={() => void startForwardTestFromBacktest(detail)}
+                  disabled={instrument === undefined || !hasLiveBarPeriod || isStartingForwardTest}
+                  onclick={() => {
+                    if (instrument !== undefined) {
+                      void startForwardTestFromBacktest(detail, instrument);
+                    }
+                  }}
                 />
               </span>
             {/snippet}

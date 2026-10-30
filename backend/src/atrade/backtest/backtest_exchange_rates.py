@@ -60,7 +60,7 @@ def find_exchange_rate_range(request: BacktestRequest) -> TimeRange:
 
 def describe_missing_start_rate(request: BacktestRequest) -> str:
     """The message of a backtest without a saved rate before its start: the route refuses it, and the child fails."""
-    currency = request.instrument.currency
+    currency = request.currency
     start_utc = request.time_range.start_utc
     return (
         f"There is no saved {currency} to USD exchange rate of a day in the {EXCHANGE_RATE_LOOK_BACK.days} days before"
@@ -71,7 +71,7 @@ def describe_missing_start_rate(request: BacktestRequest) -> str:
 async def read_daily_exchange_rates(*, database_url: str, request: BacktestRequest) -> DailyExchangeRates:
     """The saved rates of the backtest. It never calls IBKR."""
     rates = await read_saved_exchange_rates(
-        database_url=database_url, currency=request.instrument.currency, time_range=find_exchange_rate_range(request)
+        database_url=database_url, currency=request.currency, time_range=find_exchange_rate_range(request)
     )
     return DailyExchangeRates(rates)
 
@@ -83,7 +83,7 @@ async def save_exchange_rates(
 
     A USD instrument needs no rates.
     """
-    currency = request.instrument.currency
+    currency = request.currency
     if currency == USD:
         return None
     rate_range = find_exchange_rate_range(request)

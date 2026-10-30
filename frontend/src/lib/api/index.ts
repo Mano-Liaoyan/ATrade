@@ -823,12 +823,15 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
+            universe_kind: components["schemas"]["UniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -941,12 +944,15 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
+            universe_kind: components["schemas"]["UniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -1076,12 +1082,15 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
+            universe_kind: components["schemas"]["UniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -1610,6 +1619,15 @@ export interface components {
             match: components["schemas"]["GroupMatch"];
             /** Items */
             items: components["schemas"]["RuleCondition"][];
+        };
+        /** InstrumentBody */
+        InstrumentBody: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
         };
         /** InstrumentResponse */
         InstrumentResponse: {
@@ -2163,16 +2181,26 @@ export interface components {
             in_sample: components["schemas"]["BacktestMetricsResponse"];
             out_of_sample: components["schemas"]["BacktestMetricsResponse"];
         };
-        /** StartBacktestRequest */
+        /**
+         * StartBacktestRequest
+         * @description `universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
+         *     `list` needs `instruments` (docs/architecture/backtest.md section 10.10.6).
+         */
         StartBacktestRequest: {
             /** Strategy Version Id */
             strategy_version_id: number;
+            /** @default single */
+            universe_kind: components["schemas"]["UniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
             /** Exchange */
-            exchange: string;
+            exchange?: string | null;
             /** Currency */
-            currency: string;
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+            /** Instruments */
+            instruments?: components["schemas"]["InstrumentBody"][] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -2369,7 +2397,13 @@ export interface components {
             price_usd: string;
             /** Commission Usd */
             commission_usd: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Exchange */
+            exchange: string | null;
         };
+        /** @enum {string} */
+        UniverseKind: "single" | "rule" | "list";
         /** ValidationError */
         ValidationError: {
             /** Location */

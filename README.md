@@ -296,6 +296,22 @@ docker compose --file deploy/compose.yaml --env-file .env run --rm web \
 A confirmed stock split changes the stored bars before its ex-date. A
 rejected stock split changes nothing, and the next import keeps it rejected.
 
+Buy the hourly bars after the first import and the check
+(`docs/architecture/market_data.md` section 8.8.1). First print the purchase
+list and its cost. This reads `metadata.get_cost` (free, needs
+`DATABENTO_API_KEY`) and buys nothing:
+
+```sh
+docker compose --file deploy/compose.yaml --env-file .env run --rm web \
+  python -m atrade.app.databento_import --hourly-cost
+```
+
+The log has one line for each quarter: the time range, the symbols, and the
+cost. Buy XNAS.ITCH `ohlcv-1h` with these symbols and time ranges as batch
+jobs in DBN format, then import them with the same commands as above. The
+import keeps the 7 regular-hours bars of each day, and only in the quarters
+in which the instrument is in the universe.
+
 ### Old data
 
 The rewrite migrates no old data. The new database uses the new volume

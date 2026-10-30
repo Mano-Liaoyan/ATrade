@@ -298,7 +298,7 @@ app           -> all modules
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second uvicorn server on port 8001 runs in the same event loop (`serve_both`) and has only the allow-list routes for the `assistant` service (`app/assistant_port.py`, section 25). When one server stops, the other stops too. Only port 8000 has a lifespan (IB Gateway connection, paper account check, backtest runner). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
-| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. It reads the IBKR daily closes of the instruments that still trade (IB Gateway, client ID `--ibkr-client-id`, default `30`), links symbol changes, adjusts the bars for stock splits, and writes `stock_split` and `databento_symbol_link` rows (section 8.8.3, 8.8.4). |
+| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. It reads the IBKR daily closes of the instruments that still trade (IB Gateway, client ID `--ibkr-client-id`, default `30`), links symbol changes, adjusts the bars for stock splits, and writes `stock_split` and `databento_symbol_link` rows (section 8.8.3, 8.8.4). It imports the daily bars and the XNAS.ITCH `ohlcv-1h` hourly bars of the universe quarters (section 8.8.2), and then calculates the quarters of `us_universe_member` without members (section 8.9). `--hourly-cost` imports nothing: it prints the hourly bar purchase list and its cost from `metadata.get_cost` before the purchase (section 8.8.1). |
 | `app/databento_check.py` | Run by the user after the Databento import, in the `web` image with `docker compose run` (README.md) | Lists the detected stock splits that wait for the user check and the symbol links that are not checked. `--accept` confirms them, `--reject-split <ID>` rejects one stock split (section 8.8.3). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
@@ -1082,9 +1082,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default
   `127.0.0.1:8000`).
 - `web` has `read_only: true`, a `tmpfs` on `/tmp`, and
-  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`; phase 3 changes it
-  to `8g`, because a multi-instrument backtest of 500 instruments on 1-hour
-  bars can need 4 to 5 GB,
+  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `8g`; it was `4g`
+  before phase 3, #199, because a multi-instrument backtest of 500 instruments
+  on 1-hour bars can need 4 to 5 GB,
   [#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)). `0` turns the memory
   limit off. Use `0` only on a host that cannot set memory limits, for example
   rootless Podman without the memory cgroup controller.
@@ -1656,8 +1656,9 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
 | The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
 | The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. |
-| Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). | Run one with real data and measure the peak memory and the time. |
-| Look-back bars of many bar types in one catalog, and chunked loading memory (#131, source only). | A multi-instrument child test with look-back bars for each member. |
+| Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). Not measured in #199: there are no saved real hourly bars of 500 instruments locally. | Run one with real data and measure the peak memory and the time. |
+| The PostgreSQL read time and the Arrow conversion time of each backtest child with a universe (#142). Not measured in #199 (no real bars locally). | Time one real `rule` backtest child. |
+| Chunked loading memory (#131, source only). The child of #199 loads all bars at once. | Measure the peak memory of a 500-instrument child. |
 | Databento `ohlcv-1h` is on whole hours. The first IBKR regular-hours hourly bar starts at 9:30 ET and is 30 minutes long (#141). | Compare IBKR and Databento hourly bars of one instrument on one day. |
 | NYSE American and NYSE Arca instruments have no official open and close in XNAS or XNYS `statistics` (#141). | After the daily import, count the instruments without `stat_type` 11. |
 | The cost of the universe hourly bars is about 24 USD (#141). | `metadata.get_cost` before the purchase. |
@@ -1697,6 +1698,7 @@ implementation" list.
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
 | The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | Yes, with changes. On 2026-10-30 with NautilusTrader 2.0.0rc7 (#213), the Python `ExecutionClient` and `DataClient` of `nautilus_trader.live.clients` ran in a `LiveNode` with the IBKR fake and the owner ledger fake (`tests/forward_test/test_atrade_clients_live_node.py`). 2 or more LiveNodes can run one after the other in 1 process. After a restart, NautilusTrader made an external order with an inferred fill from the `PositionStatusReport` (`quantity`, `avg_px_open`): it does make a synthetic fill. With `external_order_instrument_ids` set to the instrument, the strategy got the position with the reported average price and did not buy again. Without it, the position belonged to the strategy `EXTERNAL`. After a 2-for-1 split in the fake ledger and a restart, the strategy got the new quantity and the new average price. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
+| Look-back bars of many bar types in one catalog (#131, source only). | Yes. On 2026-10-30 (#199), a real backtest child with a `rule` universe of 2 quarters wrote the look-back bars of 3 members to one catalog. Each new member warmed up an SMA(20) from it and the strategy bought on the first bar after the member joined, also for the member that joined in the second quarter (`tests/backtest/test_universe_backtest_runs.py`). A `request_bars` with an `end` after the engine time raises `ValueError: end was > now`; without `end`, the catalog gives only the bars up to the engine time. |
 | The time of the bulk daily bar read for a screen run (`read_last_daily_bars`, #136), on synthetic tables. | On 2026-10-30 (#206), PostgreSQL 18.3 in Docker on the development machine, only `ibkr_bar` filled: 10000 instruments × 260 daily bars, 1 saved range for each instrument, after `ANALYZE`. One read of the last 260 daily bars of all instruments: 13.9 and 15.6 seconds (2 runs, 2600000 bars). 2000 instruments: 3.5 and 3.7 seconds. A run from `all_with_daily_bars` without filters reads the longest look-back of its indicators, so the read is most of its run time. The real bar tables are not measured (section 21). |
 | Moskowitz, Ooi & Pedersen 2012 use a 12-month look-back and a 1-month hold (#139, template S3). | Yes. On 2026-10-30 (#175), from the published paper (JFE 104, 228–250, author copy at `pages.stern.nyu.edu/~lpederse`): section 4 (p. 237) uses k = 12 months and h = 1 month as the main strategy. Eq. (5) uses the return from t − 12 to t, so no month is skipped (only the cross-sectional strategy of footnote 10 skips 1 month): S3 uses skip 0. The signal is the sign of the past excess return: long above 0, short below 0. Each position is scaled to 40% annual ex ante volatility. S3 differs: no short sale, no volatility scaling, price return (strategy section 9.9.3). |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
@@ -1808,6 +1810,12 @@ option and records it in this document.
   configuration of a multi-instrument strategy has no `instrument_id`, no
   `bar_type`, and no universe field
   ([`backtest.md`](architecture/backtest.md) section 10.10.8).
+- Decided (#199): the start route writes the members of each universe
+  period. The universe bar check needs one saved bar of one member. A
+  multi-instrument backtest on 1-hour bars uses the single-instrument
+  look-back. A `list` has 500 instruments at most. The round trips count for
+  each instrument, and the exposure counts the bars with any position
+  ([`backtest.md`](architecture/backtest.md) section 10.10.8).
 - Decided (#188): a source order holds each `BarSource` exactly 1 time.
   `PUT /api/market-data/source-order` refuses an order that leaves out a bar
   source with `422`. Thus the bars route always reads the IBKR bars that it
@@ -1880,6 +1888,11 @@ option and records it in this document.
   watchlist read (`read_watchlist_instruments` of `watchlist`), because
   `market_data` does not import `watchlist`. The time, the calendar, and
   "still trading" are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#193): the Databento import program also imports the XNAS.ITCH
+  `ohlcv-1h` files. `--hourly-cost` prints the hourly bar purchase list and
+  its cost before the purchase. The official open of the 9:30 ET hourly bar
+  and the hourly range of the bars route:
+  `docs/architecture/market_data.md` section 8.14.
 - Decided (#196): evidence A of a stock split is in the bars route and in
   the daily bar update. A candidate is a `stock_split` row with the source
   `ibkr_evidence` and no confirmation. The stock split check reads the

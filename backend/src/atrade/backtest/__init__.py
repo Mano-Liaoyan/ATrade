@@ -20,6 +20,7 @@ from atrade.backtest.backtest_metrics import (
     calculate_metrics,
     calculate_round_trip_metrics,
     calculate_split_metrics,
+    calculate_universe_equity_curve,
     find_round_trips,
 )
 from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
@@ -53,6 +54,7 @@ __all__ = [
     "calculate_probabilistic_sharpe",
     "calculate_round_trip_metrics",
     "calculate_split_metrics",
+    "calculate_universe_equity_curve",
     "check_backtest_request",
     "create_backtest_assistant_router",
     "create_backtest_router",

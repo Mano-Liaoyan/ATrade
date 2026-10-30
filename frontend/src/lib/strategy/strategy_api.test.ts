@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
   createStrategy,
+  listStrategyTemplates,
   deleteStrategy,
   readStrategy,
   BLANK_RULES,
@@ -109,6 +110,33 @@ describe('createStrategy', () => {
     const result = await createStrategy(respondWith(409, { detail: 'A strategy with this name exists.' }), 'Moving average');
 
     expect(result).toEqual({ kind: 'failed', message: 'A strategy with this name exists.' });
+  });
+
+  it('sends the name and the start point', async () => {
+    const bodies: unknown[] = [];
+    const recordingFetch: typeof fetch = (_input, init) => {
+      bodies.push(JSON.parse(init?.body as string));
+      return Promise.resolve(new Response(JSON.stringify({ id: 4 }), { status: 201 }));
+    };
+
+    await createStrategy(recordingFetch, 'Trend test', 's1');
+
+    expect(bodies).toEqual([{ name: 'Trend test', start_from: 's1' }]);
+  });
+});
+
+describe('listStrategyTemplates', () => {
+  it('reads the template list', async () => {
+    const paths: string[] = [];
+    const recordingFetch: typeof fetch = (input) => {
+      paths.push(input as string);
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    };
+
+    const result = await listStrategyTemplates(recordingFetch);
+
+    expect(paths).toEqual(['/api/strategy-templates']);
+    expect(result).toEqual({ kind: 'ok', value: [] });
   });
 });
 
