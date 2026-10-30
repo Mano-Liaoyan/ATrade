@@ -241,7 +241,10 @@ app           -> all modules
   contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
-  (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
+  (`docs/architecture/assistant.md`). `app/` also gives `assistant` the
+  start context of a conversation (`strategy.read_strategy_outline()`,
+  `backtest.read_last_backtest_ids()`) and the strategy template for the
+  default system prompt (#184). The `conversation_id` foreign keys of
   `strategy_version`, `backtest`, and the screen tables point at
   `assistant_conversation` (section 6.3 allows a foreign key).
 - `paper_trading` does not import `forward_test`. Until phase 3, the refusal
@@ -1704,6 +1707,11 @@ option and records it in this document.
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#184): the default prompt is saved as prompt version 1 when no
+  version exists. The browser sends the open version number when it creates
+  a conversation. A trigger refuses each `UPDATE` of
+  `assistant_prompt_version`. `app/` gives `assistant` the start context
+  reader and the strategy template. See section 25.9.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

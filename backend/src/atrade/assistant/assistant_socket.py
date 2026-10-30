@@ -26,6 +26,7 @@ from atrade.assistant.assistant_service import (
     RunEvent,
     TextDelta,
 )
+from atrade.assistant.system_prompt import join_system_prompt
 from atrade.foundation.socket_push import HEARTBEAT_INTERVAL_SECONDS, HeartbeatMessage
 
 ASSISTANT_SOCKET_PATH = "/ws/assistant"
@@ -167,11 +168,21 @@ class ConversationSocket:
             case AbortMessage():
                 await self.assistant_service.abort(self.conversation_id)
 
+    async def read_system_prompt(self) -> str:
+        """The prompt version of the conversation and the fixed part of its start (25.9)."""
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            parts = await conversation_store.select_system_prompt_parts(connection, self.conversation_id)
+        if parts is None:
+            message = f"The conversation {self.conversation_id} does not exist."
+            raise AssistantServiceError(message)
+        return join_system_prompt(parts.editable_part, parts.fixed_part)
+
     async def run(self, text: str, selection: ModelSelection) -> None:
         await self.send(RunStateMessage(state="running"))
         has_answer = False
         try:
-            async for event in self.assistant_service.run(self.conversation_id, text, selection):
+            system_prompt = await self.read_system_prompt()
+            async for event in self.assistant_service.run(self.conversation_id, text, selection, system_prompt):
                 if isinstance(event, MessageEnd):
                     has_answer = True
                     await self.save_last_model(event)

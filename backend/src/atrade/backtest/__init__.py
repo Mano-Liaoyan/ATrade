@@ -1,11 +1,12 @@
 """Public entry of the backtest capability: backtest runs, their results, the metric functions, backtests for
-other capabilities (queue one, read its outcome), and the look-back bars of `request_bars`."""
+other capabilities (queue one, read its outcome, the last IDs of a strategy), and the look-back bars of `request_bars`."""
 
 from atrade.backtest.backtest_access import (
     BacktestOutcome,
     check_backtest_request,
     queue_backtest,
     read_backtest_outcome,
+    read_last_backtest_ids,
 )
 from atrade.backtest.backtest_metrics import (
     BacktestMetrics,
@@ -35,6 +36,7 @@ __all__ = [
     "find_look_back_length",
     "queue_backtest",
     "read_backtest_outcome",
+    "read_last_backtest_ids",
     "run_backtest",
     "write_look_back_catalog",
 ]
