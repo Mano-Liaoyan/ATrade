@@ -8,7 +8,9 @@
      open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
      and Logs. A backtest that ends opens in its tab. The editor panel has the "Rules" tab (the rule builder, RulesTab) and
      the `strategy.py` tab (the code editor). While "Rules" is open, the save button and Ctrl S save the rules as a new
-     version. Unsaved edits of the code and of the rules stay in localStorage (drafts of the strategy capability).
+     version. When the code of the open version changed after the rules, the tab shows a warning, and the save first
+     shows the diff of that code and the new code in a dialog. Unsaved edits of the code and of the rules stay in
+     localStorage (drafts of the strategy capability).
      Below the two panels is the problems and output panel (ticket #107, like the VS Code panel). It starts minimized
      to its 24px status bar: the error and warning counts open the Problems tab, "Output" opens the Output tab. A click
      on the selected tab minimizes it again. A save that the code checks refuse opens Problems; a click on a problem goes
@@ -31,7 +33,7 @@
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
   import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
-  import { CodeEditor } from '#lib/foundation/code_editor';
+  import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { startPolling } from '#lib/foundation/polling';
@@ -53,8 +55,10 @@
     connectStrategyLanguageServer,
     createStrategy,
     deleteStrategy,
+    describeRulesWarning,
     findRulesVersionNumber,
     formatVersionLabel,
+    generateRulesCode,
     listStrategies,
     readDraft,
     readStrategy,
@@ -152,6 +156,8 @@
   let isDeleting = $state(false);
   let isBacktestDialogOpen = $state(false);
   let isForwardTestDialogOpen = $state(false);
+  // The new code of the rules while the diff dialog before a rules save is open (section 9.8.4), else null.
+  let replacingCode = $state<string | null>(null);
   let newStrategyForm: HTMLFormElement | undefined = $state();
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
@@ -172,6 +178,9 @@
   );
   const runningForwardTest = $derived(findRunningForwardTest(forwardTestFeed.forwardTests, activeStrategyId));
   const hasUnsavedCode = $derived(openVersion !== null && editorCode !== openVersion.code);
+  const rulesWarning = $derived(
+    openVersion === null ? null : describeRulesWarning(openVersion.version_number, rulesVersionNumber),
+  );
   const hasUnsavedRules = $derived(rules !== null && JSON.stringify(rules) !== JSON.stringify(savedRules));
   const hasUnsavedChanges = $derived(fileTab === 'rules' ? hasUnsavedRules : hasUnsavedCode);
   const saveLabel = $derived(fileTab === 'rules' ? 'Save rules as new version' : 'Save version');
@@ -188,7 +197,11 @@
   const swapButton = $derived(describeSwapButton(paneOrder));
   const panels = $derived(listWorkbenchPanels(paneOrder));
   const isDialogOpen = $derived(
-    isNewStrategyDialogOpen || isDeleteDialogOpen || isBacktestDialogOpen || isForwardTestDialogOpen,
+    isNewStrategyDialogOpen ||
+      isDeleteDialogOpen ||
+      isBacktestDialogOpen ||
+      isForwardTestDialogOpen ||
+      replacingCode !== null,
   );
 
   $effect(() => {
@@ -344,7 +357,25 @@
     }
   }
 
+  // In the warning case (section 9.8.4), a rules save first shows the diff of the open version code and the new code.
+  // When the code request fails, the save runs at once and shows the problems.
   async function saveVersion(): Promise<void> {
+    if (openVersion === null || strategy === null || isSaving) {
+      return;
+    }
+    if (fileTab === 'rules' && rules !== null && rulesWarning !== null) {
+      isSaving = true;
+      const result = await generateRulesCode(fetch, rules);
+      isSaving = false;
+      if (result.kind === 'ok') {
+        replacingCode = result.value;
+        return;
+      }
+    }
+    await saveNow();
+  }
+
+  async function saveNow(): Promise<void> {
     if (openVersion === null || strategy === null || isSaving) {
       return;
     }
@@ -631,7 +662,7 @@
               {#if fileTab === 'rules'}
                 {#if rules !== null}
                   {#key `${String(shownStrategy.id)}.${String(rulesVersionNumber)}`}
-                    <RulesTab {rules} onRulesChange={changeRules} />
+                    <RulesTab {rules} onRulesChange={changeRules} warning={rulesWarning} />
                   {/key}
                 {/if}
               {:else if openVersion !== null}
@@ -736,6 +767,32 @@
     }}
   >
     <p>All versions of the strategy are deleted.</p>
+  </Dialog>
+{/if}
+
+{#if openVersion !== null}
+  <Dialog
+    open={replacingCode !== null}
+    onOpenChange={(open: boolean) => {
+      if (!open) {
+        replacingCode = null;
+      }
+    }}
+    title="Replace code changes of v{openVersion.version_number}"
+    size="lg"
+    primaryText="Save rules as new version"
+    busy={isSaving}
+    onPrimary={() => {
+      replacingCode = null;
+      void saveNow();
+    }}
+  >
+    <CodeDiff
+      firstCode={openVersion.code}
+      secondCode={replacingCode ?? ''}
+      firstLabel="v{openVersion.version_number}"
+      secondLabel="Code from the rules"
+    />
   </Dialog>
 {/if}
 
