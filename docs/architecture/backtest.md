@@ -1091,6 +1091,11 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
   the user deletes the conversation, the ID becomes null. The backtest stays.
 - The AI assistant cannot change the backtest limits and cannot start a
   parameter sweep.
+- Decided (#181): `POST /api/backtests` on port 8001 makes the same checks
+  as port 8000 (`start_backtest`). When the instrument is not in USD and a
+  daily exchange rate is missing, it saves the rates from IBKR (section
+  10.8), like port 8000. The rule "cannot load bars" is about bars only. A
+  backtest without saved bars gets `422` (section 10.1).
 
 Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
 

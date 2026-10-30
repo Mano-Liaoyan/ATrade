@@ -2,7 +2,7 @@
 and the save of the AI assistant."""
 
 from atrade.strategy.code_checks import CodeProblem
-from atrade.strategy.http_routes import create_strategy_router
+from atrade.strategy.http_routes import create_strategy_assistant_router, create_strategy_router
 from atrade.strategy.language_server import STRATEGY_LANGUAGE_SERVER_PATH, create_strategy_language_server_router
 from atrade.strategy.strategy_loading import StrategyFileError, load_strategy_classes
 from atrade.strategy.strategy_store import SavedVersion, StrategyVersionRecord
@@ -16,6 +16,7 @@ __all__ = [
     "StrategyFileError",
     "StrategyVersion",
     "StrategyVersionRecord",
+    "create_strategy_assistant_router",
     "create_strategy_language_server_router",
     "create_strategy_router",
     "load_strategy_classes",

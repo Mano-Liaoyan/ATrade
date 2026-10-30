@@ -125,6 +125,19 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - So `assistant` cannot call a route of port 8000.
 - A unit test checks the allow-list: the port 8001 app has exactly the
   routes of 25.3.3.
+- Done (#181): `app/assistant_port.py` builds the port 8001 app
+  (`create_assistant_port_app`) from `create_strategy_assistant_router` and
+  `create_backtest_assistant_router`. The app has no OpenAPI document and no
+  `/docs` page. A route that is not in the allow-list gets `404`, or `405`
+  when an allowed route has the same path.
+- Done (#181): each request of `assistant` to port 8001 sends the header
+  `X-ATrade-Conversation-Id` with the conversation ID. The 2 routes that
+  record the conversation (`POST /api/strategies/{strategy_id}/versions` and
+  `POST /api/backtests`) need it. Without the header, or with a value that is
+  not a positive integer, the answer is FastAPI's `422` validation body. When
+  the conversation does not exist, the answer is `422` with
+  `{"detail": "Conversation <id> does not exist."}`. The read routes ignore
+  the header.
 
 ### 25.3.3 Allow-list
 
@@ -815,9 +828,17 @@ columns behave the same (section 13).
 - Decided (#178): the subnet of `atrade-assistant-internal` is
   `172.31.250.0/24`. It is fixed in `deploy/compose.yaml` and is not a
   setting.
-- How port 8001 knows the conversation of a request (for example a header
-  that `assistant` sends), so that it records the conversation ID.
-- How the `web` process runs 2 uvicorn listeners in 1 process.
+- Decided (#181): port 8001 knows the conversation of a request from the
+  header `X-ATrade-Conversation-Id` (25.3.2). The constant is
+  `CONVERSATION_HEADER` in `backend/src/atrade/foundation/assistant_conversation.py`.
+  A missing header gets `422` (FastAPI validation), and an unknown
+  conversation gets `422` with a text `detail`. The check of the
+  conversation is `conversation_exists` of the `assistant` public entry.
+  `app/` gives it to the routers, so `strategy` and `backtest` do not import
+  `assistant`.
+- Decided (#181): `app/web.py` runs 2 `uvicorn.Server` objects in 1 event
+  loop (`serve_both`): port 8000 with the lifespan, and port 8001 with
+  `lifespan="off"`. When one server stops, the other stops too.
 - Decided (#180): the discarded mark is a row of the table
   `strategy_version_discard` (25.5.1). The trigger
   `strategy_version_append_only` still refuses each `UPDATE` statement.
@@ -843,9 +864,9 @@ columns behave the same (section 13).
   also port 8001.
 - How the AI assistant finds the instruments and bar periods with saved bars.
   No tool reads the watchlist.
-- Whether `POST /api/backtests` from port 8001 may save daily exchange rates
-  from IBKR (backtest section 10.8). The AI assistant "cannot download
-  bars", and the rates come from IBKR.
+- Decided (#181): `POST /api/backtests` from port 8001 saves the daily
+  exchange rates from IBKR like port 8000 (backtest section 10.13). Rates
+  are not bars.
 - The phase 3 message for the condition card. Decided (#179): the field
   names of the other `/ws/assistant` messages (25.10).
 - The field that names the position of a condition in a screen problem

@@ -302,25 +302,11 @@ export interface paths {
         /** List Backtests */
         get: operations["list_backtests_api_backtests_get"];
         put?: never;
-        /** Start Backtest */
+        /**
+         * Start Backtest
+         * @description The start of port 8000: a backtest without a conversation.
+         */
         post: operations["start_backtest_api_backtests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/backtests/{backtest_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Backtest */
-        get: operations["read_backtest_api_backtests__backtest_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -338,6 +324,23 @@ export interface paths {
         get: operations["read_limits_api_backtest_limits_get"];
         /** Change Limits */
         put: operations["change_limits_api_backtest_limits_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Backtest */
+        get: operations["read_backtest_api_backtests__backtest_id__get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2705,46 +2708,6 @@ export interface operations {
             };
         };
     };
-    read_backtest_api_backtests__backtest_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                backtest_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestDetailResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_limits_api_backtest_limits_get: {
         parameters: {
             query?: never;
@@ -2785,6 +2748,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestLimitsBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_backtest_api_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

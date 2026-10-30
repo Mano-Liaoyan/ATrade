@@ -997,6 +997,7 @@
       },
       "post": {
         "summary": "Start Backtest",
+        "description": "The start of port 8000: a backtest without a conversation.",
         "operationId": "start_backtest_api_backtests_post",
         "requestBody": {
           "content": {
@@ -1025,55 +1026,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/backtests/{backtest_id}": {
-      "get": {
-        "summary": "Read Backtest",
-        "operationId": "read_backtest_api_backtests__backtest_id__get",
-        "parameters": [
-          {
-            "name": "backtest_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Backtest Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BacktestDetailResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1121,6 +1073,55 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backtests/{backtest_id}": {
+      "get": {
+        "summary": "Read Backtest",
+        "operationId": "read_backtest_api_backtests__backtest_id__get",
+        "parameters": [
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",

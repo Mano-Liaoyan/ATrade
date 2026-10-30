@@ -4,8 +4,10 @@ The AI assistant runs in the assistant service (docs/architecture/assistant.md 2
 conversation metadata in PostgreSQL and connects the browser to the assistant service.
 """
 
+import psycopg
 from fastapi import APIRouter
 
+from atrade.assistant import conversation_store
 from atrade.assistant.assistant_service import (
     AssistantService,
     AssistantServiceClient,
@@ -33,6 +35,12 @@ def create_assistant_router(*, database_url: str, clock: Clock, assistant_servic
     return router
 
 
+async def conversation_exists(*, database_url: str, conversation_id: int) -> bool:
+    """Port 8001 records only a conversation that exists (docs/architecture/assistant.md 25.3.2)."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        return await conversation_store.select_conversation(connection, conversation_id) is not None
+
+
 __all__ = [
     "ASSISTANT_SOCKET_MESSAGE_MODELS",
     "AssistantService",
@@ -44,5 +52,6 @@ __all__ = [
     "RunError",
     "RunEvent",
     "TextDelta",
+    "conversation_exists",
     "create_assistant_router",
 ]

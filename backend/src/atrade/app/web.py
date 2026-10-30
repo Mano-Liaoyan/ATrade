@@ -1,6 +1,7 @@
 """Web entry point: builds the FastAPI app, runs the migrations, and starts uvicorn with 1 worker.
 
-Run with `python -m atrade.app.web`. The Compose service `web` runs this module.
+Run with `python -m atrade.app.web`. The Compose service `web` runs this module. The process serves 2 apps:
+port 8000 (the browser) and port 8001 (the assistant service, docs/architecture/assistant.md 25.3.2).
 """
 
 import asyncio
@@ -15,6 +16,7 @@ from fastapi import FastAPI
 from pydantic import ValidationError
 
 from atrade.app.access_session_routes import create_access_session_router
+from atrade.app.assistant_port import ASSISTANT_PORT, RefuseAssistantSubnet, create_assistant_port_app
 from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
@@ -90,6 +92,8 @@ def create_web_app(
         gateway_connection.disconnect()
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
+    # The assistant service can call only port 8001 (docs/architecture/assistant.md 25.3.2).
+    app.add_middleware(RefuseAssistantSubnet)
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))
     app.include_router(create_access_session_router())
     app.include_router(
@@ -180,8 +184,26 @@ def main() -> None:
     gateway_connection = IbAsyncGatewayConnection(
         host=settings.ibkr_host, port=settings.ibkr_paper_port, client_id=settings.ibkr_web_client_id
     )
-    app = create_web_app(settings=settings, clock=SystemClock(), gateway_connection=gateway_connection)
-    uvicorn.run(app, host=LISTEN_HOST, port=LISTEN_PORT, workers=1)
+    clock = SystemClock()
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    assistant_app = create_assistant_port_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    asyncio.run(serve_both(app, assistant_app))
+
+
+async def serve_both(app: FastAPI, assistant_app: FastAPI) -> None:
+    """Runs the 2 uvicorn servers in 1 event loop. When one server stops, the other stops too.
+
+    Port 8001 has no lifespan: the lifespan of port 8000 keeps IB Gateway connected and runs the backtest runner.
+    """
+    servers = [
+        uvicorn.Server(uvicorn.Config(app, host=LISTEN_HOST, port=LISTEN_PORT, workers=1)),
+        uvicorn.Server(uvicorn.Config(assistant_app, host=LISTEN_HOST, port=ASSISTANT_PORT, lifespan="off")),
+    ]
+    tasks = [asyncio.create_task(server.serve()) for server in servers]
+    await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    for server in servers:
+        server.should_exit = True
+    await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
