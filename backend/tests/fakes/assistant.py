@@ -25,6 +25,9 @@ class FakeAssistantService:
         self.title_requests: list[tuple[int, ModelSelection]] = []
         # The generated title, or the error text of a failed generation.
         self.title: str | AssistantServiceError = "SMA crossover"
+        # True: the title generation waits until it is cancelled (the browser leaves during the model call).
+        self.hold_title = False
+        self.title_started = anyio.Event()
         self.messages: dict[int, list[ConversationMessage]] = {}
         self.deleted_conversations: list[int] = []
         self.is_reachable = True
@@ -66,6 +69,9 @@ class FakeAssistantService:
     async def generate_title(self, conversation_id: int, selection: ModelSelection) -> str:
         self.require_reachable()
         self.title_requests.append((conversation_id, selection))
+        self.title_started.set()
+        if self.hold_title:
+            await anyio.sleep_forever()
         if isinstance(self.title, AssistantServiceError):
             raise self.title
         return self.title

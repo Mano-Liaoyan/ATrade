@@ -28,6 +28,7 @@ from tests.fakes.ibkr import (
     make_forward_test_order,
     make_stock_position,
 )
+from tests.saved_ranges import save_ibkr_saved_range
 
 FAKE_ACCOUNT_ID = "DU1234567"
 E2E_POSITION_COUNT = 40
@@ -134,7 +135,7 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
     with connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s, 1000)
             ON CONFLICT DO NOTHING
             """,
@@ -148,6 +149,13 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
                 }
                 for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
             ],
+        )
+        save_ibkr_saved_range(
+            connection,
+            Instrument(symbol=E2E_COMPARED_SYMBOL, exchange="ARCA", currency="USD"),
+            "1-DAY",
+            E2E_COMPARED_FIRST_BAR_START_UTC,
+            E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
         )
 
 
