@@ -180,7 +180,7 @@ counts from `atrade/`.
 | `backtest/` | Run backtests and parameter sweeps. Save and read backtest results. Provide the metric functions and the robustness checks (in-sample and out-of-sample split, probabilistic and deflated Sharpe ratio). |
 | `paper_trading/` | Paper orders sent by hand, order status, positions, account balance, paper capital, the paper account check, the owner ledger, the ledger changes at a stock split, and the "Split check needed" state. |
 | `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, the quarterly universe job, and the daily stock split check. |
-| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It holds no credential. |
+| `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It calls the `assistant` service over HTTP (`AssistantServiceClient`, section 25.14). It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
 | `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
@@ -239,6 +239,9 @@ app           -> all modules
   `foundation`. So `indicator` can import only `foundation`, and `indicator`
   and `ibkr` do not import each other. A contract keeps the internal files
   of `indicator` private (#160).
+- import-linter puts `assistant` in the same layer as `ibkr` and
+  `indicator`, so `assistant` can import only `foundation` (#179). A
+  contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
   (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
@@ -542,8 +545,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `app/openapi_document.py` adds the Pydantic JSON Schema (serialization mode)
   of each WebSocket message model to `components.schemas`. A capability
   exports its models, for example `MARKET_DATA_SOCKET_MESSAGE_MODELS`,
-  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`, and
-  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`. Each list has `HeartbeatMessage` of
+  `FORWARD_TEST_SOCKET_MESSAGE_MODELS`,
+  `PAPER_TRADING_SOCKET_MESSAGE_MODELS`, and
+  `ASSISTANT_SOCKET_MESSAGE_MODELS` (the messages of both directions). Each list has `HeartbeatMessage` of
   `foundation/socket_push`. A message schema must not have the name of a
   different schema. Routes declare their error bodies with `responses=`
   (`ErrorResponse` of `foundation/error_response`), so the frontend does not
@@ -1352,6 +1356,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   Databento call in CI.
 - Model providers: the `assistant` service tests use a local fake
   OpenAI-compatible model server. No real provider in CI.
+- The `assistant` service: the `web` tests use a hand-written fake of
+  `AssistantService` in `tests/fakes/assistant.py`. The HTTP client has a
+  test with an `httpx.MockTransport`.
 
 ### 17.4 Tests for specific parts
 
@@ -1775,6 +1782,9 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#179): the protocol between `web` and `assistant`, the
+  `/ws/assistant` field names, the columns of `assistant_conversation`, and
+  the strategy delete (`ON DELETE CASCADE`). See section 25.14.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in
