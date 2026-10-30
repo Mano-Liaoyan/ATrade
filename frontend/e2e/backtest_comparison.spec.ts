@@ -15,7 +15,15 @@ const CHANGED_CODE_LINE = '# Compared version: one more comment line.';
 // More changed lines than the code difference region shows, so that it scrolls with a visible track.
 const ADDED_COMMENT_LINES = Array.from({ length: 40 }, (_, index) => `# Added line ${String(index + 1)}.`).join('\n');
 // The key metrics of the backtest page, in the same order.
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
 
 interface StrategyVersion {
   id: number;

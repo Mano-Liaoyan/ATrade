@@ -144,7 +144,7 @@ New columns are null on existing rows, except where a default is given.
 | Phase | Table | Change |
 |---|---|---|
 | 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). Migration `8d4b6f2a1c93_backtest_add_metric_columns.py`. |
-| 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. |
+| 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. Migration `2f6a9c1e4d85_backtest_add_out_of_sample_split.py`. |
 | 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2, `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
 | 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
@@ -308,7 +308,7 @@ use the same functions for the comparison (section 12.10).
 | Phase 1: `calculate_daily_returns(*, start_capital_usd, equity_curve)` | The daily returns of section 10.9.1, as fractions (0.02 is 2 %). |
 | Phase 1: `find_round_trips(trades)` | `RoundTrip` list: `start_utc`, `end_utc`, `profit_usd` (after commissions), and `entry_amount_usd` (the amount of the fills on the side of the first fill). A round trip goes from a position of 0 back to a position of 0. A position that is still open is not a round trip. The win rate, the profit factor, the average win, and the average loss use it. |
 | Phase 1: `calculate_metrics(*, paper_capital_usd, time_range, equity_curve, trades)` | Also gives the metrics of section 10.9.2 and the win rate, and `missing_reasons` (section 10.9.3). It takes the trades in place of `trade_count` (`trade_count` is the number of trades), and the time range for `years`. It takes no bars: the equity curve has one point at the end of each bar, so the exposure counts the points. Thus a forward test, which has no saved bars, uses the same function. Ratios, percents, and money have 2 decimal places. |
-| Phase 1: `calculate_split_metrics(*, ..., split_time_utc)` | The metrics of the in-sample part and of the out-of-sample part (section 10.9.4). |
+| Phase 1: `calculate_split_metrics(*, paper_capital_usd, time_range, equity_curve, trades, split_time_utc)` | `SplitMetrics`: `in_sample` and `out_of_sample`, each a `BacktestMetrics` (section 10.9.4). |
 | Phase 1: `calculate_probabilistic_sharpe(*, daily_returns)` and `calculate_deflated_sharpe(*, daily_returns, trial_sharpe_ratios)` | Section 10.9.5. |
 | Phase 1: `find_sharpe_probability_status(percent)` | The status of a PSR or DSR percent: `likely_real`, `uncertain`, `likely_luck`, or None without a value (section 10.9.5). |
 
@@ -351,8 +351,9 @@ Changes of later phases:
 
 | Phase | Route | Change |
 |---|---|---|
-| 1 | `POST /api/backtests` | The body can contain `out_of_sample_share` (integer percent). Without it, the route uses 30. `422` when it is not from 0 to 50. The route calculates `split_time_utc` (section 10.9.4). |
-| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
+| 1 | `POST /api/backtests` | The body can contain `out_of_sample_share` (integer percent). Without it, the route uses 30. `422` when it is not from 0 to 50. The route calculates `split_time_utc` (section 10.9.4). The same-period backtest of a forward test uses 0. |
+| 1 | `GET /api/backtests`, `POST /api/backtests` | Each backtest has `out_of_sample_share` and `split_time_utc`. |
+| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. #166 adds `split_metrics` and the two out-of-sample fields of `robustness`. `split_metrics` is also null until the backtest finishes. Without a split, both out-of-sample fields are null. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
 | 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
@@ -369,22 +370,18 @@ document. The implementation can change them.
   `listBacktests`, `readBacktest`), the value formats, and the parts that the
   backtest page, the strategy page, and the forward test page share (spec
   [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99)):
-  - `KeyMetricRow` (`metrics`, `startCapitalUsd`, `trades`): the key metrics
-    of `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
-    drawdown, Win rate, Trades, Final equity (USD). Each is a `MetricTile` of
+  - `KeyMetricRow` (`metrics`, `startCapitalUsd`): the key metrics of
+    `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
+    drawdown, Sharpe ratio, Win rate, Trades, Final equity (USD). Each is a
+    `MetricTile` of
     `foundation/metric_tile`. The API gives the max drawdown as a positive
     percent; the row shows it as a negative percent (for example
     "-37.71 %"), with the sign rule of `formatSignedNumber`. Total return, net
-    profit, and max drawdown show their direction with `ChangeText`. The win
-    rate comes from the trades: the share of round trips (from position 0
-    back to 0) with a profit after commissions; "–" without a round trip. The
-    API has no Sharpe ratio, so the row has none.
-  - Phase 1 changes the row
-    ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)). The order
-    is: Total return, Net profit (USD), Max drawdown, Sharpe ratio, Win rate,
-    Trades, Final equity (USD). The Sharpe ratio and the win rate come from
-    the API (section 10.9.2). The frontend no longer calculates the win rate.
-    Under the row, the robustness row of section 10.9.6 shows.
+    profit, and max drawdown show their direction with `ChangeText`. The
+    Sharpe ratio and the win rate come from the API (section 10.9.2,
+    [#137](https://github.com/Mano-Liaoyan/ATrade/issues/137), #168). A null
+    value shows "–". The frontend does not calculate the win rate.
+  - Phase 1: under the row, the robustness row of section 10.9.6 shows.
   - `EquityDrawdownChart` (`curves`, `label`, `interruptions`, `fill`): the
     equity curves and, under them, the drawdown curves
     (`computeDrawdownCurve()`, a negative percent from the highest equity so
@@ -412,9 +409,9 @@ document. The implementation can change them.
   - The "Backtest tables" panel has the tabs Trades (32px rows), Orders, and
     Logs. The API has no orders, so Orders shows "No orders". Logs shows the
     strategy error of a failed backtest, or "No logs". Phase 1 adds the tab
-    Metrics (section 10.9.6). Phase 3 adds the tab Instruments and the
-    Symbol column of Trades (section 10.10.7), and the tab Bar sources
-    (section 10.12).
+    Metrics (section 10.9.6, `BacktestMetricTable`, #168). Phase 3 adds the
+    tab Instruments and the Symbol column of Trades (section 10.10.7), and
+    the tab Bar sources (section 10.12).
   - The page reads the open backtest each second until its status is final,
     and the list every 2 seconds while a backtest in it is queued or running.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
@@ -669,6 +666,27 @@ longer bars first.
   the user saw this out-of-sample part before. ATrade does not refuse such
   a backtest.
 - A forward test has no split.
+- Decided (#166): the out-of-sample share is a share of the calendar time
+  of the range: `split_time_utc = start_utc + (end_utc − start_utc) ×
+  (100 − out_of_sample_share) / 100`. The split time does not align to a bar
+  end. An equity point or a fill at or before the split time is in sample.
+  A round trip is in the part where it ends. The in-sample range goes from
+  `start_utc` to the split time, and the out-of-sample range from the split
+  time to `end_utc`. The out-of-sample part starts with the equity of the
+  last in-sample point (the paper capital when there is none) and with the
+  position that is open at the split time. Reason: it is the simplest, and
+  it needs no bars.
+- Decided (#166): the backend saves no split metrics. The route calculates
+  them at each read from the saved equity curve and trades. Reason: no new
+  columns, and the metric functions are fast.
+- Decided (#166): "Out-of-sample Sharpe / in-sample Sharpe" is
+  `out_of_sample sharpe_ratio / in_sample sharpe_ratio × 100`, from the two
+  rounded values, with 2 decimal places. It is null when the in-sample
+  Sharpe ratio is 0, below 0, or null, or when the out-of-sample Sharpe
+  ratio is null. Reason: a percent of a value that is 0 or below has no
+  meaning.
+- Decided (#166): without `out_of_sample_share`, `POST /api/backtests` uses
+  30. Two out-of-sample parts overlap when each starts before the other ends.
 
 ### 10.9.5 Probabilistic and deflated Sharpe ratio
 
@@ -755,20 +773,21 @@ longer bars first.
   (section 10.7).
 - The page adds no other label or description (AGENTS.md, frontend rule
   one).
+- Decided (#168): the Metrics table has the metrics of section 10.9.2 in
+  this order: CAGR, Annual volatility, Sharpe ratio, Sortino ratio, Calmar
+  ratio, Profit factor, Win rate, Average win (USD), Average loss (USD),
+  Exposure, and Turnover. These are the English names in the UI. The
+  average win shows the USD value and the percent of the entry amount, for
+  example "+1,234.50 (+2.10 %)". The turnover shows the API value with 2
+  decimal places, for example "3.20× per year". Each name is a Carbon
+  definition term. Its tooltip is the formula and "Risk-free rate: 0".
+  `readMetricRows(metricSets)` gives one value column for each set of
+  metrics, so the In-sample and Out-of-sample columns (#169) and the
+  comparison page can use the same rows.
 
 ### 10.9.7 Left to the implementation
 
-- The English names of the new metrics in the UI. The decisions name
-  "Sharpe ratio", "Sortino ratio", "Calmar ratio", and "Profit factor" only.
 - The tile name and the tooltip when the tile shows PSR(0) (trial count 1).
-- Whether the out-of-sample share is a share of the calendar time or of the
-  bars, and how the split time aligns to a bar end.
-- Whether the backend saves the in-sample and out-of-sample metrics or
-  calculates them at each read from the saved equity curve and trades.
-- The value of "Out-of-sample Sharpe / in-sample Sharpe" when the in-sample
-  Sharpe ratio is 0, below 0, or "–".
-- The default 30 of `out_of_sample_share` in the API when the body has no
-  such field. This is a choice of this document.
 
 ## 10.10 Multi-instrument backtest
 

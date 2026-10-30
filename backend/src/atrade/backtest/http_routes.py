@@ -27,7 +27,15 @@ from atrade.backtest.backtest_limits import (
     read_backtest_limits,
     save_backtest_limits,
 )
-from atrade.backtest.backtest_metrics import BacktestMetrics
+from atrade.backtest.backtest_metrics import (
+    PERCENT,
+    BacktestMetrics,
+    BacktestTrade,
+    EquityPoint,
+    SplitMetrics,
+    calculate_split_metrics,
+    round_value,
+)
 from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
 from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
@@ -36,9 +44,11 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarSource, ExchangeRateReader
-from atrade.strategy import read_strategy_version
+from atrade.strategy import read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
+DEFAULT_OUT_OF_SAMPLE_SHARE = 30
+MAX_OUT_OF_SAMPLE_SHARE = 50
 
 InstrumentField = Annotated[str, Field(min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)]
 
@@ -53,6 +63,8 @@ class StartBacktestRequest(BaseModel):
     end_utc: AwareDatetime
     # Required, with no default: a backtest never starts with an unknown amount (docs/architecture.md section 10).
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
+    # The last percent of the range that is out of sample (docs/architecture/backtest.md section 10.9.4). 0 is no split.
+    out_of_sample_share: Annotated[int, Field(ge=0, le=MAX_OUT_OF_SAMPLE_SHARE)] = DEFAULT_OUT_OF_SAMPLE_SHARE
     # Only for this backtest. Without it, the global source order (docs/architecture/backtest.md section 10.12).
     source_order: list[BarSource] | None = None
 
@@ -105,11 +117,18 @@ class BacktestResponse(BaseModel):
     created_at_utc: datetime
     started_at_utc: datetime | None
     ended_at_utc: datetime | None
+    out_of_sample_share: int
+    split_time_utc: datetime | None
     metrics: BacktestMetricsResponse | None
     # Null for a backtest from before the source order. The bar counts are null until the backtest finishes.
     source_order: list[BarSource] | None
     bar_count_by_source: dict[BarSource, int] | None
     survivorship_bias: bool
+
+
+class SplitMetricsResponse(BaseModel):
+    in_sample: BacktestMetricsResponse
+    out_of_sample: BacktestMetricsResponse
 
 
 class EquityPointResponse(BaseModel):
@@ -126,19 +145,24 @@ class TradeResponse(BaseModel):
 
 
 class BacktestRobustnessResponse(BaseModel):
-    """The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
-    a meaning is null, and `missing_reasons` gives its reason by its field name."""
+    """The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+    value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."""
 
     trial_count: int
     sharpe_probability_percent: Decimal | None
     sharpe_probability_kind: SharpeProbabilityKind
     sharpe_probability_status: SharpeProbabilityStatus | None
     missing_reasons: dict[str, str]
+    # Null without a split, when a Sharpe ratio is null, or when the in-sample Sharpe ratio is 0 or below.
+    out_of_sample_to_in_sample_sharpe_percent: Decimal | None
+    # Null without a split.
+    out_of_sample_use_count: int | None
 
 
 class BacktestDetailResponse(BacktestResponse):
     equity_curve: list[EquityPointResponse]
     trades: list[TradeResponse]
+    split_metrics: SplitMetricsResponse | None
     robustness: BacktestRobustnessResponse
 
 
@@ -156,6 +180,10 @@ class BacktestComparisonResponse(BaseModel):
 def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsResponse | None:
     if metrics is None:
         return None
+    return to_present_metrics_response(metrics)
+
+
+def to_present_metrics_response(metrics: BacktestMetrics) -> BacktestMetricsResponse:
     return BacktestMetricsResponse(
         final_equity_usd=metrics.final_equity_usd,
         total_return_percent=metrics.total_return_percent,
@@ -175,6 +203,33 @@ def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsRespo
         win_rate_percent=metrics.win_rate_percent,
         missing_reasons=metrics.missing_reasons,
     )
+
+
+def calculate_finished_split_metrics(
+    row: BacktestRow, equity_curve: list[EquityPoint], trades: list[BacktestTrade]
+) -> SplitMetrics | None:
+    """The split metrics from the saved equity curve and fills, or None without a split or a result."""
+    if row.split_time_utc is None or backtest_store.read_metrics(row) is None:
+        return None
+    return calculate_split_metrics(
+        paper_capital_usd=row.paper_capital_usd,
+        time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
+        equity_curve=equity_curve,
+        trades=trades,
+        split_time_utc=row.split_time_utc,
+    )
+
+
+def calculate_sharpe_percent(split_metrics: SplitMetrics | None) -> Decimal | None:
+    """The out-of-sample Sharpe ratio as a percent of the in-sample Sharpe ratio. None when the in-sample Sharpe ratio
+    is 0 or below, because a percent of such a value has no meaning."""
+    if split_metrics is None:
+        return None
+    in_sample_sharpe = split_metrics.in_sample.sharpe_ratio
+    out_of_sample_sharpe = split_metrics.out_of_sample.sharpe_ratio
+    if in_sample_sharpe is None or out_of_sample_sharpe is None or in_sample_sharpe <= 0:
+        return None
+    return round_value(out_of_sample_sharpe / in_sample_sharpe * PERCENT)
 
 
 class BacktestRoutes:
@@ -211,6 +266,8 @@ class BacktestRoutes:
             created_at_utc=row.created_at_utc,
             started_at_utc=row.started_at_utc,
             ended_at_utc=row.ended_at_utc,
+            out_of_sample_share=row.out_of_sample_share,
+            split_time_utc=row.split_time_utc,
             metrics=to_metrics_response(backtest_store.read_metrics(row)),
             source_order=request.source_order,
             bar_count_by_source=None
@@ -226,6 +283,7 @@ class BacktestRoutes:
             bar_period=request.bar_period,
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
+            out_of_sample_share=request.out_of_sample_share,
             source_order=request.source_order,
         )
         refusal = check_backtest_request(backtest_request)
@@ -298,7 +356,9 @@ class BacktestRoutes:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
             equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
             trades = await backtest_store.select_trades(connection, backtest_id)
+            out_of_sample_use_count = await self.count_out_of_sample_uses(connection, row)
         backtest = await self.to_backtest_response(row)
+        split_metrics = calculate_finished_split_metrics(row, equity_curve, trades)
         robustness = await read_robustness(
             database_url=self.database_url, row=row, strategy_id=backtest.strategy_id, equity_curve=equity_curve
         )
@@ -310,6 +370,8 @@ class BacktestRoutes:
                 sharpe_probability_kind=robustness.sharpe_probability_kind,
                 sharpe_probability_status=robustness.sharpe_probability_status,
                 missing_reasons=robustness.missing_reasons,
+                out_of_sample_to_in_sample_sharpe_percent=calculate_sharpe_percent(split_metrics),
+                out_of_sample_use_count=out_of_sample_use_count,
             ),
             equity_curve=[
                 EquityPointResponse(time_utc=point.time_utc, equity_usd=point.equity_usd) for point in equity_curve
@@ -324,7 +386,28 @@ class BacktestRoutes:
                 )
                 for trade in trades
             ],
+            split_metrics=(
+                None
+                if split_metrics is None
+                else SplitMetricsResponse(
+                    in_sample=to_present_metrics_response(split_metrics.in_sample),
+                    out_of_sample=to_present_metrics_response(split_metrics.out_of_sample),
+                )
+            ),
         )
+
+    async def count_out_of_sample_uses(self, connection: psycopg.AsyncConnection, row: BacktestRow) -> int | None:
+        """The finished backtests of the same strategy (all versions), instrument, and bar period whose out-of-sample
+        part overlaps the out-of-sample part of `row`. The count includes `row`. None without a split."""
+        if row.split_time_utc is None:
+            return None
+        overlapping = await backtest_store.select_overlapping_out_of_sample_parts(connection, row)
+        versions = await read_strategy_versions(
+            database_url=self.database_url,
+            strategy_version_ids=sorted({backtest.strategy_version_id for backtest in overlapping}),
+        )
+        strategy_id = versions[row.strategy_version_id].strategy_id
+        return sum(versions[backtest.strategy_version_id].strategy_id == strategy_id for backtest in overlapping)
 
     async def read_limits(self) -> BacktestLimitsBody:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
