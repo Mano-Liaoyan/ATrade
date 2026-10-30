@@ -3,8 +3,8 @@
      side column (ForwardTestList, live from /ws/forward-tests). Center: the comparison panel (header line: the name,
      the strategy version, the instrument, and the backtest status; then one key metric row for each test and both
      equity and drawdown curves on one time axis with the interruptions in grey) over the Fills / Logs panel. Fills
-     compares the fills of both tests; Logs shows the backtest error. The page reads the comparison, the forward test
-     fills, and the backtest trades again every 2 seconds until the backtest has its final status. -->
+     compares the fills of both tests; Logs shows the backtest error. The page reads the comparison again every 2
+     seconds until the backtest has its final status. -->
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -14,10 +14,8 @@
     EquityDrawdownChart,
     findBacktestStatusKind,
     isFinalStatus,
-    readBacktest,
     type ComparedTest,
     type DrawdownCurve,
-    type TestTrade,
   } from '#lib/backtest';
   import { InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
@@ -30,7 +28,6 @@
     FillComparisonTable,
     ForwardTestsOnInstrumentsFeed,
     readForwardTestComparison,
-    readForwardTestDetail,
     type ForwardTestComparison,
   } from '#lib/forward_test';
   import { formatVersionLabel } from '#lib/strategy';
@@ -57,12 +54,7 @@
   // The one /ws/forward-tests socket of the page: the list.
   const feed = new ForwardTestsOnInstrumentsFeed();
   let comparison = $state<ForwardTestComparison | null>(null);
-  // The fills of the forward test and the trades of the backtest: the win rates come from them.
-  let forwardTestFills = $state<TestTrade[]>([]);
-  let backtestTrades = $state<TestTrade[]>([]);
   let errorMessage = $state('');
-  // The read error of the forward test fills or the backtest trades: the win rates are not known then.
-  let tradeMessage = $state('');
   let selectedTable: ComparisonTable = $state('fills');
 
   const comparedTests = $derived.by<ComparedTest[]>(() => {
@@ -74,18 +66,15 @@
       {
         name: `Forward test #${String(forwardTest.id)} ${formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}`,
         href: resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) }),
+        // The forward test metrics of the comparison cover the backtest period only (the API gives them so).
         metrics: comparison.forward_test_metrics,
         startCapitalUsd: forwardTest.start_balance_usd,
-        trades: forwardTestFills,
-        // The forward test metrics of the comparison cover the backtest period only.
-        period: backtest,
       },
       {
         name: `Backtest #${String(backtest.id)}`,
         href: resolve('/backtests/[[backtestId]]', { backtestId: String(backtest.id) }),
         metrics: backtest.metrics,
         startCapitalUsd: backtest.paper_capital_usd,
-        trades: backtestTrades,
       },
     ];
   });
@@ -106,27 +95,14 @@
     const currentForwardTestId = forwardTestId;
     const currentBacktestId = backtestId;
     return startPolling(
-      () =>
-        Promise.all([
-          readForwardTestComparison(fetch, currentForwardTestId, currentBacktestId),
-          readForwardTestDetail(fetch, currentForwardTestId),
-          readBacktest(fetch, currentBacktestId),
-        ]),
-      ([result, forwardTestResult, backtestResult]) => {
+      () => readForwardTestComparison(fetch, currentForwardTestId, currentBacktestId),
+      (result) => {
         if (result.kind === 'failed') {
           errorMessage = result.message;
           return true;
         }
         errorMessage = '';
         comparison = result.value;
-        if (forwardTestResult.kind === 'ok') {
-          forwardTestFills = forwardTestResult.value.fills;
-        }
-        if (backtestResult.kind === 'ok') {
-          backtestTrades = backtestResult.value.trades;
-        }
-        const failedTradeRead = [forwardTestResult, backtestResult].find((read) => read.kind === 'failed');
-        tradeMessage = failedTradeRead?.kind === 'failed' ? failedTradeRead.message : '';
         return !isFinalStatus(result.value.backtest.status);
       },
       READ_INTERVAL_MILLISECONDS,
@@ -175,9 +151,6 @@
                 />
               </span>
             {/snippet}
-            {#if tradeMessage !== ''}
-              <InlineNotification kind="error" title="Win rates not read" subtitle={tradeMessage} lowContrast />
-            {/if}
             <div class="compare-area">
               <div class="metrics">
                 <ComparedKeyMetrics tests={comparedTests} />

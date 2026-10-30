@@ -217,6 +217,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-rules/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Code
+         * @description Makes the code from the rules and saves nothing (section 9.8.3).
+         */
+        post: operations["make_code_api_strategy_rules_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -302,6 +322,8 @@ export interface paths {
         /**
          * Save Version
          * @description Checks the code first. Then it appends a version, or returns the latest version when the code is the same.
+         *
+         *     A `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.
          */
         post: operations["save_version_api_strategies__strategy_id__versions_post"];
         delete?: never;
@@ -715,6 +737,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -730,6 +756,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
@@ -828,6 +855,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -842,8 +873,8 @@ export interface components {
         };
         /**
          * BacktestRobustnessResponse
-         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
-         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         * @description The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+         *     value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`.
          */
         BacktestRobustnessResponse: {
             /** Trial Count */
@@ -856,6 +887,10 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+            /** Out Of Sample To In Sample Sharpe Percent */
+            out_of_sample_to_in_sample_sharpe_percent: string | null;
+            /** Out Of Sample Use Count */
+            out_of_sample_use_count: number | null;
         };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
@@ -949,6 +984,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -964,6 +1003,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
@@ -1060,6 +1100,8 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** @enum {string} */
+        Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
         /** ConversationDetailResponse */
         ConversationDetailResponse: {
             /** Id */
@@ -1213,6 +1255,16 @@ export interface components {
             /** Price Difference Usd */
             price_difference_usd: string | null;
         };
+        /** FixedShares */
+        FixedShares: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "fixed_shares";
+            /** Shares */
+            shares: number;
+        };
         /** ForwardTestComparisonResponse */
         ForwardTestComparisonResponse: {
             forward_test: components["schemas"]["ForwardTestResponse"];
@@ -1316,6 +1368,8 @@ export interface components {
             /** Port */
             port: number;
         };
+        /** @enum {string} */
+        GroupMatch: "all_of" | "any_of";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1365,6 +1419,39 @@ export interface components {
              */
             added_at_utc: string;
         };
+        /**
+         * IndicatorOperand
+         * @description A stored indicator reference. A single-line indicator without `output` uses `value`.
+         */
+        IndicatorOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "indicator";
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: components["schemas"]["Number"];
+            };
+            /** Output */
+            output?: string | null;
+        };
+        /**
+         * InnerRuleGroup
+         * @description A group in a group. It holds conditions only, so the maximum depth is 1 nested group.
+         */
+        InnerRuleGroup: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: components["schemas"]["RuleCondition"][];
+        };
         /** InstrumentResponse */
         InstrumentResponse: {
             /** Symbol */
@@ -1394,6 +1481,7 @@ export interface components {
         };
         /** @enum {string} */
         LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
+        LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -1465,6 +1553,16 @@ export interface components {
             filled_quantity: string | null;
             /** Average Fill Price */
             average_fill_price: string | null;
+        };
+        Number: number;
+        /** NumberOperand */
+        NumberOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "number";
+            value: components["schemas"]["Number"];
         };
         /** OpenOrderListResponse */
         OpenOrderListResponse: {
@@ -1559,6 +1657,29 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /**
+         * PercentOfEquity
+         * @description The quantity is equity x percent / close price, rounded down to whole shares.
+         */
+        PercentOfEquity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "percent_of_equity";
+            percent: components["schemas"]["Number"];
+        };
+        /** @enum {string} */
+        PriceName: "close" | "open" | "high" | "low";
+        /** PriceOperand */
+        PriceOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "price";
+            price: components["schemas"]["PriceName"];
+        };
         /** PromptVersionListResponse */
         PromptVersionListResponse: {
             /** Prompt Versions */
@@ -1610,6 +1731,61 @@ export interface components {
             /** Title */
             title: string;
         };
+        RightOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"] | components["schemas"]["NumberOperand"];
+        /** RuleCondition */
+        RuleCondition: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "condition";
+            left: components["schemas"]["LeftOperand"];
+            comparison: components["schemas"]["Comparison"];
+            right: components["schemas"]["RightOperand"];
+        };
+        /**
+         * RuleExits
+         * @description The exit items. Each item that is not null (or `true`) is selected.
+         */
+        RuleExits: {
+            stop_loss_percent?: components["schemas"]["Number"] | null;
+            take_profit_percent?: components["schemas"]["Number"] | null;
+            /** Exit After Bars */
+            exit_after_bars?: number | null;
+            /**
+             * Exit When Entry Is False
+             * @default false
+             */
+            exit_when_entry_is_false: boolean;
+            exit_group?: components["schemas"]["RuleGroup"] | null;
+        };
+        /** RuleGroup */
+        RuleGroup: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
+        };
+        /** RuleSettings */
+        RuleSettings: {
+            /** Position Size */
+            position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
+            /** Template Id */
+            template_id?: string | null;
+        };
+        /** RulesCodeRequest */
+        RulesCodeRequest: {
+            rules: components["schemas"]["StrategyRules"];
+        };
+        /** RulesCodeResponse */
+        RulesCodeResponse: {
+            /** Code */
+            code: string;
+        };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
@@ -1620,10 +1796,14 @@ export interface components {
             /** Text */
             text: string;
         };
-        /** SaveVersionRequest */
+        /**
+         * SaveVersionRequest
+         * @description Exactly one of `code` and `rules` (section 9.6).
+         */
         SaveVersionRequest: {
             /** Code */
-            code: string;
+            code?: string | null;
+            rules?: components["schemas"]["StrategyRules"] | null;
         };
         /**
          * SavedBarsResponse
@@ -1671,6 +1851,11 @@ export interface components {
             /** Source Order */
             source_order: components["schemas"]["BarSource"][];
         };
+        /** SplitMetricsResponse */
+        SplitMetricsResponse: {
+            in_sample: components["schemas"]["BacktestMetricsResponse"];
+            out_of_sample: components["schemas"]["BacktestMetricsResponse"];
+        };
         /** StartBacktestRequest */
         StartBacktestRequest: {
             /** Strategy Version Id */
@@ -1694,6 +1879,11 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };
@@ -1743,6 +1933,17 @@ export interface components {
             created_at_utc: string;
             /** Versions */
             versions: components["schemas"]["StrategyVersionSummary"][];
+        };
+        /** StrategyRules */
+        StrategyRules: {
+            /**
+             * Format Version
+             * @constant
+             */
+            format_version: 1;
+            settings: components["schemas"]["RuleSettings"];
+            entry: components["schemas"]["RuleGroup"];
+            exits: components["schemas"]["RuleExits"];
         };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
@@ -2817,6 +3018,39 @@ export interface operations {
             };
         };
     };
+    make_code_api_strategy_rules_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulesCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_strategies_api_strategies_get: {
         parameters: {
             query?: never;
@@ -3072,7 +3306,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The code is the same as the latest version. No new version is made. */
+            /** @description The code (and, for a rules body, the rules) is the same as the latest version. No new version is made. */
             200: {
                 headers: {
                     [name: string]: unknown;

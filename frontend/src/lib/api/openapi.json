@@ -664,6 +664,45 @@
         }
       }
     },
+    "/api/strategy-rules/code": {
+      "post": {
+        "summary": "Make Code",
+        "description": "Makes the code from the rules and saves nothing (section 9.8.3).",
+        "operationId": "make_code_api_strategy_rules_code_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulesCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCodeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies": {
       "get": {
         "summary": "List Strategies",
@@ -961,7 +1000,7 @@
     "/api/strategies/{strategy_id}/versions": {
       "post": {
         "summary": "Save Version",
-        "description": "Checks the code first. Then it appends a version, or returns the latest version when the code is the same.",
+        "description": "Checks the code first. Then it appends a version, or returns the latest version when the code is the same.\n\nA `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.",
         "operationId": "save_version_api_strategies__strategy_id__versions_post",
         "parameters": [
           {
@@ -996,7 +1035,7 @@
             }
           },
           "200": {
-            "description": "The code is the same as the latest version. No new version is made.",
+            "description": "The code (and, for a rules body, the rules) is the same as the latest version. No new version is made.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2259,6 +2298,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2329,6 +2384,16 @@
             "type": "array",
             "title": "Trades"
           },
+          "split_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           }
@@ -2352,6 +2417,8 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "conversation_id",
           "source_order",
@@ -2359,6 +2426,7 @@
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "split_metrics",
           "robustness"
         ],
         "title": "BacktestDetailResponse"
@@ -2661,6 +2729,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -2737,6 +2821,8 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "conversation_id",
           "source_order",
@@ -2781,6 +2867,28 @@
             },
             "type": "object",
             "title": "Missing Reasons"
+          },
+          "out_of_sample_to_in_sample_sharpe_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample To In Sample Sharpe Percent"
+          },
+          "out_of_sample_use_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Out Of Sample Use Count"
           }
         },
         "type": "object",
@@ -2789,10 +2897,12 @@
           "sharpe_probability_percent",
           "sharpe_probability_kind",
           "sharpe_probability_status",
-          "missing_reasons"
+          "missing_reasons",
+          "out_of_sample_to_in_sample_sharpe_percent",
+          "out_of_sample_use_count"
         ],
         "title": "BacktestRobustnessResponse",
-        "description": "The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without\na meaning is null, and `missing_reasons` gives its reason by its field name."
+        "description": "The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A\nvalue without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."
       },
       "BacktestStatus": {
         "type": "string",
@@ -3009,6 +3119,22 @@
             ],
             "title": "Ended At Utc"
           },
+          "out_of_sample_share": {
+            "type": "integer",
+            "title": "Out Of Sample Share"
+          },
+          "split_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Time Utc"
+          },
           "metrics": {
             "anyOf": [
               {
@@ -3079,6 +3205,16 @@
             "type": "array",
             "title": "Trades"
           },
+          "split_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitMetricsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           },
@@ -3106,6 +3242,8 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
+          "out_of_sample_share",
+          "split_time_utc",
           "metrics",
           "conversation_id",
           "source_order",
@@ -3113,6 +3251,7 @@
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "split_metrics",
           "robustness",
           "code"
         ],
@@ -3400,6 +3539,17 @@
         ],
         "title": "ComparedMetricsResponse",
         "description": "The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the\nfinal equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10)."
+      },
+      "Comparison": {
+        "type": "string",
+        "enum": [
+          "above",
+          "below",
+          "at_or_above",
+          "at_or_below",
+          "crosses_above",
+          "crosses_below"
+        ]
       },
       "ConversationDetailResponse": {
         "properties": {
@@ -3884,6 +4034,27 @@
         ],
         "title": "FillComparisonResponse"
       },
+      "FixedShares": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "fixed_shares",
+            "title": "Type"
+          },
+          "shares": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "shares"
+        ],
+        "title": "FixedShares"
+      },
       "ForwardTestComparisonResponse": {
         "properties": {
           "forward_test": {
@@ -4209,6 +4380,13 @@
         ],
         "title": "GatewayStatusResponse"
       },
+      "GroupMatch": {
+        "type": "string",
+        "enum": [
+          "all_of",
+          "any_of"
+        ]
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4317,6 +4495,73 @@
         ],
         "title": "HkInstrumentResponse"
       },
+      "IndicatorOperand": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "indicator",
+            "title": "Type"
+          },
+          "indicator": {
+            "type": "string",
+            "title": "Indicator"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Number"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "indicator"
+        ],
+        "title": "IndicatorOperand",
+        "description": "A stored indicator reference. A single-line indicator without `output` uses `value`."
+      },
+      "InnerRuleGroup": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "group",
+            "title": "Type"
+          },
+          "match": {
+            "$ref": "#/components/schemas/GroupMatch"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "match",
+          "items"
+        ],
+        "title": "InnerRuleGroup",
+        "description": "A group in a group. It holds conditions only, so the maximum depth is 1 nested group."
+      },
       "InstrumentResponse": {
         "properties": {
           "symbol": {
@@ -4402,6 +4647,23 @@
           "buy_more_than_cash",
           "ledger_not_started"
         ]
+      },
+      "LeftOperand": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PriceOperand"
+          },
+          {
+            "$ref": "#/components/schemas/IndicatorOperand"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "indicator": "#/components/schemas/IndicatorOperand",
+            "price": "#/components/schemas/PriceOperand"
+          }
+        }
       },
       "ManualOrderListResponse": {
         "properties": {
@@ -4595,6 +4857,35 @@
         ],
         "title": "ManualOrderWithFillsResponse",
         "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
+      },
+      "Number": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          }
+        ]
+      },
+      "NumberOperand": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "number",
+            "title": "Type"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Number"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "NumberOperand"
       },
       "OpenOrderListResponse": {
         "properties": {
@@ -4837,6 +5128,56 @@
         "title": "PaperCapitalResponse",
         "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
       },
+      "PercentOfEquity": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "percent_of_equity",
+            "title": "Type"
+          },
+          "percent": {
+            "$ref": "#/components/schemas/Number",
+            "gt": 0,
+            "le": 100
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "percent"
+        ],
+        "title": "PercentOfEquity",
+        "description": "The quantity is equity x percent / close price, rounded down to whole shares."
+      },
+      "PriceName": {
+        "type": "string",
+        "enum": [
+          "close",
+          "open",
+          "high",
+          "low"
+        ]
+      },
+      "PriceOperand": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "price",
+            "title": "Type"
+          },
+          "price": {
+            "$ref": "#/components/schemas/PriceName"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "price"
+        ],
+        "title": "PriceOperand"
+      },
       "PromptVersionListResponse": {
         "properties": {
           "prompt_versions": {
@@ -4979,6 +5320,219 @@
         ],
         "title": "RenameConversationRequest"
       },
+      "RightOperand": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PriceOperand"
+          },
+          {
+            "$ref": "#/components/schemas/IndicatorOperand"
+          },
+          {
+            "$ref": "#/components/schemas/NumberOperand"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "indicator": "#/components/schemas/IndicatorOperand",
+            "number": "#/components/schemas/NumberOperand",
+            "price": "#/components/schemas/PriceOperand"
+          }
+        }
+      },
+      "RuleCondition": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "condition",
+            "title": "Type"
+          },
+          "left": {
+            "$ref": "#/components/schemas/LeftOperand"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/Comparison"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RightOperand"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "left",
+          "comparison",
+          "right"
+        ],
+        "title": "RuleCondition"
+      },
+      "RuleExits": {
+        "properties": {
+          "stop_loss_percent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Number",
+                "gt": 0,
+                "lt": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "take_profit_percent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Number",
+                "gt": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exit_after_bars": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit After Bars"
+          },
+          "exit_when_entry_is_false": {
+            "type": "boolean",
+            "title": "Exit When Entry Is False",
+            "default": false
+          },
+          "exit_group": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleGroup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RuleExits",
+        "description": "The exit items. Each item that is not null (or `true`) is selected."
+      },
+      "RuleGroup": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "group",
+            "title": "Type"
+          },
+          "match": {
+            "$ref": "#/components/schemas/GroupMatch"
+          },
+          "items": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RuleCondition"
+                },
+                {
+                  "$ref": "#/components/schemas/InnerRuleGroup"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "condition": "#/components/schemas/RuleCondition",
+                  "group": "#/components/schemas/InnerRuleGroup"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "match",
+          "items"
+        ],
+        "title": "RuleGroup"
+      },
+      "RuleSettings": {
+        "properties": {
+          "position_size": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FixedShares"
+              },
+              {
+                "$ref": "#/components/schemas/PercentOfEquity"
+              }
+            ],
+            "title": "Position Size",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "fixed_shares": "#/components/schemas/FixedShares",
+                "percent_of_equity": "#/components/schemas/PercentOfEquity"
+              }
+            }
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position_size"
+        ],
+        "title": "RuleSettings"
+      },
+      "RulesCodeRequest": {
+        "properties": {
+          "rules": {
+            "$ref": "#/components/schemas/StrategyRules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules"
+        ],
+        "title": "RulesCodeRequest"
+      },
+      "RulesCodeResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "RulesCodeResponse"
+      },
       "SamePeriodBacktestResponse": {
         "properties": {
           "backtest_id": {
@@ -5010,15 +5564,30 @@
       "SaveVersionRequest": {
         "properties": {
           "code": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Code"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
-        "required": [
-          "code"
-        ],
-        "title": "SaveVersionRequest"
+        "title": "SaveVersionRequest",
+        "description": "Exactly one of `code` and `rules` (section 9.6)."
       },
       "SavedBarsResponse": {
         "properties": {
@@ -5144,6 +5713,22 @@
         "title": "SourceOrderBody",
         "description": "The global source order: the first bar source that saved a time range gives all bars of the range."
       },
+      "SplitMetricsResponse": {
+        "properties": {
+          "in_sample": {
+            "$ref": "#/components/schemas/BacktestMetricsResponse"
+          },
+          "out_of_sample": {
+            "$ref": "#/components/schemas/BacktestMetricsResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "in_sample",
+          "out_of_sample"
+        ],
+        "title": "SplitMetricsResponse"
+      },
       "StartBacktestRequest": {
         "properties": {
           "strategy_version_id": {
@@ -5192,6 +5777,13 @@
               }
             ],
             "title": "Paper Capital Usd"
+          },
+          "out_of_sample_share": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Out Of Sample Share",
+            "default": 30
           },
           "source_order": {
             "anyOf": [
@@ -5351,6 +5943,33 @@
           "versions"
         ],
         "title": "StrategyResponse"
+      },
+      "StrategyRules": {
+        "properties": {
+          "format_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Format Version"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RuleSettings"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/RuleGroup"
+          },
+          "exits": {
+            "$ref": "#/components/schemas/RuleExits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "format_version",
+          "settings",
+          "entry",
+          "exits"
+        ],
+        "title": "StrategyRules"
       },
       "StrategyVersionResponse": {
         "properties": {

@@ -1,13 +1,13 @@
 """assistant: create the assistant_prompt_version table and record the prompt of each conversation
 
 Revision ID: 969360e99893
-Revises: 4a6c8e1b3d57
+Revises: 2f6b8d1c4e97
 """
 
 from alembic import op
 
 revision = "969360e99893"
-down_revision = "4a6c8e1b3d57"
+down_revision = "2f6b8d1c4e97"
 
 
 def upgrade() -> None:

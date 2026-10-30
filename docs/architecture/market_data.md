@@ -375,8 +375,9 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
 | `PUT /api/market-data/source-order` with `{"source_order": [...]}` | `200` with the saved source order. |
 | | `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source. |
 
-- The settings page shows the source order. The page has a Carbon
-  structured list with one row for each bar source, in the source order.
+- The settings page `/settings` shows the source order. The header link
+  "Settings" opens it. The page has a Carbon structured list with one row
+  for each bar source, in the source order.
 - Each row has 2 icon buttons: "Move <bar source> up" and "Move <bar source>
   down". The first row has no up button. The last row has no down button.
 - A move saves the new source order at once with `PUT`. On an error, the
@@ -671,6 +672,12 @@ This section has only the market data part. The forward test part is in
   for each member.
 - Multi-instrument forward tests support only daily bars, with 500
   instruments at most.
+- Implemented (#216): the fetcher gets the ranges to read from
+  `read_unsaved_ranges(*, database_url, bar_request)` of the public entry.
+  It returns the parts of the range that no bar source in the global source
+  order saved, oldest first, and never calls IBKR. The bars route uses the
+  same rule for its missing parts. The fetcher saves with
+  `save_received_bars`.
 
 ## 8.13 Stock splits in the stored bars
 
@@ -769,10 +776,12 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   Kong close, and the trading calendars that it uses.
 - How `daily_bar_summary` decides "still trading", and how it is calculated
   again after a change of the global source order.
-- The daily bar update (`web`, client ID of the Web process) and the bar
-  fetcher (`forward-test`, client ID 20) can save the same instrument at the
-  same time. The fill lock of section 8.4 is only in the Web process. Both
-  saves use the same SQL, so a second save adds no row.
+- Decided (#216): the daily bar update (`web`, client ID of the Web
+  process) and the bar fetcher (`forward-test`, client ID 20) can save the
+  same instrument at the same time. The fill lock of section 8.4 is only in
+  the Web process. Both saves use the same SQL (`save_received_bars`), so a
+  second save adds no row. A test of the bar fetcher saves the same bars a
+  second time and finds the same bar count.
 - How symbol reuse is handled: a symbol that a different company uses later.
 - The bar start of the hourly 9:30 ET bar is not on a whole hour from the
   UNIX epoch (section 8.4). The bars route widens a range to whole bar

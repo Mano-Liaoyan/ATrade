@@ -838,6 +838,17 @@ below are choices of this document. The implementation can change them.
   - `DELETE {conversation_id}` answers `204`.
   - A conversation that does not exist gets `404`. `GET {conversation_id}`
     and `DELETE` answer `503` when `assistant` is not reachable.
+- #184 implements the prompt version rows:
+  - `GET` answers `{"prompt_versions": [...], "default_text", "fixed_part"}`.
+    The versions are the newest first. Each has `id`, `version_number`,
+    `text`, and `created_at_utc`. `fixed_part` has the names of the values
+    (`<strategy ID>`, …) in the place of the values.
+  - `POST` takes `{"text"}` (1 to 50000 characters after the trim) and
+    answers `201` with the new version. These routes refuse nothing else, so
+    they declare no `ErrorResponse`. A text that is not valid gets FastAPI's
+    `422`.
+  - `POST /api/assistant/conversations` also takes the optional
+    `version_number` (25.9).
 - #183 implements the providers and credentials rows:
   - `GET /api/assistant/providers` answers `{"providers": [{id, name,
     login_methods, models: [{id, name}]}]}` (25.7.1).

@@ -29,7 +29,6 @@
       label={`${name} metrics`}
       metrics={backtest.metrics}
       startCapitalUsd={backtest.paper_capital_usd}
-      trades={backtest.trades}
     />
   {:else if message !== ''}
     <p class="card-message">{message}</p>
