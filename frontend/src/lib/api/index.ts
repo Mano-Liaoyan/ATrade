@@ -572,6 +572,57 @@ export interface paths {
         patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
         trace?: never;
     };
+    "/api/assistant/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Providers */
+        get: operations["list_providers_api_assistant_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credentials */
+        get: operations["list_credentials_api_assistant_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Credential */
+        delete: operations["delete_credential_api_assistant_credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1077,6 +1128,34 @@ export interface components {
             /** @default blank_code */
             start_from: components["schemas"]["StartPoint"];
         };
+        /** CredentialListResponse */
+        CredentialListResponse: {
+            /** Credentials */
+            credentials: components["schemas"]["CredentialResponse"][];
+        };
+        /** CredentialResponse */
+        CredentialResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "oauth" | "api_key";
+            /** Key Last4 */
+            key_last4: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "failed";
+            /** State Message */
+            state_message: string | null;
+        };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
         /** EquityPointResponse */
@@ -1542,6 +1621,29 @@ export interface components {
             type: "price";
             price: components["schemas"]["PriceName"];
         };
+        /** ProviderListResponse */
+        ProviderListResponse: {
+            /** Providers */
+            providers: components["schemas"]["ProviderResponse"][];
+        };
+        /** ProviderModelResponse */
+        ProviderModelResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** ProviderResponse */
+        ProviderResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Login Methods */
+            login_methods: ("oauth" | "api_key")[];
+            /** Models */
+            models: components["schemas"]["ProviderModelResponse"][];
+        };
         /** RenameConversationRequest */
         RenameConversationRequest: {
             /** Title */
@@ -1962,6 +2064,98 @@ export interface components {
              */
             type: "bar";
             bar: components["schemas"]["BarResponse"];
+        };
+        /**
+         * LoginAnswerMessage
+         * @description Browser to server: the answer to a login step `prompt`. For a `select` prompt, the ID of the option.
+         */
+        LoginAnswerMessage: {
+            /**
+             * Type
+             * @default login_answer
+             * @constant
+             */
+            type: "login_answer";
+            /** Prompt Id */
+            prompt_id: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * LoginEndMessage
+         * @description The login ended. The credential is in the credential file of the assistant service.
+         */
+        LoginEndMessage: {
+            /**
+             * Type
+             * @default login_end
+             * @constant
+             */
+            type: "login_end";
+            credential: components["schemas"]["CredentialResponse"];
+        };
+        /** LoginOptionResponse */
+        LoginOptionResponse: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * LoginStartMessage
+         * @description Browser to server: start a login. `method` "oauth" is a subscription login. `name` names the new credential.
+         */
+        LoginStartMessage: {
+            /**
+             * Type
+             * @default login_start
+             * @constant
+             */
+            type: "login_start";
+            /** Provider */
+            provider: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "oauth" | "api_key";
+            /** Name */
+            name: string;
+        };
+        /**
+         * LoginStepMessage
+         * @description One login step of pi (25.7.3).
+         *
+         *     - `auth_url`: open `url` (the authorization link). `message` has the instructions of the provider.
+         *     - `device_code`: enter `user_code` at `url`.
+         *     - `progress`, `info`: `message` (and for `info` maybe a `url`).
+         *     - `prompt`: show a field for `prompt_type` (`text`, `secret` as a password field, `select` with `options`, or
+         *       `manual_code` to paste a code) with the label `message`, and answer with `login_answer` and `prompt_id`.
+         */
+        LoginStepMessage: {
+            /**
+             * Type
+             * @default login_step
+             * @constant
+             */
+            type: "login_step";
+            /**
+             * Step
+             * @enum {string}
+             */
+            step: "auth_url" | "device_code" | "progress" | "info" | "prompt";
+            /** Message */
+            message: string | null;
+            /** Url */
+            url: string | null;
+            /** User Code */
+            user_code: string | null;
+            /** Prompt Id */
+            prompt_id: string | null;
+            /** Prompt Type */
+            prompt_type: ("text" | "secret" | "select" | "manual_code") | null;
+            /** Options */
+            options: components["schemas"]["LoginOptionResponse"][] | null;
         };
         /**
          * MessageDeltaMessage
@@ -3701,6 +3895,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_assistant_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_credentials_api_assistant_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_credential_api_assistant_credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
