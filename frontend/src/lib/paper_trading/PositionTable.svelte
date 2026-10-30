@@ -1,13 +1,15 @@
-<!-- The positions of the paper account. The symbol cell also shows the exchange, like the open orders. The unrealized
+<!-- The positions of the paper account, one row for each owner of the owner ledger (section 11.7). A position that is not
+     the sum of its owner positions has one more row with a warning icon and "Unattributed: <difference>". The symbol
+     cell also shows the exchange, like the open orders. The unrealized
      P&L shows its sign, an arrow, and a color (ChangeText). With `fill`, the table takes the full height of a workbench
      panel and scrolls in it. With `compact` (the narrow panel of the instrument page), the table has no Currency and
      Market price columns, so all column names stay on one line. -->
 <script lang="ts">
-  import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatSignedNumber } from '#lib/foundation/value_format';
-  import { formatAmount, type PaperPosition } from './paper_account';
+  import { formatAmount, listPositionRows, type PaperPosition } from './paper_account';
 
   interface Props {
     positions: PaperPosition[];
@@ -19,6 +21,7 @@
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
+    { header: 'Owner' },
     { header: 'Currency' },
     { header: 'Quantity', align: 'right' },
     { header: 'Average cost', align: 'right' },
@@ -28,11 +31,14 @@
   ];
   const COMPACT_COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
+    { header: 'Owner' },
     { header: 'Quantity', align: 'right' },
     { header: 'Average cost', align: 'right' },
     { header: 'Market value', align: 'right' },
     { header: 'Unrealized P&L', align: 'right' },
   ];
+
+  const positionRows = $derived(listPositionRows(positions));
 </script>
 
 {#if positions.length === 0}
@@ -42,20 +48,31 @@
     <div class="positions">
       <DataTable columns={compact ? COMPACT_COLUMNS : COLUMNS} size="sm">
         {#snippet rows()}
-          {#each positions as position (`${position.symbol}-${position.exchange}-${position.security_type}`)}
-            {@const unrealizedPnl = Number(position.unrealized_pnl)}
+          {#each positionRows as row (row.key)}
+            {@const position = row.position}
             <tr>
               <th scope="row">{position.symbol} <span class="exchange">{position.exchange}</span></th>
+              <td class="owner">
+                {#if row.unattributed !== null}
+                  <StatusIndicator kind="warning" label={row.unattributed} />
+                {:else}
+                  {row.owner ?? ''}
+                {/if}
+              </td>
               {#if !compact}
                 <td>{position.currency}</td>
               {/if}
-              <td align="right">{position.quantity}</td>
-              <td align="right">{formatAmount(position.average_cost)}</td>
+              <td align="right">{row.quantity ?? ''}</td>
+              <td align="right">{row.averageCost === null ? '' : formatAmount(row.averageCost)}</td>
               {#if !compact}
-                <td align="right">{formatAmount(position.market_price)}</td>
+                <td align="right">{row.unattributed === null ? formatAmount(position.market_price) : ''}</td>
               {/if}
-              <td align="right">{formatAmount(position.market_value)}</td>
-              <td align="right"><ChangeText value={unrealizedPnl} text={formatSignedNumber(unrealizedPnl)} /></td>
+              <td align="right">{row.marketValue === null ? '' : formatAmount(String(row.marketValue))}</td>
+              <td align="right">
+                {#if row.unrealizedPnl !== null}
+                  <ChangeText value={row.unrealizedPnl} text={formatSignedNumber(row.unrealizedPnl)} />
+                {/if}
+              </td>
             </tr>
           {/each}
         {/snippet}
@@ -66,7 +83,9 @@
 
 <style>
   /* Column names stay on one line (32px header like all tables). */
-  .positions :global(.cds--table-header-label) {
+  .positions :global(.cds--table-header-label),
+  .positions th,
+  .owner {
     white-space: nowrap;
   }
 

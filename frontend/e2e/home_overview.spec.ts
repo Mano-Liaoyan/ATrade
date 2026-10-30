@@ -1,6 +1,7 @@
 // The home page is the account overview workbench (#108): the watchlist column, the key numbers of the paper account,
 // the Positions panel, and the Orders panel. With the IBKR fake of backend/tests/e2e_server.py: account DU1234567,
-// a balance, 40 positions, and 30 open orders of forward test 42.
+// a balance, 40 positions, and 30 open orders of forward test 42. The owner ledger of "By hand" has 10 shares of each
+// position, but only 5 of TEST05.
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 function positionsPanel(page: Page): Locator {
@@ -26,6 +27,21 @@ test('the home page fills the window and shows the key numbers of the paper acco
     return root.scrollHeight > root.clientHeight || root.scrollWidth > root.clientWidth;
   });
   expect(hasPageScroll).toBe(false);
+});
+
+test('the Positions table shows the owner of each row and the unattributed difference', async ({ page }) => {
+  await page.goto('/');
+  const table = positionsPanel(page);
+
+  await expect(table.getByRole('columnheader', { name: 'Owner' })).toBeVisible();
+  await expect(table.getByRole('row', { name: /TEST01/ })).toContainText('By hand');
+  const rows = table.getByRole('row', { name: /TEST05/ });
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('By hand');
+  await expect(rows.nth(0).getByRole('cell').nth(2)).toHaveText('5');
+  const unattributed = rows.nth(1);
+  await expect(unattributed).toContainText('Unattributed: 5');
+  await expect(unattributed.locator('.status-indicator--warning svg')).toBeAttached();
 });
 
 test('the home page has no paper order form', async ({ page }) => {

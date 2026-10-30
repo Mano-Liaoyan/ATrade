@@ -17,11 +17,13 @@ function makePosition(symbol: string, exchange: string, quantity: string): Paper
     market_price: '110.00',
     market_value: '1100.00',
     unrealized_pnl: '100.00',
+    owners: [],
+    unattributed_quantity: quantity,
   };
 }
 
 function makeAccount(check: PaperAccountMessage['check'], positions: PaperPosition[] = []): PaperAccountMessage {
-  return { type: 'account', check, balance: null, positions };
+  return { type: 'account', check, balance: null, positions, unattributed_cash_usd: null };
 }
 
 const PASSED = { status: 'passed', message: null, actual_accounts: ['DU1234567'], expected_account: 'DU1234567' } as PaperAccountMessage['check'];
