@@ -289,6 +289,7 @@ use the same functions for the comparison (section 12.10).
 | Phase 1: `calculate_metrics(*, paper_capital_usd, time_range, equity_curve, trades)` | Also gives the metrics of section 10.9.2 and the win rate, and `missing_reasons` (section 10.9.3). It takes the trades in place of `trade_count` (`trade_count` is the number of trades), and the time range for `years`. It takes no bars: the equity curve has one point at the end of each bar, so the exposure counts the points. Thus a forward test, which has no saved bars, uses the same function. Ratios, percents, and money have 2 decimal places. |
 | Phase 1: `calculate_split_metrics(*, ..., split_time_utc)` | The metrics of the in-sample part and of the out-of-sample part (section 10.9.4). |
 | Phase 1: `calculate_probabilistic_sharpe(*, daily_returns)` and `calculate_deflated_sharpe(*, daily_returns, trial_sharpe_ratios)` | Section 10.9.5. |
+| Phase 1: `find_sharpe_probability_status(percent)` | The status of a PSR or DSR percent: `likely_real`, `uncertain`, `likely_luck`, or None without a value (section 10.9.5). |
 
 Phase 1: forward tests use the new metric functions too. A forward test has
 no in-sample and out-of-sample split, because a forward test is out of
@@ -330,7 +331,7 @@ Changes of later phases:
 | Phase | Route | Change |
 |---|---|---|
 | 1 | `POST /api/backtests` | The body can contain `out_of_sample_share` (integer percent). Without it, the route uses 30. `422` when it is not from 0 to 50. The route calculates `split_time_utc` (section 10.9.4). |
-| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. |
+| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
 | 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12). |
@@ -674,6 +675,24 @@ longer bars first.
     trials.
 - The backend has no numpy and no scipy. `statistics.NormalDist` of the
   Python standard library has `cdf` and `inv_cdf`. These are sufficient.
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read (`backtest_robustness.py`). It
+  saves no Sharpe ratio. Reason: it is the simplest, it needs no migration,
+  and the trial count changes at each read too.
+- Decided (#167): the daily Sharpe ratio of a trial is the mean of its daily
+  returns divided by their sample standard deviation. A trial with fewer
+  than 2 daily returns, or with a standard deviation of 0, has no daily
+  Sharpe ratio. `V` and the `N` of the formula use only the trials that have
+  a daily Sharpe ratio. The trial count of the response counts all trials.
+- Decided (#167): when fewer than 2 trials have a daily Sharpe ratio, `V` is
+  0. Then `SR*` is 0 and the DSR is equal to PSR(0). The kind stays
+  `deflated` when the trial count is above 1.
+- Decided (#167): `γ3` and `γ4` use the population moments of the daily
+  returns. The functions return a percent with 2 decimal places. The status
+  uses this rounded percent.
+- Decided (#167): daily returns with a standard deviation of 0 give no PSR
+  and no DSR, with the reason "The standard deviation of the daily returns
+  is 0".
 
 | Value | Status | Look |
 |---|---|---|

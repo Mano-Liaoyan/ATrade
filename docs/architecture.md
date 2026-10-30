@@ -1683,6 +1683,10 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read. When fewer than 2 trials have a
+  daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
+  10.9.5).
 - Decided (#170): the exposure of a forward test counts its recorded equity
   points (one at each bar end) as its bars. The recorded fills go to
   `find_round_trips` with no change, because `select_fills` already gives
