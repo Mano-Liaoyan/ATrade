@@ -1,13 +1,13 @@
 """market_data: the stock_split table and the databento_symbol_link table
 
 Revision ID: 20a1ab3c3c30
-Revises: 2f6b8d1c4e97
+Revises: 2f6a9c1e4d85
 """
 
 from alembic import op
 
 revision = "20a1ab3c3c30"
-down_revision = "2f6b8d1c4e97"
+down_revision = "2f6a9c1e4d85"
 
 
 def upgrade() -> None:
