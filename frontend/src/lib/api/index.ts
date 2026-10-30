@@ -161,6 +161,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/source-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Source Order */
+        get: operations["read_source_order_api_market_data_source_order_get"];
+        /** Save Source Order */
+        put: operations["save_source_order_api_market_data_source_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/hk-instrument-list": {
         parameters: {
             query?: never;
@@ -626,6 +644,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
          * BacktestLimitsBody
@@ -727,6 +746,23 @@ export interface components {
             /** Conversation Id */
             conversation_id: number | null;
         };
+        /**
+         * BacktestRobustnessResponse
+         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
+         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         */
+        BacktestRobustnessResponse: {
+            /** Trial Count */
+            trial_count: number;
+            /** Sharpe Probability Percent */
+            sharpe_probability_percent: string | null;
+            sharpe_probability_kind: components["schemas"]["SharpeProbabilityKind"];
+            sharpe_probability_status: components["schemas"]["SharpeProbabilityStatus"] | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
+        };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
         /**
@@ -753,6 +789,12 @@ export interface components {
             /** Volume */
             volume: number;
         };
+        /**
+         * BarSource
+         * @description Each bar source has its own bar table and its own saved-range table (ADR 0002).
+         * @enum {string}
+         */
+        BarSource: "ibkr" | "databento";
         /** BarsResponse */
         BarsResponse: {
             /** Bars */
@@ -820,6 +862,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
         };
@@ -870,16 +913,50 @@ export interface components {
              */
             end_utc: string;
         };
-        /** ComparedMetricsResponse */
+        /**
+         * ComparedMetricsResponse
+         * @description The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the
+         *     final equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10).
+         */
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
+            /** Net Profit Usd */
+            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
         };
         /** ConversationDetailResponse */
         ConversationDetailResponse: {
@@ -1175,6 +1252,8 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        /** @enum {string} */
+        LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -1298,6 +1377,15 @@ export interface components {
             detail: string;
         };
         /**
+         * OrderRefusedByLedgerResponse
+         * @description An order rule of the owner ledger failed for "By hand". ATrade did not send the order (section 11.10).
+         */
+        OrderRefusedByLedgerResponse: {
+            /** Detail */
+            detail: string;
+            rule: components["schemas"]["LedgerRule"];
+        };
+        /**
          * OrderRefusedResponse
          * @description The paper account check did not pass. ATrade did not send the order.
          */
@@ -1348,9 +1436,10 @@ export interface components {
         };
         /**
          * SavedBarsResponse
-         * @description The saved bars of one bar period: the start of the first and of the last saved bar.
+         * @description The saved bars of one bar source and one bar period: the start of the first and of the last saved bar.
          */
         SavedBarsResponse: {
+            bar_source: components["schemas"]["BarSource"];
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * First Start Utc
@@ -1378,6 +1467,18 @@ export interface components {
             /** Limit Price */
             limit_price: number | string | null;
             time_in_force: components["schemas"]["TimeInForce"];
+        };
+        /** @enum {string} */
+        SharpeProbabilityKind: "probabilistic" | "deflated";
+        /** @enum {string} */
+        SharpeProbabilityStatus: "likely_real" | "uncertain" | "likely_luck";
+        /**
+         * SourceOrderBody
+         * @description The global source order: the first bar source that saved a time range gives all bars of the range.
+         */
+        SourceOrderBody: {
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][];
         };
         /** StartBacktestRequest */
         StartBacktestRequest: {
@@ -1683,6 +1784,25 @@ export interface components {
             /** Orders */
             orders: components["schemas"]["OpenOrderResponse"][];
         };
+        /** @enum {string} */
+        OwnerKind: "by_hand" | "forward_test";
+        /** OwnerMessage */
+        OwnerMessage: {
+            kind: components["schemas"]["OwnerKind"];
+            /** Forward Test Id */
+            forward_test_id: number | null;
+        };
+        /**
+         * OwnerPositionMessage
+         * @description The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).
+         */
+        OwnerPositionMessage: {
+            owner: components["schemas"]["OwnerMessage"];
+            /** Quantity */
+            quantity: string;
+            /** Average Cost */
+            average_cost: string | null;
+        };
         /**
          * PaperAccountBalanceMessage
          * @description The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).
@@ -1731,6 +1851,8 @@ export interface components {
             balance: components["schemas"]["PaperAccountBalanceMessage"] | null;
             /** Positions */
             positions: components["schemas"]["PositionMessage"][];
+            /** Unattributed Cash Usd */
+            unattributed_cash_usd: string | null;
         };
         /** PositionMessage */
         PositionMessage: {
@@ -1752,6 +1874,10 @@ export interface components {
             market_value: string;
             /** Unrealized Pnl */
             unrealized_pnl: string;
+            /** Owners */
+            owners: components["schemas"]["OwnerPositionMessage"][];
+            /** Unattributed Quantity */
+            unattributed_quantity: string;
         };
         /**
          * PromptMessage
@@ -1773,7 +1899,10 @@ export interface components {
             /** Credential Id */
             credential_id: string;
         };
-        /** RunStateMessage */
+        /**
+         * RunStateMessage
+         * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
+         */
         RunStateMessage: {
             /**
              * Type
@@ -1947,7 +2076,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderBlockedResponse"];
+                    "application/json": components["schemas"]["OrderBlockedResponse"] | components["schemas"]["OrderRefusedByLedgerResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2176,6 +2305,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_source_order_api_market_data_source_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+        };
+    };
+    save_source_order_api_market_data_source_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceOrderBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
