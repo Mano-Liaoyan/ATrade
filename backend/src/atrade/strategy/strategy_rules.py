@@ -17,6 +17,8 @@ type Number = StrictInt | StrictFloat
 type Comparison = Literal["above", "below", "at_or_above", "at_or_below", "crosses_above", "crosses_below"]
 type PriceName = Literal["close", "open", "high", "low"]
 type GroupMatch = Literal["all_of", "any_of"]
+type RankDirection = Literal["high_to_low", "low_to_high"]
+type RebalancePeriod = Literal["weekly", "monthly", "quarterly"]
 
 
 class RuleModel(BaseModel):
@@ -87,9 +89,26 @@ class PercentOfEquity(RuleModel):
     percent: Annotated[Number, Field(gt=0, le=100)]
 
 
+class UniverseSettings(RuleModel):
+    """The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.
+
+    The strategy holds the `hold_count` members with the best rank, with equal weight, and ranks again at the start of
+    each `rebalance_period`.
+    """
+
+    rank_indicator: IndicatorOperand
+    rank_direction: RankDirection
+    hold_count: Annotated[StrictInt, Field(ge=1)]
+    rebalance_period: RebalancePeriod
+
+
 class RuleSettings(RuleModel):
+    """`position_size` is not used in the universe mode: each member gets equity / `hold_count`."""
+
     position_size: Annotated[FixedShares | PercentOfEquity, Field(discriminator="type")]
     template_id: Annotated[str, Field(min_length=1, max_length=MAX_TEMPLATE_ID_LENGTH)] | None = None
+    # Single-instrument rules do not hold the field, so their saved JSON stays the same as before #201.
+    universe: UniverseSettings | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class RuleExits(RuleModel):
