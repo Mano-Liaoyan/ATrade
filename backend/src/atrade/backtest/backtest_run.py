@@ -146,7 +146,10 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: D
         equity_curve = convert_equity_curve_to_usd(inputs.exchange_rates, equity_curve)
         trades = convert_trades_to_usd(inputs.exchange_rates, trades)
     metrics = calculate_metrics(
-        paper_capital_usd=request.paper_capital_usd, equity_curve=equity_curve, trade_count=len(trades)
+        paper_capital_usd=request.paper_capital_usd,
+        time_range=request.time_range,
+        equity_curve=equity_curve,
+        trades=trades,
     )
     async with await psycopg.AsyncConnection.connect(job.database_url, autocommit=True) as connection:
         await backtest_store.save_result(

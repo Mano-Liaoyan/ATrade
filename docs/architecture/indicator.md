@@ -72,12 +72,32 @@ of #130 (A is the strongest, D is practitioner use only).
 | Average trading value | mean(close × volume) | n = 20 or 60 | `value` | ATrade | B (screen only) |
 | RSI | 100 − 100 / (1 + average gain / average loss), Wilder average | n = 14, levels 30 and 70 | `value` | wraps `RelativeStrengthIndex` | D |
 | MACD | fast EMA − slow EMA, and its signal line | not given | `value` (MACD line), `signal`, `histogram` | wraps `MovingAverageConvergenceDivergence` | D (entry timing) |
-| Bollinger Bands | middle average ± k standard deviations | not given | `upper`, `middle`, `lower` | wraps `BollingerBands` | D (entry timing) |
+| Bollinger Bands | mean of the last n closes ± k population standard deviations of the same closes | not given | `upper`, `middle`, `lower` | wraps `BollingerBands` | D (entry timing) |
 | Donchian channel | highest high and lowest low of the last n bars | not given | `upper`, `middle`, `lower` | wraps `DonchianChannel` | B (trend filter, range break) |
 
 - The output names of the wrapped indicators are the NautilusTrader names.
   Checked in #138: MACD has `value`, `signal`, and `histogram`. Bollinger
   Bands and the Donchian channel have `upper`, `middle`, and `lower`.
+- The ATrade classes of the wrapped indicators (#161) and their defaults.
+  #130 gives no usual parameters for EMA, MACD, Bollinger Bands, and the
+  Donchian channel. Their defaults are the common textbook values.
+
+  | Indicator | Class | Defaults | First value at bar |
+  |---|---|---|---|
+  | SMA | `SMA` | `period=50` | `period` |
+  | EMA | `EMA` | `period=20` | `period` |
+  | ATR | `ATR` | `period=14` | `period` |
+  | RSI | `RSI` | `period=14` | `period + 1` |
+  | MACD | `MACD` | `fast_period=12`, `slow_period=26`, `signal_period=9` | `slow_period + signal_period - 1` |
+  | Bollinger Bands | `BollingerBands` | `period=20`, `k=2.0` | `period` |
+  | Donchian channel | `DonchianChannel` | `period=20` | `period` |
+
+- The Donchian `middle` is the mean of `upper` and `lower`. The MACD
+  `histogram` is `value` − `signal`. RSI is on a scale of 0 to 100.
+- The wrapped ATR and RSI use the Wilder average (#130). The NautilusTrader
+  2.0.0rc7 default of both is Wilder, so the classes do not pass
+  `MovingAverageType.Wilder` (#160, section 21.1 of
+  [`docs/architecture.md`](../architecture.md)).
 - Average trading value is in the currency of the instrument (USD for US
   instruments, HKD for Hong Kong instruments).
 - RSI, MACD, and Bollinger Bands are entry timing tools only. #130 found no
@@ -119,9 +139,9 @@ Each class has:
 |---|---|
 | Constructor | The parameters of the indicator, each with a default value. |
 | `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. |
-| A method for one `foundation` `Bar` | The screen path. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. |
+| `update(bar)` | The screen path: takes one `foundation` `Bar`. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. A wrapped class makes a NautilusTrader bar from it and calls `handle_bar`. |
 | `initialized` | `True` when the class has enough bars for a value. NautilusTrader reads it for `indicators_initialized()`. |
-| Outputs (`value`, or the names of section 23.2) | The value, or "no value" while `initialized` is `False`. |
+| Outputs (`value`, or the names of section 23.2) | The value (`float`), or "no value" (`None`) while `initialized` is `False`. |
 | `reset()` | Removes all received bars. |
 
 The public entry also exports a catalog of the first set. For each
@@ -202,11 +222,6 @@ indicator reference in JSON:
 
 ## 23.8 Left to the implementation
 
-- The Python type of a value and of "no value" (for example `float | None`,
-  as the NautilusTrader indicators use `float`).
-- The name of the screen-path method of section 23.3.
-- The defaults of EMA, MACD, Bollinger Bands, and the Donchian channel.
-  #130 gives no usual parameters for them.
 - The skip parameter of 12-1 momentum must accept 0, or the strategy template
   S3 "12-month time-series momentum" (look-back 252, skip 0) becomes a code
   template ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139)).
@@ -214,10 +229,6 @@ indicator reference in JSON:
   (section 23.4). Section 21.1 of
   [`docs/architecture.md`](../architecture.md) has the measured differences
   and a suggested count (#160).
-- Decided (#160): the wrapped ATR and RSI use the Wilder average (#130).
-  The NautilusTrader 2.0.0rc7 default of both is Wilder, so the classes do
-  not pass `MovingAverageType.Wilder` (section 21.1 of
-  [`docs/architecture.md`](../architecture.md)).
 - The annualization factor of realized volatility on 1-hour bars. The #130
   formula (√252) is for daily bars.
 - The names that the UI shows for the indicators.

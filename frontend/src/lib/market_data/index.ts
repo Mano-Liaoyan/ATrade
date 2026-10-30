@@ -1,4 +1,5 @@
-// Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, and the source order.
+// Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, the source order, and
+// the HK instrument list with its editor.
 export { default as BarChart } from './BarChart.svelte';
 export { default as InstrumentSearch } from './InstrumentSearch.svelte';
 export {
@@ -12,6 +13,15 @@ export {
   type BarsResult,
   type ChartRequest,
 } from './bars';
+export { default as HkInstrumentListEditor } from './HkInstrumentListEditor.svelte';
+export {
+  addToHkInstrumentList,
+  deleteFromHkInstrumentList,
+  listHkInstrumentList,
+  splitPastedSymbols,
+  type HkInstrument,
+  type HkInstrumentsAdded,
+} from './hk_instrument_list';
 export { formatDayChange, readDayQuote, type DayQuote } from './day_quote';
 export {
   canDrawLiveBar,
