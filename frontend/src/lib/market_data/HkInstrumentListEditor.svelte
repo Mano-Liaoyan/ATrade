@@ -142,11 +142,11 @@
       <DataTable columns={COLUMNS} size="sm">
         {#snippet rows()}
           {#each listedInstruments as instrument (instrument.id)}
+            {@const isDeleting = deletingIds.includes(instrument.id)}
             <tr>
               <th scope="row">{instrument.symbol}</th>
               <td class="time">{formatUtcTime(instrument.added_at_utc)}</td>
               <td class="cds--table-column-menu delete-cell">
-                {@const isDeleting = deletingIds.includes(instrument.id)}
                 <IconButton
                   label={isDeleting
                     ? `Deleting ${instrument.symbol} from the HK instrument list`
