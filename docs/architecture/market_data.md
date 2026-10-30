@@ -95,17 +95,19 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
   The watchlist routes add `saved_bars` to each instrument with the first.
   The backtest start route uses the second (`docs/architecture/backtest.md`
   section 10.1).
-- Phase 3: `SavedBarCoverage` also has the bar source.
-  `read_saved_bar_coverage` reads the saved ranges of all bar sources.
-  `has_saved_bars` takes a source order (section 8.7.2).
+- Phase 3 (#188): `SavedBarCoverage` also has the bar source.
+  `read_saved_bar_coverage` reads the bar tables of all bar sources, and
+  orders the items of one bar period by the global source order.
+  `has_saved_bars(database_url, bar_request, source_order)` is true when
+  `read_saved_bars` with the same source order returns at least one bar.
 - Before it saves an instrument, the add route checks it with
   `InstrumentLookup`. Thus the watchlist holds only instruments that IBKR
   knows. Listing and deleting do not need IB Gateway.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/watchlist` | `200` with `{"instruments": [{"id", "symbol", "exchange", "currency", "added_at_utc", "saved_bars"}, ...]}` in the order of adding. `saved_bars` is `[{"bar_period", "first_start_utc", "last_start_utc"}, ...]`: only the bar periods with saved bars, in the order of the bar periods (1 minute first). |
-| | Phase 3: `saved_bars` is `[{"bar_source", "bar_period", "first_start_utc", "last_start_utc"}, ...]`: one item for each bar source and bar period with saved bars, in the order of the bar periods, then in the global source order. |
+| `GET /api/watchlist` | `200` with `{"instruments": [{"id", "symbol", "exchange", "currency", "added_at_utc", "saved_bars"}, ...]}` in the order of adding. |
+| | `saved_bars` is `[{"bar_source", "bar_period", "first_start_utc", "last_start_utc"}, ...]`: one item for each bar source and bar period with saved bars, in the order of the bar periods, then in the global source order. |
 | `POST /api/watchlist` with `{"symbol", "exchange", "currency"}` | `201` with the new watchlist instrument. |
 | | `404` with `{"detail": "IBKR has no instrument <symbol> / <exchange> / <currency>. Add an instrument from the instrument search."}`. |
 | | `409` with `{"detail": "This instrument is already in the watchlist."}`. |
@@ -158,17 +160,20 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   wait. The store saves all bars of a range with one SQL statement.
 - When no part is missing, the route does not call IBKR. Saved bars are
   returned also when IB Gateway is not reachable.
-- Phase 3: the route reads through the global source order (section 8.7.2).
-  A part is missing only when no bar source in the source order saved it.
-  The route asks IBKR for the missing parts and saves them in `ibkr_bar`.
-- The public entry exports `read_saved_bars(*, database_url, bar_request)`
-  with `BarRequest(instrument, bar_period, time_range)`. It reads only the
-  bars in PostgreSQL and never calls IBKR. Backtests use it (section 10).
+- Phase 3 (#188): the route reads through the global source order (section
+  8.7.2). A part is missing only when no bar source in the source order saved
+  it. The route asks IBKR for the missing parts and saves them in `ibkr_bar`.
+- The public entry exports `read_saved_bars(*, database_url, bar_request,
+  source_order)` with `BarRequest(instrument, bar_period, time_range)`. It
+  reads only the bars in PostgreSQL and never calls IBKR. It returns
+  `SavedBars(bars, bar_counts)`: the merged bars, oldest first, and the bar
+  count of each bar source in the source order. Backtests use it (section
+  10) with the global source order from `read_source_order(database_url)`.
 - The public entry exports `save_received_bars(*, database_url, bar_request,
   bars)` (async) and `save_received_bars_blocking(...)` (the same, for
   synchronous callers). They save complete bars that a caller received from
-  IBKR for `bar_request.time_range`, and record that range as saved, in one
-  transaction. They use the same SQL as the bars route. A bar that is
+  IBKR for `bar_request.time_range` in `ibkr_bar`, and record that range as
+  saved in `ibkr_bar_saved_range`, in one transaction. They use the same SQL as the bars route. A bar that is
   already saved gets the new values, so a second save adds no row. A forward
   test uses them for its warm-up bars and its live bars
   (`docs/architecture/forward_test.md` sections 12.8 and 12.15).
@@ -321,6 +326,9 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
   saved-range table.
 - The precedence of the bar sources is not in the code. The source order
   sets it.
+- Code (#188): `market_data/bar_source.py` (`BarSource`, the source order
+  store), `market_data/source_order_routes.py`, and the merge rule in
+  `market_data/bar_reading.py`. Tests: `tests/market_data/test_bar_sources.py`.
 
 ### 8.7.1 Tables
 
@@ -332,12 +340,13 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
 | `databento_bar_saved_range` | The columns of `ibkr_bar_saved_range`. | The Databento import writes the time range that it bought for each instrument and bar period. |
 | `source_order` | 1 row: `bar_sources` (ordered list of `BarSource` values), `changed_at_utc`. | `PUT /api/market-data/source-order`. |
 
-- One migration renames `bar` to `ibkr_bar` and `bar_saved_range` to
-  `ibkr_bar_saved_range`. The data does not change. All SQL that uses the
-  old names changes in the same PR.
+- One migration (`b7e3c9a4d158`) renames `bar` to `ibkr_bar` and
+  `bar_saved_range` to `ibkr_bar_saved_range`. The data does not change. All
+  SQL that uses the old names changes in the same PR.
 - The default source order is `ibkr`, then `databento`. The migration writes
   the default row.
 - The source order is in PostgreSQL. It is not in `.env`.
+- The source order holds each bar source exactly 1 time (section 8.14).
 
 ### 8.7.2 Reading through the source order
 
@@ -364,7 +373,7 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
 |---|---|
 | `GET /api/market-data/source-order` | `200` with `{"source_order": ["ibkr", "databento"]}`. |
 | `PUT /api/market-data/source-order` with `{"source_order": [...]}` | `200` with the saved source order. |
-| | `422` when the list is empty, has a value 2 times, or has a value that is not a `BarSource`. |
+| | `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source. |
 
 - The settings page shows the source order. The page has a Carbon
   structured list with one row for each bar source, in the source order.
@@ -390,6 +399,21 @@ Phase 3. Sources:
 - Databento has only US stocks. Databento US data starts on 2018-05-01.
 - Databento has only prices that are not adjusted. The import adjusts them
   for stock splits before it saves them (section 8.8.3).
+- Code (#190): `market_data/databento_client.py` (`DatabentoClient`, it
+  downloads a bought batch job), `market_data/databento_import.py`
+  (`import_databento_files`), and the program `app/databento_import.py`
+  (`docs/architecture.md` section 6.4). Tests:
+  `tests/market_data/test_databento_import.py`,
+  `tests/app/test_databento_import_program.py`, and the fake
+  `tests/fakes/databento.py`, which writes small DBN files.
+- For each instrument with a daily bar in a bought time range, the import
+  writes that time range to `databento_bar_saved_range`. The daily bars
+  before 2024-07-01 use the time range that all 4 history files cover. The
+  import refuses history files without all 4 file kinds, because the high,
+  the low, and the volume need both exchanges. A second import of the same
+  files adds no row.
+- The import logs the symbols without `stat_type` 11 (they get no bar) and
+  the EQUS.SUMMARY symbols without a listing exchange (section 8.14).
 
 ### 8.8.1 Purchase list
 
@@ -441,6 +465,8 @@ Daily bars before 2024-07-01:
 
 Daily bars from 2024-07-01: the EQUS.SUMMARY `ohlcv-1d` bar. Its close is the
 official close. Its volume is the volume of the full market.
+Its listing exchange is the exchange of the latest earlier Databento daily
+bar of the same symbol (section 8.14).
 
 Hourly bars:
 
@@ -713,10 +739,21 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - The interface for the user check of detected stock splits (section 8.8.3)
   and symbol links (section 8.8.4): a page, a report file, or a command. Also
   if the import saves the bars before or after the check.
-- The program that runs the Databento import, and where the downloaded files
-  are kept.
-- Whether the source order must hold all bar sources. If the order can leave
-  out `ibkr`, whether the bars route then still asks IBKR for missing parts.
+- Decided (#190): the program `app/databento_import.py` runs the Databento
+  import in the `web` image with `docker compose run`. The downloaded files
+  are in `data/databento/` of the repository (in `.gitignore`), one
+  directory for each batch job (`docs/architecture.md` section 22).
+- Decided (#190): the listing exchange of an EQUS.SUMMARY bar is the
+  exchange of the latest earlier Databento daily bar of the same symbol. A
+  symbol without an earlier bar gets no bar, and the import names it.
+- Decided (#190): the trading day of an official open or close is the New
+  York date of its `ts_event`. The import uses the latest new value
+  (`update_action` 1) of each day.
+- Decided (#188): the source order must hold all bar sources, each 1 time.
+  The order cannot leave out `ibkr`, so the bars route always reads the IBKR
+  bars that it saves for the missing parts.
+- Decided (#188): bars are read only inside the saved ranges of their bar
+  source. A bar outside every saved range of its bar source is not read.
 - How the stored day of evidence A is chosen, the tolerance for "ratio is
   1", and how ATrade finds the ex-date when evidence A comes days after the
   ex-date.

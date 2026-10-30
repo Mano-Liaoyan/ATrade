@@ -493,6 +493,60 @@
         }
       }
     },
+    "/api/market-data/source-order": {
+      "get": {
+        "summary": "Read Source Order",
+        "operationId": "read_source_order_api_market_data_source_order_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceOrderBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Save Source Order",
+        "operationId": "save_source_order_api_market_data_source_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceOrderBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceOrderBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/market-data/hk-instrument-list": {
       "get": {
         "summary": "List Instruments",
@@ -2049,6 +2103,9 @@
             },
             "type": "array",
             "title": "Trades"
+          },
+          "robustness": {
+            "$ref": "#/components/schemas/BacktestRobustnessResponse"
           }
         },
         "type": "object",
@@ -2072,7 +2129,8 @@
           "ended_at_utc",
           "metrics",
           "equity_curve",
-          "trades"
+          "trades",
+          "robustness"
         ],
         "title": "BacktestDetailResponse"
       },
@@ -2408,6 +2466,55 @@
         ],
         "title": "BacktestResponse"
       },
+      "BacktestRobustnessResponse": {
+        "properties": {
+          "trial_count": {
+            "type": "integer",
+            "title": "Trial Count"
+          },
+          "sharpe_probability_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Probability Percent"
+          },
+          "sharpe_probability_kind": {
+            "$ref": "#/components/schemas/SharpeProbabilityKind"
+          },
+          "sharpe_probability_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharpeProbabilityStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Missing Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trial_count",
+          "sharpe_probability_percent",
+          "sharpe_probability_kind",
+          "sharpe_probability_status",
+          "missing_reasons"
+        ],
+        "title": "BacktestRobustnessResponse",
+        "description": "The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without\na meaning is null, and `missing_reasons` gives its reason by its field name."
+      },
       "BacktestStatus": {
         "type": "string",
         "enum": [
@@ -2469,6 +2576,15 @@
         ],
         "title": "BarResponse",
         "type": "object"
+      },
+      "BarSource": {
+        "type": "string",
+        "enum": [
+          "ibkr",
+          "databento"
+        ],
+        "title": "BarSource",
+        "description": "Each bar source has its own bar table and its own saved-range table (ADR 0002)."
       },
       "BarsResponse": {
         "properties": {
@@ -2638,6 +2754,9 @@
             "type": "array",
             "title": "Trades"
           },
+          "robustness": {
+            "$ref": "#/components/schemas/BacktestRobustnessResponse"
+          },
           "code": {
             "type": "string",
             "title": "Code"
@@ -2665,6 +2784,7 @@
           "metrics",
           "equity_curve",
           "trades",
+          "robustness",
           "code"
         ],
         "title": "ComparedBacktestResponse"
@@ -4420,6 +4540,9 @@
       },
       "SavedBarsResponse": {
         "properties": {
+          "bar_source": {
+            "$ref": "#/components/schemas/BarSource"
+          },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
           },
@@ -4436,12 +4559,13 @@
         },
         "type": "object",
         "required": [
+          "bar_source",
           "bar_period",
           "first_start_utc",
           "last_start_utc"
         ],
         "title": "SavedBarsResponse",
-        "description": "The saved bars of one bar period: the start of the first and of the last saved bar."
+        "description": "The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."
       },
       "SendOrderRequest": {
         "properties": {
@@ -4505,6 +4629,38 @@
           "time_in_force"
         ],
         "title": "SendOrderRequest"
+      },
+      "SharpeProbabilityKind": {
+        "type": "string",
+        "enum": [
+          "probabilistic",
+          "deflated"
+        ]
+      },
+      "SharpeProbabilityStatus": {
+        "type": "string",
+        "enum": [
+          "likely_real",
+          "uncertain",
+          "likely_luck"
+        ]
+      },
+      "SourceOrderBody": {
+        "properties": {
+          "source_order": {
+            "items": {
+              "$ref": "#/components/schemas/BarSource"
+            },
+            "type": "array",
+            "title": "Source Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_order"
+        ],
+        "title": "SourceOrderBody",
+        "description": "The global source order: the first bar source that saved a time range gives all bars of the range."
       },
       "StartBacktestRequest": {
         "properties": {

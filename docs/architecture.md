@@ -287,7 +287,7 @@ app           -> all modules
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second listener on port 8001 has only the allow-list routes for the `assistant` service (section 25). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
-| Databento import program (name left to the implementation) | One-time run by the user | Imports the bought Databento files into `databento_bar`. Writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
+| `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. From #191 it also writes `stock_split` and `databento_symbol_link` rows for the user check (section 8). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
@@ -1167,7 +1167,7 @@ Settings that `foundation/settings` reads:
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
 | `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
-| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason. |
+| `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason, and the Databento import program does not download batch jobs. Compose gives it to `web`, so the import program in the `web` image gets it. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
 that ends before it starts, a Web client ID inside the forward test range,
@@ -1607,7 +1607,6 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 
 | Fact | How to check |
 |---|---|
-| The 12-1 momentum class accepts skip 0 (#139, template S3). | Check the parameter in the indicator implementation. |
 | The default parameters of the template sources (#139). | Read the method section of each paper. |
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
@@ -1647,6 +1646,7 @@ implementation" list.
 | Strategy code can import `atrade.indicator` (#136, #138). | Yes. On 2026-10-30 (#160), a strategy version that imports `atrade.indicator` passed the checks before save (section 9.3, `ruff --select F` included) and ran in a real backtest child with the status `finished`. The indicator value in `on_bar` was the close of each of the 20 bars (`tests/indicator/test_indicator_registration.py`). |
 | The default smoothing (`ma_type`) of `RelativeStrengthIndex` and `AverageTrueRange` in NautilusTrader 2.0.0rc7. | On 2026-10-30 (#160), in the backend environment: both defaults are Wilder. `AverageTrueRange(14).ma_type` is `MovingAverageType.Wilder`. `RelativeStrengthIndex` has no `ma_type` property, so the check compared values: on 200 test closes, RSI(14) with the default gave 34.832627, the same as `ma_type=MovingAverageType.Wilder` and as a Wilder RSI written by hand; `Exponential` gave 14.769989 and `Simple` gave 5.270742. The value scale is 0 to 100. `MovingAverageConvergenceDivergence` defaults to `Exponential`. The indicator library does not need to pass `MovingAverageType.Wilder` for RSI and ATR. |
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
+| The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1678,6 +1678,13 @@ option and records it in this document.
   screen-path method is `update(bar)`: it makes a NautilusTrader bar from
   the `foundation` bar and calls `handle_bar`. The defaults are in section
   23.2 of [`indicator.md`](architecture/indicator.md).
+- Decided (#162): the 4 indicators that ATrade writes are the classes
+  `Momentum12_1`, `DistanceTo52WeekHigh`, `RealizedVolatility`, and
+  `AverageTradingValue` of `atrade.indicator`. The default n of realized
+  volatility is 60 and of average trading value is 20. Realized volatility
+  has the parameter `bars_per_year` (default 252): on 1-hour bars the
+  strategy passes 1764. Section 23.2 of
+  [`indicator.md`](architecture/indicator.md) has the formulas.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - Decided (#171): a named CHECK constraint holds the values of
@@ -1686,6 +1693,10 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read. When fewer than 2 trials have a
+  daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
+  10.9.5).
 - Decided (#170): the exposure of a forward test counts its recorded equity
   points (one at each bar end) as its bars. The recorded fills go to
   `find_round_trips` with no change, because `select_fills` already gives
@@ -1704,6 +1715,22 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#198): the platform gives the strategy the new universe list at
+  each period start as NautilusTrader custom data
+  (`DataType("UniverseUpdate")`, `on_data`), not with a platform timer. The
+  configuration of a multi-instrument strategy has no `instrument_id`, no
+  `bar_type`, and no universe field
+  ([`backtest.md`](architecture/backtest.md) section 10.10.8).
+- Decided (#188): a source order holds each `BarSource` exactly 1 time.
+  `PUT /api/market-data/source-order` refuses an order that leaves out a bar
+  source with `422`. Thus the bars route always reads the IBKR bars that it
+  saves in `ibkr_bar` (`docs/architecture/market_data.md` section 8.14).
+- Decided (#188): saved bars come only from the saved ranges. A bar in a bar
+  table outside every saved range of its bar source is not read. Tests that
+  insert bars directly also insert a saved range (`tests/saved_ranges.py`).
+- Decided (#188): the watchlist `saved_bars` items keep the first and the
+  last bar start of each bar table. The backtest form shows, for one bar
+  period, the earliest first bar and the latest last bar of all bar sources.
 - Decided (#194): the HK instrument list editor is on the settings page
   `/settings` (section 13). #194 made this page. The source order slice
   (#189) adds its "Source order" section to the same page.
@@ -1711,11 +1738,23 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#190): the Databento import program is `app/databento_import.py`.
+  The user runs it in the `web` image with `docker compose run`. The bought
+  files are in `data/databento/` of the repository (in `.gitignore`). The
+  program downloads a batch job with `--job-id <ID>` to
+  `data/databento/<ID>/`, or it imports the files that the user downloaded
+  from the Databento portal. It reads DBN files (`*.dbn`, `*.dbn.zst`), the
+  default encoding of a batch job
+  (`docs/architecture/market_data.md` section 8.14).
+- Decided (#190): the listing exchange of an EQUS.SUMMARY daily bar (from
+  2024-07-01) is the exchange of the latest earlier Databento daily bar of
+  the same symbol. A symbol without an earlier bar, for example a new
+  listing after 2024-07-01, gets no bar. The import names these symbols in
+  its log. `docs/architecture/forward_test.md` section 12.24 (how a
+  Databento symbol maps to the IBKR primary exchange) is the same question
+  and stays open for these symbols.
 - The open points of the map #129 are in the "Left to the implementation"
-  lists of sections 8 to 12 and 23 to 25. Two of them:
-  - How the platform gives the strategy the new universe list at each
-    period start: NautilusTrader custom data or a platform timer (#142).
-    Make a small test first.
+  lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
     momentum need about 252 bars. The look-back must follow the longest
     indicator of the strategy, or this effect is accepted.

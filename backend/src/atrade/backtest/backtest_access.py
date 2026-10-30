@@ -10,7 +10,7 @@ import psycopg
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
-from atrade.market_data import BarRequest, has_saved_bars
+from atrade.market_data import BarRequest, has_saved_bars, read_source_order
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,8 @@ async def check_saved_bars(*, database_url: str, request: BacktestRequest) -> st
     bar_request = BarRequest(
         instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
     )
-    if await has_saved_bars(database_url=database_url, bar_request=bar_request):
+    source_order = await read_source_order(database_url=database_url)
+    if await has_saved_bars(database_url=database_url, bar_request=bar_request, source_order=source_order):
         return None
     return describe_missing_bars(request)
 
