@@ -80,7 +80,7 @@ async def test_run_reads_the_tool_events() -> None:
     body = "".join(json.dumps(line) + "\n" for line in lines)
     client = client_for(httpx.Response(200, text=body), [])
 
-    events = [event async for event in client.run(7, "Hi.", SELECTION)]
+    events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
     assert events == [
         ToolStep(
