@@ -590,8 +590,12 @@ It needs the multi-instrument backtest of
 ### 9.8.7 Left to the implementation
 
 - The buttons of the diff before the save.
-- How the platform tells the strategy the universe of each quarter (phase 3,
-  #142).
+- Decided (#198): the platform tells the strategy the universe of each
+  universe period with NautilusTrader custom data. The strategy calls
+  `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
+  members in `on_data(data)` as `data.data.bar_types`. Its configuration has
+  no `instrument_id`, no `bar_type`, and no universe field
+  ([`backtest.md`](backtest.md) section 10.10.8).
 
 ## 9.9 Strategy templates
 

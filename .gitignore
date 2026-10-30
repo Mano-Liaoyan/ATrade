@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Bought Databento files for the Databento import (README.md)
+data/databento/
+
 # Python
 __pycache__/
 *.py[cod]
