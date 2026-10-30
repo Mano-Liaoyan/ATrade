@@ -11,7 +11,7 @@ from atrade.market_data.bar_reading import (
     save_received_bars,
     save_received_bars_blocking,
 )
-from atrade.market_data.bar_source import BarSource, read_source_order
+from atrade.market_data.bar_source import BarSource, check_source_order, read_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
 from atrade.market_data.databento_client import DatabentoClient, DatabentoHistoricalClient
 from atrade.market_data.databento_import import (
@@ -64,6 +64,7 @@ __all__ = [
     "UsUniverseMember",
     "UsUniverseUpdate",
     "calculate_us_universe_history",
+    "check_source_order",
     "create_market_data_router",
     "find_first_trading_day_of_quarter",
     "find_previous_trading_day",

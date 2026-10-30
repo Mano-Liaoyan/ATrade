@@ -153,6 +153,7 @@ dependencies = [
     { name = "basedpyright" },
     { name = "databento" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "ib-async" },
     { name = "nautilus-trader" },
     { name = "psycopg", extra = ["binary"] },
@@ -166,7 +167,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "anyio" },
-    { name = "httpx" },
     { name = "httpx-ws" },
     { name = "import-linter" },
     { name = "pytest" },
@@ -178,6 +178,7 @@ requires-dist = [
     { name = "basedpyright", specifier = "==1.40.2" },
     { name = "databento", specifier = "==0.87.0" },
     { name = "fastapi", specifier = "==0.162.0" },
+    { name = "httpx", specifier = "==0.28.1" },
     { name = "ib-async", specifier = "==2.1.0" },
     { name = "nautilus-trader", specifier = "==2.0.0rc7" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
@@ -191,7 +192,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "anyio", specifier = "==4.15.1" },
-    { name = "httpx", specifier = "==0.28.1" },
     { name = "httpx-ws", specifier = "==0.8.2" },
     { name = "import-linter", specifier = "==2.15" },
     { name = "pytest", specifier = "==9.1.1" },

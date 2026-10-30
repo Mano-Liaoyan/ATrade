@@ -1,13 +1,13 @@
 """market_data: the quarterly US universe
 
 Revision ID: cbe826c0a6dd
-Revises: b7e3c9a4d158
+Revises: 2f6b8d1c4e97
 """
 
 from alembic import op
 
 revision = "cbe826c0a6dd"
-down_revision = "b7e3c9a4d158"
+down_revision = "2f6b8d1c4e97"
 
 
 def upgrade() -> None:
