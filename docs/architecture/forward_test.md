@@ -564,6 +564,13 @@ Phase 3 table changes (#146). The column names are choices of this document.
   (`numeric`, `CHECK > 0`) is null for the old rows. The Web process writes
   it for each new row, so the column has no `NOT NULL`. The universe columns come
   with the multi-instrument forward test (#217).
+- Implemented (#217, migration `4ae1ad32c14d`): `universe_kind` (default
+  `single` for the old rows), `universe_top_n` (`CHECK` 1 to 500), nullable
+  `symbol`, `exchange`, and `currency`, the `CHECK`
+  `forward_test_universe_fields` (instrument columns only for `single`,
+  `universe_top_n` only for `rule`), and `forward_test_universe_member`. The
+  start inserts the members of the first quarter in the same transaction as
+  the row.
 - The watchlist kind (`list`) records the watchlist members at start in
   `forward_test_universe_member`. Whether a later change of the watchlist
   changes the members of a running forward test is left to the
@@ -632,6 +639,16 @@ and the status codes of the new refusals are choices of this document.
   `ForwardTestResponse.allocated_capital_usd` (null for an old row), and the
   `symbol` and `exchange` of the fill rows. `universe`, `split_checks_needed`,
   `instruments`, and the fill `kind` come with #217 and the split check.
+- Implemented (#217, first part): `universe` in `StartForwardTestRequest`
+  (the flat `symbol`, `exchange`, and `currency` stay as a single
+  instrument; a request with both gets `422`), the `422` refusals for the
+  bar period, `top_n`, the empty watchlist, and a missing current quarter
+  (section 12.24), and `ForwardTestResponse.universe_kind` and
+  `universe_top_n`. Not yet: `ForwardTestDetailResponse.instruments`, the
+  multi-instrument child (warm-up and new daily bars from the bar store,
+  the quarter change), the equity of section 12.8, and the start dialog.
+  Until then the child of a `rule` or `list` row crashes, and after 3
+  crashes the status is `failed` (section 12.7).
 - The metrics, the Net profit, and the same-period backtest start from
   `allocated_capital_usd`. An old row without it uses `start_balance_usd`
   (`ForwardTestRow.start_capital_usd`).
@@ -1194,6 +1211,10 @@ simplest option and records it in this document.
   are 2 jobs. They run in different processes with different client IDs.
 - The status code of a `rule` start when no universe of the current quarter
   is stored.
+  Decided (#217): `422` with `"The US universe has no saved members for the
+  quarter from <calendar quarter start>."`. The current quarter is the last
+  stored `quarter_start_utc` on or after the start of the calendar quarter
+  that contains now (the stored start is the first trading day).
 - Decided (#192): without `DATABENTO_API_KEY`, the quarterly update does not
   run, and the `forward-test` log tells why.
 - How ATrade maps a Databento symbol to the IBKR primary exchange.
@@ -1206,6 +1227,9 @@ simplest option and records it in this document.
   current quarter.
 - Whether a change of the watchlist changes the members of a running
   `list` forward test.
+  Decided (#217): no. The start records the watchlist members in
+  `forward_test_universe_member` with the start of the calendar quarter as
+  `quarter_start_utc`. The members stay fixed.
 - Whether `forward_test_fill` stays as a copy of the ledger fills, and the
   migration of the old rows and of `start_balance_usd`.
   Decided (#215): `forward_test_fill` is not a copy. It keeps only the fills

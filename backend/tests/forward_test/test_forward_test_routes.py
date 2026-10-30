@@ -315,3 +315,152 @@ async def test_the_end_time_is_optional_and_must_be_later_than_now(web_client: h
     # The database stores UTC (section 12.1).
     assert later_response.json()["end_time_utc"] == "2026-01-03T01:30:00Z"
     assert (later_response.json()["crash_count"], later_response.json()["interruptions"]) == (0, [])
+
+
+def make_universe_request(strategy_version_id: int, universe: JsonObject, bar_period: str = "1-DAY") -> JsonObject:
+    return {
+        "strategy_version_id": strategy_version_id,
+        "universe": universe,
+        "bar_period": bar_period,
+        "allocated_capital_usd": "10000",
+    }
+
+
+@pytest.mark.anyio
+async def test_a_single_instrument_forward_test_has_the_universe_kind_single(web_client: httpx.AsyncClient) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    universe = {"kind": "single", "symbol": "AAPL", "exchange": "NASDAQ", "currency": "USD"}
+
+    response = await web_client.post(FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, universe))
+
+    assert response.status_code == 201
+    assert response.json()["universe_kind"] == "single"
+    assert response.json()["universe_top_n"] is None
+    assert response.json()["symbol"] == "AAPL"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("universe", "bar_period"),
+    [
+        ({"kind": "rule", "top_n": 10}, "1-MINUTE"),
+        ({"kind": "list"}, "1-HOUR"),
+        ({"kind": "rule", "top_n": 0}, "1-DAY"),
+        ({"kind": "rule", "top_n": 501}, "1-DAY"),
+    ],
+)
+async def test_refuses_a_multi_instrument_universe_with_a_wrong_bar_period_or_top_n(
+    web_client: httpx.AsyncClient, universe: JsonObject, bar_period: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, universe, bar_period)
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_refuses_a_watchlist_forward_test_with_an_empty_watchlist(web_client: httpx.AsyncClient) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "The watchlist has no instrument."
+
+
+@pytest.mark.anyio
+async def test_starts_a_watchlist_forward_test_and_records_the_members(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        for symbol in ["AAPL", "MSFT"]:
+            connection.execute(
+                """
+                INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc)
+                VALUES (%(symbol)s, 'NASDAQ', 'USD', now())
+                """,
+                {"symbol": symbol},
+            )
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert response.status_code == 201
+    forward_test = response.json()
+    assert forward_test["universe_kind"] == "list"
+    assert forward_test["universe_top_n"] is None
+    assert forward_test["symbol"] is None
+    assert forward_test["client_id"] == 10
+    assert read_recorded_members(database_url, forward_test["id"]) == [
+        ("2026-01-01", "AAPL", "NASDAQ"),
+        ("2026-01-01", "MSFT", "NASDAQ"),
+    ]
+
+
+def read_recorded_members(database_url: str, forward_test_id: int) -> list[tuple[str, str, str]]:
+    with psycopg.connect(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT quarter_start_utc, symbol, exchange FROM forward_test_universe_member
+            WHERE forward_test_id = %(id)s ORDER BY quarter_start_utc, symbol
+            """,
+            {"id": forward_test_id},
+        ).fetchall()
+    return [(f"{quarter_start_utc:%Y-%m-%d}", symbol, exchange) for quarter_start_utc, symbol, exchange in rows]
+
+
+def save_us_universe_members(database_url: str, quarter_start_utc: str, symbols: list[str]) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        for rank, symbol in enumerate(symbols, start=1):
+            connection.execute(
+                """
+                INSERT INTO us_universe_member (
+                    quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+                )
+                VALUES (%(quarter_start_utc)s, %(rank)s, %(symbol)s, 'NASDAQ', 'USD', 1000000, '2025-12-31T00:00:00Z')
+                """,
+                {"quarter_start_utc": quarter_start_utc, "rank": rank, "symbol": symbol},
+            )
+
+
+@pytest.mark.anyio
+async def test_starts_a_top_n_forward_test_with_the_members_of_the_current_quarter(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    save_us_universe_members(database_url, "2025-10-01T00:00:00Z", ["OLD"])
+    # The clock is at 2026-01-02 03:04:05 UTC, the first trading day of the quarter.
+    save_us_universe_members(database_url, "2026-01-02T00:00:00Z", ["NVDA", "AAPL", "MSFT"])
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "rule", "top_n": 2})
+    )
+
+    assert response.status_code == 201
+    assert (response.json()["universe_kind"], response.json()["universe_top_n"]) == ("rule", 2)
+    assert read_recorded_members(database_url, response.json()["id"]) == [
+        ("2026-01-02", "AAPL", "NASDAQ"),
+        ("2026-01-02", "NVDA", "NASDAQ"),
+    ]
+
+
+@pytest.mark.anyio
+async def test_refuses_a_top_n_forward_test_without_a_stored_current_quarter(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    save_us_universe_members(database_url, "2025-10-01T00:00:00Z", ["OLD"])
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "rule", "top_n": 2})
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "The US universe has no saved members for the quarter from 2026-01-01."

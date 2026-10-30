@@ -4,6 +4,7 @@ import {
   canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
+  describeForwardTestUniverse,
   findForwardTestStatusKind,
   formatLocalTime,
   isLiveBarPeriod,
@@ -36,6 +37,8 @@ const runningForwardTest: ForwardTest = {
   exchange: 'NASDAQ',
   currency: 'USD',
   bar_period: '1-MINUTE',
+  universe_kind: 'single',
+  universe_top_n: null,
   desired_state: 'running',
   status: 'running',
   client_id: 10,
@@ -213,5 +216,17 @@ describe('the end time', () => {
   it('shows a UTC time in the local time zone', () => {
     expect(formatLocalTime(new Date(2026, 0, 3, 9, 30).toISOString())).toBe('2026-01-03 09:30');
     expect(formatLocalTime(null)).toBe('');
+  });
+});
+
+describe('describeForwardTestUniverse', () => {
+  it('names the universe of a multi-instrument forward test and null for one instrument', () => {
+    expect(describeForwardTestUniverse(runningForwardTest)).toBeNull();
+    expect(
+      describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'rule', universe_top_n: 500 }),
+    ).toBe('Top 500 by trading value');
+    expect(describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'list' })).toBe(
+      'Watchlist',
+    );
   });
 });
