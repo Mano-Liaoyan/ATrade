@@ -45,9 +45,11 @@ Chinese, write 指标.
 _Avoid_: metric, signal, factor (in user copy)
 
 **Screen**:
-A saved set of conditions on indicators and an order, for example "price to
-earnings below 15 and RSI(14) below 30, ordered by 12-month momentum". In
-Chinese, write 选股条件.
+A saved set of conditions on the instruments of one market, and an order. It
+names the instruments that it starts from, then filters them by price, trading
+value, exchange, and trading status, then applies conditions on indicators, for
+example "still trading, price above $10, RSI(14) below 30, ordered by 12-1
+momentum". All conditions must be true. In Chinese, write 选股条件.
 _Avoid_: screener (the page name only), filter, scan
 
 **Screen result**:
@@ -58,6 +60,12 @@ _Avoid_: scan result, hits
 **Watchlist**:
 The list of instruments that the user saves. In Chinese, write 自选股.
 _Avoid_: favorites, pins
+
+**HK instrument list**:
+The list of Hong Kong instruments that the user keeps for screens. ATrade keeps
+the daily bars of these instruments up to date. It has no instruments that
+stopped trading. In Chinese, write 港股品种表.
+_Avoid_: HK universe, HK watchlist, HK pool
 
 ## Strategies
 
@@ -71,6 +79,12 @@ One saved copy of the code of a strategy. A strategy version does not change
 after it is saved. Each backtest and each forward test records the strategy
 version that it used.
 _Avoid_: revision, snapshot, commit
+
+**Rule builder**:
+The form that writes a strategy version from entry conditions, exit
+conditions, and a position size. It writes code in one direction only: it
+does not read code back into conditions. In Chinese, write 规则构建器.
+_Avoid_: no-code editor, visual editor, wizard, strategy generator
 
 ## Strategy testing
 
@@ -88,7 +102,9 @@ _Avoid_: backtest settings, quota
 The instruments that one backtest can trade at each time. A point-in-time rule
 (for example the top instruments by trading value of each quarter) or a fixed
 list gives it. A point-in-time rule uses only data known at that time, so it
-includes instruments that stopped trading later. In Chinese, write 品种池.
+includes instruments that stopped trading later. A screen that runs again at
+each rebalance on the data known at that date is a point-in-time rule. A screen
+result used for the full time range is a fixed list. In Chinese, write 品种池.
 _Avoid_: index members, stock pool, basket, symbol list, portfolio
 
 **Parameter sweep**:
@@ -123,7 +139,7 @@ _Avoid_: hit rate
 
 **Net profit**:
 The final equity of a test minus its start capital (the paper capital of a
-backtest, or the start balance of a forward test).
+backtest, or the allocated capital of a forward test).
 _Avoid_: PnL
 
 **In-sample**:
@@ -149,9 +165,11 @@ orders to a paper account.
 _Avoid_: paper trading run, live simulation
 
 **Same-period backtest**:
-A backtest of the strategy version, instrument, and bar period of a forward
-test, from the forward test start to its end (or to now), with the start
-balance as paper capital. The user compares it with the forward test.
+A backtest of the strategy version, instruments, and bar period of a forward
+test, from the forward test start to its end (or to now), with the allocated
+capital as paper capital. For a universe, it uses the members that the
+forward test recorded for each quarter. The user compares it with the forward
+test.
 _Avoid_: shadow backtest, replay
 
 **Interruption**:
@@ -179,6 +197,24 @@ _Avoid_: simulated order, order simulation
 **Live order**:
 A real order sent to a broker account that holds real money.
 _Avoid_: real trade, production order
+
+**Owner**:
+The forward test, or the user by hand, that one order belongs to. Each fill,
+position, and cash amount in the paper account belongs to one owner. Orders
+from outside ATrade belong to the user by hand. In Chinese, write 所有者.
+_Avoid_: sub-account, bucket, sleeve
+
+**Owner ledger**:
+The record of the fills, positions, and cash of each owner. The position of
+the paper account in an instrument is the sum of the owner positions. In
+Chinese, write 所有者账本.
+_Avoid_: virtual account, sub-ledger
+
+**Allocated capital**:
+The USD amount of the paper account that one forward test gets at its start.
+The forward test trades only with this amount and its own fills. In Chinese,
+write 分配资金.
+_Avoid_: start balance, budget, allocation
 
 **Paper capital**:
 The cash amount a backtest starts with. It comes from the paper account
