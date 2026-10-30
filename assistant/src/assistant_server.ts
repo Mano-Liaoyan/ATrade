@@ -2,7 +2,8 @@
 // 25.14). Only web calls it. The browser never connects to it.
 //
 //   GET    /health                          The Compose health check.
-//   POST   /conversations/{id}/runs         {text, provider, model, credential_id} → the run events as JSON lines.
+//   POST   /conversations/{id}/runs         {text, provider, model, credential_id, system_prompt} → the run events as
+//                                           JSON lines.
 //   POST   /conversations/{id}/steer        {text} → 204, or 409 without an active run.
 //   POST   /conversations/{id}/abort        → 204.
 //   POST   /conversations/{id}/title        {provider, model, credential_id} → {title}, or 502 {detail}.
@@ -95,7 +96,11 @@ function createRoutes(conversations: Conversations): Record<string, RouteAction>
   return {
     'POST runs': async (conversationId, request, response) => {
       const body = await readJson(request);
-      const runRequest = { text: readText(body, 'text'), selection: readSelection(body) };
+      const runRequest = {
+        text: readText(body, 'text'),
+        selection: readSelection(body),
+        systemPrompt: readText(body, 'system_prompt'),
+      };
       response.writeHead(HTTP_OK, { 'content-type': 'application/x-ndjson' });
       await conversations.run(conversationId, runRequest, (event) => {
         response.write(`${JSON.stringify(event)}\n`);

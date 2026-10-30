@@ -19,8 +19,14 @@ from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
 from atrade.app.health_routes import create_health_router
-from atrade.assistant import AssistantService, AssistantServiceClient, create_assistant_router
-from atrade.backtest import BacktestRunner, create_backtest_router
+from atrade.assistant import (
+    AssistantService,
+    AssistantServiceClient,
+    StartContext,
+    StartContextReader,
+    create_assistant_router,
+)
+from atrade.backtest import BacktestRunner, create_backtest_router, read_last_backtest_ids
 from atrade.forward_test import (
     create_forward_test_comparison_router,
     create_forward_test_router,
@@ -32,7 +38,12 @@ from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
 from atrade.market_data import DailyBarUpdate, ExchangeRateReader, InstrumentLookup, create_market_data_router
 from atrade.paper_trading import BlockingForwardTest, PaperAccountMonitor, create_paper_trading_router
-from atrade.strategy import create_strategy_language_server_router, create_strategy_router
+from atrade.strategy import (
+    STRATEGY_TEMPLATE,
+    create_strategy_language_server_router,
+    create_strategy_router,
+    read_strategy_outline,
+)
 from atrade.watchlist import create_watchlist_router, read_watchlist_instruments
 
 # The container must accept connections from the Compose network.
@@ -42,6 +53,8 @@ LISTEN_PORT = 8000
 POSTGRES_VOLUME_NAME = "atrade-postgres18-data"
 PASSWORD_REFUSED_TEXT = "password authentication failed"
 DATABASE_CHECK_TIMEOUT_SECONDS = 10
+# The fixed part of the AI assistant system prompt names the last 3 backtests (docs/architecture/assistant.md 25.9).
+START_CONTEXT_BACKTEST_COUNT = 3
 
 logger = logging.getLogger("atrade.web")
 
@@ -58,6 +71,27 @@ def create_blocking_forward_test_finder(
         return BlockingForwardTest(forward_test_id=forward_test.forward_test_id, label=forward_test.label)
 
     return find_blocking_forward_test
+
+
+def create_start_context_reader(database_url: str) -> StartContextReader:
+    """assistant imports only foundation (docs/architecture.md section 6.2), so app/ reads the strategy and the
+    backtests for the start context of a conversation."""
+
+    async def read_start_context(strategy_id: int, version_number: int | None) -> StartContext | None:
+        outline = await read_strategy_outline(database_url=database_url, strategy_id=strategy_id)
+        if outline is None:
+            return None
+        backtest_ids = await read_last_backtest_ids(
+            database_url=database_url, strategy_version_ids=outline.version_ids, count=START_CONTEXT_BACKTEST_COUNT
+        )
+        return StartContext(
+            strategy_id=outline.id,
+            strategy_name=outline.name,
+            version_number=version_number,
+            backtest_ids=backtest_ids,
+        )
+
+    return read_start_context
 
 
 def create_web_app(
@@ -151,6 +185,8 @@ def create_web_app(
             database_url=settings.database_url,
             clock=clock,
             assistant_service=assistant_service or AssistantServiceClient(),
+            read_start_context=create_start_context_reader(settings.database_url),
+            strategy_template=STRATEGY_TEMPLATE,
         )
     )
     # The frontend router matches every path, so it is mounted last.

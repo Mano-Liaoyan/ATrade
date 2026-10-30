@@ -254,9 +254,20 @@ def update_daily_bar_summaries_blocking(connection: psycopg.Connection, instrume
 
 
 async def update_all_daily_bar_summaries(connection: psycopg.AsyncConnection) -> None:
-    """Calculates all summary rows again, for example after a change of the global source order."""
+    """Calculates all summary rows again, for example after a change of the global source order. It reads each
+    instrument with a saved daily range in a bar source, so daily bars saved before the summary table existed also
+    get a row."""
+    instrument_queries = [
+        sql.SQL("SELECT symbol, exchange, currency FROM {} WHERE bar_period = %(bar_period)s").format(
+            saved_range_table(bar_source)
+        )
+        for bar_source in BarSource
+    ]
+    query = sql.SQL(" UNION ").join(
+        [*instrument_queries, sql.SQL("SELECT symbol, exchange, currency FROM daily_bar_summary")]
+    )
     async with connection.cursor() as cursor:
-        await cursor.execute("SELECT symbol, exchange, currency FROM daily_bar_summary")
+        await cursor.execute(query, {"bar_period": BarPeriod.ONE_DAY.value})
         rows = await cursor.fetchall()
     instruments = [Instrument(symbol=str(row[0]), exchange=str(row[1]), currency=str(row[2])) for row in rows]
     await update_daily_bar_summaries(connection, instruments)

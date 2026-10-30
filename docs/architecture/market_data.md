@@ -375,8 +375,9 @@ Decision record: [ADR 0002](../adr/0002-one-bar-table-per-bar-source.md).
 | `PUT /api/market-data/source-order` with `{"source_order": [...]}` | `200` with the saved source order. |
 | | `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source. |
 
-- The settings page shows the source order. The page has a Carbon
-  structured list with one row for each bar source, in the source order.
+- The settings page `/settings` shows the source order. The header link
+  "Settings" opens it. The page has a Carbon structured list with one row
+  for each bar source, in the source order.
 - Each row has 2 icon buttons: "Move <bar source> up" and "Move <bar source>
   down". The first row has no up button. The last row has no down button.
 - A move saves the new source order at once with `PUT`. On an error, the
@@ -830,7 +831,9 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Decided (#195): `daily_bar_summary` has no status column. "Still trading"
   is a rule of `screen` on `last_day_start_utc`. After a change of the
   global source order, `PUT /api/market-data/source-order` calculates all
-  summary rows again in the same transaction.
+  summary rows again in the same transaction. It calculates a row for each
+  instrument with a saved daily range in a bar source, so daily bars saved
+  before the summary table existed also get a row.
 - Decided (#195): the daily bar update (`web`, client ID of the Web process)
   and the bar fetcher (`forward-test`, client ID 20) can save the same
   instrument at the same time. Both use the same SQL, so a second save adds

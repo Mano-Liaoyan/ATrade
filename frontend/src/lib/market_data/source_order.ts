@@ -1,5 +1,5 @@
-// Bar sources and the source order (docs/architecture/market_data.md section 8.7): the read of the global source
-// order and the source order choices of the backtest form.
+// Bar sources and the source order (docs/architecture/market_data.md section 8.7): the read and the save of the
+// global source order, a move of one bar source, and the source order choices of the backtest form.
 import type { components } from '#lib/api';
 import { requestJson, type RequestResult } from '#lib/foundation/http_request';
 
@@ -34,4 +34,38 @@ export async function readSourceOrder(fetchFunction: typeof fetch): Promise<Requ
     SOURCE_ORDER_PATH,
   );
   return result.kind === 'ok' ? { kind: 'ok', value: result.value.source_order } : result;
+}
+
+export type MoveDirection = 'up' | 'down';
+
+/** A refused order gives the `detail` text of the backend. */
+export async function saveSourceOrder(
+  fetchFunction: typeof fetch,
+  sourceOrder: BarSource[],
+): Promise<RequestResult<BarSource[]>> {
+  const result = await requestJson<components['schemas']['SourceOrderBody']>(
+    fetchFunction,
+    'Saving the source order',
+    SOURCE_ORDER_PATH,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source_order: sourceOrder }),
+    },
+  );
+  return result.kind === 'ok' ? { kind: 'ok', value: result.value.source_order } : result;
+}
+
+/** The order with the bar source at `index` moved by one place. */
+export function moveBarSource(sourceOrder: BarSource[], index: number, direction: MoveDirection): BarSource[] {
+  const otherIndex = direction === 'up' ? index - 1 : index + 1;
+  const moved = [...sourceOrder];
+  const barSource = moved[index];
+  const otherBarSource = moved[otherIndex];
+  if (barSource === undefined || otherBarSource === undefined) {
+    return moved;
+  }
+  moved[index] = otherBarSource;
+  moved[otherIndex] = barSource;
+  return moved;
 }
