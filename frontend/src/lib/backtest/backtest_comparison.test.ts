@@ -22,13 +22,10 @@ function makeBacktest(id: number, strategyId: number, strategyName: string): Bac
     started_at_utc: null,
     ended_at_utc: null,
     metrics: null,
-<<<<<<< HEAD
     conversation_id: null,
-=======
     source_order: ['ibkr', 'databento'],
     bar_count_by_source: null,
     survivorship_bias: false,
->>>>>>> origin/impl/159
   };
 }
 
