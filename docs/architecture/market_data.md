@@ -822,6 +822,11 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Some instruments are not in a universe and have no position, for example
   an instrument that the user only opened on a chart. Such an instrument
   gets evidence A when a bar read uses IBKR. The same rules apply to it.
+- Implemented (#196): the bars route and the daily bar update record
+  evidence A. A candidate is a `stock_split` row with the source
+  `ibkr_evidence` and no confirmation. The stock split check reads the
+  candidates with `read_stock_split_candidates(*, database_url)` of the
+  public entry.
 
 ### 8.13.3 Change of the stored bars
 
@@ -838,6 +843,15 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   again.
   Thus a change in place is the only method for them.
 - The saved results of earlier backtests do not change.
+- Implemented (#196): the function is `apply_stock_split(*, database_url,
+  change, confirmation, recorded_at_utc)` of the public entry. `change` is
+  a `StockSplitChange` (instrument, ex-date, split ratio). The confirmation
+  is `both_evidences`, `bar_evidence`, or `user_apply`; the caller gives it.
+  The function changes a candidate row, or adds a row with the source
+  `ibkr_evidence`. When the stock split is confirmed already, it raises
+  `StockSplitConfirmedError` and changes nothing, so the bars are not
+  divided 2 times. The user check of the Databento import (section 8.14)
+  uses the same bar change and also updates the daily bar summary.
 
 ## 8.14 Left to the implementation
 
@@ -877,9 +891,37 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   bars that it saves for the missing parts.
 - Decided (#188): bars are read only inside the saved ranges of their bar
   source. A bar outside every saved range of its bar source is not read.
-- How the stored day of evidence A is chosen, the tolerance for "ratio is
-  1", and how ATrade finds the ex-date when evidence A comes days after the
-  ex-date.
+- Decided (#196): the stored day of evidence A is the day of the last
+  stored daily bar of the instrument, through the global source order. The
+  bars route reads that day from IBKR again, before it reads the missing
+  parts. The daily bar update reads from the last saved IBKR daily bar, so
+  it needs no extra request.
+- Decided (#196): the ratio is 1 when it is within 3% of 1, the step
+  tolerance of the Databento import (section 8.8.3). Else the split ratio is
+  the fraction with the smallest denominator near the ratio, as in the
+  import.
+- Decided (#196): the ex-date of a candidate is the day after the stored
+  day. The stored day is the last stored daily bar, so no stored daily bar
+  is between the stored day and the real ex-date. The recorded ex-date can
+  be earlier than the real ex-date.
+- Decided (#196): while a stock split waits for its confirmation (a
+  candidate, or a Databento import split before the import check), each bar
+  that IBKR returns before its ex-date is saved in the old form: the prices
+  are multiplied by the split ratio and the volume is divided by it. This
+  applies to the bars route, the daily bar update, and
+  `save_received_bars`. Thus all stored bars before the ex-date have one
+  form, and the change divides each of them 1 time.
+- Decided (#196): when a stock split with an ex-date after the stored day
+  waits already, evidence A records no second candidate. `apply_stock_split()`
+  does not confirm a Databento import split; the import check does. A failed
+  IBKR read of the stored day is logged, and the read of the missing parts
+  continues.
+- Decided (#196): `market_data` does not know positions (`docs/architecture.md`
+  section 6.2). The stock split check gives the confirmation: `bar_evidence`
+  for an instrument that no owner holds.
+- Not done (#196): stored hourly and shorter bars that start after the
+  last stored daily bar and before the real ex-date keep the old prices. The
+  bar fetcher of section 8.12 does not record evidence A.
 - Decided (#192): the universe rule leaves out the symbols of
   `market_data/us_etf_symbols.py`, a list of ETFs and ETNs with a high
   trading value. Only the instruments with the highest trading values can be

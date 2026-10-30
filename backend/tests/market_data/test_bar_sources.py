@@ -214,8 +214,10 @@ async def test_the_bars_route_asks_ibkr_only_for_parts_that_no_bar_source_saved(
     )
 
     assert response.status_code == 200
+    # The first request reads the last stored daily bar again (stock split evidence A).
     assert gateway_connection.historical_bar_requests == [
-        HistoricalBarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(day(10), end_utc))
+        HistoricalBarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(day(9), day(10))),
+        HistoricalBarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(day(10), end_utc)),
     ]
     bar_times = [bar["time"] for bar in response.json()["bars"]]
     expected_days = [day(5), day(7), day(8), day(9), day(10), day(11)]

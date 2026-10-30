@@ -36,6 +36,7 @@ export {
   createCondition,
   createGroup,
   createOperand,
+  describeRulesWarning,
   findChangedLines,
   findIndicatorChoice,
   findRulesVersionNumber,
