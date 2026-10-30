@@ -1582,11 +1582,14 @@ export interface components {
             /** Version Number */
             version_number: number;
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             desired_state: components["schemas"]["DesiredState"];
             status: components["schemas"]["ForwardTestStatus"];
@@ -2352,16 +2355,20 @@ export interface components {
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };
-        /** StartForwardTestRequest */
+        /**
+         * StartForwardTestRequest
+         * @description The universe comes in `universe`, or for a single instrument in `symbol`, `exchange`, and `currency`.
+         */
         StartForwardTestRequest: {
             /** Strategy Version Id */
             strategy_version_id: number;
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
             /** Exchange */
-            exchange: string;
+            exchange?: string | null;
             /** Currency */
-            currency: string;
+            currency?: string | null;
+            universe?: components["schemas"]["UniverseBody"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /** Allocated Capital Usd */
             allocated_capital_usd: number | string;
@@ -2627,6 +2634,22 @@ export interface components {
             symbol: string | null;
             /** Exchange */
             exchange: string | null;
+        };
+        /**
+         * UniverseBody
+         * @description `single` needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, `list` needs nothing: the members
+         *     are the watchlist at the start (section 12.17).
+         */
+        UniverseBody: {
+            kind: components["schemas"]["UniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
         };
         /** UniverseInstrumentResponse */
         UniverseInstrumentResponse: {

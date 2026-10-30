@@ -7,7 +7,12 @@
   import { resolve } from '$app/paths';
   import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { describeForwardTestStatus, findForwardTestStatusKind, type ForwardTest } from '#lib/forward_test';
+  import {
+    describeForwardTestStatus,
+    describeForwardTestUniverse,
+    findForwardTestStatusKind,
+    type ForwardTest,
+  } from '#lib/forward_test';
   import { formatVersionLabel } from '#lib/strategy';
 
   interface Props {
@@ -58,7 +63,7 @@
               >
             </th>
             <td><span class="strategy-name" title={versionLabel}>{versionLabel}</span></td>
-            <td>{forwardTest.symbol}</td>
+            <td>{forwardTest.symbol ?? describeForwardTestUniverse(forwardTest)}</td>
             <td>
               <StatusIndicator
                 kind={findForwardTestStatusKind(forwardTest.status)}
