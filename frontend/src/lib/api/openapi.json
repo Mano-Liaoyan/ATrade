@@ -163,7 +163,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrderBlockedResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/OrderBlockedResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
+                    }
+                  ],
+                  "title": "Response 409 Send Order Api Paper Trading Orders Post"
                 }
               }
             }
@@ -471,6 +479,123 @@
               }
             },
             "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/hk-instrument-list": {
+      "get": {
+        "summary": "List Instruments",
+        "operationId": "list_instruments_api_market_data_hk_instrument_list_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Instruments",
+        "description": "Checks all new symbols through IBKR first. On a 502 or 503, the list does not change.",
+        "operationId": "add_instruments_api_market_data_hk_instrument_list_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddHkInstrumentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddHkInstrumentsResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/hk-instrument-list/{member_id}": {
+      "delete": {
+        "summary": "Delete Instrument",
+        "operationId": "delete_instrument_api_market_data_hk_instrument_list__member_id__delete",
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Member Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HkInstrumentListErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "description": "Validation Error",
@@ -1392,6 +1517,58 @@
         ],
         "title": "AccessSessionResponse"
       },
+      "AddHkInstrumentsRequest": {
+        "properties": {
+          "symbols": {
+            "items": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Symbols"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbols"
+        ],
+        "title": "AddHkInstrumentsRequest"
+      },
+      "AddHkInstrumentsResponse": {
+        "properties": {
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Added"
+          },
+          "not_found": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Found"
+          },
+          "already_in_list": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Already In List"
+          }
+        },
+        "type": "object",
+        "required": [
+          "added",
+          "not_found",
+          "already_in_list"
+        ],
+        "title": "AddHkInstrumentsResponse",
+        "description": "The pasted symbols in their order. A symbol that is pasted 2 times is in already_in_list the second time."
+      },
       "AddInstrumentRequest": {
         "properties": {
           "symbol": {
@@ -1631,6 +1808,145 @@
           "trade_count": {
             "type": "integer",
             "title": "Trade Count"
+          },
+          "cagr_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cagr Percent"
+          },
+          "annual_volatility_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Volatility Percent"
+          },
+          "sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Ratio"
+          },
+          "sortino_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino Ratio"
+          },
+          "calmar_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar Ratio"
+          },
+          "profit_factor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Factor"
+          },
+          "average_win_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Win Usd"
+          },
+          "average_win_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Win Percent"
+          },
+          "average_loss_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Loss Usd"
+          },
+          "exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure Percent"
+          },
+          "turnover_per_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Per Year"
+          },
+          "win_rate_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Percent"
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Missing Reasons"
           }
         },
         "type": "object",
@@ -1638,9 +1954,23 @@
           "final_equity_usd",
           "total_return_percent",
           "max_drawdown_percent",
-          "trade_count"
+          "trade_count",
+          "cagr_percent",
+          "annual_volatility_percent",
+          "sharpe_ratio",
+          "sortino_ratio",
+          "calmar_ratio",
+          "profit_factor",
+          "average_win_usd",
+          "average_win_percent",
+          "average_loss_usd",
+          "exposure_percent",
+          "turnover_per_year",
+          "win_rate_percent",
+          "missing_reasons"
         ],
-        "title": "BacktestMetricsResponse"
+        "title": "BacktestMetricsResponse",
+        "description": "The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and\n`missing_reasons` gives its reason by its field name (section 10.9.3). The page shows \"\u2013\" with the reason."
       },
       "BacktestResponse": {
         "properties": {
@@ -2134,6 +2464,10 @@
             "type": "string",
             "title": "Final Equity Usd"
           },
+          "net_profit_usd": {
+            "type": "string",
+            "title": "Net Profit Usd"
+          },
           "total_return_percent": {
             "type": "string",
             "title": "Total Return Percent"
@@ -2145,16 +2479,170 @@
           "trade_count": {
             "type": "integer",
             "title": "Trade Count"
+          },
+          "cagr_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cagr Percent"
+          },
+          "annual_volatility_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Volatility Percent"
+          },
+          "sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Ratio"
+          },
+          "sortino_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino Ratio"
+          },
+          "calmar_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar Ratio"
+          },
+          "profit_factor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Factor"
+          },
+          "average_win_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Win Usd"
+          },
+          "average_win_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Win Percent"
+          },
+          "average_loss_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Loss Usd"
+          },
+          "exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure Percent"
+          },
+          "turnover_per_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Per Year"
+          },
+          "win_rate_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Percent"
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Missing Reasons"
           }
         },
         "type": "object",
         "required": [
           "final_equity_usd",
+          "net_profit_usd",
           "total_return_percent",
           "max_drawdown_percent",
-          "trade_count"
+          "trade_count",
+          "cagr_percent",
+          "annual_volatility_percent",
+          "sharpe_ratio",
+          "sortino_ratio",
+          "calmar_ratio",
+          "profit_factor",
+          "average_win_usd",
+          "average_win_percent",
+          "average_loss_usd",
+          "exposure_percent",
+          "turnover_per_year",
+          "win_rate_percent",
+          "missing_reasons"
         ],
-        "title": "ComparedMetricsResponse"
+        "title": "ComparedMetricsResponse",
+        "description": "The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the\nfinal equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10)."
       },
       "CreateStrategyRequest": {
         "properties": {
@@ -2663,6 +3151,69 @@
         ],
         "title": "HealthResponse"
       },
+      "HkInstrumentListErrorResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "HkInstrumentListErrorResponse"
+      },
+      "HkInstrumentListResponse": {
+        "properties": {
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/HkInstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "instruments"
+        ],
+        "title": "HkInstrumentListResponse"
+      },
+      "HkInstrumentResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "added_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "currency",
+          "added_at_utc"
+        ],
+        "title": "HkInstrumentResponse"
+      },
       "InstrumentResponse": {
         "properties": {
           "symbol": {
@@ -2740,6 +3291,14 @@
         ],
         "title": "InterruptionResponse",
         "type": "object"
+      },
+      "LedgerRule": {
+        "type": "string",
+        "enum": [
+          "sell_more_than_position",
+          "buy_more_than_cash",
+          "ledger_not_started"
+        ]
       },
       "ManualOrderListResponse": {
         "properties": {
@@ -3065,6 +3624,24 @@
           "detail"
         ],
         "title": "OrderErrorResponse"
+      },
+      "OrderRefusedByLedgerResponse": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/LedgerRule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail",
+          "rule"
+        ],
+        "title": "OrderRefusedByLedgerResponse",
+        "description": "An order rule of the owner ledger failed for \"By hand\". ATrade did not send the order (section 11.10)."
       },
       "OrderRefusedResponse": {
         "properties": {
@@ -3491,6 +4068,26 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At Utc"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "rule_builder"
+            ],
+            "title": "Source"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
           }
         },
         "type": "object",
@@ -3500,7 +4097,9 @@
           "version_number",
           "code",
           "code_sha256",
-          "created_at_utc"
+          "created_at_utc",
+          "source",
+          "rules"
         ],
         "title": "StrategyVersionResponse"
       },
@@ -3522,6 +4121,14 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At Utc"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "rule_builder"
+            ],
+            "title": "Source"
           }
         },
         "type": "object",
@@ -3529,7 +4136,8 @@
           "id",
           "version_number",
           "code_sha256",
-          "created_at_utc"
+          "created_at_utc",
+          "source"
         ],
         "title": "StrategyVersionSummary"
       },
@@ -3783,6 +4391,67 @@
         "title": "OpenOrdersMessage",
         "type": "object"
       },
+      "OwnerKind": {
+        "enum": [
+          "by_hand",
+          "forward_test"
+        ],
+        "type": "string"
+      },
+      "OwnerMessage": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/OwnerKind"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "required": [
+          "kind",
+          "forward_test_id"
+        ],
+        "title": "OwnerMessage",
+        "type": "object"
+      },
+      "OwnerPositionMessage": {
+        "description": "The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/OwnerMessage"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "average_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Cost"
+          }
+        },
+        "required": [
+          "owner",
+          "quantity",
+          "average_cost"
+        ],
+        "title": "OwnerPositionMessage",
+        "type": "object"
+      },
       "PaperAccountBalanceMessage": {
         "description": "The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).",
         "properties": {
@@ -3970,12 +4639,24 @@
             },
             "title": "Positions",
             "type": "array"
+          },
+          "unattributed_cash_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unattributed Cash Usd"
           }
         },
         "required": [
           "check",
           "balance",
-          "positions"
+          "positions",
+          "unattributed_cash_usd"
         ],
         "title": "PaperAccountMessage",
         "type": "object"
@@ -4017,6 +4698,17 @@
           "unrealized_pnl": {
             "title": "Unrealized Pnl",
             "type": "string"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerPositionMessage"
+            },
+            "title": "Owners",
+            "type": "array"
+          },
+          "unattributed_quantity": {
+            "title": "Unattributed Quantity",
+            "type": "string"
           }
         },
         "required": [
@@ -4028,7 +4720,9 @@
           "average_cost",
           "market_price",
           "market_value",
-          "unrealized_pnl"
+          "unrealized_pnl",
+          "owners",
+          "unattributed_quantity"
         ],
         "title": "PositionMessage",
         "type": "object"
