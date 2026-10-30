@@ -60,8 +60,8 @@ class OpenOrder:
 class Execution:
     """One fill of an order from reqExecutions. One order can have many executions."""
 
-    # The IBKR execId. It is unique for each execution.
-    exec_id: str
+    # The IBKR execution ID (execId). The owner ledger stores each fill once by this ID.
+    execution_id: str
     order_id: int
     client_id: int
     account: str
@@ -70,6 +70,8 @@ class Execution:
     side: str
     quantity: Decimal
     price: Decimal
+    # The commission of the IBKR commission report. 0 when the report did not come yet.
+    commission: Decimal
 
 
 def build_contract(instrument: Instrument) -> Contract:
@@ -109,7 +111,7 @@ def read_price(price: float | Decimal | None) -> Decimal | None:
 def convert_fill(fill: Fill) -> Execution:
     execution = fill.execution
     return Execution(
-        exec_id=execution.execId,
+        execution_id=execution.execId,
         order_id=execution.orderId,
         client_id=execution.clientId,
         account=execution.acctNumber,
@@ -117,6 +119,7 @@ def convert_fill(fill: Fill) -> Execution:
         side=execution.side,
         quantity=Decimal(str(execution.shares)),
         price=Decimal(str(execution.price)),
+        commission=Decimal(str(fill.commissionReport.commission)),
     )
 
 

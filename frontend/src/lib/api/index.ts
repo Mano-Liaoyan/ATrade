@@ -161,6 +161,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/hk-instrument-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instruments */
+        get: operations["list_instruments_api_market_data_hk_instrument_list_get"];
+        put?: never;
+        /**
+         * Add Instruments
+         * @description Checks all new symbols through IBKR first. On a 502 or 503, the list does not change.
+         */
+        post: operations["add_instruments_api_market_data_hk_instrument_list_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/hk-instrument-list/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Instrument */
+        delete: operations["delete_instrument_api_market_data_hk_instrument_list__member_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -442,6 +480,23 @@ export interface components {
         AccessSessionResponse: {
             /** Logout Url */
             logout_url: string | null;
+        };
+        /** AddHkInstrumentsRequest */
+        AddHkInstrumentsRequest: {
+            /** Symbols */
+            symbols: string[];
+        };
+        /**
+         * AddHkInstrumentsResponse
+         * @description The pasted symbols in their order. A symbol that is pasted 2 times is in already_in_list the second time.
+         */
+        AddHkInstrumentsResponse: {
+            /** Added */
+            added: string[];
+            /** Not Found */
+            not_found: string[];
+            /** Already In List */
+            already_in_list: string[];
         };
         /** AddInstrumentRequest */
         AddInstrumentRequest: {
@@ -931,6 +986,32 @@ export interface components {
              */
             time_utc: string;
         };
+        /** HkInstrumentListErrorResponse */
+        HkInstrumentListErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /** HkInstrumentListResponse */
+        HkInstrumentListResponse: {
+            /** Instruments */
+            instruments: components["schemas"]["HkInstrumentResponse"][];
+        };
+        /** HkInstrumentResponse */
+        HkInstrumentResponse: {
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Added At Utc
+             * Format: date-time
+             */
+            added_at_utc: string;
+        };
         /** InstrumentResponse */
         InstrumentResponse: {
             /** Symbol */
@@ -958,6 +1039,8 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        /** @enum {string} */
+        LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -1079,6 +1162,15 @@ export interface components {
         OrderErrorResponse: {
             /** Detail */
             detail: string;
+        };
+        /**
+         * OrderRefusedByLedgerResponse
+         * @description An order rule of the owner ledger failed for "By hand". ATrade did not send the order (section 11.10).
+         */
+        OrderRefusedByLedgerResponse: {
+            /** Detail */
+            detail: string;
+            rule: components["schemas"]["LedgerRule"];
         };
         /**
          * OrderRefusedResponse
@@ -1377,6 +1469,25 @@ export interface components {
             /** Orders */
             orders: components["schemas"]["OpenOrderResponse"][];
         };
+        /** @enum {string} */
+        OwnerKind: "by_hand" | "forward_test";
+        /** OwnerMessage */
+        OwnerMessage: {
+            kind: components["schemas"]["OwnerKind"];
+            /** Forward Test Id */
+            forward_test_id: number | null;
+        };
+        /**
+         * OwnerPositionMessage
+         * @description The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).
+         */
+        OwnerPositionMessage: {
+            owner: components["schemas"]["OwnerMessage"];
+            /** Quantity */
+            quantity: string;
+            /** Average Cost */
+            average_cost: string | null;
+        };
         /**
          * PaperAccountBalanceMessage
          * @description The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).
@@ -1425,6 +1536,8 @@ export interface components {
             balance: components["schemas"]["PaperAccountBalanceMessage"] | null;
             /** Positions */
             positions: components["schemas"]["PositionMessage"][];
+            /** Unattributed Cash Usd */
+            unattributed_cash_usd: string | null;
         };
         /** PositionMessage */
         PositionMessage: {
@@ -1446,6 +1559,10 @@ export interface components {
             market_value: string;
             /** Unrealized Pnl */
             unrealized_pnl: string;
+            /** Owners */
+            owners: components["schemas"]["OwnerPositionMessage"][];
+            /** Unattributed Quantity */
+            unattributed_quantity: string;
         };
     };
     responses: never;
@@ -1593,7 +1710,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderBlockedResponse"];
+                    "application/json": components["schemas"]["OrderBlockedResponse"] | components["schemas"]["OrderRefusedByLedgerResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1822,6 +1939,115 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_instruments_api_market_data_hk_instrument_list_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListResponse"];
+                };
+            };
+        };
+    };
+    add_instruments_api_market_data_hk_instrument_list_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddHkInstrumentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddHkInstrumentsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_instrument_api_market_data_hk_instrument_list__member_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

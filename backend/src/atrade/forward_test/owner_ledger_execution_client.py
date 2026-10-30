@@ -110,7 +110,7 @@ class SentOrder:
     side: IbkrOrderSide
     order_ref: str
     # The execIds of the executions that are in the owner ledger.
-    saved_exec_ids: set[str]
+    saved_execution_ids: set[str]
 
 
 def create_quantity(value: Decimal) -> Quantity:
@@ -198,7 +198,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             if (
                 execution.client_id != self.ledger_input.client_id
                 or sent_order is None
-                or execution.exec_id in sent_order.saved_exec_ids
+                or execution.execution_id in sent_order.saved_execution_ids
             ):
                 continue
             await self.send_fill(execution, sent_order)
@@ -215,12 +215,12 @@ class OwnerLedgerExecutionClient(ExecutionClient):
                 order_ref=sent_order.order_ref,
             )
         )
-        sent_order.saved_exec_ids.add(execution.exec_id)
+        sent_order.saved_execution_ids.add(execution.execution_id)
         self.generate_order_filled(
             sent_order.order,
             VenueOrderId(str(execution.order_id)),
             None,
-            TradeId(execution.exec_id),
+            TradeId(execution.execution_id),
             create_quantity(execution.quantity),
             create_price(execution.price),
             Currency.from_str(sent_order.instrument.currency),
