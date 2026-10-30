@@ -892,7 +892,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   tabs "Rules" (the rule builder and the read-only code from the rules,
   strategy section 9.8.5) and `strategy.py` (the `CodeEditor`). While
   "Rules" is open, the save button is "Save rules as new version", and it
-  and Ctrl S save the rules. Below the two panels is the
+  and Ctrl S save the rules. When the code of the open version changed after
+  the rules, the tab shows a warning and the save first shows a `CodeDiff`
+  dialog (strategy section 9.8.4). Below the two panels is the
   "Problems and output" panel (ticket
   [#107](https://github.com/Mano-Liaoyan/ATrade/issues/107)), always the
   last panel of the split. By default it is minimized to its 24px status
@@ -1767,6 +1769,10 @@ option and records it in this document.
   before the last rule change; Save version and Ctrl S save the rules while
   the tab is open; unsaved rules have a `localStorage` draft; and the code
   request has no delay. The details are in strategy sections 9.7 and 9.8.5.
+- Decided (#174): the "Rules" tab of a version with rules that is older
+  than vM shows no warning; the diff before the save is a dialog with the
+  buttons "Cancel" and "Save rules as new version". The details are in
+  strategy section 9.8.4.
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
