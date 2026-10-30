@@ -1,15 +1,13 @@
 """assistant: create the assistant_prompt_version table and record the prompt of each conversation
 
 Revision ID: 969360e99893
-Revises: 8d4b2e6f1a90, 8d4b1e7c2a90, 8d4b6f2a1c93, 8d4f2a6c1e93
-
-It also merges the 4 heads that impl/159 had after 6c3e9a1f2b80, so `alembic upgrade head` has 1 head again.
+Revises: 8d4b2e6f1a90
 """
 
 from alembic import op
 
 revision = "969360e99893"
-down_revision = ("8d4b2e6f1a90", "8d4b1e7c2a90", "8d4b6f2a1c93", "8d4f2a6c1e93")
+down_revision = "8d4b2e6f1a90"
 
 
 def upgrade() -> None:
