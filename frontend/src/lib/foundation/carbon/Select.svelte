@@ -6,6 +6,8 @@
   export interface SelectItem<T extends string> {
     value: T;
     label: string;
+    // A Carbon tag after the label, for example "Discarded" after a version number.
+    tag?: string;
   }
 </script>
 
@@ -14,6 +16,7 @@
   import ChevronDown16 from '@carbon/icons/es/chevron--down/16.js';
   import { Select } from 'bits-ui';
   import Icon from './Icon.svelte';
+  import Tag from './Tag.svelte';
   import { dropdownClasses, dropdownMenuIconClasses, dropdownMenuItemClasses } from './carbon_state';
 
   interface Props {
@@ -42,7 +45,7 @@
 
   let open = $state(false);
   const triggerId = `select-${uid}`;
-  const selectedLabel = $derived(items.find((item) => item.value === value)?.label ?? placeholder);
+  const selectedItem = $derived(items.find((item) => item.value === value));
 </script>
 
 <div class="cds--dropdown__wrapper cds--list-box__wrapper">
@@ -66,7 +69,10 @@
       <Select.Trigger id={triggerId}>
         {#snippet child({ props })}
           <button {...props} type="button" class="cds--list-box__field">
-            <span class="cds--list-box__label">{selectedLabel}</span>
+            <span class="cds--list-box__label">{selectedItem?.label ?? placeholder}</span>
+            {#if selectedItem?.tag !== undefined}
+              <Tag label={selectedItem.tag} size="sm" />
+            {/if}
             <div class={dropdownMenuIconClasses(open)}>
               <Icon icon={ChevronDown16} />
             </div>
@@ -82,6 +88,9 @@
                   <div {...itemProps} class={dropdownMenuItemClasses({ highlighted, selected })}>
                     <div class="cds--list-box__menu-item__option">
                       {item.label}
+                      {#if item.tag !== undefined}
+                        <Tag label={item.tag} size="sm" />
+                      {/if}
                       {#if selected}
                         <Icon icon={Checkmark16} class="cds--list-box__menu-item__selected-icon" />
                       {/if}
@@ -96,3 +105,22 @@
     </div>
   </Select.Root>
 </div>
+
+<style>
+  /* Carbon has no tag inside a dropdown item. The tag stays on the line of the label. */
+  .cds--list-box__field :global(.cds--tag),
+  .cds--list-box__menu-item__option :global(.cds--tag) {
+    margin-block: 0;
+    margin-inline: var(--cds-spacing-03) 0;
+    vertical-align: middle;
+  }
+
+  /* The tag keeps its width. The label takes the rest of the field and gets the ellipsis. */
+  .cds--list-box__field :global(.cds--tag) {
+    flex: none;
+  }
+
+  .cds--list-box__field:has(:global(.cds--tag)) .cds--list-box__label {
+    flex: 0 1 auto;
+  }
+</style>
