@@ -234,8 +234,8 @@ entry exports `create_strategy_router(database_url=..., clock=...)`.
 | `GET /api/strategies/{strategy_id}` | `200` with `{"id", "name", "created_at_utc", "versions": [{"id", "version_number", "code_sha256", "created_at_utc", "source", "conversation_id", "discarded"}]}`. `404` when the strategy does not exist. |
 | `GET /api/strategies/{strategy_id}/versions/{version_number}` | `200` with `{"id", "strategy_id", "version_number", "code", "code_sha256", "created_at_utc", "source", "rules", "conversation_id", "discarded"}`. `rules` is null when the version has no rules. `conversation_id` is null when the AI assistant did not save the version. `discarded` is a boolean (the discarded mark). `404` when the version does not exist. |
 | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (phase 2) | Adds the discarded mark to a version that the AI assistant saved. `200` with the version as `GET .../versions/{version_number}` gives it. A version that is already discarded also gets `200`. `409` when the source of the version is not `ai_assistant`. `404` when the version does not exist. |
-| `POST /api/strategies/{strategy_id}/versions` | Body `{"code": ...}` or `{"rules": ...}`, exactly one of the two. With `code`, the source is `user`. With `rules`, the source is `rule_builder`: the route checks the rules (section 9.8.2), makes the code (section 9.8.3), and saves both. The checks of section 9.3 run on the code in both cases. `201` with the new version. `200` with the latest version when the code is the same (and, for a `rules` body, the rules are also the same). `422` with `{"problems": [{"line", "message"}]}` when a check blocks the save. `422` when the body has both or neither of `code` and `rules`, or when the rules do not match the rules format. `404` when the strategy does not exist. |
-| `POST /api/strategy-rules/code` (phase 1) | Body `{"rules": ...}`. Makes the code from the rules and saves nothing. `200` with `{"code"}`. `422` when the rules do not match the rules format. The "Rules" tab uses it for the read-only code (section 9.8.5). |
+| `POST /api/strategies/{strategy_id}/versions` | Body `{"code": ...}` or `{"rules": ...}`, exactly one of the two. With `code`, the source is `user`. With `rules`, the source is `rule_builder`: the route checks the rules (section 9.8.2), makes the code (section 9.8.3), and saves both. The checks of section 9.3 run on the code in both cases. `201` with the new version. `200` with the latest version when the code is the same (and, for a `rules` body, the rules are also the same). `422` with `{"problems": [{"line", "message"}]}` when a check blocks the save. `422` with the FastAPI validation body when the body has both or neither of `code` and `rules`, or when the rules do not match the rules format (section 9.8.2). `404` when the strategy does not exist. |
+| `POST /api/strategy-rules/code` (phase 1) | Body `{"rules": ...}`. Makes the code from the rules and saves nothing. `200` with `{"code"}`. `422` with the FastAPI validation body when the rules do not match the rules format (section 9.8.2). The "Rules" tab uses it for the read-only code (section 9.8.5). |
 | `GET /api/strategy-templates` (phase 1) | `200` with the template list (section 9.9.2): `[{"id", "name", "kind", "entry", "exit", "defaults", "market", "bar_period", "evidence", "sources": [{"label", "url"}], "differs_from_source"}]`, in the order of section 9.9. `kind` is `rules` or `code`. The "New strategy" dialog uses it. |
 | `DELETE /api/strategies/{strategy_id}` | `204` when the strategy and its versions are deleted. `409` when a backtest or forward test uses a version. `404` when the strategy does not exist. |
 
@@ -397,6 +397,63 @@ The `rules` column (section 9.1.1) holds the rules as JSON. The JSON holds
 the Settings block (position size and the template ID, section 9.9.2), the
 entry group, and the exit items.
 
+Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py`
+(`StrategyRules`, Pydantic) checks it. An unknown field is a format error.
+
+```json
+{
+  "format_version": 1,
+  "settings": {
+    "position_size": {"type": "fixed_shares", "shares": 10},
+    "template_id": null
+  },
+  "entry": {
+    "type": "group",
+    "match": "all_of",
+    "items": [
+      {
+        "type": "condition",
+        "left": {"type": "indicator", "indicator": "rsi", "parameters": {"period": 14}},
+        "comparison": "below",
+        "right": {"type": "number", "value": 30}
+      },
+      {"type": "group", "match": "any_of", "items": []}
+    ]
+  },
+  "exits": {
+    "stop_loss_percent": 5,
+    "take_profit_percent": null,
+    "exit_after_bars": null,
+    "exit_when_entry_is_false": false,
+    "exit_group": null
+  }
+}
+```
+
+| Part | Format |
+|---|---|
+| `format_version` | `1`. |
+| `position_size` | `{"type": "fixed_shares", "shares": <int, 1 or more>}` or `{"type": "percent_of_equity", "percent": <number, more than 0, at most 100>}`. |
+| `template_id` | A string of 1 to 100 characters, or null. #175 sets the template IDs. |
+| Group | `{"type": "group", "match": "all_of" or "any_of", "items": [...]}`. The items of the top group are conditions and groups. The items of a group in a group are conditions only. |
+| Condition | `{"type": "condition", "left", "comparison", "right"}`. `comparison` is `above`, `below`, `at_or_above`, `at_or_below`, `crosses_above`, or `crosses_below`. |
+| Operand | `{"type": "price", "price": "close" / "open" / "high" / "low"}`, `{"type": "number", "value": <int or float>}` (right side only), or `{"type": "indicator", ...}` with the fields of a stored indicator reference ([`indicator.md`](indicator.md) section 23.6). `check_indicator_reference` checks the reference. |
+| `exits` | Each item is not selected when it is null (or `false`). `stop_loss_percent`: more than 0, less than 100. `take_profit_percent`: more than 0. `exit_after_bars`: an int, 1 or more. `exit_group`: a group, as the entry group. |
+
+- A rules body that does not match the format gets the FastAPI `422`
+  validation body (`{"detail": [{"loc", "msg", ...}]}`). `loc` is the path
+  of the wrong part in the rules.
+- An empty group is false. Empty entry rules never buy.
+- The reference price of the stop loss and the take profit is the average
+  fill price of the entry (`Position.avg_px_open`). The stop loss is true
+  when the close is at or below `avg_px_open × (1 − percent / 100)`. The
+  take profit is true when the close is at or above
+  `avg_px_open × (1 + percent / 100)`.
+- "Exit after N bars" counts the bars that close while the position is open.
+  The bar of the entry order is bar 0. The exit is true on bar N.
+- The percent of equity uses the account balance total in the account
+  currency at the entry bar.
+
 ### 9.8.3 Code from the rules
 
 - The backend makes the code from the rules. One function makes it. The
@@ -415,6 +472,26 @@ entry group, and the exit items.
   it makes the code.
 - The code must pass the checks of section 9.3. Backend tests check this for
   each rule template and for empty rules.
+- Decided (#172): `make_rules_code(rules)` in
+  `backend/src/atrade/strategy/rules_code.py` makes the code. The classes are
+  `RulesConfig` and `RulesStrategy`. Operands with the same indicator and the
+  same parameters share 1 indicator object. The indicator objects are named
+  `<catalog key>_<n>` (for example `rsi_1`) in the order of first use: the
+  entry group first, then the exit items.
+- Decided (#172): the configuration fields are `<indicator object>_<parameter>`
+  (for example `rsi_1_period`) for each indicator parameter,
+  `threshold_<n>` for each number, and also `stop_loss_percent`,
+  `take_profit_percent`, `exit_after_bars`, `position_shares`, and
+  `equity_percent` when the rules have them. Each field has the type of its
+  JSON value (`int` or `float`).
+- Decided (#172): at each bar close, the code reads the prices and the
+  indicator outputs of the rules. When an output has no value, or an order
+  of the strategy is open or in flight, no rule runs on that bar. A cross
+  compares with the values of the previous bar. A cross is false when the
+  previous bar had no value. The code warms up the indicators with
+  `request_bars` in `on_start`: the bar count is the largest look-back count
+  of the indicators ([`indicator.md`](indicator.md) section 23.4), and 7 days
+  at least.
 
 ### 9.8.4 One-way editing
 
@@ -480,15 +557,6 @@ It needs the multi-instrument backtest of
 
 ### 9.8.7 Left to the implementation
 
-- The JSON field names of the rules, and a format version field.
-- The names of the configuration fields in the code.
-- Whether the stop loss, take profit, and N bars values are also
-  configuration fields. #138 names only indicator parameters and number
-  thresholds.
-- The reference price of stop loss and take profit (for example the average
-  fill price of the entry).
-- The bar from which "Exit after N bars" counts.
-- The behavior of an empty entry group.
 - The rules that "Blank rules" holds (for example the position size).
 - What the "Rules" tab shows for a strategy that has no version with rules.
 - What the "Rules" tab shows when the open version is an older version with

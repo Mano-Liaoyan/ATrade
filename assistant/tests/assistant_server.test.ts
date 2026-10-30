@@ -7,8 +7,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { startAssistantServer } from '../src/assistant_server.ts';
 import { Conversations } from '../src/conversations.ts';
+import { CredentialFile } from '../src/credential_file.ts';
+import { Logins } from '../src/logins.ts';
 import { createFakeOpenModel } from './fake_model.ts';
 import { startFakeModelServer, type FakeModelServer, type ModelStep } from './fake_model_server.ts';
+import { createFakeRuntimeFactory, FAKE_KEY_PROVIDER } from './fake_providers.ts';
 
 const SELECTION = { provider: 'fake', model: 'fake-model', credential_id: 'fake-key-1' };
 
@@ -31,7 +34,14 @@ async function startOnFreePort(script: ModelStep[] = []): Promise<string> {
   model = await startFakeModelServer(script);
   const openModel = await createFakeOpenModel(model.baseUrl, workDir);
   const conversations = new Conversations({ piDir: workDir, openModel, createTools: () => [] });
-  const server = await startAssistantServer({ host: '127.0.0.1', port: 0 }, conversations);
+  const file = new CredentialFile(path.join(workDir, 'credentials.json'));
+  const createRuntime = createFakeRuntimeFactory(model.baseUrl);
+  const logins = new Logins({ file, createRuntime });
+  const server = await startAssistantServer({ host: '127.0.0.1', port: 0 }, conversations, {
+    file,
+    logins,
+    createRuntime,
+  });
   close = () =>
     new Promise((resolve) => {
       server.closeAllConnections();
@@ -166,5 +176,71 @@ describe('the conversation routes', () => {
 
     expect(response.status).toBe(204);
     expect(await (await fetch(`${baseUrl}/conversations/3/messages`)).json()).toEqual({ messages: [] });
+  });
+});
+
+describe('the credential routes', () => {
+  /** Starts an API key login, answers the secret prompt, and returns the login events. */
+  async function addApiKey(baseUrl: string, key: string): Promise<{ type: string; credential?: { id: string } }[]> {
+    const response = await postJson(`${baseUrl}/logins`, { provider: FAKE_KEY_PROVIDER, method: 'api_key', name: 'Work' });
+    const decoder = new TextDecoder();
+    const events: { type: string; prompt_id?: string | null; credential?: { id: string } }[] = [];
+    let buffer = '';
+    for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(chunk);
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines.filter((item) => item !== '')) {
+        const event = JSON.parse(line) as (typeof events)[number];
+        events.push(event);
+        if (typeof event.prompt_id === 'string') {
+          const answer = await postJson(`${baseUrl}/login-answers`, { prompt_id: event.prompt_id, value: key });
+          expect(answer.status).toBe(204);
+        }
+      }
+    }
+    return events;
+  }
+
+  test('a login adds a credential, and GET credentials shows only the last 4 characters', async () => {
+    const baseUrl = await startOnFreePort();
+
+    const events = await addApiKey(baseUrl, 'sk-test-secret-4321');
+
+    expect(events.at(-1)?.type).toBe('login_end');
+    const listed = await (await fetch(`${baseUrl}/credentials`)).text();
+    expect(listed).toContain('"key_last4":"4321"');
+    expect(listed).not.toContain('secret');
+  });
+
+  test('GET providers lists the models of a provider with a credential', async () => {
+    const baseUrl = await startOnFreePort();
+    await addApiKey(baseUrl, 'sk-test-1');
+
+    const { providers } = (await (await fetch(`${baseUrl}/providers`)).json()) as {
+      providers: { id: string; models: { id: string }[] }[];
+    };
+
+    expect(providers.find((provider) => provider.id === FAKE_KEY_PROVIDER)?.models.map((item) => item.id)).toEqual([
+      'fake-model',
+      'fake-model-2',
+    ]);
+  });
+
+  test('DELETE credentials removes the credential, and a missing one answers 404', async () => {
+    const baseUrl = await startOnFreePort();
+    const events = await addApiKey(baseUrl, 'sk-test-1');
+    const id = events.at(-1)?.credential?.id ?? '';
+
+    expect((await fetch(`${baseUrl}/credentials/${id}`, { method: 'DELETE' })).status).toBe(204);
+    expect((await fetch(`${baseUrl}/credentials/${id}`, { method: 'DELETE' })).status).toBe(404);
+    expect(await (await fetch(`${baseUrl}/credentials`)).json()).toEqual({ credentials: [] });
+  });
+
+  test('an answer without a waiting login answers 404, and a wrong method answers 400', async () => {
+    const baseUrl = await startOnFreePort();
+
+    expect((await postJson(`${baseUrl}/login-answers`, { prompt_id: 'x', value: 'y' })).status).toBe(404);
+    expect((await postJson(`${baseUrl}/logins`, { provider: 'x', method: 'password', name: 'n' })).status).toBe(400);
   });
 });

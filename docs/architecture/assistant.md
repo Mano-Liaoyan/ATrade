@@ -414,6 +414,12 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The model list of a provider comes from pi
   (`ModelRuntime.getAvailable(provider)` gives only the models with a
   credential).
+- Implemented (#183): `GET /api/assistant/providers` lists each pi provider
+  with at least one login method (`login_methods`: `oauth` for a
+  subscription login, `api_key`). The `models` of a provider are the union
+  of `getAvailable(provider)` over its stored credentials. A provider
+  without a credential has no models. pi has no models.json in ATrade
+  (`modelsPath: null`).
 
 ### 25.7.2 Storage
 
@@ -429,6 +435,23 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   file.
 - `web` does not keep a credential. The secret value goes from the browser
   through `/ws/assistant` to `assistant`.
+- Implemented (#183): the file is `/data/credentials.json`
+  (`assistant/src/credential_file.ts`):
+  `{"credentials": [{id, name, provider, credential, state, state_message}]}`.
+  `credential` is the pi credential (`{type: "api_key", key}` or
+  `{type: "oauth", access, refresh, expires, ...}`). The ID is a UUID.
+  Each write makes a new file with mode `0600` and renames it.
+- `SelectedCredentialStore` is the `CredentialStore` of one run: `read()`
+  gives the selected credential only for its provider, and `list()` has 1
+  entry. pi refreshes an OAuth token inside `modify()`, and the store writes
+  the new token to the same entry. The writes are serialized.
+- The state of a credential: `ready`, or `failed` when the last OAuth
+  refresh failed (`state_message` has the reason). The user deletes a
+  failed credential and logs in again. A good refresh sets `ready` again.
+- Delete: `DELETE /api/assistant/credentials/{credential_id}` removes the
+  entry from the file (`404` when it does not exist). A credential has no
+  rename: delete it and add it again with the new name. The conversations
+  keep the old credential name in their messages.
 
 ### 25.7.3 Login
 
@@ -442,6 +465,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - A subscription login shows the authorization link, the device code, and a
   field to paste a code, as pi asks for them.
 - A new API key uses a password field.
+- Implemented (#183): `assistant/src/logins.ts`. A login runs in a
+  `ModelRuntime` with an empty credential store in memory. pi returns the
+  new credential, and `assistant` adds it to the file with the name that
+  the user entered. pi asks for an API key with a `secret` prompt
+  ("Enter API key"), so the API key also comes as a `login_answer`.
+- The Credentials dialog opens its own `/ws/assistant` socket without
+  `conversation_id`. Closing the dialog closes the socket and stops the
+  login. A cancelled login adds no credential.
 
 ### 25.7.4 Credentials dialog
 
@@ -453,6 +484,19 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - A credential has a name, for example "Anthropic API key · personal".
 - The dialog has the steps to add a subscription login and to add an API
   key (25.7.3).
+- Implemented (#183): `frontend/src/lib/assistant/CredentialsDialog.svelte`
+  (logic in `credentials.ts`). The table columns are Name, Provider, Kind,
+  and State, and a row menu with "Delete credential". Kind is
+  "Subscription" or "API key"; an API key adds its last 4 characters
+  (`••••7a9f`). State is "Ready" (success) or "Log in again" (error, the
+  reason in the cell title). Below the table: a content switcher
+  (Subscription, API key), the Provider select (only the providers with the
+  method), the Name field, and "Log in" or "Add API key". While a login
+  runs, the dialog shows the steps of pi: the link "Open the authorization
+  page", the device code, the progress text, and the field of the current
+  prompt (a password field for `secret`) with "Save API key", "Send code",
+  or "Send answer". #185 puts the "Credentials" icon button in the side
+  column and has the Playwright test of the flow.
 
 ## 25.8 Conversations
 
@@ -622,6 +666,7 @@ Browser to server:
 | `steer` | A user message while the AI assistant runs. |
 | `abort` | Stop the current run (the "Stop" button). |
 | `login_answer` | The answer to a `login_step` of kind `prompt`. |
+| `login_start` | Start a login (#183). |
 
 - Phase 3 adds a message for the condition card (a screen ID), like
   `strategy_version_saved`. See 25.14.
@@ -648,7 +693,6 @@ Fields (#179). Each message is a JSON object with `type`.
   not valid each get an `error` message. A `prompt` during a run does not
   start a second run.
 - When the browser leaves during a run, `web` stops the run (`abort`).
-- `login_step` and `login_answer` come with #183.
 - Decided (#182): the fields of the tool messages:
 
   | `type` | Direction | Fields |
@@ -667,11 +711,28 @@ Fields (#179). Each message is a JSON object with `type`.
   `run_backtest` saw a final status in its wait. The `assistant` service
   sends the same 3 events, with the same fields, as JSON lines of
   `POST /conversations/{id}/runs` (25.14).
+Login fields (#183):
+
+| `type` | Direction | Fields |
+|---|---|---|
+| `login_start` | Browser to server | `provider`, `method` (`oauth` or `api_key`), `name` (the credential name) |
+| `login_answer` | Browser to server | `prompt_id`, `value` (for `select`, the option ID) |
+| `login_step` | Server to browser | `step` (`auth_url`, `device_code`, `progress`, `info`, `prompt`), `message`, `url`, `user_code`, `prompt_id`, `prompt_type` (`text`, `secret`, `select`, `manual_code`), `options` (`[{id, label}]`); a field that the step does not use is null |
+| `login_end` | Server to browser | `credential` (the fields of `GET /api/assistant/credentials`) |
+
+- A socket without `conversation_id` is for the login only. A `prompt`,
+  `steer`, or `abort` on it gets an `error`.
+- One login runs at a time on one socket. A failed login sends `error`.
+- No message to the browser holds a secret. The error of a message that is
+  not valid does not repeat its input, because a `login_answer` can hold an
+  API key. `web` does not log the answers.
 - `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
   of both directions. Message model names: `PromptMessage`, `SteerMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
   `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
-  `BacktestFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`.
+  `BacktestFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
+  `LoginStartMessage`, `LoginAnswerMessage`, `LoginStepMessage`,
+  `LoginEndMessage`.
 
 ## 25.11 Browser routes on port 8000
 
@@ -708,6 +769,15 @@ below are choices of this document. The implementation can change them.
   - `DELETE {conversation_id}` answers `204`.
   - A conversation that does not exist gets `404`. `GET {conversation_id}`
     and `DELETE` answer `503` when `assistant` is not reachable.
+- #183 implements the providers and credentials rows:
+  - `GET /api/assistant/providers` answers `{"providers": [{id, name,
+    login_methods, models: [{id, name}]}]}` (25.7.1).
+  - `GET /api/assistant/credentials` answers `{"credentials": [{id, name,
+    provider, type, key_last4, state, state_message}]}`. `key_last4` is the
+    last 4 characters of an API key, null for a subscription login.
+  - `DELETE /api/assistant/credentials/{credential_id}` answers `204`, or
+    `404` for a credential that does not exist.
+  - All 3 answer `503` when `assistant` is not reachable.
 - None of these routes is on port 8001.
 - The login itself runs on `/ws/assistant` (25.7.3), because it asks
   questions and waits for answers.
@@ -858,14 +928,26 @@ columns behave the same (section 13).
   The conversation ID has only digits, so it cannot name a path outside
   `/data/conversations/`. A wrong body gets `400`. The run has no read
   timeout, because a tool can wait 15 minutes (25.4.2). `web` changes the
-  events into the messages of 25.10. The login steps and the credential
-  list come with #183.
-- Decided (#179): until the credential store of #183, the `assistant`
-  process has no credential. Each run sends the error "The credential <id>
-  does not exist." The tests give the fake model server a credential with
-  `createFakeOpenModel` in `assistant/tests/fake_model.ts`. The test values
-  are only in the test code. `web` has its tests with a fake of
-  `AssistantService` (`backend/tests/fakes/assistant.py`).
+  events into the messages of 25.10.
+- Decided (#183): the credential and login part of the same protocol:
+
+  | Request | Answer |
+  |---|---|
+  | `GET /providers` | `{providers}` (25.11). |
+  | `GET /credentials` | `{credentials}`, without secrets. |
+  | `DELETE /credentials/{id}` | `204`, or `404`. |
+  | `POST /logins` `{provider, method, name}` | One JSON line for each login event: `login_step`, then `login_end` `{credential}` or `error` `{message}`. When `web` closes the request, the login stops. |
+  | `POST /login-answers` `{prompt_id, value}` | `204`, or `404` when no login waits for the prompt. |
+
+  A run uses the stored credential: `openStoredModel`
+  (`assistant/src/providers.ts`) refuses a credential that does not exist
+  or that is for another provider. The conversation tests still use
+  `createFakeOpenModel` in `assistant/tests/fake_model.ts`. The credential
+  and login tests register fake providers (`assistant/tests/fake_providers.ts`):
+  `fake-oauth` (each login step, a refresh that fails for the refresh token
+  "revoked") and `fake-key`. The test values are only in the test code.
+  `web` has its tests with a fake of `AssistantService`
+  (`backend/tests/fakes/assistant.py`).
 - Decided (#178): the subnet of `atrade-assistant-internal` is
   `172.31.250.0/24`. It is fixed in `deploy/compose.yaml` and is not a
   setting.
@@ -918,8 +1000,10 @@ columns behave the same (section 13).
 - Decided (#182): the summaries in the `read_backtest` result: at most 50
   points of the equity curve and the first 50 trades with all fields
   (25.4.1).
-- The credential delete and rename behavior, and the meaning of the
-  credential state column.
+- Decided (#183): the credential delete and rename behavior, and the
+  meaning of the credential state column (25.7.2). Delete removes the entry
+  from the file. There is no rename. The state is `ready` or `failed` (the
+  last OAuth refresh failed).
 - The UI copy of each disabled control, for example "Send" without a
   credential.
 - Decided (#178): the `tool_call` handler that refuses unknown tools is
@@ -938,10 +1022,10 @@ columns behave the same (section 13).
 | Ticket | Fact | How to check |
 |---|---|---|
 | #133 | The real subscription logins and model calls of each provider. Only a fake OpenAI-compatible model server was used. | Log in through the Credentials dialog with each provider that the user has, and send one message. |
-| #140, #133 | OpenAI may count a self-hosted single-user server as "remotely hosted" for the ChatGPT subscription login. | Read the OpenAI "Preview limitations" page. |
+| #140, #133 | OpenAI may count a self-hosted single-user server as "remotely hosted" for the ChatGPT subscription login. The OpenAI pages read on 2026-10-30 do not settle it (`docs/architecture.md` section 21.1). | Ask OpenAI. |
 | #140 | Community Antigravity extensions may not work in pi 1.4.0. Not needed in this stage. | Only for the later extension ticket: install the extension in a temporary container, and let the user log in one time. |
-| #140 | `ModelRuntime.login()` with an `AuthInteraction` object does each login step from a web page. Read from the 1.4.0 source, not run with a real provider. | The first login in the Credentials dialog. |
-| #140 | `ModelRuntime.create({ credentials })` accepts ATrade's own `CredentialStore`, and an OAuth refresh writes back through it. Read from the source. | A test with 2 credentials of one provider. Then wait for an OAuth token refresh and read the file. |
+| #140 | `ModelRuntime.login()` with an `AuthInteraction` object does each login step from a web page. Checked with fake login flows (#183), not with a real provider. | The first login in the Credentials dialog (#186). |
+| #140 | An OAuth refresh of a real provider writes back through ATrade's `CredentialStore`. Checked with a fake refresh and 2 credentials of one provider (#183). | Wait for a real OAuth token refresh and read `/data/credentials.json` (#186). |
 | #150 | The run time of a point-in-time backtest from a screen (34 quarters, a screen of 500 instruments, and a multi-instrument backtest). It can be longer than the 15 minute wait. | After the implementation, run one with real data and measure the time. |
 | #150 | The token count of a screen result with 500 rows. | After the implementation, count the tokens of one real result. |
 | #140 | The VS Code secondary side bar resize and Maximize behavior, which the side column follows. | Read `src/vs/workbench/browser/layout.ts` of VS Code. |
