@@ -6,23 +6,32 @@ records of a full purchase in memory. One transaction: a failed import saves not
 """
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import LiteralString
 from zoneinfo import ZoneInfo
 
+import anyio.from_thread
+import anyio.to_thread
 import databento
 import databento_dbn
 import psycopg
 from databento.common.symbology import InstrumentMap
 
-from atrade.foundation.bar import BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange, ceil_to_bar_start, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
+from atrade.ibkr import GatewayConnection
 from atrade.market_data import databento_import_sql
 from atrade.market_data.bar_source import BarSource, saved_range_table
 from atrade.market_data.bar_store import JOIN_SAVED_RANGE_TEMPLATE, create_key_parameters
+from atrade.market_data.databento_import_adjustment import (
+    DetectedSplit,
+    IbkrDailyBarReader,
+    SymbolLink,
+    link_and_adjust_import_bars,
+)
 
 NEW_YORK = ZoneInfo("America/New_York")
 NANOSECONDS_PER_SECOND = 10**9
@@ -62,11 +71,14 @@ class DatabentoImportReport:
     `statistics` of XNAS.ITCH or XNYS.PILLAR. The import saves no bar for them (#141).
     `symbols_without_listing_exchange`: EQUS.SUMMARY symbols without an earlier Databento daily bar. The import does
     not know their listing exchange and saves no bar for them.
+    `stock_splits` and `symbol_links`: what the import found (sections 8.8.3 and 8.8.4).
     """
 
     saved_bar_count: int
     symbols_without_official_close: list[str]
     symbols_without_listing_exchange: list[str]
+    stock_splits: list[DetectedSplit] = field(default_factory=list[DetectedSplit])
+    symbol_links: list[SymbolLink] = field(default_factory=list[SymbolLink])
 
 
 def to_price(fixed_price: int) -> Decimal:
@@ -218,31 +230,58 @@ def read_file_kinds(connection: psycopg.Connection, file_paths: list[Path]) -> d
     return {file_kind: find_kind_range(time_ranges) for file_kind, time_ranges in ranges_by_kind.items()}
 
 
-def import_databento_files(*, database_url: str, file_paths: list[Path]) -> DatabentoImportReport:
+def import_databento_files(
+    *, database_url: str, file_paths: list[Path], read_ibkr_daily_bars: IbkrDailyBarReader | None = None
+) -> DatabentoImportReport:
     """Imports the DBN files of the daily bar purchase (section 8.8.1). A second import of the same files adds no
-    row: a saved bar gets the same values, and the saved ranges join."""
+    row: a saved bar gets the same values, and the saved ranges join.
+
+    Without `read_ibkr_daily_bars`, the detection rule finds the stock splits of all instruments (section 8.8.3).
+    """
     with psycopg.connect(database_url) as connection, connection.transaction():
         connection.execute(databento_import_sql.CREATE_TEMPORARY_TABLES)
         kind_ranges = read_file_kinds(connection, file_paths)
-        saved_bar_count = 0
         symbols_without_official_close: list[str] = []
         symbols_without_listing_exchange: list[str] = []
+        saved_ranges: list[TimeRange] = []
         history_range = find_history_range(kind_ranges)
         if history_range is not None:
-            saved_bar_count += save_bars(connection, databento_import_sql.INSERT_HISTORY_BARS, history_range)
+            save_bars(connection, databento_import_sql.INSERT_HISTORY_BARS, history_range)
             symbols_without_official_close = read_symbols(
                 connection, databento_import_sql.SELECT_SYMBOLS_WITHOUT_OFFICIAL_CLOSE, history_range
             )
-            save_saved_ranges(connection, history_range)
+            saved_ranges.append(history_range)
         if SUMMARY_FILE_KIND in kind_ranges:
             summary_range = to_whole_days(kind_ranges[SUMMARY_FILE_KIND])
-            saved_bar_count += save_bars(connection, databento_import_sql.INSERT_SUMMARY_BARS, summary_range)
+            save_bars(connection, databento_import_sql.INSERT_SUMMARY_BARS, summary_range)
             symbols_without_listing_exchange = read_symbols(
                 connection, databento_import_sql.SELECT_SYMBOLS_WITHOUT_LISTING_EXCHANGE, summary_range
             )
-            save_saved_ranges(connection, summary_range)
+            saved_ranges.append(summary_range)
+        symbol_links, stock_splits = link_and_adjust_import_bars(connection, read_ibkr_daily_bars)
+        saved_bar_count = connection.execute(databento_import_sql.SAVE_IMPORT_BARS).rowcount
+        for saved_range in saved_ranges:
+            save_saved_ranges(connection, saved_range)
     return DatabentoImportReport(
         saved_bar_count=saved_bar_count,
         symbols_without_official_close=symbols_without_official_close,
         symbols_without_listing_exchange=symbols_without_listing_exchange,
+        stock_splits=stock_splits,
+        symbol_links=symbol_links,
+    )
+
+
+async def import_databento_files_with_ibkr(
+    *, database_url: str, file_paths: list[Path], gateway: GatewayConnection
+) -> DatabentoImportReport:
+    """The import with the IBKR daily closes of the instruments that still trade (section 8.8.3). The import runs in
+    a worker thread. Each IBKR read runs on the event loop of the gateway connection."""
+
+    def read_ibkr_daily_bars(instrument: Instrument, time_range: TimeRange) -> list[Bar]:
+        return anyio.from_thread.run(gateway.read_historical_bars, instrument, BarPeriod.ONE_DAY, time_range)
+
+    return await anyio.to_thread.run_sync(
+        lambda: import_databento_files(
+            database_url=database_url, file_paths=file_paths, read_ibkr_daily_bars=read_ibkr_daily_bars
+        )
     )

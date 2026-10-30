@@ -275,6 +275,27 @@ With `DATABENTO_API_KEY` in `.env`, the `forward-test` service updates the
 universe at 06:00 ET on the first trading day of each quarter (about 1.3 USD
 each quarter). With an empty key, the update does not run.
 
+The import reads the IBKR daily closes of the instruments that still trade
+to find their stock splits, so IB Gateway must run (`ibkr` profile). The
+import connects with client ID 30. Use `--ibkr-client-id <ID>` for another
+free client ID. The import also links symbol changes (for example `SQ` to
+`XYZ`) and writes the stock splits and links that it found to its log
+(`docs/architecture/market_data.md` sections 8.8.3 and 8.8.4).
+
+Check the detections one time after the import:
+
+```sh
+# List the stock splits that wait for the check and the symbol links that are not checked.
+docker compose --file deploy/compose.yaml --env-file .env run --rm web \
+  python -m atrade.app.databento_check
+# Confirm all of them. Reject each wrong stock split by its ID.
+docker compose --file deploy/compose.yaml --env-file .env run --rm web \
+  python -m atrade.app.databento_check --accept --reject-split <ID>
+```
+
+A confirmed stock split changes the stored bars before its ex-date. A
+rejected stock split changes nothing, and the next import keeps it rejected.
+
 ### Old data
 
 The rewrite migrates no old data. The new database uses the new volume
