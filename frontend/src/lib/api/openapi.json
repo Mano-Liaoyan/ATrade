@@ -3491,6 +3491,26 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At Utc"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "rule_builder"
+            ],
+            "title": "Source"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules"
           }
         },
         "type": "object",
@@ -3500,7 +3520,9 @@
           "version_number",
           "code",
           "code_sha256",
-          "created_at_utc"
+          "created_at_utc",
+          "source",
+          "rules"
         ],
         "title": "StrategyVersionResponse"
       },
@@ -3522,6 +3544,14 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At Utc"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user",
+              "rule_builder"
+            ],
+            "title": "Source"
           }
         },
         "type": "object",
@@ -3529,7 +3559,8 @@
           "id",
           "version_number",
           "code_sha256",
-          "created_at_utc"
+          "created_at_utc",
+          "source"
         ],
         "title": "StrategyVersionSummary"
       },
