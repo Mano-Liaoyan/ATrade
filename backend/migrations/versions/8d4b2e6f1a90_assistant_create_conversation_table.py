@@ -1,14 +1,13 @@
 """assistant: create the assistant_conversation table
 
 Revision ID: 8d4b2e6f1a90
-Revises: 8d4f3b7d2e14, 8d4f2a6c1e93
+Revises: b7e3c9a4d158
 """
 
 from alembic import op
 
 revision = "8d4b2e6f1a90"
-# This revision also joins the heads of strategy (#171) and paper_trading (#214) into one head.
-down_revision = ("8d4f3b7d2e14", "8d4f2a6c1e93")
+down_revision = "b7e3c9a4d158"
 
 
 def upgrade() -> None:
