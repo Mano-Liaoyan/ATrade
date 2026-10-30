@@ -533,13 +533,16 @@ commissions and the open gap.
 
 | # | Name | Entry | Exit | Defaults | Sources | Evidence |
 |---|---|---|---|---|---|---|
-| S1 | 200-day trend | Close crosses above SMA | Entry conditions no longer true | SMA 200 | [Brock, Lakonishok & LeBaron 1992](https://doi.org/10.1111/j.1540-6261.1992.tb04681.x), [Faber 2007](https://doi.org/10.3905/jwm.2007.674809) | B (index), C (single stock) |
+| S1 | 200-day trend | Close above SMA | Entry conditions no longer true | SMA 200 | [Brock, Lakonishok & LeBaron 1992](https://doi.org/10.1111/j.1540-6261.1992.tb04681.x), [Faber 2007](https://doi.org/10.3905/jwm.2007.674809) | B (index), C (single stock) |
 | S2 | 50-day range break | High at or above Donchian channel upper | Exit after N bars | Donchian 50, N = 10 | [Brock, Lakonishok & LeBaron 1992](https://doi.org/10.1111/j.1540-6261.1992.tb04681.x) | B (index), C (single stock) |
 | S3 | 12-month time-series momentum | 12-month momentum above 0 | Entry conditions no longer true | Look back 252 days, skip 0 days | [Moskowitz, Ooi & Pedersen 2012](https://doi.org/10.1016/j.jfineco.2011.11.003) | B (index and futures), C (single stock) |
 
 - Differences from the sources: the rule builder checks on each bar. Faber
   and Moskowitz et al. check 1 time each month. S2 uses the high of the bar
   for the break.
+- S1 uses "Close above", not "Close crosses above". A cross is true on one
+  bar only, so "Entry conditions no longer true" would sell 1 bar after the
+  entry. Brock et al. and Faber hold while the price is above the average.
 - S2 uses "High at or above", not "Close crosses above". The Donchian upper
   value at time t includes the high of the bar at t (ADR 0001), so the close
   can never cross above it.
