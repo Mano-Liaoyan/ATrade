@@ -129,10 +129,11 @@ async def test_the_program_calculates_the_us_universe_of_the_quarters_after_the_
     insert_daily_bars(database_url, nasdaq("AAPL"), weekdays(START, date(2018, 9, 28)), "10", 100)
     monkeypatch.setenv("DATABASE_URL", database_url)
     monkeypatch.setenv("DATABENTO_API_KEY", "")
-    monkeypatch.setattr(
-        "atrade.app.databento_import.IbAsyncGatewayConnection",
-        lambda **_: FakeGatewayConnection(managed_accounts=["DU1234567"]),
-    )
+
+    def create_fake_gateway(**_: object) -> FakeGatewayConnection:
+        return FakeGatewayConnection(managed_accounts=["DU1234567"])
+
+    monkeypatch.setattr("atrade.app.databento_import.IbAsyncGatewayConnection", create_fake_gateway)
     caplog.set_level("INFO")
 
     # main runs its own event loop, so it runs in a worker thread.
