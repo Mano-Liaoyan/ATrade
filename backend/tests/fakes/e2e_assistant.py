@@ -132,7 +132,11 @@ class E2EAssistantService(FakeAssistantService):
 
     async def save_version(self, conversation_id: int) -> AsyncIterator[RunEvent]:
         yield ToolStep(
-            tool_call_id="save", tool_name="save_strategy_version", status="running", backtest_id=None, backtest_status=None
+            tool_call_id="save",
+            tool_name="save_strategy_version",
+            status="running",
+            backtest_id=None,
+            backtest_status=None,
         )
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             cursor = await connection.execute(
@@ -218,4 +222,3 @@ class E2EAssistantService(FakeAssistantService):
                 backtest_status=status,
             )
         yield BacktestFinished(backtest_id=backtest_id)
-
