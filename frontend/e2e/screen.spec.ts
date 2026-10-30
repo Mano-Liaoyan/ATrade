@@ -181,6 +181,8 @@ async function openNewScreen(
 }
 
 test('adds and changes each kind of condition and the order, and runs at once', async ({ page, request }, currentTest) => {
+  // 12 changes, each with a run of the screen: slow when all browser projects run at the same time.
+  test.slow();
   await openNewScreen(page, request, uniqueName(currentTest, 'Edit'), {
     start: 'watchlist',
     filters: [{ field: 'last_price', operator: '>', value: '0' }],
