@@ -16,7 +16,13 @@ from atrade.strategy.code_checks import CodeProblem
 from atrade.strategy.rules_code import make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
-from atrade.strategy.strategy_templates import BLANK_CODE, STRATEGY_TEMPLATES, StartPoint, find_start_code, find_start_rules
+from atrade.strategy.strategy_templates import (
+    BLANK_CODE,
+    STRATEGY_TEMPLATES,
+    StartPoint,
+    find_start_code,
+    find_start_rules,
+)
 from atrade.strategy.version_saving import save_ai_assistant_version, save_checked_version
 
 MAX_STRATEGY_NAME_LENGTH = 100

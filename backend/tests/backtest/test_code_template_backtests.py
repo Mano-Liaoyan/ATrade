@@ -31,7 +31,9 @@ async def test_a_code_template_rebalances_at_the_month_start_and_sells_before_it
         backtest = await wait_for_final_status(web_client, response.json()["id"])
 
     assert backtest["status"] == "finished", backtest["error_message"]
-    trades = [(trade["symbol"], trade["side"], datetime.fromisoformat(trade["time_utc"])) for trade in backtest["trades"]]
+    trades = [
+        (trade["symbol"], trade["side"], datetime.fromisoformat(trade["time_utc"])) for trade in backtest["trades"]
+    ]
     assert {(symbol, side) for symbol, side, _ in trades} == {
         ("AAA", "BUY"),
         ("BBB", "BUY"),

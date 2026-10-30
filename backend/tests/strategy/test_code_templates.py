@@ -15,7 +15,7 @@ def load_template_namespace(template_id: str) -> dict[str, Any]:
     code = TEMPLATES_BY_ID[template_id].code
     assert code is not None
     namespace: dict[str, Any] = {}
-    exec(compile(code, f"{template_id}.py", "exec"), namespace)  # noqa: S102 - the template code of the platform.
+    exec(compile(code, f"{template_id}.py", "exec"), namespace)
     return namespace
 
 
