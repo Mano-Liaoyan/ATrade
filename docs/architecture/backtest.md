@@ -1099,7 +1099,9 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
 - Decided (#182): only the tool `run_backtest` counts the 5 backtests of a
   user message. Port 8001 does not count them. A steer message is a new
   user message, so it starts a new count. Only a backtest that
-  `POST /api/backtests` accepted counts. A `422` does not count.
+  `POST /api/backtests` accepted counts. A `422` does not count. The tool
+  counts a backtest before its POST, so parallel tool calls of one model
+  turn also start at most 5.
 - Decided (#182): while it waits, `run_backtest` reads
   `GET /api/backtests/{backtest_id}` every 2 seconds. It sends each new
   status (`queued`, `running`, then the final status) with `onUpdate`. The
