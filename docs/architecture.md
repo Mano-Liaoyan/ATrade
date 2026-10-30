@@ -570,7 +570,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   TradingView Lightweight Charts™"), so all charts show the same attribution.
   With `fill`, the frame fills the height of its parent, and the chart
   (`autoSize`) follows each size change of its container, for example after a
-  side column collapses. Without `fill`, `height` and `minHeight` set the
+  side column is minimized or resized. Without `fill`, `height` and `minHeight` set the
   canvas height. `readChartThemeOptions(container)` and
   `readChartColor(container, token)` of `foundation/chart_frame` read the
   Carbon tokens for each chart. The price scales use the number formats of
@@ -640,10 +640,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     or its status bar.
   - `PanelHeader` (`end` snippet): the 32px header line with the class
     `atrade-panel-header`. `Splitter` (`label`, `controls`, `value`, `min`,
-    `max`, `onValueChange`): a `role="separator"` (WAI-ARIA window splitter)
-    with `aria-controls` on the panel below it; its value is the height of
-    that panel, Arrow Up and Arrow Down move it 16px, Home gives the panel its
-    minimum height, and End its maximum height.
+    `max`, `grow`, `onValueChange`, `ondblclick`): a `role="separator"`
+    (WAI-ARIA window splitter) with `aria-controls` on the region that it
+    resizes. `grow` is the direction in which the splitter moves to make that
+    region bigger. With `up` (the default) the splitter is horizontal above a
+    panel: its value is the height of that panel, and Arrow Up and Arrow Down
+    move it 16px. With `left` or `right` the splitter is vertical on the inner
+    edge of a `SideColumn`: its value is the column width, and Arrow Left and
+    Arrow Right move it 16px. Home gives the region its minimum size, and End
+    its maximum size. The splitter of a `SideColumn` has the name
+    "Resize <label>" and no visible text.
   - The browser keeps each layout in `localStorage` (`readStoredLayout`,
     `writeStoredLayout`). Blocked storage gives the default layout.
 - `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
@@ -658,7 +664,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   state, so the color is never the only sign. `Select` takes `size` (`sm`)
   and `hideLabel`. `Tabs` (and `Panel` `tabs`) take `itemLabel`, a snippet
   that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
-  header line before the Collapse button. `Tabs` takes `size` (`sm` gives the 32px
+  header line before the Minimize button. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
   `panelClass`.
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
@@ -1605,6 +1611,13 @@ option and records it in this document.
   before the LiveNode starts.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
+  its `storageKey`. `widthPixels` null gives the default width, and a
+  double-click on the splitter sets it to null. A value stored before the
+  splitter (`{isCollapsed}` only) reads as `isMinimized` with the default
+  width. The shown width is the stored width in the range of section 25.13,
+  so a smaller window makes the column narrower without a change of the
+  stored width.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
