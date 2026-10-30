@@ -251,3 +251,30 @@ async def test_a_change_that_is_not_correct_is_refused_and_keeps_the_screen(web_
         }
     ]
     assert (await web_client.get(f"/api/screens/{screen_id}")).json()["name"] == "Momentum leaders"
+
+
+@pytest.mark.anyio
+async def test_the_screen_indicator_list_gives_the_catalog_for_the_edit_popover(web_client: httpx.AsyncClient) -> None:
+    response = await web_client.get("/api/screen-indicators")
+
+    assert response.status_code == httpx.codes.OK
+    indicators = {item["key"]: item for item in response.json()}
+    assert list(indicators)[:3] == ["sma", "ema", "momentum_12_1"]
+    assert indicators["rsi"] == {
+        "key": "rsi",
+        "name": "RSI",
+        "parameters": [
+            {"name": "period", "value_type": "int", "default": 14, "minimum": 1, "maximum": 1000, "is_in_name": True}
+        ],
+        "outputs": ["value"],
+    }
+    assert indicators["bollinger_bands"]["parameters"][1] == {
+        "name": "k",
+        "value_type": "float",
+        "default": 2.0,
+        "minimum": 0.1,
+        "maximum": 10.0,
+        "is_in_name": True,
+    }
+    assert indicators["macd"]["outputs"] == ["value", "signal", "histogram"]
+    assert indicators["realized_volatility"]["parameters"][1]["is_in_name"] is False

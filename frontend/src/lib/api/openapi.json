@@ -2121,6 +2121,29 @@
         }
       }
     },
+    "/api/screen-indicators": {
+      "get": {
+        "summary": "List Screen Indicators",
+        "description": "The indicator catalog in its own order (section 24.7).",
+        "operationId": "list_screen_indicators_api_screen_indicators_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenIndicatorResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Screen Indicators Api Screen Indicators Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/watchlist": {
       "get": {
         "summary": "List Instruments",
@@ -6733,6 +6756,104 @@
         ],
         "title": "ScreenIndicatorNamesResponse",
         "description": "The UI names of the indicators of the definition, for example \"RSI(14)\" (screen.md section 24.7)."
+      },
+      "ScreenIndicatorParameterResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "int",
+              "float"
+            ],
+            "title": "Value Type"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Default"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "is_in_name": {
+            "type": "boolean",
+            "title": "Is In Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value_type",
+          "default",
+          "minimum",
+          "maximum",
+          "is_in_name"
+        ],
+        "title": "ScreenIndicatorParameterResponse"
+      },
+      "ScreenIndicatorResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenIndicatorParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters"
+          },
+          "outputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "parameters",
+          "outputs"
+        ],
+        "title": "ScreenIndicatorResponse",
+        "description": "One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page."
       },
       "ScreenListItemResponse": {
         "properties": {

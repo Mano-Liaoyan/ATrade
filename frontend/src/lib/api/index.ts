@@ -701,6 +701,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screen-indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Screen Indicators
+         * @description The indicator catalog in its own order (section 24.7).
+         */
+        get: operations["list_screen_indicators_api_screen_indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -2150,6 +2170,38 @@ export interface components {
             indicator_conditions: string[];
             /** Order */
             order: string;
+        };
+        /** ScreenIndicatorParameterResponse */
+        ScreenIndicatorParameterResponse: {
+            /** Name */
+            name: string;
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "int" | "float";
+            /** Default */
+            default: number;
+            /** Minimum */
+            minimum: number;
+            /** Maximum */
+            maximum: number;
+            /** Is In Name */
+            is_in_name: boolean;
+        };
+        /**
+         * ScreenIndicatorResponse
+         * @description One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page.
+         */
+        ScreenIndicatorResponse: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters: components["schemas"]["ScreenIndicatorParameterResponse"][];
+            /** Outputs */
+            outputs: string[];
         };
         /** ScreenListItemResponse */
         ScreenListItemResponse: {
@@ -4887,6 +4939,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screen_indicators_api_screen_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenIndicatorResponse"][];
                 };
             };
         };
