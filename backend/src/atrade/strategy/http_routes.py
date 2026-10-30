@@ -4,17 +4,19 @@ from datetime import datetime
 from typing import Annotated, Any
 
 import psycopg
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, StringConstraints, model_validator
 
+from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.strategy import strategy_store
+from atrade.strategy.code_checks import CodeProblem
 from atrade.strategy.rules_code import make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
-from atrade.strategy.version_saving import save_checked_version
+from atrade.strategy.version_saving import save_ai_assistant_version, save_checked_version
 
 MAX_STRATEGY_NAME_LENGTH = 100
 FIRST_VERSION_NUMBER = 1
@@ -46,6 +48,12 @@ class SaveVersionRequest(BaseModel):
             return strategy_store.VersionContent(code=self.code or "", source="user", rules=None)
         rules = self.rules.model_dump(mode="json")
         return strategy_store.VersionContent(code=make_rules_code(self.rules), source="rule_builder", rules=rules)
+
+
+class AiAssistantSaveVersionRequest(BaseModel):
+    """The save body of port 8001: code only. The AI assistant does not save rules (docs/architecture/assistant.md 25.5)."""
+
+    code: str
 
 
 class RulesCodeRequest(BaseModel):
@@ -138,6 +146,20 @@ async def read_strategy_response(connection: psycopg.AsyncConnection, strategy_i
     )
 
 
+def to_save_response(
+    saved: strategy_store.SavedVersion | list[CodeProblem] | None, response: Response
+) -> StrategyVersionResponse | JSONResponse:
+    if isinstance(saved, list):
+        problem_responses = [CodeProblemResponse(line=problem.line, message=problem.message) for problem in saved]
+        failure = CodeCheckFailedResponse(problems=problem_responses)
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=failure.model_dump())
+    if saved is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy not found.")
+    if not saved.is_new_version:
+        response.status_code = status.HTTP_200_OK
+    return to_version_response(saved.version)
+
+
 class StrategyRoutes:
     """The route functions. They share the database URL and the clock."""
 
@@ -196,15 +218,20 @@ class StrategyRoutes:
             content=request.to_content(),
             created_at_utc=self.clock.read_now_utc(),
         )
-        if isinstance(saved, list):
-            problem_responses = [CodeProblemResponse(line=problem.line, message=problem.message) for problem in saved]
-            failure = CodeCheckFailedResponse(problems=problem_responses)
-            return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=failure.model_dump())
-        if saved is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy not found.")
-        if not saved.is_new_version:
-            response.status_code = status.HTTP_200_OK
-        return to_version_response(saved.version)
+        return to_save_response(saved, response)
+
+    async def save_ai_assistant_version(
+        self, strategy_id: int, request: AiAssistantSaveVersionRequest, response: Response, conversation_id: int
+    ) -> StrategyVersionResponse | JSONResponse:
+        """The save of port 8001: the source ai_assistant and the conversation (docs/architecture/assistant.md 25.5)."""
+        saved = await save_ai_assistant_version(
+            database_url=self.database_url,
+            strategy_id=strategy_id,
+            code=request.code,
+            conversation_id=conversation_id,
+            created_at_utc=self.clock.read_now_utc(),
+        )
+        return to_save_response(saved, response)
 
     async def discard_version(self, strategy_id: int, version_number: int) -> StrategyVersionResponse:
         """Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5)."""
@@ -241,6 +268,35 @@ class StrategyRoutes:
             )
 
 
+NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
+SAVE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    status.HTTP_200_OK: {
+        "model": StrategyVersionResponse,
+        "description": (
+            "The code (and, for a rules body, the rules) is the same as the latest version. No new version is made."
+        ),
+    },
+    **NOT_FOUND,
+    status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": CodeCheckFailedResponse},
+}
+
+
+def add_shared_routes(router: APIRouter, routes: StrategyRoutes) -> None:
+    """The routes of port 8000 that port 8001 also has without a change (docs/architecture/assistant.md 25.3.3)."""
+    router.add_api_route(
+        "",
+        routes.create_strategy,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        responses={status.HTTP_409_CONFLICT: ERROR_RESPONSE},
+    )
+    router.add_api_route("", routes.list_strategies, methods=["GET"])
+    router.add_api_route("/{strategy_id}", routes.read_strategy, methods=["GET"], responses=NOT_FOUND)
+    router.add_api_route(
+        "/{strategy_id}/versions/{version_number}", routes.read_version, methods=["GET"], responses=NOT_FOUND
+    )
+
+
 def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = StrategyRoutes(database_url=database_url, clock=clock)
     router = APIRouter()
@@ -251,31 +307,19 @@ def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
 
 def create_strategies_router(routes: StrategyRoutes) -> APIRouter:
     router = APIRouter(prefix="/api/strategies")
-    not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
-    router.add_api_route(
-        "",
-        routes.create_strategy,
-        methods=["POST"],
-        status_code=status.HTTP_201_CREATED,
-        responses={status.HTTP_409_CONFLICT: ERROR_RESPONSE},
-    )
-    router.add_api_route("", routes.list_strategies, methods=["GET"])
-    router.add_api_route("/{strategy_id}", routes.read_strategy, methods=["GET"], responses=not_found)
+    add_shared_routes(router, routes)
     router.add_api_route(
         "/{strategy_id}",
         routes.delete_strategy,
         methods=["DELETE"],
         status_code=status.HTTP_204_NO_CONTENT,
-        responses={**not_found, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
-    )
-    router.add_api_route(
-        "/{strategy_id}/versions/{version_number}", routes.read_version, methods=["GET"], responses=not_found
+        responses={**NOT_FOUND, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
     )
     router.add_api_route(
         "/{strategy_id}/versions/{version_number}/discard",
         routes.discard_version,
         methods=["POST"],
-        responses={**not_found, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
+        responses={**NOT_FOUND, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
     )
     router.add_api_route(
         "/{strategy_id}/versions",
@@ -283,16 +327,34 @@ def create_strategies_router(routes: StrategyRoutes) -> APIRouter:
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=StrategyVersionResponse,
-        responses={
-            status.HTTP_200_OK: {
-                "model": StrategyVersionResponse,
-                "description": (
-                    "The code (and, for a rules body, the rules) is the same as the latest version. "
-                    "No new version is made."
-                ),
-            },
-            **not_found,
-            status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": CodeCheckFailedResponse},
-        },
+        responses=SAVE_RESPONSES,
+    )
+    return router
+
+
+def create_strategy_assistant_router(
+    *, database_url: str, clock: Clock, conversation_exists: ConversationCheck
+) -> APIRouter:
+    """The strategy routes of port 8001 (docs/architecture/assistant.md 25.3.3). No delete, no discard."""
+    routes = StrategyRoutes(database_url=database_url, clock=clock)
+    read_conversation_id = create_conversation_dependency(conversation_exists)
+
+    async def save_ai_assistant_version(
+        strategy_id: int,
+        request: AiAssistantSaveVersionRequest,
+        response: Response,
+        conversation_id: Annotated[int, Depends(read_conversation_id)],
+    ) -> StrategyVersionResponse | JSONResponse:
+        return await routes.save_ai_assistant_version(strategy_id, request, response, conversation_id)
+
+    router = APIRouter(prefix="/api/strategies")
+    add_shared_routes(router, routes)
+    router.add_api_route(
+        "/{strategy_id}/versions",
+        save_ai_assistant_version,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        response_model=StrategyVersionResponse,
+        responses=SAVE_RESPONSES,
     )
     return router

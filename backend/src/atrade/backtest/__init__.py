@@ -22,11 +22,11 @@ from atrade.backtest.backtest_metrics import (
     calculate_split_metrics,
     find_round_trips,
 )
-from atrade.backtest.backtest_run import find_look_back_length, run_backtest
+from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
 from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
-from atrade.backtest.http_routes import create_backtest_router
+from atrade.backtest.http_routes import create_backtest_assistant_router, create_backtest_router
 from atrade.backtest.sharpe_probability import (
     calculate_deflated_sharpe,
     calculate_probabilistic_sharpe,
@@ -43,6 +43,7 @@ __all__ = [
     "BacktestStatus",
     "BacktestTrade",
     "EquityPoint",
+    "LookBack",
     "RoundTrip",
     "SplitMetrics",
     "calculate_daily_returns",
@@ -53,8 +54,9 @@ __all__ = [
     "calculate_round_trip_metrics",
     "calculate_split_metrics",
     "check_backtest_request",
+    "create_backtest_assistant_router",
     "create_backtest_router",
-    "find_look_back_length",
+    "find_look_back",
     "find_round_trips",
     "find_sharpe_probability_status",
     "queue_backtest",
