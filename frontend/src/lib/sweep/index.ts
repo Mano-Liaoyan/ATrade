@@ -8,6 +8,7 @@ export {
   type GridEntry,
 } from './sweep_grid';
 export { readHeatmap, type Heatmap, type HeatmapRun } from './sweep_heatmap';
+export { sortSweepRows, type SortDirection, type SweepRow } from './sweep_runs';
 export {
   listSweeps,
   readSweep,
