@@ -5051,16 +5051,51 @@
             "type": "integer"
           },
           "symbol": {
-            "title": "Symbol",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
           },
           "exchange": {
-            "title": "Exchange",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
           },
           "currency": {
-            "title": "Currency",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind"
+          },
+          "universe_top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe Top N"
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -5165,6 +5200,8 @@
           "symbol",
           "exchange",
           "currency",
+          "universe_kind",
+          "universe_top_n",
           "bar_period",
           "desired_state",
           "status",
@@ -7283,22 +7320,53 @@
             "title": "Strategy Version Id"
           },
           "symbol": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Symbol"
           },
           "exchange": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Exchange"
           },
           "currency": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Currency"
+          },
+          "universe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
@@ -7331,13 +7399,11 @@
         "type": "object",
         "required": [
           "strategy_version_id",
-          "symbol",
-          "exchange",
-          "currency",
           "bar_period",
           "allocated_capital_usd"
         ],
-        "title": "StartForwardTestRequest"
+        "title": "StartForwardTestRequest",
+        "description": "The universe comes in `universe`, or for a single instrument in `symbol`, `exchange`, and `currency`."
       },
       "StartPoint": {
         "type": "string",
@@ -8048,6 +8114,71 @@
         ],
         "title": "TradeResponse"
       },
+      "UniverseBody": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/UniverseKind"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "top_n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "UniverseBody",
+        "description": "`single` needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, `list` needs nothing: the members\nare the watchlist at the start (section 12.17)."
+      },
       "UniverseInstrumentResponse": {
         "properties": {
           "symbol": {
@@ -8082,12 +8213,12 @@
         "title": "UniverseInstrumentResponse"
       },
       "UniverseKind": {
-        "type": "string",
         "enum": [
           "single",
           "rule",
           "list"
-        ]
+        ],
+        "type": "string"
       },
       "UniverseSettings": {
         "properties": {

@@ -4,7 +4,8 @@ The Web process writes only `desired_state` after the start. The forward-test wo
 (docs/architecture.md section 12.3). The socket reads the table every 2 seconds and sends the list after a change.
 """
 
-from datetime import datetime
+from dataclasses import replace
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -22,15 +23,22 @@ from atrade.forward_test.forward_test_store import (
     ForwardTestStatus,
     InterruptionReason,
     StartRefusal,
+    UniverseKind,
 )
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
+from atrade.market_data import read_us_universe_members, read_us_universe_quarter_starts
 from atrade.paper_trading import ManualOrderLedger, PaperAccountCheckError, PaperAccountMonitor
 from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
+from atrade.watchlist import read_watchlist_instruments
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
+# The largest top N of a rule universe (section 12.17).
+MAX_UNIVERSE_TOP_N = 500
+# A multi-instrument forward test uses daily bars only (section 12.17).
+MULTI_INSTRUMENT_BAR_PERIOD = BarPeriod.ONE_DAY
 STATE_READ_INTERVAL_SECONDS = 2.0
 
 # The bar periods of IB live bars (section 12.1). Every period that ATrade offers (BarPeriod) is in the list.
@@ -42,11 +50,25 @@ InstrumentField = Annotated[
 ]
 
 
+class UniverseBody(BaseModel):
+    """`single` needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, `list` needs nothing: the members
+    are the watchlist at the start (section 12.17)."""
+
+    kind: UniverseKind
+    symbol: InstrumentField | None = None
+    exchange: InstrumentField | None = None
+    currency: InstrumentField | None = None
+    top_n: Annotated[int, Field(ge=1, le=MAX_UNIVERSE_TOP_N)] | None = None
+
+
 class StartForwardTestRequest(BaseModel):
+    """The universe comes in `universe`, or for a single instrument in `symbol`, `exchange`, and `currency`."""
+
     strategy_version_id: int
-    symbol: InstrumentField
-    exchange: InstrumentField
-    currency: InstrumentField
+    symbol: InstrumentField | None = None
+    exchange: InstrumentField | None = None
+    currency: InstrumentField | None = None
+    universe: UniverseBody | None = None
     bar_period: BarPeriod
     # The capital of the forward test in USD (section 12.18). It cannot change after the start.
     allocated_capital_usd: Annotated[Decimal, Field(gt=0)]
@@ -74,9 +96,13 @@ class ForwardTestResponse(BaseModel):
     strategy_id: int
     strategy_name: str
     version_number: int
-    symbol: str
-    exchange: str
-    currency: str
+    # Null unless `universe_kind` is "single".
+    symbol: str | None
+    exchange: str | None
+    currency: str | None
+    universe_kind: UniverseKind
+    # Null unless `universe_kind` is "rule".
+    universe_top_n: int | None
     bar_period: BarPeriod
     desired_state: DesiredState
     status: ForwardTestStatus
@@ -159,6 +185,8 @@ def build_forward_test_response(
         symbol=row.symbol,
         exchange=row.exchange,
         currency=row.currency,
+        universe_kind=row.universe_kind,
+        universe_top_n=row.universe_top_n,
         bar_period=BarPeriod(row.bar_period),
         desired_state=row.desired_state,
         status=row.status,
@@ -211,6 +239,26 @@ async def describe_forward_test(*, database_url: str, forward_test_id: int) -> s
     return f"Forward test {response.id} ({response.strategy_name} v{response.version_number})"
 
 
+def refuse_request(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+
+
+def read_universe_body(request: StartForwardTestRequest) -> UniverseBody:
+    """The universe of the request. The flat `symbol`, `exchange`, and `currency` are a single instrument."""
+    has_flat_fields = request.symbol is not None or request.exchange is not None or request.currency is not None
+    if request.universe is None:
+        return UniverseBody(kind="single", symbol=request.symbol, exchange=request.exchange, currency=request.currency)
+    if has_flat_fields:
+        raise refuse_request("Send symbol, exchange, and currency in universe or outside it, not in both.")
+    return request.universe
+
+
+def find_calendar_quarter_start_utc(now_utc: datetime) -> datetime:
+    """The start of the calendar quarter that contains `now_utc`."""
+    first_month_of_quarter = 3 * ((now_utc.month - 1) // 3) + 1
+    return datetime(now_utc.year, first_month_of_quarter, 1, tzinfo=UTC)
+
+
 class ForwardTestRoutes:
     """The route functions. They share the database URL, the clock, the client ID range, and the paper account."""
 
@@ -258,17 +306,10 @@ class ForwardTestRoutes:
         if strategy_version is None:
             detail = f"Strategy version {request.strategy_version_id} does not exist."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
         if request.end_time_utc is not None and request.end_time_utc <= self.clock.read_now_utc():
             detail = "The end time must be later than now."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        forward_test_request = ForwardTestRequest(
-            strategy_version_id=request.strategy_version_id,
-            instrument=instrument,
-            bar_period=request.bar_period,
-            allocated_capital_usd=request.allocated_capital_usd,
-            end_time_utc=request.end_time_utc,
-        )
+        forward_test_request = await self.make_forward_test_request(request)
         net_liquidation = await self.read_net_liquidation_usd()
         if isinstance(net_liquidation, str):
             return refuse_start(net_liquidation)
@@ -288,6 +329,59 @@ class ForwardTestRoutes:
         if isinstance(result, StartRefusal):
             return refuse_start(describe_refusal(result, request.allocated_capital_usd), result.unallocated_usd)
         return await to_forward_test_response(self.database_url, result)
+
+    async def make_forward_test_request(self, request: StartForwardTestRequest) -> ForwardTestRequest:
+        """The forward test request with its universe. Raises a 422 HTTPException for a wrong universe."""
+        universe = read_universe_body(request)
+        forward_test_request = ForwardTestRequest(
+            strategy_version_id=request.strategy_version_id,
+            instrument=None,
+            bar_period=request.bar_period,
+            allocated_capital_usd=request.allocated_capital_usd,
+            end_time_utc=request.end_time_utc,
+            universe_kind=universe.kind,
+        )
+        if universe.kind == "single":
+            if universe.symbol is None or universe.exchange is None or universe.currency is None or universe.top_n:
+                raise refuse_request("A single-instrument forward test needs symbol, exchange, and currency only.")
+            instrument = Instrument(symbol=universe.symbol, exchange=universe.exchange, currency=universe.currency)
+            return replace(forward_test_request, instrument=instrument)
+        if universe.symbol is not None or universe.exchange is not None or universe.currency is not None:
+            raise refuse_request(f"A {universe.kind} universe does not take symbol, exchange, or currency.")
+        if request.bar_period != MULTI_INSTRUMENT_BAR_PERIOD:
+            raise refuse_request("A multi-instrument forward test needs the bar period 1-DAY.")
+        now_utc = self.clock.read_now_utc()
+        calendar_quarter_start_utc = find_calendar_quarter_start_utc(now_utc)
+        quarter_start_utc = calendar_quarter_start_utc
+        if universe.kind == "rule":
+            if universe.top_n is None:
+                raise refuse_request("A rule universe needs top_n.")
+            # The stored quarter starts at the first trading day of the calendar quarter (market_data.md section 8.9).
+            quarter_starts = await read_us_universe_quarter_starts(database_url=self.database_url, end_utc=now_utc)
+            current = [start_utc for start_utc in quarter_starts if start_utc >= calendar_quarter_start_utc]
+            if not current:
+                raise refuse_request(
+                    f"The US universe has no saved members for the quarter from {calendar_quarter_start_utc:%Y-%m-%d}."
+                )
+            quarter_start_utc = current[-1]
+            members = [
+                member.instrument
+                for member in await read_us_universe_members(
+                    database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=universe.top_n
+                )
+            ]
+        else:
+            if universe.top_n is not None:
+                raise refuse_request("A list universe does not take top_n.")
+            members = await read_watchlist_instruments(database_url=self.database_url)
+            if not members:
+                raise refuse_request("The watchlist has no instrument.")
+        return replace(
+            forward_test_request,
+            universe_top_n=universe.top_n,
+            quarter_start_utc=quarter_start_utc,
+            members=tuple(members),
+        )
 
     async def list_forward_tests(self) -> list[ForwardTestResponse]:
         return await list_forward_tests(self.database_url)

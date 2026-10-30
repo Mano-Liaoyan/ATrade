@@ -70,6 +70,22 @@ export function describeForwardTestStatus(status: ForwardTestStatus): string {
   return STATUS_LABELS[status];
 }
 
+// The universe name of a multi-instrument forward test for the page header (section 12.16). Null for one instrument.
+export function describeForwardTestUniverse(forwardTest: ForwardTest): string | null {
+  if (forwardTest.universe_kind === 'rule') {
+    return `Top ${String(forwardTest.universe_top_n)} by trading value`;
+  }
+  return forwardTest.universe_kind === 'list' ? 'Watchlist' : null;
+}
+
+// The instrument of a single-instrument forward test. Null for a multi-instrument forward test.
+export function readForwardTestInstrument(
+  forwardTest: ForwardTest,
+): { symbol: string; exchange: string; currency: string } | null {
+  const { symbol, exchange, currency } = forwardTest;
+  return symbol === null || exchange === null || currency === null ? null : { symbol, exchange, currency };
+}
+
 export function findForwardTestStatusKind(status: ForwardTestStatus): StatusKind {
   return STATUS_KINDS[status];
 }
