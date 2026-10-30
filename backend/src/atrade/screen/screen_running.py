@@ -67,7 +67,9 @@ def to_row_values(row: ScreenRow) -> tuple[str, str, str, dict[str, Any]]:
     return row.instrument.symbol, row.instrument.exchange, row.instrument.currency, values
 
 
-async def run_saved_screen(*, database_url: str, clock: Clock, screen: screen_store.ScreenRecord) -> int:
+async def run_saved_screen(
+    *, database_url: str, clock: Clock, screen: screen_store.ScreenRecord, assistant_conversation_id: int | None = None
+) -> int:
     """Runs a checked screen and returns the ID of its new screen result. A run of the user has no conversation."""
     run_at_utc = clock.read_now_utc()
     started = time.perf_counter()
@@ -106,6 +108,7 @@ async def run_saved_screen(*, database_url: str, clock: Clock, screen: screen_st
             )
             for exclusion in outcome.exclusions
         ],
+        assistant_conversation_id=assistant_conversation_id,
     )
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         screen_result_id = await screen_store.insert_screen_result(connection, new_result)

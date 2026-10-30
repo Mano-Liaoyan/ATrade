@@ -17,6 +17,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection
 from atrade.market_data import ExchangeRateReader
+from atrade.screen import create_screen_assistant_router
 from atrade.strategy import create_strategy_assistant_router
 
 ASSISTANT_PORT: Final = 8001
@@ -54,6 +55,11 @@ def create_assistant_port_app(*, settings: Settings, clock: Clock, gateway_conne
             clock=clock,
             exchange_rate_reader=exchange_rate_reader,
             conversation_exists=check_conversation,
+        )
+    )
+    app.include_router(
+        create_screen_assistant_router(
+            database_url=settings.database_url, clock=clock, conversation_exists=check_conversation
         )
     )
     return app

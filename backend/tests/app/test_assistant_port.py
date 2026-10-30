@@ -31,6 +31,12 @@ ALLOWED_ROUTES = {
     ("GET", "/api/backtests"),
     ("GET", "/api/backtests/{backtest_id}"),
     ("GET", "/api/backtests/{first_backtest_id}/comparison/{second_backtest_id}"),
+    ("GET", "/api/screens"),
+    ("GET", "/api/screens/{screen_id}"),
+    ("POST", "/api/screens"),
+    ("PUT", "/api/screens/{screen_id}"),
+    ("POST", "/api/screens/{screen_id}/runs"),
+    ("GET", "/api/screen-results/{screen_result_id}"),
 }
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -105,6 +111,11 @@ async def test_the_port_8001_app_has_no_frontend_files_and_no_socket_routes(
         ("POST", "/api/strategies/1/versions/2/discard"),
         ("GET", "/api/assistant/conversations"),
         ("POST", "/api/assistant/conversations"),
+        ("DELETE", "/api/screens/1"),
+        ("POST", "/api/market-data/hk-instrument-list"),
+        ("DELETE", "/api/market-data/hk-instrument-list/1"),
+        ("POST", "/api/market-data/daily-bars/update"),
+        ("POST", "/api/sweeps"),
     ],
 )
 async def test_the_port_8001_app_refuses_the_routes_that_are_not_in_the_allow_list(
