@@ -43,6 +43,8 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "quantity_shares": "10",
             "price_usd": "104.00",
             "commission_usd": "0.00",
+            "symbol": "BTEST",
+            "exchange": "ARCA",
         },
         {
             "time_utc": "2026-03-10T00:00:00Z",
@@ -50,6 +52,8 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "quantity_shares": "10",
             "price_usd": "106.00",
             "commission_usd": "0.00",
+            "symbol": "BTEST",
+            "exchange": "ARCA",
         },
         {
             "time_utc": "2026-03-15T00:00:00Z",
@@ -57,6 +61,8 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "quantity_shares": "10",
             "price_usd": "96.00",
             "commission_usd": "0.00",
+            "symbol": "BTEST",
+            "exchange": "ARCA",
         },
     ]
     # 10000 + 10 * (106 - 104) + 10 * (110 - 96) = 10160. The peak 10060 falls to 10020: 40 / 10060 = 0.40 %.
@@ -166,6 +172,8 @@ async def test_the_template_warms_up_on_saved_bars_before_the_start(
         "quantity_shares": "10",
         "price_usd": "100.00",
         "commission_usd": "0.00",
+        "symbol": "BTEST",
+        "exchange": "ARCA",
     }
     # The equity curve starts at the first bar of the range: look-back bars make no equity point.
     assert backtest["equity_curve"][0]["time_utc"] == "2026-03-03T00:00:00Z"

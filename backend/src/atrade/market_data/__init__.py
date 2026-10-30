@@ -39,6 +39,7 @@ from atrade.market_data.us_universe import (
     UsUniverseMember,
     calculate_us_universe_history,
     read_us_universe_members,
+    read_us_universe_quarter_starts,
     save_us_universe,
 )
 from atrade.market_data.us_universe_update import UsUniverseUpdate
@@ -75,6 +76,7 @@ __all__ = [
     "read_saved_exchange_rates",
     "read_source_order",
     "read_us_universe_members",
+    "read_us_universe_quarter_starts",
     "save_received_bars",
     "save_received_bars_blocking",
     "save_us_universe",

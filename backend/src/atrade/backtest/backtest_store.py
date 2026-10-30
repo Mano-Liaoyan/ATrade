@@ -15,18 +15,59 @@ from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarSource
 
 type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out"]
+# docs/architecture/backtest.md section 10.10.2. The kind `screen` is not in this version.
+type UniverseKind = Literal["single", "rule", "list"]
+type MultiInstrumentKind = Literal["rule", "list"]
+
+
+@dataclass(frozen=True)
+class BacktestUniverse:
+    """The universe of a multi-instrument backtest. All members are in `currency`. `top_n` is only for `rule`."""
+
+    kind: MultiInstrumentKind
+    currency: str
+    top_n: int | None = None
+
+
+@dataclass(frozen=True)
+class UniversePeriod:
+    """The members of the universe from `start_utc` to the start of the next period, or to the backtest end."""
+
+    start_utc: datetime
+    members: list[Instrument]
 
 
 @dataclass(frozen=True)
 class BacktestRequest:
     strategy_version_id: int
-    instrument: Instrument
+    # None for a multi-instrument backtest: then `universe` names the members.
+    instrument: Instrument | None
     bar_period: BarPeriod
     time_range: TimeRange
     paper_capital_usd: Decimal
     # The source order of the bars and the look-back bars. None in a new request: the global source order. None in
     # a saved backtest only for a row from before the source order (docs/architecture/backtest.md section 10.12).
     source_order: list[BarSource] | None = None
+    universe: BacktestUniverse | None = None
+
+    @property
+    def universe_kind(self) -> UniverseKind:
+        return "single" if self.universe is None else self.universe.kind
+
+    @property
+    def currency(self) -> str:
+        """The currency of the instrument or of all universe members."""
+        if self.universe is not None:
+            return self.universe.currency
+        return self.single_instrument.currency
+
+    @property
+    def single_instrument(self) -> Instrument:
+        """The instrument of a single-instrument backtest."""
+        if self.instrument is None:
+            message = "A multi-instrument backtest has no single instrument."
+            raise ValueError(message)
+        return self.instrument
 
 
 @dataclass(frozen=True)
@@ -42,9 +83,9 @@ class BacktestResult:
 class BacktestRow:
     id: int
     strategy_version_id: int
-    symbol: str
-    exchange: str
-    currency: str
+    symbol: str | None
+    exchange: str | None
+    currency: str | None
     bar_period: str
     start_utc: datetime
     end_utc: datetime
@@ -72,6 +113,8 @@ class BacktestRow:
     win_rate_percent: Decimal | None
     source_order: list[str] | None
     bar_count_by_source: dict[str, int] | None
+    universe_kind: UniverseKind
+    universe_top_n: int | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -80,18 +123,31 @@ BACKTEST_COLUMNS: Final = """
     final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
-    source_order, bar_count_by_source
+    source_order, bar_count_by_source, universe_kind, universe_top_n
 """
+
+
+def read_row_instrument(row: BacktestRow) -> Instrument | None:
+    if row.symbol is None or row.exchange is None or row.currency is None:
+        return None
+    return Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency)
+
+
+def read_universe(row: BacktestRow) -> BacktestUniverse | None:
+    if row.universe_kind == "single" or row.currency is None:
+        return None
+    return BacktestUniverse(kind=row.universe_kind, currency=row.currency, top_n=row.universe_top_n)
 
 
 def read_request(row: BacktestRow) -> BacktestRequest:
     return BacktestRequest(
         strategy_version_id=row.strategy_version_id,
-        instrument=Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency),
+        instrument=read_row_instrument(row),
         bar_period=BarPeriod(row.bar_period),
         time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
         paper_capital_usd=row.paper_capital_usd,
         source_order=None if row.source_order is None else [BarSource(value) for value in row.source_order],
+        universe=read_universe(row),
     )
 
 
@@ -124,22 +180,30 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
 
 
 async def insert_backtest(
-    connection: psycopg.AsyncConnection, *, request: BacktestRequest, created_at_utc: datetime
+    connection: psycopg.AsyncConnection,
+    *,
+    request: BacktestRequest,
+    created_at_utc: datetime,
+    universe_periods: list[UniversePeriod] | None = None,
 ) -> BacktestRow:
-    async with connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
+    """Adds a queued backtest, and the members of each universe period of a multi-instrument backtest. One
+    transaction."""
+    instrument = request.instrument
+    async with connection.transaction(), connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, status, created_at_utc, source_order)
+                paper_capital_usd, status, created_at_utc, source_order, universe_kind, universe_top_n)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s, %(source_order)s)
+                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s, %(source_order)s,
+                %(universe_kind)s, %(universe_top_n)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
                 "strategy_version_id": request.strategy_version_id,
-                "symbol": request.instrument.symbol,
-                "exchange": request.instrument.exchange,
-                "currency": request.instrument.currency,
+                "symbol": None if instrument is None else instrument.symbol,
+                "exchange": None if instrument is None else instrument.exchange,
+                "currency": request.currency,
                 "bar_period": request.bar_period.value,
                 "start_utc": request.time_range.start_utc,
                 "end_utc": request.time_range.end_utc,
@@ -148,13 +212,50 @@ async def insert_backtest(
                 "source_order": None
                 if request.source_order is None
                 else Jsonb([bar_source.value for bar_source in request.source_order]),
+                "universe_kind": request.universe_kind,
+                "universe_top_n": None if request.universe is None else request.universe.top_n,
             },
         )
         inserted_row = await cursor.fetchone()
-    if inserted_row is None:
-        message = "INSERT ... RETURNING returned no row."
-        raise RuntimeError(message)
+        if inserted_row is None:
+            message = "INSERT ... RETURNING returned no row."
+            raise RuntimeError(message)
+        await cursor.executemany(
+            """
+            INSERT INTO backtest_universe_member (backtest_id, period_start_utc, symbol, exchange)
+            VALUES (%(backtest_id)s, %(period_start_utc)s, %(symbol)s, %(exchange)s)
+            """,
+            [
+                {
+                    "backtest_id": inserted_row.id,
+                    "period_start_utc": period.start_utc,
+                    "symbol": member.symbol,
+                    "exchange": member.exchange,
+                }
+                for period in universe_periods or []
+                for member in period.members
+            ],
+        )
     return inserted_row
+
+
+async def select_universe_periods(
+    connection: psycopg.AsyncConnection, *, backtest_id: int, currency: str
+) -> list[UniversePeriod]:
+    """The members of each universe period of the backtest, oldest period first."""
+    cursor = await connection.execute(
+        """
+        SELECT period_start_utc, symbol, exchange FROM backtest_universe_member
+        WHERE backtest_id = %(backtest_id)s ORDER BY period_start_utc, symbol, exchange
+        """,
+        {"backtest_id": backtest_id},
+    )
+    periods: list[UniversePeriod] = []
+    for period_start_utc, symbol, exchange in await cursor.fetchall():
+        if not periods or periods[-1].start_utc != period_start_utc:
+            periods.append(UniversePeriod(start_utc=period_start_utc, members=[]))
+        periods[-1].members.append(Instrument(symbol=symbol, exchange=exchange, currency=currency))
+    return periods
 
 
 async def select_backtests(connection: psycopg.AsyncConnection) -> list[BacktestRow]:
@@ -195,23 +296,27 @@ class TrialRow:
     paper_capital_usd: Decimal
 
 
-async def select_finished_backtests_of(
-    connection: psycopg.AsyncConnection, *, instrument: Instrument, bar_period: BarPeriod
-) -> list[TrialRow]:
-    """The finished backtests of the instrument and the bar period, for all time ranges."""
+async def select_finished_backtests_of(connection: psycopg.AsyncConnection, row: BacktestRow) -> list[TrialRow]:
+    """The finished backtests of the same instrument or universe and the bar period of `row`, for all time ranges.
+    A universe is the same when the kind, the currency, and `universe_top_n` are the same
+    (docs/architecture/backtest.md section 10.10.8)."""
     async with connection.cursor(row_factory=class_row(TrialRow)) as cursor:
         await cursor.execute(
             """
             SELECT id, strategy_version_id, paper_capital_usd FROM backtest
-            WHERE status = 'finished' AND symbol = %(symbol)s AND exchange = %(exchange)s
-                AND currency = %(currency)s AND bar_period = %(bar_period)s
+            WHERE status = 'finished' AND symbol IS NOT DISTINCT FROM %(symbol)s
+                AND exchange IS NOT DISTINCT FROM %(exchange)s AND currency IS NOT DISTINCT FROM %(currency)s
+                AND bar_period = %(bar_period)s AND universe_kind = %(universe_kind)s
+                AND universe_top_n IS NOT DISTINCT FROM %(universe_top_n)s
             ORDER BY id
             """,
             {
-                "symbol": instrument.symbol,
-                "exchange": instrument.exchange,
-                "currency": instrument.currency,
-                "bar_period": bar_period.value,
+                "symbol": row.symbol,
+                "exchange": row.exchange,
+                "currency": row.currency,
+                "bar_period": row.bar_period,
+                "universe_kind": row.universe_kind,
+                "universe_top_n": row.universe_top_n,
             },
         )
         return await cursor.fetchall()
@@ -239,7 +344,7 @@ async def select_trades(connection: psycopg.AsyncConnection, backtest_id: int) -
     async with connection.cursor(row_factory=class_row(BacktestTrade)) as cursor:
         await cursor.execute(
             """
-            SELECT time_utc, side, quantity_shares, price_usd, commission_usd FROM backtest_trade
+            SELECT time_utc, side, quantity_shares, price_usd, commission_usd, symbol, exchange FROM backtest_trade
             WHERE backtest_id = %(backtest_id)s
             ORDER BY time_utc, id
             """,
@@ -324,8 +429,10 @@ async def save_result(
         )
         await cursor.executemany(
             """
-            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd)
-            VALUES (%(backtest_id)s, %(time_utc)s, %(side)s, %(quantity_shares)s, %(price_usd)s, %(commission_usd)s)
+            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd,
+                symbol, exchange)
+            VALUES (%(backtest_id)s, %(time_utc)s, %(side)s, %(quantity_shares)s, %(price_usd)s, %(commission_usd)s,
+                %(symbol)s, %(exchange)s)
             """,
             [
                 {
@@ -335,6 +442,8 @@ async def save_result(
                     "quantity_shares": trade.quantity_shares,
                     "price_usd": trade.price_usd,
                     "commission_usd": trade.commission_usd,
+                    "symbol": trade.symbol,
+                    "exchange": trade.exchange,
                 }
                 for trade in result.trades
             ],

@@ -15,6 +15,21 @@ export type BacktestComparison = components['schemas']['BacktestComparisonRespon
 
 export type { RequestResult } from '#lib/foundation/http_request';
 
+export interface BacktestInstrument {
+  symbol: string;
+  exchange: string;
+  currency: string;
+}
+
+// The instrument of a single-instrument backtest. A multi-instrument backtest has none.
+export function readBacktestInstrument(backtest: Backtest): BacktestInstrument | undefined {
+  const { symbol, exchange, currency } = backtest;
+  if (symbol === null || exchange === null || currency === null) {
+    return undefined;
+  }
+  return { symbol, exchange, currency };
+}
+
 const BACKTESTS_PATH = '/api/backtests';
 const BACKTEST_LIMITS_PATH = '/api/backtest-limits';
 // A refused request has ErrorResponse {"detail": "<reason>"}. A request that does not validate has HTTPValidationError.

@@ -74,7 +74,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-4g}
+    mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-8g}
     pids_limit: 2048
     # The forward-test service waits for this check: web runs the database migrations before it serves HTTP.
     healthcheck:

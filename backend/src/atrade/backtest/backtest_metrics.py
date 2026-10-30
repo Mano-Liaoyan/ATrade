@@ -36,6 +36,10 @@ class BacktestTrade:
     quantity_shares: Decimal
     price_usd: Decimal
     commission_usd: Decimal
+    # The instrument of the fill. The real exchange, not the simulated venue SMART (ADR 0003). None for a fill of a
+    # forward test and for a trade that was saved before the multi-instrument backtest.
+    symbol: str | None = None
+    exchange: str | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +103,50 @@ def calculate_equity_curve(
     return equity_curve
 
 
+type InstrumentKey = tuple[str | None, str | None]
+
+
+def find_instrument_key(trade: BacktestTrade) -> InstrumentKey:
+    """The instrument of a trade. All trades of a single-instrument test without symbols have the same key."""
+    return (trade.symbol, trade.exchange)
+
+
+def calculate_universe_equity_curve(
+    *,
+    start_cash: Decimal,
+    bars_by_instrument: dict[InstrumentKey, list[Bar]],
+    bar_period: BarPeriod,
+    trades: list[BacktestTrade],
+) -> list[EquityPoint]:
+    """The equity curve of a test with many instruments: one point at each bar end of any instrument. The value is
+    the cash plus each position at the last close price of its instrument at or before the point. A trade counts in
+    the first point at or after its time. Before the first bar close of an instrument, its last trade price counts.
+    """
+    closes_by_end: dict[datetime, dict[InstrumentKey, Decimal]] = {}
+    for key, bars in bars_by_instrument.items():
+        for bar in bars:
+            closes_by_end.setdefault(bar.start_utc + bar_period.length, {})[key] = bar.close
+    sorted_trades = sorted(trades, key=lambda trade: trade.time_utc)
+    cash = start_cash
+    positions: dict[InstrumentKey, Decimal] = {}
+    last_prices: dict[InstrumentKey, Decimal] = {}
+    next_trade_index = 0
+    equity_curve: list[EquityPoint] = []
+    for bar_end_utc in sorted(closes_by_end):
+        while next_trade_index < len(sorted_trades) and sorted_trades[next_trade_index].time_utc <= bar_end_utc:
+            trade = sorted_trades[next_trade_index]
+            key = find_instrument_key(trade)
+            signed_shares = trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
+            cash -= signed_shares * trade.price_usd + trade.commission_usd
+            positions[key] = positions.get(key, Decimal(0)) + signed_shares
+            last_prices[key] = trade.price_usd
+            next_trade_index += 1
+        last_prices.update(closes_by_end[bar_end_utc])
+        position_value = sum((shares * last_prices[key] for key, shares in positions.items()), Decimal(0))
+        equity_curve.append(EquityPoint(time_utc=bar_end_utc, equity_usd=cash + position_value))
+    return equity_curve
+
+
 def calculate_daily_returns(*, start_capital_usd: Decimal, equity_curve: list[EquityPoint]) -> list[Decimal]:
     """The change of the last equity point of each trading day from the last point of the trading day before, as a
     fraction (0.02 is 2 %). The first trading day uses `start_capital_usd`. A trading day is a UTC date. A day after
@@ -128,7 +176,21 @@ class RoundTrip:
 
 
 def find_round_trips(trades: list[BacktestTrade]) -> list[RoundTrip]:
-    """The round trips that ended. A position that is still open at the last fill is not a round trip."""
+    """The round trips that ended, of each instrument, by end time. A position that is still open at the last fill
+    is not a round trip (docs/architecture/backtest.md section 10.10.8)."""
+    trades_by_instrument: dict[InstrumentKey, list[BacktestTrade]] = {}
+    for trade in trades:
+        trades_by_instrument.setdefault(find_instrument_key(trade), []).append(trade)
+    round_trips = [
+        round_trip
+        for instrument_trades in trades_by_instrument.values()
+        for round_trip in find_instrument_round_trips(instrument_trades)
+    ]
+    return sorted(round_trips, key=lambda round_trip: round_trip.end_utc)
+
+
+def find_instrument_round_trips(trades: list[BacktestTrade]) -> list[RoundTrip]:
+    """The round trips of the trades of one instrument."""
     round_trips: list[RoundTrip] = []
     position_shares = Decimal(0)
     cash_usd = Decimal(0)
@@ -234,20 +296,22 @@ def calculate_round_trip_metrics(round_trips: list[RoundTrip]) -> RoundTripMetri
 
 
 def calculate_exposure_percent(equity_curve: list[EquityPoint], trades: list[BacktestTrade]) -> Decimal | None:
-    """The share of the bars with a position that is not 0 at the bar end. There is one equity point for each bar.
-    A trade counts at the first point at or after its time, as in `calculate_equity_curve`."""
+    """The share of the bars with a position that is not 0 at the bar end, in any instrument. There is one equity
+    point for each bar. A trade counts at the first point at or after its time, as in `calculate_equity_curve`."""
     if not equity_curve:
         return None
     sorted_trades = sorted(trades, key=lambda trade: trade.time_utc)
-    position_shares = Decimal(0)
+    positions: dict[InstrumentKey, Decimal] = {}
     next_trade_index = 0
     bars_with_position = 0
     for point in sorted(equity_curve, key=lambda point: point.time_utc):
         while next_trade_index < len(sorted_trades) and sorted_trades[next_trade_index].time_utc <= point.time_utc:
             trade = sorted_trades[next_trade_index]
-            position_shares += trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
+            key = find_instrument_key(trade)
+            signed_shares = trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
+            positions[key] = positions.get(key, Decimal(0)) + signed_shares
             next_trade_index += 1
-        bars_with_position += position_shares != 0
+        bars_with_position += any(shares != 0 for shares in positions.values())
     return round_value(Decimal(bars_with_position) / len(equity_curve) * PERCENT)
 
 

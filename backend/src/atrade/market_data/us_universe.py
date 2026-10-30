@@ -175,3 +175,17 @@ async def read_us_universe_members(
         )
         for row in rows
     ]
+
+
+async def read_us_universe_quarter_starts(*, database_url: str, end_utc: datetime) -> list[datetime]:
+    """The start of each quarter with members that starts before `end_utc`, oldest first."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        cursor = await connection.execute(
+            """
+            SELECT DISTINCT quarter_start_utc FROM us_universe_member
+            WHERE quarter_start_utc < %(end_utc)s ORDER BY quarter_start_utc
+            """,
+            {"end_utc": end_utc},
+        )
+        rows = await cursor.fetchall()
+    return [row[0] for row in rows]

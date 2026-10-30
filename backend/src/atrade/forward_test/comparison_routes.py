@@ -128,7 +128,7 @@ class ForwardTestComparisonResponse(BaseModel):
 def check_comparison_currency(request: BacktestRequest) -> str | None:
     """A forward test has no exchange rates: its equity and fills are in the instrument currency. A backtest of
     another currency converts to USD, so the two would not compare (docs/architecture/forward_test.md 12.10)."""
-    currency = request.instrument.currency
+    currency = request.currency
     if currency == "USD":
         return None
     return (

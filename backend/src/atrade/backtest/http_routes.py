@@ -4,9 +4,10 @@ and read or change the backtest limits (timeout and concurrency).
 A new backtest waits in the queue. The backtest runner of the Web process starts it (backtest_runner.py).
 """
 
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, NoReturn
 
 import psycopg
 from fastapi import APIRouter, HTTPException, status
@@ -19,7 +20,7 @@ from atrade.backtest.backtest_access import (
     check_saved_bars,
     has_survivorship_bias,
 )
-from atrade.backtest.backtest_exchange_rates import save_exchange_rates
+from atrade.backtest.backtest_exchange_rates import USD, save_exchange_rates
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -29,7 +30,22 @@ from atrade.backtest.backtest_limits import (
 )
 from atrade.backtest.backtest_metrics import BacktestMetrics
 from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
-from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
+from atrade.backtest.backtest_store import (
+    BacktestRequest,
+    BacktestRow,
+    BacktestStatus,
+    BacktestUniverse,
+    UniverseKind,
+    UniversePeriod,
+)
+from atrade.backtest.backtest_universe import (
+    MAX_UNIVERSE_SIZE,
+    check_list_members,
+    check_universe_bars,
+    describe_missing_universe,
+    find_rule_periods,
+    make_list_periods,
+)
 from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
@@ -43,11 +59,23 @@ MAX_INSTRUMENT_FIELD_LENGTH = 32
 InstrumentField = Annotated[str, Field(min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)]
 
 
-class StartBacktestRequest(BaseModel):
-    strategy_version_id: int
+class InstrumentBody(BaseModel):
     symbol: InstrumentField
     exchange: InstrumentField
     currency: InstrumentField
+
+
+class StartBacktestRequest(BaseModel):
+    """`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
+    `list` needs `instruments` (docs/architecture/backtest.md section 10.10.6)."""
+
+    strategy_version_id: int
+    universe_kind: UniverseKind = "single"
+    symbol: InstrumentField | None = None
+    exchange: InstrumentField | None = None
+    currency: InstrumentField | None = None
+    top_n: Annotated[int, Field(ge=1, le=MAX_UNIVERSE_SIZE)] | None = None
+    instruments: Annotated[list[InstrumentBody], Field(max_length=MAX_UNIVERSE_SIZE)] | None = None
     bar_period: BarPeriod
     start_utc: AwareDatetime
     end_utc: AwareDatetime
@@ -93,9 +121,12 @@ class BacktestResponse(BaseModel):
     strategy_id: int
     strategy_name: str
     version_number: int
-    symbol: str
-    exchange: str
-    currency: str
+    universe_kind: UniverseKind
+    # Null for a multi-instrument backtest. The currency is the currency of all universe members.
+    symbol: str | None
+    exchange: str | None
+    currency: str | None
+    universe_top_n: int | None
     bar_period: BarPeriod
     start_utc: datetime
     end_utc: datetime
@@ -123,6 +154,9 @@ class TradeResponse(BaseModel):
     quantity_shares: Decimal
     price_usd: Decimal
     commission_usd: Decimal
+    # The real exchange, not the simulated venue SMART. Null for a trade from before the multi-instrument backtest.
+    symbol: str | None
+    exchange: str | None
 
 
 class BacktestRobustnessResponse(BaseModel):
@@ -177,6 +211,10 @@ def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsRespo
     )
 
 
+def refuse(detail: str) -> NoReturn:
+    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+
+
 class BacktestRoutes:
     """The route functions. They share the database URL and the clock."""
 
@@ -199,9 +237,11 @@ class BacktestRoutes:
             strategy_id=strategy_version.strategy_id,
             strategy_name=strategy_version.strategy_name,
             version_number=strategy_version.version_number,
+            universe_kind=row.universe_kind,
             symbol=row.symbol,
             exchange=row.exchange,
             currency=row.currency,
+            universe_top_n=row.universe_top_n,
             bar_period=BarPeriod(row.bar_period),
             start_utc=row.start_utc,
             end_utc=row.end_utc,
@@ -219,38 +259,84 @@ class BacktestRoutes:
             survivorship_bias=has_survivorship_bias(request),
         )
 
-    async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
+    async def find_universe_periods(self, request: StartBacktestRequest, time_range: TimeRange) -> list[UniversePeriod]:
+        """The universe periods of a multi-instrument request. Raises a 422 HTTPException when it has no members."""
+        if request.universe_kind == "rule":
+            periods = await find_rule_periods(
+                database_url=self.database_url, top_n=request.top_n or 0, time_range=time_range
+            )
+            if not periods:
+                refuse(describe_missing_universe(time_range))
+            return periods
+        members = [
+            Instrument(symbol=body.symbol, exchange=body.exchange, currency=body.currency)
+            for body in request.instruments or []
+        ]
+        refusal = check_list_members(members)
+        if refusal is not None:
+            refuse(refusal)
+        return make_list_periods(time_range, members)
+
+    async def make_backtest_request(
+        self, request: StartBacktestRequest
+    ) -> tuple[BacktestRequest, list[UniversePeriod]]:
+        """The backtest request and the universe periods (none for a single-instrument backtest)."""
+        time_range = TimeRange(start_utc=request.start_utc, end_utc=request.end_utc)
         backtest_request = BacktestRequest(
             strategy_version_id=request.strategy_version_id,
-            instrument=Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency),
+            instrument=None,
             bar_period=request.bar_period,
-            time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
+            time_range=time_range,
             paper_capital_usd=request.paper_capital_usd,
             source_order=request.source_order,
         )
+        if request.universe_kind == "single":
+            if request.symbol is None or request.exchange is None or request.currency is None:
+                refuse("A single-instrument backtest needs symbol, exchange, and currency.")
+            instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
+            return replace(backtest_request, instrument=instrument), []
+        if request.universe_kind == "rule" and request.top_n is None:
+            refuse("A rule universe needs top_n.")
+        periods = await self.find_universe_periods(request, time_range)
+        # The rule universe is US only. A list has one currency (check_list_members).
+        currency = USD if request.universe_kind == "rule" else periods[0].members[0].currency
+        universe = BacktestUniverse(kind=request.universe_kind, currency=currency, top_n=request.top_n)
+        return replace(backtest_request, universe=universe), periods
+
+    async def check_bars(self, request: BacktestRequest, periods: list[UniversePeriod]) -> str | None:
+        if request.universe is None:
+            return await check_saved_bars(database_url=self.database_url, request=request)
+        return await check_universe_bars(
+            database_url=self.database_url, request=request, periods=periods, source_order=request.source_order or []
+        )
+
+    async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
+        backtest_request, periods = await self.make_backtest_request(request)
         refusal = check_backtest_request(backtest_request)
         if refusal is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
+            refuse(refusal)
         strategy_version = await read_strategy_version(
             database_url=self.database_url, strategy_version_id=request.strategy_version_id
         )
         if strategy_version is None:
-            detail = f"Strategy version {request.strategy_version_id} does not exist."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+            refuse(f"Strategy version {request.strategy_version_id} does not exist.")
         backtest_request = await add_global_source_order(database_url=self.database_url, request=backtest_request)
         # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
-        missing_bars = await check_saved_bars(database_url=self.database_url, request=backtest_request)
+        missing_bars = await self.check_bars(backtest_request, periods)
         if missing_bars is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_bars)
+            refuse(missing_bars)
         # The child never calls IBKR, so the rates of an instrument that is not in USD are saved first (section 10.8).
         missing_rates = await save_exchange_rates(
             database_url=self.database_url, exchange_rate_reader=self.exchange_rate_reader, request=backtest_request
         )
         if missing_rates is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_rates)
+            refuse(missing_rates)
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             row = await backtest_store.insert_backtest(
-                connection, request=backtest_request, created_at_utc=self.clock.read_now_utc()
+                connection,
+                request=backtest_request,
+                created_at_utc=self.clock.read_now_utc(),
+                universe_periods=periods,
             )
         return await self.to_backtest_response(row)
 
@@ -321,6 +407,8 @@ class BacktestRoutes:
                     quantity_shares=trade.quantity_shares,
                     price_usd=trade.price_usd,
                     commission_usd=trade.commission_usd,
+                    symbol=trade.symbol,
+                    exchange=trade.exchange,
                 )
                 for trade in trades
             ],

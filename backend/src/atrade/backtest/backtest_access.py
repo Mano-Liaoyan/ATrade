@@ -11,6 +11,7 @@ import psycopg
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
+from atrade.backtest.backtest_universe import check_universe
 from atrade.market_data import BarRequest, check_source_order, has_saved_bars, read_source_order
 
 
@@ -35,6 +36,9 @@ def check_backtest_request(request: BacktestRequest) -> str | None:
     """Returns why a backtest cannot run with this request, or None."""
     if request.time_range.end_utc <= request.time_range.start_utc:
         return "The time range must end after it starts."
+    universe_refusal = check_universe(request)
+    if universe_refusal is not None:
+        return universe_refusal
     if request.source_order is not None:
         return check_source_order(request.source_order)
     return None
@@ -43,7 +47,7 @@ def check_backtest_request(request: BacktestRequest) -> str | None:
 def has_survivorship_bias(request: BacktestRequest) -> bool:
     """True for an HK backtest and a US backtest that starts before the Databento history: their universe has no
     instruments that stopped trading (docs/architecture/backtest.md section 10.12)."""
-    currency = request.instrument.currency
+    currency = request.currency
     if currency == "HKD":
         return True
     return currency == "USD" and request.time_range.start_utc < DATABENTO_HISTORY_START_UTC
@@ -58,7 +62,7 @@ def describe_missing_bars(request: BacktestRequest) -> str:
 
     It names the bars, says how bars get saved, and says why a closed market gives no bars (section 10.1).
     """
-    instrument = request.instrument
+    instrument = request.single_instrument
     return (
         f"There are no saved {request.bar_period.label} bars of {instrument.symbol} / {instrument.exchange}"
         f" / {instrument.currency} from {format_message_time(request.time_range.start_utc)}"
@@ -75,7 +79,7 @@ async def check_saved_bars(*, database_url: str, request: BacktestRequest) -> st
     a backtest can start before the first saved bar or end after the last one (docs/architecture/backtest.md 10.1).
     """
     bar_request = BarRequest(
-        instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
+        instrument=request.single_instrument, bar_period=request.bar_period, time_range=request.time_range
     )
     source_order = request.source_order or await read_source_order(database_url=database_url)
     if await has_saved_bars(database_url=database_url, bar_request=bar_request, source_order=source_order):

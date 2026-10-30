@@ -1051,9 +1051,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default
   `127.0.0.1:8000`).
 - `web` has `read_only: true`, a `tmpfs` on `/tmp`, and
-  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `4g`; phase 3 changes it
-  to `8g`, because a multi-instrument backtest of 500 instruments on 1-hour
-  bars can need 4 to 5 GB,
+  `mem_limit: ${ATRADE_WEB_MEMORY_LIMIT}` (default `8g`; it was `4g`
+  before phase 3, #199, because a multi-instrument backtest of 500 instruments
+  on 1-hour bars can need 4 to 5 GB,
   [#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)). `0` turns the memory
   limit off. Use `0` only on a host that cannot set memory limits, for example
   rootless Podman without the memory cgroup controller.
@@ -1609,8 +1609,9 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
 | The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. |
 | The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. |
-| Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). | Run one with real data and measure the peak memory and the time. |
-| Look-back bars of many bar types in one catalog, and chunked loading memory (#131, source only). | A multi-instrument child test with look-back bars for each member. |
+| Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). Not measured in #199: there are no saved real hourly bars of 500 instruments locally. | Run one with real data and measure the peak memory and the time. |
+| The PostgreSQL read time and the Arrow conversion time of each backtest child with a universe (#142). Not measured in #199 (no real bars locally). | Time one real `rule` backtest child. |
+| Chunked loading memory (#131, source only). The child of #199 loads all bars at once. | Measure the peak memory of a 500-instrument child. |
 | Databento `ohlcv-1h` is on whole hours. The first IBKR regular-hours hourly bar starts at 9:30 ET and is 30 minutes long (#141). | Compare IBKR and Databento hourly bars of one instrument on one day. |
 | NYSE American and NYSE Arca instruments have no official open and close in XNAS or XNYS `statistics` (#141). | After the daily import, count the instruments without `stat_type` 11. |
 | The cost of the universe hourly bars is about 24 USD (#141). | `metadata.get_cost` before the purchase. |
@@ -1647,6 +1648,7 @@ implementation" list.
 | The default smoothing (`ma_type`) of `RelativeStrengthIndex` and `AverageTrueRange` in NautilusTrader 2.0.0rc7. | On 2026-10-30 (#160), in the backend environment: both defaults are Wilder. `AverageTrueRange(14).ma_type` is `MovingAverageType.Wilder`. `RelativeStrengthIndex` has no `ma_type` property, so the check compared values: on 200 test closes, RSI(14) with the default gave 34.832627, the same as `ma_type=MovingAverageType.Wilder` and as a Wilder RSI written by hand; `Exponential` gave 14.769989 and `Simple` gave 5.270742. The value scale is 0 to 100. `MovingAverageConvergenceDivergence` defaults to `Exponential`. The indicator library does not need to pass `MovingAverageType.Wilder` for RSI and ATR. |
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
+| Look-back bars of many bar types in one catalog (#131, source only). | Yes. On 2026-10-30 (#199), a real backtest child with a `rule` universe of 2 quarters wrote the look-back bars of 3 members to one catalog. Each new member warmed up an SMA(20) from it and the strategy bought on the first bar after the member joined, also for the member that joined in the second quarter (`tests/backtest/test_universe_backtest_runs.py`). A `request_bars` with an `end` after the engine time raises `ValueError: end was > now`; without `end`, the catalog gives only the bars up to the engine time. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1728,6 +1730,12 @@ option and records it in this document.
   (`DataType("UniverseUpdate")`, `on_data`), not with a platform timer. The
   configuration of a multi-instrument strategy has no `instrument_id`, no
   `bar_type`, and no universe field
+  ([`backtest.md`](architecture/backtest.md) section 10.10.8).
+- Decided (#199): the start route writes the members of each universe
+  period. The universe bar check needs one saved bar of one member. A
+  multi-instrument backtest on 1-hour bars uses the single-instrument
+  look-back. A `list` has 500 instruments at most. The round trips count for
+  each instrument, and the exposure counts the bars with any position
   ([`backtest.md`](architecture/backtest.md) section 10.10.8).
 - Decided (#188): a source order holds each `BarSource` exactly 1 time.
   `PUT /api/market-data/source-order` refuses an order that leaves out a bar

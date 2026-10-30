@@ -23,14 +23,27 @@ from atrade.backtest.backtest_exchange_rates import (
     describe_missing_start_rate,
     read_daily_exchange_rates,
 )
-from atrade.backtest.backtest_metrics import calculate_equity_curve, calculate_metrics
-from atrade.backtest.backtest_store import BacktestRequest, BacktestResult
+from atrade.backtest.backtest_metrics import (
+    BacktestTrade,
+    EquityPoint,
+    calculate_equity_curve,
+    calculate_metrics,
+    calculate_universe_equity_curve,
+)
+from atrade.backtest.backtest_store import BacktestRequest, BacktestResult, UniversePeriod
+from atrade.backtest.backtest_universe import (
+    UniverseBars,
+    describe_missing_universe_bars,
+    find_universe_look_back_length,
+    read_universe_bars,
+)
 from atrade.backtest.strategy_engine_run import (
     StrategyFailedError,
     StrategyRun,
     read_currency_precision,
     run_strategy_on_bars,
 )
+from atrade.backtest.universe_engine_run import UniverseRun, run_universe_strategy
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.market_data import BarRequest, BarSource, read_saved_bars, read_source_order
@@ -49,14 +62,69 @@ def find_look_back_length(bar_period: BarPeriod) -> timedelta:
 
 
 @dataclass(frozen=True)
+class UniverseInputs:
+    periods: list[UniversePeriod]
+    bars: UniverseBars
+
+
+@dataclass(frozen=True)
 class BacktestInputs:
     request: BacktestRequest
     code: str
+    # The bars of a single-instrument backtest. Empty for a multi-instrument backtest: then `universe` has the bars.
     bars: list[Bar]
     look_back_bars: list[Bar]
     bar_count_by_source: dict[BarSource, int]
-    # None for a USD instrument.
+    # None for a USD instrument or universe.
     exchange_rates: DailyExchangeRates | None
+    universe: UniverseInputs | None = None
+
+    @property
+    def has_bars(self) -> bool:
+        if self.universe is None:
+            return bool(self.bars)
+        return any(member.bars for member in self.universe.bars.members)
+
+
+async def read_universe_inputs(
+    *, database_url: str, backtest_id: int, request: BacktestRequest, source_order: list[BarSource]
+) -> UniverseInputs:
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        periods = await backtest_store.select_universe_periods(
+            connection, backtest_id=backtest_id, currency=request.currency
+        )
+    bars = await read_universe_bars(
+        database_url=database_url,
+        request=request,
+        periods=periods,
+        source_order=source_order,
+        look_back_length=find_universe_look_back_length(request.bar_period, find_look_back_length(request.bar_period)),
+    )
+    return UniverseInputs(periods=periods, bars=bars)
+
+
+async def read_single_inputs(
+    *, request: BacktestRequest, database_url: str, source_order: list[BarSource]
+) -> tuple[list[Bar], list[Bar], dict[BarSource, int]]:
+    """The bars of the range, the look-back bars, and the bar count of each bar source in the range."""
+    saved_bars = await read_saved_bars(
+        database_url=database_url,
+        bar_request=BarRequest(
+            instrument=request.single_instrument, bar_period=request.bar_period, time_range=request.time_range
+        ),
+        source_order=source_order,
+    )
+    start_utc = request.time_range.start_utc
+    saved_look_back_bars = await read_saved_bars(
+        database_url=database_url,
+        bar_request=BarRequest(
+            instrument=request.single_instrument,
+            bar_period=request.bar_period,
+            time_range=TimeRange(start_utc=start_utc - find_look_back_length(request.bar_period), end_utc=start_utc),
+        ),
+        source_order=source_order,
+    )
+    return saved_bars.bars, saved_look_back_bars.bars, saved_bars.bar_counts
 
 
 async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> BacktestInputs:
@@ -76,34 +144,31 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
     # The source order of the backtest. Only a row from before the source order has none: then the global source
     # order (docs/architecture/backtest.md section 10.12).
     source_order = request.source_order or await read_source_order(database_url=database_url)
-    saved_bars = await read_saved_bars(
-        database_url=database_url,
-        bar_request=BarRequest(
-            instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
-        ),
-        source_order=source_order,
-    )
-    start_utc = request.time_range.start_utc
-    saved_look_back_bars = await read_saved_bars(
-        database_url=database_url,
-        bar_request=BarRequest(
-            instrument=request.instrument,
-            bar_period=request.bar_period,
-            time_range=TimeRange(start_utc=start_utc - find_look_back_length(request.bar_period), end_utc=start_utc),
-        ),
-        source_order=source_order,
-    )
     exchange_rates = (
-        None
-        if request.instrument.currency == USD
-        else await read_daily_exchange_rates(database_url=database_url, request=request)
+        None if request.currency == USD else await read_daily_exchange_rates(database_url=database_url, request=request)
+    )
+    if request.universe is not None:
+        universe = await read_universe_inputs(
+            database_url=database_url, backtest_id=backtest_id, request=request, source_order=source_order
+        )
+        return BacktestInputs(
+            request=request,
+            code=strategy_version.code,
+            bars=[],
+            look_back_bars=[],
+            bar_count_by_source=universe.bars.bar_count_by_source,
+            exchange_rates=exchange_rates,
+            universe=universe,
+        )
+    bars, look_back_bars, bar_count_by_source = await read_single_inputs(
+        request=request, database_url=database_url, source_order=source_order
     )
     return BacktestInputs(
         request=request,
         code=strategy_version.code,
-        bars=saved_bars.bars,
-        look_back_bars=saved_look_back_bars.bars,
-        bar_count_by_source=saved_bars.bar_counts,
+        bars=bars,
+        look_back_bars=look_back_bars,
+        bar_count_by_source=bar_count_by_source,
         exchange_rates=exchange_rates,
     )
 
@@ -125,26 +190,62 @@ async def save_failure(job: BacktestJob, error_message: str) -> None:
         )
 
 
+def run_single_instrument(
+    inputs: BacktestInputs, starting_cash: Decimal, work_directory: Path
+) -> tuple[list[BacktestTrade], list[EquityPoint]]:
+    """The trades and the equity curve in the instrument currency."""
+    request = inputs.request
+    run = StrategyRun(
+        code=inputs.code,
+        request=request,
+        starting_cash=starting_cash,
+        bars=inputs.bars,
+        look_back_bars=inputs.look_back_bars,
+    )
+    trades = run_strategy_on_bars(run, work_directory)
+    equity_curve = calculate_equity_curve(
+        start_cash=starting_cash, bars=inputs.bars, bar_period=request.bar_period, trades=trades
+    )
+    return trades, equity_curve
+
+
+def run_universe(
+    inputs: BacktestInputs, universe: UniverseInputs, starting_cash: Decimal, work_directory: Path
+) -> tuple[list[BacktestTrade], list[EquityPoint]]:
+    """The trades and the equity curve in the universe currency: the cash plus all positions at the bar closes."""
+    request = inputs.request
+    run = UniverseRun(
+        code=inputs.code,
+        bar_period=request.bar_period,
+        currency=request.currency,
+        starting_cash=starting_cash,
+        members=universe.bars.members,
+        periods=universe.periods,
+    )
+    trades = run_universe_strategy(run, work_directory)
+    equity_curve = calculate_universe_equity_curve(
+        start_cash=starting_cash,
+        bars_by_instrument={
+            (member.instrument.symbol, member.instrument.exchange): member.bars for member in universe.bars.members
+        },
+        bar_period=request.bar_period,
+        trades=trades,
+    )
+    return trades, equity_curve
+
+
 async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: Decimal, work_directory: Path) -> None:
-    """Runs the strategy with `starting_cash` in the instrument currency and saves the result in USD."""
+    """Runs the strategy with `starting_cash` in the backtest currency and saves the result in USD."""
     request = inputs.request
     try:
-        run = StrategyRun(
-            code=inputs.code,
-            request=request,
-            starting_cash=starting_cash,
-            bars=inputs.bars,
-            look_back_bars=inputs.look_back_bars,
-        )
-        trades = run_strategy_on_bars(run, work_directory)
+        if inputs.universe is None:
+            trades, equity_curve = run_single_instrument(inputs, starting_cash, work_directory)
+        else:
+            trades, equity_curve = run_universe(inputs, inputs.universe, starting_cash, work_directory)
     except StrategyFailedError as error:
         # readability-exception: the engine reports a strategy error only as an exception (G1).
         await save_failure(job, str(error))
         return
-    # In the instrument currency, like the trades.
-    equity_curve = calculate_equity_curve(
-        start_cash=starting_cash, bars=inputs.bars, bar_period=request.bar_period, trades=trades
-    )
     if inputs.exchange_rates is not None:
         equity_curve = convert_equity_curve_to_usd(inputs.exchange_rates, equity_curve)
         trades = convert_trades_to_usd(inputs.exchange_rates, trades)
@@ -169,22 +270,26 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: D
 
 
 def find_starting_cash(inputs: BacktestInputs) -> Decimal | None:
-    """The paper capital in the instrument currency, or None without a rate at the start (section 10.8)."""
+    """The paper capital in the backtest currency, or None without a rate at the start (section 10.8)."""
     request = inputs.request
     if inputs.exchange_rates is None:
         return request.paper_capital_usd
     usd_per_unit = inputs.exchange_rates.find_usd_per_unit(request.time_range.start_utc)
     if usd_per_unit is None:
         return None
-    return convert_paper_capital(
-        request.paper_capital_usd, usd_per_unit, read_currency_precision(request.instrument.currency)
-    )
+    return convert_paper_capital(request.paper_capital_usd, usd_per_unit, read_currency_precision(request.currency))
+
+
+def describe_no_bars(request: BacktestRequest) -> str:
+    if request.universe is None:
+        return describe_missing_bars(request)
+    return describe_missing_universe_bars(request)
 
 
 async def run_backtest_steps(job: BacktestJob) -> None:
     inputs = await read_backtest_inputs(database_url=job.database_url, backtest_id=job.backtest_id)
-    if not inputs.bars:
-        await save_failure(job, describe_missing_bars(inputs.request))
+    if not inputs.has_bars:
+        await save_failure(job, describe_no_bars(inputs.request))
         return
     starting_cash = find_starting_cash(inputs)
     if starting_cash is None:

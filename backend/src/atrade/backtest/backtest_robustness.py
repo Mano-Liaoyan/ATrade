@@ -21,8 +21,6 @@ from atrade.backtest.sharpe_probability import (
     find_sharpe_probability_reason,
     find_sharpe_probability_status,
 )
-from atrade.foundation.bar import BarPeriod
-from atrade.foundation.instrument import Instrument
 from atrade.strategy import read_strategy_versions
 
 type SharpeProbabilityKind = Literal["probabilistic", "deflated"]
@@ -37,15 +35,12 @@ class Robustness:
     missing_reasons: dict[str, str]
 
 
-async def read_trial_sharpe_ratios(
-    *, database_url: str, strategy_id: int, instrument: Instrument, bar_period: BarPeriod
-) -> list[float | None]:
-    """The daily Sharpe ratio of each trial: each finished backtest of the strategy (all versions), the instrument,
-    and the bar period. A trial with fewer than 2 daily returns or a standard deviation of 0 has None."""
+async def read_trial_sharpe_ratios(*, database_url: str, strategy_id: int, row: BacktestRow) -> list[float | None]:
+    """The daily Sharpe ratio of each trial: each finished backtest of the strategy (all versions), the instrument or
+    universe, and the bar period of `row`. A trial with fewer than 2 daily returns or a standard deviation of 0 has
+    None."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        finished = await backtest_store.select_finished_backtests_of(
-            connection, instrument=instrument, bar_period=bar_period
-        )
+        finished = await backtest_store.select_finished_backtests_of(connection, row)
         # Section 6.3: no JOIN with the strategy tables. The strategy capability gives the strategy of each version.
         versions = await read_strategy_versions(
             database_url=database_url, strategy_version_ids=[trial.strategy_version_id for trial in finished]
@@ -69,12 +64,7 @@ async def read_robustness(
 ) -> Robustness:
     """PSR(0) when the trial count is 1 or less, else the DSR. The DSR uses only the trials with a daily Sharpe
     ratio for the variance of the Sharpe ratios and for N."""
-    trial_sharpe_ratios = await read_trial_sharpe_ratios(
-        database_url=database_url,
-        strategy_id=strategy_id,
-        instrument=Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency),
-        bar_period=BarPeriod(row.bar_period),
-    )
+    trial_sharpe_ratios = await read_trial_sharpe_ratios(database_url=database_url, strategy_id=strategy_id, row=row)
     daily_returns = calculate_daily_returns(start_capital_usd=row.paper_capital_usd, equity_curve=equity_curve)
     trial_count = len(trial_sharpe_ratios)
     if trial_count <= 1:

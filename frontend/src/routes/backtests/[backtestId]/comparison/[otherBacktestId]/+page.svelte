@@ -13,8 +13,10 @@
     EquityDrawdownChart,
     isFinalStatus,
     listBacktests,
+    readBacktestInstrument,
     type Backtest,
     type BacktestComparison,
+    type BacktestInstrument,
     type ComparedTest,
     type DrawdownCurve,
   } from '#lib/backtest';
@@ -114,6 +116,16 @@
       trades: backtest.trades,
     };
   }
+
+  // The instrument of both backtests, when they are single-instrument backtests of the same instrument.
+  function findSharedInstrument(first: Backtest, second: Backtest): BacktestInstrument | undefined {
+    const firstInstrument = readBacktestInstrument(first);
+    const secondInstrument = readBacktestInstrument(second);
+    if (firstInstrument === undefined || secondInstrument === undefined) {
+      return undefined;
+    }
+    return isSameInstrument(firstInstrument, secondInstrument) ? firstInstrument : undefined;
+  }
 </script>
 
 <Workbench>
@@ -145,10 +157,13 @@
                   >{compared.strategy_name}</a
                 >
                 <!-- The instrument and the bar period show when both backtests have the same one. -->
-                {#if isSameInstrument(compared.first, compared.second)}
-                  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                  <a class="cds--link" href={createInstrumentHref(compared.first)}>{compared.first.symbol}</a>
-                {/if}
+                {#snippet instrumentLink(sharedInstrument: BacktestInstrument | undefined)}
+                  {#if sharedInstrument !== undefined}
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                    <a class="cds--link" href={createInstrumentHref(sharedInstrument)}>{sharedInstrument.symbol}</a>
+                  {/if}
+                {/snippet}
+                {@render instrumentLink(findSharedInstrument(compared.first, compared.second))}
                 {#if compared.first.bar_period === compared.second.bar_period}
                   <span class="run-period">{formatBarPeriod(compared.first.bar_period)}</span>
                 {/if}
