@@ -1,6 +1,6 @@
 """SQL for the backtest, backtest_equity_point, and backtest_trade tables. Only the backtest capability uses them."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Final, Literal
@@ -51,12 +51,26 @@ class BacktestRow:
     total_return_percent: Decimal | None
     max_drawdown_percent: Decimal | None
     trade_count: int | None
+    cagr_percent: Decimal | None
+    annual_volatility_percent: Decimal | None
+    sharpe_ratio: Decimal | None
+    sortino_ratio: Decimal | None
+    calmar_ratio: Decimal | None
+    profit_factor: Decimal | None
+    average_win_usd: Decimal | None
+    average_win_percent: Decimal | None
+    average_loss_usd: Decimal | None
+    exposure_percent: Decimal | None
+    turnover_per_year: Decimal | None
+    win_rate_percent: Decimal | None
 
 
 BACKTEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc, paper_capital_usd,
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
-    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count
+    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
+    cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
+    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent
 """
 
 
@@ -83,6 +97,18 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
         total_return_percent=row.total_return_percent,
         max_drawdown_percent=row.max_drawdown_percent,
         trade_count=row.trade_count,
+        cagr_percent=row.cagr_percent,
+        annual_volatility_percent=row.annual_volatility_percent,
+        sharpe_ratio=row.sharpe_ratio,
+        sortino_ratio=row.sortino_ratio,
+        calmar_ratio=row.calmar_ratio,
+        profit_factor=row.profit_factor,
+        average_win_usd=row.average_win_usd,
+        average_win_percent=row.average_win_percent,
+        average_loss_usd=row.average_loss_usd,
+        exposure_percent=row.exposure_percent,
+        turnover_per_year=row.turnover_per_year,
+        win_rate_percent=row.win_rate_percent,
     )
 
 
@@ -144,6 +170,55 @@ async def select_equity_curve(connection: psycopg.AsyncConnection, backtest_id: 
             {"backtest_id": backtest_id},
         )
         return await cursor.fetchall()
+
+
+@dataclass(frozen=True)
+class TrialRow:
+    """A finished backtest that can count as a trial of another backtest (docs/architecture/backtest.md 10.9.5)."""
+
+    id: int
+    strategy_version_id: int
+    paper_capital_usd: Decimal
+
+
+async def select_finished_backtests_of(
+    connection: psycopg.AsyncConnection, *, instrument: Instrument, bar_period: BarPeriod
+) -> list[TrialRow]:
+    """The finished backtests of the instrument and the bar period, for all time ranges."""
+    async with connection.cursor(row_factory=class_row(TrialRow)) as cursor:
+        await cursor.execute(
+            """
+            SELECT id, strategy_version_id, paper_capital_usd FROM backtest
+            WHERE status = 'finished' AND symbol = %(symbol)s AND exchange = %(exchange)s
+                AND currency = %(currency)s AND bar_period = %(bar_period)s
+            ORDER BY id
+            """,
+            {
+                "symbol": instrument.symbol,
+                "exchange": instrument.exchange,
+                "currency": instrument.currency,
+                "bar_period": bar_period.value,
+            },
+        )
+        return await cursor.fetchall()
+
+
+async def select_equity_curves(
+    connection: psycopg.AsyncConnection, backtest_ids: list[int]
+) -> dict[int, list[EquityPoint]]:
+    """The equity curves of the backtests, by backtest ID, with one query. A backtest without points has []."""
+    equity_curves: dict[int, list[EquityPoint]] = {backtest_id: [] for backtest_id in backtest_ids}
+    cursor = await connection.execute(
+        """
+        SELECT backtest_id, time_utc, equity_usd FROM backtest_equity_point
+        WHERE backtest_id = ANY(%(backtest_ids)s)
+        ORDER BY backtest_id, time_utc
+        """,
+        {"backtest_ids": backtest_ids},
+    )
+    for backtest_id, time_utc, equity_usd in await cursor.fetchall():
+        equity_curves[backtest_id].append(EquityPoint(time_utc=time_utc, equity_usd=equity_usd))
+    return equity_curves
 
 
 async def select_trades(connection: psycopg.AsyncConnection, backtest_id: int) -> list[BacktestTrade]:
@@ -254,15 +329,17 @@ async def save_result(
             """
             UPDATE backtest SET status = 'finished', ended_at_utc = %(ended_at_utc)s, final_equity_usd = %(final_equity_usd)s,
                 total_return_percent = %(total_return_percent)s, max_drawdown_percent = %(max_drawdown_percent)s,
-                trade_count = %(trade_count)s
+                trade_count = %(trade_count)s, cagr_percent = %(cagr_percent)s,
+                annual_volatility_percent = %(annual_volatility_percent)s, sharpe_ratio = %(sharpe_ratio)s,
+                sortino_ratio = %(sortino_ratio)s, calmar_ratio = %(calmar_ratio)s, profit_factor = %(profit_factor)s,
+                average_win_usd = %(average_win_usd)s, average_win_percent = %(average_win_percent)s,
+                average_loss_usd = %(average_loss_usd)s, exposure_percent = %(exposure_percent)s,
+                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s
             WHERE id = %(backtest_id)s
             """,
             {
                 "backtest_id": backtest_id,
-                "final_equity_usd": result.metrics.final_equity_usd,
-                "total_return_percent": result.metrics.total_return_percent,
-                "max_drawdown_percent": result.metrics.max_drawdown_percent,
-                "trade_count": result.metrics.trade_count,
+                **asdict(result.metrics),
                 "ended_at_utc": ended_at_utc,
             },
         )
