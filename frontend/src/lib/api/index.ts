@@ -588,7 +588,8 @@ export interface paths {
         put?: never;
         /**
          * Run Screen
-         * @description Runs the saved screen and saves 1 screen result (section 24.5).
+         * @description Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and
+         *     definition in place of the saved ones and keeps the saved screen (section 24.13).
          */
         post: operations["run_screen_api_screens__screen_id__runs_post"];
         delete?: never;
@@ -1955,6 +1956,15 @@ export interface components {
         RulesCodeResponse: {
             /** Code */
             code: string;
+        };
+        /**
+         * RunScreenRequest
+         * @description A run of a changed screen (section 24.13). The run does not change the saved screen.
+         */
+        RunScreenRequest: {
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
         };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
@@ -4324,7 +4334,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RunScreenRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {

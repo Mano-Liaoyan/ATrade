@@ -1,6 +1,7 @@
 """HTTP routes of the screen capability: list, read, create, change, delete, and run screens, and read screen results
 (screen.md section 24.7)."""
 
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
@@ -26,6 +27,13 @@ type Market = Literal["US", "HK"]
 class CreateScreenRequest(BaseModel):
     # The check of section 24.6 checks the market and the definition, so a problem gives its location.
     name: str
+    market: str
+    definition: JsonValue
+
+
+class RunScreenRequest(BaseModel):
+    """A run of a changed screen (section 24.13). The run does not change the saved screen."""
+
     market: str
     definition: JsonValue
 
@@ -309,12 +317,20 @@ class ScreenRoutes:
         if not is_deleted:
             raise screen_not_found(screen_id)
 
-    async def run_screen(self, screen_id: int) -> ScreenResultResponse | JSONResponse:
-        """Runs the saved screen and saves 1 screen result (section 24.5)."""
+    async def run_screen(
+        self, screen_id: int, request: RunScreenRequest | None = None
+    ) -> ScreenResultResponse | JSONResponse:
+        """Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and
+        definition in place of the saved ones and keeps the saved screen (section 24.13)."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.select_screen(connection, screen_id)
         if screen is None:
             raise screen_not_found(screen_id)
+        if request is not None:
+            problems = check_screen(name=screen.name, market=request.market, definition=request.definition)
+            if problems:
+                return check_failed(problems)
+            screen = replace(screen, market=request.market, definition=request.definition)
         problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
         if problems:
             return check_failed(problems)

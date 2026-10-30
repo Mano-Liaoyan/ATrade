@@ -285,7 +285,7 @@ Decided (#205): the paths and the field names of this table are final.
 | `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen, as `GET /api/screens/{screen_id}` gives it. A screen of the user has `kept` true and `assistant_conversation_id` null. `422` with the problem list (section 24.6). |
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
 | `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. |
-| `POST /api/screens/{screen_id}/runs` | Runs the saved screen. `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
+| `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
 The screen result answer:
@@ -478,8 +478,16 @@ Behavior:
   (section 24.6).
 - The route for Keep. Discard can use `DELETE /api/screens/{id}` on the Web
   port.
-- How a run of a screen with unsaved changes works: the run route takes a
-  saved screen only.
+- Decided (#212): a run of a screen with unsaved changes sends the changed
+  market and definition in the body of `POST /api/screens/{id}/runs`. The
+  screen result keeps its copy of that definition. The saved screen stays
+  the same until "Save screen" (`PUT`) or "Save as new screen" (`POST`).
+- Decided (#212): a screen keeps its market. A US / HK switch makes a
+  draft that "Save as new screen" saves; "Save screen" does not show for it.
+  The switch sets the start instruments of the market (US: quarter
+  universe, HK: HK instrument list) and removes the exchange filters.
+- Decided (#212): "Save as new screen" names the new screen
+  "<name> copy" (or "<name> copy N" when that name is in use).
 - How the user runs a screen again after new daily bars. The final title row
   of #145 has no "Run screen" button.
 - Decided (#206): what the result does when more than 500 instruments

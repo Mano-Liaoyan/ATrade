@@ -1762,7 +1762,7 @@
     "/api/screens/{screen_id}/runs": {
       "post": {
         "summary": "Run Screen",
-        "description": "Runs the saved screen and saves 1 screen result (section 24.5).",
+        "description": "Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and\ndefinition in place of the saved ones and keeps the saved screen (section 24.13).",
         "operationId": "run_screen_api_screens__screen_id__runs_post",
         "parameters": [
           {
@@ -1775,6 +1775,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RunScreenRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Successful Response",
@@ -6150,6 +6167,24 @@
           "code"
         ],
         "title": "RulesCodeResponse"
+      },
+      "RunScreenRequest": {
+        "properties": {
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "type": "object",
+        "required": [
+          "market",
+          "definition"
+        ],
+        "title": "RunScreenRequest",
+        "description": "A run of a changed screen (section 24.13). The run does not change the saved screen."
       },
       "SamePeriodBacktestResponse": {
         "properties": {

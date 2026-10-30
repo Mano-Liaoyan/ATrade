@@ -21,6 +21,46 @@ export function readScreen(fetchFunction: typeof fetch, screenId: number): Promi
   return requestJson(fetchFunction, FAILED_ACTION, `/api/screens/${String(screenId)}`);
 }
 
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+/** Runs the market and the definition of the draft for the screen. The saved screen does not change (section 24.13). */
+export function runScreenDraft(
+  fetchFunction: typeof fetch,
+  screenId: number,
+  draft: { market: string; definition: unknown },
+): Promise<RequestResult<ScreenResult>> {
+  return requestJson(fetchFunction, FAILED_ACTION, `/api/screens/${String(screenId)}/runs`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(draft),
+  });
+}
+
+/** "Save screen": overwrites the definition of the saved screen. */
+export function saveScreen(
+  fetchFunction: typeof fetch,
+  screen: { id: number; name: string },
+  definition: unknown,
+): Promise<RequestResult<Screen>> {
+  return requestJson(fetchFunction, FAILED_ACTION, `/api/screens/${String(screen.id)}`, {
+    method: 'PUT',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name: screen.name, definition }),
+  });
+}
+
+/** "Save as new screen". */
+export function createScreen(
+  fetchFunction: typeof fetch,
+  screen: { name: string; market: string; definition: unknown },
+): Promise<RequestResult<Screen>> {
+  return requestJson(fetchFunction, FAILED_ACTION, '/api/screens', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(screen),
+  });
+}
+
 export function readScreenResult(
   fetchFunction: typeof fetch,
   screenResultId: number,

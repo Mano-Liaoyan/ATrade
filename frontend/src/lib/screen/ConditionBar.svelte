@@ -4,16 +4,24 @@
      assistant use it. -->
 <script lang="ts">
   import ChevronRight16 from '@carbon/icons/es/chevron--right/16.js';
+  import Close16 from '@carbon/icons/es/close/16.js';
   import { Icon } from '#lib/foundation/carbon';
   import { buildConditionGroups, type FunnelCounts, type IndicatorNames, type ScreenDefinition } from './condition_bar';
+  import type { RemovableGroup } from './screen_draft';
 
   interface Props {
     definition: ScreenDefinition;
     indicatorNames: IndicatorNames;
     counts: FunnelCounts;
+    // The screen page passes it: each filter and indicator condition then has a × button.
+    onRemove?: (group: RemovableGroup, index: number) => void;
   }
 
-  const { definition, indicatorNames, counts }: Props = $props();
+  const { definition, indicatorNames, counts, onRemove }: Props = $props();
+
+  function removableGroup(label: string): RemovableGroup | null {
+    return label === 'Filters' || label === 'Indicator conditions' ? label : null;
+  }
 
   const groups = $derived(buildConditionGroups(definition, indicatorNames, counts));
   const COUNT_FORMAT = new Intl.NumberFormat('en-US');
@@ -26,12 +34,21 @@
     {/if}
     <li class="group" aria-label={group.label}>
       {#each group.tags as tag, tagIndex (tagIndex)}
-        <span class="cds--tag cds--tag--gray condition-tag">
+        {@const removable = onRemove === undefined ? null : removableGroup(group.label)}
+        <span class={['cds--tag cds--tag--gray condition-tag', removable !== null && 'cds--tag--filter']}>
           <span class="cds--tag__label">
             <span class="subject">{tag.subject}</span>
             {#if tag.operation !== ''}<span class="operation">{tag.operation}</span>{/if}
             {#if tag.value !== ''}<span class="value">{tag.value}</span>{/if}
           </span>
+          {#if removable !== null}
+            <button
+              type="button"
+              class="cds--tag__close-icon"
+              aria-label={`Remove ${tag.subject} ${tag.operation} ${tag.value}`.trim()}
+              onclick={() => onRemove?.(removable, tagIndex)}><Icon icon={Close16} /></button
+            >
+          {/if}
         </span>
       {/each}
       <span class={['count', index === groups.length - 1 && 'count-last']} aria-label={`${group.label} count`}

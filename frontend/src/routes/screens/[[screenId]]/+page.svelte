@@ -16,13 +16,21 @@
   import { SurvivorshipBiasWarning } from '#lib/market_data';
   import {
     ConditionBar,
+    createScreen,
+    isDraftChanged,
     listScreens,
+    removeCondition,
+    runScreenDraft,
+    saveScreen,
+    switchMarket,
     readScreen,
     readScreenResult,
     ScreenExclusionTable,
     ScreenResultTable,
+    type RemovableGroup,
     type Screen,
     type ScreenListItem,
+    type ScreenMarket,
     type ScreenResult,
   } from '#lib/screen';
   import { addToWatchlist } from '#lib/watchlist';
@@ -47,6 +55,9 @@
   let selectedPositions: number[] = $state([]);
   let isAdding = $state(false);
   let addMessage = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
+  // The changed, unsaved screen (section 24.13). Null when the page shows the saved screen.
+  let draft = $state<{ screenId: number; market: ScreenMarket; definition: Record<string, unknown> } | null>(null);
+  let isSaving = $state(false);
 
   const shownScreen = $derived(screen !== null && screen.id === screenId ? screen : null);
   const screenResultId = $derived.by(() => {
@@ -127,6 +138,93 @@
     });
   });
 
+  const shownDraft = $derived(draft !== null && draft.screenId === screenId ? draft : null);
+  const isChanged = $derived(
+    shownScreen !== null &&
+      shownDraft !== null &&
+      isDraftChanged({ market: shownScreen.market, definition: shownScreen.definition }, shownDraft),
+  );
+
+  // Each change runs the draft at once. The run makes a screen result; the saved screen stays the same.
+  async function changeDraft(current: Screen, market: ScreenMarket, definition: Record<string, unknown>): Promise<void> {
+    draft = { screenId: current.id, market, definition };
+    resultMessage = '';
+    const result = await runScreenDraft(fetch, current.id, { market, definition });
+    if (draft.definition !== definition || draft.market !== market) {
+      return;
+    }
+    if (result.kind === 'failed') {
+      resultMessage = result.message;
+      return;
+    }
+    screenResult = result.value;
+    const path = `${resolve('/screens/[[screenId]]', { screenId: String(current.id) })}?result=${String(result.value.id)}`;
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the path above is resolved.
+    await goto(path, { replaceState: true });
+  }
+
+  function currentDraft(current: Screen, result: ScreenResult): { market: ScreenMarket; definition: Record<string, unknown> } {
+    return shownDraft ?? { market: result.market, definition: result.definition };
+  }
+
+  function removeFromDraft(current: Screen, result: ScreenResult, group: RemovableGroup, index: number): void {
+    const base = currentDraft(current, result);
+    void changeDraft(current, base.market, removeCondition(base.definition, group, index) as Record<string, unknown>);
+  }
+
+  function switchDraftMarket(current: Screen, result: ScreenResult, market: ScreenMarket): void {
+    const base = currentDraft(current, result);
+    void changeDraft(current, market, switchMarket(base.definition, market) as Record<string, unknown>);
+  }
+
+  async function saveDraft(current: Screen): Promise<void> {
+    if (shownDraft === null) {
+      return;
+    }
+    isSaving = true;
+    const saved = await saveScreen(fetch, current, shownDraft.definition);
+    isSaving = false;
+    if (saved.kind === 'failed') {
+      resultMessage = saved.message;
+      return;
+    }
+    screen = saved.value;
+    draft = null;
+  }
+
+  function newScreenName(name: string): string {
+    const names = new Set(screens.map((item) => item.name));
+    let candidate = `${name} copy`;
+    for (let number = 2; names.has(candidate); number += 1) {
+      candidate = `${name} copy ${String(number)}`;
+    }
+    return candidate;
+  }
+
+  async function saveAsNewScreen(current: Screen, result: ScreenResult): Promise<void> {
+    const base = currentDraft(current, result);
+    isSaving = true;
+    const created = await createScreen(fetch, {
+      name: newScreenName(current.name),
+      market: base.market,
+      definition: base.definition,
+    });
+    isSaving = false;
+    if (created.kind === 'failed') {
+      resultMessage = created.message;
+      return;
+    }
+    const listed = await listScreens(fetch);
+    if (listed.kind === 'ok') {
+      screens = listed.value;
+    }
+    draft = null;
+    const run = await runScreenDraft(fetch, created.value.id, base);
+    const target = resolve('/screens/[[screenId]]', { screenId: String(created.value.id) });
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the target is resolved.
+    await goto(run.kind === 'ok' ? `${target}?result=${String(run.value.id)}` : target);
+  }
+
   // The watchlist add route checks each instrument with IBKR, so the page adds the instruments one after the other.
   async function addRowsToWatchlist(result: ScreenResult, positions: number[] | null): Promise<void> {
     const rows = positions === null ? result.rows : result.rows.filter((row) => positions.includes(row.position));
@@ -173,7 +271,40 @@
       {/if}
     {:else}
       {@const current = shownScreen}
-      <h1 class="screen-title">{current.name}</h1>
+      <div class="title-row">
+        <h1 class="screen-title">{current.name}</h1>
+        {#if shownResult !== null}
+          {@const result = shownResult}
+          <ContentSwitcher
+            label="Market"
+            size="sm"
+            items={[
+              { value: 'US', label: 'US' },
+              { value: 'HK', label: 'HK' },
+            ]}
+            value={currentDraft(current, result).market}
+            onValueChange={(value: ScreenMarket) => {
+              switchDraftMarket(current, result, value);
+            }}
+          />
+          <div class="title-actions">
+            <button
+              type="button"
+              class="cds--btn cds--btn--tertiary cds--btn--sm"
+              disabled={isSaving}
+              onclick={() => void saveAsNewScreen(current, result)}>Save as new screen</button
+            >
+            {#if isChanged && shownDraft?.market === current.market}
+              <button
+                type="button"
+                class="cds--btn cds--btn--primary cds--btn--sm"
+                disabled={isSaving}
+                onclick={() => void saveDraft(current)}>Save screen</button
+              >
+            {/if}
+          </div>
+        {/if}
+      </div>
       {#if current.market === 'HK'}
         <SurvivorshipBiasWarning />
       {/if}
@@ -187,7 +318,14 @@
         {@const result = shownResult}
         <div class="condition-region">
           <ScrollRegion label="Condition bar" maxHeight="7.5rem">
-            <ConditionBar definition={result.definition} indicatorNames={result.indicator_names} counts={result.summary} />
+            <ConditionBar
+              definition={result.definition}
+              indicatorNames={result.indicator_names}
+              counts={result.summary}
+              onRemove={(group: RemovableGroup, index: number) => {
+                removeFromDraft(current, result, group, index);
+              }}
+            />
           </ScrollRegion>
         </div>
         {#if addMessage !== null}
@@ -281,6 +419,19 @@
     padding: var(--cds-spacing-05);
     /* $layer-01, so the $background group strips of the condition bar show (screen.md section 24.10.1). */
     background: var(--cds-layer-01);
+  }
+
+  .title-row {
+    display: flex;
+    flex: none;
+    gap: var(--cds-spacing-05);
+    align-items: center;
+  }
+
+  .title-actions {
+    display: flex;
+    gap: var(--cds-spacing-03);
+    margin-inline-start: auto;
   }
 
   .screen-title {

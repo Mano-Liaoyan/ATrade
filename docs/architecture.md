@@ -2030,6 +2030,11 @@ option and records it in this document.
   shows how many it added. The tag value color is `$link-primary` (blue 60
   in g10, blue 40 in g100): blue 70 is not a token. `docs/architecture/screen.md`
   section 24.13 has the details.
+- Decided (#212): a change on the condition bar runs the changed screen at
+  once with the optional body `{market, definition}` of
+  `POST /api/screens/{id}/runs`; the saved screen does not change. A screen
+  keeps its market, so a US / HK switch is saved with "Save as new screen".
+  `docs/architecture/screen.md` sections 24.7 and 24.13 have the details.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`
