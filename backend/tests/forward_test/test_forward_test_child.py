@@ -214,8 +214,8 @@ async def test_the_live_node_gets_the_warm_up_bars_of_7_days_before_the_start(
     assert warm_up_bars[-1].start_utc == warm_up_end_utc - timedelta(minutes=1)
     # The child saves the warm-up bars in the bar store, so a same-period backtest can use them.
     with psycopg.connect(database_url) as connection:
-        assert connection.execute("SELECT count(*) FROM bar").fetchall() == [(7 * 24 * 60,)]
-        assert connection.execute("SELECT start_utc, end_utc FROM bar_saved_range").fetchall() == [
+        assert connection.execute("SELECT count(*) FROM ibkr_bar").fetchall() == [(7 * 24 * 60,)]
+        assert connection.execute("SELECT start_utc, end_utc FROM ibkr_bar_saved_range").fetchall() == [
             (warm_up_end_utc - timedelta(days=7), warm_up_end_utc)
         ]
 

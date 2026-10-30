@@ -11,7 +11,7 @@ from psycopg import sql
 
 from atrade.app.database_migrations import MIGRATIONS_DIR
 
-REVISION_BEFORE_THE_SPLIT = "8d4b6f2a1c93"
+REVISION_BEFORE_THE_SPLIT = "b7e3c9a4d158"
 SPLIT_REVISION = "2f6a9c1e4d85"
 EMPTY_DATABASE_NAME = "atrade_split_migration_test"
 
