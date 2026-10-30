@@ -60,6 +60,8 @@
   // The choices start with the global source order, the default of a backtest (docs/architecture/backtest.md 10.12).
   let sourceOrders: BarSource[][] = $state([]);
   let sourceOrderKey = $state('');
+  // The disabled source order select says why it has no choices.
+  let sourceOrderPlaceholder = $state('Reading the source order');
   let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let form: HTMLFormElement | undefined = $state();
@@ -128,6 +130,8 @@
       if (result.kind === 'ok') {
         sourceOrders = listSourceOrders(result.value);
         sourceOrderKey = result.value.join(',');
+      } else {
+        sourceOrderPlaceholder = 'Could not read the source order';
       }
     });
   });
@@ -253,6 +257,7 @@
       label="Source order"
       items={sourceOrderItems}
       value={sourceOrderKey}
+      placeholder={sourceOrderPlaceholder}
       disabled={sourceOrderItems.length === 0}
       onValueChange={(key: string) => {
         sourceOrderKey = key;
