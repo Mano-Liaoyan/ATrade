@@ -19,6 +19,8 @@ const VERSION: StrategyVersion = {
   created_at_utc: '2026-01-02T03:04:05Z',
   source: 'user',
   rules: null,
+  conversation_id: null,
+  discarded: false,
 };
 
 function respondWith(status: number, body: unknown): typeof fetch {
@@ -72,8 +74,24 @@ describe('readStrategy', () => {
       name: 'Moving average',
       created_at_utc: '2026-01-02T03:04:05Z',
       versions: [
-        { id: 6, version_number: 1, code_sha256: 'aaa', created_at_utc: '2026-01-02T03:04:05Z', source: 'user' },
-        { id: 7, version_number: 2, code_sha256: 'bbb', created_at_utc: '2026-01-02T03:04:05Z', source: 'rule_builder' },
+        {
+          id: 6,
+          version_number: 1,
+          code_sha256: 'aaa',
+          created_at_utc: '2026-01-02T03:04:05Z',
+          source: 'user',
+          conversation_id: null,
+          discarded: false,
+        },
+        {
+          id: 7,
+          version_number: 2,
+          code_sha256: 'bbb',
+          created_at_utc: '2026-01-02T03:04:05Z',
+          source: 'rule_builder',
+          conversation_id: null,
+          discarded: false,
+        },
       ],
     };
 
