@@ -6,12 +6,14 @@ from typing import Annotated, Any
 import psycopg
 from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, StringConstraints, model_validator
 
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.strategy import strategy_store
 from atrade.strategy.code_checks import check_strategy_code
+from atrade.strategy.rules_code import make_rules_code
+from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 
 MAX_STRATEGY_NAME_LENGTH = 100
@@ -27,6 +29,30 @@ class CreateStrategyRequest(BaseModel):
 
 
 class SaveVersionRequest(BaseModel):
+    """Exactly one of `code` and `rules` (section 9.6)."""
+
+    code: str | None = None
+    rules: StrategyRules | None = None
+
+    @model_validator(mode="after")
+    def check_one_of_code_and_rules(self) -> SaveVersionRequest:
+        if (self.code is None) == (self.rules is None):
+            message = "The body must have exactly one of code and rules."
+            raise ValueError(message)
+        return self
+
+    def to_content(self) -> strategy_store.VersionContent:
+        if self.rules is None:
+            return strategy_store.VersionContent(code=self.code or "", source="user", rules=None)
+        rules = self.rules.model_dump(mode="json")
+        return strategy_store.VersionContent(code=make_rules_code(self.rules), source="rule_builder", rules=rules)
+
+
+class RulesCodeRequest(BaseModel):
+    rules: StrategyRules
+
+
+class RulesCodeResponse(BaseModel):
     code: str
 
 
@@ -152,8 +178,12 @@ class StrategyRoutes:
     async def save_version(
         self, strategy_id: int, request: SaveVersionRequest, response: Response
     ) -> StrategyVersionResponse | JSONResponse:
-        """Checks the code first. Then it appends a version, or returns the latest version when the code is the same."""
-        problems = await check_strategy_code(request.code)
+        """Checks the code first. Then it appends a version, or returns the latest version when the code is the same.
+
+        A `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.
+        """
+        content = request.to_content()
+        problems = await check_strategy_code(content.code)
         if problems:
             problem_responses = [
                 CodeProblemResponse(line=problem.line, message=problem.message) for problem in problems
@@ -162,7 +192,7 @@ class StrategyRoutes:
             return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=failure.model_dump())
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             saved = await strategy_store.save_version(
-                connection, strategy_id=strategy_id, code=request.code, created_at_utc=self.clock.read_now_utc()
+                connection, strategy_id=strategy_id, content=content, created_at_utc=self.clock.read_now_utc()
             )
             await connection.commit()
         if saved is None:
@@ -170,6 +200,10 @@ class StrategyRoutes:
         if not saved.is_new_version:
             response.status_code = status.HTTP_200_OK
         return to_version_response(saved.version)
+
+    async def make_code(self, request: RulesCodeRequest) -> RulesCodeResponse:
+        """Makes the code from the rules and saves nothing (section 9.8.3)."""
+        return RulesCodeResponse(code=make_rules_code(request.rules))
 
     async def delete_strategy(self, strategy_id: int) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
@@ -185,6 +219,13 @@ class StrategyRoutes:
 
 def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = StrategyRoutes(database_url=database_url, clock=clock)
+    router = APIRouter()
+    router.add_api_route("/api/strategy-rules/code", routes.make_code, methods=["POST"])
+    router.include_router(create_strategies_router(routes))
+    return router
+
+
+def create_strategies_router(routes: StrategyRoutes) -> APIRouter:
     router = APIRouter(prefix="/api/strategies")
     not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
     router.add_api_route(
@@ -215,7 +256,10 @@ def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
         responses={
             status.HTTP_200_OK: {
                 "model": StrategyVersionResponse,
-                "description": "The code is the same as the latest version. No new version is made.",
+                "description": (
+                    "The code (and, for a rules body, the rules) is the same as the latest version. "
+                    "No new version is made."
+                ),
             },
             **not_found,
             status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": CodeCheckFailedResponse},

@@ -9,10 +9,11 @@ from typing import Annotated, Literal
 
 import psycopg
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
 
-from atrade.assistant import conversation_store
+from atrade.assistant import conversation_store, prompt_store
 from atrade.assistant.assistant_service import AssistantService, AssistantServiceError
+from atrade.assistant.system_prompt import StartContextReader, make_fixed_part
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 
@@ -24,6 +25,8 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 
 class CreateConversationRequest(BaseModel):
     strategy_id: int
+    # The version that the browser shows when the conversation starts. The fixed part of the system prompt names it.
+    version_number: int | None = Field(default=None, ge=1)
 
 
 class RenameConversationRequest(BaseModel):
@@ -40,6 +43,9 @@ class ConversationResponse(BaseModel):
     last_provider: str | None
     last_model: str | None
     last_credential_name: str | None
+    # The prompt version of the conversation (25.9.1). All its runs use it.
+    prompt_version_id: int
+    prompt_version_number: int
 
 
 class ConversationListResponse(BaseModel):
@@ -74,6 +80,8 @@ def to_response(record: conversation_store.ConversationRecord) -> ConversationRe
         last_provider=record.last_provider,
         last_model=record.last_model,
         last_credential_name=record.last_credential_name,
+        prompt_version_id=record.prompt_version_id,
+        prompt_version_number=record.prompt_version_number,
     )
 
 
@@ -86,12 +94,22 @@ def assistant_not_reachable(error: AssistantServiceError) -> HTTPException:
 
 
 class ConversationRoutes:
-    """The route functions. They share the database URL, the clock, and the assistant service."""
+    """The route functions. They share the database URL, the clock, the assistant service, and the prompt parts."""
 
-    def __init__(self, *, database_url: str, clock: Clock, assistant_service: AssistantService) -> None:
+    def __init__(
+        self,
+        *,
+        database_url: str,
+        clock: Clock,
+        assistant_service: AssistantService,
+        read_start_context: StartContextReader,
+        default_prompt_text: str,
+    ) -> None:
         self.database_url = database_url
         self.clock = clock
         self.assistant_service = assistant_service
+        self.read_start_context = read_start_context
+        self.default_prompt_text = default_prompt_text
 
     async def list_conversations(self, strategy_id: int) -> ConversationListResponse:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
@@ -99,16 +117,31 @@ class ConversationRoutes:
         return ConversationListResponse(conversations=[to_response(record) for record in records])
 
     async def create_conversation(self, request: CreateConversationRequest) -> ConversationResponse:
+        """The conversation records the latest prompt version and the fixed part of the system prompt (25.9)."""
+        strategy_missing = HTTPException(
+            status.HTTP_404_NOT_FOUND, detail=f"The strategy {request.strategy_id} does not exist."
+        )
+        start_context = await self.read_start_context(request.strategy_id, request.version_number)
+        if start_context is None:
+            raise strategy_missing
         created_at_utc = self.clock.read_now_utc()
-        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+        async with (
+            await psycopg.AsyncConnection.connect(self.database_url) as connection,
+            connection.transaction(),
+        ):
+            prompt_version = await prompt_store.select_or_insert_latest_version(
+                connection, default_text=self.default_prompt_text, created_at_utc=created_at_utc
+            )
             record = await conversation_store.insert_conversation(
                 connection,
                 strategy_id=request.strategy_id,
                 title=new_conversation_title(created_at_utc),
                 created_at_utc=created_at_utc,
+                prompt_version_id=prompt_version.id,
+                fixed_prompt=make_fixed_part(start_context),
             )
         if record is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"The strategy {request.strategy_id} does not exist.")
+            raise strategy_missing
         return to_response(record)
 
     async def read_conversation(self, conversation_id: int) -> ConversationDetailResponse:
@@ -155,8 +188,21 @@ class ConversationRoutes:
             await conversation_store.delete_conversation(connection, conversation_id)
 
 
-def create_conversation_router(*, database_url: str, clock: Clock, assistant_service: AssistantService) -> APIRouter:
-    routes = ConversationRoutes(database_url=database_url, clock=clock, assistant_service=assistant_service)
+def create_conversation_router(
+    *,
+    database_url: str,
+    clock: Clock,
+    assistant_service: AssistantService,
+    read_start_context: StartContextReader,
+    default_prompt_text: str,
+) -> APIRouter:
+    routes = ConversationRoutes(
+        database_url=database_url,
+        clock=clock,
+        assistant_service=assistant_service,
+        read_start_context=read_start_context,
+        default_prompt_text=default_prompt_text,
+    )
     router = APIRouter(prefix="/api/assistant/conversations")
     router.add_api_route("", routes.list_conversations, methods=["GET"])
     router.add_api_route(

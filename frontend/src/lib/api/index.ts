@@ -217,6 +217,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategy-rules/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Code
+         * @description Makes the code from the rules and saves nothing (section 9.8.3).
+         */
+        post: operations["make_code_api_strategy_rules_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies": {
         parameters: {
             query?: never;
@@ -282,6 +302,8 @@ export interface paths {
         /**
          * Save Version
          * @description Checks the code first. Then it appends a version, or returns the latest version when the code is the same.
+         *
+         *     A `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.
          */
         post: operations["save_version_api_strategies__strategy_id__versions_post"];
         delete?: never;
@@ -543,7 +565,10 @@ export interface paths {
         /** List Conversations */
         get: operations["list_conversations_api_assistant_conversations_get"];
         put?: never;
-        /** Create Conversation */
+        /**
+         * Create Conversation
+         * @description The conversation records the latest prompt version and the fixed part of the system prompt (25.9).
+         */
         post: operations["create_conversation_api_assistant_conversations_post"];
         delete?: never;
         options?: never;
@@ -571,6 +596,27 @@ export interface paths {
         head?: never;
         /** Rename Conversation */
         patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/assistant/prompt-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Prompt Versions
+         * @description When no version exists, saves the default text as version 1, so the list is never empty.
+         */
+        get: operations["list_prompt_versions_api_assistant_prompt_versions_get"];
+        put?: never;
+        /** Save Prompt Version */
+        post: operations["save_prompt_version_api_assistant_prompt_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/assistant/providers": {
@@ -1056,6 +1102,8 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** @enum {string} */
+        Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
         /** ConversationDetailResponse */
         ConversationDetailResponse: {
             /** Id */
@@ -1076,6 +1124,10 @@ export interface components {
             last_model: string | null;
             /** Last Credential Name */
             last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
             /** Messages */
             messages: components["schemas"]["ConversationMessageResponse"][];
         };
@@ -1120,11 +1172,17 @@ export interface components {
             last_model: string | null;
             /** Last Credential Name */
             last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
         };
         /** CreateConversationRequest */
         CreateConversationRequest: {
             /** Strategy Id */
             strategy_id: number;
+            /** Version Number */
+            version_number?: number | null;
         };
         /** CreateScreenRequest */
         CreateScreenRequest: {
@@ -1206,6 +1264,16 @@ export interface components {
             backtest_price_usd: string | null;
             /** Price Difference Usd */
             price_difference_usd: string | null;
+        };
+        /** FixedShares */
+        FixedShares: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "fixed_shares";
+            /** Shares */
+            shares: number;
         };
         /** ForwardTestComparisonResponse */
         ForwardTestComparisonResponse: {
@@ -1310,6 +1378,8 @@ export interface components {
             /** Port */
             port: number;
         };
+        /** @enum {string} */
+        GroupMatch: "all_of" | "any_of";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1359,6 +1429,39 @@ export interface components {
              */
             added_at_utc: string;
         };
+        /**
+         * IndicatorOperand
+         * @description A stored indicator reference. A single-line indicator without `output` uses `value`.
+         */
+        IndicatorOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "indicator";
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: components["schemas"]["Number"];
+            };
+            /** Output */
+            output?: string | null;
+        };
+        /**
+         * InnerRuleGroup
+         * @description A group in a group. It holds conditions only, so the maximum depth is 1 nested group.
+         */
+        InnerRuleGroup: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: components["schemas"]["RuleCondition"][];
+        };
         /** InstrumentResponse */
         InstrumentResponse: {
             /** Symbol */
@@ -1389,6 +1492,7 @@ export interface components {
         JsonValue: unknown;
         /** @enum {string} */
         LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
+        LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -1463,6 +1567,16 @@ export interface components {
         };
         /** @enum {string} */
         Market: "US" | "HK";
+        Number: number;
+        /** NumberOperand */
+        NumberOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "number";
+            value: components["schemas"]["Number"];
+        };
         /** OpenOrderListResponse */
         OpenOrderListResponse: {
             /** Orders */
@@ -1556,6 +1670,52 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /**
+         * PercentOfEquity
+         * @description The quantity is equity x percent / close price, rounded down to whole shares.
+         */
+        PercentOfEquity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "percent_of_equity";
+            percent: components["schemas"]["Number"];
+        };
+        /** @enum {string} */
+        PriceName: "close" | "open" | "high" | "low";
+        /** PriceOperand */
+        PriceOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "price";
+            price: components["schemas"]["PriceName"];
+        };
+        /** PromptVersionListResponse */
+        PromptVersionListResponse: {
+            /** Prompt Versions */
+            prompt_versions: components["schemas"]["PromptVersionResponse"][];
+            /** Default Text */
+            default_text: string;
+            /** Fixed Part */
+            fixed_part: string;
+        };
+        /** PromptVersionResponse */
+        PromptVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version Number */
+            version_number: number;
+            /** Text */
+            text: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+        };
         /** ProviderListResponse */
         ProviderListResponse: {
             /** Providers */
@@ -1584,15 +1744,79 @@ export interface components {
             /** Title */
             title: string;
         };
+        RightOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"] | components["schemas"]["NumberOperand"];
+        /** RuleCondition */
+        RuleCondition: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "condition";
+            left: components["schemas"]["LeftOperand"];
+            comparison: components["schemas"]["Comparison"];
+            right: components["schemas"]["RightOperand"];
+        };
+        /**
+         * RuleExits
+         * @description The exit items. Each item that is not null (or `true`) is selected.
+         */
+        RuleExits: {
+            stop_loss_percent?: components["schemas"]["Number"] | null;
+            take_profit_percent?: components["schemas"]["Number"] | null;
+            /** Exit After Bars */
+            exit_after_bars?: number | null;
+            /**
+             * Exit When Entry Is False
+             * @default false
+             */
+            exit_when_entry_is_false: boolean;
+            exit_group?: components["schemas"]["RuleGroup"] | null;
+        };
+        /** RuleGroup */
+        RuleGroup: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
+        };
+        /** RuleSettings */
+        RuleSettings: {
+            /** Position Size */
+            position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
+            /** Template Id */
+            template_id?: string | null;
+        };
+        /** RulesCodeRequest */
+        RulesCodeRequest: {
+            rules: components["schemas"]["StrategyRules"];
+        };
+        /** RulesCodeResponse */
+        RulesCodeResponse: {
+            /** Code */
+            code: string;
+        };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
             backtest_id: number;
         };
-        /** SaveVersionRequest */
+        /** SavePromptVersionRequest */
+        SavePromptVersionRequest: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * SaveVersionRequest
+         * @description Exactly one of `code` and `rules` (section 9.6).
+         */
         SaveVersionRequest: {
             /** Code */
-            code: string;
+            code?: string | null;
+            rules?: components["schemas"]["StrategyRules"] | null;
         };
         /**
          * SavedBarsResponse
@@ -1779,6 +2003,17 @@ export interface components {
             created_at_utc: string;
             /** Versions */
             versions: components["schemas"]["StrategyVersionSummary"][];
+        };
+        /** StrategyRules */
+        StrategyRules: {
+            /**
+             * Format Version
+             * @constant
+             */
+            format_version: 1;
+            settings: components["schemas"]["RuleSettings"];
+            entry: components["schemas"]["RuleGroup"];
+            exits: components["schemas"]["RuleExits"];
         };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
@@ -2784,6 +3019,39 @@ export interface operations {
             };
         };
     };
+    make_code_api_strategy_rules_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulesCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_strategies_api_strategies_get: {
         parameters: {
             query?: never;
@@ -2989,7 +3257,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The code is the same as the latest version. No new version is made. */
+            /** @description The code (and, for a rules body, the rules) is the same as the latest version. No new version is made. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3903,6 +4171,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_versions_api_assistant_prompt_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionListResponse"];
+                };
+            };
+        };
+    };
+    save_prompt_version_api_assistant_prompt_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePromptVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"];
                 };
             };
             /** @description Validation Error */
