@@ -103,7 +103,7 @@ async def test_backtest_without_saved_bars_fails_with_a_clear_message(
     save_test_bars(database_url)
     backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text())
     with psycopg.connect(database_url, autocommit=True) as connection:
-        connection.execute("DELETE FROM bar")
+        connection.execute("DELETE FROM ibkr_bar")
 
     async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
         backtest = await wait_for_final_status(web_client, backtest_id)
@@ -128,7 +128,7 @@ async def test_the_template_warms_up_on_saved_bars_before_the_start(
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('BTEST', 'ARCA', 'USD', '1-DAY', %s, 50, 51, 49, 50, 1000)
             """,
             [(datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=index),) for index in range(59)],

@@ -11,12 +11,14 @@ import httpx
 import psycopg
 import pytest
 
+from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
 from tests.forward_test.test_forward_test_routes import (
     FORWARD_TESTS_PATH,
     make_start_request,
     save_test_strategy_version,
 )
+from tests.saved_ranges import save_ibkr_saved_range
 
 type JsonObject = dict[str, Any]
 
@@ -317,11 +319,12 @@ async def test_a_backtest_of_another_instrument_is_refused(web_client: httpx.Asy
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('MSFT', 'NASDAQ', 'USD', '1-MINUTE', %(start_utc)s, 100, 101, 99, 100, 1000)
             """,
             {"start_utc": make_minute(5)},
         )
+        save_ibkr_saved_range(connection, Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD"), "1-MINUTE")
     other_backtest = await web_client.post(
         "/api/backtests",
         json={
