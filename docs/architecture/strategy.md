@@ -49,7 +49,8 @@ puts the new parts of this section in phases.
 
 ### 9.1.1 Tables
 
-Migration: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`.
+Migrations: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`
+and `backend/migrations/versions/c4a8e2f6b913_strategy_add_version_source_and_rules.py`.
 
 | Table | Columns |
 |---|---|
@@ -72,6 +73,15 @@ New columns of `strategy_version`:
   of a version do not change.
 - The migration that adds the columns includes the capability name, for
   example `<revision>_strategy_add_version_source_and_rules.py`.
+- Decided (#171): the named CHECK constraint `strategy_version_source_check`
+  holds the values of `source`, not a PostgreSQL enum. Phase 2 drops the
+  constraint and adds it again with `ai_assistant`.
+- Decided (#171): `source` has the default `user`. The default fills the
+  existing rows, because an `UPDATE` would hit the trigger. A save sets the
+  source explicitly.
+- Decided (#171): `read_strategy_version` does not return `source` and
+  `rules`. Section 9.6 does not ask for them. A later change can add them
+  when a capability needs them.
 - The discarded mark of a discarded strategy version is part of the AI
   assistant design (ADR 0004, phase 2). This section does not set its
   storage.
@@ -546,8 +556,8 @@ commissions and the open gap.
 - S2 uses "High at or above", not "Close crosses above". The Donchian upper
   value at time t includes the high of the bar at t (ADR 0001), so the close
   can never cross above it.
-- S3 uses the 12-1 momentum indicator with 0 skipped days. When the
-  indicator cannot skip 0 days, S3 becomes a code template.
+- S3 uses the 12-1 momentum indicator with 0 skipped days. The indicator
+  accepts skip 0 (section 21.1 of [`docs/architecture.md`](../architecture.md), #162).
 - No Hong Kong templates: tests of moving average rules in Hong Kong show
   small effects (Bessembinder & Chan 1995).
 
@@ -579,7 +589,6 @@ must check them first.
 | The Brock et al. range break holds for 10 days and uses the close for the break. | Read section II of the paper. |
 | Faber 2007 checks "close above the 10-month average" only at the month end. | Read the paper. |
 | Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. |
-| The 12-1 momentum indicator can skip 0 days (S3). | Check the indicator parameters in the implementation ticket of #136. |
 | The IBKR instrument search returns ETFs, for example `SPY`. `backend/src/atrade/ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. | Search `SPY` on the paper account. |
 | A strategy file can import `atrade.indicator` (#136, #138). The code from the rules needs it. | Run 1 import in the backtest child process, in the implementation ticket of #136. |
 

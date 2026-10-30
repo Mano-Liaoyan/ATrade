@@ -922,8 +922,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the "Split check needed" row with "Apply split <ratio>" and "Keep
     ledger" (phase 3, sections 11 and 12).
   - A settings page has the "Source order" list of the bar sources
-    (`docs/architecture/market_data.md`). Its route and the place of the HK
-    instrument list editor are left to the implementation.
+    (`docs/architecture/market_data.md`). The settings page is `/settings`
+    with the header link "Settings" after "Forward tests". It is a document
+    page with the heading "Settings" and one section for each setting. The
+    HK instrument list editor is the section "HK instrument list" of this
+    page (#194, `docs/architecture/market_data.md` section 8.10).
   - A survivorship bias warning (icon, word, and warning color) shows on HK
     screens, on HK backtest results, and on US backtest results that start
     before 2018-05-01.
@@ -1595,7 +1598,6 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 
 | Fact | How to check |
 |---|---|
-| The 12-1 momentum class accepts skip 0 (#139, template S3). | Check the parameter in the indicator implementation. |
 | The default parameters of the template sources (#139). | Read the method section of each paper. |
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
@@ -1636,6 +1638,7 @@ implementation" list.
 | Strategy code can import `atrade.indicator` (#136, #138). | Yes. On 2026-10-30 (#160), a strategy version that imports `atrade.indicator` passed the checks before save (section 9.3, `ruff --select F` included) and ran in a real backtest child with the status `finished`. The indicator value in `on_bar` was the close of each of the 20 bars (`tests/indicator/test_indicator_registration.py`). |
 | The default smoothing (`ma_type`) of `RelativeStrengthIndex` and `AverageTrueRange` in NautilusTrader 2.0.0rc7. | On 2026-10-30 (#160), in the backend environment: both defaults are Wilder. `AverageTrueRange(14).ma_type` is `MovingAverageType.Wilder`. `RelativeStrengthIndex` has no `ma_type` property, so the check compared values: on 200 test closes, RSI(14) with the default gave 34.832627, the same as `ma_type=MovingAverageType.Wilder` and as a Wilder RSI written by hand; `Exponential` gave 14.769989 and `Simple` gave 5.270742. The value scale is 0 to 100. `MovingAverageConvergenceDivergence` defaults to `Exponential`. The indicator library does not need to pass `MovingAverageType.Wilder` for RSI and ATR. |
 | The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
+| The 12-1 momentum class accepts skip 0 (#139, template S3). | Yes. On 2026-10-30 (#162), `atrade.indicator.Momentum12_1(look_back=252, skip=0)` gave no value for the first 252 bars and then close(t) / close(t − 252) − 1 at each bar of 300 test daily bars. The screen path and the backtest engine path gave the same values (`tests/indicator/test_atrade_indicators.py`). Template S3 does not need to become a code template. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1661,8 +1664,32 @@ option and records it in this document.
 - Decided (#160): an ATrade indicator class does not subclass a
   NautilusTrader class. It has `handle_bar(bar)` and an `initialized`
   property (section 21.1).
+- Decided (#161): the 7 wrapped indicators are the classes `SMA`, `EMA`,
+  `ATR`, `RSI`, `MACD`, `BollingerBands`, and `DonchianChannel` of
+  `atrade.indicator`. An output is `float | None` (None is "no value"). The
+  screen-path method is `update(bar)`: it makes a NautilusTrader bar from
+  the `foundation` bar and calls `handle_bar`. The defaults are in section
+  23.2 of [`indicator.md`](architecture/indicator.md).
+- Decided (#162): the 4 indicators that ATrade writes are the classes
+  `Momentum12_1`, `DistanceTo52WeekHigh`, `RealizedVolatility`, and
+  `AverageTradingValue` of `atrade.indicator`. The default n of realized
+  volatility is 60 and of average trading value is 20. Realized volatility
+  has the parameter `bars_per_year` (default 252): on 1-hour bars the
+  strategy passes 1764. Section 23.2 of
+  [`indicator.md`](architecture/indicator.md) has the formulas.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
+- Decided (#165): the daily returns use the UTC date as the trading day,
+  `years` comes from the request range, and `metrics.missing_reasons` gives
+  the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#170): the exposure of a forward test counts its recorded equity
+  points (one at each bar end) as its bars. The recorded fills go to
+  `find_round_trips` with no change, because `select_fills` already gives
+  `BacktestTrade` rows. The metrics of the forward test routes have
+  `net_profit_usd` (forward test section 12.10).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1715,6 +1742,13 @@ option and records it in this document.
   `app/databento_check.py`. Enum values of `stock_split`, the order of the
   check and the save, and symbol reuse:
   `docs/architecture/market_data.md` section 8.14.
+- Decided (#194): the HK instrument list editor is on the settings page
+  `/settings` (section 13). #194 made this page. The source order slice
+  (#189) adds its "Source order" section to the same page.
+- Decided (#194): the add route of the HK instrument list checks all new
+  symbols with `InstrumentLookup` before it saves one. On `502` or `503`
+  the list does not change. A symbol that the request has 2 times is in
+  `already_in_list` the second time.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
@@ -1735,6 +1769,11 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#214): the owner ledger of "By hand" (the ledger start at the
+  first passed check, the cash of rule 2, the price of a market buy, the
+  USD conversion, and when the Web process records fills) is in
+  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
+  11.13.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

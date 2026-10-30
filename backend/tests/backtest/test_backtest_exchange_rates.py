@@ -22,6 +22,9 @@ from tests.fakes.ibkr import DailyExchangeRateRequest, FakeGatewayConnection
 NOW_UTC = datetime(2026, 4, 10, tzinfo=UTC)
 HKD_USD_RATE = Decimal("0.128")
 
+# The new metrics use the same USD values. This file tests only the conversion.
+OLD_METRIC_NAMES = ("final_equity_usd", "total_return_percent", "max_drawdown_percent", "trade_count")
+
 
 def save_two_hkd_rates(database_url: str) -> None:
     """Saves the HKD rates of 2026-02-22 to 2026-03-31: 0.128 USD to 2026-03-09, then 0.126 USD."""
@@ -175,7 +178,8 @@ async def test_a_backtest_in_hkd_shows_the_results_in_usd(
         "9856.35", "9858.87", "9861.39", "9863.91",
     ]  # fmt: skip
     # The HKD fall from 0.128 to 0.126 USD is a loss in USD: 161.41 / 10007.68 = 1.61 %.
-    assert backtest["metrics"] == {
+    metrics = backtest["metrics"]
+    assert {name: metrics[name] for name in OLD_METRIC_NAMES} == {
         "final_equity_usd": "9863.91",
         "total_return_percent": "-1.36",
         "max_drawdown_percent": "1.61",

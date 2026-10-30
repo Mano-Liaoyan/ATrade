@@ -83,6 +83,9 @@ orders only when all 4 conditions are true:
   rules of the owner ledger (section 11.10) for "By hand". When a rule
   fails, the response is `409` with the reason. ATrade sends nothing and
   stores nothing.
+- Implemented (#214): the ledger rules for orders by hand run after the
+  paper account check and after the forward test refusal above. The forward
+  test refusal stays until the ATrade execution client (#215) is done.
 - Phase 3 (#149): an order by hand on an instrument in the
   "Split check needed" state is refused with `409` and the reason
   (section 11.11). Cancels are not blocked.
@@ -168,6 +171,12 @@ this document. The implementation can change them.
 | `apply_stock_split(*, database_url, stock_split)` | Changes the owner ledger for a stock split in one transaction (section 11.11). |
 | `Owner` | `kind` (`by_hand`, `forward_test`) and `forward_test_id` (null for `by_hand`). |
 
+- Implemented (#214): the ledger of "By hand" is in
+  `paper_trading/manual_order_ledger.py` (`ManualOrderLedger`: the ledger
+  start, the fills of orders by hand, and the 3 order rules) and
+  `paper_trading/owner_ledger_store.py` (the SQL and the sums). They are not
+  in the public entry yet. #215 adds the public functions above for
+  `forward_test`.
 - Phase 3: `create_paper_trading_router` loses `find_blocking_forward_test`,
   because the refusal of section 11.3 goes away. It gets
   `read_allocated_capital` from `app/web.py`, which calls
@@ -226,6 +235,14 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   `account_quantity_before`, `account_quantity_after`). The `account`
   message also gets `unattributed_cash_usd` (section 11.12). The field names
   are choices of this document.
+- Implemented (#214): `owners` and `unattributed_quantity` on each
+  position, and `unattributed_cash_usd` on the `account` message. `owner` is
+  `{kind, forward_test_id}`. `average_cost` of an owner is `null` when the
+  owner holds no shares. Without a ledger start (section 11.10), `owners` is
+  empty, `unattributed_quantity` is the IBKR quantity, and
+  `unattributed_cash_usd` is `null`. `unattributed_cash_usd` is
+  `balance.cash_usd` minus the sum of the cash of all owners. `split_check`
+  comes with #149.
 - Each order has the fields of `OpenOrderResponse` (section 11.8). When IB
   Gateway does not answer, the server keeps the last list and tries again.
 - Amounts and quantities are decimal text, for example `"101234.50"`.
@@ -286,6 +303,14 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   the owner positions, the row of that instrument shows a warning icon and
   the difference, for example "Unattributed: 50". The icon and the word
   together show the state, not only the color.
+- Implemented (#214): `PositionTable.svelte` shows one row for each owner
+  (`listPositionRows` of `paper_account.ts`): the owner quantity and
+  average cost, the market value and the unrealized P&L at the IBKR market
+  price. The difference is one more row of the instrument with the warning
+  status "Unattributed: 50" in the Owner column and empty number cells. A
+  position without owners and without a difference has one row with the
+  IBKR values and an empty Owner cell. The compact table of the instrument
+  page also has the Owner column.
 - Phase 3 (#149): an instrument in the "Split check needed" state has a row
   with a warning icon, "Split check needed", the detected ratio, and the
   IBKR share count before and after. The row has 2 buttons:
@@ -293,6 +318,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   says what it does. The row has no other help text.
 - Phase 3 (#146): when the ledger refuses an order by hand, the review button
   stays enabled, and the `409` reason shows as an inline error notification.
+  Implemented (#214): the notification "Order not sent" with the `detail`.
   When the instrument is in the "Split check needed" state, the review button
   is disabled and the panel says why, for example "AAPL needs a split check.
   Apply the split or keep the ledger on the paper trading page.".
@@ -318,12 +344,25 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 
 - The Phase 3 route names, the response names, and the `rule` values are
   choices of this document.
+- Implemented (#214): `OrderRefusedByLedgerResponse` with `rule`
+  `sell_more_than_position`, `buy_more_than_cash`, or `ledger_not_started`
+  (the ledger has no start yet, section 11.10). Buy example `detail`: "By
+  hand has 10000.00 USD cash and open buy orders for 5000.00 USD. ATrade
+  refuses a buy order for 5100.00 USD.". An IBKR error during the rule check
+  (open orders, the last close, or the forex rate) is `502`. The `409` of
+  `POST /api/paper-trading/orders` documents both response models.
+- The backend tests of the owner ledger are in
+  `backend/tests/paper_trading/test_owner_ledger.py`.
 - The backend tests (`backend/tests/paper_trading/test_paper_orders.py`) go
   through these routes with the IBKR fake and real PostgreSQL.
 - The Playwright test `frontend/e2e/paper_orders.spec.ts` sends an order
   through the modal, cancels it, checks the focus trap, Escape, and the focus
   return of the modal, checks the keyboard control of the side, order type,
   and time in force, and checks the scroll track of the order list. The e2e server has 30 open orders of forward test 42.
+  `frontend/e2e/home_overview.spec.ts` checks the Owner column and the
+  "Unattributed: 5" row of TEST05 (the e2e server starts the ledger with 5
+  of the 10 shares). `frontend/e2e/instrument_order_panel.spec.ts` checks
+  the ledger refusal notification.
 
 ## 11.9 Balance in USD for any base currency
 
@@ -355,7 +394,8 @@ the base currency EUR, and IBKR does not let the owner change it. IBKR sends
   3, "The paper account has no NetLiquidation value in USD." and the
   `message`, section 12.8), and `fetch_paper_capital_usd()` returns the local
   value. Orders by hand do not use the balance, so a missing rate does not
-  block them.
+  block them after the owner ledger started. The ledger start needs the cash
+  in USD (section 11.10).
 - The balance shows the base currency values and the rate, so the user sees
   what ATrade converted (section 11.7).
 
@@ -420,6 +460,20 @@ Table (the names are choices of this document):
 
 - An insert of a fill has `ON CONFLICT DO NOTHING` on `ibkr_execution_id`, so
   a fill that ATrade reads again adds no row.
+- Implemented (#214, migration `8d4f2a6c1e93`): `cash_change` is USD.
+  `commission` is in the currency of the instrument. A cash row (the start
+  cash) has `symbol` and `exchange` `null` and `quantity_change` `0`.
+  `ibkr_execution_id` has a partial unique index (not null rows).
+- Ledger start (#214): a migration cannot read IBKR. So the Web process
+  writes the `ledger_start` rows of an account when it first reads the
+  ledger after a passed check and the ledger of the account has no row: one
+  row for each IBKR position (`quantity_change` is the position, `price` is
+  the IBKR average cost) and one cash row with `balance.cash_usd`. All rows
+  belong to "By hand". An advisory lock stops a second start. Without a USD
+  cash value, the ledger does not start. Orders by hand then get `409` with
+  the `rule` `ledger_not_started`.
+- The average cost of an owner: a buy adds quantity times price to the
+  cost, a sell takes away the same part of the cost as of the quantity.
 - The position of an owner is the sum of `quantity_change`. The cost of the
   position follows from the fills and the stock split adjustments.
 
@@ -503,21 +557,42 @@ Table (the names are choices of this document):
 The decisions do not name these details. The implementation picks the
 simplest option and records it in this document.
 
-- The cash of "By hand" for order rule 2. The decision gives the capital of
-  "By hand" (`NetLiquidation` minus the allocated capital). The buy check
-  needs a cash value. A cash dividend must show as "Unattributed", so the
-  cash of "By hand" cannot be only "the account cash minus the forward test
-  cash".
-- How the page calculates the "Unattributed" cash, with the USD conversion
-  of section 11.9.
-- The amount of a market buy order for rule 2 (the order has no price), and
-  whether rule 2 includes the commission.
-- The cash rule for an instrument that is not in USD. The allocated capital
-  is in USD.
-- When the Web process records the fills of orders by hand. `reqExecutions`
-  returns only the executions of the current day (section 11.4).
-- How ATrade records fills from outside ATrade, if it can read them
-  (`reqExecutions` of other client IDs is not checked, section 21).
+Decided (#214):
+
+- The cash of "By hand" for rule 2 is the sum of its `cash_change` in USD:
+  the account cash in USD at the ledger start, plus the cash of its fills
+  (with the commission). A cash dividend changes the account cash, not the
+  ledger, so it shows in `unattributed_cash_usd`. #215 adds the allocated
+  capital (in this slice it is 0).
+- The page gets the "Unattributed" cash as `unattributed_cash_usd`:
+  `balance.cash_usd` (section 11.9) minus the sum of the cash of all owners.
+  The page does not show it yet.
+- The amount of a buy order for rule 2 is the quantity times the limit
+  price. For a market order, the price is the close of the last daily bar of
+  IBKR in the last 10 days. Open buy orders by hand count with their
+  remaining quantity in the same way. Rule 2 does not include the
+  commission.
+- An instrument that is not in USD: the amount of rule 2 and the cash of a
+  fill are converted to USD with the IBKR forex rate
+  (`read_exchange_rate(currency, "USD")`). Without a rate, the order gets
+  `502`, and the fill is written at a later read.
+- The Web process records the fills of orders by hand from `reqExecutions`
+  before each order by hand and each second while `/ws/paper-trading` is
+  open (with the order list). A fill counts when it has the Web client ID,
+  the checked account, and an IBKR order ID of a `manual_order` row, and
+  its time is not before the ledger start (the positions at the ledger start
+  have the older fills). `reqExecutions` returns only the fills of the
+  current day (section 21), so a fill is lost when no page and no order by
+  hand reads it on its day. It then shows as "Unattributed".
+- Fills from outside ATrade are not written into the ledger. They show as
+  "Unattributed". Whether `reqExecutions` returns the fills of other client
+  IDs is not checked (section 21).
+- Rule 3 (no short sale) is part of rule 1: the position of "By hand" is
+  never below 0, so a sell larger than the position fails rule 1 with
+  `sell_more_than_position`.
+
+Still open:
+
 - How ATrade gets the IBKR cash in lieu of a stock split.
 - The tolerance when ATrade compares the 2 ratios of a stock split.
 - Whether "Apply split" and "Keep ledger" also change the stored bars and
