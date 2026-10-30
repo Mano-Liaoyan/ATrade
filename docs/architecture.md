@@ -1843,6 +1843,11 @@ option and records it in this document.
   watchlist read (`read_watchlist_instruments` of `watchlist`), because
   `market_data` does not import `watchlist`. The time, the calendar, and
   "still trading" are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#193): the Databento import program also imports the XNAS.ITCH
+  `ohlcv-1h` files. `--hourly-cost` prints the hourly bar purchase list and
+  its cost before the purchase. The official open of the 9:30 ET hourly bar
+  and the hourly range of the bars route:
+  `docs/architecture/market_data.md` section 8.14.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
