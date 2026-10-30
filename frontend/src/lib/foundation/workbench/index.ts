@@ -22,6 +22,24 @@ export {
   type PanelSplitLayout,
   type PixelRange,
 } from './panel_split';
-export { findSplitterDragValue, findSplitterKeyValue, type SplitterDrag, type SplitterKeyRange, type SplitterRange } from './splitter';
-export { readSideColumnLayout, readStoredLayout, writeStoredLayout, type SideColumnLayout } from './stored_layout';
+export {
+  findSplitterDragValue,
+  findSplitterKeyValue,
+  type SplitterDrag,
+  type SplitterGrowDirection,
+  type SplitterKeyRange,
+  type SplitterRange,
+} from './splitter';
+export {
+  findSideColumnGrowDirection,
+  findSideColumnRange,
+  findSideColumnWidth,
+  readRemPixels,
+  readSideColumnLayout,
+  toPixels,
+  type SideColumnLayout,
+  type SideColumnRangeInput,
+  type SideColumnSide,
+} from './side_column';
+export { readStoredLayout, writeStoredLayout } from './stored_layout';
 export { isEmptyHeaderPart } from './header_target';

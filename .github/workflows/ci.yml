@@ -44,6 +44,16 @@ jobs:
           cache: true
       - run: ./scripts/check frontend
 
+  assistant:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          working-directory: assistant
+          cache: true
+      - run: ./scripts/check assistant
+
   e2e:
     runs-on: ubuntu-24.04
     # A normal e2e job takes 10 to 16 minutes. A hang fails the job, so it does not run for hours.
