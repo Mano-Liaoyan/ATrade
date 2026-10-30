@@ -94,6 +94,12 @@ def find_screen_period_starts(time_range: TimeRange, rebalance_period: UniverseR
         next_index += step
 
 
+def find_screen_run_time(period_start_utc: datetime) -> datetime:
+    """00:00 UTC of the period start day. A daily bar starts at 00:00 UTC and closes later that day, so a range start
+    in the day must not see the bar of that day."""
+    return period_start_utc.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 async def run_screen_periods(
     *, database_url: str, screen: UniverseScreen, rebalance_period: UniverseRebalancePeriod, time_range: TimeRange
 ) -> list[UniversePeriod]:
@@ -102,7 +108,10 @@ async def run_screen_periods(
     periods: list[UniversePeriod] = []
     for start_utc in find_screen_period_starts(time_range, rebalance_period):
         outcome = await run_screen_at(
-            database_url=database_url, market=screen.market, definition=screen.definition, as_of_utc=start_utc
+            database_url=database_url,
+            market=screen.market,
+            definition=screen.definition,
+            as_of_utc=find_screen_run_time(start_utc),
         )
         periods.append(UniversePeriod(start_utc=start_utc, members=[row.instrument for row in outcome.rows]))
     return periods

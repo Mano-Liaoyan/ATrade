@@ -414,11 +414,12 @@ class BacktestRoutes:
             refuse(f"Screen result {request.screen_result_id} does not exist.")
         if request.symbols is None:
             return rows
-        by_symbol = {row.symbol: row for row in rows}
-        missing = [symbol for symbol in request.symbols if symbol not in by_symbol]
+        symbols_in_result = {row.symbol for row in rows}
+        missing = [symbol for symbol in request.symbols if symbol not in symbols_in_result]
         if missing:
             refuse(f"Screen result {request.screen_result_id} does not have {', '.join(missing)}.")
-        return [by_symbol[symbol] for symbol in dict.fromkeys(request.symbols)]
+        # A symbol can be on two exchanges of the screen result: each of its rows is a member.
+        return [row for symbol in dict.fromkeys(request.symbols) for row in rows if row.symbol == symbol]
 
     async def make_backtest_request(
         self, request: StartBacktestRequest

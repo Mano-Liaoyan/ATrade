@@ -833,8 +833,8 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 |---|---|---|---|
 | `single` | One instrument. The existing backtest. | None | `symbol`, `exchange`, `currency` |
 | `rule` | Point-in-time rule: the top N instruments by trading value of each quarter (`us_universe_member` with `rank` ≤ N, [`market_data.md`](market_data.md) section 8.9). N is 500 at most. US only. | Quarter | `universe_top_n` |
-| `list` | Fixed list: the watchlist, a screen result, or the selected rows of a screen result. The list does not change in the range. The form warns of survivorship bias. | The full range | The members (`backtest_universe_member` with `period_start_utc` = `start_utc`) |
-| `screen` | Point-in-time rule: at each universe period start, the platform runs a copy of the screen again on the daily bars known at that date. The result is the new list. | Quarter (default) or month | `universe_screen` (JSON copy of the screen), `universe_rebalance_period` (`quarter` or `month`) |
+| `list` | Fixed list: the watchlist, a screen result, or the selected rows of a screen result. The list does not change in the range. The form and the API (`survivorship_bias`) warn of survivorship bias. | The full range | The members (`backtest_universe_member` with `period_start_utc` = `start_utc`) |
+| `screen` | Point-in-time rule: at each universe period start, the platform runs a copy of the screen again on the daily bars that start before 00:00 UTC of that date. The result is the new list. | Quarter (default) or month | `universe_screen` (JSON copy of the screen), `universe_rebalance_period` (`quarter` or `month`) |
 
 - The backtest saves a copy of the screen. A later change of the screen does
   not change the backtest ([#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)).
