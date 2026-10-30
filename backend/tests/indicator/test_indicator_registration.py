@@ -21,7 +21,10 @@ FIRST_BAR_UTC = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def read_record_strategy_code(record_file: Path) -> str:
-    return RECORD_BAR_CLOSE_STRATEGY_FILE.read_text().replace("/tmp/bar_close_records.txt", str(record_file))
+    code = RECORD_BAR_CLOSE_STRATEGY_FILE.read_text()
+    default_line = 'RECORD_FILE = "/tmp/bar_close_records.txt"'
+    assert default_line in code
+    return code.replace(default_line, f"RECORD_FILE = {str(record_file)!r}")
 
 
 def make_bar(index: int, close: int) -> Bar:

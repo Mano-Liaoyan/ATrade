@@ -211,10 +211,13 @@ indicator reference in JSON:
   S3 "12-month time-series momentum" (look-back 252, skip 0) becomes a code
   template ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139)).
 - The fixed look-back count of EMA, RSI, ATR, and MACD in a screen
-  (section 23.4).
-- The smoothing type of the wrapped ATR and RSI. #130 gives the Wilder
-  average. If the NautilusTrader default is different, the class passes
-  `MovingAverageType.Wilder`.
+  (section 23.4). Section 21.1 of
+  [`docs/architecture.md`](../architecture.md) has the measured differences
+  and a suggested count (#160).
+- Decided (#160): the wrapped ATR and RSI use the Wilder average (#130).
+  The NautilusTrader 2.0.0rc7 default of both is Wilder, so the classes do
+  not pass `MovingAverageType.Wilder` (section 21.1 of
+  [`docs/architecture.md`](../architecture.md)).
 - The annualization factor of realized volatility on 1-hour bars. The #130
   formula (√252) is for daily bars.
 - The names that the UI shows for the indicators.
