@@ -434,6 +434,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens */
+        get: operations["list_screens_api_screens_get"];
+        put?: never;
+        /** Create Screen */
+        post: operations["create_screen_api_screens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen */
+        get: operations["read_screen_api_screens__screen_id__get"];
+        /**
+         * Change Screen
+         * @description Overwrites the name and the definition. A screen has no versions (section 24.1).
+         */
+        put: operations["change_screen_api_screens__screen_id__put"];
+        post?: never;
+        /**
+         * Delete Screen
+         * @description Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.
+         */
+        delete: operations["delete_screen_api_screens__screen_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -734,6 +777,12 @@ export interface components {
             /** Bars */
             bars: components["schemas"]["BarResponse"][];
         };
+        /** ChangeScreenRequest */
+        ChangeScreenRequest: {
+            /** Name */
+            name: string;
+            definition: components["schemas"]["JsonValue"];
+        };
         /** CodeCheckFailedResponse */
         CodeCheckFailedResponse: {
             /** Problems */
@@ -959,6 +1008,14 @@ export interface components {
             /** Strategy Id */
             strategy_id: number;
         };
+        /** CreateScreenRequest */
+        CreateScreenRequest: {
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
+        };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
             /** Name */
@@ -1183,6 +1240,7 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        JsonValue: unknown;
         /** @enum {string} */
         LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
         /** ManualOrderListResponse */
@@ -1257,6 +1315,8 @@ export interface components {
             /** Average Fill Price */
             average_fill_price: string | null;
         };
+        /** @enum {string} */
+        Market: "US" | "HK";
         /** OpenOrderListResponse */
         OpenOrderListResponse: {
             /** Orders */
@@ -1381,6 +1441,73 @@ export interface components {
              * Format: date-time
              */
             last_start_utc: string;
+        };
+        /** ScreenCheckFailedResponse */
+        ScreenCheckFailedResponse: {
+            /** Problems */
+            problems: components["schemas"]["ScreenProblemResponse"][];
+        };
+        /** ScreenListItemResponse */
+        ScreenListItemResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Kept */
+            kept: boolean;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+        };
+        /** ScreenProblemResponse */
+        ScreenProblemResponse: {
+            /** Location */
+            location: (string | number)[];
+            /** Message */
+            message: string;
+        };
+        /** ScreenResponse */
+        ScreenResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Kept */
+            kept: boolean;
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+            /** Recent Screen Results */
+            recent_screen_results: components["schemas"]["ScreenResultSummaryResponse"][];
+        };
+        /** ScreenResultSummaryResponse */
+        ScreenResultSummaryResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Result Count */
+            result_count: number;
         };
         /** SendOrderRequest */
         SendOrderRequest: {
@@ -2932,6 +3059,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ForwardTestComparisonResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screens_api_screens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenListItemResponse"][];
+                };
+            };
+        };
+    };
+    create_screen_api_screens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_api_screens__screen_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_screen_api_screens__screen_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    delete_screen_api_screens__screen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */

@@ -98,7 +98,10 @@ type = "layers"
 layers = [
     "atrade.app",
     "atrade.forward_test",
-    "atrade.backtest | atrade.paper_trading | atrade.watchlist",
+    "atrade.backtest | atrade.paper_trading",
+    # screen -> indicator, market_data, watchlist (docs/architecture.md section 6.2). backtest imports screen.
+    "atrade.screen",
+    "atrade.watchlist",
     "atrade.strategy | atrade.market_data",
     # indicator -> foundation only, assistant -> foundation only (docs/architecture.md section 6.2).
     "atrade.ibkr | atrade.indicator | atrade.assistant",
@@ -111,6 +114,15 @@ name = "watchlist finds instruments through market_data"
 type = "forbidden"
 source_modules = ["atrade.watchlist"]
 forbidden_modules = ["atrade.ibkr"]
+allow_indirect_imports = true
+
+# screen -> indicator, market_data, watchlist only (docs/architecture.md section 6.2). The layers above allow the
+# other lower modules, so this forbids them.
+[[tool.importlinter.contracts]]
+name = "screen imports only indicator, market_data, and watchlist"
+type = "forbidden"
+source_modules = ["atrade.screen"]
+forbidden_modules = ["atrade.strategy", "atrade.ibkr", "atrade.assistant"]
 allow_indirect_imports = true
 
 # F2: only the capability itself can import its internal modules. Other
@@ -150,6 +162,12 @@ name = "forward_test internals are private"
 type = "protected"
 protected_modules = ["atrade.forward_test.*"]
 allowed_importers = ["atrade.forward_test"]
+
+[[tool.importlinter.contracts]]
+name = "screen internals are private"
+type = "protected"
+protected_modules = ["atrade.screen.*"]
+allowed_importers = ["atrade.screen"]
 
 [[tool.importlinter.contracts]]
 name = "indicator internals are private"

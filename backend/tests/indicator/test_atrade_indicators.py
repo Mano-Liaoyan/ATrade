@@ -4,6 +4,7 @@
 
 import math
 import random
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -12,24 +13,51 @@ import pytest
 
 import atrade.indicator
 from atrade.foundation.bar import Bar
-from tests.indicator.test_wrapped_indicators import IndicatorCase, read_screen_path_outputs, read_strategy_path_outputs
+from atrade.indicator import AverageTradingValue, DistanceTo52WeekHigh, Momentum12_1, RealizedVolatility
+from tests.indicator.test_wrapped_indicators import (
+    IndicatorCase,
+    IndicatorWithOutputs,
+    read_screen_path_outputs,
+    read_strategy_path_outputs,
+)
 
 FIRST_BAR_UTC = datetime(2026, 1, 1, tzinfo=UTC)
 # More bars than the longest default warm-up (12-1 momentum: 253 bars).
 BAR_COUNT = 300
 
+type AtradeIndicator = Momentum12_1 | DistanceTo52WeekHigh | RealizedVolatility | AverageTradingValue
+INDICATOR_CLASSES: dict[str, Callable[..., AtradeIndicator]] = {
+    "Momentum12_1": Momentum12_1,
+    "DistanceTo52WeekHigh": DistanceTo52WeekHigh,
+    "RealizedVolatility": RealizedVolatility,
+    "AverageTradingValue": AverageTradingValue,
+}
+
+
+def make_case(name: str, warm_up_bars: int, parameters: dict[str, int] | None = None) -> IndicatorCase:
+    """A case of one ATrade indicator with the output `value`."""
+    values = parameters or {}
+
+    def create() -> IndicatorWithOutputs:
+        indicator = INDICATOR_CLASSES[name](**values)
+        return indicator, lambda: [indicator.value]
+
+    arguments = ", ".join(f"{key}={value}" for key, value in values.items())
+    return IndicatorCase(f"{name}({arguments})", ["value"], warm_up_bars, create)
+
+
 CASES = [
     # Look-back 252 needs 253 closes.
-    IndicatorCase("Momentum12_1", ["value"], 253),
-    IndicatorCase("Momentum12_1", ["value"], 253, {"look_back": 252, "skip": 0}),
-    IndicatorCase("Momentum12_1", ["value"], 11, {"look_back": 10, "skip": 2}),
-    IndicatorCase("DistanceTo52WeekHigh", ["value"], 252),
+    make_case("Momentum12_1", 253),
+    make_case("Momentum12_1", 253, {"look_back": 252, "skip": 0}),
+    make_case("Momentum12_1", 11, {"look_back": 10, "skip": 2}),
+    make_case("DistanceTo52WeekHigh", 252),
     # 60 log returns need 61 closes.
-    IndicatorCase("RealizedVolatility", ["value"], 61),
-    IndicatorCase("RealizedVolatility", ["value"], 253, {"period": 252}),
-    IndicatorCase("AverageTradingValue", ["value"], 20),
+    make_case("RealizedVolatility", 61),
+    make_case("RealizedVolatility", 253, {"period": 252}),
+    make_case("AverageTradingValue", 20),
 ]
-CASE_IDS = [f"{case.name}{case.parameters}" for case in CASES]
+CASE_IDS = [case.constructor_code for case in CASES]
 
 
 def make_long_test_bars() -> list[Bar]:
@@ -68,15 +96,15 @@ def make_bars(prices: list[tuple[int, int, int]]) -> list[Bar]:
     ]
 
 
-def read_values(name: str, parameters: dict[str, object], bars: list[Bar]) -> list[float | None]:
-    return [output[0] for output in read_screen_path_outputs(IndicatorCase(name, ["value"], 1, parameters), bars)]
+def read_values(name: str, parameters: dict[str, int], bars: list[Bar]) -> list[float | None]:
+    return [output[0] for output in read_screen_path_outputs(make_case(name, 1, parameters).create(), bars)]
 
 
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
 def test_the_screen_path_and_the_strategy_path_give_the_same_outputs(case: IndicatorCase, tmp_path: Path) -> None:
     bars = make_long_test_bars()
 
-    screen_outputs = read_screen_path_outputs(case, bars)
+    screen_outputs = read_screen_path_outputs(case.create(), bars)
     strategy_outputs = read_strategy_path_outputs(case, bars, tmp_path)
 
     assert len(strategy_outputs) == BAR_COUNT
@@ -88,9 +116,9 @@ def test_the_screen_path_and_the_strategy_path_give_the_same_outputs(case: Indic
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
 def test_the_outputs_are_no_value_before_the_warm_up_end_not_zero(case: IndicatorCase) -> None:
     bars = make_long_test_bars()
-    indicator = getattr(atrade.indicator, case.name)(**case.parameters)
+    indicator, read_outputs = case.create()
 
-    outputs = read_screen_path_outputs(case, bars)
+    outputs = read_screen_path_outputs((indicator, read_outputs), bars)
 
     assert outputs[: case.warm_up_bars - 1] == [[None]] * (case.warm_up_bars - 1)
     assert None not in outputs[case.warm_up_bars - 1]
@@ -101,7 +129,7 @@ def test_the_outputs_are_no_value_before_the_warm_up_end_not_zero(case: Indicato
     assert indicator.initialized
     indicator.reset()
     assert not indicator.initialized
-    assert indicator.value is None
+    assert read_outputs() == [None]
 
 
 def test_momentum_divides_the_close_skip_bars_ago_by_the_close_look_back_bars_ago() -> None:
