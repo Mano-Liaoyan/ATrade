@@ -9,9 +9,18 @@
 //   POST   /conversations/{id}/title        {provider, model, credential_id} → {title}, or 502 {detail}.
 //   GET    /conversations/{id}/messages     → {messages}.
 //   DELETE /conversations/{id}              Stops the active run and deletes the JSONL file → 204.
+//   GET    /providers                       → {providers} (25.7.1).
+//   GET    /credentials                     → {credentials}, without secrets (25.7.4).
+//   DELETE /credentials/{id}                → 204, or 404.
+//   POST   /logins                          {provider, method, name} → the login events as JSON lines (25.7.3).
+//                                           The login stops when web closes the request.
+//   POST   /login-answers                   {prompt_id, value} → 204, or 404 when no login waits for the prompt.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { Conversations } from './conversations.ts';
+import type { CreateModelRuntime, CredentialFile } from './credential_file.ts';
+import type { LoginMethod, Logins } from './logins.ts';
 import type { ModelSelection } from './model_selection.ts';
+import { listProviders } from './providers.ts';
 
 const HTTP_OK = 200;
 const HTTP_NO_CONTENT = 204;
@@ -21,6 +30,16 @@ const HTTP_CONFLICT = 409;
 const HTTP_BAD_GATEWAY = 502;
 // Only digits, so a conversation ID can never name a path outside the conversation directory.
 const CONVERSATION_PATH = /^\/conversations\/(\d+)(?:\/(runs|steer|abort|title|messages))?$/u;
+
+const CREDENTIAL_PATH = /^\/credentials\/([\w-]+)$/u;
+const LOGIN_METHODS: readonly string[] = ['oauth', 'api_key'];
+
+/** The credential file, the logins, and the model runtime factory of the service (25.7). */
+export interface CredentialServices {
+  file: CredentialFile;
+  logins: Logins;
+  createRuntime: CreateModelRuntime;
+}
 
 export interface ListenAddress {
   host: string;
@@ -119,6 +138,76 @@ function createRoutes(conversations: Conversations): Record<string, RouteAction>
   };
 }
 
+function readLoginMethod(body: Record<string, unknown>): LoginMethod {
+  const method = readText(body, 'method');
+  if (!LOGIN_METHODS.includes(method)) {
+    throw new BadRequestError('The field method must be oauth or api_key.');
+  }
+  return method as LoginMethod;
+}
+
+type PlainRouteAction = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
+
+function createCredentialRoutes(services: CredentialServices): Record<string, PlainRouteAction> {
+  return {
+    'GET /providers': async (_request, response) => {
+      sendJson(response, HTTP_OK, { providers: await listProviders(services.file, services.createRuntime) });
+    },
+    'GET /credentials': (_request, response) => {
+      sendJson(response, HTTP_OK, { credentials: services.file.list() });
+      return Promise.resolve();
+    },
+    'POST /logins': async (request, response) => {
+      const body = await readJson(request);
+      const loginRequest = { provider: readText(body, 'provider'), method: readLoginMethod(body), name: readText(body, 'name') };
+      const controller = new AbortController();
+      response.on('close', () => {
+        controller.abort();
+      });
+      response.writeHead(HTTP_OK, { 'content-type': 'application/x-ndjson' });
+      await services.logins.login(
+        loginRequest,
+        (event) => {
+          response.write(`${JSON.stringify(event)}\n`);
+        },
+        controller.signal,
+      );
+      response.end();
+    },
+    'POST /login-answers': async (request, response) => {
+      const body = await readJson(request);
+      const value = body.value;
+      if (typeof value !== 'string') {
+        throw new BadRequestError('The field value must be a text.');
+      }
+      if (services.logins.answer(readText(body, 'prompt_id'), value)) {
+        sendNoContent(response);
+      } else {
+        sendJson(response, HTTP_NOT_FOUND, { detail: 'No login waits for this prompt.' });
+      }
+    },
+  };
+}
+
+function findCredentialRoute(
+  routes: Record<string, PlainRouteAction>,
+  services: CredentialServices,
+  request: IncomingMessage,
+): PlainRouteAction | undefined {
+  const credentialId = CREDENTIAL_PATH.exec(request.url ?? '')?.[1];
+  if (request.method === 'DELETE' && credentialId !== undefined) {
+    return (_request, response) => {
+      if (services.file.delete(credentialId)) {
+        sendNoContent(response);
+      } else {
+        sendJson(response, HTTP_NOT_FOUND, { detail: `The credential ${credentialId} does not exist.` });
+      }
+      return Promise.resolve();
+    };
+  }
+  return routes[`${request.method ?? ''} ${request.url ?? ''}`];
+}
+
 /** The conversation ID and the route action of a request, or undefined when no route matches. */
 function findRoute(
   routes: Record<string, RouteAction>,
@@ -132,18 +221,34 @@ function findRoute(
   return { conversationId, action };
 }
 
-async function answer(routes: Record<string, RouteAction>, request: IncomingMessage, response: ServerResponse) {
+interface ServerRoutes {
+  conversations: Record<string, RouteAction>;
+  credentials: Record<string, PlainRouteAction>;
+  services: CredentialServices;
+}
+
+function findAnyRoute(routes: ServerRoutes, request: IncomingMessage): PlainRouteAction | undefined {
   if (request.method === 'GET' && request.url === '/health') {
-    sendJson(response, HTTP_OK, { status: 'ok' });
-    return;
+    return (_request, response) => {
+      sendJson(response, HTTP_OK, { status: 'ok' });
+      return Promise.resolve();
+    };
   }
-  const route = findRoute(routes, request);
-  if (route === undefined) {
+  const route = findRoute(routes.conversations, request);
+  if (route !== undefined) {
+    return (routeRequest, response) => route.action(route.conversationId, routeRequest, response);
+  }
+  return findCredentialRoute(routes.credentials, routes.services, request);
+}
+
+async function answer(routes: ServerRoutes, request: IncomingMessage, response: ServerResponse) {
+  const action = findAnyRoute(routes, request);
+  if (action === undefined) {
     sendJson(response, HTTP_NOT_FOUND, { detail: 'Not Found' });
     return;
   }
   try {
-    await route.action(route.conversationId, request, response);
+    await action(request, response);
   } catch (error) {
     if (!(error instanceof BadRequestError)) {
       throw error;
@@ -152,8 +257,12 @@ async function answer(routes: Record<string, RouteAction>, request: IncomingMess
   }
 }
 
-export async function startAssistantServer(address: ListenAddress, conversations: Conversations): Promise<Server> {
-  const routes = createRoutes(conversations);
+export async function startAssistantServer(
+  address: ListenAddress,
+  conversations: Conversations,
+  services: CredentialServices,
+): Promise<Server> {
+  const routes = { conversations: createRoutes(conversations), credentials: createCredentialRoutes(services), services };
   const server = createServer((request, response) => {
     answer(routes, request, response).catch((error: unknown) => {
       console.error(error);
