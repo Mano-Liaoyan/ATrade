@@ -1668,8 +1668,17 @@ option and records it in this document.
 - Decided (#160): an ATrade indicator class does not subclass a
   NautilusTrader class. It has `handle_bar(bar)` and an `initialized`
   property (section 21.1).
+- Decided (#161): the 7 wrapped indicators are the classes `SMA`, `EMA`,
+  `ATR`, `RSI`, `MACD`, `BollingerBands`, and `DonchianChannel` of
+  `atrade.indicator`. An output is `float | None` (None is "no value"). The
+  screen-path method is `update(bar)`: it makes a NautilusTrader bar from
+  the `foundation` bar and calls `handle_bar`. The defaults are in section
+  23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#165): the daily returns use the UTC date as the trading day,
+  `years` comes from the request range, and `metrics.missing_reasons` gives
+  the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new

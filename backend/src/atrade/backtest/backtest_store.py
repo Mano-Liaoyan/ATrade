@@ -1,6 +1,6 @@
 """SQL for the backtest, backtest_equity_point, and backtest_trade tables. Only the backtest capability uses them."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Final, Literal
@@ -51,12 +51,26 @@ class BacktestRow:
     total_return_percent: Decimal | None
     max_drawdown_percent: Decimal | None
     trade_count: int | None
+    cagr_percent: Decimal | None
+    annual_volatility_percent: Decimal | None
+    sharpe_ratio: Decimal | None
+    sortino_ratio: Decimal | None
+    calmar_ratio: Decimal | None
+    profit_factor: Decimal | None
+    average_win_usd: Decimal | None
+    average_win_percent: Decimal | None
+    average_loss_usd: Decimal | None
+    exposure_percent: Decimal | None
+    turnover_per_year: Decimal | None
+    win_rate_percent: Decimal | None
 
 
 BACKTEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc, paper_capital_usd,
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
-    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count
+    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
+    cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
+    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent
 """
 
 
@@ -83,6 +97,18 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
         total_return_percent=row.total_return_percent,
         max_drawdown_percent=row.max_drawdown_percent,
         trade_count=row.trade_count,
+        cagr_percent=row.cagr_percent,
+        annual_volatility_percent=row.annual_volatility_percent,
+        sharpe_ratio=row.sharpe_ratio,
+        sortino_ratio=row.sortino_ratio,
+        calmar_ratio=row.calmar_ratio,
+        profit_factor=row.profit_factor,
+        average_win_usd=row.average_win_usd,
+        average_win_percent=row.average_win_percent,
+        average_loss_usd=row.average_loss_usd,
+        exposure_percent=row.exposure_percent,
+        turnover_per_year=row.turnover_per_year,
+        win_rate_percent=row.win_rate_percent,
     )
 
 
@@ -254,15 +280,17 @@ async def save_result(
             """
             UPDATE backtest SET status = 'finished', ended_at_utc = %(ended_at_utc)s, final_equity_usd = %(final_equity_usd)s,
                 total_return_percent = %(total_return_percent)s, max_drawdown_percent = %(max_drawdown_percent)s,
-                trade_count = %(trade_count)s
+                trade_count = %(trade_count)s, cagr_percent = %(cagr_percent)s,
+                annual_volatility_percent = %(annual_volatility_percent)s, sharpe_ratio = %(sharpe_ratio)s,
+                sortino_ratio = %(sortino_ratio)s, calmar_ratio = %(calmar_ratio)s, profit_factor = %(profit_factor)s,
+                average_win_usd = %(average_win_usd)s, average_win_percent = %(average_win_percent)s,
+                average_loss_usd = %(average_loss_usd)s, exposure_percent = %(exposure_percent)s,
+                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s
             WHERE id = %(backtest_id)s
             """,
             {
                 "backtest_id": backtest_id,
-                "final_equity_usd": result.metrics.final_equity_usd,
-                "total_return_percent": result.metrics.total_return_percent,
-                "max_drawdown_percent": result.metrics.max_drawdown_percent,
-                "trade_count": result.metrics.trade_count,
+                **asdict(result.metrics),
                 "ended_at_utc": ended_at_utc,
             },
         )

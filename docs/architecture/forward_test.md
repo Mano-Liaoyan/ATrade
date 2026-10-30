@@ -429,8 +429,9 @@ Phase 3 changes (#146, #149):
     version) over the Fills / Logs panel (the fill table, and the backtest
     error). The win rate of the forward test counts only the fills in the
     backtest period.
-  - Metrics: `calculate_metrics` with `start_balance_usd`, the recorded
-    equity points, and the number of recorded fills.
+  - Metrics: `calculate_metrics` with `start_balance_usd`, the range from
+    the forward test start to its stop (or to now while it runs), the
+    recorded equity points, and the recorded fills.
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
     or before its time, so a live fill just after a bar close and the
     backtest fill at that bar close are in one row. One row for each bar end
