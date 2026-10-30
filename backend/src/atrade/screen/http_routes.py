@@ -123,7 +123,9 @@ class ScreenIndicatorNamesResponse(BaseModel):
 
 def name_definition_indicators(definition: dict[str, Any]) -> ScreenIndicatorNamesResponse:
     return ScreenIndicatorNamesResponse(
-        indicator_conditions=[name_indicator(condition["indicator"]) for condition in definition["indicator_conditions"]],
+        indicator_conditions=[
+            name_indicator(condition["indicator"]) for condition in definition["indicator_conditions"]
+        ],
         order=name_indicator(definition["order"]["indicator"]),
     )
 
