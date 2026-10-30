@@ -64,7 +64,7 @@ async function openConversations(script: ModelStep[], wait: BacktestWait = QUICK
 
 async function runOnce(conversations: Conversations, text = 'Start.'): Promise<RunEvent[]> {
   const events: RunEvent[] = [];
-  await conversations.run(CONVERSATION_ID, { text, selection: SELECTION }, (event) => events.push(event));
+  await conversations.run(CONVERSATION_ID, { text, selection: SELECTION, systemPrompt: 'You are the ATrade strategy assistant.' }, (event) => events.push(event));
   return events;
 }
 
