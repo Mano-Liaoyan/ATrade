@@ -193,7 +193,7 @@ rules.
 ```
 market_data   -> ibkr
 watchlist     -> market_data
-strategy      -> (foundation only)
+strategy      -> indicator
 indicator     -> (foundation only)
 screen        -> indicator, market_data, watchlist
 backtest      -> strategy, market_data, screen
@@ -205,6 +205,9 @@ app           -> all modules
 ```
 
 - `ibkr` depends on no capability.
+- `strategy -> indicator` is for the rule builder (#172): the rules check
+  reads `INDICATOR_CATALOG` and `check_indicator_reference()`, and the code
+  from the rules names the `atrade.indicator` classes.
 - `forward_test -> paper_trading` is for the paper account check
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
   start). From phase 3 (section 20.1) it is also for the owner ledger
@@ -1688,6 +1691,10 @@ option and records it in this document.
 - Decided (#171): a named CHECK constraint holds the values of
   `strategy_version.source`, and `read_strategy_version` does not return
   `source` and `rules` (strategy section 9.1.1).
+- Decided (#172): `strategy` imports `indicator` (section 6.2). The rules
+  format, the code from the rules, the empty group, the stop loss and take
+  profit reference price, and the count of "Exit after N bars" are in
+  strategy sections 9.8.2 and 9.8.3.
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
