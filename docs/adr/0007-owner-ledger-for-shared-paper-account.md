@@ -41,6 +41,7 @@ section 12.2 and `docs/architecture/paper_trading.md` section 11.3.
 - When a forward test stops, its positions and cash go to "by hand".
 - Each NautilusTrader upgrade must run the tests of both clients, because
   `nautilus_trader.live.clients` is new in 2.0.
-- Not decided: the ledger change at a stock split. Not checked: whether IBKR
+- A stock split changes the owner positions as
+  [ADR 0008](0008-stock-splits-from-ibkr-evidence.md) says. Not checked: whether IBKR
   refuses opposite orders of two owners on one instrument (self-trade
   prevention).
