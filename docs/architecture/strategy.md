@@ -231,14 +231,14 @@ entry exports `create_strategy_router(database_url=..., clock=...)`.
 
 | Route | Behavior |
 |---|---|
-| `POST /api/strategies` | Body `{"name": ..., "start_from": ...}`. `start_from` is `blank_code`, `blank_rules`, or a template ID (section 9.9). Without `start_from`, the start point is `blank_code`. Creates the strategy and version 1 from the start point (section 9.9.1). `201` with the strategy. `409` when the name is in use. `422` when the name is empty or longer than 100 characters, or when `start_from` is not a known start point. |
+| `POST /api/strategies` | Body `{"name": ..., "start_from": ...}`. `start_from` is `blank_code`, `blank_rules`, or a template ID (`s1` to `s3`, `m1` to `m4`, section 9.9). Without `start_from`, the start point is `blank_code`. Creates the strategy and version 1 from the start point (section 9.9.1). `201` with the strategy. `409` when the name is in use. `422` when the name is empty or longer than 100 characters, or when `start_from` is not a known start point. |
 | `GET /api/strategies` | `200` with `[{"id", "name", "latest_version_number"}]`, sorted by name. |
 | `GET /api/strategies/{strategy_id}` | `200` with `{"id", "name", "created_at_utc", "versions": [{"id", "version_number", "code_sha256", "created_at_utc", "source", "conversation_id", "discarded"}]}`. `404` when the strategy does not exist. |
 | `GET /api/strategies/{strategy_id}/versions/{version_number}` | `200` with `{"id", "strategy_id", "version_number", "code", "code_sha256", "created_at_utc", "source", "rules", "conversation_id", "discarded"}`. `rules` is null when the version has no rules. `conversation_id` is null when the AI assistant did not save the version. `discarded` is a boolean (the discarded mark). `404` when the version does not exist. |
 | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (phase 2) | Adds the discarded mark to a version that the AI assistant saved. `200` with the version as `GET .../versions/{version_number}` gives it. A version that is already discarded also gets `200`. `409` when the source of the version is not `ai_assistant`. `404` when the version does not exist. |
 | `POST /api/strategies/{strategy_id}/versions` | Body `{"code": ...}` or `{"rules": ...}`, exactly one of the two. With `code`, the source is `user`. With `rules`, the source is `rule_builder`: the route checks the rules (section 9.8.2), makes the code (section 9.8.3), and saves both. The checks of section 9.3 run on the code in both cases. `201` with the new version. `200` with the latest version when the code is the same (and, for a `rules` body, the rules are also the same). `422` with `{"problems": [{"line", "message"}]}` when a check blocks the save. `422` with the FastAPI validation body when the body has both or neither of `code` and `rules`, or when the rules do not match the rules format (section 9.8.2). `404` when the strategy does not exist. Port 8001 (phase 2) accepts only `{"code": ...}`; it saves with the source `ai_assistant` and the conversation ID (`assistant.md` 25.3.2). |
 | `POST /api/strategy-rules/code` (phase 1) | Body `{"rules": ...}`. Makes the code from the rules and saves nothing. `200` with `{"code"}`. `422` with the FastAPI validation body when the rules do not match the rules format (section 9.8.2). The "Rules" tab uses it for the read-only code (section 9.8.5). |
-| `GET /api/strategy-templates` (phase 1) | `200` with the template list (section 9.9.2): `[{"id", "name", "kind", "entry", "exit", "defaults", "market", "bar_period", "evidence", "sources": [{"label", "url"}], "differs_from_source"}]`, in the order of section 9.9. `kind` is `rules` or `code`. The "New strategy" dialog uses it. |
+| `GET /api/strategy-templates` (phase 1) | `200` with the template list (section 9.9.2): `[{"id", "name", "kind", "entry", "exit", "defaults", "market", "bar_period", "evidence", "sources": [{"label", "url"}], "differs_from_source"}]`, in the order of section 9.9. `kind` is `rules` or `code`. A code template has 1 rule: it is in `entry`, and `exit` is empty (section 9.9.5). The "New strategy" dialog uses it. |
 | `DELETE /api/strategies/{strategy_id}` | `204` when the strategy and its versions are deleted. `409` when a backtest or forward test uses a version. `404` when the strategy does not exist. |
 
 There is no route that changes or deletes one version. `PUT` and `DELETE` on a
@@ -336,7 +336,8 @@ Source: [Content of the strategy template library](https://github.com/Mano-Liaoy
   "Create strategy" sends `POST /api/strategies` with `name` and
   `start_from`.
 - Phase 1 lists "Blank code", "Blank rules", and the templates S1 to S3.
-  Phase 3 adds the code templates M1 to M4.
+  Phase 3 adds the code templates M1 to M4. For a code template, a "Rule"
+  row replaces the "Entry" and "Exit" rows (section 9.9.5).
 - Decided (#176): the dialog is `NewStrategyDialog.svelte` in
   `frontend/src/routes/strategies/`. When it opens, "Blank code" is
   selected. This is the start point of a request without `start_from`, so a
@@ -675,7 +676,7 @@ code template holds strategy code.
 | Blank code | Existing | The code of `strategy_template.py` (section 9.2). Source `user`. |
 | Blank rules | 1 | Rules with no conditions, and the code from them. Source `rule_builder`. |
 | Rule template (S1 to S3) | 1 | The rules of the template, and the code from them. Source `rule_builder`. |
-| Code template (M1 to M4) | 3 | The code of the template. |
+| Code template (M1 to M4) | 3 | The code of the template. Source `user`. |
 
 ### 9.9.2 Template list and gate
 
@@ -754,6 +755,30 @@ universe is the US top 500 of the current quarter.
 - Fundamental templates (value, quality, Piotroski) need a financial data
   source. They get their own ticket.
 
+Decided (#202):
+
+- The code templates are in `STRATEGY_TEMPLATES` after S1 to S3, with the
+  IDs `m1` to `m4`. The `start_from` values also accept them.
+- The 4 templates share 1 code body in
+  `backend/src/atrade/strategy/code_templates.py`. Only the score of an
+  instrument and the M4 volatility target are different. The code starts
+  with the template docstring.
+- The strategy gets the members from `UniverseUpdate` (section 9.8.7) and
+  warms up each new member with 400 days of bars (`on_historical_bars`).
+- The first bar of a month starts the rebalance. When the universe or the
+  look-back bars of a new member come later in the same month, a later bar
+  ranks again. The sell orders go first. The buys go on the next bar after
+  the last sell fills, because the account gets the cash of a sell after
+  the fill event.
+- M1 and M4 use the 12-1 momentum (252 bars back, skip 21 bars). M2 uses the
+  volatility of the daily log returns of 252 bars. M3 uses the close divided
+  by the highest high of 252 bars.
+- M4: total position = 12% / annual volatility of the daily equity of the
+  strategy in the last 126 bars, at most 100%. With fewer than 3 equity
+  values, the total position is 100%.
+- The buys keep 2% of the equity as cash, because a market order fills at
+  the open of the next bar.
+
 Decided (#175):
 
 - The template list is `STRATEGY_TEMPLATES` in
@@ -778,12 +803,15 @@ must check them first.
 |---|---|---|
 | The Brock et al. range break holds for 10 days and uses the close for the break. | Read section II of the paper. | Not checked. The paper is paywalled (Wiley returned 403), and no author or university copy was found. The S2 defaults (50 days, N = 10) stay as in section 9.9.3. Open in section 21. |
 | Faber 2007 checks "close above the 10-month average" only at the month end. | Read the paper. | Not checked. SSRN 962461 and the journal refused the download. Secondary sources (not the paper) say month end. Open in section 21. |
-| Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. | Moskowitz et al.: yes (section 21.1 of [`docs/architecture.md`](../architecture.md)). Blitz & van Vliet, Barroso & Santa-Clara: not checked, they are phase 3 templates. |
+| Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. | Moskowitz et al.: yes (section 21.1 of [`docs/architecture.md`](../architecture.md)). Blitz & van Vliet, Barroso & Santa-Clara: not checked (#202). The papers were not read in the implementation environment. M2 and M4 write the difference from the description of section 9.9.3. Open in section 21. |
 | The IBKR instrument search returns ETFs, for example `SPY`. `backend/src/atrade/ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. | Search `SPY` on the paper account. | Not checked: no IB Gateway in the implementation environment. Open in section 21. The templates run on test bars. |
 | A strategy file can import `atrade.indicator` (#136, #138). The code from the rules needs it. | Run 1 import in the backtest child process, in the implementation ticket of #136. | Yes (#160, section 21.1). |
 
 ### 9.9.5 Left to the implementation
 
-- The rows of the dialog (section 9.7.1) for a code template. A code
-  template has a rule, not an entry rule and an exit rule.
-- The version source of version 1 from a code template.
+- Decided (#202): for a code template, the dialog (section 9.7.1) shows a
+  "Rule" row in place of the "Entry" and "Exit" rows. The other rows do not
+  change. The API keeps 1 shape: the rule is in `entry`, and `exit` is
+  empty.
+- Decided (#202): version 1 from a code template has the source `user`, the
+  same as "Blank code". A code template has no rules.
