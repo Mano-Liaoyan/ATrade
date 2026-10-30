@@ -6838,6 +6838,34 @@
             ],
             "title": "Instruments"
           },
+          "screen_result_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen Result Id"
+          },
+          "symbols": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 32,
+                  "minLength": 1
+                },
+                "type": "array",
+                "maxItems": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbols"
+          },
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
           },
@@ -6894,7 +6922,7 @@
           "paper_capital_usd"
         ],
         "title": "StartBacktestRequest",
-        "description": "`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and\n`list` needs `instruments` (docs/architecture/backtest.md section 10.10.6)."
+        "description": "`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and\n`list` needs `instruments` or `screen_result_id` (docs/architecture/backtest.md section 10.10.6)."
       },
       "StartForwardTestRequest": {
         "properties": {

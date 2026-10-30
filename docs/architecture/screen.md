@@ -364,6 +364,12 @@ kinds:
 - A point-in-time run uses the rules of sections 23.1 and 24.5 with a date.
   It uses only bars that close at or before the rebalance. Its filter
   values must equal the values that the daily bar summary had at that date.
+- Done in #208: `POST /api/backtests` takes a fixed list by
+  `screen_result_id` (backtest.md section 10.10.6). The public entry of
+  `screen` exports `read_screen_result_members(*, database_url,
+  screen_result_id)`: the instruments of the screen result in position
+  order, or `None` when it does not exist. The point-in-time kind, the form
+  source "Screen", and the screen page buttons are not done yet.
 - For a fixed list from the AI assistant, the tool result has the
   survivorship bias warning. The AI assistant must write the warning in its
   answer.

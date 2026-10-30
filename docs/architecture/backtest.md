@@ -941,10 +941,16 @@ look-back bars of a later member cannot give a strategy future bars. Tests:
 The field names are choices of this document. The implementation can change
 them.
 
-Done in #199 for `single`, `rule`, and `list` with `instruments`. The
-`screen` kind and `screen_result_id` are
-[#208](https://github.com/Mano-Liaoyan/ATrade/issues/208): the route refuses
-`universe_kind=screen` with `422` until then. The first `rule` period starts
+Done in #199 for `single`, `rule`, and `list` with `instruments`. Done in
+[#208](https://github.com/Mano-Liaoyan/ATrade/issues/208) for `list` with
+`screen_result_id`: the members are the rows of the screen result in position
+order, or only the rows of `symbols`. `422` (no row) when the screen result
+does not exist, when a symbol of `symbols` is not in the screen result, when
+`symbols` comes without `screen_result_id`, or when the body has both
+`instruments` and `screen_result_id`. A `list` backtest always has
+`survivorship_bias` true (section 10.12): its members are chosen at the end
+of the range. The `screen` kind is not done yet: the
+route refuses `universe_kind=screen` with `422`. The first `rule` period starts
 at `start_utc` and holds the members of the last quarter that starts at or
 before `start_utc`. Each later quarter that starts before `end_utc` is one
 more period. When no quarter starts at or before `start_utc`, the route

@@ -57,6 +57,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
+from atrade.screen import read_screen_result_members
 from atrade.strategy import read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -74,7 +75,7 @@ class InstrumentBody(BaseModel):
 
 class StartBacktestRequest(BaseModel):
     """`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
-    `list` needs `instruments` (docs/architecture/backtest.md section 10.10.6)."""
+    `list` needs `instruments` or `screen_result_id` (docs/architecture/backtest.md section 10.10.6)."""
 
     strategy_version_id: int
     universe_kind: UniverseKind = "single"
@@ -83,6 +84,9 @@ class StartBacktestRequest(BaseModel):
     currency: InstrumentField | None = None
     top_n: Annotated[int, Field(ge=1, le=MAX_UNIVERSE_SIZE)] | None = None
     instruments: Annotated[list[InstrumentBody], Field(max_length=MAX_UNIVERSE_SIZE)] | None = None
+    # A `list` from a screen result: all its rows, or only `symbols` (docs/architecture/screen.md section 24.9).
+    screen_result_id: int | None = None
+    symbols: Annotated[list[InstrumentField], Field(max_length=MAX_UNIVERSE_SIZE)] | None = None
     bar_period: BarPeriod
     start_utc: AwareDatetime
     end_utc: AwareDatetime
@@ -261,7 +265,7 @@ def find_extra_universe_fields(request: StartBacktestRequest) -> list[str]:
     used = {
         "single": {"symbol", "exchange", "currency"},
         "rule": {"top_n"},
-        "list": {"instruments"},
+        "list": {"instruments", "screen_result_id", "symbols"},
     }[request.universe_kind]
     values = {
         "symbol": request.symbol,
@@ -269,6 +273,8 @@ def find_extra_universe_fields(request: StartBacktestRequest) -> list[str]:
         "currency": request.currency,
         "top_n": request.top_n,
         "instruments": request.instruments,
+        "screen_result_id": request.screen_result_id,
+        "symbols": request.symbols,
     }
     return [name for name, value in values.items() if value is not None and name not in used]
 
@@ -360,14 +366,36 @@ class BacktestRoutes:
             if not periods:
                 refuse(describe_missing_universe(time_range))
             return periods
-        members = [
-            Instrument(symbol=body.symbol, exchange=body.exchange, currency=body.currency)
-            for body in request.instruments or []
-        ]
+        members = await self.find_list_members(request)
         refusal = check_list_members(members)
         if refusal is not None:
             refuse(refusal)
         return make_list_periods(time_range, members)
+
+    async def find_list_members(self, request: StartBacktestRequest) -> list[Instrument]:
+        """The members of a `list` universe: `instruments`, or the rows of a screen result (all, or only
+        `symbols`). Raises a 422 HTTPException when the screen result is missing or a symbol is not in it."""
+        if request.screen_result_id is None:
+            if request.symbols is not None:
+                refuse("A list universe takes symbols only with screen_result_id.")
+            return [
+                Instrument(symbol=body.symbol, exchange=body.exchange, currency=body.currency)
+                for body in request.instruments or []
+            ]
+        if request.instruments is not None:
+            refuse("A list universe takes instruments or screen_result_id, not both.")
+        rows = await read_screen_result_members(
+            database_url=self.database_url, screen_result_id=request.screen_result_id
+        )
+        if rows is None:
+            refuse(f"Screen result {request.screen_result_id} does not exist.")
+        if request.symbols is None:
+            return rows
+        by_symbol = {row.symbol: row for row in rows}
+        missing = [symbol for symbol in request.symbols if symbol not in by_symbol]
+        if missing:
+            refuse(f"Screen result {request.screen_result_id} does not have {', '.join(missing)}.")
+        return [by_symbol[symbol] for symbol in dict.fromkeys(request.symbols)]
 
     async def make_backtest_request(
         self, request: StartBacktestRequest

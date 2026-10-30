@@ -46,7 +46,10 @@ def check_backtest_request(request: BacktestRequest) -> str | None:
 
 def has_survivorship_bias(request: BacktestRequest) -> bool:
     """True for an HK backtest and a US backtest that starts before the Databento history: their universe has no
-    instruments that stopped trading (docs/architecture/backtest.md section 10.12)."""
+    instruments that stopped trading (docs/architecture/backtest.md section 10.12). Also true for a fixed `list`
+    universe: its members are chosen at the end of the range (docs/architecture/screen.md section 24.9)."""
+    if request.universe is not None and request.universe.kind == "list":
+        return True
     currency = request.currency
     if currency == "HKD":
         return True

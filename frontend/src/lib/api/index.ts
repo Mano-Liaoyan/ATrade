@@ -2194,7 +2194,7 @@ export interface components {
         /**
          * StartBacktestRequest
          * @description `universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
-         *     `list` needs `instruments` (docs/architecture/backtest.md section 10.10.6).
+         *     `list` needs `instruments` or `screen_result_id` (docs/architecture/backtest.md section 10.10.6).
          */
         StartBacktestRequest: {
             /** Strategy Version Id */
@@ -2211,6 +2211,10 @@ export interface components {
             top_n?: number | null;
             /** Instruments */
             instruments?: components["schemas"]["InstrumentBody"][] | null;
+            /** Screen Result Id */
+            screen_result_id?: number | null;
+            /** Symbols */
+            symbols?: string[] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
