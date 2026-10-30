@@ -60,7 +60,10 @@ services:
       ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
       ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
       ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+      ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
       ATRADE_LOCAL_PAPER_CAPITAL_USD: ${ATRADE_LOCAL_PAPER_CAPITAL_USD:-100000}
+      # The Databento import program runs in this service with "docker compose run" (README.md).
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,6 +103,9 @@ services:
       ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
       ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
       ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+      ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
+      # The quarterly US universe update downloads EQUS.SUMMARY bars to /tmp. Empty: the update does not run.
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
     depends_on:
       web:
         condition: service_healthy

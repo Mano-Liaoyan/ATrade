@@ -15,17 +15,23 @@ import {
 import { ASSISTANT_TOOL_NAMES } from './assistant_tools.ts';
 import { createToolGuard } from './tool_guard.ts';
 
-export const SYSTEM_PROMPT = 'You are the ATrade strategy assistant.';
-
 export interface AssistantSessionOptions {
   modelRuntime: ModelRuntime;
   model: NonNullable<Parameters<typeof createAgentSession>[0]>['model'];
   /** The directory of the pi files (the volume atrade-assistant-pi in the container). */
   piDir: string;
   customTools: ToolDefinition[];
+  /** The system prompt of the conversation: the editable part and the fixed part (assistant.md 25.9). web makes it. */
+  systemPrompt: string;
+  /** The session of one conversation (its JSONL file). Default: a session in memory. */
+  conversationSession?: SessionManager;
 }
 
-async function createResourceLoader(piDir: string, settings: SettingsManager): Promise<DefaultResourceLoader> {
+async function createResourceLoader(
+  piDir: string,
+  settings: SettingsManager,
+  systemPrompt: string,
+): Promise<DefaultResourceLoader> {
   const resourceLoader = new DefaultResourceLoader({
     cwd: piDir,
     agentDir: piDir,
@@ -35,7 +41,7 @@ async function createResourceLoader(piDir: string, settings: SettingsManager): P
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     extensionFactories: [{ name: 'atrade-tool-guard', factory: createToolGuard(ASSISTANT_TOOL_NAMES) }],
   });
   await resourceLoader.reload();
@@ -52,8 +58,8 @@ export async function createAssistantSession(options: AssistantSessionOptions): 
     thinkingLevel: 'off',
     noTools: 'builtin',
     customTools: options.customTools,
-    resourceLoader: await createResourceLoader(options.piDir, settings),
-    sessionManager: SessionManager.inMemory(options.piDir),
+    resourceLoader: await createResourceLoader(options.piDir, settings, options.systemPrompt),
+    sessionManager: options.conversationSession ?? SessionManager.inMemory(options.piDir),
     settingsManager: settings,
   });
   return session;

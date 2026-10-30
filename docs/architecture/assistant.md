@@ -19,7 +19,11 @@ backtests, and (in phase 3) reads, runs, and creates screens. It uses pi
 routes of an allow-list.
 
 This section is the target. Most of it is not implemented. #178 adds the
-service skeleton and the networks (25.2, 25.3.1). The tickets name facts
+service skeleton and the networks (25.2, 25.3.1). #179 adds the
+conversations, the titles, `/ws/assistant` with `prompt`, `steer`, and
+`abort`, and the first 5 browser routes (25.8, 25.10, 25.11). #184 adds the
+system prompt, the prompt versions, their 2 routes, and the "Prompt" dialog
+component (25.9). The tickets name facts
 that nobody ran. Section 25.15 lists them.
 
 ## 25.1 Phases
@@ -123,11 +127,24 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - So `assistant` cannot call a route of port 8000.
 - A unit test checks the allow-list: the port 8001 app has exactly the
   routes of 25.3.3.
+- Done (#181): `app/assistant_port.py` builds the port 8001 app
+  (`create_assistant_port_app`) from `create_strategy_assistant_router` and
+  `create_backtest_assistant_router`. The app has no OpenAPI document and no
+  `/docs` page. A route that is not in the allow-list gets `404`, or `405`
+  when an allowed route has the same path.
+- Done (#181): each request of `assistant` to port 8001 sends the header
+  `X-ATrade-Conversation-Id` with the conversation ID. The 2 routes that
+  record the conversation (`POST /api/strategies/{strategy_id}/versions` and
+  `POST /api/backtests`) need it. Without the header, or with a value that is
+  not a positive integer, the answer is FastAPI's `422` validation body. When
+  the conversation does not exist, the answer is `422` with
+  `{"detail": "Conversation <id> does not exist."}`. The read routes ignore
+  the header.
 
 ### 25.3.3 Allow-list
 
-The screen paths come from #150. They are proposals. The ticket that
-implements the screen routes names the final paths.
+The screen paths come from #150. Decided (#205): they are the final paths
+(screen section 24.7).
 
 | Route on port 8001 | Tool | Phase | Limit on port 8001 |
 |---|---|---|---|
@@ -272,15 +289,17 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 | Table | New column | Meaning |
 |---|---|---|
-| `strategy_version` | source | `user`, `assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
+| `strategy_version` | `source` | `user`, `ai_assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
 | `strategy_version` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant saved the version. |
-| `strategy_version` | discarded mark | Set when the user discards the version. |
+| `strategy_version_discard` | `strategy_version_id`, `discarded_at_utc` | The discarded mark: one row for each discarded version. Added when the user discards the version. |
 | `backtest` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant started the backtest. |
 
 - A discarded strategy version is never deleted. Its backtests stay.
 - The trigger `strategy_version_append_only` refuses each `UPDATE`
   (strategy section 9.1.1). The discarded mark cannot be an `UPDATE` of the
-  version row. See 25.14.
+  version row, so it is a row of `strategy_version_discard` (#180). The
+  trigger lets through only the `ON DELETE SET NULL` of `conversation_id`
+  (strategy section 9.1.1).
 
 ### 25.5.2 Diff card
 
@@ -298,8 +317,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 - The version `Select` of the strategy page hides discarded strategy
   versions by default.
-- A toggle "Show discarded versions" below the `Select` shows them. Each
+- A toggle "Show discarded versions" next to the `Select` shows them. Each
   shows the tag "Discarded" after its version number.
+- Decided (#180): the toggle is in the toolbar line after the `Select`,
+  because the toolbar has one line. It shows only when the strategy has a
+  discarded version. When the open version is discarded, the `Select` also
+  lists it with the toggle off, so that the `Select` names the open
+  version. Without a version address, the strategy page opens the latest
+  version that is not discarded.
 - The backtest list shows the backtests of discarded strategy versions as
   usual.
 
@@ -368,6 +393,12 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The model list of a provider comes from pi
   (`ModelRuntime.getAvailable(provider)` gives only the models with a
   credential).
+- Implemented (#183): `GET /api/assistant/providers` lists each pi provider
+  with at least one login method (`login_methods`: `oauth` for a
+  subscription login, `api_key`). The `models` of a provider are the union
+  of `getAvailable(provider)` over its stored credentials. A provider
+  without a credential has no models. pi has no models.json in ATrade
+  (`modelsPath: null`).
 
 ### 25.7.2 Storage
 
@@ -383,6 +414,23 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   file.
 - `web` does not keep a credential. The secret value goes from the browser
   through `/ws/assistant` to `assistant`.
+- Implemented (#183): the file is `/data/credentials.json`
+  (`assistant/src/credential_file.ts`):
+  `{"credentials": [{id, name, provider, credential, state, state_message}]}`.
+  `credential` is the pi credential (`{type: "api_key", key}` or
+  `{type: "oauth", access, refresh, expires, ...}`). The ID is a UUID.
+  Each write makes a new file with mode `0600` and renames it.
+- `SelectedCredentialStore` is the `CredentialStore` of one run: `read()`
+  gives the selected credential only for its provider, and `list()` has 1
+  entry. pi refreshes an OAuth token inside `modify()`, and the store writes
+  the new token to the same entry. The writes are serialized.
+- The state of a credential: `ready`, or `failed` when the last OAuth
+  refresh failed (`state_message` has the reason). The user deletes a
+  failed credential and logs in again. A good refresh sets `ready` again.
+- Delete: `DELETE /api/assistant/credentials/{credential_id}` removes the
+  entry from the file (`404` when it does not exist). A credential has no
+  rename: delete it and add it again with the new name. The conversations
+  keep the old credential name in their messages.
 
 ### 25.7.3 Login
 
@@ -396,6 +444,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - A subscription login shows the authorization link, the device code, and a
   field to paste a code, as pi asks for them.
 - A new API key uses a password field.
+- Implemented (#183): `assistant/src/logins.ts`. A login runs in a
+  `ModelRuntime` with an empty credential store in memory. pi returns the
+  new credential, and `assistant` adds it to the file with the name that
+  the user entered. pi asks for an API key with a `secret` prompt
+  ("Enter API key"), so the API key also comes as a `login_answer`.
+- The Credentials dialog opens its own `/ws/assistant` socket without
+  `conversation_id`. Closing the dialog closes the socket and stops the
+  login. A cancelled login adds no credential.
 
 ### 25.7.4 Credentials dialog
 
@@ -407,6 +463,19 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - A credential has a name, for example "Anthropic API key · personal".
 - The dialog has the steps to add a subscription login and to add an API
   key (25.7.3).
+- Implemented (#183): `frontend/src/lib/assistant/CredentialsDialog.svelte`
+  (logic in `credentials.ts`). The table columns are Name, Provider, Kind,
+  and State, and a row menu with "Delete credential". Kind is
+  "Subscription" or "API key"; an API key adds its last 4 characters
+  (`••••7a9f`). State is "Ready" (success) or "Log in again" (error, the
+  reason in the cell title). Below the table: a content switcher
+  (Subscription, API key), the Provider select (only the providers with the
+  method), the Name field, and "Log in" or "Add API key". While a login
+  runs, the dialog shows the steps of pi: the link "Open the authorization
+  page", the device code, the progress text, and the field of the current
+  prompt (a password field for `secret`) with "Save API key", "Send code",
+  or "Send answer". #185 puts the "Credentials" icon button in the side
+  column and has the Playwright test of the flow.
 
 ## 25.8 Conversations
 
@@ -424,8 +493,29 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 | Table | Columns |
 |---|---|
-| `assistant_conversation` | `id`, `title`, the title state (generated or renamed by the user), `strategy_id`, `created_at_utc`, `prompt_version_id` (foreign key to `assistant_prompt_version`), the last provider, the last model, the last credential name |
+| `assistant_conversation` | `id`, `title`, `title_state`, `strategy_id`, `created_at_utc`, `prompt_version_id` (foreign key to `assistant_prompt_version`, added by #184), `last_provider`, `last_model`, `last_credential_name` |
 | `assistant_prompt_version` | See 25.9. |
+
+Implemented (#179, #184):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `bigint` identity | The conversation ID. |
+| `strategy_id` | `bigint`, foreign key to `strategy` with `ON DELETE CASCADE` | The strategy of the conversation. |
+| `title` | `text`, 1 to 200 characters | The title. |
+| `title_state` | `text` | `new`, `generating`, `generated`, `not_generated` (the generation failed), or `renamed`. |
+| `created_at_utc` | `timestamptz` | The creation time. |
+| `last_provider`, `last_model`, `last_credential_name` | `text`, nullable | The provider, model, and credential name of the last AI assistant message. Null before the first answer. |
+| `prompt_version_id` | `bigint`, foreign key to `assistant_prompt_version` | The prompt version of the conversation (#184). All runs of the conversation use it. |
+| `fixed_prompt` | `text` | The fixed part of the system prompt, made when the conversation starts (#184, 25.9). |
+
+- Implemented (#184): the routes of 25.11 answer each conversation also with
+  `prompt_version_id` and `prompt_version_number` (for "Prompt v3").
+- The JSONL file of a conversation is `/data/conversations/<id>.jsonl` in
+  the volume `atrade-assistant-pi`. Before each run, `assistant` adds a pi
+  custom entry `atrade_credential` with the credential name. So each AI
+  assistant message of the file has its model (from pi) and its credential
+  name.
 
 - A conversation belongs to at most one strategy.
 - The strategy page lists only the conversations of the open strategy.
@@ -439,6 +529,9 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The user can change the provider, the model, or the credential in the
   middle of a conversation.
 - Each AI assistant message shows its model and its credential name.
+- The browser sends the provider, the model, and the credential with each
+  `prompt`. `assistant` opens the JSONL file again for each run with this
+  model, so a change needs no other message (#179).
 - So the answers of 2 models in one conversation are easy to compare.
 
 ### 25.8.3 Title
@@ -453,10 +546,18 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The title has the language of the user message. A Chinese title has at
   most 20 characters. An English title has at most 8 words.
 - Before the title exists, the title is "New conversation" and the creation
-  time in UTC.
+  time in UTC, for example "New conversation 2026-01-02 03:04 UTC".
+- The generation runs only after a run with an AI assistant answer
+  (a `message_end`). A run that ends with an error does not use up the
+  generation.
+- `assistant` takes the first line of the model answer without quotes. When
+  it has a Chinese character, it keeps the first 20 characters. Else it
+  keeps the first 8 words.
 - When the generation fails, the title stays "New conversation" and the
-  creation time. The Output tab of the "Problems and output" panel records
-  the error. ATrade does not try again.
+  creation time. `web` sends an `error` message "The title was not
+  generated. <reason>" on `/ws/assistant`. The Output tab of the "Problems
+  and output" panel records it. ATrade does not try again (`title_state`
+  `not_generated`).
 - The user can rename a conversation. After a rename, ATrade never changes
   the title again.
 - The model call costs a small amount on the credential that the user
@@ -466,6 +567,11 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 - Delete opens a danger `Dialog` first.
 - A delete deletes the `assistant_conversation` row and the JSONL file.
+  `web` asks `assistant` to stop the run and delete the file first. When
+  `assistant` is not reachable, the route answers `503` and the row stays,
+  so the user can delete again.
+- A delete of the strategy deletes its conversation rows
+  (`ON DELETE CASCADE`). Their JSONL files stay in the volume (#179).
 - The strategy versions, backtests, screens, and screen results stay. Their
   conversation ID becomes null (`ON DELETE SET NULL`).
 
@@ -485,6 +591,40 @@ editable part.
 - The forbidden actions in the prompt only tell the model. They are not a
   security control. The allow-list of port 8001 is the control (25.3).
 
+Implemented (#184):
+
+- `web` makes the system prompt, not `assistant`. The default editable part
+  is `make_default_text()` in `backend/src/atrade/assistant/system_prompt.py`.
+  It has the role, the rules of strategy section 9.2 with the "Blank code"
+  start point (`STRATEGY_TEMPLATE`, which `app/` gives to `assistant`), and
+  the answer rules.
+- The system prompt is the editable part, an empty line, and the fixed part.
+  The fixed part is the forbidden actions and these lines:
+
+  ```text
+  The context at the start of this conversation:
+  - The open strategy: ID <strategy ID>, name <strategy name>.
+  - The open version: <version number>.
+  - The last 3 backtests of the strategy: <backtest IDs>.
+  ```
+
+  A missing version or no backtest gives `none`. The backtest IDs are the
+  newest first, from all versions of the strategy.
+- The browser sends the open version number in the body of
+  `POST /api/assistant/conversations`: `{"strategy_id", "version_number"}`.
+  `version_number` is optional. `web` reads the strategy name and the last 3
+  backtests when the conversation starts, and saves the fixed part in
+  `assistant_conversation.fixed_prompt`. So all runs of one conversation get
+  the same system prompt, also after a rename of the strategy or a new
+  backtest.
+- `assistant` imports only `foundation` (section 6.2). `app/web.py` gives
+  `create_assistant_router()` a start context reader that calls
+  `strategy.read_strategy_outline()` and `backtest.read_last_backtest_ids()`.
+- `web` sends the system prompt with each run (`system_prompt` in
+  `POST /conversations/{id}/runs`, 25.14). pi adds one section after it:
+  `<cwd>` with the pi directory. pi adds nothing else, because the prompt is
+  a custom prompt.
+
 ### 25.9.1 `assistant_prompt_version`
 
 | Table | Columns |
@@ -500,6 +640,26 @@ editable part.
 - So all answers in one conversation use the same prompt and are easy to
   compare. To use a new prompt, the user starts a new conversation.
 
+Implemented (#184):
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | `bigint` identity | The prompt version ID. |
+| `version_number` | `integer`, unique, 1 or more | 1, 2, 3, … The next save takes the highest number plus 1. |
+| `text` | `text`, 1 to 50000 characters | The editable part. |
+| `created_at_utc` | `timestamptz` | The save time. |
+
+- The trigger `assistant_prompt_version_append_only` refuses each `UPDATE`,
+  like `strategy_version_append_only`.
+- A save locks the table (`EXCLUSIVE` mode) in its transaction, so 2 saves
+  cannot take the same number.
+- The default text is saved as version 1 when no version exists and a
+  conversation starts or the dialog lists the versions. So the list is never
+  empty. A later change of the default text in the code does not change
+  version 1. "Restore default" puts the default of the code in the text area.
+- The conversations of #179 got version 1 with their old system prompt "You
+  are the ATrade strategy assistant." in the migration.
+
 ### 25.9.2 Prompt dialog
 
 - The "Prompt" icon button of the assistant side column opens a `Dialog`.
@@ -508,6 +668,13 @@ editable part.
   button.
 - "Restore default" puts the default text in the text area. It saves
   nothing. The user must click "Save as new version".
+- Implemented (#184): `PromptDialog` in `frontend/src/lib/assistant/`, with
+  its logic in `prompt_dialog.ts`. The dialog opens with the latest version.
+  A version of the `Select` puts its text in the text area. The text area
+  and the fixed part each scroll in a `ScrollRegion`. The 2 buttons are in
+  the dialog content, so the dialog has no other button than Close. A save
+  of an empty text shows the error "Enter the prompt text.". #185 puts the
+  dialog in the assistant side column.
 
 ## 25.10 `/ws/assistant`
 
@@ -543,9 +710,57 @@ Browser to server:
 | `steer` | A user message while the AI assistant runs. |
 | `abort` | Stop the current run (the "Stop" button). |
 | `login_answer` | The answer to a `login_step` of kind `prompt`. |
+| `login_start` | Start a login (#183). |
 
 - Phase 3 adds a message for the condition card (a screen ID), like
   `strategy_version_saved`. See 25.14.
+
+Fields (#179). Each message is a JSON object with `type`.
+
+| `type` | Direction | Fields |
+|---|---|---|
+| `prompt` | Browser to server | `text`, `provider`, `model`, `credential_id` |
+| `steer` | Browser to server | `text` |
+| `abort` | Browser to server | — |
+| `message_delta` | Server to browser | `text` |
+| `message_end` | Server to browser | `text`, `provider`, `model`, `credential_name` |
+| `run_state` | Server to browser | `state`: `running` or `settled` |
+| `error` | Server to browser | `message` |
+| `heartbeat` | Server to browser | — (every 10 seconds) |
+
+- The browser opens one socket for one conversation:
+  `/ws/assistant?conversation_id=<id>`. For a conversation that does not
+  exist, the server sends `error` and closes the socket with code 1008.
+- `web` sends `run_state` `running` before the run and `settled` after the
+  run, also after an `abort` or an error.
+- A `prompt` during a run, a `steer` without a run, and a message that is
+  not valid each get an `error` message. A `prompt` during a run does not
+  start a second run.
+- When the browser leaves during a run, `web` stops the run (`abort`).
+- `tool_step`, `strategy_version_saved`, and `backtest_finished` come with
+  #182.
+
+Login fields (#183):
+
+| `type` | Direction | Fields |
+|---|---|---|
+| `login_start` | Browser to server | `provider`, `method` (`oauth` or `api_key`), `name` (the credential name) |
+| `login_answer` | Browser to server | `prompt_id`, `value` (for `select`, the option ID) |
+| `login_step` | Server to browser | `step` (`auth_url`, `device_code`, `progress`, `info`, `prompt`), `message`, `url`, `user_code`, `prompt_id`, `prompt_type` (`text`, `secret`, `select`, `manual_code`), `options` (`[{id, label}]`); a field that the step does not use is null |
+| `login_end` | Server to browser | `credential` (the fields of `GET /api/assistant/credentials`) |
+
+- A socket without `conversation_id` is for the login only. A `prompt`,
+  `steer`, or `abort` on it gets an `error`.
+- One login runs at a time on one socket. A failed login sends `error`.
+- No message to the browser holds a secret. The error of a message that is
+  not valid does not repeat its input, because a `login_answer` can hold an
+  API key. `web` does not log the answers.
+- `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
+  of both directions. Message model names: `PromptMessage`, `SteerMessage`,
+  `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
+  `RunStateMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
+  `LoginStartMessage`, `LoginAnswerMessage`, `LoginStepMessage`,
+  `LoginEndMessage`.
 
 ## 25.11 Browser routes on port 8000
 
@@ -564,10 +779,44 @@ below are choices of this document. The implementation can change them.
 | Delete a credential | `DELETE /api/assistant/credentials/{credential_id}` | 2 |
 | List prompt versions | `GET /api/assistant/prompt-versions` | 2 |
 | Save a prompt version | `POST /api/assistant/prompt-versions` | 2 |
-| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` | 2 |
+| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (done, #180, strategy section 9.6) | 2 |
 | Keep a screen of the AI assistant | `POST /api/screens/{screen_id}/keep` | 3 |
 | Discard a screen of the AI assistant | `DELETE /api/screens/{screen_id}` (the user route) | 3 |
 
+- #179 implements the first 5 rows:
+  - `GET ?strategy_id=` answers `{"conversations": [...]}`, the newest
+    first. Each conversation has the columns of 25.8.1.
+  - `POST` takes `{"strategy_id"}` and answers `201` with the conversation.
+    A strategy that does not exist gets `404`.
+  - `GET {conversation_id}` answers the conversation and `messages`: the
+    user messages and the AI assistant messages with text, each with
+    `role`, `text`, `provider`, `model`, and `credential_name` (the last 3
+    only for an AI assistant message).
+  - `PATCH {conversation_id}` takes `{"title"}` (1 to 200 characters) and
+    sets `title_state` `renamed`.
+  - `DELETE {conversation_id}` answers `204`.
+  - A conversation that does not exist gets `404`. `GET {conversation_id}`
+    and `DELETE` answer `503` when `assistant` is not reachable.
+- #184 implements the prompt version rows:
+  - `GET` answers `{"prompt_versions": [...], "default_text", "fixed_part"}`.
+    The versions are the newest first. Each has `id`, `version_number`,
+    `text`, and `created_at_utc`. `fixed_part` has the names of the values
+    (`<strategy ID>`, …) in the place of the values.
+  - `POST` takes `{"text"}` (1 to 50000 characters after the trim) and
+    answers `201` with the new version. These routes refuse nothing else, so
+    they declare no `ErrorResponse`. A text that is not valid gets FastAPI's
+    `422`.
+  - `POST /api/assistant/conversations` also takes the optional
+    `version_number` (25.9).
+- #183 implements the providers and credentials rows:
+  - `GET /api/assistant/providers` answers `{"providers": [{id, name,
+    login_methods, models: [{id, name}]}]}` (25.7.1).
+  - `GET /api/assistant/credentials` answers `{"credentials": [{id, name,
+    provider, type, key_last4, state, state_message}]}`. `key_last4` is the
+    last 4 characters of an API key, null for a subscription login.
+  - `DELETE /api/assistant/credentials/{credential_id}` answers `204`, or
+    `404` for a credential that does not exist.
+  - All 3 answer `503` when `assistant` is not reachable.
 - None of these routes is on port 8001.
 - The login itself runs on `/ws/assistant` (25.7.3), because it asks
   questions and waits for answers.
@@ -699,45 +948,102 @@ columns behave the same (section 13).
 - Decided (#178): `assistant` listens on port 8002 in
   `atrade-assistant-internal`. In #178 it has only `GET /health` for the
   Compose health check. The process does not start a pi session yet. #179
-  starts the session with the tool guard.
-- The protocol between `web` and `assistant` (conversation messages, login
-  steps, credential list, title generation, JSONL delete).
+  starts the session with the tool guard. Decided (#179): the routes of
+  `/conversations/...` are on the same port.
+- Decided (#179): the protocol between `web` and `assistant` for the
+  conversations. `web` calls `http://assistant:8002` with
+  `AssistantServiceClient` (`backend/src/atrade/assistant/assistant_service.py`,
+  `httpx`). The server is `assistant/src/assistant_server.ts`:
+
+  | Request | Answer |
+  |---|---|
+  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`. The answer ends when the run ends. |
+  | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
+  | `POST /conversations/{id}/abort` | `204`. |
+  | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |
+  | `GET /conversations/{id}/messages` | `{messages}`. |
+  | `DELETE /conversations/{id}` | Stops the run and deletes the JSONL file. `204`. |
+
+  The conversation ID has only digits, so it cannot name a path outside
+  `/data/conversations/`. A wrong body gets `400`. The run has no read
+  timeout, because a tool can wait 15 minutes (25.4.2). `web` changes the
+  events into the messages of 25.10.
+- Decided (#183): the credential and login part of the same protocol:
+
+  | Request | Answer |
+  |---|---|
+  | `GET /providers` | `{providers}` (25.11). |
+  | `GET /credentials` | `{credentials}`, without secrets. |
+  | `DELETE /credentials/{id}` | `204`, or `404`. |
+  | `POST /logins` `{provider, method, name}` | One JSON line for each login event: `login_step`, then `login_end` `{credential}` or `error` `{message}`. When `web` closes the request, the login stops. |
+  | `POST /login-answers` `{prompt_id, value}` | `204`, or `404` when no login waits for the prompt. |
+
+  A run uses the stored credential: `openStoredModel`
+  (`assistant/src/providers.ts`) refuses a credential that does not exist
+  or that is for another provider. The conversation tests still use
+  `createFakeOpenModel` in `assistant/tests/fake_model.ts`. The credential
+  and login tests register fake providers (`assistant/tests/fake_providers.ts`):
+  `fake-oauth` (each login step, a refresh that fails for the refresh token
+  "revoked") and `fake-key`. The test values are only in the test code.
+  `web` has its tests with a fake of `AssistantService`
+  (`backend/tests/fakes/assistant.py`).
 - Decided (#178): the subnet of `atrade-assistant-internal` is
   `172.31.250.0/24`. It is fixed in `deploy/compose.yaml` and is not a
   setting.
-- How port 8001 knows the conversation of a request (for example a header
-  that `assistant` sends), so that it records the conversation ID.
-- How the `web` process runs 2 uvicorn listeners in 1 process.
-- Where the discarded mark is kept. The trigger
-  `strategy_version_append_only` refuses each `UPDATE` of
-  `strategy_version`, so a separate table or a narrower trigger is
-  necessary.
-- The column names and types of the version source, the title state, and the
-  last provider, model, and credential name.
-- Whether Keep of a diff card is recorded on the server, so a reload shows
-  "Kept".
+- Decided (#181): port 8001 knows the conversation of a request from the
+  header `X-ATrade-Conversation-Id` (25.3.2). The constant is
+  `CONVERSATION_HEADER` in `backend/src/atrade/foundation/assistant_conversation.py`.
+  A missing header gets `422` (FastAPI validation), and an unknown
+  conversation gets `422` with a text `detail`. The check of the
+  conversation is `conversation_exists` of the `assistant` public entry.
+  `app/` gives it to the routers, so `strategy` and `backtest` do not import
+  `assistant`.
+- Decided (#181): `app/web.py` runs 2 `uvicorn.Server` objects in 1 event
+  loop (`serve_both`): port 8000 with the lifespan, and port 8001 with
+  `lifespan="off"`. When one server stops, the other stops too.
+- Decided (#180): the discarded mark is a row of the table
+  `strategy_version_discard` (25.5.1). The trigger
+  `strategy_version_append_only` still refuses each `UPDATE` statement.
+- Decided (#180): the version source is the `text` column `source` with
+  the CHECK constraint `strategy_version_source_check` (`user`,
+  `rule_builder`, `ai_assistant`). Decided (#179): the title state and the
+  last provider, model, and credential name (25.8.1).
+- Decided (#180): Keep of a diff card is not recorded on the server. Only
+  Discard changes a version (25.5.2), so a reload shows a version without
+  the discarded mark as kept.
+- Decided (#180): the discard route answers `409` for a version that the AI
+  assistant did not save, and `200` for a version that is already
+  discarded (25.11).
 - How the server records that the user kept a screen, so `update_screen`
   returns `403` after Keep.
-- What happens to the conversations of a strategy when the user deletes the
-  strategy.
-- Whether the default prompt is saved as prompt version 1, or only exists in
-  code until the first save.
+- Decided (#179): a delete of the strategy deletes its conversation rows
+  (`ON DELETE CASCADE`). The JSONL files stay in the volume.
+- Decided (#179): a title generation failure reaches the browser as an
+  `error` message (25.8.3).
+- Decided (#184): the default prompt is saved as prompt version 1 when no
+  version exists and a conversation starts or the Prompt dialog lists the
+  versions. The browser sends the open version number in the body of the
+  new conversation request. A trigger refuses each `UPDATE` of a prompt
+  version. See 25.9.
 - Which part enforces the 5 backtests of one user message: only the tool, or
   also port 8001.
 - How the AI assistant finds the instruments and bar periods with saved bars.
   No tool reads the watchlist.
-- Whether `POST /api/backtests` from port 8001 may save daily exchange rates
-  from IBKR (backtest section 10.8). The AI assistant "cannot download
-  bars", and the rates come from IBKR.
-- The field names of each `/ws/assistant` message, and the phase 3 message
-  for the condition card.
-- The field that names the position of a condition in a screen problem
-  (25.4.3).
+- Decided (#181): `POST /api/backtests` from port 8001 saves the daily
+  exchange rates from IBKR like port 8000 (backtest section 10.13). Rates
+  are not bars.
+- The phase 3 message for the condition card. Decided (#179): the field
+  names of the other `/ws/assistant` messages (25.10).
+- Decided (#205): the field that names the position of a condition in a
+  screen problem (25.4.3) is `location`, the path in the request body (screen
+  section 24.6).
 - The pages of `read_screen_result` (page size and parameter names).
 - The summaries in the `read_backtest` result (how many points of the
   equity curve and which trade fields).
-- The credential delete and rename behavior, and the meaning of the
-  credential state column.
+- Decided (#183): the credential delete and rename behavior, and the
+  meaning of the credential state column (25.7.2). Delete removes the entry
+  from the file. There is no rename. The state is `ready` or `failed` (the
+  last OAuth refresh failed).
 - The UI copy of each disabled control, for example "Send" without a
   credential.
 - Decided (#178): the `tool_call` handler that refuses unknown tools is
@@ -756,10 +1062,10 @@ columns behave the same (section 13).
 | Ticket | Fact | How to check |
 |---|---|---|
 | #133 | The real subscription logins and model calls of each provider. Only a fake OpenAI-compatible model server was used. | Log in through the Credentials dialog with each provider that the user has, and send one message. |
-| #140, #133 | OpenAI may count a self-hosted single-user server as "remotely hosted" for the ChatGPT subscription login. | Read the OpenAI "Preview limitations" page. |
+| #140, #133 | OpenAI may count a self-hosted single-user server as "remotely hosted" for the ChatGPT subscription login. The OpenAI pages read on 2026-10-30 do not settle it (`docs/architecture.md` section 21.1). | Ask OpenAI. |
 | #140 | Community Antigravity extensions may not work in pi 1.4.0. Not needed in this stage. | Only for the later extension ticket: install the extension in a temporary container, and let the user log in one time. |
-| #140 | `ModelRuntime.login()` with an `AuthInteraction` object does each login step from a web page. Read from the 1.4.0 source, not run with a real provider. | The first login in the Credentials dialog. |
-| #140 | `ModelRuntime.create({ credentials })` accepts ATrade's own `CredentialStore`, and an OAuth refresh writes back through it. Read from the source. | A test with 2 credentials of one provider. Then wait for an OAuth token refresh and read the file. |
+| #140 | `ModelRuntime.login()` with an `AuthInteraction` object does each login step from a web page. Checked with fake login flows (#183), not with a real provider. | The first login in the Credentials dialog (#186). |
+| #140 | An OAuth refresh of a real provider writes back through ATrade's `CredentialStore`. Checked with a fake refresh and 2 credentials of one provider (#183). | Wait for a real OAuth token refresh and read `/data/credentials.json` (#186). |
 | #150 | The run time of a point-in-time backtest from a screen (34 quarters, a screen of 500 instruments, and a multi-instrument backtest). It can be longer than the 15 minute wait. | After the implementation, run one with real data and measure the time. |
 | #150 | The token count of a screen result with 500 rows. | After the implementation, count the tokens of one real result. |
 | #140 | The VS Code secondary side bar resize and Maximize behavior, which the side column follows. | Read `src/vs/workbench/browser/layout.ts` of VS Code. |

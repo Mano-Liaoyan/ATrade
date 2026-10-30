@@ -3,7 +3,21 @@
 import pytest
 
 import atrade.indicator
-from atrade.indicator import INDICATOR_CATALOG
+from atrade.indicator import (
+    ATR,
+    EMA,
+    INDICATOR_CATALOG,
+    MACD,
+    RSI,
+    SMA,
+    AverageTradingValue,
+    BollingerBands,
+    CatalogIndicator,
+    DistanceTo52WeekHigh,
+    DonchianChannel,
+    Momentum12_1,
+    RealizedVolatility,
+)
 from tests.indicator.test_atrade_indicators import make_long_test_bars
 
 CATALOG_KEYS = [
@@ -19,6 +33,28 @@ CATALOG_KEYS = [
     "bollinger_bands",
     "donchian_channel",
 ]
+
+
+def read_outputs(indicator: CatalogIndicator) -> list[float | None]:
+    match indicator:
+        case MACD():
+            return [indicator.value, indicator.signal, indicator.histogram]
+        case BollingerBands() | DonchianChannel():
+            return [indicator.upper, indicator.middle, indicator.lower]
+        case (
+            SMA()
+            | EMA()
+            | ATR()
+            | RSI()
+            | Momentum12_1()
+            | DistanceTo52WeekHigh()
+            | RealizedVolatility()
+            | AverageTradingValue()
+        ):
+            return [indicator.value]
+        case _:
+            message = f"No output reader for {indicator!r}."
+            raise AssertionError(message)
 
 
 def test_the_catalog_has_the_11_keys_of_section_23_6() -> None:
@@ -75,8 +111,10 @@ def test_the_default_class_has_a_value_after_the_screen_look_back_bars(key: str)
     for bar in bars:
         indicator.update(bar)
 
+    outputs = read_outputs(indicator)
     assert len(bars) == look_back_bars
-    assert all(getattr(indicator, output) is not None for output in definition.outputs)
+    assert len(outputs) == len(definition.outputs)
+    assert all(output is not None for output in outputs)
 
 
 @pytest.mark.parametrize("key", CATALOG_KEYS)

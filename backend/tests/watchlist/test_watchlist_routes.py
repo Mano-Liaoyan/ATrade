@@ -55,7 +55,7 @@ def save_bars(database_url: str, instrument: dict[str, str], bar_period: str, st
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s, 100, 101, 99, 100, 1000)
             """,
             [{**instrument, "bar_period": bar_period, "start_utc": start_utc} for start_utc in starts_utc],
@@ -78,8 +78,18 @@ async def test_lists_the_saved_bars_of_each_instrument_for_each_bar_period(
     tencent, apple = list_response.json()["instruments"]
     assert tencent["saved_bars"] == []
     assert apple["saved_bars"] == [
-        {"bar_period": "1-HOUR", "first_start_utc": "2026-03-02T14:00:00Z", "last_start_utc": "2026-03-02T14:00:00Z"},
-        {"bar_period": "1-DAY", "first_start_utc": "2026-03-02T00:00:00Z", "last_start_utc": "2026-03-04T00:00:00Z"},
+        {
+            "bar_source": "ibkr",
+            "bar_period": "1-HOUR",
+            "first_start_utc": "2026-03-02T14:00:00Z",
+            "last_start_utc": "2026-03-02T14:00:00Z",
+        },
+        {
+            "bar_source": "ibkr",
+            "bar_period": "1-DAY",
+            "first_start_utc": "2026-03-02T00:00:00Z",
+            "last_start_utc": "2026-03-04T00:00:00Z",
+        },
     ]
 
 

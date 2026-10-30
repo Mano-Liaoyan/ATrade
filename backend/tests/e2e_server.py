@@ -28,6 +28,7 @@ from tests.fakes.ibkr import (
     make_forward_test_order,
     make_stock_position,
 )
+from tests.saved_ranges import save_ibkr_saved_range
 
 FAKE_ACCOUNT_ID = "DU1234567"
 E2E_POSITION_COUNT = 40
@@ -53,6 +54,17 @@ E2E_COMPARED_FILL_COUNT = 40
 # An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
+# A strategy with a discarded version of the AI assistant (docs/architecture/assistant.md 25.5.3): v1 of the user,
+# v2 of the AI assistant with the discarded mark and a failed backtest, and v3 of the AI assistant.
+E2E_DISCARDED_STRATEGY_NAME = "E2E discarded version"
+# A failed HK backtest and a failed US backtest of 2026: only the HK backtest shows the survivorship bias warning
+# (docs/architecture/backtest.md section 10.12). They never run, so their strategy version needs no real code.
+E2E_SURVIVORSHIP_STRATEGY_NAME = "E2E survivorship bias"
+E2E_SURVIVORSHIP_STRATEGY_CODE = "# The strategy version of the e2e survivorship bias backtests.\n"
+E2E_SURVIVORSHIP_INSTRUMENTS = [
+    Instrument(symbol="700", exchange="SEHK", currency="HKD"),
+    Instrument(symbol="SBUS", exchange="ARCA", currency="USD"),
+]
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
@@ -131,7 +143,7 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
     with connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s, 1000)
             ON CONFLICT DO NOTHING
             """,
@@ -145,6 +157,13 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
                 }
                 for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
             ],
+        )
+        save_ibkr_saved_range(
+            connection,
+            Instrument(symbol=E2E_COMPARED_SYMBOL, exchange="ARCA", currency="USD"),
+            "1-DAY",
+            E2E_COMPARED_FIRST_BAR_START_UTC,
+            E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
         )
 
 
@@ -227,6 +246,95 @@ def add_compared_forward_test(database_url: str) -> None:
         add_compared_records(connection, int(forward_test_row[0]))
 
 
+def add_discarded_version(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_1_id = insert_strategy_version(
+            connection, name=E2E_DISCARDED_STRATEGY_NAME, code=E2E_COMPARED_STRATEGY_FILE.read_text()
+        )
+        if version_1_id is None:
+            return
+        conversation_row = connection.execute(
+            """
+            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc)
+            SELECT strategy_id, 'E2E conversation', %(now)s FROM strategy_version WHERE id = %(version_id)s
+            RETURNING id, strategy_id
+            """,
+            {"version_id": version_1_id, "now": FIXED_NOW_UTC},
+        ).fetchone()
+        assert conversation_row is not None
+        conversation_id, strategy_id = conversation_row
+        version_ids: list[int] = []
+        for version_number in (2, 3):
+            code = f"{E2E_COMPARED_STRATEGY_FILE.read_text()}\n# Version {version_number} of the AI assistant.\n"
+            version_row = connection.execute(
+                """
+                INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc, source,
+                    conversation_id)
+                VALUES (%(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(now)s, 'ai_assistant',
+                    %(conversation_id)s)
+                RETURNING id
+                """,
+                {
+                    "strategy_id": strategy_id,
+                    "version_number": version_number,
+                    "code": code,
+                    "code_sha256": hashlib.sha256(code.encode()).hexdigest(),
+                    "now": FIXED_NOW_UTC,
+                    "conversation_id": conversation_id,
+                },
+            ).fetchone()
+            assert version_row is not None
+            version_ids.append(int(version_row[0]))
+        discarded_version_id = version_ids[0]
+        connection.execute(
+            "INSERT INTO strategy_version_discard (strategy_version_id, discarded_at_utc) VALUES (%(id)s, %(now)s)",
+            {"id": discarded_version_id, "now": FIXED_NOW_UTC},
+        )
+        connection.execute(
+            """
+            INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                paper_capital_usd, status, error_message, created_at_utc, started_at_utc, ended_at_utc, conversation_id)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(end_utc)s, 10000, 'failed',
+                'E2E backtest of a discarded version.', %(now)s, %(now)s, %(now)s, %(conversation_id)s)
+            """,
+            {
+                "version_id": discarded_version_id,
+                "symbol": E2E_COMPARED_SYMBOL,
+                "start_utc": E2E_COMPARED_FIRST_BAR_START_UTC,
+                "end_utc": E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+                "now": FIXED_NOW_UTC,
+                "conversation_id": conversation_id,
+            },
+        )
+
+
+def add_survivorship_bias_backtests(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection, name=E2E_SURVIVORSHIP_STRATEGY_NAME, code=E2E_SURVIVORSHIP_STRATEGY_CODE
+        )
+        if version_id is None:
+            return
+        for instrument in E2E_SURVIVORSHIP_INSTRUMENTS:
+            connection.execute(
+                """
+                INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                    paper_capital_usd, status, error_message, created_at_utc, ended_at_utc, source_order)
+                VALUES (%(version_id)s, %(symbol)s, %(exchange)s, %(currency)s, '1-DAY', %(start_utc)s, %(end_utc)s,
+                    10000, 'failed', 'E2E backtest without a run.', %(now)s, %(now)s, '["ibkr", "databento"]')
+                """,
+                {
+                    "version_id": version_id,
+                    "symbol": instrument.symbol,
+                    "exchange": instrument.exchange,
+                    "currency": instrument.currency,
+                    "start_utc": datetime(2026, 3, 2, tzinfo=UTC),
+                    "end_utc": datetime(2026, 4, 1, tzinfo=UTC),
+                    "now": FIXED_NOW_UTC,
+                },
+            )
+
+
 async def serve_with_forward_test_worker(server: uvicorn.Server, worker: ForwardTestWorker) -> None:
     # The forward-test service of Compose runs the worker. Here it runs in the same process, with fake children.
     worker_task = asyncio.create_task(worker.keep_comparing())
@@ -273,7 +381,9 @@ def main() -> None:
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
+    add_discarded_version(database_url)
     add_owner_ledger_start(database_url)
+    add_survivorship_bias_backtests(database_url)
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )

@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vite-plus/test';
 import { describeSavedBars, findSavedBars, selectInstrumentsWithSavedBars, type WatchlistInstrument } from './index';
 
 const DAILY_BARS = {
+  bar_source: 'ibkr',
   bar_period: '1-DAY',
   first_start_utc: '2023-01-02T00:00:00Z',
   last_start_utc: '2025-12-31T00:00:00Z',
 } as const;
 const HOURLY_BARS = {
+  bar_source: 'ibkr',
   bar_period: '1-HOUR',
   first_start_utc: '2026-03-02T14:00:00Z',
   last_start_utc: '2026-03-03T20:00:00Z',
@@ -49,9 +51,27 @@ describe('selectInstrumentsWithSavedBars', () => {
 });
 
 describe('findSavedBars', () => {
-  it('returns the saved bars of the bar period, or undefined', () => {
-    expect(findSavedBars(APPLE, '1-DAY')).toEqual(DAILY_BARS);
+  it('returns the first and the last saved bar of the bar period, or undefined', () => {
+    expect(findSavedBars(APPLE, '1-DAY')).toEqual({
+      first_start_utc: '2023-01-02T00:00:00Z',
+      last_start_utc: '2025-12-31T00:00:00Z',
+    });
     expect(findSavedBars(MICROSOFT, '1-DAY')).toBeUndefined();
+  });
+
+  it('spans the saved bars of all bar sources of the bar period', () => {
+    const databentoDailyBars = {
+      ...DAILY_BARS,
+      bar_source: 'databento',
+      first_start_utc: '2018-05-01T00:00:00Z',
+      last_start_utc: '2025-06-30T00:00:00Z',
+    } as const;
+    const instrument = { ...APPLE, saved_bars: [DAILY_BARS, databentoDailyBars] };
+
+    expect(findSavedBars(instrument, '1-DAY')).toEqual({
+      first_start_utc: '2018-05-01T00:00:00Z',
+      last_start_utc: '2025-12-31T00:00:00Z',
+    });
   });
 });
 

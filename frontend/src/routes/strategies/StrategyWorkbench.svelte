@@ -1,8 +1,8 @@
 <!-- Strategy page: a workbench (foundation/workbench, spec #99, ticket #106) like the QuantConnect editor. URL:
-     /strategies/<id> opens the latest version; /strategies/<id>/versions/<n> opens version n, and then the address
+     /strategies/<id> opens the latest version that is not discarded; /strategies/<id>/versions/<n> opens version n, and then the address
      follows the open version; /strategies opens the first strategy of the list.
      Left: the "Strategies" side column with the "New strategy" button. Center: the toolbar line (strategy name, version,
-     and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
+     "Show discarded versions" when the strategy has a discarded version, and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
      splitter between them. The swap button puts the editor on top or at the bottom; the browser keeps the choice.
      Run backtest and Start forward test open the dialogs of the backtest page and the forward test page with the
      open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
@@ -30,7 +30,7 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
-  import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
+  import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput, Toggle } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
@@ -84,10 +84,12 @@
     describeProblemCounts,
     describeShortcut,
     describeSwapButton,
+    findDefaultVersionNumber,
     findFinishedBacktest,
     findRunningForwardTest,
     isMacPlatform,
     listResultTabs,
+    listVersionItems,
     listWorkbenchPanels,
     PANE_ORDER_STORAGE_KEY,
     readPaneOrder,
@@ -102,7 +104,8 @@
     type WorkbenchShortcut,
   } from './strategy_workbench';
 
-  // versionNumber comes from the version address /strategies/<id>/versions/<n>. Without it, the latest version opens.
+  // versionNumber comes from the version address /strategies/<id>/versions/<n>. Without it, the latest version that is
+  // not discarded opens.
   const {
     strategyId,
     versionNumber: addressVersionNumber = null,
@@ -125,6 +128,8 @@
   let listReadCount = $state(0);
   let strategy = $state<StrategyDetail | null>(null);
   let openVersion = $state<StrategyVersion | null>(null);
+  // "Show discarded versions": the version Select hides the discarded versions until the user turns it on.
+  let showDiscarded = $state(false);
   let editorCode = $state('');
   let fileTab = $state<'rules' | 'strategy'>('strategy');
   // The rules of the "Rules" tab, and the version that they come from (0: the blank rules, no version has rules).
@@ -176,11 +181,12 @@
   const hasUnsavedChanges = $derived(fileTab === 'rules' ? hasUnsavedRules : hasUnsavedCode);
   const saveLabel = $derived(fileTab === 'rules' ? 'Save rules as new version' : 'Save version');
   const versionItems = $derived(
-    (strategy?.versions ?? []).map((version) => ({
-      value: String(version.version_number),
-      label: `v${String(version.version_number)}`,
-    })),
+    listVersionItems(strategy?.versions ?? [], {
+      showDiscarded,
+      openVersionNumber: openVersion?.version_number ?? null,
+    }),
   );
+  const hasDiscardedVersion = $derived((strategy?.versions ?? []).some((version) => version.discarded));
   const openVersionKey = $derived<StrategyVersionKey | null>(
     openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id },
   );
@@ -268,7 +274,7 @@
     }
     strategyMessage = '';
     strategy = result.value;
-    const versionNumber = versionNumberToOpen ?? result.value.versions.at(-1)?.version_number;
+    const versionNumber = versionNumberToOpen ?? findDefaultVersionNumber(result.value.versions);
     if (versionNumber !== undefined) {
       await openStrategyVersion(id, versionNumber);
     }
@@ -533,6 +539,15 @@
             }}
           />
         </div>
+        {#if hasDiscardedVersion}
+          <Toggle
+            label="Show discarded versions"
+            checked={showDiscarded}
+            onCheckedChange={(checked: boolean) => {
+              showDiscarded = checked;
+            }}
+          />
+        {/if}
         {#snippet end()}
           <IconButton
             label="Delete strategy"
@@ -782,7 +797,8 @@
 
   .version-select {
     flex: none;
-    inline-size: var(--cds-spacing-11);
+    /* Room for "v123" and the tag "Discarded". */
+    inline-size: calc(var(--cds-spacing-13) + var(--cds-spacing-07));
   }
 
   .main :global(.cds--inline-notification) {

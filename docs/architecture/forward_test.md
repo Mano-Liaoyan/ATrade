@@ -131,7 +131,7 @@ This replaces the rules above:
 - Phase 3 (#146, #149): the worker also runs 3 jobs. They are not child
   processes of a forward test.
   - The bar fetcher (section 12.20).
-  - The quarterly universe calculation (section 12.21).
+  - The quarterly universe update of `market_data` (section 12.21).
   - The daily stock split check (section 12.22).
 
 ## 12.4 Client IDs
@@ -153,7 +153,9 @@ This replaces the rules above:
   `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID` (default `20`). At start, the worker
   checks that this ID is not in the forward test range and is not equal to
   the Web client ID. When the check fails, the worker does not start and
-  writes the reason.
+  writes the reason. Implemented (#216): `Settings` makes the check, and
+  `app/forward_test_worker.py` logs "The forward-test worker does not start"
+  with the reason and exits with code 1.
 - The reason for a separate fetcher ID: one client ID cannot have 2
   connections. The LiveNode of a forward test child already holds its client
   ID (section 12.15).
@@ -227,11 +229,13 @@ This replaces the rules above:
      on this instrument belongs to this strategy (section 12.2).
   3. The strategy indicators start from zero. NautilusTrader does not save
      strategy state without Redis.
-- Phase 3 (#146): restart step 2 changes. The child does not set
-  `external_order_instrument_ids` and does not reconcile with the account
-  position. The ATrade execution client reports the owner position of each
-  instrument from the owner ledger. NautilusTrader restores the strategy
-  position from these reports.
+- Phase 3 (#146): restart step 2 changes. The child does not reconcile
+  with the account position. The ATrade execution client reports the owner
+  position of each instrument from the owner ledger. NautilusTrader restores
+  the strategy position from these reports. The child sets
+  `external_order_instrument_ids` to the instruments of the forward test.
+  Without it, the restored position belongs to the strategy `EXTERNAL`, not
+  to the strategy (#213, `docs/architecture.md` section 21.1).
 - Phase 3 (#146): a multi-instrument forward test gets 1 year of warm-up
   daily bars from the bar store (section 12.17). When the quarter changed
   during an interruption, the restarted strategy gets the members of the
@@ -419,14 +423,13 @@ Phase 3 changes (#146, #149):
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
     `GET /api/forward-tests/{id}/comparison/{backtest_id}` every 2 seconds
-    until the backtest has a final status, with the forward test fills and
-    the backtest trades (for the win rates). It is a workbench (spec #99,
+    until the backtest has a final status. It is a workbench (spec #99,
     #109): the "Forward tests" side column, the comparison panel (header
     line with the backtest status, `ComparedKeyMetrics` and
     `EquityDrawdownChart` of `#lib/backtest`; no code diff: the same strategy
     version) over the Fills / Logs panel (the fill table, and the backtest
     error). The win rate of the forward test counts only the fills in the
-    backtest period.
+    backtest period (the comparison route calculates it, #170).
   - Metrics: `calculate_metrics` with `start_balance_usd`, the range from
     the forward test start to its stop (or to now while it runs), the
     recorded equity points, and the recorded fills.
@@ -448,8 +451,9 @@ Phase 3 changes (#146, #149):
     change the pairs of the later fills. Without such a
     round trip it is null with the reason
     "No round trips in the backtest period". The other metrics use all
-    fills. The forward test page shows the same values as before: the
-    frontend still calculates its win rate (#168 changes the row).
+    fills. Decided (#168): the key metric rows show `win_rate_percent` and
+    `sharpe_ratio` of the API, and the frontend has no win rate
+    calculation.
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
     or before its time, so a live fill just after a bar close and the
     backtest fill at that bar close are in one row. One row for each bar end
@@ -496,10 +500,12 @@ this document. The implementation can change them.
 
 | Name | Purpose |
 |---|---|
-| `OwnerLedgerExecutionClient` | The ATrade NautilusTrader execution client of section 12.19. |
-| `BarStoreDataClient` | The ATrade NautilusTrader data client of section 12.19. |
-| `BarFetcher(*, database_url, clock, gateway_connection)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. |
-| `QuarterlyUniverseJob(*, database_url, clock, databento_client)` | The quarterly universe calculation of section 12.21. |
+| `OwnerLedgerExecutionClient`, `OwnerLedgerExecutionClientFactory(ledger_input, ledger, gateway)`, `OwnerLedgerInput` | The ATrade NautilusTrader execution client of section 12.19 (#213). `OwnerLedgerInput` has `forward_test_id`, `client_id`, `account_id`, `instruments`, and `fill_check_interval_seconds` (default 1). `gateway` is an `OrderGateway`: the order functions of the `ibkr` GatewayConnection. |
+| `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition` | The owner ledger interface of the execution client (#213). |
+| `BarStoreDataClient`, `BarStoreDataClientFactory(bar_store_input)`, `BarStoreInput` | The ATrade NautilusTrader data client of section 12.19 (#213). `BarStoreInput` has `database_url` and `instruments`. The factory keeps the created client in `client`, for `send_new_bars()`. |
+| `add_atrade_clients(builder, data_client_factory, execution_client_factory)` | Adds both clients to a `LiveNodeBuilder` as the default route. Without a data client factory, it adds only the execution client (#213). |
+| `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
+| `ReadMemberLists` | The type of `read_member_lists`: it returns the members of each running multi-instrument forward test. |
 | `StockSplitCheck(*, database_url, clock, gateway_connection)` | The daily stock split check of section 12.22. |
 | `read_allocated_capital(*, database_url)` | The sum of the allocated capital of the forward tests that hold a client ID. `paper_trading` gets it from `app/web.py` for the "By hand" capital (section 11.10 of [`paper_trading.md`](paper_trading.md)). |
 
@@ -534,8 +540,6 @@ Phase 3 table changes (#146). The column names are choices of this document.
 |---|---|
 | `forward_test` | Add `universe_kind` (`single`, `rule`, `list`), `universe_top_n` (null unless `rule`), and `allocated_capital_usd` (not null for a new row). `symbol`, `exchange`, and `currency` can be null (null unless `single`). Drop the partial unique index `forward_test_one_per_instrument`. `start_balance_usd` stays for the old rows. |
 | `forward_test_universe_member` (new) | `forward_test_id`, `quarter_start_utc`, `symbol`, `exchange`, `currency`. Primary key `(forward_test_id, quarter_start_utc, symbol, exchange)`. `ON DELETE CASCADE` from `forward_test`. One row for each member that the forward test gave the strategy in that quarter. The same-period backtest reads it (section 12.10). |
-| `quarterly_universe` (new) | `quarter_start_date`, `rank` (1 to 500), `symbol`, `exchange`, `average_trading_value_usd`, `window_end_date` (the last trading day of the 63-day window that the calculation used). Primary key `(quarter_start_date, rank)`. Section 12.21 writes it. |
-| `quarterly_universe_run` (new) | `quarter_start_date` (primary key), `started_at_utc`, `ended_at_utc`, `window_end_date`, `status` (`running`, `done`, `failed`), `error_message`. One row for each calculation. |
 
 - The watchlist kind (`list`) records the watchlist members at start in
   `forward_test_universe_member`. Whether a later change of the watchlist
@@ -651,9 +655,13 @@ than the worker clock.
   `__init__` of the user config class (section 9.2). The reason: the user
   `__init__` passes other keywords to `object.__init__`, which refuses them.
 - Warm-up bars: after the cancel of the old orders, on the same connection,
-  the child reads the bars of `find_look_back_length(bar_period)` of
-  `backtest` (the backtest look-back, 7 days at least) before the start of
-  the current bar, with `GatewayConnection.read_historical_bars()`. That
+  the child reads the bars of `find_look_back(bar_period,
+  warm_up_bar_count)` of `backtest` (the backtest look-back, 7 days at
+  least) before the start of the current bar, with
+  `GatewayConnection.read_historical_bars()`. For a rule builder version the
+  LiveNode gets only the last bars of the bar count of the longest indicator
+  (#164, [`backtest.md`](backtest.md) section 10.3.1). The child saves all
+  read bars. That
   function splits the range into requests of the IBKR step size of the bar
   period (1 day for 1-minute bars, `ibkr/historical_bars.py`). A failed read
   logs a warning and gives no warm-up bars. The forward test still starts.
@@ -835,8 +843,9 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
 - Warm-up: the warm-up of a multi-instrument forward test on daily bars is
   1 year, the same as the multi-instrument backtest. The reason: 12-1
   momentum and the distance to the 52-week high need about 252 daily bars.
-  The old look-back of 1-day bars is 60 days
-  (`backend/src/atrade/backtest/backtest_run.py`).
+  The default look-back of 1-day bars is 60 days; a rule builder version
+  gets the bars of its longest indicator (#164,
+  `backend/src/atrade/backtest/backtest_run.py`).
   - The child reads the warm-up bars from the bar store with the global
     source order (`ibkr_bar`, then `databento_bar`,
     [`market_data.md`](market_data.md)). It sends no request to IBKR. The
@@ -883,7 +892,8 @@ ATrade writes its own NautilusTrader `ExecutionClient` and `DataClient` in
 Python with `nautilus_trader.live.clients`. ATrade does not change the
 NautilusTrader code and does not fork it.
 
-Execution client (`OwnerLedgerExecutionClient`):
+Execution client (`OwnerLedgerExecutionClient`,
+`backend/src/atrade/forward_test/owner_ledger_execution_client.py`):
 
 - It implements `_submit_order`, `_cancel_order`, and the 4 reconciliation
   hooks, including `_generate_position_status_reports`
@@ -904,13 +914,21 @@ Execution client (`OwnerLedgerExecutionClient`):
   account cash.
 - After a restart, NautilusTrader restores the strategy position from these
   reports. Thus the strategy knows its position and does not buy again.
+  NautilusTrader 2.0.0rc7 makes an external order with an inferred fill
+  from each report. The strategy gets the position only when its
+  `external_order_instrument_ids` hold the instrument (section 12.7).
+- Until #214 and #215, the owner ledger is the interface `OwnerLedger`
+  (`backend/src/atrade/forward_test/owner_ledger.py`). The tests use the
+  in-memory fake `backend/tests/fakes/owner_ledger.py`.
 - Each order adds 1 PostgreSQL query. The time is not measured.
 
-Data client (`BarStoreDataClient`):
+Data client (`BarStoreDataClient`,
+`backend/src/atrade/forward_test/bar_store_data_client.py`):
 
 - It implements `_subscribe_bars` and `_request_bars`.
-- It gives the strategy the bars from the bar store. The strategy uses
-  `on_bar` and `request_bars` as before.
+- It gives the strategy the bars from the bar store, merged by the global
+  source order as in a backtest (`market_data.md` section 8.7.2). The
+  strategy uses `on_bar` and `request_bars` as before.
 - A multi-instrument forward test uses it (section 12.17).
 
 Rules for both clients:
@@ -922,6 +940,10 @@ Rules for both clients:
 - Before the implementation, a LiveNode test must run both clients with a
   fake IBKR connection: send an order, fill it, restart, and check the
   strategy position. The test also gets a stock split step (section 12.22).
+  The tests are `backend/tests/forward_test/test_atrade_clients_live_node.py`
+  and `backend/tests/forward_test/test_bar_store_data_client.py` (#213).
+  `add_atrade_clients()` adds both clients to a `LiveNodeBuilder`. The child
+  process still uses the IB clients until #215.
 
 ## 12.20 Bar fetcher (Phase 3)
 
@@ -949,6 +971,24 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
   section 8.4). So 500 instruments take about 250 seconds at least. The real
   time is not measured.
 - The cost is 0 USD.
+- Implementation (#216): `BarFetcher` in `forward_test/bar_fetcher.py`.
+  - `fetch_when_due()`: the daily read. It reads the union of the member
+    lists, each instrument 1 time, for the year before the current UTC day.
+  - `fill_warm_up(instruments, start_utc)`: the warm-up fill before a start.
+    It reads the year before the UTC day of `start_utc`.
+    No start path calls it before the multi-instrument forward test
+    ([#217](https://github.com/Mano-Liaoyan/ATrade/issues/217)).
+  - Both ask IBKR only for the ranges that no bar source in the global
+    source order saved (`read_unsaved_ranges` of `market_data`). So the daily
+    read asks only for the days after the last saved day. A day that is not
+    complete (section 8.4 of [`market_data.md`](market_data.md)) is not read.
+  - The fetcher waits 0.5 seconds before each request after the first one.
+  - The member lists come from a function argument. Until the
+    multi-instrument forward test
+    ([#217](https://github.com/Mano-Liaoyan/ATrade/issues/217)), the worker
+    passes a function that returns no list.
+  - Stock split evidence A comes later with the `market_data` read path
+    ([#196](https://github.com/Mano-Liaoyan/ATrade/issues/196)).
 
 ## 12.21 Quarterly universe (Phase 3)
 
@@ -969,11 +1009,14 @@ Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-
 - When the daily bar of the previous trading day is not available yet, the
   worker tries again every 15 minutes until 09:00 ET.
 - When the bar is still missing at 09:00 ET, the worker uses the 63 trading
-  days that end 1 trading day earlier. It records the actual end date in
-  `window_end_date`.
+  days that end 1 trading day earlier. It records the actual last day in
+  `last_ranking_day_utc`.
 - The new universe goes to the strategies before the market opens.
-- The worker stores each result in `quarterly_universe` and each calculation
-  in `quarterly_universe_run` (section 12.12).
+- `market_data` holds the rule, the update, and the table
+  `us_universe_member` ([`market_data.md`](market_data.md) section 8.9).
+  The worker runs `UsUniverseUpdate` of the `market_data` public entry.
+  Backtests and forward tests read the members with
+  `read_us_universe_members`.
 - Cost: about 1.30 USD for each quarter. On 2026-10-30, `metadata.get_cost`
   gave 1.23 USD to 1.36 USD for one quarter. After the free credit, the
   Databento account pays.
@@ -1053,21 +1096,34 @@ simplest option and records it in this document.
   share the client ID with it before this choice.
 - How the ATrade data client gets the new daily bars after the bar fetcher
   saved them.
-- How the platform tells the strategy the new members at a quarter start.
-  The multi-instrument backtest makes the same choice.
-- The time after the daily close at which the bar fetcher reads the bars,
-  and what it does when IB Gateway is not reachable.
-- Whether the bar fetcher and the daily bar update of `web`
+- Decided (#198): the platform tells the strategy the new members at a
+  quarter start with NautilusTrader custom data, as the multi-instrument
+  backtest does ([`backtest.md`](backtest.md) section 10.10.8): one
+  `CustomData` with `DataType("UniverseUpdate")`, which the strategy gets in
+  `on_data`. Not checked in a LiveNode: how the ATrade data client sends it.
+- Decided (#216): the bar fetcher reads the bars at the first check after
+  00:30 UTC of each UTC day. A daily bar starts at 00:00 UTC of its trading
+  date, so the bar of the last US trading day is complete then. The worker
+  checks every 5 minutes. When IB Gateway is not reachable, or the
+  connection is lost during the read, the fetcher logs the reason and reads
+  again at the next check. The worker does not crash. A failed request of
+  one instrument on a working connection is logged and not saved, so the
+  next daily read asks IBKR again.
+- Decided (#216): the bar fetcher and the daily bar update of `web`
   ([Screen page prototype](https://github.com/Mano-Liaoyan/ATrade/issues/145))
-  share one job.
+  are 2 jobs. They run in different processes with different client IDs.
 - The status code of a `rule` start when no universe of the current quarter
-  is stored, and what the calculation does without `DATABENTO_API_KEY`.
+  is stored.
+- Decided (#192): without `DATABENTO_API_KEY`, the quarterly update does not
+  run, and the `forward-test` log tells why.
 - How ATrade maps a Databento symbol to the IBKR primary exchange.
-- The trading day calendar for "first trading day of the quarter" and
-  "before the market opens".
-- Whether the downloaded EQUS.SUMMARY bars go into `databento_bar`.
-- Which capability owns `quarterly_universe`. The screen page also uses the
-  universe of the current quarter.
+- Decided (#192): the trading day calendar for "first trading day of the
+  quarter" and "before the market opens" is in
+  [`market_data.md`](market_data.md) section 8.14.
+- Decided (#192): the downloaded EQUS.SUMMARY bars go into `databento_bar`.
+- Decided (#192): `market_data` owns the quarterly universe
+  (`us_universe_member`). The screen page also uses the universe of the
+  current quarter.
 - Whether a change of the watchlist changes the members of a running
   `list` forward test.
 - Whether `forward_test_fill` stays as a copy of the ledger fills, and the
