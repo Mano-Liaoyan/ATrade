@@ -619,6 +619,11 @@ The default width is 28rem.
   - at the end of the log, the log scrolls to each new message
   - while the user reads older messages, the log does not scroll
   - the log has `role="log"`
+- The components are `ChatLog`, `ChatMessage`, `ChatDivider`, and the
+  function `arrangeChatLog` (groups and date dividers). Their properties are
+  in `docs/architecture.md` section 13. "At the end" means at most 48px
+  from the end (section 22). A message that the user sends always scrolls
+  the log to the end.
 - License: the source repository uses Apache-2.0. Each file that copies or
   adapts its code has a header with the source link and the Apache-2.0
   copyright notice.
