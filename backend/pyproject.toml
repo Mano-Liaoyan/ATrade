@@ -9,6 +9,8 @@ dependencies = [
     # (docs/architecture/strategy.md section 9.4). The package brings Node.js (nodejs-wheel-binaries).
     "basedpyright==1.40.2",
     "fastapi==0.162.0",
+    # web calls the assistant service over HTTP (docs/architecture/assistant.md 25.14).
+    "httpx==0.28.1",
     "ib-async==2.1.0",
     "nautilus-trader==2.0.0rc7",
     "psycopg[binary]==3.3.6",
@@ -24,7 +26,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "anyio==4.15.1",
-    "httpx==0.28.1",
     "httpx-ws==0.8.2",
     "import-linter==2.15",
     "pytest==9.1.1",
@@ -99,8 +100,8 @@ layers = [
     "atrade.forward_test",
     "atrade.backtest | atrade.paper_trading | atrade.watchlist",
     "atrade.strategy | atrade.market_data",
-    # indicator -> foundation only (docs/architecture.md section 6.2).
-    "atrade.ibkr | atrade.indicator",
+    # indicator -> foundation only, assistant -> foundation only (docs/architecture.md section 6.2).
+    "atrade.ibkr | atrade.indicator | atrade.assistant",
     "atrade.foundation",
 ]
 
@@ -155,6 +156,12 @@ name = "indicator internals are private"
 type = "protected"
 protected_modules = ["atrade.indicator.*"]
 allowed_importers = ["atrade.indicator"]
+
+[[tool.importlinter.contracts]]
+name = "assistant internals are private"
+type = "protected"
+protected_modules = ["atrade.assistant.*"]
+allowed_importers = ["atrade.assistant"]
 
 [[tool.importlinter.contracts]]
 name = "ibkr internals are private"
