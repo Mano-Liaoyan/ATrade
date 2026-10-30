@@ -921,8 +921,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the "Split check needed" row with "Apply split <ratio>" and "Keep
     ledger" (phase 3, sections 11 and 12).
   - A settings page has the "Source order" list of the bar sources
-    (`docs/architecture/market_data.md`). Its route and the place of the HK
-    instrument list editor are left to the implementation.
+    (`docs/architecture/market_data.md`). The settings page is `/settings`
+    with the header link "Settings" after "Forward tests". It is a document
+    page with the heading "Settings" and one section for each setting. The
+    HK instrument list editor is the section "HK instrument list" of this
+    page (#194, `docs/architecture/market_data.md` section 8.10).
   - A survivorship bias warning (icon, word, and warning color) shows on HK
     screens, on HK backtest results, and on US backtest results that start
     before 2018-05-01.
@@ -1667,9 +1670,17 @@ option and records it in this document.
   23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#170): the exposure of a forward test counts its recorded equity
+  points (one at each bar end) as its bars. The recorded fills go to
+  `find_round_trips` with no change, because `select_fills` already gives
+  `BacktestTrade` rows. The metrics of the forward test routes have
+  `net_profit_usd` (forward test section 12.10).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1693,6 +1704,13 @@ option and records it in this document.
 - Decided (#188): the watchlist `saved_bars` items keep the first and the
   last bar start of each bar table. The backtest form shows, for one bar
   period, the earliest first bar and the latest last bar of all bar sources.
+- Decided (#194): the HK instrument list editor is on the settings page
+  `/settings` (section 13). #194 made this page. The source order slice
+  (#189) adds its "Source order" section to the same page.
+- Decided (#194): the add route of the HK instrument list checks all new
+  symbols with `InstrumentLookup` before it saves one. On `502` or `503`
+  the list does not change. A symbol that the request has 2 times is in
+  `already_in_list` the second time.
 - Decided (#197): the request field of the backtest source order is
   `source_order`. It holds each `BarSource` exactly 1 time, like the global
   source order (`422` otherwise). `bar_count_by_source` counts only the bars
@@ -1721,6 +1739,11 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#214): the owner ledger of "By hand" (the ledger start at the
+  first passed check, the cash of rule 2, the price of a market buy, the
+  USD conversion, and when the Web process records fills) is in
+  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
+  11.13.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`
