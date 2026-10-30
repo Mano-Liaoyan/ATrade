@@ -1,13 +1,14 @@
 """backtest: the source order and the bar count of each bar source of a backtest
 
 Revision ID: 2f6b8d1c4e97
-Revises: 8d4f2a6c1e93
+Revises: 8d4f2a6c1e93, 8d4b6f2a1c93
 """
 
 from alembic import op
 
 revision = "2f6b8d1c4e97"
-down_revision = "8d4f2a6c1e93"
+# Also the merge point of the bar source tables (#188) and the metric columns (#165), 2 branches of 6c3e9a1f2b80.
+down_revision = ("8d4f2a6c1e93", "8d4b6f2a1c93")
 
 
 def upgrade() -> None:

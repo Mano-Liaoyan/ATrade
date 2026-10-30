@@ -1723,6 +1723,145 @@
           "trade_count": {
             "type": "integer",
             "title": "Trade Count"
+          },
+          "cagr_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cagr Percent"
+          },
+          "annual_volatility_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annual Volatility Percent"
+          },
+          "sharpe_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Ratio"
+          },
+          "sortino_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino Ratio"
+          },
+          "calmar_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar Ratio"
+          },
+          "profit_factor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profit Factor"
+          },
+          "average_win_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Win Usd"
+          },
+          "average_win_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Win Percent"
+          },
+          "average_loss_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Loss Usd"
+          },
+          "exposure_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure Percent"
+          },
+          "turnover_per_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Per Year"
+          },
+          "win_rate_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate Percent"
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Missing Reasons"
           }
         },
         "type": "object",
@@ -1730,9 +1869,23 @@
           "final_equity_usd",
           "total_return_percent",
           "max_drawdown_percent",
-          "trade_count"
+          "trade_count",
+          "cagr_percent",
+          "annual_volatility_percent",
+          "sharpe_ratio",
+          "sortino_ratio",
+          "calmar_ratio",
+          "profit_factor",
+          "average_win_usd",
+          "average_win_percent",
+          "average_loss_usd",
+          "exposure_percent",
+          "turnover_per_year",
+          "win_rate_percent",
+          "missing_reasons"
         ],
-        "title": "BacktestMetricsResponse"
+        "title": "BacktestMetricsResponse",
+        "description": "The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and\n`missing_reasons` gives its reason by its field name (section 10.9.3). The page shows \"\u2013\" with the reason."
       },
       "BacktestResponse": {
         "properties": {
