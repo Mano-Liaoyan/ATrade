@@ -4,6 +4,7 @@
 import { expect, test } from '@playwright/test';
 
 const TEMPLATE_ROW_LABELS = ['Entry', 'Exit', 'Defaults', 'Market', 'Bar period', 'Evidence', 'Sources', 'Differs from source'];
+const CODE_TEMPLATE_ROW_LABELS = ['Rule', 'Defaults', 'Market', 'Bar period', 'Evidence', 'Sources', 'Differs from source'];
 
 test('the dialog lists the start points and shows the rows of the selected template', async ({ page }) => {
   await page.goto('/strategies');
@@ -17,6 +18,10 @@ test('the dialog lists the start points and shows the rows of the selected templ
     '200-day trend',
     '50-day range break',
     '12-month time-series momentum',
+    'Cross-sectional momentum',
+    'Low volatility',
+    '52-week high',
+    'Volatility-adjusted momentum',
   ]);
   await expect(startPoints.getByRole('option', { name: 'Blank code' })).toHaveAttribute('aria-selected', 'true');
   await expect(dialog.getByRole('heading', { level: 3 })).toHaveText('Blank code');
@@ -31,6 +36,11 @@ test('the dialog lists the start points and shows the rows of the selected templ
     'https://doi.org/10.1111/j.1540-6261.1992.tb04681.x',
   );
   await expect(dialog.getByRole('link')).toHaveCount(2);
+
+  await startPoints.getByRole('option', { name: 'Cross-sectional momentum' }).click();
+
+  await expect(dialog.getByRole('heading', { level: 3 })).toHaveText('Cross-sectional momentum');
+  await expect(dialog.locator('dt')).toHaveText(CODE_TEMPLATE_ROW_LABELS);
 });
 
 test('a strategy from template S1 opens with version 1 made by the rule builder', async ({ page }, currentTest) => {
@@ -50,4 +60,26 @@ test('a strategy from template S1 opens with version 1 made by the rule builder'
   const strategyId = /\/strategies\/(\d+)/.exec(page.url())?.[1];
   const version = await page.request.get(`/api/strategies/${String(strategyId)}/versions/1`);
   expect(await version.json()).toMatchObject({ version_number: 1, source: 'rule_builder' });
+});
+
+test('a strategy from template M1 opens with version 1 that holds the template code', async ({ page }, currentTest) => {
+  const name = `M1 momentum ${currentTest.project.name} ${String(Date.now())}`;
+  await page.goto('/strategies');
+  await page.getByRole('button', { name: 'New strategy' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New strategy' });
+  await dialog.getByLabel('Strategy name').fill(name);
+  await dialog
+    .getByRole('listbox', { name: 'Start from' })
+    .getByRole('option', { name: 'Cross-sectional momentum' })
+    .click();
+
+  const request = page.waitForRequest((sent) => sent.method() === 'POST' && sent.url().endsWith('/api/strategies'));
+  await dialog.getByRole('button', { name: 'Create strategy' }).click();
+
+  expect((await request).postDataJSON()).toEqual({ name, start_from: 'm1' });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Cross-sectional momentum');
+  const strategyId = /\/strategies\/(\d+)/.exec(page.url())?.[1];
+  const version = await page.request.get(`/api/strategies/${String(strategyId)}/versions/1`);
+  expect(await version.json()).toMatchObject({ version_number: 1, source: 'user', rules: null });
 });

@@ -7320,7 +7320,11 @@
           "blank_rules",
           "s1",
           "s2",
-          "s3"
+          "s3",
+          "m1",
+          "m2",
+          "m3",
+          "m4"
         ]
       },
       "StartRefusedResponse": {
