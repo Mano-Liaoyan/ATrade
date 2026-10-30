@@ -1736,6 +1736,11 @@ option and records it in this document.
   and imports the file into `databento_bar`. The Databento import program
   calculates the quarters without members after each import. The other
   #192 choices are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#193): the Databento import program also imports the XNAS.ITCH
+  `ohlcv-1h` files. `--hourly-cost` prints the hourly bar purchase list and
+  its cost before the purchase. The official open of the 9:30 ET hourly bar
+  and the hourly range of the bars route:
+  `docs/architecture/market_data.md` section 8.14.
 - Decided (#191): the Databento import reads the IBKR daily closes through
   IB Gateway with its own client ID (`--ibkr-client-id`, default `30`), so
   it needs IB Gateway. The user checks the detections with the program

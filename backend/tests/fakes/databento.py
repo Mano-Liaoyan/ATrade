@@ -19,10 +19,12 @@ import databento_dbn.metadata
 NEW_YORK = ZoneInfo("America/New_York")
 # DBN prices are integers in units of 1e-9 (fixed-point).
 PRICE_SCALE = Decimal(10**9)
+HOURLY_COST_PER_SYMBOL = Decimal("0.01")
 # The publisher IDs of the datasets. The import does not read them.
 PUBLISHER_IDS = {"XNAS.ITCH": 2, "XNYS.PILLAR": 9, "EQUS.SUMMARY": 95}
 # The stubs of databento_dbn type the enum members as plain values, so the fake builds them from their values.
 DAILY_SCHEMA = databento_dbn.Schema.from_str("ohlcv-1d")
+HOURLY_SCHEMA = databento_dbn.Schema.from_str("ohlcv-1h")
 STATISTICS_SCHEMA = databento_dbn.Schema.from_str("statistics")
 OPENING_PRICE = databento_dbn.StatType.from_int(1)
 CLOSE_PRICE = databento_dbn.StatType.from_int(11)
@@ -34,6 +36,19 @@ class DailyRecord:
 
     symbol: str
     trading_day: date
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: int
+
+
+@dataclass(frozen=True)
+class HourlyRecord:
+    """One XNAS.ITCH `ohlcv-1h` record. `start_et` is the bar start in New York time, on a whole hour."""
+
+    symbol: str
+    start_et: datetime
     open: Decimal
     high: Decimal
     low: Decimal
@@ -63,6 +78,7 @@ class DbnFile:
     end: date
     daily_records: list[DailyRecord] = field(default_factory=list[DailyRecord])
     statistic_records: list[StatisticRecord] = field(default_factory=list[StatisticRecord])
+    hourly_records: list[HourlyRecord] = field(default_factory=list[HourlyRecord])
 
     @property
     def file_name(self) -> str:
@@ -98,6 +114,7 @@ def to_fixed_price(price: Decimal) -> int:
 def find_symbols(dbn_file: DbnFile) -> list[str]:
     symbols = [record.symbol for record in dbn_file.daily_records]
     symbols += [record.symbol for record in dbn_file.statistic_records]
+    symbols += [record.symbol for record in dbn_file.hourly_records]
     return sorted(set(symbols))
 
 
@@ -107,6 +124,21 @@ def encode_daily_record(publisher_id: int, instrument_id: int, record: DailyReco
         publisher_id,
         instrument_id,
         to_day_nanoseconds(record.trading_day),
+        to_fixed_price(record.open),
+        to_fixed_price(record.high),
+        to_fixed_price(record.low),
+        to_fixed_price(record.close),
+        record.volume,
+    )
+    return bytes(message)
+
+
+def encode_hourly_record(publisher_id: int, instrument_id: int, record: HourlyRecord) -> bytes:
+    message = databento_dbn.OHLCVMsg(
+        databento_dbn.RType.OHLCV_1H,
+        publisher_id,
+        instrument_id,
+        to_nanoseconds(record.start_et),
         to_fixed_price(record.open),
         to_fixed_price(record.high),
         to_fixed_price(record.low),
@@ -156,6 +188,10 @@ def encode_dbn_file(dbn_file: DbnFile) -> bytes:
         for record in sorted(dbn_file.daily_records, key=lambda record: record.trading_day)
     ]
     encoded += [
+        encode_hourly_record(publisher_id, instrument_ids[record.symbol], record)
+        for record in sorted(dbn_file.hourly_records, key=lambda record: record.start_et)
+    ]
+    encoded += [
         encode_statistic_record(publisher_id, instrument_ids[record.symbol], record)
         for record in sorted(dbn_file.statistic_records, key=lambda record: record.trading_day)
     ]
@@ -188,6 +224,7 @@ class FakeDatabentoClient:
         self.downloaded_job_ids: list[str] = []
         self.summary_downloads: list[tuple[date, date]] = []
         self.summary_end_reads = 0
+        self.hourly_cost_requests: list[tuple[list[str], date, date]] = []
 
     def download_batch_job(self, job_id: str, output_dir: Path) -> list[Path]:
         """Writes the files of the batch job to `<output_dir>/<job_id>/`, like `batch.download` of Databento."""
@@ -197,6 +234,11 @@ class FakeDatabentoClient:
     def read_daily_summary_end_utc(self) -> datetime:
         self.summary_end_reads += 1
         return datetime.combine(self.summary_end, time(), tzinfo=UTC)
+
+    def read_hourly_cost(self, symbols: list[str], start: date, end: date) -> Decimal:
+        """The fake costs 0.01 USD for each symbol."""
+        self.hourly_cost_requests.append((symbols, start, end))
+        return HOURLY_COST_PER_SYMBOL * len(symbols)
 
     def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
         """Databento refuses a range after the available end, so the fake refuses it too."""

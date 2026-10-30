@@ -5,6 +5,7 @@ the quarterly US universe update (docs/architecture.md section 6.2, docs/archite
 """
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
@@ -12,6 +13,8 @@ import databento
 
 SUMMARY_DATASET = "EQUS.SUMMARY"
 DAILY_SCHEMA = "ohlcv-1d"
+HOURLY_DATASET = "XNAS.ITCH"
+HOURLY_SCHEMA = "ohlcv-1h"
 ISO_DATE_LENGTH = 10
 ISO_SECONDS_LENGTH = 19
 
@@ -23,6 +26,11 @@ class DatabentoClient(Protocol):
 
     def read_daily_summary_end_utc(self) -> datetime:
         """The end (not included) of the EQUS.SUMMARY data that is available now."""
+        ...
+
+    def read_hourly_cost(self, symbols: list[str], start: date, end: date) -> Decimal:
+        """The cost in USD of the XNAS.ITCH `ohlcv-1h` bars of `symbols` from `start` to `end` (not included). Reading
+        the cost is free (`metadata.get_cost`). It buys nothing."""
         ...
 
     def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
@@ -49,6 +57,12 @@ class DatabentoHistoricalClient:
 
     def read_daily_summary_end_utc(self) -> datetime:
         return parse_range_end(self.historical.metadata.get_dataset_range(dataset=SUMMARY_DATASET)["end"])
+
+    def read_hourly_cost(self, symbols: list[str], start: date, end: date) -> Decimal:
+        cost = self.historical.metadata.get_cost(
+            dataset=HOURLY_DATASET, schema=HOURLY_SCHEMA, symbols=symbols, start=start, end=end
+        )
+        return Decimal(str(cost))
 
     def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
