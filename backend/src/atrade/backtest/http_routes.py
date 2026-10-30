@@ -4,8 +4,8 @@ and read or change the backtest limits (timeout and concurrency).
 A new backtest waits in the queue. The backtest runner of the Web process starts it (backtest_runner.py).
 """
 
-from dataclasses import replace
-from datetime import datetime
+from dataclasses import asdict, replace
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal, NoReturn
 
@@ -50,12 +50,13 @@ from atrade.backtest.backtest_universe import (
     make_list_periods,
 )
 from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
+from atrade.backtest.universe_instruments import summarize_instruments
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import BarSource, ExchangeRateReader
+from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
 from atrade.strategy import read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -191,9 +192,26 @@ class BacktestRobustnessResponse(BaseModel):
     out_of_sample_use_count: int | None
 
 
+class UniverseInstrumentResponse(BaseModel):
+    symbol: str
+    exchange: str
+    trade_count: int
+    net_profit_usd: Decimal
+    quarter_count: int
+
+
+class UsUniverseRangeResponse(BaseModel):
+    """The first and the last quarter start with US universe data. Null without universe data."""
+
+    first_day_utc: datetime | None
+    last_day_utc: datetime | None
+
+
 class BacktestDetailResponse(BacktestResponse):
     equity_curve: list[EquityPointResponse]
     trades: list[TradeResponse]
+    # One row for each universe member (docs/architecture/backtest.md 10.10.7). Empty for a single-instrument backtest.
+    instruments: list[UniverseInstrumentResponse]
     split_metrics: SplitMetricsResponse | None
     robustness: BacktestRobustnessResponse
 
@@ -451,6 +469,7 @@ class BacktestRoutes:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
             equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
             trades = await backtest_store.select_trades(connection, backtest_id)
+            quarter_counts = await backtest_store.count_member_periods(connection, backtest_id)
             out_of_sample_use_count = await self.count_out_of_sample_uses(connection, row)
         backtest = await self.to_backtest_response(row)
         split_metrics = calculate_finished_split_metrics(row, equity_curve, trades)
@@ -470,6 +489,10 @@ class BacktestRoutes:
             ),
             equity_curve=[
                 EquityPointResponse(time_utc=point.time_utc, equity_usd=point.equity_usd) for point in equity_curve
+            ],
+            instruments=[
+                UniverseInstrumentResponse(**asdict(instrument))
+                for instrument in summarize_instruments(trades, quarter_counts)
             ],
             trades=[
                 TradeResponse(
@@ -505,6 +528,14 @@ class BacktestRoutes:
         )
         strategy_id = versions[row.strategy_version_id].strategy_id
         return sum(versions[backtest.strategy_version_id].strategy_id == strategy_id for backtest in overlapping)
+
+    async def read_us_universe_range(self) -> UsUniverseRangeResponse:
+        quarter_starts = await read_us_universe_quarter_starts(
+            database_url=self.database_url, end_utc=datetime.max.replace(tzinfo=UTC)
+        )
+        if not quarter_starts:
+            return UsUniverseRangeResponse(first_day_utc=None, last_day_utc=None)
+        return UsUniverseRangeResponse(first_day_utc=quarter_starts[0], last_day_utc=quarter_starts[-1])
 
     async def read_limits(self) -> BacktestLimitsBody:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
@@ -545,6 +576,7 @@ def create_backtest_router(*, database_url: str, clock: Clock, exchange_rate_rea
         responses=REFUSED,
     )
     router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
+    router.add_api_route("/us-universe/range", routes.read_us_universe_range, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
     add_read_routes(router, routes)
     return router

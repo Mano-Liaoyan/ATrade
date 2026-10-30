@@ -1195,6 +1195,24 @@
         }
       }
     },
+    "/api/us-universe/range": {
+      "get": {
+        "summary": "Read Us Universe Range",
+        "operationId": "read_us_universe_range_api_us_universe_range_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsUniverseRangeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/backtests/{backtest_id}": {
       "get": {
         "summary": "Read Backtest",
@@ -2780,6 +2798,13 @@
             "type": "array",
             "title": "Trades"
           },
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/UniverseInstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          },
           "split_metrics": {
             "anyOf": [
               {
@@ -2824,6 +2849,7 @@
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "instruments",
           "split_metrics",
           "robustness"
         ],
@@ -3692,6 +3718,13 @@
             "type": "array",
             "title": "Trades"
           },
+          "instruments": {
+            "items": {
+              "$ref": "#/components/schemas/UniverseInstrumentResponse"
+            },
+            "type": "array",
+            "title": "Instruments"
+          },
           "split_metrics": {
             "anyOf": [
               {
@@ -3740,6 +3773,7 @@
           "survivorship_bias",
           "equity_curve",
           "trades",
+          "instruments",
           "split_metrics",
           "robustness",
           "code"
@@ -7355,6 +7389,39 @@
         ],
         "title": "TradeResponse"
       },
+      "UniverseInstrumentResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "trade_count": {
+            "type": "integer",
+            "title": "Trade Count"
+          },
+          "net_profit_usd": {
+            "type": "string",
+            "title": "Net Profit Usd"
+          },
+          "quarter_count": {
+            "type": "integer",
+            "title": "Quarter Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "trade_count",
+          "net_profit_usd",
+          "quarter_count"
+        ],
+        "title": "UniverseInstrumentResponse"
+      },
       "UniverseKind": {
         "type": "string",
         "enum": [
@@ -7362,6 +7429,41 @@
           "rule",
           "list"
         ]
+      },
+      "UsUniverseRangeResponse": {
+        "properties": {
+          "first_day_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Day Utc"
+          },
+          "last_day_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Day Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "first_day_utc",
+          "last_day_utc"
+        ],
+        "title": "UsUniverseRangeResponse",
+        "description": "The first and the last quarter start with US universe data. Null without universe data."
       },
       "ValidationError": {
         "properties": {
