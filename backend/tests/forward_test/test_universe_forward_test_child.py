@@ -254,7 +254,7 @@ async def test_the_live_node_gives_the_strategy_1_year_of_warm_up_and_new_daily_
 
 
 @pytest.mark.anyio
-async def test_at_a_quarter_start_the_strategy_gets_the_new_members_and_their_bars(
+async def test_at_a_quarter_start_the_strategy_gets_the_new_members_after_their_warm_up_is_saved(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path, clock: FixedClock
 ) -> None:
     forward_test_id = await start_top_2_forward_test(web_client, database_url)
@@ -264,6 +264,15 @@ async def test_at_a_quarter_start_the_strategy_gets_the_new_members_and_their_ba
         await wait_until(lambda: len(child.strategy.historical_bars) == 2)
         save_us_universe(database_url, NEXT_QUARTER_UTC, [NVIDIA, APPLE])
         clock.now_utc = NEXT_QUARTER_UTC + timedelta(hours=12)
+        await wait_until(lambda: len(read_recorded_quarters(database_url, forward_test_id)) == 2)
+        # The update waits for the warm-up of NVDA up to the new quarter: the bar fetcher has not saved it yet.
+        await asyncio.sleep(20 * POLL_SECONDS)
+        assert len(child.strategy.lists) == 1
+        await save_received_bars(
+            database_url=database_url,
+            bar_request=BarRequest(NVIDIA, DAILY, TimeRange(TODAY_UTC, NEXT_QUARTER_UTC)),
+            bars=[],
+        )
         await wait_until(lambda: len(child.strategy.lists) == 2 and len(child.strategy.historical_bars) == 3)
     finally:
         await child.stop()

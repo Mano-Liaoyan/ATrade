@@ -12,7 +12,7 @@ import contextlib
 import logging
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import psycopg
@@ -45,13 +45,17 @@ from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import IbAsyncGatewayConnection
-from atrade.market_data import BarRequest, read_saved_bars, read_source_order
+from atrade.market_data import BarRequest, read_saved_bars, read_source_order, read_unsaved_ranges
 from atrade.paper_trading import ForwardTestLedger, read_forward_test_fills
 from atrade.strategy import load_strategy_classes
 
 DAILY = BarPeriod.ONE_DAY
 # The bar fetcher saves the daily bars after 00:30 UTC (section 12.24). One minute later the strategy gets them.
 UNIVERSE_POLL_SECONDS = 60.0
+# The 1-year warm-up of a new member (section 12.17).
+WARM_UP_LENGTH = timedelta(days=365)
+# At a new quarter, the update waits at most this long for the warm-up of the new members.
+NEW_MEMBER_WARM_UP_WAIT = timedelta(minutes=30)
 
 logger = logging.getLogger("atrade.universe_live_node")
 
@@ -198,9 +202,31 @@ class UniversePoller:
     clock: Clock
     quarter: UniverseQuarter = field(init=False)
     is_first_update_sent: bool = field(init=False, default=False)
+    # The new members of a new quarter whose update waits for their warm-up in the bar store, and the start of the
+    # wait.
+    waiting_members: tuple[Instrument, ...] = field(init=False, default=())
+    wait_start_utc: datetime | None = field(init=False, default=None)
 
     def __post_init__(self) -> None:
         self.quarter = read_universe(self.live_node_input).quarter
+
+    async def is_warm_up_saved(self, now_utc: datetime) -> bool:
+        """True when a bar source saved the 1-year warm-up of each waiting member (the bar fetcher fills it a few
+        seconds after the new quarter is recorded), or after NEW_MEMBER_WARM_UP_WAIT."""
+        assert self.wait_start_utc is not None
+        if now_utc - self.wait_start_utc >= NEW_MEMBER_WARM_UP_WAIT:
+            logger.warning(
+                "Forward test %s: the warm-up of the new members is not complete. The strategy gets them now.",
+                self.live_node_input.forward_test_id,
+            )
+            return True
+        end_utc = floor_to_bar_start(now_utc, DAILY)
+        warm_up_range = TimeRange(end_utc - WARM_UP_LENGTH, end_utc)
+        for instrument in self.waiting_members:
+            bar_request = BarRequest(instrument, DAILY, warm_up_range)
+            if await read_unsaved_ranges(database_url=self.live_node_input.database_url, bar_request=bar_request):
+                return False
+        return True
 
     async def poll(self) -> None:
         """One check: a new quarter first, then the new daily bars, then the equity."""
@@ -212,12 +238,19 @@ class UniversePoller:
             database_url=self.live_node_input.database_url, row=read_universe(self.live_node_input).row, now_utc=now_utc
         )
         if quarter.quarter_start_utc != self.quarter.quarter_start_utc:
+            new_members = tuple(instrument for instrument in quarter.members if instrument not in self.quarter.members)
             self.quarter = quarter
             data_client.add_instruments(quarter.members)
             if self.clients.execution_factory.client is not None:
                 self.clients.execution_factory.client.add_instruments(quarter.members)
             if self.is_first_update_sent:
-                data_client.send_universe_update(find_bar_type_names(quarter.members))
+                # The update waits until the bar fetcher saved the warm-up of the new members (section 12.17).
+                self.waiting_members = new_members
+                self.wait_start_utc = now_utc
+        if self.wait_start_utc is not None and await self.is_warm_up_saved(now_utc):
+            data_client.send_universe_update(find_bar_type_names(self.quarter.members))
+            self.waiting_members = ()
+            self.wait_start_utc = None
         if not self.is_first_update_sent and self.strategy.is_running():
             # The strategy subscribed in `on_start`. A restart gives it the members of the current quarter.
             data_client.send_universe_update(find_bar_type_names(self.quarter.members))
@@ -230,7 +263,8 @@ class UniversePoller:
         while True:
             try:
                 await self.poll()
-            except psycopg.Error, OSError:
+            except Exception:
+                # Any failed check is logged: the poll must keep running for the next bars and quarters.
                 logger.exception("Forward test %s: the universe check failed.", self.live_node_input.forward_test_id)
             await asyncio.sleep(poll_seconds)
 

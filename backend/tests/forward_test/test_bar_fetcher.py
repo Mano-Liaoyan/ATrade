@@ -207,6 +207,23 @@ async def test_a_new_forward_test_gets_its_warm_up_before_the_daily_read_time(da
 
 
 @pytest.mark.anyio
+async def test_the_new_members_of_a_quarter_get_their_warm_up_at_the_next_check(database_url: str) -> None:
+    gateway = make_gateway()
+    clock = FixedClock(datetime(2026, 1, 2, 0, 15, tzinfo=UTC))
+    member_lists: dict[int, list[Instrument]] = {4: [APPLE]}
+    bar_fetcher = make_bar_fetcher(database_url, clock, gateway, member_lists)
+    await bar_fetcher.fill_new_forward_tests()
+
+    # The child recorded a new quarter with NVDA.
+    member_lists[4] = [NVIDIA, APPLE]
+    await bar_fetcher.fill_new_forward_tests()
+
+    assert gateway.historical_bar_requests[1:] == [
+        HistoricalBarRequest(NVIDIA, DAILY, TimeRange(ONE_YEAR_AGO_UTC, TODAY_UTC))
+    ]
+
+
+@pytest.mark.anyio
 async def test_without_ib_gateway_a_new_forward_test_stays_without_a_warm_up(
     database_url: str, clock: FixedClock
 ) -> None:

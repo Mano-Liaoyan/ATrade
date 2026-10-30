@@ -60,13 +60,34 @@ class BarFetcher:
         self.sleep = sleep
         # The start of the last UTC day of a daily read that reached IB Gateway.
         self.last_read_day_utc: datetime | None = None
-        # The forward tests whose warm-up this worker filled. Their children can start (section 12.17).
-        self.filled_forward_test_ids: set[int] = set()
+        # The members whose warm-up this worker filled, for each forward test. Its child can start (section 12.17).
+        # A new quarter adds members: the next check fills their warm-up.
+        self.filled_members: dict[int, set[Instrument]] = {}
         # After a failed fill of a new forward test, the next try waits until this time.
         self.next_new_fill_utc: datetime | None = None
 
     def is_warm_up_filled(self, forward_test_id: int) -> bool:
-        return forward_test_id in self.filled_forward_test_ids
+        return forward_test_id in self.filled_members
+
+    def find_unfilled_members(self, member_lists: dict[int, list[Instrument]]) -> dict[int, list[Instrument]]:
+        """The members without a warm-up fill of this worker: of a new forward test, or new in a quarter."""
+        unfilled = {
+            forward_test_id: [
+                instrument
+                for instrument in members
+                if instrument not in self.filled_members.get(forward_test_id, set())
+            ]
+            for forward_test_id, members in member_lists.items()
+        }
+        return {
+            forward_test_id: members
+            for forward_test_id, members in unfilled.items()
+            if members or not self.is_warm_up_filled(forward_test_id)
+        }
+
+    def record_filled(self, member_lists: dict[int, list[Instrument]]) -> None:
+        for forward_test_id, members in member_lists.items():
+            self.filled_members.setdefault(forward_test_id, set()).update(members)
 
     async def keep_fetching(self) -> None:
         """Runs until the caller cancels it."""
@@ -81,21 +102,17 @@ class BarFetcher:
 
     async def fill_new_forward_tests(self) -> None:
         """Fills the 1-year warm-up of each forward test that this worker did not fill yet, before its child starts
-        (section 12.17). It never raises. When IB Gateway is not reachable, it tries again after
+        (section 12.17), and of the new members of a quarter. It never raises. When IB Gateway is not reachable, it tries again after
         CHECK_INTERVAL_SECONDS."""
         now_utc = self.clock.read_now_utc()
         if self.next_new_fill_utc is not None and now_utc < self.next_new_fill_utc:
             return
         try:
             member_lists = await self.read_member_lists()
-            new_ids = [
-                forward_test_id for forward_test_id in member_lists if not self.is_warm_up_filled(forward_test_id)
-            ]
-            if new_ids:
-                await self.fill_warm_up(
-                    join_members(member_lists[forward_test_id] for forward_test_id in new_ids), now_utc
-                )
-                self.filled_forward_test_ids.update(new_ids)
+            unfilled = self.find_unfilled_members(member_lists)
+            if unfilled:
+                await self.fill_warm_up(join_members(unfilled.values()), now_utc)
+                self.record_filled(unfilled)
         except GatewayRequestError as error:
             logger.warning("The bar fetcher did not fill a new warm-up. IB Gateway is not reachable: %s", error)
             self.next_new_fill_utc = now_utc + timedelta(seconds=CHECK_INTERVAL_SECONDS)
@@ -123,7 +140,7 @@ class BarFetcher:
             logger.exception("The daily read of the bar fetcher failed.")
             return
         self.last_read_day_utc = today_utc
-        self.filled_forward_test_ids.update(member_lists)
+        self.record_filled(member_lists)
 
     async def fill_warm_up(self, instruments: Iterable[Instrument], start_utc: datetime) -> None:
         """Reads the daily bars of the 1-year warm-up before `start_utc` that no bar source saved, and saves them in
