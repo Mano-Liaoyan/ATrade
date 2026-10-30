@@ -9,6 +9,7 @@ from atrade.market_data.bar_reading import (
     has_saved_bars,
     read_saved_bar_coverage,
     read_saved_bars,
+    read_unsaved_ranges,
     save_received_bars,
     save_received_bars_blocking,
 )
@@ -81,6 +82,7 @@ __all__ = [
     "read_saved_bars",
     "read_saved_exchange_rates",
     "read_source_order",
+    "read_unsaved_ranges",
     "read_us_universe_members",
     "save_received_bars",
     "save_received_bars_blocking",
