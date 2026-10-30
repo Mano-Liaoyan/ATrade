@@ -164,6 +164,13 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `POST /api/screens/{screen_id}/runs` | `run_screen` | 3 | The screen result records the conversation ID. |
 | `GET /api/screen-results/{screen_result_id}` (with page parameters) | `read_screen_result` | 3 | None. |
 
+Decided (#209): `screen/http_routes.py` has `create_screen_assistant_router`.
+`app/assistant_port.py` adds it to the port 8001 app. It has the 6 screen
+routes and no `DELETE`. `POST`, `PUT`, and the run route read the
+conversation from the header `X-ATrade-Conversation-Id` (25.3.2), as the
+strategy and backtest routes do. The `403` body is
+`{"detail": "The AI assistant cannot change screen <id>. ..."}`.
+
 These routes are not on port 8001:
 
 - the paper order routes (`/api/paper-trading/...`)
@@ -283,6 +290,14 @@ prompt does not list the tools.
   - the count of each exclusion reason
   - the date of the daily bars
 - Each row has all columns of the screen result table.
+- Decided (#209): the tool has the parameters `screen_result_id` and
+  `offset` (default 0). It calls
+  `GET /api/screen-results/{id}?offset=<offset>&limit=50`. The result to the
+  model is `{"id", "screen_id", "market", "summary", "definition", "offset",
+  "rows", "next_offset"}`. `next_offset` is null on the last page. The
+  result leaves out the `exclusions` list, because the summary has the count
+  of each exclusion reason. `run_screen` gives the same result for offset 0.
+  The code is `assistant/src/screen_tools.ts`.
 
 Problem list of the screen tools (#150 B5):
 
@@ -1054,7 +1069,9 @@ columns behave the same (section 13).
   assistant did not save, and `200` for a version that is already
   discarded (25.11).
 - How the server records that the user kept a screen, so `update_screen`
-  returns `403` after Keep.
+  returns `403` after Keep. Decided (#209): `update_screen` reads the column
+  `kept` of the screen. The Keep route itself is still open (screen section
+  24.13).
 - Decided (#179): a delete of the strategy deletes its conversation rows
   (`ON DELETE CASCADE`). The JSONL files stay in the volume.
 - Decided (#179): a title generation failure reaches the browser as an
@@ -1078,7 +1095,8 @@ columns behave the same (section 13).
 - Decided (#205): the field that names the position of a condition in a
   screen problem (25.4.3) is `location`, the path in the request body (screen
   section 24.6).
-- The pages of `read_screen_result` (page size and parameter names).
+- Decided (#209): the pages of `read_screen_result`: page size 50 and the
+  parameter `offset` (25.4.3).
 - Decided (#182): the summaries in the `read_backtest` result: at most 50
   points of the equity curve and the first 50 trades with all fields
   (25.4.1).

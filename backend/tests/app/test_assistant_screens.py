@@ -54,8 +54,7 @@ async def test_a_new_screen_on_port_8001_adds_a_number_when_the_name_is_in_use(
         await browser.post("/api/screens", json=screen_body())
 
         names = [
-            (await assistant.post("/api/screens", json=screen_body(), headers=headers)).json()["name"]
-            for _ in range(3)
+            (await assistant.post("/api/screens", json=screen_body(), headers=headers)).json()["name"] for _ in range(3)
         ]
 
     assert names == ["Momentum leaders (AI)", "Momentum leaders (AI 2)", "Momentum leaders (AI 3)"]
@@ -112,7 +111,6 @@ async def test_a_change_on_port_8001_is_only_for_an_unkept_screen_of_the_same_co
 
 async def set_kept(database_url: str, screen_id: int) -> None:
     """Keep: section 24.13 leaves the route to the screen page, so the test sets the column."""
-
 
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         await connection.execute("UPDATE screen SET kept = true WHERE id = %s", (screen_id,))

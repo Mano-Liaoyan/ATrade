@@ -190,6 +190,10 @@ def to_screen_response(
     )
 
 
+def to_new_screen(request: CreateScreenRequest) -> screen_store.NewScreen:
+    return screen_store.NewScreen(name=request.name, market=request.market, definition=request.definition)
+
+
 def check_failed(problems: list[ScreenProblem]) -> JSONResponse:
     failure = ScreenCheckFailedResponse(
         problems=[
@@ -257,11 +261,7 @@ class ScreenRoutes:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             try:
                 screen = await screen_store.insert_screen(
-                    connection,
-                    name=request.name,
-                    market=request.market,
-                    definition=request.definition,
-                    now_utc=self.clock.read_now_utc(),
+                    connection, to_new_screen(request), now_utc=self.clock.read_now_utc()
                 )
             except screen_store.NameInUseError:
                 return name_in_use(request.name)
@@ -278,22 +278,21 @@ class ScreenRoutes:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.insert_ai_assistant_screen(
                 connection,
-                name=request.name,
-                market=request.market,
-                definition=request.definition,
+                to_new_screen(request),
                 now_utc=self.clock.read_now_utc(),
                 assistant_conversation_id=conversation_id,
             )
             await connection.commit()
         return to_screen_response(screen, [])
 
-    async def change_screen(
-        self, screen_id: int, request: ChangeScreenRequest, conversation_id: int | None = None
-    ) -> ScreenResponse | JSONResponse:
-        """Overwrites the name and the definition. A screen has no versions (section 24.1).
+    async def change_screen(self, screen_id: int, request: ChangeScreenRequest) -> ScreenResponse | JSONResponse:
+        """Overwrites the name and the definition. A screen has no versions (section 24.1)."""
+        return await self.change_screen_of(screen_id, request, None)
 
-        With `conversation_id` (port 8001): only a screen of that conversation that the user has not kept. Else 403.
-        """
+    async def change_screen_of(
+        self, screen_id: int, request: ChangeScreenRequest, conversation_id: int | None
+    ) -> ScreenResponse | JSONResponse:
+        """With `conversation_id` (port 8001): only a screen of that conversation that the user has not kept. Else 403."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.select_screen(connection, screen_id)
             if screen is None:
@@ -326,10 +325,12 @@ class ScreenRoutes:
         if not is_deleted:
             raise screen_not_found(screen_id)
 
-    async def run_screen(
-        self, screen_id: int, conversation_id: int | None = None
-    ) -> ScreenResultResponse | JSONResponse:
-        """Runs the saved screen and saves 1 screen result (section 24.5). Port 8001 gives the conversation."""
+    async def run_screen(self, screen_id: int) -> ScreenResultResponse | JSONResponse:
+        """Runs the saved screen and saves 1 screen result (section 24.5)."""
+        return await self.run_screen_of(screen_id, None)
+
+    async def run_screen_of(self, screen_id: int, conversation_id: int | None) -> ScreenResultResponse | JSONResponse:
+        """Port 8001 gives the conversation. The screen result records it."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screen = await screen_store.select_screen(connection, screen_id)
         if screen is None:
@@ -375,18 +376,21 @@ def create_screen_assistant_router(
     """The 6 screen routes of port 8001 (docs/architecture/assistant.md 25.3.3, screen.md 24.8). No delete."""
     routes = ScreenRoutes(database_url=database_url, clock=clock)
     read_conversation_id = create_conversation_dependency(conversation_exists)
-    type ConversationId = Annotated[int, Depends(read_conversation_id)]
 
-    async def create_screen(request: CreateScreenRequest, conversation_id: ConversationId) -> ScreenResponse | JSONResponse:
+    async def create_screen(
+        request: CreateScreenRequest, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> ScreenResponse | JSONResponse:
         return await routes.create_ai_assistant_screen(request, conversation_id)
 
     async def change_screen(
-        screen_id: int, request: ChangeScreenRequest, conversation_id: ConversationId
+        screen_id: int, request: ChangeScreenRequest, conversation_id: Annotated[int, Depends(read_conversation_id)]
     ) -> ScreenResponse | JSONResponse:
-        return await routes.change_screen(screen_id, request, conversation_id)
+        return await routes.change_screen_of(screen_id, request, conversation_id)
 
-    async def run_screen(screen_id: int, conversation_id: ConversationId) -> ScreenResultResponse | JSONResponse:
-        return await routes.run_screen(screen_id, conversation_id)
+    async def run_screen(
+        screen_id: int, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> ScreenResultResponse | JSONResponse:
+        return await routes.run_screen_of(screen_id, conversation_id)
 
     router = APIRouter()
     add_read_routes(router, routes)

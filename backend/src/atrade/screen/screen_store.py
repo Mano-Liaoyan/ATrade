@@ -37,12 +37,17 @@ class NameInUseError(Exception):
     """Another screen has the name."""
 
 
+@dataclass(frozen=True)
+class NewScreen:
+    name: str
+    market: str
+    definition: object
+
+
 async def insert_screen(
     connection: psycopg.AsyncConnection,
+    screen: NewScreen,
     *,
-    name: str,
-    market: str,
-    definition: object,
     now_utc: datetime,
     assistant_conversation_id: int | None = None,
 ) -> ScreenRecord:
@@ -59,9 +64,9 @@ async def insert_screen(
             RETURNING id, name, market, definition, kept, assistant_conversation_id, created_at_utc, updated_at_utc
             """,
             {
-                "name": name,
-                "market": market,
-                "definition": Jsonb(definition),
+                "name": screen.name,
+                "market": screen.market,
+                "definition": Jsonb(screen.definition),
                 "kept": assistant_conversation_id is None,
                 "conversation": assistant_conversation_id,
                 "now": now_utc,
@@ -74,29 +79,21 @@ async def insert_screen(
 
 
 def ai_assistant_names(name: str) -> Iterator[str]:
-    """"<name> (AI)", then "<name> (AI 2)", "<name> (AI 3)", and so on (screen.md section 24.8)."""
+    """The name "<name> (AI)", then "<name> (AI 2)", "<name> (AI 3)", and so on (screen.md section 24.8)."""
     yield f"{name} (AI)"
     for number in itertools.count(2):
         yield f"{name} (AI {number})"
 
 
 async def insert_ai_assistant_screen(
-    connection: psycopg.AsyncConnection,
-    *,
-    name: str,
-    market: str,
-    definition: object,
-    now_utc: datetime,
-    assistant_conversation_id: int,
+    connection: psycopg.AsyncConnection, screen: NewScreen, *, now_utc: datetime, assistant_conversation_id: int
 ) -> ScreenRecord:
     """A screen of the AI assistant with the first free name of `ai_assistant_names`."""
-    for candidate in ai_assistant_names(name):
+    for candidate in ai_assistant_names(screen.name):
         try:
             return await insert_screen(
                 connection,
-                name=candidate,
-                market=market,
-                definition=definition,
+                NewScreen(name=candidate, market=screen.market, definition=screen.definition),
                 now_utc=now_utc,
                 assistant_conversation_id=assistant_conversation_id,
             )

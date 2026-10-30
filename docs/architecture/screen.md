@@ -332,6 +332,16 @@ card. This section gives only what the screen routes must allow.
 | `read_screen_result` | `GET /api/screen-results/{id}` | Default: the summary and the first 50 rows. The AI assistant can read more pages. |
 | `run_backtest` | `POST /api/backtests` with the universe fields | Section 24.9. |
 
+Decided (#209): the port 8001 routes read the conversation from the header
+`X-ATrade-Conversation-Id` (assistant section 25.3.2). A missing header or
+an unknown conversation gets `422`. The new screen has `kept` false. The
+store tries "<name> (AI)", then "<name> (AI 2)", "<name> (AI 3)", and so
+on, until a name is free. `PUT` answers `404` for a screen that does not
+exist, and `403` when the screen has `kept` true or another
+`assistant_conversation_id`. A delete of the conversation sets
+`assistant_conversation_id` to null on its screens and screen results
+(`ON DELETE SET NULL`, section 24.4). They stay.
+
 - The AI assistant never overwrites a screen that the user saved. To change
   one, it saves a new screen.
 - The name of a new screen of the AI assistant is the old name with
@@ -471,6 +481,10 @@ Behavior:
   (section 24.6).
 - The route for Keep. Discard can use `DELETE /api/screens/{id}` on the Web
   port.
+- Decided (#209): how the API tells the screen routes the AI assistant
+  caller and the conversation: port 8001 has its own router
+  (`create_screen_assistant_router`), and the conversation comes from the
+  header `X-ATrade-Conversation-Id` (section 24.8).
 - How a run of a screen with unsaved changes works: the run route takes a
   saved screen only.
 - How the user runs a screen again after new daily bars. The final title row
