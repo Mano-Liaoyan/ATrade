@@ -143,6 +143,9 @@
 
   /** A change of the kind also stops a login that runs. */
   function selectMethod(value: LoginMethod): void {
+    if (value === method) {
+      return;
+    }
     closeSocket();
     login = NO_LOGIN;
     method = value;
@@ -295,19 +298,23 @@
   .credentials__steps p {
     display: flex;
     flex-wrap: wrap;
+    align-items: baseline;
     gap: var(--cds-spacing-04);
-  }
-
-  .credentials__key,
-  .credentials__code {
-    font-family: var(--cds-code-02-font-family, 'IBM Plex Mono', monospace);
+    font-size: var(--cds-body-compact-01-font-size);
+    line-height: var(--cds-body-compact-01-line-height);
+    letter-spacing: var(--cds-body-compact-01-letter-spacing);
   }
 
   .credentials__key {
     margin-inline-start: var(--cds-spacing-03);
+    font-family: var(--cds-code-01-font-family);
+    font-size: var(--cds-code-01-font-size);
   }
 
+  /* The device code: the user types it on the page of the provider. */
   .credentials__code {
-    font-size: var(--cds-heading-03-font-size, 1.25rem);
+    font-family: var(--cds-code-02-font-family);
+    font-size: var(--cds-code-02-font-size);
+    font-weight: var(--cds-heading-compact-02-font-weight);
   }
 </style>
