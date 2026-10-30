@@ -1685,6 +1685,9 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
