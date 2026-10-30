@@ -18,8 +18,9 @@ backtests, and (in phase 3) reads, runs, and creates screens. It uses pi
 (the pi coding agent) as its agent runtime. It can call only the ATrade
 routes of an allow-list.
 
-This section is the target. Nothing in it is implemented. The tickets name
-facts that nobody ran. Section 25.15 lists them.
+This section is the target. Most of it is not implemented. #178 adds the
+service skeleton and the networks (25.2, 25.3.1). The tickets name facts
+that nobody ran. Section 25.15 lists them.
 
 ## 25.1 Phases
 
@@ -68,7 +69,8 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The process also has a `tool_call` handler. It refuses each tool that is
   not in the tool list of section 25.4. This is the second guard.
 - pi does not load `AGENTS.md`, skills, or project files.
-- pi loads no extension. It does not load a third-party extension, and the
+- pi loads no extension file. The only extension is the `tool_call` guard,
+  an inline factory of the process. pi does not load a third-party extension, and the
   AI assistant cannot write an extension. A later ticket designs "the AI
   writes an extension and the user reviews it".
 - Strategy code goes to ATrade as a tool argument. pi writes no file outside
@@ -691,7 +693,8 @@ columns behave the same (section 13).
   local fake OpenAI-compatible model server (`assistant/tests/fake_model_server.ts`).
 - Decided (#178): `assistant` listens on port 8002 in
   `atrade-assistant-internal`. In #178 it has only `GET /health` for the
-  Compose health check.
+  Compose health check. The process does not start a pi session yet. #179
+  starts the session with the tool guard.
 - The protocol between `web` and `assistant` (conversation messages, login
   steps, credential list, title generation, JSONL delete).
 - Decided (#178): the subnet of `atrade-assistant-internal` is
