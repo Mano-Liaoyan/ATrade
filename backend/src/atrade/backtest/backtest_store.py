@@ -86,7 +86,7 @@ BACKTEST_COLUMNS: Final = """
     final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
-    conversation_id, out_of_sample_share, split_time_utc, source_order, bar_count_by_source
+    out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source
 """
 
 

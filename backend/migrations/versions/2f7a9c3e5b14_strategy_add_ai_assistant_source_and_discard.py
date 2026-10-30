@@ -1,14 +1,14 @@
 """strategy: add the source ai_assistant, strategy_version.conversation_id, and the discarded mark
 
 Revision ID: 2f7a9c3e5b14
-Revises: cbe826c0a6dd
+Revises: 8c6ea950b20c, d41ce3053ba2
 """
 
 from alembic import op
 
 revision = "2f7a9c3e5b14"
-# After the head of impl/159 (cbe826c0a6dd, #192).
-down_revision = "cbe826c0a6dd"
+# Joins the 2 heads of impl/159: #195 (daily bar summary, after #192) and #205 (screen tables).
+down_revision = ("8c6ea950b20c", "d41ce3053ba2")
 
 
 def upgrade() -> None:
