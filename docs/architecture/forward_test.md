@@ -1128,7 +1128,8 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
   - `fill_warm_up(instruments, start_utc)`: the warm-up fill before a start.
     It reads the year before the UTC day of `start_utc`.
     `fill_new_forward_tests()` calls it every 5 seconds for each running
-    multi-instrument forward test that this worker did not fill yet (#217).
+    multi-instrument forward test that this worker did not fill yet, and
+    for the new members of a newly recorded quarter (#217).
     When IB Gateway is not reachable, the next try waits 5 minutes. The
     worker starts the child of a multi-instrument forward test only after
     this fill (`is_warm_up_filled()`, the `is_ready_to_run` argument of
@@ -1273,7 +1274,11 @@ simplest option and records it in this document.
   client, but the data engine gives the custom data to the strategy. So the
   universe poller sends the first update when the strategy runs, and the
   next update at each new quarter, after it adds the new instruments to
-  both clients.
+  both clients. The update of a new quarter waits until a bar source saved
+  the 1-year warm-up of each new member (`read_unsaved_ranges` of
+  `market_data`; the bar fetcher fills it a few seconds after the child
+  records the quarter), at most 30 minutes. So the bar request of the
+  strategy for a new member gets its warm-up.
 - Decided (#216): the bar fetcher reads the bars at the first check after
   00:30 UTC of each UTC day. A daily bar starts at 00:00 UTC of its trading
   date, so the bar of the last US trading day is complete then. The worker

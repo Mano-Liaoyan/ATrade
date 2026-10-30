@@ -2008,7 +2008,8 @@ option and records it in this document.
 - Decided (#217): a multi-instrument forward test gets its members as
   `UniverseUpdate` custom data from the ATrade data client, after the
   strategy start and at each new quarter. The worker starts its child only
-  after the bar fetcher filled the 1-year warm-up. See
+  after the bar fetcher filled the 1-year warm-up. The update of a new
+  quarter waits for the warm-up of the new members (at most 30 minutes). See
   [`forward_test.md`](architecture/forward_test.md) sections 12.17, 12.20,
   and 12.24.
 - Decided (#179): the protocol between `web` and `assistant`, the
