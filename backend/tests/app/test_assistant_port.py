@@ -177,6 +177,24 @@ async def test_a_save_on_port_8001_without_a_known_conversation_is_refused(
 
 
 @pytest.mark.anyio
+async def test_a_save_on_port_8001_accepts_only_code(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    async with open_both_clients(database_url, clock, frontend_build_dir) as (browser, assistant):
+        strategy_id = await create_strategy(browser, "Moving average")
+        conversation_id = await create_conversation(browser, strategy_id)
+
+        response = await assistant.post(
+            f"/api/strategies/{strategy_id}/versions",
+            json={"rules": {}},
+            headers={CONVERSATION_HEADER: str(conversation_id)},
+        )
+
+    assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY
+    assert response.json()["detail"][0]["loc"] == ["body", "code"]
+
+
+@pytest.mark.anyio
 async def test_a_backtest_on_port_8001_records_the_conversation(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:

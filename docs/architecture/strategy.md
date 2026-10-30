@@ -121,7 +121,9 @@ New columns of `strategy_version`:
   least (`find_warm_up_length`). It is not a fixed 60 days, because 60 days of
   1-minute bars need many IBKR historical data requests. In a backtest,
   `request_bars` gets the saved bars before the start (backtest section
-  10.3.1).
+  10.3.1). For a rule builder version, the platform gives the last bars that
+  the longest indicator of the rules needs (#164), and the generated code
+  asks for them (section 9.8.3).
 - A new strategy starts from a start point as version 1 (section 9.9.1).
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
@@ -234,7 +236,7 @@ entry exports `create_strategy_router(database_url=..., clock=...)`.
 | `GET /api/strategies/{strategy_id}` | `200` with `{"id", "name", "created_at_utc", "versions": [{"id", "version_number", "code_sha256", "created_at_utc", "source", "conversation_id", "discarded"}]}`. `404` when the strategy does not exist. |
 | `GET /api/strategies/{strategy_id}/versions/{version_number}` | `200` with `{"id", "strategy_id", "version_number", "code", "code_sha256", "created_at_utc", "source", "rules", "conversation_id", "discarded"}`. `rules` is null when the version has no rules. `conversation_id` is null when the AI assistant did not save the version. `discarded` is a boolean (the discarded mark). `404` when the version does not exist. |
 | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (phase 2) | Adds the discarded mark to a version that the AI assistant saved. `200` with the version as `GET .../versions/{version_number}` gives it. A version that is already discarded also gets `200`. `409` when the source of the version is not `ai_assistant`. `404` when the version does not exist. |
-| `POST /api/strategies/{strategy_id}/versions` | Body `{"code": ...}` or `{"rules": ...}`, exactly one of the two. With `code`, the source is `user`. With `rules`, the source is `rule_builder`: the route checks the rules (section 9.8.2), makes the code (section 9.8.3), and saves both. The checks of section 9.3 run on the code in both cases. `201` with the new version. `200` with the latest version when the code is the same (and, for a `rules` body, the rules are also the same). `422` with `{"problems": [{"line", "message"}]}` when a check blocks the save. `422` with the FastAPI validation body when the body has both or neither of `code` and `rules`, or when the rules do not match the rules format (section 9.8.2). `404` when the strategy does not exist. |
+| `POST /api/strategies/{strategy_id}/versions` | Body `{"code": ...}` or `{"rules": ...}`, exactly one of the two. With `code`, the source is `user`. With `rules`, the source is `rule_builder`: the route checks the rules (section 9.8.2), makes the code (section 9.8.3), and saves both. The checks of section 9.3 run on the code in both cases. `201` with the new version. `200` with the latest version when the code is the same (and, for a `rules` body, the rules are also the same). `422` with `{"problems": [{"line", "message"}]}` when a check blocks the save. `422` with the FastAPI validation body when the body has both or neither of `code` and `rules`, or when the rules do not match the rules format (section 9.8.2). `404` when the strategy does not exist. Port 8001 (phase 2) accepts only `{"code": ...}`; it saves with the source `ai_assistant` and the conversation ID (`assistant.md` 25.3.2). |
 | `POST /api/strategy-rules/code` (phase 1) | Body `{"rules": ...}`. Makes the code from the rules and saves nothing. `200` with `{"code"}`. `422` with the FastAPI validation body when the rules do not match the rules format (section 9.8.2). The "Rules" tab uses it for the read-only code (section 9.8.5). |
 | `GET /api/strategy-templates` (phase 1) | `200` with the template list (section 9.9.2): `[{"id", "name", "kind", "entry", "exit", "defaults", "market", "bar_period", "evidence", "sources": [{"label", "url"}], "differs_from_source"}]`, in the order of section 9.9. `kind` is `rules` or `code`. The "New strategy" dialog uses it. |
 | `DELETE /api/strategies/{strategy_id}` | `204` when the strategy and its versions are deleted. `409` when a backtest or forward test uses a version. `404` when the strategy does not exist. |
@@ -490,8 +492,10 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   compares with the values of the previous bar. A cross is false when the
   previous bar had no value. The code warms up the indicators with
   `request_bars` in `on_start`: the bar count is the largest look-back count
-  of the indicators ([`indicator.md`](indicator.md) section 23.4), and 7 days
-  at least.
+  of the indicators ([`indicator.md`](indicator.md) section 23.4). The
+  request goes `bar period × count × 6` back, and 7 days at least. The
+  platform gives only the last bars of this count (#164,
+  [`backtest.md`](backtest.md) section 10.3.1).
 
 ### 9.8.4 One-way editing
 
@@ -568,10 +572,6 @@ It needs the multi-instrument backtest of
   edits in the browser).
 - The delay between a rule change and the code request.
 - The buttons of the diff before the save.
-- The look-back length of the backtest is 60 days for daily bars
-  ([`backtest.md`](backtest.md) section 10.3.1). SMA(200) and 12-1 momentum
-  need about 252 bars. With the current look-back, these indicators have no
-  value on the first part of the range, so no rule runs there.
 - Decided (#198): the platform tells the strategy the universe of each
   universe period with NautilusTrader custom data. The strategy calls
   `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the

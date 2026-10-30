@@ -50,8 +50,8 @@ class SaveVersionRequest(BaseModel):
         return strategy_store.VersionContent(code=make_rules_code(self.rules), source="rule_builder", rules=rules)
 
 
-class SaveCodeRequest(BaseModel):
-    """The save of port 8001: the AI assistant changes only the code, never the rules (ADR 0006)."""
+class AiAssistantSaveVersionRequest(BaseModel):
+    """The save body of port 8001: code only. The AI assistant does not save rules (docs/architecture/assistant.md 25.5)."""
 
     code: str
 
@@ -221,7 +221,7 @@ class StrategyRoutes:
         return to_save_response(saved, response)
 
     async def save_ai_assistant_version(
-        self, strategy_id: int, request: SaveCodeRequest, response: Response, conversation_id: int
+        self, strategy_id: int, request: AiAssistantSaveVersionRequest, response: Response, conversation_id: int
     ) -> StrategyVersionResponse | JSONResponse:
         """The save of port 8001: the source ai_assistant and the conversation (docs/architecture/assistant.md 25.5)."""
         saved = await save_ai_assistant_version(
@@ -299,6 +299,13 @@ def add_shared_routes(router: APIRouter, routes: StrategyRoutes) -> None:
 
 def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = StrategyRoutes(database_url=database_url, clock=clock)
+    router = APIRouter()
+    router.add_api_route("/api/strategy-rules/code", routes.make_code, methods=["POST"])
+    router.include_router(create_strategies_router(routes))
+    return router
+
+
+def create_strategies_router(routes: StrategyRoutes) -> APIRouter:
     router = APIRouter(prefix="/api/strategies")
     add_shared_routes(router, routes)
     router.add_api_route(
@@ -322,10 +329,7 @@ def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
         response_model=StrategyVersionResponse,
         responses=SAVE_RESPONSES,
     )
-    root_router = APIRouter()
-    root_router.add_api_route("/api/strategy-rules/code", routes.make_code, methods=["POST"])
-    root_router.include_router(router)
-    return root_router
+    return router
 
 
 def create_strategy_assistant_router(
@@ -337,7 +341,7 @@ def create_strategy_assistant_router(
 
     async def save_ai_assistant_version(
         strategy_id: int,
-        request: SaveCodeRequest,
+        request: AiAssistantSaveVersionRequest,
         response: Response,
         conversation_id: Annotated[int, Depends(read_conversation_id)],
     ) -> StrategyVersionResponse | JSONResponse:
