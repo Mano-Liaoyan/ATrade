@@ -138,15 +138,11 @@ HKD_INSTRUMENT = Instrument(symbol="700", exchange="SEHK", currency="HKD")
             id="1-minute bars",
         ),
         pytest.param({"universe_kind": "single"}, id="single without an instrument"),
-        pytest.param(
-            {"universe_kind": "single", **to_instrument_body(AAA), "top_n": 2}, id="single with top_n"
-        ),
+        pytest.param({"universe_kind": "single", **to_instrument_body(AAA), "top_n": 2}, id="single with top_n"),
         pytest.param(
             {"universe_kind": "rule", "top_n": 2, "instruments": [to_instrument_body(AAA)]}, id="rule with instruments"
         ),
-        pytest.param(
-            {"universe_kind": "rule", "top_n": 2, **to_instrument_body(AAA)}, id="rule with an instrument"
-        ),
+        pytest.param({"universe_kind": "rule", "top_n": 2, **to_instrument_body(AAA)}, id="rule with an instrument"),
         pytest.param(
             {"universe_kind": "list", "top_n": 2, "instruments": [to_instrument_body(AAA)]}, id="list with top_n"
         ),

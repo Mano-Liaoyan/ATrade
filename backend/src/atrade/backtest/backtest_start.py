@@ -27,7 +27,7 @@ class BacktestRefusal:
     detail: str
 
 
-async def start_backtest(
+async def start_backtest(  # noqa: PLR0913 readability-exception: the keywords of a start from either port.
     *,
     database_url: str,
     exchange_rate_reader: ExchangeRateReader,
