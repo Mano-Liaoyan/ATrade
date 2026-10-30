@@ -8,6 +8,7 @@ import {
   findChangedLines,
   describeRulesWarning,
   findRulesVersionNumber,
+  listOperandChoices,
   readOperandChoice,
   type RuleCondition,
 } from './strategy_rules';
@@ -119,5 +120,14 @@ describe('findChangedLines', () => {
 
   it('gives no lines when there is no old code', () => {
     expect(findChangedLines('', 'a = 1\n')).toEqual([]);
+  });
+});
+
+describe('listOperandChoices', () => {
+  it('offers only indicators for the rank of the universe mode', () => {
+    const choices = listOperandChoices('rank').map((choice) => choice.value);
+
+    expect(choices).toContain('indicator:momentum_12_1');
+    expect(choices.every((choice) => choice.startsWith('indicator:'))).toBe(true);
   });
 });

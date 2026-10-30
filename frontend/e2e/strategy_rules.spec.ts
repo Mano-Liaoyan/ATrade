@@ -117,3 +117,38 @@ test('the Rules tab of a version with rules has no warning and saves without a d
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect((await readVersions(page, strategyId)).at(-1)).toMatchObject({ version_number: 4, source: 'rule_builder' });
 });
+
+test('the Rules tab shows the universe mode settings and makes multi-instrument code', async ({
+  page,
+}, currentTest) => {
+  const name = createUniqueName(currentTest, 'Universe rules');
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const created = (await (await page.request.post('/api/strategies', { data: { name } })).json()) as StrategyBody;
+  const rules = {
+    format_version: 1,
+    settings: {
+      position_size: { type: 'percent_of_equity', percent: 95 },
+      universe: {
+        rank_indicator: { type: 'indicator', indicator: 'momentum_12_1', parameters: {} },
+        rank_direction: 'high_to_low',
+        hold_count: 2,
+        rebalance_period: 'monthly',
+      },
+    },
+    entry: { type: 'group', match: 'all_of', items: [] },
+    exits: { exit_when_entry_is_false: false },
+  };
+  const versionsUrl = `/api/strategies/${String(created.id)}/versions`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  expect((await page.request.post(versionsUrl, { data: { rules } })).status()).toBe(201);
+
+  await page.goto(`/strategies/${String(created.id)}`);
+  await page.getByRole('tablist', { name: 'Files' }).getByRole('tab', { name: 'Rules' }).click();
+  const code = page.getByRole('region', { name: 'Code from the rules' });
+  await expect(page.getByRole('heading', { name: 'Entry filter' })).toBeVisible();
+  await expect(page.getByText('Position size')).toHaveCount(0);
+  await expect(code).toContainText('class MemberIndicators');
+
+  await page.getByRole('spinbutton', { name: 'Hold' }).fill('3');
+  await expect(code).toContainText('hold_count: int = 3');
+});

@@ -5957,6 +5957,21 @@
         ],
         "title": "ProviderResponse"
       },
+      "RankDirection": {
+        "type": "string",
+        "enum": [
+          "high_to_low",
+          "low_to_high"
+        ]
+      },
+      "RebalancePeriod": {
+        "type": "string",
+        "enum": [
+          "weekly",
+          "monthly",
+          "quarterly"
+        ]
+      },
       "RenameConversationRequest": {
         "properties": {
           "title": {
@@ -6151,6 +6166,16 @@
               }
             ],
             "title": "Template Id"
+          },
+          "universe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UniverseSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6158,7 +6183,8 @@
         "required": [
           "position_size"
         ],
-        "title": "RuleSettings"
+        "title": "RuleSettings",
+        "description": "`position_size` is not used in the universe mode: each member gets equity / `hold_count`."
       },
       "RulesCodeRequest": {
         "properties": {
@@ -7459,6 +7485,34 @@
           "rule",
           "list"
         ]
+      },
+      "UniverseSettings": {
+        "properties": {
+          "rank_indicator": {
+            "$ref": "#/components/schemas/IndicatorOperand"
+          },
+          "rank_direction": {
+            "$ref": "#/components/schemas/RankDirection"
+          },
+          "hold_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Hold Count"
+          },
+          "rebalance_period": {
+            "$ref": "#/components/schemas/RebalancePeriod"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rank_indicator",
+          "rank_direction",
+          "hold_count",
+          "rebalance_period"
+        ],
+        "title": "UniverseSettings",
+        "description": "The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.\n\nThe strategy holds the `hold_count` members with the best rank, with equal weight, and ranks again at the start of\neach `rebalance_period`."
       },
       "UsUniverseRangeResponse": {
         "properties": {
