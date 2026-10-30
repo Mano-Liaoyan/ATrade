@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from atrade.foundation.clock import Clock
 from atrade.market_data.bar_source import BarSource, check_source_order, select_source_order, update_source_order
+from atrade.market_data.daily_bar_summary import update_all_daily_bar_summaries
 
 
 class SourceOrderBody(BaseModel):
@@ -31,8 +32,10 @@ def create_source_order_router(*, database_url: str, clock: Clock) -> APIRouter:
         problem = check_source_order(body.source_order)
         if problem is not None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=problem)
-        async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
+        async with await psycopg.AsyncConnection.connect(database_url) as connection, connection.transaction():
             await update_source_order(connection, body.source_order, clock.read_now_utc())
+            # The summary reads through the global source order (market_data.md section 8.14).
+            await update_all_daily_bar_summaries(connection)
         return SourceOrderBody(source_order=body.source_order)
 
     return router
