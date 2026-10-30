@@ -23,7 +23,9 @@ from atrade.backtest.backtest_limits import (
     save_backtest_limits,
 )
 from atrade.backtest.backtest_metrics import BacktestMetrics
+from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
+from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
@@ -112,9 +114,21 @@ class TradeResponse(BaseModel):
     commission_usd: Decimal
 
 
+class BacktestRobustnessResponse(BaseModel):
+    """The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
+    a meaning is null, and `missing_reasons` gives its reason by its field name."""
+
+    trial_count: int
+    sharpe_probability_percent: Decimal | None
+    sharpe_probability_kind: SharpeProbabilityKind
+    sharpe_probability_status: SharpeProbabilityStatus | None
+    missing_reasons: dict[str, str]
+
+
 class BacktestDetailResponse(BacktestResponse):
     equity_curve: list[EquityPointResponse]
     trades: list[TradeResponse]
+    robustness: BacktestRobustnessResponse
 
 
 class ComparedBacktestResponse(BacktestDetailResponse):
@@ -266,8 +280,18 @@ class BacktestRoutes:
             equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
             trades = await backtest_store.select_trades(connection, backtest_id)
         backtest = await self.to_backtest_response(row)
+        robustness = await read_robustness(
+            database_url=self.database_url, row=row, strategy_id=backtest.strategy_id, equity_curve=equity_curve
+        )
         return BacktestDetailResponse(
             **backtest.model_dump(),
+            robustness=BacktestRobustnessResponse(
+                trial_count=robustness.trial_count,
+                sharpe_probability_percent=robustness.sharpe_probability_percent,
+                sharpe_probability_kind=robustness.sharpe_probability_kind,
+                sharpe_probability_status=robustness.sharpe_probability_status,
+                missing_reasons=robustness.missing_reasons,
+            ),
             equity_curve=[
                 EquityPointResponse(time_utc=point.time_utc, equity_usd=point.equity_usd) for point in equity_curve
             ],

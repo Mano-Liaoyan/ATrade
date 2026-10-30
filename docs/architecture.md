@@ -1685,6 +1685,10 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read. When fewer than 2 trials have a
+  daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
+  10.9.5).
 - Decided (#170): the exposure of a forward test counts its recorded equity
   points (one at each bar end) as its bars. The recorded fills go to
   `find_round_trips` with no change, because `select_fills` already gives
@@ -1703,6 +1707,12 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#198): the platform gives the strategy the new universe list at
+  each period start as NautilusTrader custom data
+  (`DataType("UniverseUpdate")`, `on_data`), not with a platform timer. The
+  configuration of a multi-instrument strategy has no `instrument_id`, no
+  `bar_type`, and no universe field
+  ([`backtest.md`](architecture/backtest.md) section 10.10.8).
 - Decided (#188): a source order holds each `BarSource` exactly 1 time.
   `PUT /api/market-data/source-order` refuses an order that leaves out a bar
   source with `422`. Thus the bars route always reads the IBKR bars that it
@@ -1755,10 +1765,7 @@ option and records it in this document.
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
 - The open points of the map #129 are in the "Left to the implementation"
-  lists of sections 8 to 12 and 23 to 25. Two of them:
-  - How the platform gives the strategy the new universe list at each
-    period start: NautilusTrader custom data or a platform timer (#142).
-    Make a small test first.
+  lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
     momentum need about 252 bars. The look-back must follow the longest
     indicator of the strategy, or this effect is accepted.
