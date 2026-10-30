@@ -479,7 +479,8 @@ this document. The implementation can change them.
 |---|---|
 | `OwnerLedgerExecutionClient` | The ATrade NautilusTrader execution client of section 12.19. |
 | `BarStoreDataClient` | The ATrade NautilusTrader data client of section 12.19. |
-| `BarFetcher(*, database_url, clock, gateway_connection)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. |
+| `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
+| `ReadMemberLists` | The type of `read_member_lists`: it returns the members of each running multi-instrument forward test. |
 | `QuarterlyUniverseJob(*, database_url, clock, databento_client)` | The quarterly universe calculation of section 12.21. |
 | `StockSplitCheck(*, database_url, clock, gateway_connection)` | The daily stock split check of section 12.22. |
 | `read_allocated_capital(*, database_url)` | The sum of the allocated capital of the forward tests that hold a client ID. `paper_trading` gets it from `app/web.py` for the "By hand" capital (section 11.10 of [`paper_trading.md`](paper_trading.md)). |
@@ -935,6 +936,8 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
     lists, each instrument 1 time, for the year before the current UTC day.
   - `fill_warm_up(instruments, start_utc)`: the warm-up fill before a start.
     It reads the year before the UTC day of `start_utc`.
+    No start path calls it before the multi-instrument forward test
+    ([#217](https://github.com/Mano-Liaoyan/ATrade/issues/217)).
   - Both ask IBKR only for the ranges that no bar source in the global
     source order saved (`read_unsaved_ranges` of `market_data`). So the daily
     read asks only for the days after the last saved day. A day that is not

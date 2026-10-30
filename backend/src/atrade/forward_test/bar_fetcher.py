@@ -63,7 +63,7 @@ class BarFetcher:
         """Runs until the caller cancels it."""
         while True:
             await self.fetch_when_due()
-            await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+            await self.sleep(CHECK_INTERVAL_SECONDS)
 
     async def fetch_when_due(self) -> None:
         """Runs the daily read when it is due today and did not reach IB Gateway yet today. It never raises: a failure
@@ -99,8 +99,8 @@ class BarFetcher:
         if not bar_requests:
             return
         gateway_connection = self.open_gateway_connection()
-        await gateway_connection.connect()
         try:
+            await gateway_connection.connect()
             await self.read_and_save(gateway_connection, bar_requests)
         finally:
             gateway_connection.disconnect()
