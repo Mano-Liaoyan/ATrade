@@ -2336,13 +2336,6 @@ export interface components {
             /** Url */
             url: string;
         };
-        /** TemplateSourceResponse */
-        TemplateSourceResponse: {
-            /** Label */
-            label: string;
-            /** Url */
-            url: string;
-        };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
         /** @enum {string} */
