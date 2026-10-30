@@ -145,7 +145,7 @@ New columns are null on existing rows, except where a default is given.
 |---|---|---|
 | 1 | `backtest` | Add the metric columns of section 10.9.2: `cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`, and `win_rate_percent`. Each is null until the backtest finishes, and null when the metric shows "–" (section 10.9.3). Migration `8d4b6f2a1c93_backtest_add_metric_columns.py`. |
 | 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. Migration `2f6a9c1e4d85_backtest_add_out_of_sample_split.py`. |
-| 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
+| 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). Done (#180): migration `4a6c8e1b3d57_backtest_add_conversation_id.py`. |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2, `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
 | 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
 | 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. |
@@ -355,7 +355,7 @@ Changes of later phases:
 | 1 | `GET /api/backtests`, `POST /api/backtests` | Each backtest has `out_of_sample_share` and `split_time_utc`. |
 | 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. #166 adds `split_metrics` and the two out-of-sample fields of `robustness`. `split_metrics` is also null until the backtest finishes. Without a split, both out-of-sample fields are null. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
 | 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
-| 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
+| 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. |
 | 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
@@ -370,22 +370,18 @@ document. The implementation can change them.
   `listBacktests`, `readBacktest`), the value formats, and the parts that the
   backtest page, the strategy page, and the forward test page share (spec
   [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99)):
-  - `KeyMetricRow` (`metrics`, `startCapitalUsd`, `trades`): the key metrics
-    of `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
-    drawdown, Win rate, Trades, Final equity (USD). Each is a `MetricTile` of
+  - `KeyMetricRow` (`metrics`, `startCapitalUsd`): the key metrics of
+    `readKeyMetrics()` in this order: Total return, Net profit (USD), Max
+    drawdown, Sharpe ratio, Win rate, Trades, Final equity (USD). Each is a
+    `MetricTile` of
     `foundation/metric_tile`. The API gives the max drawdown as a positive
     percent; the row shows it as a negative percent (for example
     "-37.71 %"), with the sign rule of `formatSignedNumber`. Total return, net
-    profit, and max drawdown show their direction with `ChangeText`. The win
-    rate comes from the trades: the share of round trips (from position 0
-    back to 0) with a profit after commissions; "–" without a round trip. The
-    API has no Sharpe ratio, so the row has none.
-  - Phase 1 changes the row
-    ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)). The order
-    is: Total return, Net profit (USD), Max drawdown, Sharpe ratio, Win rate,
-    Trades, Final equity (USD). The Sharpe ratio and the win rate come from
-    the API (section 10.9.2). The frontend no longer calculates the win rate.
-    Under the row, the robustness row of section 10.9.6 shows.
+    profit, and max drawdown show their direction with `ChangeText`. The
+    Sharpe ratio and the win rate come from the API (section 10.9.2,
+    [#137](https://github.com/Mano-Liaoyan/ATrade/issues/137), #168). A null
+    value shows "–". The frontend does not calculate the win rate.
+  - Phase 1: under the row, the robustness row of section 10.9.6 shows.
   - `EquityDrawdownChart` (`curves`, `label`, `interruptions`, `fill`): the
     equity curves and, under them, the drawdown curves
     (`computeDrawdownCurve()`, a negative percent from the highest equity so
@@ -413,9 +409,9 @@ document. The implementation can change them.
   - The "Backtest tables" panel has the tabs Trades (32px rows), Orders, and
     Logs. The API has no orders, so Orders shows "No orders". Logs shows the
     strategy error of a failed backtest, or "No logs". Phase 1 adds the tab
-    Metrics (section 10.9.6). Phase 3 adds the tab Instruments and the
-    Symbol column of Trades (section 10.10.7), and the tab Bar sources
-    (section 10.12).
+    Metrics (section 10.9.6, `BacktestMetricTable`, #168). Phase 3 adds the
+    tab Instruments and the Symbol column of Trades (section 10.10.7), and
+    the tab Bar sources (section 10.12).
   - The page reads the open backtest each second until its status is final,
     and the list every 2 seconds while a backtest in it is queued or running.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
@@ -777,11 +773,20 @@ longer bars first.
   (section 10.7).
 - The page adds no other label or description (AGENTS.md, frontend rule
   one).
+- Decided (#168): the Metrics table has the metrics of section 10.9.2 in
+  this order: CAGR, Annual volatility, Sharpe ratio, Sortino ratio, Calmar
+  ratio, Profit factor, Win rate, Average win (USD), Average loss (USD),
+  Exposure, and Turnover. These are the English names in the UI. The
+  average win shows the USD value and the percent of the entry amount, for
+  example "+1,234.50 (+2.10 %)". The turnover shows the API value with 2
+  decimal places, for example "3.20× per year". Each name is a Carbon
+  definition term. Its tooltip is the formula and "Risk-free rate: 0".
+  `readMetricRows(metricSets)` gives one value column for each set of
+  metrics, so the In-sample and Out-of-sample columns (#169) and the
+  comparison page can use the same rows.
 
 ### 10.9.7 Left to the implementation
 
-- The English names of the new metrics in the UI. The decisions name
-  "Sharpe ratio", "Sortino ratio", "Calmar ratio", and "Profit factor" only.
 - The tile name and the tooltip when the tile shows PSR(0) (trial count 1).
 
 ## 10.10 Multi-instrument backtest

@@ -130,8 +130,8 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 ### 25.3.3 Allow-list
 
-The screen paths come from #150. They are proposals. The ticket that
-implements the screen routes names the final paths.
+The screen paths come from #150. Decided (#205): they are the final paths
+(screen section 24.7).
 
 | Route on port 8001 | Tool | Phase | Limit on port 8001 |
 |---|---|---|---|
@@ -276,15 +276,17 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 | Table | New column | Meaning |
 |---|---|---|
-| `strategy_version` | source | `user`, `assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
+| `strategy_version` | `source` | `user`, `ai_assistant` (AI assistant), or `rule_builder` (rule builder, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)). |
 | `strategy_version` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant saved the version. |
-| `strategy_version` | discarded mark | Set when the user discards the version. |
+| `strategy_version_discard` | `strategy_version_id`, `discarded_at_utc` | The discarded mark: one row for each discarded version. Added when the user discards the version. |
 | `backtest` | `conversation_id` | Nullable. Foreign key to `assistant_conversation` with `ON DELETE SET NULL`. Set when the AI assistant started the backtest. |
 
 - A discarded strategy version is never deleted. Its backtests stay.
 - The trigger `strategy_version_append_only` refuses each `UPDATE`
   (strategy section 9.1.1). The discarded mark cannot be an `UPDATE` of the
-  version row. See 25.14.
+  version row, so it is a row of `strategy_version_discard` (#180). The
+  trigger lets through only the `ON DELETE SET NULL` of `conversation_id`
+  (strategy section 9.1.1).
 
 ### 25.5.2 Diff card
 
@@ -302,8 +304,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 
 - The version `Select` of the strategy page hides discarded strategy
   versions by default.
-- A toggle "Show discarded versions" below the `Select` shows them. Each
+- A toggle "Show discarded versions" next to the `Select` shows them. Each
   shows the tag "Discarded" after its version number.
+- Decided (#180): the toggle is in the toolbar line after the `Select`,
+  because the toolbar has one line. It shows only when the strategy has a
+  discarded version. When the open version is discarded, the `Select` also
+  lists it with the toggle off, so that the `Select` names the open
+  version. Without a version address, the strategy page opens the latest
+  version that is not discarded.
 - The backtest list shows the backtests of discarded strategy versions as
   usual.
 
@@ -758,7 +766,7 @@ below are choices of this document. The implementation can change them.
 | Delete a credential | `DELETE /api/assistant/credentials/{credential_id}` | 2 |
 | List prompt versions | `GET /api/assistant/prompt-versions` | 2 |
 | Save a prompt version | `POST /api/assistant/prompt-versions` | 2 |
-| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` | 2 |
+| Discard a strategy version | `POST /api/strategies/{strategy_id}/versions/{version_number}/discard` (done, #180, strategy section 9.6) | 2 |
 | Keep a screen of the AI assistant | `POST /api/screens/{screen_id}/keep` | 3 |
 | Discard a screen of the AI assistant | `DELETE /api/screens/{screen_id}` (the user route) | 3 |
 
@@ -972,14 +980,19 @@ columns behave the same (section 13).
 - How port 8001 knows the conversation of a request (for example a header
   that `assistant` sends), so that it records the conversation ID.
 - How the `web` process runs 2 uvicorn listeners in 1 process.
-- Where the discarded mark is kept. The trigger
-  `strategy_version_append_only` refuses each `UPDATE` of
-  `strategy_version`, so a separate table or a narrower trigger is
-  necessary.
-- The column names and types of the version source. Decided (#179): the
-  title state and the last provider, model, and credential name (25.8.1).
-- Whether Keep of a diff card is recorded on the server, so a reload shows
-  "Kept".
+- Decided (#180): the discarded mark is a row of the table
+  `strategy_version_discard` (25.5.1). The trigger
+  `strategy_version_append_only` still refuses each `UPDATE` statement.
+- Decided (#180): the version source is the `text` column `source` with
+  the CHECK constraint `strategy_version_source_check` (`user`,
+  `rule_builder`, `ai_assistant`). Decided (#179): the title state and the
+  last provider, model, and credential name (25.8.1).
+- Decided (#180): Keep of a diff card is not recorded on the server. Only
+  Discard changes a version (25.5.2), so a reload shows a version without
+  the discarded mark as kept.
+- Decided (#180): the discard route answers `409` for a version that the AI
+  assistant did not save, and `200` for a version that is already
+  discarded (25.11).
 - How the server records that the user kept a screen, so `update_screen`
   returns `403` after Keep.
 - Decided (#179): a delete of the strategy deletes its conversation rows
@@ -1000,8 +1013,9 @@ columns behave the same (section 13).
   bars", and the rates come from IBKR.
 - The phase 3 message for the condition card. Decided (#179): the field
   names of the other `/ws/assistant` messages (25.10).
-- The field that names the position of a condition in a screen problem
-  (25.4.3).
+- Decided (#205): the field that names the position of a condition in a
+  screen problem (25.4.3) is `location`, the path in the request body (screen
+  section 24.6).
 - The pages of `read_screen_result` (page size and parameter names).
 - The summaries in the `read_backtest` result (how many points of the
   equity curve and which trade fields).

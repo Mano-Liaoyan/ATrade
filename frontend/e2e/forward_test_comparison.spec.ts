@@ -8,7 +8,15 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // A real child process runs each backtest. The browser projects share one queue.
 const BACKTEST_TIMEOUT_MILLISECONDS = 90_000;
 const COMPARED_STRATEGY_LABEL = 'E2E compared forward test v1';
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
 
 /** Opens the forward test of the list row. Returns its ID. /forward-tests first opens the newest forward test. */
 async function openForwardTest(page: Page, row: Locator): Promise<string> {
@@ -47,11 +55,11 @@ async function expectComparedMetrics(metrics: Locator, forwardTestId: string): P
   await expect(forwardTestMetrics.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(backtestMetrics.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   // The forward test records 40 fills. The bar count strategy of the backtest buys and sells 3 times.
-  await expect(forwardTestMetrics.getByRole('definition').nth(4)).toHaveText('40');
-  await expect(backtestMetrics.getByRole('definition').nth(4)).toHaveText('3');
+  await expect(forwardTestMetrics.getByRole('definition').nth(5)).toHaveText('40');
+  await expect(backtestMetrics.getByRole('definition').nth(5)).toHaveText('3');
   await expect(backtestMetrics.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
-  // The win rates come from the fills and the trades: a percent, not a dash.
-  await expect(backtestMetrics.getByRole('definition').nth(3)).toHaveText(/^\s*\d+\.\d{2} %$/);
+  // The API gives the win rate of the backtest: a percent, not a dash.
+  await expect(backtestMetrics.getByRole('definition').nth(4)).toHaveText(/^\s*\d+\.\d{2} %$/);
 }
 
 test('backtests the same period and compares the metrics, the equity curves, and the fills', async ({ page }) => {
@@ -130,7 +138,7 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
   // The same key metrics as the backtest page, in the same order. The max drawdown is a negative percent (or 0.00 %).
   await expect(chartPanel.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(chartPanel.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
-  await expect(chartPanel.getByRole('definition').nth(4)).toHaveText('40');
+  await expect(chartPanel.getByRole('definition').nth(5)).toHaveText('40');
   await expect(chartPanel.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
   await expect(chartPanel.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
   await expect(chartPanel.getByRole('list', { name: 'Equity and drawdown interruptions' }).getByRole('listitem')).toHaveText([

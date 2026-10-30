@@ -24,6 +24,7 @@ from atrade.backtest.backtest_metrics import (
 )
 from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
+from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
 from atrade.backtest.http_routes import create_backtest_router
 from atrade.backtest.sharpe_probability import (
@@ -36,6 +37,7 @@ from atrade.backtest.strategy_engine_run import write_look_back_catalog
 __all__ = [
     "BacktestMetrics",
     "BacktestOutcome",
+    "BacktestRefusal",
     "BacktestRequest",
     "BacktestRunner",
     "BacktestStatus",
@@ -60,5 +62,6 @@ __all__ = [
     "read_backtest_outcome",
     "read_last_backtest_ids",
     "run_backtest",
+    "start_backtest",
     "write_look_back_catalog",
 ]
