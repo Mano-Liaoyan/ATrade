@@ -1680,6 +1680,11 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#170): the exposure of a forward test counts its recorded equity
+  points (one at each bar end) as its bars. The recorded fills go to
+  `find_round_trips` with no change, because `select_fills` already gives
+  `BacktestTrade` rows. The metrics of the forward test routes have
+  `net_profit_usd` (forward test section 12.10).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1731,6 +1736,11 @@ option and records it in this document.
 - Decided (#179): the protocol between `web` and `assistant`, the
   `/ws/assistant` field names, the columns of `assistant_conversation`, and
   the strategy delete (`ON DELETE CASCADE`). See section 25.14.
+- Decided (#214): the owner ledger of "By hand" (the ledger start at the
+  first passed check, the cash of rule 2, the price of a market buy, the
+  USD conversion, and when the Web process records fills) is in
+  [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
+  11.13.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`

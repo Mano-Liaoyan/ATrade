@@ -15,6 +15,7 @@ from atrade.backtest.backtest_metrics import (
     calculate_daily_returns,
     calculate_equity_curve,
     calculate_metrics,
+    calculate_round_trip_metrics,
     find_round_trips,
 )
 from atrade.backtest.backtest_run import find_look_back_length, run_backtest
@@ -37,6 +38,7 @@ __all__ = [
     "calculate_daily_returns",
     "calculate_equity_curve",
     "calculate_metrics",
+    "calculate_round_trip_metrics",
     "check_backtest_request",
     "create_backtest_router",
     "find_look_back_length",
