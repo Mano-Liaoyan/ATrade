@@ -1651,6 +1651,14 @@ option and records it in this document.
   has the parameter `bars_per_year` (default 252): on 1-hour bars the
   strategy passes 1764. Section 23.2 of
   [`indicator.md`](architecture/indicator.md) has the formulas.
+- Decided (#163): the catalog is `INDICATOR_CATALOG` of `atrade.indicator`
+  (`indicator/indicator_catalog.py`). `check_indicator_reference(reference)`
+  returns `IndicatorProblem(location, message)` items, and
+  `create_indicator(reference)` makes the class. The fixed screen look-back
+  of EMA, RSI, ATR, and MACD is 8 × the longest recursive period (section
+  21.1). The UI names, the allowed ranges, and the problem format are in
+  sections 23.3, 23.4, and 23.6 of
+  [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
