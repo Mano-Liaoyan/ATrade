@@ -246,7 +246,7 @@ async def test_a_backtest_on_port_8001_without_saved_bars_is_refused(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("path", ["/api/health", "/api/strategies", "/strategies"])
-async def test_port_8000_refuses_each_request_on_an_address_of_the_assistant_subnet(
+async def test_port_8000_refuses_each_request_from_another_address_of_the_assistant_subnet(
     database_url: str, clock: FixedClock, frontend_build_dir: Path, path: str
 ) -> None:
     app = create_web_app(
@@ -254,18 +254,29 @@ async def test_port_8000_refuses_each_request_on_an_address_of_the_assistant_sub
         clock=clock,
         gateway_connection=FakeGatewayConnection(managed_accounts=["DU1234567"]),
     )
-    # httpx gives the host and the port of base_url as the ASGI `server`: the local address of the request.
-    transport = httpx.ASGITransport(app=app)
+    # httpx gives the host and the port of base_url as the ASGI `server` (the local address of the request), and
+    # `client` as the ASGI `client` (the peer address).
     async with (
-        httpx.AsyncClient(transport=transport, base_url="http://172.31.250.2:8000") as from_assistant_subnet,
-        httpx.AsyncClient(transport=transport, base_url="http://172.18.0.3:8000") as from_default_network,
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, client=("172.31.250.3", 40000)), base_url="http://172.31.250.4:8000"
+        ) as from_assistant,
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, client=("172.18.0.1", 40000)), base_url="http://172.18.0.3:8000"
+        ) as from_default_network,
+        # Rootless Podman sends a published port to the address of web in the first network by name, which is
+        # atrade-assistant-internal, and connects from that same address.
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, client=("172.31.250.4", 40000)), base_url="http://172.31.250.4:8000"
+        ) as from_podman_port_forwarder,
     ):
-        refused = await from_assistant_subnet.get(path)
+        refused = await from_assistant.get(path)
         answered = await from_default_network.get(path)
+        forwarded = await from_podman_port_forwarder.get(path)
 
     assert refused.status_code == httpx.codes.FORBIDDEN
     assert refused.json() == {"detail": "Port 8000 does not answer requests from the assistant network."}
     assert answered.status_code == httpx.codes.OK
+    assert forwarded.status_code == httpx.codes.OK
 
 
 def test_compose_does_not_publish_port_8001_and_fixes_the_assistant_subnet() -> None:

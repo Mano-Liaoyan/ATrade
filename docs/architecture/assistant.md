@@ -121,9 +121,16 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   does not publish this port to the host.
 - Port 8001 has its own FastAPI app. This app mounts only the routes of the
   allow-list (25.3.3). It has no `/ws/` route and no frontend files.
-- The app of port 8000 refuses each request that arrives on an address of
-  the `atrade-assistant-internal` subnet with `403`. The check reads the
-  local address of the request (ASGI `scope["server"]`).
+- The app of port 8000 refuses with `403` each request whose peer address
+  (ASGI `scope["client"]`) is in the `atrade-assistant-internal` subnet and
+  is not the local address of the request (ASGI `scope["server"]`).
+- A peer that is the local address is `web` itself. Rootless Podman sends
+  the published port to the address of `web` in the first network by name,
+  `atrade-assistant-internal`, and connects from that same address. A check
+  of the local address only refused each browser request there.
+- `assistant` has no `NET_RAW` capability (`cap_drop` in
+  `deploy/compose.yaml`), so it cannot send packets with the address of
+  `web`.
 - So `assistant` cannot call a route of port 8000.
 - A unit test checks the allow-list: the port 8001 app has exactly the
   routes of 25.3.3.
