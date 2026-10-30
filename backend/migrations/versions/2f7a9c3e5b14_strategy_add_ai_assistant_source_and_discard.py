@@ -1,14 +1,14 @@
 """strategy: add the source ai_assistant, strategy_version.conversation_id, and the discarded mark
 
 Revision ID: 2f7a9c3e5b14
-Revises: 2f6a9c1e4d85
+Revises: cbe826c0a6dd
 """
 
 from alembic import op
 
 revision = "2f7a9c3e5b14"
-# Follows the out-of-sample split of the backtest (#166). The tables of #179 and #171 are earlier in the chain.
-down_revision = "2f6a9c1e4d85"
+# Follows the US universe members (#192). The tables of #179 and #171 are earlier in the chain.
+down_revision = "cbe826c0a6dd"
 
 
 def upgrade() -> None:
