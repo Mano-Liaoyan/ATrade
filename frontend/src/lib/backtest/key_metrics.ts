@@ -1,6 +1,6 @@
 // The key metric row of a backtest or a forward test (spec #99): the same metrics in the same order with the same
 // sign rule on all pages. The max drawdown is a loss, so it shows as a negative percent, for example "-37.71 %".
-// The forward test API has no win rate yet (#170): it comes from the trades here. The row has no Sharpe ratio.
+// The win rate comes from the trades here until #168 uses `win_rate_percent` of the API. The row has no Sharpe ratio.
 import { formatSignedNumber, MISSING_VALUE } from '#lib/foundation/value_format';
 import type { BacktestMetrics } from './backtest_api';
 import { formatMaxDrawdown, formatPercent, formatUsd } from './backtest_format';
@@ -20,7 +20,7 @@ export interface TestPeriod {
   end_utc: string;
 }
 
-/** The metrics that the row shows. A forward test has only these metrics (its new metrics come later). */
+/** The metrics that the row shows. */
 export type KeyMetricValues = Pick<
   BacktestMetrics,
   'final_equity_usd' | 'total_return_percent' | 'max_drawdown_percent' | 'trade_count'

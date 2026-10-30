@@ -161,6 +161,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/source-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Source Order */
+        get: operations["read_source_order_api_market_data_source_order_get"];
+        /** Save Source Order */
+        put: operations["save_source_order_api_market_data_source_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/hk-instrument-list": {
         parameters: {
             query?: never;
@@ -689,6 +707,12 @@ export interface components {
             /** Volume */
             volume: number;
         };
+        /**
+         * BarSource
+         * @description Each bar source has its own bar table and its own saved-range table (ADR 0002).
+         * @enum {string}
+         */
+        BarSource: "ibkr" | "databento";
         /** BarsResponse */
         BarsResponse: {
             /** Bars */
@@ -804,16 +828,50 @@ export interface components {
              */
             end_utc: string;
         };
-        /** ComparedMetricsResponse */
+        /**
+         * ComparedMetricsResponse
+         * @description The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the
+         *     final equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10).
+         */
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
+            /** Net Profit Usd */
+            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
@@ -1218,9 +1276,10 @@ export interface components {
         };
         /**
          * SavedBarsResponse
-         * @description The saved bars of one bar period: the start of the first and of the last saved bar.
+         * @description The saved bars of one bar source and one bar period: the start of the first and of the last saved bar.
          */
         SavedBarsResponse: {
+            bar_source: components["schemas"]["BarSource"];
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * First Start Utc
@@ -1248,6 +1307,14 @@ export interface components {
             /** Limit Price */
             limit_price: number | string | null;
             time_in_force: components["schemas"]["TimeInForce"];
+        };
+        /**
+         * SourceOrderBody
+         * @description The global source order: the first bar source that saved a time range gives all bars of the range.
+         */
+        SourceOrderBody: {
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][];
         };
         /** StartBacktestRequest */
         StartBacktestRequest: {
@@ -1337,6 +1404,15 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
+            /** Rules */
+            rules: {
+                [key: string]: unknown;
+            } | null;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1351,6 +1427,11 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder";
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
@@ -1939,6 +2020,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_source_order_api_market_data_source_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+        };
+    };
+    save_source_order_api_market_data_source_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceOrderBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
