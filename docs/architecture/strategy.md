@@ -317,6 +317,20 @@ Source: [Content of the strategy template library](https://github.com/Mano-Liaoy
   `start_from`.
 - Phase 1 lists "Blank code", "Blank rules", and the templates S1 to S3.
   Phase 3 adds the code templates M1 to M4.
+- Decided (#176): the dialog is `NewStrategyDialog.svelte` in
+  `frontend/src/routes/strategies/`. When it opens, "Blank code" is
+  selected. This is the start point of a request without `start_from`, so a
+  new strategy is the same as before when the user selects nothing.
+- Decided (#176): after "Create strategy", the strategy page opens version 1
+  with the `strategy.py` tab, for each start point. This is the tab that the
+  page opens for all strategies. The user selects the "Rules" tab to edit the
+  rules.
+- Decided (#176): the start point list is a listbox. The Up and Down arrow
+  keys move the selection. The list and the right side each scroll in their
+  own `ScrollRegion`.
+- Decided (#176): the prototype shows the market and the bar period in 1
+  row. The dialog shows them in 2 rows ("Market" and "Bar period"), as the
+  table above.
 
 ## 9.8 Rule builder (phase 1)
 
@@ -707,6 +721,3 @@ must check them first.
 - The rows of the dialog (section 9.7.1) for a code template. A code
   template has a rule, not an entry rule and an exit rule.
 - The version source of version 1 from a code template.
-- The default start point that the dialog selects when it opens.
-- The tab that the strategy page opens after "Create strategy" from a rules
-  start point.
