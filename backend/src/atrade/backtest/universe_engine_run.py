@@ -5,7 +5,7 @@ All members are on one simulated venue SMART with one cash account (ADR 0003). T
 universe period as `UniverseUpdate` custom data (section 10.10.8).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import Final
@@ -16,7 +16,7 @@ from nautilus_trader.persistence import BarDataWrangler, DataCatalogConfig, Parq
 
 from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
 from atrade.backtest.backtest_metrics import BacktestTrade
-from atrade.backtest.backtest_store import UniversePeriod
+from atrade.backtest.backtest_store import ParameterValues, UniversePeriod
 from atrade.backtest.backtest_universe import MemberBars
 from atrade.backtest.strategy_engine_run import (
     CATALOG_FIRST_NS,
@@ -45,6 +45,8 @@ class UniverseRun:
     starting_cash: Decimal
     members: list[MemberBars]
     periods: list[UniversePeriod]
+    # The parameter values of a parameter sweep run (docs/architecture/backtest.md 10.11.2).
+    parameters: ParameterValues = field(default_factory=dict[str, int | float | bool])
 
 
 def find_bar_type_name(instrument: Instrument, bar_period: BarPeriod) -> str:
@@ -121,5 +123,5 @@ def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[Backte
     # Data with the same time comes in the order of the `add_data` calls. The bars come first, so the bar that closes
     # at a period start comes before the list of that period (section 10.10.3).
     engine.add_data(make_universe_updates(run))
-    run_engine(engine, run.code, work_directory, {})
+    run_engine(engine, run.code, work_directory, dict(run.parameters))
     return read_trades(engine, {member.instrument.symbol: member.instrument.exchange for member in run.members})
