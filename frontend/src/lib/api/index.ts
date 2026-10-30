@@ -1927,7 +1927,10 @@ export interface components {
             /** Credential Id */
             credential_id: string;
         };
-        /** RunStateMessage */
+        /**
+         * RunStateMessage
+         * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
+         */
         RunStateMessage: {
             /**
              * Type

@@ -5679,6 +5679,7 @@
         "type": "object"
       },
       "RunStateMessage": {
+        "description": "The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.",
         "properties": {
           "type": {
             "const": "run_state",

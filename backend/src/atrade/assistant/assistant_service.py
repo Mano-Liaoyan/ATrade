@@ -107,6 +107,20 @@ def to_run_event(event: dict[str, Any]) -> RunEvent | None:
             return None
 
 
+def read_run_event(line: str) -> RunEvent | None:
+    if not line:
+        return None
+    try:
+        return to_run_event(json.loads(line))
+    except ValueError, KeyError, TypeError, AttributeError:
+        message = f"The assistant service sent a line that is not a run event: {line[:200]}"
+        raise AssistantServiceError(message) from None
+
+
+def not_reachable(error: httpx.HTTPError) -> AssistantServiceError:
+    return AssistantServiceError(f"The assistant service is not reachable: {error}")
+
+
 def read_detail(response: httpx.Response) -> str:
     try:
         return str(response.json()["detail"])
@@ -134,8 +148,7 @@ class AssistantServiceClient:
             async with self.open_client(read_timeout_seconds=REQUEST_TIMEOUT_SECONDS) as client:
                 return await client.request(method, path, json=body)
         except httpx.HTTPError as error:
-            message = f"The assistant service is not reachable: {error}"
-            raise AssistantServiceError(message) from error
+            raise not_reachable(error) from error
 
     async def run(
         self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
@@ -151,12 +164,11 @@ class AssistantServiceClient:
                     await response.aread()
                     raise AssistantServiceError(read_detail(response))
                 async for line in response.aiter_lines():
-                    event = to_run_event(json.loads(line)) if line else None
+                    event = read_run_event(line)
                     if event is not None:
                         yield event
         except httpx.HTTPError as error:
-            message = f"The assistant service is not reachable: {error}"
-            raise AssistantServiceError(message) from error
+            raise not_reachable(error) from error
 
     async def steer(self, conversation_id: int, text: str) -> bool:
         response = await self.request("POST", f"/conversations/{conversation_id}/steer", {"text": text})
