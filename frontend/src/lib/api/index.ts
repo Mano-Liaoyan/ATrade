@@ -504,11 +504,17 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
+            robustness: components["schemas"]["RobustnessResponse"];
         };
         /**
          * BacktestLimitsBody
@@ -606,6 +612,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
         };
         /** @enum {string} */
@@ -694,11 +704,17 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
+            robustness: components["schemas"]["RobustnessResponse"];
             /** Code */
             code: string;
         };
@@ -1114,6 +1130,16 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /**
+         * RobustnessResponse
+         * @description The robustness checks of docs/architecture/backtest.md section 10.9. The route calculates them at each read.
+         */
+        RobustnessResponse: {
+            /** Out Of Sample To In Sample Sharpe Percent */
+            out_of_sample_to_in_sample_sharpe_percent: string | null;
+            /** Out Of Sample Use Count */
+            out_of_sample_use_count: number | null;
+        };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
@@ -1157,6 +1183,11 @@ export interface components {
             limit_price: number | string | null;
             time_in_force: components["schemas"]["TimeInForce"];
         };
+        /** SplitMetricsResponse */
+        SplitMetricsResponse: {
+            in_sample: components["schemas"]["BacktestMetricsResponse"];
+            out_of_sample: components["schemas"]["BacktestMetricsResponse"];
+        };
         /** StartBacktestRequest */
         StartBacktestRequest: {
             /** Strategy Version Id */
@@ -1180,6 +1211,11 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
         };
         /** StartForwardTestRequest */
         StartForwardTestRequest: {

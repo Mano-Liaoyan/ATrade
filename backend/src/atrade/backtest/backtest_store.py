@@ -8,7 +8,7 @@ from typing import Final, Literal
 import psycopg
 from psycopg.rows import class_row
 
-from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
+from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint, find_split_time
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 
@@ -22,6 +22,9 @@ class BacktestRequest:
     bar_period: BarPeriod
     time_range: TimeRange
     paper_capital_usd: Decimal
+    # The last percent of the range that is out of sample (docs/architecture/backtest.md section 10.9.4). 0 is no
+    # split. The same-period backtest of a forward test uses 0, because a forward test has no split.
+    out_of_sample_share: int = 0
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,8 @@ class BacktestRow:
     exposure_percent: Decimal | None
     turnover_per_year: Decimal | None
     win_rate_percent: Decimal | None
+    out_of_sample_share: int
+    split_time_utc: datetime | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -70,8 +75,15 @@ BACKTEST_COLUMNS: Final = """
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
     final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
-    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent
+    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
+    out_of_sample_share, split_time_utc
 """
+
+
+@dataclass(frozen=True)
+class OverlappingBacktest:
+    id: int
+    strategy_version_id: int
 
 
 def read_request(row: BacktestRow) -> BacktestRequest:
@@ -81,6 +93,7 @@ def read_request(row: BacktestRow) -> BacktestRequest:
         bar_period=BarPeriod(row.bar_period),
         time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
         paper_capital_usd=row.paper_capital_usd,
+        out_of_sample_share=row.out_of_sample_share,
     )
 
 
@@ -119,9 +132,10 @@ async def insert_backtest(
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, status, created_at_utc)
+                paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s)
+                %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
+                %(created_at_utc)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -133,6 +147,8 @@ async def insert_backtest(
                 "start_utc": request.time_range.start_utc,
                 "end_utc": request.time_range.end_utc,
                 "paper_capital_usd": request.paper_capital_usd,
+                "out_of_sample_share": request.out_of_sample_share,
+                "split_time_utc": find_split_time(request.time_range, request.out_of_sample_share),
                 "created_at_utc": created_at_utc,
             },
         )
@@ -157,6 +173,35 @@ async def select_backtest(connection: psycopg.AsyncConnection, backtest_id: int)
             {"backtest_id": backtest_id},
         )
         return await cursor.fetchone()
+
+
+async def select_overlapping_out_of_sample_parts(
+    connection: psycopg.AsyncConnection, row: BacktestRow
+) -> list[OverlappingBacktest]:
+    """The backtests of the same instrument and bar period whose out-of-sample part overlaps the out-of-sample part
+    of `row`: the finished backtests and `row` itself. The caller filters them by strategy, because the strategy
+    tables belong to the strategy capability."""
+    async with connection.cursor(row_factory=class_row(OverlappingBacktest)) as cursor:
+        await cursor.execute(
+            """
+            SELECT id, strategy_version_id FROM backtest
+            WHERE (status = 'finished' OR id = %(id)s)
+                AND symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
+                AND bar_period = %(bar_period)s
+                AND split_time_utc < %(end_utc)s AND %(split_time_utc)s < end_utc
+            ORDER BY id
+            """,
+            {
+                "id": row.id,
+                "symbol": row.symbol,
+                "exchange": row.exchange,
+                "currency": row.currency,
+                "bar_period": row.bar_period,
+                "end_utc": row.end_utc,
+                "split_time_utc": row.split_time_utc,
+            },
+        )
+        return await cursor.fetchall()
 
 
 async def select_equity_curve(connection: psycopg.AsyncConnection, backtest_id: int) -> list[EquityPoint]:

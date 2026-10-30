@@ -231,6 +231,8 @@ class ComparisonRoutes:
             bar_period=BarPeriod(row.bar_period),
             time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
             paper_capital_usd=row.start_balance_usd,
+            # A forward test has no split, so its same-period backtest has none (docs/architecture/backtest.md 10.9.4).
+            out_of_sample_share=0,
         )
         refusal = check_backtest_request(request) or check_comparison_currency(request)
         if refusal is not None:
