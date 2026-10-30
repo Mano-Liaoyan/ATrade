@@ -1,5 +1,7 @@
 <!-- Carbon tooltip on Bits UI Tooltip: it opens on hover and on keyboard focus, and Escape closes it.
-     The `trigger` snippet renders the trigger element and must spread `props` on it. -->
+     The `trigger` snippet renders the trigger element and must spread `props` on it.
+     Bits UI closes a tooltip when a parent of its trigger scrolls. Keyboard focus on a trigger outside the view of a
+     scroll region scrolls that region in the next frame, so the tooltip that the focus opened opens again. -->
 <script module lang="ts">
   export type TooltipAlignment = 'top' | 'top-start' | 'top-end' | 'bottom' | 'bottom-start' | 'bottom-end' | 'left' | 'right';
 </script>
@@ -17,6 +19,33 @@
   const { text, align = 'bottom', trigger }: Props = $props();
 
   let open = $state(false);
+
+  // The scroll event of a focus comes before the animation frame callbacks of the next frame. Two frames are safe.
+  const FRAMES_AFTER_FOCUS = 2;
+
+  function keepOpenAfterFocusScroll(triggerElement: EventTarget | null, framesLeft: number): void {
+    requestAnimationFrame(() => {
+      if (framesLeft > 1) {
+        keepOpenAfterFocusScroll(triggerElement, framesLeft - 1);
+      } else if (document.activeElement === triggerElement) {
+        open = true;
+      }
+    });
+  }
+
+  function withFocusScrollFix(props: Record<string, unknown>): Record<string, unknown> {
+    const bitsFocusHandler = props['onfocus'] as ((event: FocusEvent) => void) | undefined;
+    return {
+      ...props,
+      onfocus: (event: FocusEvent) => {
+        bitsFocusHandler?.(event);
+        // Only a tooltip that the focus opened opens again. A pointer focus does not open it.
+        if (open) {
+          keepOpenAfterFocusScroll(event.currentTarget, FRAMES_AFTER_FOCUS);
+        }
+      },
+    };
+  }
 </script>
 
 <Tooltip.Root bind:open>
@@ -33,7 +62,7 @@
   >
     <Tooltip.Trigger>
       {#snippet child({ props })}
-        {@render trigger({ props })}
+        {@render trigger({ props: withFocusScrollFix(props) })}
       {/snippet}
     </Tooltip.Trigger>
     <Tooltip.ContentStatic>
