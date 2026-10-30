@@ -391,6 +391,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/us-universe/range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Us Universe Range */
+        get: operations["read_us_universe_range_api_us_universe_range_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backtests/{backtest_id}": {
         parameters: {
             query?: never;
@@ -877,6 +894,8 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
@@ -1136,6 +1155,8 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
@@ -2412,8 +2433,31 @@ export interface components {
             /** Exchange */
             exchange: string | null;
         };
+        /** UniverseInstrumentResponse */
+        UniverseInstrumentResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Net Profit Usd */
+            net_profit_usd: string;
+            /** Quarter Count */
+            quarter_count: number;
+        };
         /** @enum {string} */
         UniverseKind: "single" | "rule" | "list";
+        /**
+         * UsUniverseRangeResponse
+         * @description The first and the last quarter start with US universe data. Null without universe data.
+         */
+        UsUniverseRangeResponse: {
+            /** First Day Utc */
+            first_day_utc: string | null;
+            /** Last Day Utc */
+            last_day_utc: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -3858,6 +3902,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_us_universe_range_api_us_universe_range_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsUniverseRangeResponse"];
                 };
             };
         };

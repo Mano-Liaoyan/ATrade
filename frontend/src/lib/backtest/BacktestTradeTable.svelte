@@ -1,4 +1,4 @@
-<!-- The trades of a backtest in 32px rows: number, time, side, quantity, price, and commission, with right-aligned
+<!-- The trades of a backtest in 32px rows: number, time, symbol, side, quantity, price, and commission, with right-aligned
      tabular numbers. It fills the height of its panel body and scrolls in itself. The backtest page and the strategy
      page show it in their Trades tab. -->
 <script lang="ts">
@@ -6,6 +6,7 @@
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
+  import { MISSING_VALUE } from '#lib/foundation/value_format';
   import type { BacktestTrade } from './backtest_api';
   import { formatUsd } from './backtest_format';
 
@@ -14,6 +15,7 @@
   const TRADE_COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
     { header: 'Time' },
+    { header: 'Symbol' },
     { header: 'Side' },
     { header: 'Quantity', align: 'right' },
     { header: 'Price (USD)', align: 'right' },
@@ -31,6 +33,7 @@
           <tr>
             <th scope="row" align="right">{tradeIndex + 1}</th>
             <td>{formatUtcTime(trade.time_utc)}</td>
+            <td>{trade.symbol ?? MISSING_VALUE}</td>
             <td>{trade.side}</td>
             <td align="right">{trade.quantity_shares}</td>
             <td align="right">{formatUsd(trade.price_usd)}</td>
