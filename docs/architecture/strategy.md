@@ -556,8 +556,8 @@ commissions and the open gap.
 - S2 uses "High at or above", not "Close crosses above". The Donchian upper
   value at time t includes the high of the bar at t (ADR 0001), so the close
   can never cross above it.
-- S3 uses the 12-1 momentum indicator with 0 skipped days. When the
-  indicator cannot skip 0 days, S3 becomes a code template.
+- S3 uses the 12-1 momentum indicator with 0 skipped days. The indicator
+  accepts skip 0 (section 21.1 of [`docs/architecture.md`](../architecture.md), #162).
 - No Hong Kong templates: tests of moving average rules in Hong Kong show
   small effects (Bessembinder & Chan 1995).
 
@@ -589,7 +589,6 @@ must check them first.
 | The Brock et al. range break holds for 10 days and uses the close for the break. | Read section II of the paper. |
 | Faber 2007 checks "close above the 10-month average" only at the month end. | Read the paper. |
 | Moskowitz et al. use a 12-month look-back and a 1-month hold. Blitz & van Vliet use the volatility of the last 3 years. Barroso & Santa-Clara use the daily returns of the last 6 months. | Read the method section of each paper. |
-| The 12-1 momentum indicator can skip 0 days (S3). | Check the indicator parameters in the implementation ticket of #136. |
 | The IBKR instrument search returns ETFs, for example `SPY`. `backend/src/atrade/ibkr/gateway_connection.py` keeps only contracts with `secType` `STK`. | Search `SPY` on the paper account. |
 | A strategy file can import `atrade.indicator` (#136, #138). The code from the rules needs it. | Run 1 import in the backtest child process, in the implementation ticket of #136. |
 
