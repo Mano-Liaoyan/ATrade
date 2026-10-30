@@ -1776,6 +1776,9 @@ option and records it in this document.
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.
+- Decided (#189): the "Source order" section comes after "HK instrument
+  list" on the settings page, so the HK table with its own scroll track
+  stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
