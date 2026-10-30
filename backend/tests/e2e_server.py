@@ -63,6 +63,14 @@ WATCHLIST_INSTRUMENTS = [
     for project_name in PLAYWRIGHT_PROJECT_NAMES
     for number in range(1, WATCHLIST_INSTRUMENTS_PER_PROJECT + 1)
 ]
+# The HK instrument list holds each instrument once too: <PROJECT NAME>HK01 ... <PROJECT NAME>HK20 on SEHK
+# (frontend/e2e/hk_instrument_list.spec.ts).
+HK_INSTRUMENTS_PER_PROJECT = 20
+HK_INSTRUMENTS = [
+    Instrument(symbol=f"{project_name.upper()}HK{number:02d}", exchange="SEHK", currency="HKD")
+    for project_name in PLAYWRIGHT_PROJECT_NAMES
+    for number in range(1, HK_INSTRUMENTS_PER_PROJECT + 1)
+]
 
 
 def insert_strategy_version(connection: psycopg.Connection, *, name: str, code: str) -> int | None:
@@ -302,7 +310,7 @@ def main() -> None:
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )
     gateway_connection = FakeGatewayConnection(
-        managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS]
+        managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS, *HK_INSTRUMENTS]
     )
     gateway_connection.account_values = make_balance_values(
         FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd="25000.00"

@@ -925,8 +925,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     the "Split check needed" row with "Apply split <ratio>" and "Keep
     ledger" (phase 3, sections 11 and 12).
   - A settings page has the "Source order" list of the bar sources
-    (`docs/architecture/market_data.md`). Its route and the place of the HK
-    instrument list editor are left to the implementation.
+    (`docs/architecture/market_data.md`). The settings page is `/settings`
+    with the header link "Settings" after "Forward tests". It is a document
+    page with the heading "Settings" and one section for each setting. The
+    HK instrument list editor is the section "HK instrument list" of this
+    page (#194, `docs/architecture/market_data.md` section 8.10).
   - A survivorship bias warning (icon, word, and warning color) shows on HK
     screens, on HK backtest results, and on US backtest results that start
     before 2018-05-01.
@@ -1666,8 +1669,17 @@ option and records it in this document.
 - Decided (#160): an ATrade indicator class does not subclass a
   NautilusTrader class. It has `handle_bar(bar)` and an `initialized`
   property (section 21.1).
+- Decided (#161): the 7 wrapped indicators are the classes `SMA`, `EMA`,
+  `ATR`, `RSI`, `MACD`, `BollingerBands`, and `DonchianChannel` of
+  `atrade.indicator`. An output is `float | None` (None is "no value"). The
+  screen-path method is `update(bar)`: it makes a NautilusTrader bar from
+  the `foundation` bar and calls `handle_bar`. The defaults are in section
+  23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#165): the daily returns use the UTC date as the trading day,
+  `years` comes from the request range, and `metrics.missing_reasons` gives
+  the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1689,6 +1701,13 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#194): the HK instrument list editor is on the settings page
+  `/settings` (section 13). #194 made this page. The source order slice
+  (#189) adds its "Source order" section to the same page.
+- Decided (#194): the add route of the HK instrument list checks all new
+  symbols with `InstrumentLookup` before it saves one. On `502` or `503`
+  the list does not change. A symbol that the request has 2 times is in
+  `already_in_list` the second time.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
