@@ -76,8 +76,9 @@ puts the new parts of this section in phases.
   saved bar in the range is enough. The range can start before the first
   saved bar or end after the last one, and the backtest runs on the saved
   bars only. The check uses `has_saved_bars()` of `market_data`, which
-  selects the same rows as `read_saved_bars()` (`bar.start_utc` in
-  `[start_utc, end_utc)`).
+  selects the same rows as `read_saved_bars()` (bar start in
+  `[start_utc, end_utc)`, through the global source order of
+  `docs/architecture/market_data.md` section 8.7.2).
 - The backtest form offers only watchlist instruments with saved bars of the
   selected bar period (section 10.6). It has no free-text symbol, exchange,
   or currency fields, so a request cannot name an instrument that has no

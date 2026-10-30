@@ -11,6 +11,7 @@ from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import (
+    BarSource,
     GatewayNotReachableError,
     InstrumentLookup,
     InstrumentLookupFailedError,
@@ -35,8 +36,9 @@ class AddInstrumentRequest(BaseModel):
 
 
 class SavedBarsResponse(BaseModel):
-    """The saved bars of one bar period: the start of the first and of the last saved bar."""
+    """The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."""
 
+    bar_source: BarSource
     bar_period: BarPeriod
     first_start_utc: datetime
     last_start_utc: datetime
@@ -48,7 +50,8 @@ class WatchlistInstrumentResponse(BaseModel):
     exchange: str
     currency: str
     added_at_utc: datetime
-    # Only the bar periods with saved bars, in the order of BarPeriod. The backtest form offers only these.
+    # Only the bar sources and bar periods with saved bars, in the order of BarPeriod, then in the global source order.
+    # The backtest form offers only these bar periods.
     saved_bars: list[SavedBarsResponse]
 
 
@@ -76,7 +79,10 @@ async def to_instrument_responses(
             added_at_utc=record.added_at_utc,
             saved_bars=[
                 SavedBarsResponse(
-                    bar_period=item.bar_period, first_start_utc=item.first_start_utc, last_start_utc=item.last_start_utc
+                    bar_source=item.bar_source,
+                    bar_period=item.bar_period,
+                    first_start_utc=item.first_start_utc,
+                    last_start_utc=item.last_start_utc,
                 )
                 for item in instrument_coverage
             ],

@@ -1,4 +1,4 @@
-"""HTTP routes of market_data: instrument search, bars, live bars, and the HK instrument list."""
+"""HTTP routes of market_data: instrument search, bars, live bars, the source order, and the HK instrument list."""
 
 from datetime import timedelta
 from typing import Annotated
@@ -15,6 +15,7 @@ from atrade.market_data.bar_reading import BarReader, BarRequest, GatewayNotConn
 from atrade.market_data.hk_instrument_list_routes import create_hk_instrument_list_router
 from atrade.market_data.instrument_lookup import InstrumentLookup
 from atrade.market_data.live_bar_socket import create_live_bar_router
+from atrade.market_data.source_order_routes import create_source_order_router
 
 # IBKR symbols are short. A longer query is a mistake, so the route refuses it before it calls IBKR.
 MAX_QUERY_LENGTH = 32
@@ -126,6 +127,7 @@ def create_market_data_router(
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=message) from error
         return BarsResponse(bars=[to_bar_response(bar) for bar in bars])
 
+    router.include_router(create_source_order_router(database_url=database_url, clock=clock))
     router.include_router(create_live_bar_router(gateway_connection=gateway_connection, host=host, port=port))
     instrument_lookup = InstrumentLookup(gateway_connection=gateway_connection, host=host, port=port)
     router.include_router(
