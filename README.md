@@ -230,13 +230,38 @@ limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
 `ATRADE_ASSISTANT_MEMORY_LIMIT=0` in `.env`. Only Compose reads these 2
 values.
 
-The volume `atrade-assistant-pi` holds the files of the AI assistant. Later
-it also holds the AI assistant credentials, so keep each backup of it like
+The volume `atrade-assistant-pi` holds the files of the AI assistant: one
+JSONL file of messages for each conversation in `conversations/`. Later it
+also holds the AI assistant credentials, so keep each backup of it like
 `.env`. ATrade makes no automatic backup. A manual backup:
 
 ```sh
 docker run --rm -v atrade-assistant-pi:/data:ro -v "$PWD":/backup busybox tar czf /backup/atrade-assistant-pi.tar.gz -C /data .
 ```
+
+### Import the Databento history
+
+The user buys the Databento daily bars and `statistics` one time
+(`docs/architecture/market_data.md` section 8.8.1). Then the import program
+saves them in `databento_bar`. It runs in the `web` image. Keep the files in
+`data/databento/` (not in git).
+
+```sh
+mkdir -p data/databento
+# Download the bought batch jobs (needs DATABENTO_API_KEY in .env) and import all DBN files.
+# --user lets the program write to data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/data/databento:/databento" web \
+  python -m atrade.app.databento_import /databento --job-id <batch job ID> --job-id <batch job ID>
+# Or import the DBN files that are already in data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm \
+  -v "$PWD/data/databento:/databento:ro" web \
+  python -m atrade.app.databento_import /databento
+```
+
+The import writes the symbols without an official close and the
+EQUS.SUMMARY symbols without a listing exchange to its log. A second import
+of the same files adds no row.
 
 ### Old data
 
