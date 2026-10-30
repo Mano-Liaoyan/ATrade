@@ -1665,6 +1665,7 @@ option and records it in this document.
   screen-path method is `update(bar)`: it makes a NautilusTrader bar from
   the `foundation` bar and calls `handle_bar`. The defaults are in section
   23.2 of [`indicator.md`](architecture/indicator.md).
+<<<<<<< HEAD
 - Decided (#162): the 4 indicators that ATrade writes are the classes
   `Momentum12_1`, `DistanceTo52WeekHigh`, `RealizedVolatility`, and
   `AverageTradingValue` of `atrade.indicator`. The default n of realized
@@ -1672,8 +1673,13 @@ option and records it in this document.
   has the parameter `bars_per_year` (default 252): on 1-hour bars the
   strategy passes 1764. Section 23.2 of
   [`indicator.md`](architecture/indicator.md) has the formulas.
+=======
+>>>>>>> origin/impl/159
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#165): the daily returns use the UTC date as the trading day,
+  `years` comes from the request range, and `metrics.missing_reasons` gives
+  the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
