@@ -5,14 +5,15 @@ and keeps its fills in the owner ledger (docs/architecture/forward_test.md secti
   ClientOrderId, which holds `FT<ID>` (section 12.9).
 - The owner ledger checks each order first. A failed rule gives `OrderDenied` with the reason, and no order.
 - The client reads the executions of its own client ID every `fill_check_interval_seconds` (reqExecutions) and
-  sends a fill for each new execution of an order that it sent in this run.
+  sends a fill for each new execution (execId) of an order that it sent in this run. It reads them once more at the
+  stop. A failed save is tried again at the next read.
 - Reconciliation reports the owner positions and the owner cash, not the account positions and the account cash.
 """
 
 import asyncio
 import contextlib
+import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Protocol, override
 
@@ -72,6 +73,8 @@ TIMES_IN_FORCE: dict[TimeInForce, IbkrTimeInForce] = {TimeInForce.DAY: "DAY", Ti
 UNSUPPORTED_ORDER_REASON = "ATrade sends only market and limit orders with the time in force DAY or GTC."
 UNKNOWN_INSTRUMENT_REASON = "The instrument is not an instrument of this forward test."
 
+logger = logging.getLogger(__name__)
+
 
 class OrderGateway(Protocol):
     """The functions of the `ibkr` GatewayConnection that the client uses. The connection has the client ID of the
@@ -106,11 +109,8 @@ class SentOrder:
     instrument: Instrument
     side: IbkrOrderSide
     order_ref: str
-    seen_executions: list[Execution]
-
-
-def read_utc(clock: Clock) -> datetime:
-    return datetime.fromtimestamp(clock.timestamp_ns() / NANOSECONDS_PER_SECOND, UTC)
+    # The execIds of the executions that are in the owner ledger.
+    saved_exec_ids: set[str]
 
 
 def create_quantity(value: Decimal) -> Quantity:
@@ -169,6 +169,8 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             self.fill_check_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self.fill_check_task
+            # The last read: the fills since the last check go into the owner ledger before the stop.
+            await self.read_new_fills()
         self.gateway.disconnect()
 
     @override
@@ -178,8 +180,16 @@ class OwnerLedgerExecutionClient(ExecutionClient):
     async def check_fills(self) -> None:
         while True:
             await asyncio.sleep(self.ledger_input.fill_check_interval_seconds)
-            with contextlib.suppress(GatewayRequestError):
-                await self.send_new_fills(await self.gateway.read_executions())
+            await self.read_new_fills()
+
+    async def read_new_fills(self) -> None:
+        """A failed read or save does not stop the fill check. The next check tries the execution again."""
+        try:
+            await self.send_new_fills(await self.gateway.read_executions())
+        except GatewayRequestError:
+            return
+        except Exception:
+            logger.exception("Forward test %s could not save a fill", self.ledger_input.forward_test_id)
 
     async def send_new_fills(self, executions: list[Execution]) -> None:
         for execution in executions:
@@ -188,10 +198,9 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             if (
                 execution.client_id != self.ledger_input.client_id
                 or sent_order is None
-                or execution in sent_order.seen_executions
+                or execution.exec_id in sent_order.saved_exec_ids
             ):
                 continue
-            sent_order.seen_executions.append(execution)
             await self.send_fill(execution, sent_order)
 
     async def send_fill(self, execution: Execution, sent_order: SentOrder) -> None:
@@ -206,11 +215,12 @@ class OwnerLedgerExecutionClient(ExecutionClient):
                 order_ref=sent_order.order_ref,
             )
         )
+        sent_order.saved_exec_ids.add(execution.exec_id)
         self.generate_order_filled(
             sent_order.order,
             VenueOrderId(str(execution.order_id)),
             None,
-            TradeId(f"{execution.order_id}-{len(sent_order.seen_executions)}"),
+            TradeId(execution.exec_id),
             create_quantity(execution.quantity),
             create_price(execution.price),
             Currency.from_str(sent_order.instrument.currency),
@@ -257,7 +267,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         except GatewayRequestError as error:
             self.generate_order_rejected(order, str(error), self.clock.timestamp_ns(), False)
             return
-        self.sent_orders[order_id] = SentOrder(order, instrument, side, order_ref, [])
+        self.sent_orders[order_id] = SentOrder(order, instrument, side, order_ref, set())
         self.generate_order_accepted(order, VenueOrderId(str(order_id)), self.clock.timestamp_ns())
 
     @override
@@ -271,7 +281,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         except GatewayRequestError as error:
             self.generate_order_cancel_rejected(order, venue_order_id, str(error), self.clock.timestamp_ns())
             return
-        self.sent_orders.pop(int(str(venue_order_id)), None)
+        # The entry in sent_orders stays: a fill before the cancel can come with the next fill check.
         self.generate_order_canceled(order, venue_order_id, self.clock.timestamp_ns())
 
     def is_own_order(self, open_order: OpenOrder) -> bool:

@@ -9,6 +9,7 @@ Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `acco
 No mock library is used (section 17.3).
 """
 
+import itertools
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -376,11 +377,15 @@ def make_forward_test_order(
     )
 
 
+EXECUTION_NUMBERS = itertools.count(1)
+
+
 def make_execution(
     account_id: str, *, order_id: int, quantity: str, price: str, client_id: int = WEB_CLIENT_ID
 ) -> Execution:
-    """One fill from reqExecutions."""
+    """One fill from reqExecutions, with a new execId."""
     return Execution(
+        exec_id=f"0000e0d5.{next(EXECUTION_NUMBERS):08d}.01.01",
         order_id=order_id,
         client_id=client_id,
         account=account_id,

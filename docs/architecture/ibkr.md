@@ -108,8 +108,8 @@ The public entry `atrade.ibkr` exports:
   after 10 seconds without the confirmation. An order that is not open any
   more needs no cancel.
 - `read_executions()` calls `reqExecutions` and returns `Execution` values
-  (`order_id`, `client_id`, `account`, `time_utc`, `side`, `quantity`,
-  `price`). `paper_trading` uses it for the fills of orders by hand.
+  (`exec_id`, `order_id`, `client_id`, `account`, `time_utc`, `side`,
+  `quantity`, `price`). `paper_trading` uses it for the fills of orders by hand.
 - The order functions raise `GatewayRequestError` when the connection is
   not there.
 - `read_exchange_rate(currency, quote_currency)` returns the IBKR forex

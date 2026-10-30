@@ -106,7 +106,8 @@ def make_world(database_url: str) -> ClientsWorld:
 
 
 def build_node(world: ClientsWorld, run_number: int) -> tuple[LiveNodeBuilder, BarStoreDataClientFactory]:
-    """No `external_order_instrument_ids`, as in section 12.7 Phase 3. The tests add them where they need them."""
+    """The strategy sets `external_order_instrument_ids` (section 12.7 Phase 3). A test without them shows that the
+    restored position then belongs to `EXTERNAL`."""
     config = LiveNodeConfig(
         environment=Environment.LIVE,
         trader_id=TraderId(f"ATRADE-{FORWARD_TEST_ID:03d}"),

@@ -60,6 +60,8 @@ class OpenOrder:
 class Execution:
     """One fill of an order from reqExecutions. One order can have many executions."""
 
+    # The IBKR execId. It is unique for each execution.
+    exec_id: str
     order_id: int
     client_id: int
     account: str
@@ -107,6 +109,7 @@ def read_price(price: float | Decimal | None) -> Decimal | None:
 def convert_fill(fill: Fill) -> Execution:
     execution = fill.execution
     return Execution(
+        exec_id=execution.execId,
         order_id=execution.orderId,
         client_id=execution.clientId,
         account=execution.acctNumber,

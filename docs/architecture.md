@@ -1710,9 +1710,13 @@ option and records it in this document.
   give the real ledger.
 - Decided (#213): the ATrade execution client gets its fills from
   `reqExecutions` (`read_executions()`) every second. It sends a fill only
-  for a new execution of its own client ID and of an order that it sent in
-  the same run. Its fill reports are empty: the position reports from the
-  ledger give the position.
+  for a new execution (new IBKR `execId`) of its own client ID and of an
+  order that it sent in the same run. A cancel does not remove the order
+  from this list. It reads the executions once more at the stop. When
+  `save_fill()` fails, the next read tries the execution again. Its fill
+  reports are empty: the position reports from the ledger give the
+  position. An execution that IBKR makes after the stop of a run does not
+  go into the owner ledger; #215 decides how the next run gets it.
 - Decided (#213): the ATrade execution client has the venue `ATRADE` and the
   account `ATRADE-FT<ID>`. Both clients are the default route
   (`RoutingConfig(default=True)`), so they handle all primary exchanges.
