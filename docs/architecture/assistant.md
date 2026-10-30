@@ -207,6 +207,22 @@ prompt does not list the tools.
 - The AI assistant does not change the rules of the rule builder. It changes
   only code. ATrade treats a code change of the AI assistant like a code
   change by hand (#138, [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md)).
+- Done (#182): `assistant/src/assistant_tools.ts` (`createAssistantTools`)
+  makes the 9 tools for each run. `WebPortClient`
+  (`assistant/src/web_port_client.ts`) calls `http://web:8001` with the
+  header `X-ATrade-Conversation-Id` of the run. A tool gives a refusal of
+  port 8001 to the model as an error with the status and the body, for
+  example `Port 8001 answered 422: {"problems": [{"line": 4, "message":
+  "..."}]}`.
+- Decided (#182): `read_strategy_version` returns `id`, `strategy_id`,
+  `version_number`, `source`, and `code`. It adds `rules` only when
+  `source` is `rule_builder`.
+- Decided (#182): `read_backtest` returns all fields of
+  `GET /api/backtests/{backtest_id}` with 2 summaries. `equity_curve` has at
+  most 50 points, evenly spread, with the first and the last point.
+  `equity_curve_point_count` gives the full count. `trades` has the first 50
+  trades with all their fields (`time_utc`, `side`, `quantity_shares`,
+  `price_usd`, `commission_usd`). `trade_count_total` gives the full count.
 
 ### 25.4.2 `run_backtest`
 
@@ -223,6 +239,13 @@ prompt does not list the tools.
   without saved bars with `422` (backtest section 10.1).
 - One user message can start at most 5 backtests. At the sixth, the tool
   returns an error. The error tells the AI assistant to ask the user first.
+- Decided (#182): the tool counts the backtests (backtest section 10.13).
+  The error text is "This user message already started 5 backtests. No
+  backtest started. Ask the user before you start more backtests."
+- Decided (#182): the wait is a parameter of the tools (`BacktestWait` in
+  `assistant/src/backtest_tools.ts`: `limitMilliseconds`,
+  `pollMilliseconds`, `now`). The service uses 15 minutes and 2 seconds.
+  The tests use a few milliseconds.
 - Phase 3: the tool takes a universe, with the same choices as the backtest
   form ([#142](https://github.com/Mano-Liaoyan/ATrade/issues/142),
   [#145](https://github.com/Mano-Liaoyan/ATrade/issues/145)):
@@ -737,9 +760,24 @@ Fields (#179). Each message is a JSON object with `type`.
   not valid each get an `error` message. A `prompt` during a run does not
   start a second run.
 - When the browser leaves during a run, `web` stops the run (`abort`).
-- `tool_step`, `strategy_version_saved`, and `backtest_finished` come with
-  #182.
+- Decided (#182): the fields of the tool messages:
 
+  | `type` | Direction | Fields |
+  |---|---|---|
+  | `tool_step` | Server to browser | `tool_call_id`, `tool_name`, `status` (`running`, `succeeded`, or `failed`), `backtest_id`, `backtest_status` |
+  | `strategy_version_saved` | Server to browser | `strategy_id`, `strategy_version_id`, `version_number` |
+  | `backtest_finished` | Server to browser | `backtest_id` |
+
+  One `tool_call_id` is one tool step. `status` is `running` at the start
+  and at each `onUpdate`, then `succeeded` or `failed`. `backtest_id` and
+  `backtest_status` are set only for `run_backtest` after its start:
+  `backtest_status` is the queue state (`queued`) or the run state
+  (`running`, then `finished`, `failed`, or `timed_out`). They are null
+  for the other tools. `strategy_version_saved` comes only for a save that
+  made a new version (`201`). `backtest_finished` comes when
+  `run_backtest` saw a final status in its wait. The `assistant` service
+  sends the same 3 events, with the same fields, as JSON lines of
+  `POST /conversations/{id}/runs` (25.14).
 Login fields (#183):
 
 | `type` | Direction | Fields |
@@ -758,7 +796,8 @@ Login fields (#183):
 - `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
   of both directions. Message model names: `PromptMessage`, `SteerMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
-  `RunStateMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
+  `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
+  `BacktestFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
   `LoginStartMessage`, `LoginAnswerMessage`, `LoginStepMessage`,
   `LoginEndMessage`.
 
@@ -957,7 +996,7 @@ columns behave the same (section 13).
 
   | Request | Answer |
   |---|---|
-  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`. The answer ends when the run ends. |
+  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`, and (#182) `tool_step`, `strategy_version_saved`, and `backtest_finished` with the fields of 25.10. The answer ends when the run ends. |
   | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
   | `POST /conversations/{id}/abort` | `204`. |
   | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |
@@ -1025,21 +1064,24 @@ columns behave the same (section 13).
   versions. The browser sends the open version number in the body of the
   new conversation request. A trigger refuses each `UPDATE` of a prompt
   version. See 25.9.
-- Which part enforces the 5 backtests of one user message: only the tool, or
-  also port 8001.
-- How the AI assistant finds the instruments and bar periods with saved bars.
-  No tool reads the watchlist.
+- Decided (#182): only the tool `run_backtest` enforces the 5 backtests of
+  one user message. Port 8001 does not (backtest section 10.13).
+- Decided (#182): no tool and no new route lists the instruments and bar
+  periods with saved bars. The AI assistant uses the instrument that the
+  user names, or an instrument of `list_backtests`. A range without saved
+  bars gets `422`, and the model reads it (backtest section 10.13).
 - Decided (#181): `POST /api/backtests` from port 8001 saves the daily
   exchange rates from IBKR like port 8000 (backtest section 10.13). Rates
   are not bars.
-- The phase 3 message for the condition card. Decided (#179): the field
-  names of the other `/ws/assistant` messages (25.10).
+- The phase 3 message for the condition card. Decided (#179, #182): the
+  field names of the other `/ws/assistant` messages (25.10).
 - Decided (#205): the field that names the position of a condition in a
   screen problem (25.4.3) is `location`, the path in the request body (screen
   section 24.6).
 - The pages of `read_screen_result` (page size and parameter names).
-- The summaries in the `read_backtest` result (how many points of the
-  equity curve and which trade fields).
+- Decided (#182): the summaries in the `read_backtest` result: at most 50
+  points of the equity curve and the first 50 trades with all fields
+  (25.4.1).
 - Decided (#183): the credential delete and rename behavior, and the
   meaning of the credential state column (25.7.2). Delete removes the entry
   from the file. There is no rename. The state is `ready` or `failed` (the

@@ -34,7 +34,7 @@ async function openConversations(script: ModelStep[]): Promise<{ conversations: 
   const model = await startFakeModelServer(script);
   server = model;
   const openModel = await createFakeOpenModel(model.baseUrl, workDir);
-  return { conversations: new Conversations({ piDir: workDir, openModel, customTools: [] }), model };
+  return { conversations: new Conversations({ piDir: workDir, openModel, createTools: () => [] }), model };
 }
 
 async function runOnce(
@@ -216,7 +216,7 @@ describe('a run of a conversation', () => {
         await gate.promise;
         return openModel(selection);
       },
-      customTools: [],
+      createTools: () => [],
     });
 
     const run = runOnce(conversations, 'Hi.');
