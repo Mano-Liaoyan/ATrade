@@ -15,6 +15,11 @@ CREATE_TEMPORARY_TABLES: LiteralString = """
         dataset text NOT NULL, symbol text NOT NULL, trading_day date NOT NULL, stat_type integer NOT NULL,
         price numeric NOT NULL, ts_recv bigint NOT NULL
     ) ON COMMIT DROP;
+    CREATE TEMPORARY TABLE databento_hourly_record (
+        symbol text NOT NULL, start_utc timestamptz NOT NULL,
+        open numeric NOT NULL, high numeric NOT NULL, low numeric NOT NULL, close numeric NOT NULL,
+        volume numeric NOT NULL
+    ) ON COMMIT DROP;
     -- The bars of this import before the symbol links and the stock split adjustment (sections 8.8.3 and 8.8.4).
     CREATE TEMPORARY TABLE databento_import_bar (LIKE databento_bar INCLUDING ALL) ON COMMIT DROP;
 """

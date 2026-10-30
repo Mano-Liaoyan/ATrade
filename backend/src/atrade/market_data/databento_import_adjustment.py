@@ -152,11 +152,11 @@ def adjust_import_bars(connection: psycopg.Connection) -> None:
         )
 
 
-def link_and_adjust_import_bars(
+def link_and_detect_splits(
     connection: psycopg.Connection, read_ibkr_daily_bars: IbkrDailyBarReader | None
 ) -> tuple[list[SymbolLink], list[DetectedSplit]]:
+    """Links the symbols and records the stock splits of the daily bars. `adjust_import_bars` then changes the bars."""
     links = link_symbols(connection)
     splits = detect_stock_splits(connection, read_ibkr_daily_bars)
     record_stock_splits(connection, splits)
-    adjust_import_bars(connection)
     return links, splits
