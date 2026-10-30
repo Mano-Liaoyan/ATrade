@@ -193,7 +193,7 @@ rules.
 ```
 market_data   -> ibkr
 watchlist     -> market_data
-strategy      -> (foundation only)
+strategy      -> indicator
 indicator     -> (foundation only)
 screen        -> indicator, market_data, watchlist
 backtest      -> strategy, market_data, screen
@@ -205,6 +205,9 @@ app           -> all modules
 ```
 
 - `ibkr` depends on no capability.
+- `strategy -> indicator` is for the rule builder (#172): the rules check
+  reads `INDICATOR_CATALOG` and `check_indicator_reference()`, and the code
+  from the rules names the `atrade.indicator` classes.
 - `forward_test -> paper_trading` is for the paper account check
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
   start). From phase 3 (section 20.1) it is also for the owner ledger
@@ -1630,8 +1633,8 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The ATrade execution and data clients in a real LiveNode: reconciliation from owner reports, no repeated buy after a restart (#146). | The LiveNode test of section 17.4, then the `ibkr_paper` forward test contract test. |
 | IBKR does or does not refuse opposite orders of 2 owners on one instrument (self-trade prevention) (#146). | 2 client IDs on the paper account place an AAPL buy and a sell, first with prices that do not cross, then with prices that cross. |
 | Real subscription logins and model calls through the pi SDK `ModelRuntime.login()` (#133, #140). Only a fake model server was run. | Log in with each provider and send one message. |
-| `ModelRuntime.create({ credentials })` with the ATrade `CredentialStore` writes an OAuth refresh back (#140). | Test with 2 credentials of one provider, and read the file after a refresh. |
-| OpenAI can count a self-hosted single-user server as "remotely hosted" (#133). | Read the OpenAI "Preview limitations" page. |
+| A real OAuth token refresh through the ATrade `CredentialStore` writes the new token to `/data/credentials.json` (#140). A fake refresh does (section 21.1). | Wait for a real token refresh of one provider, and read the file. |
+| OpenAI can count a self-hosted single-user server as "remotely hosted" (#133). Not settled by the OpenAI pages (section 21.1). | Ask OpenAI, or read their terms again when they name self-hosted servers. |
 
 Each section file of the map lists more facts in its "Left to the
 implementation" list.
@@ -1640,6 +1643,9 @@ implementation" list.
 
 | Fact | Result |
 |---|---|
+| `ModelRuntime.create({ credentials })` accepts ATrade's own `CredentialStore`, and an OAuth refresh writes back through it (#140 read the source only). | Yes, with a fake provider. On 2026-10-30 with pi 1.4.0 (#183), `ModelRuntime.create` takes `credentials` and wraps it. `getAuth()` refreshes an expired OAuth token inside `CredentialStore.modify()`. The test `assistant/tests/credential_file.test.ts` stores 2 OAuth credentials of one fake provider, refreshes the first, and reads the file: the first has the new token, the second is unchanged, the mode stays `0600`. A real provider refresh is #186. |
+| `ModelRuntime.login()` with an `AuthInteraction` does each login step from a web page (#140 read the source only). | Yes, with fake login flows. On 2026-10-30 (#183), `assistant/tests/logins.test.ts` runs a fake OAuth login (`auth_url`, `device_code`, `progress`, then a `manual_code` prompt) and a fake API key login (a `secret` prompt) through the interaction of `assistant/src/logins.ts`. Each `notify()` event became one `login_step`, and each `prompt()` waited for its answer. The first real login is #186. |
+| OpenAI "Preview limitations" and "remotely hosted" (#133). | Not settled. On 2026-10-30 (#183), the OpenAI "Sign in with ChatGPT" pages for open-source apps were read: [Preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations) lists the hosted Responses tools that plan usage does not support. A search result of the same pages says that a paid or remotely hosted app needs OpenAI approval through an interest form, but the page text read did not have this sentence. The [Self-hosted VMs](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms) guide describes an open-source app on the user's own remote VM: the OAuth callback reaches the computer with the browser, not the VM. The pages do not say whether a single-user self-hosted server is "remotely hosted". This does not change the scope: ATrade does not remove a provider because of its terms (section 25.7.1). |
 | `ib_async` 2.1.0 and NautilusTrader 2.0 resolve together in one environment. | Yes. On 2026-10-27, `uv lock` (uv 0.13.5) resolved `ib-async==2.1.0`, `nautilus-trader==2.0.0rc7`, and `tzdata==2025.3` for Python 3.14 (#62). |
 | `ghcr.io/gnzsnz/ib-gateway:stable` digest. | On 2026-10-27, the `stable` index was `sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581` (IB Gateway 10.50.1f) (#63). |
 | `ib_async` 2.1.0 and NautilusTrader 2.0.0rc7 import on Python 3.14. | Yes. Both packages import on CPython 3.14.9 (#62). The real connection is the next row. |
@@ -1715,6 +1721,10 @@ option and records it in this document.
   `find_round_trips` with no change, because `select_fills` already gives
   `BacktestTrade` rows. The metrics of the forward test routes have
   `net_profit_usd` (forward test section 12.10).
+- Decided (#172): `strategy` imports `indicator` (section 6.2). The rules
+  format, the code from the rules, the empty group, the stop loss and take
+  profit reference price, and the count of "Exit after N bars" are in
+  strategy sections 9.8.2 and 9.8.3.
 - Decided (#187): `ChatLog` follows new content while the end of the log is
   at most 48px below the visible area (`LOG_END_THRESHOLD_PIXELS` of
   `foundation/carbon/chat_log.ts`, the value of the Carbon `ChatLog`). A new
@@ -1782,6 +1792,9 @@ option and records it in this document.
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.
+- Decided (#189): the "Source order" section comes after "HK instrument
+  list" on the settings page, so the HK table with its own scroll track
+  stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
@@ -1806,6 +1819,10 @@ option and records it in this document.
   conversation header `X-ATrade-Conversation-Id` of port 8001, and the daily
   exchange rates of a backtest on port 8001. See section 25.14 and
   [`backtest.md`](architecture/backtest.md) section 10.13.
+- Decided (#183): the credential file is `/data/credentials.json` in the
+  volume `atrade-assistant-pi`, mode `0600`. The credential delete, no
+  rename, the state column, the login messages of `/ws/assistant`, and the
+  login and credential routes of `assistant`. See section 25.14.
 - Decided (#214): the owner ledger of "By hand" (the ledger start at the
   first passed check, the cash of rule 2, the price of a market buy, the
   USD conversion, and when the Web process records fills) is in

@@ -664,6 +664,45 @@
         }
       }
     },
+    "/api/strategy-rules/code": {
+      "post": {
+        "summary": "Make Code",
+        "description": "Makes the code from the rules and saves nothing (section 9.8.3).",
+        "operationId": "make_code_api_strategy_rules_code_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulesCodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulesCodeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies": {
       "get": {
         "summary": "List Strategies",
@@ -961,7 +1000,7 @@
     "/api/strategies/{strategy_id}/versions": {
       "post": {
         "summary": "Save Version",
-        "description": "Checks the code first. Then it appends a version, or returns the latest version when the code is the same.",
+        "description": "Checks the code first. Then it appends a version, or returns the latest version when the code is the same.\n\nA `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.",
         "operationId": "save_version_api_strategies__strategy_id__versions_post",
         "parameters": [
           {
@@ -996,7 +1035,7 @@
             }
           },
           "200": {
-            "description": "The code is the same as the latest version. No new version is made.",
+            "description": "The code (and, for a rules body, the rules) is the same as the latest version. No new version is made.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1830,6 +1869,115 @@
             "schema": {
               "type": "integer",
               "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/providers": {
+      "get": {
+        "summary": "List Providers",
+        "operationId": "list_providers_api_assistant_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderListResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/credentials": {
+      "get": {
+        "summary": "List Credentials",
+        "operationId": "list_credentials_api_assistant_credentials_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialListResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assistant/credentials/{credential_id}": {
+      "delete": {
+        "summary": "Delete Credential",
+        "operationId": "delete_credential_api_assistant_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "name": "credential_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9-]{1,64}$",
+              "title": "Credential Id"
             }
           }
         ],
@@ -3236,6 +3384,17 @@
         "title": "ComparedMetricsResponse",
         "description": "The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the\nfinal equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10)."
       },
+      "Comparison": {
+        "type": "string",
+        "enum": [
+          "above",
+          "below",
+          "at_or_above",
+          "at_or_below",
+          "crosses_above",
+          "crosses_below"
+        ]
+      },
       "ConversationDetailResponse": {
         "properties": {
           "id": {
@@ -3484,6 +3643,87 @@
         ],
         "title": "CreateStrategyRequest"
       },
+      "CredentialListResponse": {
+        "properties": {
+          "credentials": {
+            "items": {
+              "$ref": "#/components/schemas/CredentialResponse"
+            },
+            "type": "array",
+            "title": "Credentials"
+          }
+        },
+        "type": "object",
+        "required": [
+          "credentials"
+        ],
+        "title": "CredentialListResponse"
+      },
+      "CredentialResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "oauth",
+              "api_key"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "key_last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Last4"
+          },
+          "state": {
+            "enum": [
+              "ready",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "state_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Message"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "provider",
+          "type",
+          "key_last4",
+          "state",
+          "state_message"
+        ],
+        "title": "CredentialResponse",
+        "type": "object"
+      },
       "DesiredState": {
         "enum": [
           "running",
@@ -3605,6 +3845,27 @@
           "price_difference_usd"
         ],
         "title": "FillComparisonResponse"
+      },
+      "FixedShares": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "fixed_shares",
+            "title": "Type"
+          },
+          "shares": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Shares"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "shares"
+        ],
+        "title": "FixedShares"
       },
       "ForwardTestComparisonResponse": {
         "properties": {
@@ -3931,6 +4192,13 @@
         ],
         "title": "GatewayStatusResponse"
       },
+      "GroupMatch": {
+        "type": "string",
+        "enum": [
+          "all_of",
+          "any_of"
+        ]
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4039,6 +4307,73 @@
         ],
         "title": "HkInstrumentResponse"
       },
+      "IndicatorOperand": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "indicator",
+            "title": "Type"
+          },
+          "indicator": {
+            "type": "string",
+            "title": "Indicator"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Number"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "indicator"
+        ],
+        "title": "IndicatorOperand",
+        "description": "A stored indicator reference. A single-line indicator without `output` uses `value`."
+      },
+      "InnerRuleGroup": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "group",
+            "title": "Type"
+          },
+          "match": {
+            "$ref": "#/components/schemas/GroupMatch"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "match",
+          "items"
+        ],
+        "title": "InnerRuleGroup",
+        "description": "A group in a group. It holds conditions only, so the maximum depth is 1 nested group."
+      },
       "InstrumentResponse": {
         "properties": {
           "symbol": {
@@ -4124,6 +4459,23 @@
           "buy_more_than_cash",
           "ledger_not_started"
         ]
+      },
+      "LeftOperand": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PriceOperand"
+          },
+          {
+            "$ref": "#/components/schemas/IndicatorOperand"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "indicator": "#/components/schemas/IndicatorOperand",
+            "price": "#/components/schemas/PriceOperand"
+          }
+        }
       },
       "ManualOrderListResponse": {
         "properties": {
@@ -4317,6 +4669,35 @@
         ],
         "title": "ManualOrderWithFillsResponse",
         "description": "A stored order by hand with its fills from reqExecutions. None when ATrade cannot ask IBKR."
+      },
+      "Number": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          }
+        ]
+      },
+      "NumberOperand": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "number",
+            "title": "Type"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Number"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "value"
+        ],
+        "title": "NumberOperand"
       },
       "OpenOrderListResponse": {
         "properties": {
@@ -4559,6 +4940,128 @@
         "title": "PaperCapitalResponse",
         "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
       },
+      "PercentOfEquity": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "percent_of_equity",
+            "title": "Type"
+          },
+          "percent": {
+            "$ref": "#/components/schemas/Number",
+            "gt": 0,
+            "le": 100
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "percent"
+        ],
+        "title": "PercentOfEquity",
+        "description": "The quantity is equity x percent / close price, rounded down to whole shares."
+      },
+      "PriceName": {
+        "type": "string",
+        "enum": [
+          "close",
+          "open",
+          "high",
+          "low"
+        ]
+      },
+      "PriceOperand": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "price",
+            "title": "Type"
+          },
+          "price": {
+            "$ref": "#/components/schemas/PriceName"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "price"
+        ],
+        "title": "PriceOperand"
+      },
+      "ProviderListResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderResponse"
+            },
+            "type": "array",
+            "title": "Providers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "providers"
+        ],
+        "title": "ProviderListResponse"
+      },
+      "ProviderModelResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ProviderModelResponse"
+      },
+      "ProviderResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "login_methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "oauth",
+                "api_key"
+              ]
+            },
+            "type": "array",
+            "title": "Login Methods"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderModelResponse"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "login_methods",
+          "models"
+        ],
+        "title": "ProviderResponse"
+      },
       "RenameConversationRequest": {
         "properties": {
           "title": {
@@ -4573,6 +5076,219 @@
           "title"
         ],
         "title": "RenameConversationRequest"
+      },
+      "RightOperand": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PriceOperand"
+          },
+          {
+            "$ref": "#/components/schemas/IndicatorOperand"
+          },
+          {
+            "$ref": "#/components/schemas/NumberOperand"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "indicator": "#/components/schemas/IndicatorOperand",
+            "number": "#/components/schemas/NumberOperand",
+            "price": "#/components/schemas/PriceOperand"
+          }
+        }
+      },
+      "RuleCondition": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "condition",
+            "title": "Type"
+          },
+          "left": {
+            "$ref": "#/components/schemas/LeftOperand"
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/Comparison"
+          },
+          "right": {
+            "$ref": "#/components/schemas/RightOperand"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "left",
+          "comparison",
+          "right"
+        ],
+        "title": "RuleCondition"
+      },
+      "RuleExits": {
+        "properties": {
+          "stop_loss_percent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Number",
+                "gt": 0,
+                "lt": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "take_profit_percent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Number",
+                "gt": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exit_after_bars": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit After Bars"
+          },
+          "exit_when_entry_is_false": {
+            "type": "boolean",
+            "title": "Exit When Entry Is False",
+            "default": false
+          },
+          "exit_group": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleGroup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RuleExits",
+        "description": "The exit items. Each item that is not null (or `true`) is selected."
+      },
+      "RuleGroup": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "group",
+            "title": "Type"
+          },
+          "match": {
+            "$ref": "#/components/schemas/GroupMatch"
+          },
+          "items": {
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RuleCondition"
+                },
+                {
+                  "$ref": "#/components/schemas/InnerRuleGroup"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "type",
+                "mapping": {
+                  "condition": "#/components/schemas/RuleCondition",
+                  "group": "#/components/schemas/InnerRuleGroup"
+                }
+              }
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "match",
+          "items"
+        ],
+        "title": "RuleGroup"
+      },
+      "RuleSettings": {
+        "properties": {
+          "position_size": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FixedShares"
+              },
+              {
+                "$ref": "#/components/schemas/PercentOfEquity"
+              }
+            ],
+            "title": "Position Size",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "fixed_shares": "#/components/schemas/FixedShares",
+                "percent_of_equity": "#/components/schemas/PercentOfEquity"
+              }
+            }
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position_size"
+        ],
+        "title": "RuleSettings"
+      },
+      "RulesCodeRequest": {
+        "properties": {
+          "rules": {
+            "$ref": "#/components/schemas/StrategyRules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules"
+        ],
+        "title": "RulesCodeRequest"
+      },
+      "RulesCodeResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "RulesCodeResponse"
       },
       "SamePeriodBacktestResponse": {
         "properties": {
@@ -4590,15 +5306,30 @@
       "SaveVersionRequest": {
         "properties": {
           "code": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Code"
+          },
+          "rules": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyRules"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
-        "required": [
-          "code"
-        ],
-        "title": "SaveVersionRequest"
+        "title": "SaveVersionRequest",
+        "description": "Exactly one of `code` and `rules` (section 9.6)."
       },
       "SavedBarsResponse": {
         "properties": {
@@ -4931,6 +5662,33 @@
           "versions"
         ],
         "title": "StrategyResponse"
+      },
+      "StrategyRules": {
+        "properties": {
+          "format_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Format Version"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/RuleSettings"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/RuleGroup"
+          },
+          "exits": {
+            "$ref": "#/components/schemas/RuleExits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "format_version",
+          "settings",
+          "entry",
+          "exits"
+        ],
+        "title": "StrategyRules"
       },
       "StrategyVersionResponse": {
         "properties": {
@@ -5336,6 +6094,213 @@
           "bar"
         ],
         "title": "LiveBarMessage",
+        "type": "object"
+      },
+      "LoginAnswerMessage": {
+        "description": "Browser to server: the answer to a login step `prompt`. For a `select` prompt, the ID of the option.",
+        "properties": {
+          "type": {
+            "const": "login_answer",
+            "default": "login_answer",
+            "title": "Type",
+            "type": "string"
+          },
+          "prompt_id": {
+            "minLength": 1,
+            "title": "Prompt Id",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt_id",
+          "value"
+        ],
+        "title": "LoginAnswerMessage",
+        "type": "object"
+      },
+      "LoginEndMessage": {
+        "description": "The login ended. The credential is in the credential file of the assistant service.",
+        "properties": {
+          "type": {
+            "const": "login_end",
+            "default": "login_end",
+            "title": "Type",
+            "type": "string"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/CredentialResponse"
+          }
+        },
+        "required": [
+          "credential"
+        ],
+        "title": "LoginEndMessage",
+        "type": "object"
+      },
+      "LoginOptionResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "LoginOptionResponse",
+        "type": "object"
+      },
+      "LoginStartMessage": {
+        "description": "Browser to server: start a login. `method` \"oauth\" is a subscription login. `name` names the new credential.",
+        "properties": {
+          "type": {
+            "const": "login_start",
+            "default": "login_start",
+            "title": "Type",
+            "type": "string"
+          },
+          "provider": {
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "oauth",
+              "api_key"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "method",
+          "name"
+        ],
+        "title": "LoginStartMessage",
+        "type": "object"
+      },
+      "LoginStepMessage": {
+        "description": "One login step of pi (25.7.3).\n\n- `auth_url`: open `url` (the authorization link). `message` has the instructions of the provider.\n- `device_code`: enter `user_code` at `url`.\n- `progress`, `info`: `message` (and for `info` maybe a `url`).\n- `prompt`: show a field for `prompt_type` (`text`, `secret` as a password field, `select` with `options`, or\n  `manual_code` to paste a code) with the label `message`, and answer with `login_answer` and `prompt_id`.",
+        "properties": {
+          "type": {
+            "const": "login_step",
+            "default": "login_step",
+            "title": "Type",
+            "type": "string"
+          },
+          "step": {
+            "enum": [
+              "auth_url",
+              "device_code",
+              "progress",
+              "info",
+              "prompt"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "user_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Code"
+          },
+          "prompt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Id"
+          },
+          "prompt_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "text",
+                  "secret",
+                  "select",
+                  "manual_code"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Type"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoginOptionResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          }
+        },
+        "required": [
+          "step",
+          "message",
+          "url",
+          "user_code",
+          "prompt_id",
+          "prompt_type",
+          "options"
+        ],
+        "title": "LoginStepMessage",
         "type": "object"
       },
       "MessageDeltaMessage": {
