@@ -185,10 +185,11 @@ async def select_overlapping_out_of_sample_parts(
         await cursor.execute(
             """
             SELECT id, strategy_version_id FROM backtest
-            WHERE (status = 'finished' OR id = %(id)s)
-                AND symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
-                AND bar_period = %(bar_period)s
-                AND split_time_utc < %(end_utc)s AND %(split_time_utc)s < end_utc
+            WHERE id = %(id)s
+                OR (status = 'finished'
+                    AND symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
+                    AND bar_period = %(bar_period)s
+                    AND split_time_utc < %(end_utc)s AND %(split_time_utc)s < end_utc)
             ORDER BY id
             """,
             {
