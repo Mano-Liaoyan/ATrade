@@ -710,6 +710,75 @@
         }
       }
     },
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+      "post": {
+        "summary": "Discard Version",
+        "description": "Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).",
+        "operationId": "discard_version_api_strategies__strategy_id__versions__version_number__discard_post",
+        "parameters": [
+          {
+            "name": "strategy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Strategy Id"
+            }
+          },
+          {
+            "name": "version_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/strategies/{strategy_id}/versions": {
       "post": {
         "summary": "Save Version",
@@ -1803,6 +1872,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -1838,6 +1918,7 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "conversation_id",
           "equity_curve",
           "trades"
         ],
@@ -1997,6 +2078,17 @@
                 "type": "null"
               }
             ]
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
           }
         },
         "type": "object",
@@ -2018,7 +2110,8 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
-          "metrics"
+          "metrics",
+          "conversation_id"
         ],
         "title": "BacktestResponse"
       },
@@ -2238,6 +2331,17 @@
               }
             ]
           },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -2277,6 +2381,7 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "conversation_id",
           "equity_curve",
           "trades",
           "code"
@@ -3996,7 +4101,8 @@
             "type": "string",
             "enum": [
               "user",
-              "rule_builder"
+              "rule_builder",
+              "ai_assistant"
             ],
             "title": "Source"
           },
@@ -4011,6 +4117,21 @@
               }
             ],
             "title": "Rules"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "discarded": {
+            "type": "boolean",
+            "title": "Discarded"
           }
         },
         "type": "object",
@@ -4022,7 +4143,9 @@
           "code_sha256",
           "created_at_utc",
           "source",
-          "rules"
+          "rules",
+          "conversation_id",
+          "discarded"
         ],
         "title": "StrategyVersionResponse"
       },
@@ -4049,9 +4172,25 @@
             "type": "string",
             "enum": [
               "user",
-              "rule_builder"
+              "rule_builder",
+              "ai_assistant"
             ],
             "title": "Source"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "discarded": {
+            "type": "boolean",
+            "title": "Discarded"
           }
         },
         "type": "object",
@@ -4060,7 +4199,9 @@
           "version_number",
           "code_sha256",
           "created_at_utc",
-          "source"
+          "source",
+          "conversation_id",
+          "discarded"
         ],
         "title": "StrategyVersionSummary"
       },

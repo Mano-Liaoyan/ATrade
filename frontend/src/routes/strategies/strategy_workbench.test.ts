@@ -14,8 +14,10 @@ import {
   describeShortcut,
   describeSwapButton,
   findFinishedBacktest,
+  findDefaultVersionNumber,
   findRunningForwardTest,
   listResultTabs,
+  listVersionItems,
   listWorkbenchPanels,
   readPaneOrder,
   readWorkbenchShortcut,
@@ -237,5 +239,52 @@ describe('readWorkbenchShortcut', () => {
   it('names the shortcut keys of the platform in the tooltip', () => {
     expect(describeShortcut('forward-test', false)).toBe('Ctrl+Shift+F');
     expect(describeShortcut('save', true)).toBe('Cmd+S');
+  });
+});
+
+describe('listVersionItems', () => {
+  const versions = [
+    { version_number: 1, discarded: false },
+    { version_number: 2, discarded: true },
+    { version_number: 3, discarded: false },
+  ];
+
+  it('hides the discarded versions by default', () => {
+    expect(listVersionItems(versions, { showDiscarded: false, openVersionNumber: 3 })).toEqual([
+      { value: '1', label: 'v1' },
+      { value: '3', label: 'v3' },
+    ]);
+  });
+
+  it('shows the discarded versions with the tag Discarded when the toggle is on', () => {
+    expect(listVersionItems(versions, { showDiscarded: true, openVersionNumber: 3 })).toEqual([
+      { value: '1', label: 'v1' },
+      { value: '2', label: 'v2', tag: 'Discarded' },
+      { value: '3', label: 'v3' },
+    ]);
+  });
+
+  it('keeps the open version in the list when it is discarded', () => {
+    expect(listVersionItems(versions, { showDiscarded: false, openVersionNumber: 2 })).toEqual([
+      { value: '1', label: 'v1' },
+      { value: '2', label: 'v2', tag: 'Discarded' },
+      { value: '3', label: 'v3' },
+    ]);
+  });
+});
+
+describe('findDefaultVersionNumber', () => {
+  it('opens the latest version that is not discarded', () => {
+    expect(
+      findDefaultVersionNumber([
+        { version_number: 1, discarded: false },
+        { version_number: 2, discarded: true },
+      ]),
+    ).toBe(1);
+  });
+
+  it('opens the latest version when all versions are discarded', () => {
+    expect(findDefaultVersionNumber([{ version_number: 4, discarded: true }])).toBe(4);
+    expect(findDefaultVersionNumber([])).toBeUndefined();
   });
 });

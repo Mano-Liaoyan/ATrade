@@ -13,8 +13,6 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_access import check_backtest_request, check_saved_bars
-from atrade.backtest.backtest_exchange_rates import save_exchange_rates
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -23,6 +21,7 @@ from atrade.backtest.backtest_limits import (
     save_backtest_limits,
 )
 from atrade.backtest.backtest_metrics import BacktestMetrics
+from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
@@ -81,6 +80,8 @@ class BacktestResponse(BaseModel):
     started_at_utc: datetime | None
     ended_at_utc: datetime | None
     metrics: BacktestMetricsResponse | None
+    # The conversation of the AI assistant that started the backtest. Null for a backtest of the user.
+    conversation_id: int | None
 
 
 class EquityPointResponse(BaseModel):
@@ -157,6 +158,7 @@ class BacktestRoutes:
             started_at_utc=row.started_at_utc,
             ended_at_utc=row.ended_at_utc,
             metrics=to_metrics_response(backtest_store.read_metrics(row)),
+            conversation_id=row.conversation_id,
         )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
@@ -167,29 +169,19 @@ class BacktestRoutes:
             time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
             paper_capital_usd=request.paper_capital_usd,
         )
-        refusal = check_backtest_request(backtest_request)
-        if refusal is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
-        strategy_version = await read_strategy_version(
-            database_url=self.database_url, strategy_version_id=request.strategy_version_id
+        started = await start_backtest(
+            database_url=self.database_url,
+            exchange_rate_reader=self.exchange_rate_reader,
+            request=backtest_request,
+            created_at_utc=self.clock.read_now_utc(),
         )
-        if strategy_version is None:
-            detail = f"Strategy version {request.strategy_version_id} does not exist."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
-        missing_bars = await check_saved_bars(database_url=self.database_url, request=backtest_request)
-        if missing_bars is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_bars)
-        # The child never calls IBKR, so the rates of an instrument that is not in USD are saved first (section 10.8).
-        missing_rates = await save_exchange_rates(
-            database_url=self.database_url, exchange_rate_reader=self.exchange_rate_reader, request=backtest_request
-        )
-        if missing_rates is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_rates)
-        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            row = await backtest_store.insert_backtest(
-                connection, request=backtest_request, created_at_utc=self.clock.read_now_utc()
-            )
+        if isinstance(started, BacktestRefusal):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=started.detail)
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            row = await backtest_store.select_backtest(connection, started)
+        if row is None:
+            message = f"Backtest {started} is missing after its start."
+            raise RuntimeError(message)
         return await self.to_backtest_response(row)
 
     async def list_backtests(self) -> list[BacktestResponse]:

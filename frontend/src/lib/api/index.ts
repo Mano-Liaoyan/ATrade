@@ -214,6 +214,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard Version
+         * @description Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).
+         */
+        post: operations["discard_version_api_strategies__strategy_id__versions__version_number__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies/{strategy_id}/versions": {
         parameters: {
             query?: never;
@@ -545,6 +565,8 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -615,6 +637,8 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
         };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
@@ -703,6 +727,8 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
@@ -1332,11 +1358,15 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
             /** Rules */
             rules: {
                 [key: string]: unknown;
             } | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1355,7 +1385,11 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "user" | "rule_builder";
+            source: "user" | "rule_builder" | "ai_assistant";
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
@@ -2205,6 +2239,56 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_version_api_strategies__strategy_id__versions__version_number__discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

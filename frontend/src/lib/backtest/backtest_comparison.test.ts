@@ -22,6 +22,7 @@ function makeBacktest(id: number, strategyId: number, strategyName: string): Bac
     started_at_utc: null,
     ended_at_utc: null,
     metrics: null,
+    conversation_id: null,
   };
 }
 

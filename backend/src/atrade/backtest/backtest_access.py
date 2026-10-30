@@ -66,10 +66,14 @@ async def check_saved_bars(*, database_url: str, request: BacktestRequest) -> st
     return describe_missing_bars(request)
 
 
-async def queue_backtest(*, database_url: str, request: BacktestRequest, created_at_utc: datetime) -> int:
+async def queue_backtest(
+    *, database_url: str, request: BacktestRequest, created_at_utc: datetime, conversation_id: int | None = None
+) -> int:
     """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it."""
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        row = await backtest_store.insert_backtest(connection, request=request, created_at_utc=created_at_utc)
+        row = await backtest_store.insert_backtest(
+            connection, request=request, created_at_utc=created_at_utc, conversation_id=conversation_id
+        )
     return row.id
 
 

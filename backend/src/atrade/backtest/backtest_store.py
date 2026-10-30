@@ -51,12 +51,13 @@ class BacktestRow:
     total_return_percent: Decimal | None
     max_drawdown_percent: Decimal | None
     trade_count: int | None
+    conversation_id: int | None
 
 
 BACKTEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc, paper_capital_usd,
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
-    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count
+    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count, conversation_id
 """
 
 
@@ -87,15 +88,19 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
 
 
 async def insert_backtest(
-    connection: psycopg.AsyncConnection, *, request: BacktestRequest, created_at_utc: datetime
+    connection: psycopg.AsyncConnection,
+    *,
+    request: BacktestRequest,
+    created_at_utc: datetime,
+    conversation_id: int | None = None,
 ) -> BacktestRow:
     async with connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, status, created_at_utc)
+                paper_capital_usd, status, created_at_utc, conversation_id)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s)
+                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s, %(conversation_id)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -108,6 +113,7 @@ async def insert_backtest(
                 "end_utc": request.time_range.end_utc,
                 "paper_capital_usd": request.paper_capital_usd,
                 "created_at_utc": created_at_utc,
+                "conversation_id": conversation_id,
             },
         )
         inserted_row = await cursor.fetchone()

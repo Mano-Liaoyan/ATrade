@@ -73,7 +73,9 @@ async def test_the_rules_of_a_version_cannot_be_changed(web_client: httpx.AsyncC
 
 
 @pytest.mark.anyio
-async def test_the_source_accepts_only_user_and_rule_builder(web_client: httpx.AsyncClient, database_url: str) -> None:
+async def test_the_source_accepts_only_user_rule_builder_and_ai_assistant(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
     strategy = (await web_client.post("/api/strategies", json={"name": "Moving average"})).json()
     insert_version = """
         INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc, source)
@@ -89,10 +91,14 @@ async def test_the_source_accepts_only_user_and_rule_builder(web_client: httpx.A
             insert_version,
             {"strategy_id": strategy["id"], "version_number": 3, "source": "rule_builder", "now": CREATED_AT_UTC},
         )
+        connection.execute(
+            insert_version,
+            {"strategy_id": strategy["id"], "version_number": 4, "source": "ai_assistant", "now": CREATED_AT_UTC},
+        )
         with pytest.raises(psycopg.errors.CheckViolation):
             connection.execute(
                 insert_version,
-                {"strategy_id": strategy["id"], "version_number": 4, "source": "ai_assistant", "now": CREATED_AT_UTC},
+                {"strategy_id": strategy["id"], "version_number": 5, "source": "assistant", "now": CREATED_AT_UTC},
             )
 
 

@@ -1394,7 +1394,7 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Port 8001 app (phase 2): a unit test asserts that its routes are exactly
   the allow-list of section 25. A test asserts `403` on port 8000 for a
   request from the assistant subnet. A test asserts that a save on port 8001
-  records the source `assistant` and the conversation ID.
+  records the source `ai_assistant` and the conversation ID.
 - Market data (phase 3): the source order merge rule, the Databento import
   (price rules, 7 regular-hours hourly bars, split and symbol link
   detection), the quarterly universe (63-day ranking, retry and fallback
@@ -1677,6 +1677,11 @@ option and records it in this document.
 - Decided (#171): a named CHECK constraint holds the values of
   `strategy_version.source`, and `read_strategy_version` does not return
   `source` and `rules` (strategy section 9.1.1).
+- Decided (#180): the table `strategy_version_discard` holds the discarded
+  mark, the source value of the AI assistant is `ai_assistant`, Keep of a
+  diff card is not recorded, and the discard route answers `409` for a
+  version that the AI assistant did not save (strategy sections 9.1.1 and
+  9.6, assistant section 25.14).
 - Decided (#177): a `SideColumn` stores `{isMinimized, widthPixels}` under
   its `storageKey`. `widthPixels` null gives the default width, and a
   double-click on the splitter sets it to null. A value stored before the

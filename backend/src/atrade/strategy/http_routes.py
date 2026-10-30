@@ -11,8 +11,8 @@ from pydantic import BaseModel, StringConstraints
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.strategy import strategy_store
-from atrade.strategy.code_checks import check_strategy_code
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
+from atrade.strategy.version_saving import save_checked_version
 
 MAX_STRATEGY_NAME_LENGTH = 100
 FIRST_VERSION_NUMBER = 1
@@ -36,6 +36,8 @@ class StrategyVersionSummary(BaseModel):
     code_sha256: str
     created_at_utc: datetime
     source: strategy_store.VersionSource
+    conversation_id: int | None
+    discarded: bool
 
 
 class StrategyResponse(BaseModel):
@@ -60,6 +62,8 @@ class StrategyVersionResponse(BaseModel):
     created_at_utc: datetime
     source: strategy_store.VersionSource
     rules: dict[str, Any] | None
+    conversation_id: int | None
+    discarded: bool
 
 
 class CodeProblemResponse(BaseModel):
@@ -81,6 +85,8 @@ def to_version_response(version: strategy_store.StrategyVersionRecord) -> Strate
         created_at_utc=version.created_at_utc,
         source=version.source,
         rules=version.rules,
+        conversation_id=version.conversation_id,
+        discarded=version.discarded,
     )
 
 
@@ -96,6 +102,8 @@ async def read_strategy_response(connection: psycopg.AsyncConnection, strategy_i
             code_sha256=version.code_sha256,
             created_at_utc=version.created_at_utc,
             source=version.source,
+            conversation_id=version.conversation_id,
+            discarded=version.discarded,
         )
         for version in versions
     ]
@@ -153,23 +161,40 @@ class StrategyRoutes:
         self, strategy_id: int, request: SaveVersionRequest, response: Response
     ) -> StrategyVersionResponse | JSONResponse:
         """Checks the code first. Then it appends a version, or returns the latest version when the code is the same."""
-        problems = await check_strategy_code(request.code)
-        if problems:
-            problem_responses = [
-                CodeProblemResponse(line=problem.line, message=problem.message) for problem in problems
-            ]
+        saved = await save_checked_version(
+            database_url=self.database_url,
+            strategy_id=strategy_id,
+            content=strategy_store.VersionContent(code=request.code, source="user", rules=None),
+            created_at_utc=self.clock.read_now_utc(),
+        )
+        if isinstance(saved, list):
+            problem_responses = [CodeProblemResponse(line=problem.line, message=problem.message) for problem in saved]
             failure = CodeCheckFailedResponse(problems=problem_responses)
             return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=failure.model_dump())
-        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            saved = await strategy_store.save_version(
-                connection, strategy_id=strategy_id, code=request.code, created_at_utc=self.clock.read_now_utc()
-            )
-            await connection.commit()
         if saved is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy not found.")
         if not saved.is_new_version:
             response.status_code = status.HTTP_200_OK
         return to_version_response(saved.version)
+
+    async def discard_version(self, strategy_id: int, version_number: int) -> StrategyVersionResponse:
+        """Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5)."""
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            result = await strategy_store.discard_version(
+                connection,
+                strategy_id=strategy_id,
+                version_number=version_number,
+                discarded_at_utc=self.clock.read_now_utc(),
+            )
+            await connection.commit()
+        if result == strategy_store.DiscardResult.NOT_FOUND:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Strategy version not found.")
+        if result == strategy_store.DiscardResult.NOT_AI_ASSISTANT:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only a strategy version that the AI assistant saved can be discarded.",
+            )
+        return await self.read_version(strategy_id, version_number)
 
     async def delete_strategy(self, strategy_id: int) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
@@ -205,6 +230,12 @@ def create_strategy_router(*, database_url: str, clock: Clock) -> APIRouter:
     )
     router.add_api_route(
         "/{strategy_id}/versions/{version_number}", routes.read_version, methods=["GET"], responses=not_found
+    )
+    router.add_api_route(
+        "/{strategy_id}/versions/{version_number}/discard",
+        routes.discard_version,
+        methods=["POST"],
+        responses={**not_found, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
     )
     router.add_api_route(
         "/{strategy_id}/versions",
