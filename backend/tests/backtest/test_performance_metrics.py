@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from atrade.backtest import BacktestMetrics, BacktestTrade, EquityPoint, calculate_metrics
+from atrade.backtest.backtest_metrics import NEW_METRIC_NAMES
 from atrade.foundation.bar import TimeRange
 
 PAPER_CAPITAL = Decimal(10000)
@@ -157,3 +158,32 @@ def test_no_round_trip_gives_no_round_trip_metrics() -> None:
     assert metrics.missing_reasons["average_win_percent"] == "No round trips"
     assert metrics.exposure_percent == Decimal("0.00")
     assert metrics.turnover_per_year == Decimal("0.00")
+
+
+def test_a_max_drawdown_below_the_rounding_step_still_gives_a_calmar_ratio() -> None:
+    # The max drawdown is 0.5 / 10100 = 0.00495 %. It shows as 0.00 %, but it is not 0.
+    metrics = metrics_of(daily_curve("10100", "10099.5", "10300"))
+
+    assert metrics.max_drawdown_percent == Decimal("0.00")
+    assert metrics.calmar_ratio is not None
+    assert "calmar_ratio" not in metrics.missing_reasons
+
+
+def test_a_test_without_equity_points_gives_reasons_only_for_the_metrics_without_a_value() -> None:
+    metrics = metrics_of([], WORKED_TRADES)
+
+    assert metrics.exposure_percent is None
+    assert metrics.win_rate_percent == Decimal("50.00")
+    assert metrics.cagr_percent == Decimal("0.00")
+    assert set(metrics.missing_reasons) == {
+        name for name in NEW_METRIC_NAMES if getattr(metrics, name) is None
+    }
+
+
+def test_a_range_without_length_gives_no_turnover() -> None:
+    no_length = TimeRange(start_utc=RANGE_OF_90_DAYS.start_utc, end_utc=RANGE_OF_90_DAYS.start_utc)
+
+    metrics = metrics_of(WORKED_CURVE, WORKED_TRADES, no_length)
+
+    assert metrics.turnover_per_year is None
+    assert metrics.missing_reasons["turnover_per_year"] == "The mean equity is not above 0, or the range has no length"

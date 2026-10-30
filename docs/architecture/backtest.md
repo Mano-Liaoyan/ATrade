@@ -558,7 +558,8 @@ backtest run and no new data source.
   risk-free rate of 2 %.
 - Decided (#165): the trading day of a daily return is the UTC date of the
   equity point. Reason: it is the simplest, and the bars of one US trading
-  session end on one UTC date.
+  session end on one UTC date. A day after an equity of 0 has no daily
+  return, because a change from 0 has no value.
 
 ### 10.9.2 New metrics
 
@@ -610,7 +611,7 @@ saved values, so the table needs no reason column. These are the reasons:
 | `win_rate_percent` and the round trip metrics | "No round trips" |
 | `average_win_usd`, `average_win_percent` | "No round trip with a profit" |
 | `profit_factor`, `average_loss_usd` | "No round trip with a loss" |
-| `turnover_per_year` | "The mean equity is not above 0" |
+| `turnover_per_year` | "The mean equity is not above 0, or the range has no length" |
 | All 12 new fields | "The test has no equity points, or it ended before ATrade calculated this metric" (a backtest that finished before the migration) |
 
 The average win in percent is the mean of the percents of the round trips

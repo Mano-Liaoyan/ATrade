@@ -101,7 +101,8 @@ def calculate_equity_curve(
 
 def calculate_daily_returns(*, start_capital_usd: Decimal, equity_curve: list[EquityPoint]) -> list[Decimal]:
     """The change of the last equity point of each trading day from the last point of the trading day before, as a
-    fraction (0.02 is 2 %). The first trading day uses `start_capital_usd`. A trading day is a UTC date.
+    fraction (0.02 is 2 %). The first trading day uses `start_capital_usd`. A trading day is a UTC date. A day after
+    an equity of 0 has no return, because the change from 0 has no value.
     """
     last_equity_by_day: dict[date, Decimal] = {}
     for point in sorted(equity_curve, key=lambda point: point.time_utc):
@@ -109,7 +110,8 @@ def calculate_daily_returns(*, start_capital_usd: Decimal, equity_curve: list[Eq
     daily_returns: list[Decimal] = []
     equity_before_usd = start_capital_usd
     for equity_usd in last_equity_by_day.values():
-        daily_returns.append(equity_usd / equity_before_usd - 1)
+        if equity_before_usd != 0:
+            daily_returns.append(equity_usd / equity_before_usd - 1)
         equity_before_usd = equity_usd
     return daily_returns
 
@@ -158,14 +160,14 @@ def find_round_trips(trades: list[BacktestTrade]) -> list[RoundTrip]:
 
 
 def calculate_max_drawdown_percent(*, paper_capital_usd: Decimal, equity_curve: list[EquityPoint]) -> Decimal:
-    """The largest fall from a peak, as a percent of that peak. The paper capital is the first peak."""
+    """The largest fall from a peak, as a percent of that peak, not rounded. The paper capital is the first peak."""
     peak_usd = paper_capital_usd
     max_drawdown_percent = Decimal(0)
     for point in equity_curve:
         peak_usd = max(peak_usd, point.equity_usd)
         drawdown_percent = (peak_usd - point.equity_usd) / peak_usd * PERCENT
         max_drawdown_percent = max(max_drawdown_percent, drawdown_percent)
-    return max_drawdown_percent.quantize(PERCENT_STEP)
+    return max_drawdown_percent
 
 
 @dataclass(frozen=True)
@@ -253,7 +255,7 @@ def calculate_turnover_per_year(
     equity_curve: list[EquityPoint], trades: list[BacktestTrade], years: Decimal
 ) -> Decimal | None:
     """The amount of all fills, divided by the mean equity of all equity points, divided by `years`."""
-    if not equity_curve:
+    if not equity_curve or years <= 0:
         return None
     mean_equity_usd = statistics.mean(point.equity_usd for point in equity_curve)
     if mean_equity_usd <= 0:
@@ -289,7 +291,7 @@ def calculate_metrics(
     return BacktestMetrics(
         final_equity_usd=final_equity_usd,
         total_return_percent=total_return_percent.quantize(PERCENT_STEP),
-        max_drawdown_percent=max_drawdown_percent,
+        max_drawdown_percent=round_value(max_drawdown_percent),
         trade_count=len(trades),
         cagr_percent=None if cagr_percent is None else round_value(cagr_percent),
         annual_volatility_percent=ratio_metrics.annual_volatility_percent,
@@ -368,8 +370,8 @@ def find_round_trip_reasons(metrics: BacktestMetrics) -> dict[str, str]:
 def find_missing_reasons(metrics: BacktestMetrics) -> dict[str, str]:
     """The reason of each metric that is None (docs/architecture/backtest.md section 10.9.3), by its field name."""
     if metrics.exposure_percent is None:
-        return dict.fromkeys(NEW_METRIC_NAMES, NOT_CALCULATED)
+        return {name: NOT_CALCULATED for name in NEW_METRIC_NAMES if getattr(metrics, name) is None}
     reasons = {**find_ratio_reasons(metrics), **find_cagr_reasons(metrics), **find_round_trip_reasons(metrics)}
     if metrics.turnover_per_year is None:
-        reasons["turnover_per_year"] = "The mean equity is not above 0"
+        reasons["turnover_per_year"] = "The mean equity is not above 0, or the range has no length"
     return reasons

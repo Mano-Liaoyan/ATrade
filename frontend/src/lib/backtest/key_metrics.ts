@@ -1,6 +1,6 @@
 // The key metric row of a backtest or a forward test (spec #99): the same metrics in the same order with the same
 // sign rule on all pages. The max drawdown is a loss, so it shows as a negative percent, for example "-37.71 %".
-// The API has no win rate: it comes from the trades here. The API has no Sharpe ratio, so the row has none.
+// The forward test API has no win rate yet (#170): it comes from the trades here. The row has no Sharpe ratio.
 import { formatSignedNumber, MISSING_VALUE } from '#lib/foundation/value_format';
 import type { BacktestMetrics } from './backtest_api';
 import { formatMaxDrawdown, formatPercent, formatUsd } from './backtest_format';

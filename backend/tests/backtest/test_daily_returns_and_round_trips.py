@@ -69,3 +69,11 @@ def test_a_round_trip_goes_from_no_position_back_to_no_position_with_the_profit_
             entry_amount_usd=Decimal(250),
         ),
     ]
+
+
+def test_a_day_after_an_equity_of_0_has_no_daily_return() -> None:
+    equity_curve = [point(2, 21, "0"), point(3, 21, "100")]
+
+    daily_returns = calculate_daily_returns(start_capital_usd=Decimal(10000), equity_curve=equity_curve)
+
+    assert daily_returns == [Decimal(-1)]
