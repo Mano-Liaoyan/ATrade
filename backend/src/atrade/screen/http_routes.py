@@ -15,6 +15,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.screen import screen_store
 from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
+from atrade.screen.screen_run import name_indicator
 from atrade.screen.screen_running import run_saved_screen
 
 DEFAULT_PAGE_SIZE = 50
@@ -113,6 +114,23 @@ class ScreenResultExclusionResponse(BaseModel):
     reason: str
 
 
+class ScreenIndicatorNamesResponse(BaseModel):
+    """The UI names of the indicators of the definition, for example "RSI(14)" (screen.md section 24.7)."""
+
+    # One name for each indicator condition, in the order of the definition.
+    indicator_conditions: list[str]
+    order: str
+
+
+def name_definition_indicators(definition: dict[str, Any]) -> ScreenIndicatorNamesResponse:
+    return ScreenIndicatorNamesResponse(
+        indicator_conditions=[
+            name_indicator(condition["indicator"]) for condition in definition["indicator_conditions"]
+        ],
+        order=name_indicator(definition["order"]["indicator"]),
+    )
+
+
 class ScreenResultResponse(BaseModel):
     id: int
     screen_id: int
@@ -121,6 +139,7 @@ class ScreenResultResponse(BaseModel):
     summary: ScreenRunSummaryResponse
     # The copy of the screen definition at the run.
     definition: dict[str, Any]
+    indicator_names: ScreenIndicatorNamesResponse
     rows: list[ScreenResultRowResponse]
     exclusions: list[ScreenResultExclusionResponse]
 
@@ -158,6 +177,7 @@ async def read_screen_result_response(
         assistant_conversation_id=result.assistant_conversation_id,
         summary=summary,
         definition=result.definition,
+        indicator_names=name_definition_indicators(result.definition),
         rows=[to_row_response(row) for row in rows],
         exclusions=[
             ScreenResultExclusionResponse(

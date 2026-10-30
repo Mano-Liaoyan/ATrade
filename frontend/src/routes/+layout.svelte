@@ -35,6 +35,7 @@
 
   const PAGE_LINKS = [
     { label: 'Home', href: resolve('/') },
+    { label: 'Screens', href: resolve('/screens/[[screenId]]', {}) },
     { label: 'Strategies', href: resolve('/strategies') },
     { label: 'Backtests', href: resolve('/backtests/[[backtestId]]', {}) },
     { label: 'Forward tests', href: resolve('/forward-tests/[[forwardTestId]]', {}) },

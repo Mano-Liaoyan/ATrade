@@ -941,7 +941,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - New pages and parts of the map #129 (section 20.1):
   - The screen page `/screens/<id>` is a workbench
     (`docs/architecture/screen.md` section 24.10). `#lib/screen` holds its
-    HTTP client and parts.
+    HTTP client and parts. Decided (#207): the route is
+    `src/routes/screens/[[screenId]]/` (an optional parameter, as the
+    backtest page), `?result=<id>` opens one run, and the "Screens"
+    `SideColumn` is `routes/screens/ScreenList.svelte`. `ConditionBar` is
+    read-only and has no page state, so the condition card of the AI
+    assistant can use it. The condition bar, the result table, the excluded
+    table, and the screen list each scroll in their own `ScrollRegion`.
   - The backtest page gets a robustness row under `KeyMetricRow`, a Metrics
     tab, and one vertical line at the split time on the equity chart (phase
     1). A multi-instrument backtest gets an Instruments tab and a Symbol
@@ -2020,6 +2026,14 @@ option and records it in this document.
   USD conversion, and when the Web process records fills) is in
   [`paper_trading.md`](architecture/paper_trading.md) sections 11.10 and
   11.13.
+- Decided (#207): `/screens` stores the id of the last opened screen in the
+  browser storage (`atrade.screen-page.last-screen`). Without it, `/screens`
+  opens the first screen of the list. The side column shows the last 10 runs
+  of `GET /api/screens/{id}`. "Add to watchlist" sends one
+  `POST /api/watchlist` for each instrument, one after the other, and then
+  shows how many it added. The tag value color is `$link-primary` (blue 60
+  in g10, blue 40 in g100): blue 70 is not a token. `docs/architecture/screen.md`
+  section 24.13 has the details.
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`
