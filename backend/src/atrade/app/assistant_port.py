@@ -66,20 +66,27 @@ def create_assistant_port_app(*, settings: Settings, clock: Clock, gateway_conne
 
 
 def is_assistant_address(scope: Scope) -> bool:
-    """True when the local address of the request (ASGI `server`) is in the assistant subnet."""
-    server = scope.get("server")
-    if server is None:
+    """True when the peer address (ASGI `client`) is in the assistant subnet and is not the local address.
+
+    The local address (ASGI `server`) alone is not enough: rootless Podman sends a published port to the address of
+    web in atrade-assistant-internal and connects from that same address. A peer that is web itself is not assistant.
+    """
+    client = scope.get("client")
+    if client is None:
         return False
     try:
-        address = ipaddress.ip_address(server[0])
+        peer = ipaddress.ip_address(client[0])
     except ValueError:
         # A host name (for example in a test client) is not an address of the subnet.
         return False
-    return address in ASSISTANT_SUBNET
+    if peer not in ASSISTANT_SUBNET:
+        return False
+    server = scope.get("server")
+    return server is None or server[0] != client[0]
 
 
 class RefuseAssistantSubnet:
-    """ASGI middleware of port 8000: 403 for each request that arrives on an address of the assistant subnet."""
+    """ASGI middleware of port 8000: 403 for each request from another address of the assistant subnet."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app

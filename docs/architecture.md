@@ -315,9 +315,10 @@ A restart of `web` does not stop forward tests.
 | `GET /api/health` | `200` with `{"status": "ok", "database": "ok", "time_utc": ...}` when the Web process can connect to PostgreSQL. `503` with `"status": "degraded"` and `"database": "unreachable"` when it cannot. The time comes from `foundation/clock`. |
 | `GET /{path}` | The built frontend (section 14.1). It is mounted after all other routers. |
 
-Port 8000 refuses with `403` each request that arrives on a local address
-(ASGI `scope["server"]`) of the `atrade-assistant-internal` subnet
-`172.31.250.0/24` (section 25). The middleware is `RefuseAssistantSubnet` in
+Port 8000 refuses with `403` each request whose peer address (ASGI
+`scope["client"]`) is in the `atrade-assistant-internal` subnet
+`172.31.250.0/24` and is not the local address (ASGI `scope["server"]`)
+(section 25.3.2). The middleware is `RefuseAssistantSubnet` in
 `app/assistant_port.py`. The body is `{"detail": "Port 8000 does not answer
 requests from the assistant network."}`. A WebSocket from this subnet is
 closed before accept, so uvicorn answers `403`.

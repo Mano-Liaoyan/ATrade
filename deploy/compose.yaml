@@ -131,6 +131,10 @@ services:
       # The pi files: later the credential file and the conversation files. ATrade never deletes or changes it.
       - assistant-pi:/data
     read_only: true
+    # Without raw sockets, assistant cannot send packets with the address of web, which port 8000 lets through
+    # (docs/architecture/assistant.md 25.3.2).
+    cap_drop:
+      - NET_RAW
     tmpfs:
       - /tmp
     mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT:-1g}
