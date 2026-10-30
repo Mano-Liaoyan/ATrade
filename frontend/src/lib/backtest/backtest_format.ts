@@ -1,6 +1,6 @@
 // Labels and values that the backtest pages show.
 import type { StatusKind } from '#lib/foundation/carbon';
-import { formatSignedPercent } from '#lib/foundation/value_format';
+import { formatSignedPercent, MISSING_VALUE } from '#lib/foundation/value_format';
 import type { BacktestStatus } from './backtest_api';
 
 const STATUS_LABELS: Record<BacktestStatus, string> = {
@@ -58,6 +58,16 @@ export function formatMaxDrawdown(maxDrawdownPercent: string): { text: string; c
 
 export function formatUsd(amount: string): string {
   return AMOUNT_FORMAT.format(Number(amount));
+}
+
+/** A ratio of the API with 2 decimal places ("1.23"), or "–" for null. */
+export function formatRatio(ratio: string | null): string {
+  return ratio === null ? MISSING_VALUE : AMOUNT_FORMAT.format(Number(ratio));
+}
+
+/** A share of the API without a sign ("66.67 %"), or "–" for null. */
+export function formatUnsignedPercent(percent: string | null): string {
+  return percent === null ? MISSING_VALUE : `${AMOUNT_FORMAT.format(Number(percent))} %`;
 }
 
 // The backend stores the timeout in seconds. The UI shows and takes it in minutes.

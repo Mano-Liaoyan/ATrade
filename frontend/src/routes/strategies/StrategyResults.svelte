@@ -81,7 +81,7 @@
       <StatusIndicator label={describeBacktestStatus(run.status)} kind={findBacktestStatusKind(run.status)} />
     </div>
   {:else}
-    <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} trades={run.trades} />
+    <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} />
     <div class="chart">
       {#key run.id}
         <EquityDrawdownChart
