@@ -135,9 +135,11 @@ async def select_version(
 
 
 async def save_version(
-    connection: psycopg.AsyncConnection, *, strategy_id: int, code: str, created_at_utc: datetime
+    connection: psycopg.AsyncConnection, *, strategy_id: int, content: VersionContent, created_at_utc: datetime
 ) -> SavedVersion | None:
     """Appends a version when the code differs from the latest version. Returns None when the strategy is missing.
+
+    A rule builder save also appends a version when only the rules differ (section 9.1).
 
     The caller runs this in a transaction. FOR UPDATE on the strategy row makes two saves of the same
     strategy wait for each other, so they cannot get the same version number.
@@ -159,18 +161,23 @@ async def save_version(
             {"strategy_id": strategy_id},
         )
         latest_version = await cursor.fetchone()
-    code_sha256 = calculate_code_sha256(code)
-    if latest_version is not None and latest_version.code_sha256 == code_sha256:
+    if latest_version is not None and is_same_content(latest_version, content):
         return SavedVersion(version=latest_version, is_new_version=False)
     next_version_number = 1 if latest_version is None else latest_version.version_number + 1
     new_version = await insert_version(
         connection,
         strategy_id=strategy_id,
         version_number=next_version_number,
-        content=VersionContent(code=code, source="user", rules=None),
+        content=content,
         created_at_utc=created_at_utc,
     )
     return SavedVersion(version=new_version, is_new_version=True)
+
+
+def is_same_content(latest_version: StrategyVersionRecord, content: VersionContent) -> bool:
+    if latest_version.code_sha256 != calculate_code_sha256(content.code):
+        return False
+    return content.source != "rule_builder" or latest_version.rules == content.rules
 
 
 async def insert_version(
