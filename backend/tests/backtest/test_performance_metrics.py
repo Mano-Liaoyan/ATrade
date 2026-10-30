@@ -175,9 +175,7 @@ def test_a_test_without_equity_points_gives_reasons_only_for_the_metrics_without
     assert metrics.exposure_percent is None
     assert metrics.win_rate_percent == Decimal("50.00")
     assert metrics.cagr_percent == Decimal("0.00")
-    assert set(metrics.missing_reasons) == {
-        name for name in NEW_METRIC_NAMES if getattr(metrics, name) is None
-    }
+    assert set(metrics.missing_reasons) == {name for name in NEW_METRIC_NAMES if getattr(metrics, name) is None}
 
 
 def test_a_range_without_length_gives_no_turnover() -> None:
