@@ -116,6 +116,8 @@ async def test_a_run_saves_a_screen_result_that_the_read_route_gives_back(
         "market": "US",
         "assistant_conversation_id": None,
         "definition": definition,
+        # The UI names of the indicators of the definition: one for each indicator condition, and the order.
+        "indicator_names": {"indicator_conditions": ["SMA(2)"], "order": "SMA(3)"},
         "summary": {
             "row_count": 2,
             "start_count": 4,
