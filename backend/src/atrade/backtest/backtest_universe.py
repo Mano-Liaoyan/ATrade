@@ -119,9 +119,10 @@ async def check_universe_bars(
 
 
 def find_universe_look_back_length(bar_period: BarPeriod, single_look_back: timedelta) -> timedelta:
-    """1 year for 1-day bars. 1-hour bars use the look-back of a single-instrument backtest (section 10.10.8)."""
+    """At least 1 year for 1-day bars. 1-hour bars use the look-back of a single-instrument backtest (section
+    10.10.8). A longer look-back of the strategy version (#164) also applies."""
     if bar_period == BarPeriod.ONE_DAY:
-        return ONE_DAY_UNIVERSE_LOOK_BACK
+        return max(ONE_DAY_UNIVERSE_LOOK_BACK, single_look_back)
     return single_look_back
 
 

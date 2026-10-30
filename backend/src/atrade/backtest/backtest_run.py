@@ -49,16 +49,45 @@ from atrade.foundation.clock import Clock
 from atrade.market_data import BarRequest, BarSource, read_saved_bars, read_source_order
 from atrade.strategy import read_strategy_version
 
-# The look-back is the warm-up of the strategy template: 3 average periods of its default 20 bars, and 1 week at
-# least (docs/architecture/backtest.md section 10.3). A strategy that asks for more gets only these bars.
+# The default look-back is the warm-up of the strategy template: 3 average periods of its default 20 bars, and
+# 1 week at least (docs/architecture/backtest.md section 10.3.1). A strategy without rules gets only these bars.
 LOOK_BACK_AVERAGE_PERIOD_BARS = 20
 LOOK_BACK_AVERAGE_PERIODS = 3
 MIN_LOOK_BACK_LENGTH = timedelta(days=7)
+# A daily bar comes on about 252 of 365 days, and an intraday bar only in the trading hours (about 6.5 of 24 hours
+# on 5 of 7 days). The read range for a bar count is this many bar lengths per bar, so that it holds the bars.
+DAILY_CALENDAR_FACTOR = 2
+INTRADAY_CALENDAR_FACTOR = 6
 
 
-def find_look_back_length(bar_period: BarPeriod) -> timedelta:
-    """How long before the backtest start the saved look-back bars go, for `request_bars` in the strategy."""
-    return max(bar_period.length * LOOK_BACK_AVERAGE_PERIOD_BARS * LOOK_BACK_AVERAGE_PERIODS, MIN_LOOK_BACK_LENGTH)
+@dataclass(frozen=True)
+class LookBack:
+    """The bars before the start that answer `request_bars` of the strategy (section 10.3.1).
+
+    The read range goes `length` back from the start. With a `bar_count`, only the last bars of this count stay: the
+    bars that the longest indicator of the rules needs (#164).
+    """
+
+    length: timedelta
+    bar_count: int | None
+
+    def keep_bars(self, bars: list[Bar]) -> list[Bar]:
+        return bars if self.bar_count is None else bars[-self.bar_count :]
+
+
+def find_look_back(bar_period: BarPeriod, warm_up_bar_count: int | None = None) -> LookBack:
+    """The look-back of a strategy version. `warm_up_bar_count` is the bar count of the longest indicator of the
+    rules, or None for a version without rules: then the look-back is the default length and keeps all bars.
+    """
+    default_length = max(
+        bar_period.length * LOOK_BACK_AVERAGE_PERIOD_BARS * LOOK_BACK_AVERAGE_PERIODS, MIN_LOOK_BACK_LENGTH
+    )
+    if warm_up_bar_count is None:
+        return LookBack(length=default_length, bar_count=None)
+    factor = DAILY_CALENDAR_FACTOR if bar_period == BarPeriod.ONE_DAY else INTRADAY_CALENDAR_FACTOR
+    return LookBack(
+        length=max(bar_period.length * warm_up_bar_count * factor, default_length), bar_count=warm_up_bar_count
+    )
 
 
 @dataclass(frozen=True)
@@ -87,7 +116,7 @@ class BacktestInputs:
 
 
 async def read_universe_inputs(
-    *, database_url: str, backtest_id: int, request: BacktestRequest, source_order: list[BarSource]
+    *, database_url: str, backtest_id: int, request: BacktestRequest, source_order: list[BarSource], look_back: LookBack
 ) -> UniverseInputs:
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         periods = await backtest_store.select_universe_periods(
@@ -98,13 +127,13 @@ async def read_universe_inputs(
         request=request,
         periods=periods,
         source_order=source_order,
-        look_back_length=find_universe_look_back_length(request.bar_period, find_look_back_length(request.bar_period)),
+        look_back_length=find_universe_look_back_length(request.bar_period, look_back.length),
     )
     return UniverseInputs(periods=periods, bars=bars)
 
 
 async def read_single_inputs(
-    *, request: BacktestRequest, database_url: str, source_order: list[BarSource]
+    *, request: BacktestRequest, database_url: str, source_order: list[BarSource], look_back: LookBack
 ) -> tuple[list[Bar], list[Bar], dict[BarSource, int]]:
     """The bars of the range, the look-back bars, and the bar count of each bar source in the range."""
     saved_bars = await read_saved_bars(
@@ -120,11 +149,11 @@ async def read_single_inputs(
         bar_request=BarRequest(
             instrument=request.single_instrument,
             bar_period=request.bar_period,
-            time_range=TimeRange(start_utc=start_utc - find_look_back_length(request.bar_period), end_utc=start_utc),
+            time_range=TimeRange(start_utc=start_utc - look_back.length, end_utc=start_utc),
         ),
         source_order=source_order,
     )
-    return saved_bars.bars, saved_look_back_bars.bars, saved_bars.bar_counts
+    return saved_bars.bars, look_back.keep_bars(saved_look_back_bars.bars), saved_bars.bar_counts
 
 
 async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> BacktestInputs:
@@ -144,12 +173,17 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
     # The source order of the backtest. Only a row from before the source order has none: then the global source
     # order (docs/architecture/backtest.md section 10.12).
     source_order = request.source_order or await read_source_order(database_url=database_url)
+    look_back = find_look_back(request.bar_period, strategy_version.warm_up_bar_count)
     exchange_rates = (
         None if request.currency == USD else await read_daily_exchange_rates(database_url=database_url, request=request)
     )
     if request.universe is not None:
         universe = await read_universe_inputs(
-            database_url=database_url, backtest_id=backtest_id, request=request, source_order=source_order
+            database_url=database_url,
+            backtest_id=backtest_id,
+            request=request,
+            source_order=source_order,
+            look_back=look_back,
         )
         return BacktestInputs(
             request=request,
@@ -161,7 +195,7 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
             universe=universe,
         )
     bars, look_back_bars, bar_count_by_source = await read_single_inputs(
-        request=request, database_url=database_url, source_order=source_order
+        request=request, database_url=database_url, source_order=source_order, look_back=look_back
     )
     return BacktestInputs(
         request=request,

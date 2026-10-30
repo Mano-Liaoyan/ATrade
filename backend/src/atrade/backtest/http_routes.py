@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Literal, NoReturn
 
 import psycopg
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
@@ -50,6 +50,7 @@ from atrade.backtest.backtest_universe import (
     make_list_periods,
 )
 from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
+from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
@@ -381,6 +382,13 @@ class BacktestRoutes:
         return replace(backtest_request, universe=universe), periods
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
+        """The start of port 8000: a backtest without a conversation."""
+        return await self.start_with_conversation(request, None)
+
+    async def start_with_conversation(
+        self, request: StartBacktestRequest, conversation_id: int | None
+    ) -> BacktestResponse:
+        """Port 8001 gives the conversation of the request."""
         backtest_request, periods = await self.make_backtest_request(request)
         started = await start_backtest(
             database_url=self.database_url,
@@ -388,6 +396,7 @@ class BacktestRoutes:
             request=backtest_request,
             created_at_utc=self.clock.read_now_utc(),
             universe_periods=periods,
+            conversation_id=conversation_id,
         )
         if isinstance(started, BacktestRefusal):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=started.detail)
@@ -509,26 +518,61 @@ class BacktestRoutes:
         return request
 
 
+REFUSED: dict[int | str, dict[str, Any]] = {status.HTTP_422_UNPROCESSABLE_CONTENT: REFUSED_OR_NOT_VALID_RESPONSE}
+NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
+
+
+def add_read_routes(router: APIRouter, routes: BacktestRoutes) -> None:
+    """The read routes that port 8001 also has (docs/architecture/assistant.md 25.3.3)."""
+    router.add_api_route("/backtests", routes.list_backtests, methods=["GET"])
+    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"], responses=NOT_FOUND)
+    router.add_api_route(
+        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}",
+        routes.compare_backtests,
+        methods=["GET"],
+        responses={**REFUSED, **NOT_FOUND},
+    )
+
+
 def create_backtest_router(*, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader) -> APIRouter:
     routes = BacktestRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
     router = APIRouter(prefix="/api")
-    refused: dict[int | str, dict[str, Any]] = {status.HTTP_422_UNPROCESSABLE_CONTENT: REFUSED_OR_NOT_VALID_RESPONSE}
-    not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
     router.add_api_route(
         "/backtests",
         routes.start_backtest,
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
-        responses=refused,
+        responses=REFUSED,
     )
-    router.add_api_route("/backtests", routes.list_backtests, methods=["GET"])
-    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"], responses=not_found)
     router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
+    add_read_routes(router, routes)
+    return router
+
+
+def create_backtest_assistant_router(
+    *, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader, conversation_exists: ConversationCheck
+) -> APIRouter:
+    """The backtest routes of port 8001 (docs/architecture/assistant.md 25.3.3). No backtest limits routes.
+
+    A start records the conversation of the request. Like port 8000, it saves the daily exchange rates from IBKR
+    that a backtest of an instrument that is not in USD needs (docs/architecture/backtest.md 10.13).
+    """
+    routes = BacktestRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
+    read_conversation_id = create_conversation_dependency(conversation_exists)
+
+    async def start_ai_assistant_backtest(
+        request: StartBacktestRequest, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> BacktestResponse:
+        return await routes.start_with_conversation(request, conversation_id)
+
+    router = APIRouter(prefix="/api")
     router.add_api_route(
-        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}",
-        routes.compare_backtests,
-        methods=["GET"],
-        responses={**refused, **not_found},
+        "/backtests",
+        start_ai_assistant_backtest,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        responses=REFUSED,
     )
+    add_read_routes(router, routes)
     return router
