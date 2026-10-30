@@ -379,7 +379,7 @@ test('adds Close, changes Avg trading value (20) and Exchange, removes each othe
   await expectRunDone(page);
 
   let popover = await editTag(page, 'Avg trading value (20) ≥ 20,000,000');
-  await popover.getByLabel('Value').fill('1');
+  await popover.getByRole('textbox', { name: 'Value', exact: true }).fill('1');
   await applyAndWait(page, popover, 'Avg trading value (20) ≥ 1');
 
   popover = await editTag(page, 'Exchange in NASDAQ, NYSE');
