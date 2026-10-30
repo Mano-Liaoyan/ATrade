@@ -640,6 +640,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     in the page while the column is minimized, so a form keeps its values.
     Only the AI assistant column has Maximize (section 25)
     ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)).
+    Implemented (#185): `railIcon` (the icon of the Open button of the rail),
+    `buttonName` (the name in the button names, default the lower-case
+    `label`), `maximizable`, and `onMaximizedChange`. Maximize ("Maximize
+    <name>", then "Restore <name>") gives the column the workbench width less
+    the other side columns and 32px. A second click or Escape restores the
+    width from before. Minimize ends Maximize. Maximize is not stored.
   - `PanelSplit` (`storageKey`, `panels`, and the snippet `panel(id,
     state)`): 2 or more stacked panels. Each `PanelSpec` has `id`,
     `minPixels`, `defaultPixels` (not for the first panel), and
@@ -868,7 +874,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   name, and "Create strategy"; strategy section 9.7.1). The editor panel has
   the tabs "Rules" (the rule builder, strategy section 9.8) and
   `strategy.py`. The right `SideColumn` "AI assistant" (default 28rem) holds
-  the conversation (section 25). The toolbar line (`PanelHeader`) has the strategy name, the version
+  the conversation (section 25). Implemented (#185): `AssistantColumn`,
+  `AssistantLog`, and `AssistantMetricCard` in `src/routes/strategies/`
+  (assistant section 25.12). While the column is maximized, the center area
+  is a 32px rail and its content stays in the page. A click on a diff card
+  adds the tab "v<n-1> → v<n>" with `CodeDiff` to the editor panel. The
+  errors of the AI assistant go to the Output tab. The toolbar line (`PanelHeader`) has the strategy name, the version
   (`Select` size `sm`), and icon buttons with the state in the icon shape
   and color: Delete strategy (danger `Dialog`), the swap button (an arrow to
   the place that the editor moves to), Save version (a blue dot for unsaved
@@ -1791,6 +1802,9 @@ option and records it in this document.
   the header `X-ATrade-Conversation-Id`, and `read_screen_result` reads
   pages of 50 rows with the parameter `offset` (screen section 24.8,
   assistant sections 25.3.3 and 25.4.3).
+- Decided (#185): the conversation controls of the assistant side column,
+  the copy of its disabled controls, the diff cards after a reload, and the
+  fake assistant service of the e2e server (assistant section 25.14).
 - Decided (#168): the Metrics table names the metrics CAGR, Annual
   volatility, Sharpe ratio, Sortino ratio, Calmar ratio, Profit factor, Win
   rate, Average win (USD), Average loss (USD), Exposure, and Turnover
