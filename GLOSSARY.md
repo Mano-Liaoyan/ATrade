@@ -149,9 +149,11 @@ orders to a paper account.
 _Avoid_: paper trading run, live simulation
 
 **Same-period backtest**:
-A backtest of the strategy version, instrument, and bar period of a forward
-test, from the forward test start to its end (or to now), with the start
-balance as paper capital. The user compares it with the forward test.
+A backtest of the strategy version, instruments, and bar period of a forward
+test, from the forward test start to its end (or to now), with the allocated
+capital as paper capital. For a universe, it uses the members that the
+forward test recorded for each quarter. The user compares it with the forward
+test.
 _Avoid_: shadow backtest, replay
 
 **Interruption**:
@@ -179,6 +181,24 @@ _Avoid_: simulated order, order simulation
 **Live order**:
 A real order sent to a broker account that holds real money.
 _Avoid_: real trade, production order
+
+**Owner**:
+The forward test, or the user by hand, that one order belongs to. Each fill,
+position, and cash amount in the paper account belongs to one owner. Orders
+from outside ATrade belong to the user by hand. In Chinese, write 所有者.
+_Avoid_: sub-account, bucket, sleeve
+
+**Owner ledger**:
+The record of the fills, positions, and cash of each owner. The position of
+the paper account in an instrument is the sum of the owner positions. In
+Chinese, write 所有者账本.
+_Avoid_: virtual account, sub-ledger
+
+**Allocated capital**:
+The USD amount of the paper account that one forward test gets at its start.
+The forward test trades only with this amount and its own fills. In Chinese,
+write 分配资金.
+_Avoid_: start balance, budget, allocation
 
 **Paper capital**:
 The cash amount a backtest starts with. It comes from the paper account
