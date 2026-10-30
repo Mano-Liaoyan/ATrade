@@ -39,7 +39,8 @@ When you add, update, or remove a skill, change `.agents/skills/`,
 ## Quality Gate
 
 - `./scripts/check` runs all checks that CI runs. Run it before you finish a
-  change. `./scripts/check backend`, `frontend`, and `e2e` run one part.
+  change. `./scripts/check backend`, `frontend`, `assistant`, and `e2e` run
+  one part.
 - Set `ATRADE_PLAYWRIGHT_PROJECTS` to the Playwright browsers that are
   installed, for example `"chromium firefox"`. CI runs all 4 projects.
 

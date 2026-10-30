@@ -140,7 +140,10 @@ frontend/
   src/lib/             # one directory per capability, plus foundation/
   src/routes/          # pages, the only place that combines capabilities
   e2e/                 # Playwright tests
-assistant/             # TypeScript pi SDK service (section 25); path left to the implementation
+assistant/             # TypeScript pi SDK service (section 25)
+  src/                 # Node.js runs these files directly (type stripping); no build step
+  tests/               # Vitest tests, with a fake OpenAI-compatible model server
+  package.json         # own pnpm project, run with Vite+ like frontend/
 deploy/                # compose.yaml, web.Dockerfile, assistant.Dockerfile
 scripts/check          # the quality gate: the same checks as CI (section 17.7)
 scripts/deploy         # deploys one commit of main on the server (section 14.2)
@@ -962,7 +965,7 @@ One Docker Compose project on the user's own server runs all services:
 | `ib-gateway` | `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest, `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`. |
 | `web` | `app/web.py`, backtest child processes, basedpyright processes. Memory limit, read-only root file system, writable `/tmp`. |
 | `forward-test` | `app/forward_test_worker.py` and the forward test child processes. |
-| `assistant` | The Node.js process with the pi SDK (section 25). Read-only root file system, `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}` (default `1g`), volume `atrade-assistant-pi`, networks `atrade-assistant-internal` and `atrade-assistant-egress`. No published port, no `DATABASE_URL`, and no IBKR settings. |
+| `assistant` | The Node.js process with the pi SDK (section 25). Image from `deploy/assistant.Dockerfile`. Read-only root file system, writable `/tmp`, `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}` (default `1g`), volume `atrade-assistant-pi` on `/data`, networks `atrade-assistant-internal` and `atrade-assistant-egress`. No published port, no `env_file`, no `DATABASE_URL`, and no IBKR settings. |
 
 External access (#73). The user's existing network already has these parts.
 ATrade adds no Compose service for them:
@@ -1054,10 +1057,19 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   Web 1, forward tests 10 to 13, bar fetcher 20, contract tests 98 and 99.
   The limit is 32.
 - The AI assistant (phase 2, section 25) adds 2 networks.
-  `atrade-assistant-internal` has `internal: true` and a fixed subnet, and
-  only `web` and `assistant` are in it. `atrade-assistant-egress` has only
-  `assistant`. `web` also listens on port 8001 in
-  `atrade-assistant-internal`. Compose does not publish port 8001.
+  `atrade-assistant-internal` has `internal: true` and the fixed subnet
+  `172.31.250.0/24`, and only `web` and `assistant` are in it.
+  `atrade-assistant-egress` has only `assistant`. `assistant` is not on the
+  default network, so it cannot connect to `postgres` or `ib-gateway`. `web`
+  is on the default network and on `atrade-assistant-internal`. `web` also
+  listens on port 8001 in `atrade-assistant-internal`. Compose does not
+  publish port 8001.
+- `assistant` uses the image of `deploy/assistant.Dockerfile`: a Vite+ stage
+  installs the production dependencies of `assistant/`, and a
+  `node:24.13.0-slim` stage runs `node src/main.ts` as the user `node`.
+  `assistant` listens on port 8002 in `atrade-assistant-internal`. Its
+  Compose health check calls `GET /health` on that port. `assistant` has no
+  `depends_on`: it starts also when `web` is not ready.
 - Disk: plan about 4 GB more in PostgreSQL for the Databento daily bars and
   the universe hourly bars (estimate, #141).
 
@@ -1150,7 +1162,9 @@ The backtest timeout and concurrency are not in `settings`. PostgreSQL stores
 them (section 10).
 
 `ATRADE_WEB_MEMORY_LIMIT` and `ATRADE_ASSISTANT_MEMORY_LIMIT` are not
-settings: only Compose reads them (section 14.1).
+settings: only Compose reads them (section 14.1). `.env.example` lists both.
+The `assistant` container gets neither of them, and no other value of
+`.env`.
 
 Exception ([ADR 0005](adr/0005-assistant-credentials-outside-postgresql.md)):
 AI assistant credentials (subscription logins and API keys) come from the
@@ -1415,7 +1429,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - End to end: Playwright with 4 projects.
 - Not in CI: `ibkr_paper`.
 - `.github/workflows/ci.yml` runs `./scripts/check backend`,
-  `./scripts/check frontend`, and `./scripts/check e2e` as 3 jobs. The backend
+  `./scripts/check frontend`, `./scripts/check assistant`, and
+  `./scripts/check e2e` as 4 jobs. The backend
   and end-to-end jobs use a `postgres:18.3` service container. Local runs use
   the same script. Without `ATRADE_TEST_DATABASE_URL`, the script starts a
   temporary PostgreSQL container.
@@ -1423,9 +1438,9 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - The test PostgreSQL fixture runs the migrations one time per session and
   truncates all tables except `alembic_version` before each test.
 
-- The `assistant` service checks (lint, type check, tests) run in
-  `./scripts/check` from phase 2. The job name is left to the
-  implementation.
+- The `assistant` service checks run in `./scripts/check assistant` (also
+  in `./scripts/check` without a scope): ESLint with the readability rules,
+  `tsc --noEmit`, and Vitest. The CI job is `assistant`.
 
 ### 17.8 Release checklist
 
@@ -1640,6 +1655,18 @@ option and records it in this document.
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
     momentum need about 252 bars. The look-back must follow the longest
     indicator of the strategy, or this effect is accepted.
+- Decided (#178): the `assistant` service code is in `assistant/`, an own
+  pnpm project that Vite+ runs like `frontend/`. Node.js runs the
+  TypeScript files directly (type stripping), so there is no build step. The
+  image is `deploy/assistant.Dockerfile`. The checks are
+  `./scripts/check assistant` and the CI job `assistant` (section 17.7).
+- Decided (#178): the subnet of `atrade-assistant-internal` is fixed in
+  `deploy/compose.yaml` as `172.31.250.0/24`. It is not a setting.
+  `assistant` listens on port 8002 in this network. In #178 it has only
+  `GET /health`.
+- Decided (#178): the `tool_call` handler is `createToolGuard` in
+  `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
+  the `assistant` process (section 25.14).
 - These names are choices of this document, not decisions of a ticket. The
   implementation can change them:
   - the Compose service names `postgres`, `ib-gateway`, `web`, `forward-test`
