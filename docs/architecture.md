@@ -1647,14 +1647,14 @@ option and records it in this document.
   width. The shown width is the stored width in the range of section 25.13,
   so a smaller window makes the column narrower without a change of the
   stored width.
+- Decided (#198): the platform gives the strategy the new universe list at
+  each period start as NautilusTrader custom data
+  (`DataType("UniverseUpdate")`, `on_data`), not with a platform timer. The
+  configuration of a multi-instrument strategy has no `instrument_id`, no
+  `bar_type`, and no universe field
+  ([`backtest.md`](architecture/backtest.md) section 10.10.8).
 - The open points of the map #129 are in the "Left to the implementation"
-  lists of sections 8 to 12 and 23 to 25. Two of them:
-  - Decided (#198): the platform gives the strategy the new universe list
-    at each period start as NautilusTrader custom data
-    (`DataType("UniverseUpdate")`, `on_data`), not with a platform timer.
-    The configuration of a multi-instrument strategy has no `instrument_id`,
-    no `bar_type`, and no universe field
-    ([`backtest.md`](architecture/backtest.md) section 10.10.8).
+  lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1
     momentum need about 252 bars. The look-back must follow the longest
     indicator of the strategy, or this effect is accepted.

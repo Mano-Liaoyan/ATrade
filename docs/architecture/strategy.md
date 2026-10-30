@@ -478,8 +478,8 @@ It needs the multi-instrument backtest of
   universe period with NautilusTrader custom data. The strategy calls
   `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
   members in `on_data(data)` as `data.data.bar_types`. Its configuration has
-  no `instrument_id` and no `bar_type` ([`backtest.md`](backtest.md)
-  section 10.10.8).
+  no `instrument_id`, no `bar_type`, and no universe field
+  ([`backtest.md`](backtest.md) section 10.10.8).
 
 ## 9.9 Strategy templates
 

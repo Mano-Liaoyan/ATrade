@@ -1,8 +1,6 @@
 """A strategy gets the universe of each universe period as NautilusTrader custom data (#198).
 
-The platform adds one `UniverseUpdate` for each universe period start to the engine data. The engine sends it to
-`on_data` at that time, in time order with the bars. The strategy configuration holds no universe, so the strategy
-cannot read a later list (docs/architecture/backtest.md sections 10.10.1 and 10.10.8).
+The decision and the reason are in docs/architecture/backtest.md section 10.10.8.
 """
 
 # The NautilusTrader 2.0 stubs type some parameters as a bare dict (docs/architecture.md section 16 G).
@@ -86,12 +84,12 @@ def make_bars(first_start_utc: datetime, count: int) -> list[Bar]:
     ]
 
 
-def to_nanoseconds(time_utc: datetime) -> int:
+def convert_to_nanoseconds(time_utc: datetime) -> int:
     return int(time_utc.timestamp()) * NANOSECONDS_PER_SECOND
 
 
 def make_universe_update(period_start_utc: datetime, bar_types: tuple[str, ...]) -> CustomData:
-    time_ns = to_nanoseconds(period_start_utc)
+    time_ns = convert_to_nanoseconds(period_start_utc)
     # readability-exception: the decorator adds the `ts_event` and `ts_init` arguments, and the type checker does
     # not see them.
     update = UniverseUpdate(time_ns, time_ns, bar_types=",".join(bar_types))  # pyright: ignore[reportCallIssue]
@@ -104,7 +102,8 @@ def run_two_universe_periods(work_directory: Path) -> FollowUniverseStrategy:
     )
     # The child reads the bars of each instrument only for its universe periods (section 10.10.1).
     member_bars = {
-        "AAA": make_bars(FIRST_PERIOD_START_UTC, PERIOD_BAR_COUNT),
+        # AAA has bars in the second period too, so the test shows that the strategy unsubscribes from them.
+        "AAA": make_bars(FIRST_PERIOD_START_UTC, 2 * PERIOD_BAR_COUNT),
         "BBB": make_bars(FIRST_PERIOD_START_UTC, 2 * PERIOD_BAR_COUNT),
         "CCC": make_bars(SECOND_PERIOD_START_UTC, PERIOD_BAR_COUNT),
     }
@@ -113,6 +112,8 @@ def run_two_universe_periods(work_directory: Path) -> FollowUniverseStrategy:
         engine.add_instrument(instrument)
         wrangler = BarDataWrangler(f"{instrument.id}-1-DAY-LAST-EXTERNAL", instrument.price_precision, 0)
         engine.add_data(wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(bars, BarPeriod.ONE_DAY)))
+    # Data with the same time comes in the order of the `add_data` calls. The bars come first, so the bar that closes
+    # at a period start comes before the list of that period (section 10.10.3).
     engine.add_data(
         [
             make_universe_update(FIRST_PERIOD_START_UTC, FIRST_PERIOD_BAR_TYPES),
@@ -122,6 +123,7 @@ def run_two_universe_periods(work_directory: Path) -> FollowUniverseStrategy:
     strategy = FollowUniverseStrategy(UniverseConfig())
     engine.add_strategy(strategy)
     engine.run()
+    engine.dispose()
     return strategy
 
 
