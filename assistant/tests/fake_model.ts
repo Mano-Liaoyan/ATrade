@@ -5,7 +5,7 @@ import path from 'node:path';
 import { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import type { OpenModel } from '../src/model_selection.ts';
 
-/** Credential ID → credential name. #183 replaces this with the credential store of the volume. */
+/** Credential ID → credential name, for the conversation tests. The credential file tests use fake_providers.ts. */
 export const FAKE_CREDENTIAL_NAMES: Readonly<Record<string, string>> = {
   'fake-key-1': 'Fake API key · first',
   'fake-key-2': 'Fake API key · second',
