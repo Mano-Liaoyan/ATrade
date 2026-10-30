@@ -1685,6 +1685,14 @@ option and records it in this document.
   has the parameter `bars_per_year` (default 252): on 1-hour bars the
   strategy passes 1764. Section 23.2 of
   [`indicator.md`](architecture/indicator.md) has the formulas.
+- Decided (#163): the catalog is `INDICATOR_CATALOG` of `atrade.indicator`
+  (`indicator/indicator_catalog.py`). `check_indicator_reference(reference)`
+  returns `IndicatorProblem(location, message)` items, and
+  `create_indicator(reference)` makes the class. The fixed screen look-back
+  of EMA, RSI, ATR, and MACD is 8 × the longest recursive period (section
+  21.1). The UI names, the allowed ranges, and the problem format are in
+  sections 23.3, 23.4, and 23.6 of
+  [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - Decided (#171): a named CHECK constraint holds the values of
@@ -1738,6 +1746,14 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#197): the request field of the backtest source order is
+  `source_order`. It holds each `BarSource` exactly 1 time, like the global
+  source order (`422` otherwise). `bar_count_by_source` counts only the bars
+  of the backtest range, not the look-back bars. The backtest page shows the
+  source order and the bar counts in the "Bar sources" tab. A backtest has
+  survivorship bias when its currency is `HKD`, or its currency is `USD` and
+  it starts before 2018-05-01 (`docs/architecture/backtest.md` section
+  10.12).
 - Decided (#190): the Databento import program is `app/databento_import.py`.
   The user runs it in the `web` image with `docker compose run`. The bought
   files are in `data/databento/` of the repository (in `.gitignore`). The

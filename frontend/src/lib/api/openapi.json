@@ -2090,6 +2090,41 @@
               }
             ]
           },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -2128,6 +2163,9 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias",
           "equity_curve",
           "trades",
           "robustness"
@@ -2441,6 +2479,41 @@
                 "type": "null"
               }
             ]
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
           }
         },
         "type": "object",
@@ -2462,7 +2535,10 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
-          "metrics"
+          "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias"
         ],
         "title": "BacktestResponse"
       },
@@ -2740,6 +2816,41 @@
               }
             ]
           },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -2782,6 +2893,9 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias",
           "equity_curve",
           "trades",
           "robustness",
@@ -4710,6 +4824,20 @@
               }
             ],
             "title": "Paper Capital Usd"
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
           }
         },
         "type": "object",
