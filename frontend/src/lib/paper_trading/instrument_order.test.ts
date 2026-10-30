@@ -30,12 +30,12 @@ const PASSED = { status: 'passed', message: null, actual_accounts: ['DU1234567']
 
 describe('findInstrumentOrderBlock', () => {
   it('blocks the order while the paper account is not read', () => {
-    expect(findInstrumentOrderBlock(null, AAPL, [])).toEqual({ kind: 'in-progress', text: 'Reading the paper account.' });
+    expect(findInstrumentOrderBlock(null)).toEqual({ kind: 'in-progress', text: 'Reading the paper account.' });
   });
 
   it('blocks the order when IB Gateway is not connected', () => {
     const account = makeAccount({ status: 'disconnected', message: null, actual_accounts: [], expected_account: null });
-    expect(findInstrumentOrderBlock(account, AAPL, [])).toEqual({
+    expect(findInstrumentOrderBlock(account)).toEqual({
       kind: 'warning',
       text: 'Paper account not checked. IB Gateway is not connected.',
     });
@@ -43,23 +43,14 @@ describe('findInstrumentOrderBlock', () => {
 
   it('blocks the order when the paper account check failed', () => {
     const account = makeAccount({ status: 'failed', message: 'Wrong account.', actual_accounts: ['U1'], expected_account: 'DU1' });
-    expect(findInstrumentOrderBlock(account, AAPL, [])).toEqual({
+    expect(findInstrumentOrderBlock(account)).toEqual({
       kind: 'error',
       text: 'Paper account check failed. ATrade sends no orders.',
     });
   });
 
-  it('blocks the order when a forward test trades the instrument', () => {
-    const blocking = [{ label: 'Forward test 7 (Bar count v1)', symbol: 'AAPL', exchange: 'NASDAQ' }];
-    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL, blocking)).toEqual({
-      kind: 'warning',
-      text: 'Forward test 7 (Bar count v1) trades AAPL / NASDAQ. Stop the forward test to send an order by hand.',
-    });
-  });
-
-  it('lets the order go when the check passed and no forward test trades the instrument', () => {
-    const blocking = [{ label: 'Forward test 7 (Bar count v1)', symbol: 'MSFT', exchange: 'NASDAQ' }];
-    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL, blocking)).toBeNull();
+  it('lets the order go when the check passed', () => {
+    expect(findInstrumentOrderBlock(makeAccount(PASSED))).toBeNull();
   });
 });
 

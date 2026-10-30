@@ -163,15 +163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/OrderBlockedResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
-                    }
-                  ],
-                  "title": "Response 409 Send Order Api Paper Trading Orders Post"
+                  "$ref": "#/components/schemas/OrderRefusedByLedgerResponse"
                 }
               }
             }
@@ -1307,6 +1299,24 @@
               }
             },
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/forward-tests/capital": {
+      "get": {
+        "summary": "Read Capital",
+        "operationId": "read_capital_api_forward_tests_capital_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestCapitalResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4327,6 +4337,51 @@
         ],
         "title": "FixedShares"
       },
+      "ForwardTestCapitalResponse": {
+        "properties": {
+          "net_liquidation_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Liquidation Usd"
+          },
+          "allocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Usd"
+          },
+          "unallocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Usd"
+          }
+        },
+        "type": "object",
+        "required": [
+          "net_liquidation_usd",
+          "allocated_usd",
+          "unallocated_usd"
+        ],
+        "title": "ForwardTestCapitalResponse",
+        "description": "The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not\npass or IBKR has no NetLiquidation value in USD."
+      },
       "ForwardTestComparisonResponse": {
         "properties": {
           "forward_test": {
@@ -4436,6 +4491,14 @@
       },
       "ForwardTestFillResponse": {
         "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
           "time_utc": {
             "type": "string",
             "format": "date-time",
@@ -4464,6 +4527,8 @@
         },
         "type": "object",
         "required": [
+          "symbol",
+          "exchange",
           "time_utc",
           "side",
           "quantity_shares",
@@ -4587,6 +4652,17 @@
             },
             "title": "Interruptions",
             "type": "array"
+          },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Capital Usd"
           }
         },
         "required": [
@@ -4608,7 +4684,8 @@
           "stopped_at_utc",
           "end_time_utc",
           "crash_count",
-          "interruptions"
+          "interruptions",
+          "allocated_capital_usd"
         ],
         "title": "ForwardTestResponse",
         "type": "object"
@@ -5266,25 +5343,6 @@
         ],
         "title": "OpenOrderResponse",
         "type": "object"
-      },
-      "OrderBlockedResponse": {
-        "properties": {
-          "detail": {
-            "type": "string",
-            "title": "Detail"
-          },
-          "forward_test_id": {
-            "type": "integer",
-            "title": "Forward Test Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detail",
-          "forward_test_id"
-        ],
-        "title": "OrderBlockedResponse",
-        "description": "A forward test runs on the instrument. ATrade did not send the order (section 12.2)."
       },
       "OrderErrorResponse": {
         "properties": {
@@ -6286,6 +6344,18 @@
           "bar_period": {
             "$ref": "#/components/schemas/BarPeriod"
           },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Allocated Capital Usd"
+          },
           "end_time_utc": {
             "anyOf": [
               {
@@ -6305,7 +6375,8 @@
           "symbol",
           "exchange",
           "currency",
-          "bar_period"
+          "bar_period",
+          "allocated_capital_usd"
         ],
         "title": "StartForwardTestRequest"
       },
@@ -6335,15 +6406,25 @@
               }
             ],
             "title": "Forward Test Id"
+          },
+          "unallocated_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unallocated Usd"
           }
         },
         "type": "object",
         "required": [
-          "detail",
-          "forward_test_id"
+          "detail"
         ],
         "title": "StartRefusedResponse",
-        "description": "The start was refused. `forward_test_id` is the forward test that already runs on the instrument."
+        "description": "The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18)."
       },
       "StrategyListItem": {
         "properties": {

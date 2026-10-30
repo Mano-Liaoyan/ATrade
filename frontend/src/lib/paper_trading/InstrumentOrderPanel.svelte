@@ -32,7 +32,6 @@
     describeOrderTitle,
     readOrderForm,
     sendPaperOrder,
-    type BlockingForwardTest,
     type OrderForm,
     type SendOrderRequest,
   } from './paper_orders';
@@ -42,12 +41,11 @@
     /** The last price of the instrument. The limit price starts with it. */
     lastPrice: number | null;
     account: PaperAccountMessage | null;
-    blockingForwardTests?: readonly BlockingForwardTest[];
-    /** False while a live socket of the account or of the forward tests is not connected. */
+    /** False while the live socket of the account is not connected. */
     isConnected: boolean;
   }
 
-  const { instrument, lastPrice, account, blockingForwardTests = [], isConnected }: Props = $props();
+  const { instrument, lastPrice, account, isConnected }: Props = $props();
 
   const SIDES = [
     { value: 'BUY' as const, label: 'Buy' },
@@ -98,7 +96,7 @@
     }
   });
 
-  const blockReason = $derived(findInstrumentOrderBlock(account, instrument, blockingForwardTests));
+  const blockReason = $derived(findInstrumentOrderBlock(account));
   // The paper account that passed the check. The backend checks it again before it sends the order.
   const accountId = $derived(account?.check.status === 'passed' ? (account.check.actual_accounts[0] ?? null) : null);
   const position = $derived(findInstrumentPosition(account, instrument));
