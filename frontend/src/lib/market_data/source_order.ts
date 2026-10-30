@@ -1,32 +1,58 @@
-// Calls the source order routes (docs/architecture/market_data.md section 8.7.3) and moves a bar source in the order.
+// Bar sources and the source order (docs/architecture/market_data.md section 8.7): the read and the save of the
+// global source order, a move of one bar source, and the source order choices of the backtest form.
 import type { components } from '#lib/api';
 import { requestJson, type RequestResult } from '#lib/foundation/http_request';
 
 export type BarSource = components['schemas']['BarSource'];
-type SourceOrderBody = components['schemas']['SourceOrderBody'];
-
-export type MoveDirection = 'up' | 'down';
 
 const SOURCE_ORDER_PATH = '/api/market-data/source-order';
-const FAILED_ACTION = 'The source order request';
 
 const BAR_SOURCE_NAMES: Record<BarSource, string> = { ibkr: 'IBKR', databento: 'Databento' };
 
+export function formatBarSource(barSource: BarSource): string {
+  return BAR_SOURCE_NAMES[barSource];
+}
+
+export function formatSourceOrder(sourceOrder: BarSource[]): string {
+  return sourceOrder.map(formatBarSource).join(', ');
+}
+
+/** Each order of the bar sources once. The given order is first, so it can be the default choice. */
+export function listSourceOrders(sourceOrder: BarSource[]): BarSource[][] {
+  if (sourceOrder.length <= 1) {
+    return [sourceOrder];
+  }
+  return sourceOrder.flatMap((first, index) =>
+    listSourceOrders(sourceOrder.filter((_, otherIndex) => otherIndex !== index)).map((rest) => [first, ...rest]),
+  );
+}
+
 export async function readSourceOrder(fetchFunction: typeof fetch): Promise<RequestResult<BarSource[]>> {
-  const result = await requestJson<SourceOrderBody>(fetchFunction, FAILED_ACTION, SOURCE_ORDER_PATH);
+  const result = await requestJson<components['schemas']['SourceOrderBody']>(
+    fetchFunction,
+    'Reading the source order',
+    SOURCE_ORDER_PATH,
+  );
   return result.kind === 'ok' ? { kind: 'ok', value: result.value.source_order } : result;
 }
+
+export type MoveDirection = 'up' | 'down';
 
 /** A refused order gives the `detail` text of the backend. */
 export async function saveSourceOrder(
   fetchFunction: typeof fetch,
   sourceOrder: BarSource[],
 ): Promise<RequestResult<BarSource[]>> {
-  const result = await requestJson<SourceOrderBody>(fetchFunction, FAILED_ACTION, SOURCE_ORDER_PATH, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ source_order: sourceOrder }),
-  });
+  const result = await requestJson<components['schemas']['SourceOrderBody']>(
+    fetchFunction,
+    'Saving the source order',
+    SOURCE_ORDER_PATH,
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source_order: sourceOrder }),
+    },
+  );
   return result.kind === 'ok' ? { kind: 'ok', value: result.value.source_order } : result;
 }
 
@@ -42,8 +68,4 @@ export function moveBarSource(sourceOrder: BarSource[], index: number, direction
   moved[index] = otherBarSource;
   moved[otherIndex] = barSource;
   return moved;
-}
-
-export function formatBarSource(barSource: BarSource): string {
-  return BAR_SOURCE_NAMES[barSource];
 }

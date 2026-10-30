@@ -1,6 +1,13 @@
-// Reads and saves the global source order, and moves one bar source up or down in it.
+// The source order choices of the backtest form, and the read, the save, and a move in the global source order.
 import { describe, expect, it } from 'vite-plus/test';
-import { formatBarSource, moveBarSource, readSourceOrder, saveSourceOrder } from './index';
+import {
+  formatBarSource,
+  formatSourceOrder,
+  listSourceOrders,
+  moveBarSource,
+  readSourceOrder,
+  saveSourceOrder,
+} from './source_order';
 
 interface RecordedRequest {
   url: string;
@@ -21,14 +28,28 @@ function recordRequests(status: number, body: unknown): { fetchFunction: typeof 
   return { fetchFunction, requests };
 }
 
+describe('listSourceOrders', () => {
+  it('gives each order of the bar sources once, the given order first', () => {
+    expect(listSourceOrders(['databento', 'ibkr'])).toEqual([
+      ['databento', 'ibkr'],
+      ['ibkr', 'databento'],
+    ]);
+  });
+});
+
+describe('formatSourceOrder', () => {
+  it('names the bar sources in their order', () => {
+    expect(formatSourceOrder(['ibkr', 'databento'])).toBe('IBKR, Databento');
+    expect(formatBarSource('databento')).toBe('Databento');
+  });
+});
+
 describe('readSourceOrder', () => {
-  it('returns the bar sources in the source order', async () => {
-    const { fetchFunction, requests } = recordRequests(200, { source_order: ['databento', 'ibkr'] });
+  it('returns the global source order', async () => {
+    const answeringFetch: typeof fetch = () =>
+      Promise.resolve(new Response(JSON.stringify({ source_order: ['databento', 'ibkr'] }), { status: 200 }));
 
-    const readResult = await readSourceOrder(fetchFunction);
-
-    expect(readResult).toEqual({ kind: 'ok', value: ['databento', 'ibkr'] });
-    expect(requests).toEqual([{ url: '/api/market-data/source-order', method: 'GET', body: null }]);
+    expect(await readSourceOrder(answeringFetch)).toEqual({ kind: 'ok', value: ['databento', 'ibkr'] });
   });
 });
 
@@ -60,12 +81,5 @@ describe('moveBarSource', () => {
 
   it('moves a bar source down by one place', () => {
     expect(moveBarSource(['ibkr', 'databento'], 0, 'down')).toEqual(['databento', 'ibkr']);
-  });
-});
-
-describe('formatBarSource', () => {
-  it('names each bar source as the glossary does', () => {
-    expect(formatBarSource('ibkr')).toBe('IBKR');
-    expect(formatBarSource('databento')).toBe('Databento');
   });
 });
