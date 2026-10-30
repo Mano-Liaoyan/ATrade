@@ -36,9 +36,9 @@ MESSAGE_WAIT_SECONDS = 5
 type JsonObject = dict[str, Any]
 
 
-def make_settings(frontend_build_dir: Path, *, ibkr_account_id: str | None = ACCOUNT_ID) -> Settings:
+def make_settings(database_url: str, frontend_build_dir: Path, *, ibkr_account_id: str | None = ACCOUNT_ID) -> Settings:
     return Settings(
-        database_url="postgresql://unused/atrade",
+        database_url=database_url,
         frontend_build_dir=frontend_build_dir,
         ibkr_account_id=ibkr_account_id,
     )
@@ -76,14 +76,14 @@ async def read_first_account(settings: Settings, gateway_connection: FakeGateway
 
 
 @pytest.mark.anyio
-async def test_pushes_balance_and_positions_after_a_passed_check(frontend_build_dir: Path) -> None:
+async def test_pushes_balance_and_positions_after_a_passed_check(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     gateway_connection.account_values = make_balance_values(
         ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd="25000.00"
     )
     gateway_connection.portfolio = [make_stock_position(ACCOUNT_ID, symbol="AAPL", quantity="10", market_price="200")]
 
-    account = await read_first_account(make_settings(frontend_build_dir), gateway_connection)
+    account = await read_first_account(make_settings(database_url, frontend_build_dir), gateway_connection)
 
     assert account["check"] == {
         "status": "passed",
@@ -112,6 +112,10 @@ async def test_pushes_balance_and_positions_after_a_passed_check(frontend_build_
             "market_price": "200",
             "market_value": "2000",
             "unrealized_pnl": "0",
+            "owners": [
+                {"owner": {"kind": "by_hand", "forward_test_id": None}, "quantity": "10", "average_cost": "200"}
+            ],
+            "unattributed_quantity": "0",
         }
     ]
 
@@ -128,13 +132,17 @@ async def test_pushes_balance_and_positions_after_a_passed_check(frontend_build_
     ],
 )
 async def test_refuses_an_account_that_fails_the_check(
-    frontend_build_dir: Path, managed_accounts: list[str], expected_account: str | None, message_part: str
+    database_url: str,
+    frontend_build_dir: Path,
+    managed_accounts: list[str],
+    expected_account: str | None,
+    message_part: str,
 ) -> None:
     gateway_connection = make_connected_gateway(managed_accounts)
     gateway_connection.account_values = make_balance_values("U1234567", net_liquidation_usd="1", cash_usd="1")
 
     account = await read_first_account(
-        make_settings(frontend_build_dir, ibkr_account_id=expected_account), gateway_connection
+        make_settings(database_url, frontend_build_dir, ibkr_account_id=expected_account), gateway_connection
     )
 
     assert account["check"]["status"] == "failed"
@@ -146,11 +154,11 @@ async def test_refuses_an_account_that_fails_the_check(
 
 
 @pytest.mark.anyio
-async def test_refuses_a_connection_that_is_not_on_the_paper_port(frontend_build_dir: Path) -> None:
+async def test_refuses_a_connection_that_is_not_on_the_paper_port(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     gateway_connection.port = 4001
 
-    account = await read_first_account(make_settings(frontend_build_dir), gateway_connection)
+    account = await read_first_account(make_settings(database_url, frontend_build_dir), gateway_connection)
 
     assert account["check"]["status"] == "failed"
     assert "port 4001" in account["check"]["message"]
@@ -158,9 +166,9 @@ async def test_refuses_a_connection_that_is_not_on_the_paper_port(frontend_build
 
 
 @pytest.mark.anyio
-async def test_refuses_a_trading_mode_that_is_not_paper(frontend_build_dir: Path) -> None:
+async def test_refuses_a_trading_mode_that_is_not_paper(database_url: str, frontend_build_dir: Path) -> None:
     # Settings refuse "live" at start. A copy without validation shows that the check also refuses it.
-    settings = make_settings(frontend_build_dir).model_copy(update={"trading_mode": "live"})
+    settings = make_settings(database_url, frontend_build_dir).model_copy(update={"trading_mode": "live"})
 
     account = await read_first_account(settings, make_connected_gateway([ACCOUNT_ID]))
 
@@ -170,12 +178,12 @@ async def test_refuses_a_trading_mode_that_is_not_paper(frontend_build_dir: Path
 
 @pytest.mark.anyio
 async def test_writes_one_error_line_and_does_not_retry_a_failed_check(
-    frontend_build_dir: Path, caplog: pytest.LogCaptureFixture
+    database_url: str, frontend_build_dir: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.ERROR, logger="atrade.paper_trading")
     gateway_connection = make_connected_gateway(["DU7654321"])
 
-    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+    async with open_paper_trading_socket(make_settings(database_url, frontend_build_dir), gateway_connection) as socket:
         first = await receive_account(socket)
         gateway_connection.managed_accounts = [ACCOUNT_ID]
         await anyio.sleep(1)
@@ -188,11 +196,11 @@ async def test_writes_one_error_line_and_does_not_retry_a_failed_check(
 
 
 @pytest.mark.anyio
-async def test_clears_the_result_when_the_connection_drops(frontend_build_dir: Path) -> None:
+async def test_clears_the_result_when_the_connection_drops(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     gateway_connection.account_values = make_balance_values(ACCOUNT_ID, net_liquidation_usd="5", cash_usd="5")
 
-    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+    async with open_paper_trading_socket(make_settings(database_url, frontend_build_dir), gateway_connection) as socket:
         connected = await receive_account(socket)
         gateway_connection.connected = False
         dropped = await receive_account(socket)
@@ -208,10 +216,10 @@ async def test_clears_the_result_when_the_connection_drops(frontend_build_dir: P
 
 
 @pytest.mark.anyio
-async def test_checks_again_after_a_reconnection(frontend_build_dir: Path) -> None:
+async def test_checks_again_after_a_reconnection(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway(["DU7654321"])
 
-    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+    async with open_paper_trading_socket(make_settings(database_url, frontend_build_dir), gateway_connection) as socket:
         first = await receive_account(socket)
         gateway_connection.connected = False
         await receive_account(socket)
@@ -224,11 +232,11 @@ async def test_checks_again_after_a_reconnection(frontend_build_dir: Path) -> No
 
 
 @pytest.mark.anyio
-async def test_pushes_a_balance_change(frontend_build_dir: Path) -> None:
+async def test_pushes_a_balance_change(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     gateway_connection.account_values = make_balance_values(ACCOUNT_ID, net_liquidation_usd="100", cash_usd="100")
 
-    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+    async with open_paper_trading_socket(make_settings(database_url, frontend_build_dir), gateway_connection) as socket:
         await receive_account(socket)
         gateway_connection.account_values = make_balance_values(ACCOUNT_ID, net_liquidation_usd="90", cash_usd="80")
         changed = await receive_account(socket)
@@ -238,7 +246,9 @@ async def test_pushes_a_balance_change(frontend_build_dir: Path) -> None:
 
 
 @pytest.mark.anyio
-async def test_pushes_a_eur_balance_in_usd_with_the_base_currency_and_the_rate(frontend_build_dir: Path) -> None:
+async def test_pushes_a_eur_balance_in_usd_with_the_base_currency_and_the_rate(
+    database_url: str, frontend_build_dir: Path
+) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     gateway_connection.account_values = [
         AccountValue(account=ACCOUNT_ID, tag="NetLiquidation", value="1000.00", currency="EUR"),
@@ -246,7 +256,7 @@ async def test_pushes_a_eur_balance_in_usd_with_the_base_currency_and_the_rate(f
     ]
     gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
 
-    account = await read_first_account(make_settings(frontend_build_dir), gateway_connection)
+    account = await read_first_account(make_settings(database_url, frontend_build_dir), gateway_connection)
 
     assert account["balance"] == {
         "net_liquidation_usd": "1113.90",
@@ -261,10 +271,10 @@ async def test_pushes_a_eur_balance_in_usd_with_the_base_currency_and_the_rate(f
 
 
 @pytest.mark.anyio
-async def test_shows_no_balance_when_the_gateway_is_not_connected(frontend_build_dir: Path) -> None:
+async def test_shows_no_balance_when_the_gateway_is_not_connected(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = FakeGatewayConnection(managed_accounts=[ACCOUNT_ID], is_gateway_reachable=False)
 
-    account = await read_first_account(make_settings(frontend_build_dir), gateway_connection)
+    account = await read_first_account(make_settings(database_url, frontend_build_dir), gateway_connection)
 
     assert account["check"]["status"] == "disconnected"
     assert account["balance"] is None
@@ -280,11 +290,11 @@ async def receive_orders(socket: AsyncWebSocketSession) -> list[JsonObject]:
 
 
 @pytest.mark.anyio
-async def test_pushes_the_open_orders_and_each_change(frontend_build_dir: Path) -> None:
+async def test_pushes_the_open_orders_and_each_change(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
     forward_test_order = make_forward_test_order(ACCOUNT_ID, forward_test_id=42, order_id=7, client_id=10)
 
-    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+    async with open_paper_trading_socket(make_settings(database_url, frontend_build_dir), gateway_connection) as socket:
         first = await receive_orders(socket)
         gateway_connection.open_orders = [forward_test_order]
         after_new_order = await receive_orders(socket)
@@ -299,13 +309,13 @@ async def test_pushes_the_open_orders_and_each_change(frontend_build_dir: Path) 
 
 
 @pytest.mark.anyio
-async def test_pushes_no_orders_when_the_check_did_not_pass(frontend_build_dir: Path) -> None:
+async def test_pushes_no_orders_when_the_check_did_not_pass(database_url: str, frontend_build_dir: Path) -> None:
     gateway_connection = make_connected_gateway(["DU7654321"])
     gateway_connection.open_orders = [
         make_forward_test_order("DU7654321", forward_test_id=42, order_id=7, client_id=10)
     ]
 
-    async with open_paper_trading_socket(make_settings(frontend_build_dir), gateway_connection) as socket:
+    async with open_paper_trading_socket(make_settings(database_url, frontend_build_dir), gateway_connection) as socket:
         orders = await receive_orders(socket)
 
     assert orders == []

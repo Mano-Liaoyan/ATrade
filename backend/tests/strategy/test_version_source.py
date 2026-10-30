@@ -14,7 +14,7 @@ from psycopg import sql
 
 from atrade.app.database_migrations import MIGRATIONS_DIR
 
-REVISION_BEFORE_SOURCE_AND_RULES = "8d4b6f2a1c93"
+REVISION_BEFORE_SOURCE_AND_RULES = "8d4f2a6c1e93"
 CREATED_AT_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 

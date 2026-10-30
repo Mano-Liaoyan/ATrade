@@ -1,13 +1,13 @@
 """strategy: add the source and rules columns to strategy_version
 
-Revision ID: 8d4f2a6c1e93
-Revises: 8d4b6f2a1c93
+Revision ID: 4a9e7d2c6b18
+Revises: 8d4f2a6c1e93
 """
 
 from alembic import op
 
-revision = "8d4f2a6c1e93"
-down_revision = "8d4b6f2a1c93"
+revision = "4a9e7d2c6b18"
+down_revision = "8d4f2a6c1e93"
 
 
 def upgrade() -> None:
