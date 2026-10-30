@@ -35,7 +35,17 @@ export {
   type UniverseInstrument,
   type UsUniverseRange,
 } from './backtest_api';
-export { checkTopN, formatUniverseLabel, formatUniverseRange, MAX_TOP_N } from './backtest_universe';
+export {
+  checkTopN,
+  formatPeriodCountHeader,
+  formatUniverseLabel,
+  formatUniverseRange,
+  makeScreenUniverseFields,
+  MAX_TOP_N,
+  type RebalancePeriod,
+  type ScreenSource,
+  type ScreenUniverseSource,
+} from './backtest_universe';
 export { default as UniverseInstrumentTable } from './UniverseInstrumentTable.svelte';
 export {
   convertDateToUtcStart,

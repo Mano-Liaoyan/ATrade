@@ -1,5 +1,5 @@
 <!-- The Instruments tab of a multi-instrument backtest: one row for each universe member with its trade count, net
-     profit, and quarters in the universe as right-aligned tabular numbers (docs/architecture/backtest.md 10.10.7). It
+     profit, and the universe periods (quarters, or months of a monthly screen universe) as right-aligned tabular numbers (docs/architecture/backtest.md 10.10.7). It
      fills the height of its panel body and scrolls in itself. -->
 <script lang="ts">
   import { DataTable, type TableColumn } from '#lib/foundation/carbon';
@@ -8,21 +8,22 @@
   import type { UniverseInstrument } from './backtest_api';
   import { formatUsd } from './backtest_format';
 
-  const { instruments }: { instruments: UniverseInstrument[] } = $props();
+  const { instruments, periodHeader = 'Quarters' }: { instruments: UniverseInstrument[]; periodHeader?: string } =
+    $props();
 
-  const COLUMNS: TableColumn[] = [
+  const columns: TableColumn[] = $derived([
     { header: 'Instrument' },
     { header: 'Trades', align: 'right' },
     { header: 'Net profit (USD)', align: 'right' },
-    { header: 'Quarters', align: 'right' },
-  ];
+    { header: periodHeader, align: 'right' },
+  ]);
 </script>
 
 {#if instruments.length === 0}
   <EmptyText text="No instruments" />
 {:else}
   <ScrollRegion label="Instruments" fill>
-    <DataTable columns={COLUMNS} size="sm">
+    <DataTable {columns} size="sm">
       {#snippet rows()}
         {#each instruments as instrument (`${instrument.symbol}:${instrument.exchange}`)}
           <tr>

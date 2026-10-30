@@ -2,8 +2,9 @@
      /screens opens the screen that the user opened last (browser storage), or the first screen of the list. Without
      ?result, the page shows the last run. Start side: the "Screens" side column (ScreenList). Main region: the title
      row (the name), the read-only condition bar, the table toolbar (Result N / Excluded N, the daily bars date, the
-     run time, and "Add to watchlist"; batch actions when rows are selected), and the result or the excluded table. An
-     HK screen shows the survivorship bias warning. -->
+     run time, "Add to watchlist", and "Run backtest on this screen result"; batch actions when rows are selected), and
+     the result or the excluded table. An HK screen shows the survivorship bias warning. The backtest buttons open the
+     "New backtest" form with the screen, the screen result, and the selected rows (screen.md section 24.9). -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -25,7 +26,9 @@
     type ScreenListItem,
     type ScreenResult,
   } from '#lib/screen';
+  import type { Backtest, ScreenSource } from '#lib/backtest';
   import { addToWatchlist } from '#lib/watchlist';
+  import StartBacktestDialog from '../../backtests/StartBacktestDialog.svelte';
   import { readLastScreenId, writeLastScreenId } from '../last_screen';
   import ScreenList from '../ScreenList.svelte';
 
@@ -47,6 +50,7 @@
   let selectedPositions: number[] = $state([]);
   let isAdding = $state(false);
   let addMessage = $state<{ kind: 'success' | 'error'; text: string } | null>(null);
+  let backtestSource = $state<ScreenSource | null>(null);
 
   const shownScreen = $derived(screen !== null && screen.id === screenId ? screen : null);
   const screenResultId = $derived.by(() => {
@@ -152,6 +156,21 @@
             text: `Added ${String(addedCount)} of ${String(rows.length)} instruments to the watchlist. ${lastFailure}`,
           };
   }
+
+  function openBacktestForm(result: ScreenResult, positions: number[] | null): void {
+    backtestSource = {
+      screenId: result.screen_id,
+      screenResultId: result.id,
+      symbols:
+        positions === null
+          ? null
+          : result.rows.filter((row) => positions.includes(row.position)).map((row) => row.symbol),
+    };
+  }
+
+  function openStartedBacktest(backtest: Backtest): void {
+    void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(backtest.id) }));
+  }
 </script>
 
 <Workbench>
@@ -216,6 +235,13 @@
                 >
                 <button
                   type="button"
+                  class="cds--btn cds--btn--primary cds--btn--sm"
+                  onclick={() => {
+                    openBacktestForm(result, selectedPositions);
+                  }}>Run backtest on selected</button
+                >
+                <button
+                  type="button"
                   class="cds--btn cds--btn--primary cds--btn--sm cds--batch-summary__cancel"
                   onclick={() => {
                     selectedPositions = [];
@@ -242,10 +268,17 @@
               >
               <button
                 type="button"
-                class="cds--btn cds--btn--primary cds--btn--sm toolbar-button"
+                class="cds--btn cds--btn--ghost cds--btn--sm toolbar-button"
                 disabled={isAdding || result.rows.length === 0}
                 onclick={() => void addRowsToWatchlist(result, null)}
                 >{isAdding ? 'Adding to watchlist…' : 'Add to watchlist'}</button
+              >
+              <button
+                type="button"
+                class="cds--btn cds--btn--primary cds--btn--sm"
+                onclick={() => {
+                  openBacktestForm(result, null);
+                }}>Run backtest on this screen result</button
               >
             </div>
           {/if}
@@ -269,6 +302,17 @@
     {/if}
   </main>
 </Workbench>
+
+<StartBacktestDialog
+  open={backtestSource !== null}
+  onOpenChange={(open: boolean) => {
+    if (!open) {
+      backtestSource = null;
+    }
+  }}
+  onStarted={openStartedBacktest}
+  screenSource={backtestSource}
+/>
 
 <style>
   .screen-main {

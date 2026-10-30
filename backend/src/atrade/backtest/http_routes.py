@@ -39,8 +39,10 @@ from atrade.backtest.backtest_store import (
     BacktestRow,
     BacktestStatus,
     BacktestUniverse,
-    UniverseKind,
+    BacktestUniverseKind,
     UniversePeriod,
+    UniverseRebalancePeriod,
+    UniverseScreen,
 )
 from atrade.backtest.backtest_universe import (
     MAX_UNIVERSE_SIZE,
@@ -57,7 +59,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
-from atrade.screen import read_screen_result_members
+from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_result_members
 from atrade.strategy import read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
@@ -75,10 +77,11 @@ class InstrumentBody(BaseModel):
 
 class StartBacktestRequest(BaseModel):
     """`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
-    `list` needs `instruments` or `screen_result_id` (docs/architecture/backtest.md section 10.10.6)."""
+    `list` needs `instruments` or `screen_result_id`, and `screen` needs `screen_id` (docs/architecture/backtest.md
+    section 10.10.6)."""
 
     strategy_version_id: int
-    universe_kind: UniverseKind = "single"
+    universe_kind: BacktestUniverseKind = "single"
     symbol: InstrumentField | None = None
     exchange: InstrumentField | None = None
     currency: InstrumentField | None = None
@@ -87,6 +90,9 @@ class StartBacktestRequest(BaseModel):
     # A `list` from a screen result: all its rows, or only `symbols` (docs/architecture/screen.md section 24.9).
     screen_result_id: int | None = None
     symbols: Annotated[list[InstrumentField], Field(max_length=MAX_UNIVERSE_SIZE)] | None = None
+    # A `screen` universe: the screen runs again at each period start. Without `rebalance_period`, each quarter.
+    screen_id: int | None = None
+    rebalance_period: UniverseRebalancePeriod | None = None
     bar_period: BarPeriod
     start_utc: AwareDatetime
     end_utc: AwareDatetime
@@ -128,18 +134,30 @@ class BacktestMetricsResponse(BaseModel):
     missing_reasons: dict[str, str]
 
 
+class UniverseScreenResponse(BaseModel):
+    """The copy of the screen that a `screen` universe saved at its start (docs/architecture/screen.md 24.9)."""
+
+    screen_id: int
+    name: str
+    market: str
+    definition: dict[str, Any]
+
+
 class BacktestResponse(BaseModel):
     id: int
     strategy_version_id: int
     strategy_id: int
     strategy_name: str
     version_number: int
-    universe_kind: UniverseKind
+    universe_kind: BacktestUniverseKind
     # Null for a multi-instrument backtest. The currency is the currency of all universe members.
     symbol: str | None
     exchange: str | None
     currency: str | None
     universe_top_n: int | None
+    # The copy of the screen of a `screen` universe, and its rebalance period. Null for the other kinds.
+    universe_screen: UniverseScreenResponse | None
+    universe_rebalance_period: UniverseRebalancePeriod | None
     bar_period: BarPeriod
     start_utc: datetime
     end_utc: datetime
@@ -266,6 +284,7 @@ def find_extra_universe_fields(request: StartBacktestRequest) -> list[str]:
         "single": {"symbol", "exchange", "currency"},
         "rule": {"top_n"},
         "list": {"instruments", "screen_result_id", "symbols"},
+        "screen": {"screen_id", "rebalance_period"},
     }[request.universe_kind]
     values = {
         "symbol": request.symbol,
@@ -275,6 +294,8 @@ def find_extra_universe_fields(request: StartBacktestRequest) -> list[str]:
         "instruments": request.instruments,
         "screen_result_id": request.screen_result_id,
         "symbols": request.symbols,
+        "screen_id": request.screen_id,
+        "rebalance_period": request.rebalance_period,
     }
     return [name for name, value in values.items() if value is not None and name not in used]
 
@@ -337,6 +358,8 @@ class BacktestRoutes:
             exchange=row.exchange,
             currency=row.currency,
             universe_top_n=row.universe_top_n,
+            universe_screen=None if row.universe_screen is None else UniverseScreenResponse(**row.universe_screen),
+            universe_rebalance_period=row.universe_rebalance_period,
             bar_period=BarPeriod(row.bar_period),
             start_utc=row.start_utc,
             end_utc=row.end_utc,
@@ -419,6 +442,8 @@ class BacktestRoutes:
                 refuse("A single-instrument backtest needs symbol, exchange, and currency.")
             instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
             return replace(backtest_request, instrument=instrument), []
+        if request.universe_kind == "screen":
+            return replace(backtest_request, universe=await self.make_screen_universe(request)), []
         if request.universe_kind == "rule" and request.top_n is None:
             refuse("A rule universe needs top_n.")
         periods = await self.find_universe_periods(request, time_range)
@@ -426,6 +451,23 @@ class BacktestRoutes:
         currency = USD if request.universe_kind == "rule" else periods[0].members[0].currency
         universe = BacktestUniverse(kind=request.universe_kind, currency=currency, top_n=request.top_n)
         return replace(backtest_request, universe=universe), periods
+
+    async def make_screen_universe(self, request: StartBacktestRequest) -> BacktestUniverse:
+        """A copy of the screen and the rebalance period. The child runs the screen at each period start, so the
+        start route writes no members (docs/architecture/backtest.md section 10.10.8)."""
+        if request.screen_id is None:
+            refuse("A screen universe needs screen_id.")
+        screen = await read_saved_screen(database_url=self.database_url, screen_id=request.screen_id)
+        if screen is None:
+            refuse(f"Screen {request.screen_id} does not exist.")
+        return BacktestUniverse(
+            kind="screen",
+            currency=MARKET_CURRENCIES[screen.market],
+            screen=UniverseScreen(
+                screen_id=screen.id, name=screen.name, market=screen.market, definition=screen.definition
+            ),
+            rebalance_period=request.rebalance_period or "quarter",
+        )
 
     async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
         """The start of port 8000: a backtest without a conversation."""

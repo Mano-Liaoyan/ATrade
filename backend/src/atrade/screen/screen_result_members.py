@@ -1,4 +1,5 @@
-"""The members of a screen result for a fixed-list backtest (docs/architecture/screen.md section 24.9)."""
+"""The members of a screen result for a fixed-list backtest, and the saved screen for a point-in-time backtest
+universe (docs/architecture/screen.md section 24.9)."""
 
 import psycopg
 
@@ -18,3 +19,9 @@ async def read_screen_result_members(*, database_url: str, screen_result_id: int
         )
         rows = await cursor.fetchall()
     return [Instrument(symbol=row[0], exchange=row[1], currency=row[2]) for row in rows]
+
+
+async def read_saved_screen(*, database_url: str, screen_id: int) -> screen_store.ScreenRecord | None:
+    """The saved screen, for the copy that a `screen` backtest universe keeps. None when it is missing."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        return await screen_store.select_screen(connection, screen_id)
