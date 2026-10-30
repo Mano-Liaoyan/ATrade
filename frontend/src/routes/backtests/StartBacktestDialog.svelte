@@ -3,12 +3,21 @@
      capital (paper_trading). A backtest reads only saved bars, so the form offers only instruments with saved bars of
      the selected bar period (docs/architecture/backtest.md section 10.6). The form id is START_BACKTEST_FORM_ID: the
      command palette opens the dialog with it. With `strategyVersion`, each open selects that strategy version, for
-     example the open version of the strategy page (Run backtest). -->
+     example the open version of the strategy page (Run backtest). The source order starts at the global source order
+     and changes only this backtest. -->
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { convertDateToUtcStart, startBacktest, type Backtest } from '#lib/backtest';
   import { Dialog, InlineNotification, Select, TextInput, type NotificationMessage } from '#lib/foundation/carbon';
-  import { BAR_PERIODS, DEFAULT_BAR_PERIOD, type BarPeriod } from '#lib/market_data';
+  import {
+    BAR_PERIODS,
+    DEFAULT_BAR_PERIOD,
+    formatSourceOrder,
+    listSourceOrders,
+    readSourceOrder,
+    type BarPeriod,
+    type BarSource,
+  } from '#lib/market_data';
   import { readPaperCapital } from '#lib/paper_trading';
   import {
     formatVersionLabel,
@@ -48,6 +57,11 @@
   let startDate = $state('');
   let endDate = $state('');
   let paperCapitalUsd = $state('');
+  // The choices start with the global source order, the default of a backtest (docs/architecture/backtest.md 10.12).
+  let sourceOrders: BarSource[][] = $state([]);
+  let sourceOrderKey = $state('');
+  // The disabled source order select says why it has no choices.
+  let sourceOrderPlaceholder = $state('Reading the source order');
   let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let form: HTMLFormElement | undefined = $state();
@@ -69,6 +83,10 @@
           label: formatVersionLabel(selectedStrategy?.name ?? '', version.version_number),
         })),
   );
+  const sourceOrderItems = $derived(
+    sourceOrders.map((sourceOrder) => ({ value: sourceOrder.join(','), label: formatSourceOrder(sourceOrder) })),
+  );
+  const selectedSourceOrder = $derived(sourceOrders.find((sourceOrder) => sourceOrder.join(',') === sourceOrderKey));
   const instrumentItems = $derived(
     instrumentChoices.map((instrument) => ({ value: String(instrument.id), label: formatWatchlistInstrument(instrument) })),
   );
@@ -100,6 +118,22 @@
         paperCapitalUsd = paperCapital ?? '';
       });
     }
+  });
+
+  // Each open starts at the global source order. Only `open` runs this effect again, so a later read of another
+  // choice does not undo the selection of the user.
+  $effect(() => {
+    if (!open) {
+      return;
+    }
+    void readSourceOrder(fetch).then((result) => {
+      if (result.kind === 'ok') {
+        sourceOrders = listSourceOrders(result.value);
+        sourceOrderKey = result.value.join(',');
+      } else {
+        sourceOrderPlaceholder = 'Could not read the source order';
+      }
+    });
   });
 
   // A change of the bar period can remove the selected instrument from the choices.
@@ -142,6 +176,8 @@
       start_utc: convertDateToUtcStart(startDate),
       end_utc: convertDateToUtcStart(endDate),
       paper_capital_usd: paperCapitalUsd,
+      // Without a source order, the backend uses the global source order.
+      ...(selectedSourceOrder === undefined ? {} : { source_order: selectedSourceOrder }),
     });
     isStarting = false;
     if (result.kind === 'failed') {
@@ -217,6 +253,16 @@
     <TextInput label="Start date (UTC)" type="date" bind:value={startDate} required />
     <TextInput label="End date (UTC)" type="date" bind:value={endDate} required />
     <TextInput label="Paper capital (USD)" inputmode="decimal" class="number" bind:value={paperCapitalUsd} required />
+    <Select
+      label="Source order"
+      items={sourceOrderItems}
+      value={sourceOrderKey}
+      placeholder={sourceOrderPlaceholder}
+      disabled={sourceOrderItems.length === 0}
+      onValueChange={(key: string) => {
+        sourceOrderKey = key;
+      }}
+    />
   </form>
   {#if startError !== null}
     <InlineNotification {...startError} lowContrast onClose={() => (startError = null)} />
