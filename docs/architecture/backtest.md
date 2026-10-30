@@ -1242,6 +1242,24 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
   daily exchange rate is missing, it saves the rates from IBKR (section
   10.8), like port 8000. The rule "cannot load bars" is about bars only. A
   backtest without saved bars gets `422` (section 10.1).
+- Decided (#182): only the tool `run_backtest` counts the 5 backtests of a
+  user message. Port 8001 does not count them. A steer message is a new
+  user message, so it starts a new count. Only a backtest that
+  `POST /api/backtests` accepted counts. A `422` does not count. The tool
+  counts a backtest before its POST, so parallel tool calls of one model
+  turn also start at most 5.
+- Decided (#182): while it waits, `run_backtest` reads
+  `GET /api/backtests/{backtest_id}` every 2 seconds. It sends each new
+  status (`queued`, `running`, then the final status) with `onUpdate`. The
+  browser gets each one as a `tool_step` (assistant section 25.10). After a
+  final status, the tool result is the `read_backtest` content and the
+  browser gets `backtest_finished`. After 15 minutes, the tool returns
+  "still running" with the backtest ID and the last status. The backtest
+  continues in the queue.
+- Decided (#182): no new route finds the instruments and bar periods with
+  saved bars. The AI assistant uses the instrument that the user names, or
+  an instrument of `list_backtests`. A range without saved bars gets `422`,
+  and the tool gives this `422` to the model.
 
 Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
 

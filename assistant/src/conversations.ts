@@ -6,6 +6,7 @@ import { rmSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import type { AgentSession, AgentSessionEvent, ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { createAssistantSession } from './assistant_session.ts';
+import type { UserMessageBudget } from './backtest_tools.ts';
 import {
   CREDENTIAL_ENTRY_TYPE,
   conversationDir,
@@ -17,11 +18,16 @@ import {
 } from './conversation_files.ts';
 import { generateTitle } from './conversation_title.ts';
 import type { ModelSelection, OpenModel } from './model_selection.ts';
+import { toToolRunEvents, type ToolRunEvent } from './tool_events.ts';
 
 export type RunEvent =
   | { type: 'text_delta'; delta: string }
   | { type: 'message_end'; text: string; provider: string; model: string; credential_name: string }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | ToolRunEvent;
+
+/** The tools of one run. The budget counts the backtests of the current user message. */
+export type CreateTools = (run: { conversationId: string; budget: UserMessageBudget }) => ToolDefinition[];
 
 export interface RunRequest {
   text: string;
@@ -34,7 +40,7 @@ export interface ConversationsOptions {
   /** The directory of the pi files (the volume atrade-assistant-pi in the container). */
   piDir: string;
   openModel: OpenModel;
-  customTools: ToolDefinition[];
+  createTools: CreateTools;
 }
 
 interface EndedAssistantMessage {
@@ -50,8 +56,8 @@ function readErrorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** The run event of one pi event, or null when web does not need the pi event. */
-function toRunEvent(event: AgentSessionEvent, credentialName: string): RunEvent | null {
+/** The run event of one pi message event, or null when web does not need the pi event. */
+function toMessageRunEvent(event: AgentSessionEvent, credentialName: string): RunEvent | null {
   if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {
     return { type: 'text_delta', delta: event.assistantMessageEvent.delta };
   }
@@ -69,6 +75,12 @@ function toRunEvent(event: AgentSessionEvent, credentialName: string): RunEvent 
   return { type: 'message_end', text, provider: message.provider, model: message.model, credential_name: credentialName };
 }
 
+/** The run events of one pi event. Empty when web does not need the pi event. */
+function toRunEvents(event: AgentSessionEvent, credentialName: string): RunEvent[] {
+  const messageEvent = toMessageRunEvent(event, credentialName);
+  return messageEvent === null ? toToolRunEvents(event) : [messageEvent];
+}
+
 export class Conversations {
   private readonly options: ConversationsOptions;
   /** The active runs. A run is active before its session exists. */
@@ -76,6 +88,7 @@ export class Conversations {
   /** The active runs that got an abort before their session existed. */
   private readonly abortedRuns = new Set<string>();
   private readonly sessions = new Map<string, AgentSession>();
+  private readonly budgets = new Map<string, UserMessageBudget>();
 
   constructor(options: ConversationsOptions) {
     this.options = options;
@@ -97,6 +110,7 @@ export class Conversations {
       })
       .finally(() => {
         this.sessions.delete(conversationId);
+        this.budgets.delete(conversationId);
         this.abortedRuns.delete(conversationId);
         this.activeRuns.delete(conversationId);
       });
@@ -112,11 +126,13 @@ export class Conversations {
     }
     const conversationSession = openConversationSession(this.options.piDir, conversationId);
     conversationSession.appendCustomEntry(CREDENTIAL_ENTRY_TYPE, { credential_name: opened.credentialName });
+    const budget: UserMessageBudget = { startedBacktests: 0 };
+    this.budgets.set(conversationId, budget);
     const session = await createAssistantSession({
       modelRuntime: opened.modelRuntime,
       model: opened.model,
       piDir: this.options.piDir,
-      customTools: this.options.customTools,
+      customTools: this.options.createTools({ conversationId, budget }),
       systemPrompt: request.systemPrompt,
       conversationSession,
     });
@@ -126,10 +142,7 @@ export class Conversations {
     }
     this.sessions.set(conversationId, session);
     const unsubscribe = session.subscribe((event) => {
-      const runEvent = toRunEvent(event, opened.credentialName);
-      if (runEvent !== null) {
-        emit(runEvent);
-      }
+      toRunEvents(event, opened.credentialName).forEach(emit);
     });
     try {
       await session.prompt(request.text);
@@ -139,11 +152,16 @@ export class Conversations {
     }
   }
 
-  /** Adds a user message to the active run. False when the conversation has no active run. */
+  /** Adds a user message to the active run. False when the conversation has no active run. A steer message is a new
+   * user message, so it can start 5 more backtests (25.4.2). */
   async steer(conversationId: string, text: string): Promise<boolean> {
     const session = this.sessions.get(conversationId);
     if (session === undefined) {
       return false;
+    }
+    const budget = this.budgets.get(conversationId);
+    if (budget !== undefined) {
+      budget.startedBacktests = 0;
     }
     await session.steer(text);
     return true;

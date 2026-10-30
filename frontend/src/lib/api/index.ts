@@ -2460,6 +2460,20 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * BacktestFinishedMessage
+         * @description A backtest of `run_backtest` ended in the wait of the tool, for the metric card.
+         */
+        BacktestFinishedMessage: {
+            /**
+             * Type
+             * @default backtest_finished
+             * @constant
+             */
+            type: "backtest_finished";
+            /** Backtest Id */
+            backtest_id: number;
+        };
         /** ForwardTestsMessage */
         ForwardTestsMessage: {
             /**
@@ -2786,6 +2800,53 @@ export interface components {
             type: "steer";
             /** Text */
             text: string;
+        };
+        /**
+         * StrategyVersionSavedMessage
+         * @description The AI assistant saved a strategy version, for the diff card (25.5.2).
+         */
+        StrategyVersionSavedMessage: {
+            /**
+             * Type
+             * @default strategy_version_saved
+             * @constant
+             */
+            type: "strategy_version_saved";
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Version Number */
+            version_number: number;
+        };
+        /**
+         * ToolStepMessage
+         * @description The start, an update, or the end of one tool call. One `tool_call_id` is one tool step of the conversation.
+         *
+         *     `status` is `running` at the start and at each update, then `succeeded` or `failed`. For `run_backtest`,
+         *     `backtest_id` and `backtest_status` give the queue state (`queued`) or the run state (`running`, then a final
+         *     status). They are null for the other tools and at the start.
+         */
+        ToolStepMessage: {
+            /**
+             * Type
+             * @default tool_step
+             * @constant
+             */
+            type: "tool_step";
+            /** Tool Call Id */
+            tool_call_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "succeeded" | "failed";
+            /** Backtest Id */
+            backtest_id: number | null;
+            /** Backtest Status */
+            backtest_status: string | null;
         };
     };
     responses: never;
