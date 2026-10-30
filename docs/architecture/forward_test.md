@@ -429,8 +429,29 @@ Phase 3 changes (#146, #149):
     version) over the Fills / Logs panel (the fill table, and the backtest
     error). The win rate of the forward test counts only the fills in the
     backtest period.
-  - Metrics: `calculate_metrics` with `start_balance_usd`, the recorded
-    equity points, and the number of recorded fills.
+  - Metrics: `calculate_metrics` with `start_balance_usd`, the range from
+    the forward test start to its stop (or to now while it runs), the
+    recorded equity points, and the recorded fills.
+  - Decided (#170): the exposure counts the recorded equity points as the
+    bars, because a forward test has no saved bars and the DataActor
+    records one point at each bar end (section 12.8). The recorded fills
+    go to `find_round_trips` with no change: `select_fills` gives
+    `BacktestTrade` rows.
+  - Decided (#170): the forward test metrics have the fields of the backtest
+    `metrics` (backtest section 10.5, Phase 1 row) and `net_profit_usd`
+    (the final equity minus `start_balance_usd`). They have no
+    `split_metrics` and no `robustness`. The backtest summaries of the
+    forward test routes have the same fields, and their `net_profit_usd`
+    uses `paper_capital_usd`.
+  - Decided (#170): in the comparison route, `win_rate_percent` of the
+    forward test counts only the round trips that start and end in the
+    backtest period (both ends included). The round trips come from all
+    fills, so a position that opens before the backtest start does not
+    change the pairs of the later fills. Without such a
+    round trip it is null with the reason
+    "No round trips in the backtest period". The other metrics use all
+    fills. The forward test page shows the same values as before: the
+    frontend still calculates its win rate (#168 changes the row).
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
     or before its time, so a live fill just after a bar close and the
     backtest fill at that bar close are in one row. One row for each bar end
@@ -560,10 +581,10 @@ Phase 3 table changes (#146). The column names are choices of this document.
 |---|---|
 | `POST /api/forward-tests` | Body `StartForwardTestRequest`: `strategy_version_id`, `symbol`, `exchange`, `currency`, `bar_period`, optional `end_time_utc` (with a time zone, later than now). `201` with `ForwardTestResponse`. `409` with `StartRefusedResponse` (`detail`, `forward_test_id`): `"limit of running forward tests reached"` (`forward_test_id` null), or `"Forward test 3 (Trend v2) already runs on AAPL / NASDAQ."`. `422` for a missing strategy version, a bar period that IB live bars do not support, or an end time that is not later than now or has no time zone. |
 | `GET /api/forward-tests` | `200` with the list of `ForwardTestResponse`, newest first: the row of section 12.12 plus `strategy_id`, `strategy_name`, `version_number`, and `interruptions` (`reason`, `started_at_utc`, `ended_at_utc`, oldest first). |
-| `GET /api/forward-tests/{id}` | `200` with `ForwardTestDetailResponse`, for the forward test page: `forward_test` (`ForwardTestResponse`), `metrics` (null without a start balance), `equity_curve`, `fills` (`time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`, oldest first), and `same_period_backtests` (the backtest summary of the comparison route, newest first). `404` for an unknown ID. |
+| `GET /api/forward-tests/{id}` | `200` with `ForwardTestDetailResponse`, for the forward test page: `forward_test` (`ForwardTestResponse`), `metrics` (null without a start balance; the fields of section 12.10, #170), `equity_curve`, `fills` (`time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`, oldest first), and `same_period_backtests` (the backtest summary of the comparison route, newest first). `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/same-period-backtests` | `201` with `{"backtest_id"}`: a queued backtest of the same period (section 12.10). `404` for an unknown ID. `422` without a start balance (`"The forward test has no start balance yet. The backtest uses it as the paper capital."`), for a currency that is not USD, or for an empty period. |
-| `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
+| `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance; the fields of section 12.10, with the win rate in the backtest period, #170), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
 | `/ws/forward-tests` | `{"type": "forward_tests", "forward_tests": [...]}` at once and after each change. The server reads the table every 2 seconds, with a fixed number of database connections for the full list (not connections for each row). `{"type": "heartbeat"}` after 10 seconds without a change. The browser sends nothing. |
 
 Phase 3 route changes (#146, #149). The field names, the new route path,

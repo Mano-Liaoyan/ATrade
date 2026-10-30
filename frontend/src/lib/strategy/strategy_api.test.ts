@@ -1,14 +1,24 @@
 // Calls the strategy HTTP routes and turns each answer into a result that the editor page can show.
 import { describe, expect, it } from 'vite-plus/test';
-import { createStrategy, deleteStrategy, saveStrategyVersion } from './index';
+import {
+  createStrategy,
+  deleteStrategy,
+  readStrategy,
+  readStrategyVersion,
+  saveStrategyVersion,
+  type StrategyDetail,
+  type StrategyVersion,
+} from './index';
 
-const VERSION = {
+const VERSION: StrategyVersion = {
   id: 7,
   strategy_id: 4,
   version_number: 3,
   code: 'x = 1\n',
   code_sha256: 'abc',
   created_at_utc: '2026-01-02T03:04:05Z',
+  source: 'user',
+  rules: null,
 };
 
 function respondWith(status: number, body: unknown): typeof fetch {
@@ -42,6 +52,34 @@ describe('saveStrategyVersion', () => {
     const result = await saveStrategyVersion(failingFetch, 4, 'x = 1\n');
 
     expect(result).toEqual({ kind: 'failed', message: 'The backend is not reachable.' });
+  });
+});
+
+describe('readStrategyVersion', () => {
+  it('returns the source and the rules of the version', async () => {
+    const ruleBuilderVersion: StrategyVersion = { ...VERSION, source: 'rule_builder', rules: { entry: [] } };
+
+    const result = await readStrategyVersion(respondWith(200, ruleBuilderVersion), 4, 3);
+
+    expect(result).toEqual({ kind: 'ok', value: ruleBuilderVersion });
+  });
+});
+
+describe('readStrategy', () => {
+  it('returns the source of each version', async () => {
+    const strategy: StrategyDetail = {
+      id: 4,
+      name: 'Moving average',
+      created_at_utc: '2026-01-02T03:04:05Z',
+      versions: [
+        { id: 6, version_number: 1, code_sha256: 'aaa', created_at_utc: '2026-01-02T03:04:05Z', source: 'user' },
+        { id: 7, version_number: 2, code_sha256: 'bbb', created_at_utc: '2026-01-02T03:04:05Z', source: 'rule_builder' },
+      ],
+    };
+
+    const result = await readStrategy(respondWith(200, strategy), 4);
+
+    expect(result).toEqual({ kind: 'ok', value: strategy });
   });
 });
 

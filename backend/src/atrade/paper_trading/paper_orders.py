@@ -20,6 +20,7 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import MANUAL_ORDER_REF, read_order_source
 from atrade.ibkr import Execution, GatewayRequestError, OpenOrder, OrderRequest, OrderSide, OrderType, TimeInForce
 from atrade.paper_trading import manual_order_store
+from atrade.paper_trading.manual_order_ledger import LedgerRule, ManualOrderLedger, OrderByHand, OrderRefusal
 from atrade.paper_trading.paper_account_check import PaperAccountCheckError
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 
@@ -132,6 +133,13 @@ class OrderBlockedResponse(BaseModel):
 
     detail: str
     forward_test_id: int
+
+
+class OrderRefusedByLedgerResponse(BaseModel):
+    """An order rule of the owner ledger failed for "By hand". ATrade did not send the order (section 11.10)."""
+
+    detail: str
+    rule: LedgerRule
 
 
 def to_manual_order_response(record: manual_order_store.ManualOrderRecord) -> ManualOrderResponse:
@@ -247,6 +255,9 @@ class PaperOrderRoutes:
         self.database_url = database_url
         self.clock = clock
         self.find_blocking_forward_test = find_blocking_forward_test
+        self.ledger = ManualOrderLedger(
+            paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock
+        )
 
     async def send_order(self, request: SendOrderRequest) -> ManualOrderResponse | JSONResponse:
         try:
@@ -257,6 +268,15 @@ class PaperOrderRoutes:
         blocking_forward_test = await self.find_blocking_forward_test(instrument)
         if blocking_forward_test is not None:
             return block_order(blocking_forward_test, instrument)
+        order_by_hand = OrderByHand(
+            instrument=instrument, side=request.side, quantity=request.quantity, limit_price=request.limit_price
+        )
+        try:
+            refusal = await self.ledger.check_order(account_id, order_by_hand)
+        except GatewayRequestError as error:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+        if refusal is not None:
+            return refuse_by_ledger(refusal)
         order_request = OrderRequest(
             account=account_id,
             instrument=instrument,
@@ -340,6 +360,11 @@ def block_order(blocking_forward_test: BlockingForwardTest, instrument: Instrume
         forward_test_id=blocking_forward_test.forward_test_id,
     )
     return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=blocked.model_dump())
+
+
+def refuse_by_ledger(refusal: OrderRefusal) -> JSONResponse:
+    refused = OrderRefusedByLedgerResponse(detail=refusal.detail, rule=refusal.rule)
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=refused.model_dump())
 
 
 def raise_not_cancellable(matching_orders: list[OpenOrder]) -> None:
