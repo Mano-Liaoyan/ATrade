@@ -1,6 +1,15 @@
 // Unsaved edits stay in the browser storage, one draft for each strategy version, until the user saves.
 import { describe, expect, it } from 'vite-plus/test';
-import { clearDraft, formatVersionLabel, readDraft, writeDraft } from './index';
+import {
+  BLANK_RULES,
+  clearDraft,
+  clearRulesDraft,
+  formatVersionLabel,
+  readDraft,
+  readRulesDraft,
+  writeDraft,
+  writeRulesDraft,
+} from './index';
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -53,5 +62,19 @@ describe('strategy drafts', () => {
 describe('formatVersionLabel', () => {
   it('shows the strategy name and the version number', () => {
     expect(formatVersionLabel('Moving average', 3)).toBe('Moving average v3');
+  });
+});
+
+describe('rules drafts', () => {
+  it('keeps unsaved rules for one strategy and rules version until they are cleared', () => {
+    const storage = createMemoryStorage();
+    const key = { strategyId: 4, versionNumber: 2 };
+
+    writeRulesDraft(storage, key, BLANK_RULES);
+
+    expect(readRulesDraft(storage, key)).toEqual(BLANK_RULES);
+    expect(readRulesDraft(storage, { strategyId: 4, versionNumber: 3 })).toBeNull();
+    clearRulesDraft(storage, key);
+    expect(readRulesDraft(storage, key)).toBeNull();
   });
 });

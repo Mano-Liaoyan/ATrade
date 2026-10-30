@@ -4,7 +4,10 @@ import {
   createStrategy,
   deleteStrategy,
   readStrategy,
+  BLANK_RULES,
+  generateRulesCode,
   readStrategyVersion,
+  saveStrategyRules,
   saveStrategyVersion,
   type StrategyDetail,
   type StrategyVersion,
@@ -132,5 +135,39 @@ describe('deleteStrategy', () => {
     const result = await deleteStrategy(proxyFetch, 4);
 
     expect(result).toEqual({ kind: 'failed', message: 'The strategy request failed with HTTP status 502.' });
+  });
+});
+
+describe('saveStrategyRules', () => {
+  it('sends the rules and reports the new version', async () => {
+    let sentBody = '';
+    const recordingFetch: typeof fetch = (_input, init) => {
+      sentBody = typeof init?.body === 'string' ? init.body : '';
+      return Promise.resolve(new Response(JSON.stringify(VERSION), { status: 201 }));
+    };
+
+    const result = await saveStrategyRules(recordingFetch, 4, BLANK_RULES);
+
+    expect(JSON.parse(sentBody)).toEqual({ rules: BLANK_RULES });
+    expect(result).toEqual({ kind: 'saved', version: VERSION, isNewVersion: true });
+  });
+
+  it('gives the path and the reason of each rules format error', async () => {
+    const detail = [{ loc: ['body', 'rules', 'exits', 'exit_after_bars'], msg: 'Input should be greater than or equal to 1' }];
+
+    const result = await saveStrategyRules(respondWith(422, { detail }), 4, BLANK_RULES);
+
+    expect(result).toEqual({
+      kind: 'check_failed',
+      problems: [{ line: 0, message: 'body.rules.exits.exit_after_bars: Input should be greater than or equal to 1' }],
+    });
+  });
+});
+
+describe('generateRulesCode', () => {
+  it('returns the code of the rules', async () => {
+    const result = await generateRulesCode(respondWith(200, { code: 'class RulesStrategy: ...\n' }), BLANK_RULES);
+
+    expect(result).toEqual({ kind: 'ok', value: 'class RulesStrategy: ...\n' });
   });
 });
