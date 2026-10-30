@@ -7,10 +7,12 @@ from typing import Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.market_data import BarSource
 
 type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out"]
 
@@ -22,6 +24,9 @@ class BacktestRequest:
     bar_period: BarPeriod
     time_range: TimeRange
     paper_capital_usd: Decimal
+    # The source order of the bars and the look-back bars. None in a new request: the global source order. None in
+    # a saved backtest only for a row from before the source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 @dataclass(frozen=True)
@@ -29,6 +34,8 @@ class BacktestResult:
     equity_curve: list[EquityPoint]
     trades: list[BacktestTrade]
     metrics: BacktestMetrics
+    # The bar count of each bar source in the backtest range, without the look-back bars.
+    bar_count_by_source: dict[BarSource, int]
 
 
 @dataclass(frozen=True)
@@ -63,6 +70,8 @@ class BacktestRow:
     exposure_percent: Decimal | None
     turnover_per_year: Decimal | None
     win_rate_percent: Decimal | None
+    source_order: list[str] | None
+    bar_count_by_source: dict[str, int] | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -70,7 +79,8 @@ BACKTEST_COLUMNS: Final = """
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
     final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
-    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent
+    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
+    source_order, bar_count_by_source
 """
 
 
@@ -81,6 +91,7 @@ def read_request(row: BacktestRow) -> BacktestRequest:
         bar_period=BarPeriod(row.bar_period),
         time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
         paper_capital_usd=row.paper_capital_usd,
+        source_order=None if row.source_order is None else [BarSource(value) for value in row.source_order],
     )
 
 
@@ -119,9 +130,9 @@ async def insert_backtest(
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, status, created_at_utc)
+                paper_capital_usd, status, created_at_utc, source_order)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s)
+                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s, %(source_order)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -134,6 +145,9 @@ async def insert_backtest(
                 "end_utc": request.time_range.end_utc,
                 "paper_capital_usd": request.paper_capital_usd,
                 "created_at_utc": created_at_utc,
+                "source_order": None
+                if request.source_order is None
+                else Jsonb([bar_source.value for bar_source in request.source_order]),
             },
         )
         inserted_row = await cursor.fetchone()
@@ -170,6 +184,55 @@ async def select_equity_curve(connection: psycopg.AsyncConnection, backtest_id: 
             {"backtest_id": backtest_id},
         )
         return await cursor.fetchall()
+
+
+@dataclass(frozen=True)
+class TrialRow:
+    """A finished backtest that can count as a trial of another backtest (docs/architecture/backtest.md 10.9.5)."""
+
+    id: int
+    strategy_version_id: int
+    paper_capital_usd: Decimal
+
+
+async def select_finished_backtests_of(
+    connection: psycopg.AsyncConnection, *, instrument: Instrument, bar_period: BarPeriod
+) -> list[TrialRow]:
+    """The finished backtests of the instrument and the bar period, for all time ranges."""
+    async with connection.cursor(row_factory=class_row(TrialRow)) as cursor:
+        await cursor.execute(
+            """
+            SELECT id, strategy_version_id, paper_capital_usd FROM backtest
+            WHERE status = 'finished' AND symbol = %(symbol)s AND exchange = %(exchange)s
+                AND currency = %(currency)s AND bar_period = %(bar_period)s
+            ORDER BY id
+            """,
+            {
+                "symbol": instrument.symbol,
+                "exchange": instrument.exchange,
+                "currency": instrument.currency,
+                "bar_period": bar_period.value,
+            },
+        )
+        return await cursor.fetchall()
+
+
+async def select_equity_curves(
+    connection: psycopg.AsyncConnection, backtest_ids: list[int]
+) -> dict[int, list[EquityPoint]]:
+    """The equity curves of the backtests, by backtest ID, with one query. A backtest without points has []."""
+    equity_curves: dict[int, list[EquityPoint]] = {backtest_id: [] for backtest_id in backtest_ids}
+    cursor = await connection.execute(
+        """
+        SELECT backtest_id, time_utc, equity_usd FROM backtest_equity_point
+        WHERE backtest_id = ANY(%(backtest_ids)s)
+        ORDER BY backtest_id, time_utc
+        """,
+        {"backtest_ids": backtest_ids},
+    )
+    for backtest_id, time_utc, equity_usd in await cursor.fetchall():
+        equity_curves[backtest_id].append(EquityPoint(time_utc=time_utc, equity_usd=equity_usd))
+    return equity_curves
 
 
 async def select_trades(connection: psycopg.AsyncConnection, backtest_id: int) -> list[BacktestTrade]:
@@ -285,12 +348,16 @@ async def save_result(
                 sortino_ratio = %(sortino_ratio)s, calmar_ratio = %(calmar_ratio)s, profit_factor = %(profit_factor)s,
                 average_win_usd = %(average_win_usd)s, average_win_percent = %(average_win_percent)s,
                 average_loss_usd = %(average_loss_usd)s, exposure_percent = %(exposure_percent)s,
-                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s
+                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s,
+                bar_count_by_source = %(bar_count_by_source)s
             WHERE id = %(backtest_id)s
             """,
             {
                 "backtest_id": backtest_id,
                 **asdict(result.metrics),
+                "bar_count_by_source": Jsonb(
+                    {bar_source.value: count for bar_source, count in result.bar_count_by_source.items()}
+                ),
                 "ended_at_utc": ended_at_utc,
             },
         )

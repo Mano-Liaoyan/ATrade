@@ -2240,6 +2240,41 @@
               }
             ]
           },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -2253,6 +2288,9 @@
             },
             "type": "array",
             "title": "Trades"
+          },
+          "robustness": {
+            "$ref": "#/components/schemas/BacktestRobustnessResponse"
           }
         },
         "type": "object",
@@ -2275,8 +2313,12 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias",
           "equity_curve",
-          "trades"
+          "trades",
+          "robustness"
         ],
         "title": "BacktestDetailResponse"
       },
@@ -2587,6 +2629,41 @@
                 "type": "null"
               }
             ]
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
           }
         },
         "type": "object",
@@ -2608,9 +2685,61 @@
           "created_at_utc",
           "started_at_utc",
           "ended_at_utc",
-          "metrics"
+          "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias"
         ],
         "title": "BacktestResponse"
+      },
+      "BacktestRobustnessResponse": {
+        "properties": {
+          "trial_count": {
+            "type": "integer",
+            "title": "Trial Count"
+          },
+          "sharpe_probability_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe Probability Percent"
+          },
+          "sharpe_probability_kind": {
+            "$ref": "#/components/schemas/SharpeProbabilityKind"
+          },
+          "sharpe_probability_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharpeProbabilityStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Missing Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trial_count",
+          "sharpe_probability_percent",
+          "sharpe_probability_kind",
+          "sharpe_probability_status",
+          "missing_reasons"
+        ],
+        "title": "BacktestRobustnessResponse",
+        "description": "The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without\na meaning is null, and `missing_reasons` gives its reason by its field name."
       },
       "BacktestStatus": {
         "type": "string",
@@ -2854,6 +2983,41 @@
               }
             ]
           },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "bar_count_by_source": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bar Count By Source"
+          },
+          "survivorship_bias": {
+            "type": "boolean",
+            "title": "Survivorship Bias"
+          },
           "equity_curve": {
             "items": {
               "$ref": "#/components/schemas/EquityPointResponse"
@@ -2867,6 +3031,9 @@
             },
             "type": "array",
             "title": "Trades"
+          },
+          "robustness": {
+            "$ref": "#/components/schemas/BacktestRobustnessResponse"
           },
           "code": {
             "type": "string",
@@ -2893,8 +3060,12 @@
           "started_at_utc",
           "ended_at_utc",
           "metrics",
+          "source_order",
+          "bar_count_by_source",
+          "survivorship_bias",
           "equity_curve",
           "trades",
+          "robustness",
           "code"
         ],
         "title": "ComparedBacktestResponse"
@@ -4834,6 +5005,21 @@
         ],
         "title": "SendOrderRequest"
       },
+      "SharpeProbabilityKind": {
+        "type": "string",
+        "enum": [
+          "probabilistic",
+          "deflated"
+        ]
+      },
+      "SharpeProbabilityStatus": {
+        "type": "string",
+        "enum": [
+          "likely_real",
+          "uncertain",
+          "likely_luck"
+        ]
+      },
       "SourceOrderBody": {
         "properties": {
           "source_order": {
@@ -4899,6 +5085,20 @@
               }
             ],
             "title": "Paper Capital Usd"
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
           }
         },
         "type": "object",

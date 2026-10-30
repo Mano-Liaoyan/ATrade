@@ -215,7 +215,7 @@ needs. Examples from #136: RSI(14) reads about 100 bars. 12-1 momentum reads
 | Indicator | Daily bars that a screen reads |
 |---|---|
 | SMA(n), average trading value(n), Bollinger Bands(n), Donchian channel(n) | n |
-| Distance to 52-week high | 252 |
+| Distance to 52-week high (period n, default 252) | n |
 | 12-1 momentum (look-back L) | L + 1 |
 | Realized volatility(n) | n + 1 (n log returns) |
 | EMA(n), RSI(n), ATR(n) | 8 × n (RSI(14): 112) |
@@ -299,5 +299,4 @@ indicator reference in JSON:
 
 ## 23.8 Left to the implementation
 
-- No item is open. The items of #139, #160, #162, and #163 are decided in
-  sections 23.2 to 23.6.
+No open points.

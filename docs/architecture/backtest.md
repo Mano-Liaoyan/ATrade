@@ -147,7 +147,7 @@ New columns are null on existing rows, except where a default is given.
 | 1 | `backtest` | Add `out_of_sample_share` (integer percent, 0 to 50, not null; existing rows get 0) and `split_time_utc` (null when `out_of_sample_share` is 0). The start route sets `split_time_utc`. Nothing changes it later. |
 | 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2, `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). |
-| 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. |
+| 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
 | 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. |
 | 3 | `backtest_trade` | Add `symbol` and `exchange`. The exchange is the real exchange, not the simulated venue `SMART` ([ADR 0003](../adr/0003-one-simulated-venue-per-currency.md)). |
 | 3 | `parameter_sweep` | New. `id`, `strategy_version_id` (foreign key to `strategy_version` with no `ON DELETE` action), the universe columns of `backtest`, `bar_period`, `start_utc`, `end_utc`, `paper_capital_usd`, `out_of_sample_share`, `parameter_grid` (JSON, section 10.11.1), `created_at_utc`. |
@@ -289,6 +289,7 @@ use the same functions for the comparison (section 12.10).
 | Phase 1: `calculate_metrics(*, paper_capital_usd, time_range, equity_curve, trades)` | Also gives the metrics of section 10.9.2 and the win rate, and `missing_reasons` (section 10.9.3). It takes the trades in place of `trade_count` (`trade_count` is the number of trades), and the time range for `years`. It takes no bars: the equity curve has one point at the end of each bar, so the exposure counts the points. Thus a forward test, which has no saved bars, uses the same function. Ratios, percents, and money have 2 decimal places. |
 | Phase 1: `calculate_split_metrics(*, ..., split_time_utc)` | The metrics of the in-sample part and of the out-of-sample part (section 10.9.4). |
 | Phase 1: `calculate_probabilistic_sharpe(*, daily_returns)` and `calculate_deflated_sharpe(*, daily_returns, trial_sharpe_ratios)` | Section 10.9.5. |
+| Phase 1: `find_sharpe_probability_status(percent)` | The status of a PSR or DSR percent: `likely_real`, `uncertain`, `likely_luck`, or None without a value (section 10.9.5). |
 
 Phase 1: forward tests use the new metric functions too. A forward test has
 no in-sample and out-of-sample split, because a forward test is out of
@@ -330,12 +331,12 @@ Changes of later phases:
 | Phase | Route | Change |
 |---|---|---|
 | 1 | `POST /api/backtests` | The body can contain `out_of_sample_share` (integer percent). Without it, the route uses 30. `422` when it is not from 0 to 50. The route calculates `split_time_utc` (section 10.9.4). |
-| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. |
+| 1 | `GET /api/backtests/{backtest_id}` | The backtest also has `out_of_sample_share`, `split_time_utc`, `metrics` with the metrics of section 10.9.2 (`cagr_percent`, `annual_volatility_percent`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `profit_factor`, `average_win_usd`, `average_win_percent`, `average_loss_usd`, `exposure_percent`, `turnover_per_year`), `win_rate_percent`, and `missing_reasons` (section 10.9.3), `split_metrics` (`{"in_sample", "out_of_sample"}`, each a `metrics` object, or null without a split), and `robustness` (section 10.9.5): `{"trial_count", "sharpe_probability_percent", "sharpe_probability_kind"` (`probabilistic` when the trial count is 1, else `deflated`), `"sharpe_probability_status"` (`likely_real`, `uncertain`, `likely_luck`, or null), `"out_of_sample_to_in_sample_sharpe_percent", "out_of_sample_use_count"}`. The route calculates `robustness` at each read, so a later backtest changes it. Decided (#167): `robustness.missing_reasons` gives the reason of a null `sharpe_probability_percent` by the field name, as `metrics.missing_reasons` does (section 10.9.3). Only `GET /api/backtests/{backtest_id}` and the comparison route have `robustness`. `GET /api/backtests` does not. |
 | 1 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `first` and `second` have the Phase 1 fields too. |
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. |
-| 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12). |
+| 3 | `POST /api/backtests` | The body names a universe (section 10.10.6) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. |
-| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
 | 3 | `/api/sweeps` | New routes, section 10.11.3. |
 
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
@@ -391,7 +392,8 @@ document. The implementation can change them.
     Logs. The API has no orders, so Orders shows "No orders". Logs shows the
     strategy error of a failed backtest, or "No logs". Phase 1 adds the tab
     Metrics (section 10.9.6). Phase 3 adds the tab Instruments and the
-    Symbol column of Trades (section 10.10.7).
+    Symbol column of Trades (section 10.10.7), and the tab Bar sources
+    (section 10.12).
   - The page reads the open backtest each second until its status is final,
     and the list every 2 seconds while a backtest in it is queued or running.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
@@ -412,7 +414,9 @@ document. The implementation can change them.
   on the home page: the bar chart of a watchlist instrument saves its bars.
 - Phase 1: the form has the number input "Out-of-sample share" (section
   10.9.4). Phase 3: "Instrument" becomes "Instruments" (section 10.10.7),
-  and the form can change the source order (section 10.12).
+  and the form can change the source order (section 10.12). Done in #197:
+  the select "Source order" offers each order of the bar sources (for
+  example "IBKR, Databento"). Each open selects the global source order.
 - The "Backtest limits" dialog (a passive Carbon modal) has the "Limits" form
   (`BacktestLimitsForm`). It shows
   the timeout in minutes (`formatTimeoutMinutes`) and takes only whole
@@ -674,6 +678,24 @@ longer bars first.
     trials.
 - The backend has no numpy and no scipy. `statistics.NormalDist` of the
   Python standard library has `cdf` and `inv_cdf`. These are sufficient.
+- Decided (#167): the route calculates the daily Sharpe ratio of each trial
+  from its saved equity curve at each read (`backtest_robustness.py`). It
+  saves no Sharpe ratio. Reason: it is the simplest, it needs no migration,
+  and the trial count changes at each read too.
+- Decided (#167): the daily Sharpe ratio of a trial is the mean of its daily
+  returns divided by their sample standard deviation. A trial with fewer
+  than 2 daily returns, or with a standard deviation of 0, has no daily
+  Sharpe ratio. `V` and the `N` of the formula use only the trials that have
+  a daily Sharpe ratio. The trial count of the response counts all trials.
+- Decided (#167): when fewer than 2 trials have a daily Sharpe ratio, `V` is
+  0. Then `SR*` is 0 and the DSR is equal to PSR(0). The kind stays
+  `deflated` when the trial count is above 1.
+- Decided (#167): `γ3` and `γ4` use the population moments of the daily
+  returns. The functions return a percent with 2 decimal places. The status
+  uses this rounded percent.
+- Decided (#167): daily returns with a standard deviation of 0 give no PSR
+  and no DSR, with the reason "The standard deviation of the daily returns
+  is 0".
 
 | Value | Status | Look |
 |---|---|---|
@@ -805,6 +827,10 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   orders).
 - 500 instruments × 2,500 daily bars: `run()` takes 2.45 seconds, with a
   peak memory of about 2 GB.
+- Custom data (checked in #198): `subscribe_data(DataType(...))` without a
+  client ID gets the custom data that `add_data` added. With a client ID,
+  the backtest engine finds no data client and logs an error. Data items
+  with the same time come in the order of the `add_data` calls.
 - Estimate, not checked: a universe of 500 instruments on 1-hour bars has
   about 7.35 million bars (about 2,100 trading days × 7 bars). One run then
   takes about 15 seconds, with a peak memory of 4 to 5 GB.
@@ -883,11 +909,32 @@ them.
 
 ### 10.10.8 Left to the implementation
 
-- How the platform tells the strategy the new list at a universe period
-  start: NautilusTrader custom data or a platform timer. Make a small test
-  before the implementation.
-- How the strategy configuration gets the universe in place of
-  `instrument_id` and `bar_type`.
+- Decided (#198): the platform tells the strategy the new list at a
+  universe period start with NautilusTrader custom data, not with a
+  platform timer. For each universe period start, the child adds one
+  `CustomData` with `DataType("UniverseUpdate")` to the engine data. Its
+  data is a `UniverseUpdate` (`@customdataclass`). The field `bar_types`
+  holds the bar types of the members, joined with commas, for example
+  `AAA.SMART-1-DAY-LAST-EXTERNAL,BBB.SMART-1-DAY-LAST-EXTERNAL`.
+  `ts_event` and `ts_init` are the period start. The child adds the bars
+  before the `UniverseUpdate` items. Thus the bar that closes at a period
+  start comes before the list of that period (section 10.10.3). The strategy calls
+  `subscribe_data(DataType("UniverseUpdate"))` in `on_start` and gets the
+  list in `on_data(data)` as `data.data.bar_types`. Then it subscribes to
+  the bars of the new members and unsubscribes from the bars of the old
+  members. Reason: a timer needs the list in the strategy before the time,
+  so the strategy can read a later list. The engine sends the custom data
+  in time order with the bars, so the strategy cannot read a later list.
+  The regression test is `backend/tests/backtest/test_universe_update.py`.
+  The test file holds the `UniverseUpdate` class until the
+  multi-instrument backtest
+  ([#199](https://github.com/Mano-Liaoyan/ATrade/issues/199)) moves it to
+  the platform code.
+- Decided (#198): the configuration of a multi-instrument strategy has no
+  `instrument_id`, no `bar_type`, and no universe field. The platform fills
+  no universe field. The strategy gets the bar types only from
+  `UniverseUpdate`, and the instrument ID of a member from
+  `BarType.instrument_id`.
 - When the start route or the child writes `backtest_universe_member`
   (a `screen` universe needs the daily bars of each date).
 - The decision names the member column "quarter start". This document uses
@@ -1064,8 +1111,27 @@ Phase 3. Sources: [#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
     history).
 - The warning text is "The universe has survivorship bias: instruments that
   stopped trading are missing." It is a Carbon warning with an icon.
-- Left to the implementation: where the backtest page shows the source
-  order and the bar counts, and whether a `list` universe also shows the
+- Decided (#197): the "Bar sources" tab of the "Backtest tables" panel
+  shows the source order and the bar counts: a data table with one row for
+  each bar source in the source order, and the columns "Bar source" and
+  "Bars" (right-aligned tabular numbers). A backtest from before the source
+  order shows "No bar sources". A backtest that did not finish shows "–" as
+  its bar counts.
+- Decided (#197): `bar_count_by_source` counts the bars of the backtest
+  range. The look-back bars are read through the same source order, but are
+  not counted.
+- Decided (#197): the backend gives `survivorship_bias`. An HK backtest is a
+  backtest in `HKD`. A US backtest is a backtest in `USD`. The warning shows
+  over the key metric row of the backtest panel. It is the shared component
+  `SurvivorshipBiasWarning` of `frontend/src/lib/market_data/` (a low-contrast
+  Carbon warning notification). The screen page and the multi-instrument
+  backtest form use the same component.
+- Code (#197): `backtest_access.py` (`has_survivorship_bias`,
+  `add_global_source_order`), `backtest_run.py`, `backtest_store.py`, and
+  `frontend/src/routes/backtests/BarSourceTable.svelte`. Tests:
+  `backend/tests/backtest/test_backtest_bar_sources.py`,
+  `frontend/e2e/backtest_bar_sources.spec.ts`.
+- Left to the implementation: whether a `list` universe also shows the
   warning on the backtest page. The English warning text is a translation
   of the decided Chinese text.
 

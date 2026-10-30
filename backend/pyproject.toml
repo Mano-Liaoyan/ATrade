@@ -8,6 +8,8 @@ dependencies = [
     # Code completion: each editor WebSocket connection starts 1 basedpyright language server
     # (docs/architecture/strategy.md section 9.4). The package brings Node.js (nodejs-wheel-binaries).
     "basedpyright==1.40.2",
+    # Databento history import (docs/architecture/market_data.md section 8.8). Reads DBN files and downloads batch jobs.
+    "databento==0.87.0",
     "fastapi==0.162.0",
     # web calls the assistant service over HTTP (docs/architecture/assistant.md 25.14).
     "httpx==0.28.1",
