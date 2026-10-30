@@ -2260,7 +2260,7 @@ export interface components {
             end_time_utc?: string | null;
         };
         /** @enum {string} */
-        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
+        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3" | "m1" | "m2" | "m3" | "m4";
         /**
          * StartRefusedResponse
          * @description The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18).

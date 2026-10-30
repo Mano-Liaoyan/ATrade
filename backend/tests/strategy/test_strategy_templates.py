@@ -12,6 +12,8 @@ from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from atrade.strategy.strategy_templates import BLANK_RULES, STRATEGY_TEMPLATES, StartPoint, StrategyTemplate
 from tests.strategy.rules_examples import Json, condition, group, indicator, make_rules, number, price
 
+RULE_TEMPLATES = [template for template in STRATEGY_TEMPLATES if template.kind == "rules"]
+
 S1_ENTRY = group("all_of", condition(price("close"), "above", indicator("sma", period=200)))
 S2_ENTRY = group("all_of", condition(price("high"), "at_or_above", indicator("donchian_channel", "upper", period=50)))
 S3_ENTRY = group("all_of", condition(indicator("momentum_12_1", look_back=252, skip=0), "above", number(0)))
@@ -40,12 +42,12 @@ async def read_version_1(web_client: httpx.AsyncClient, strategy_id: int) -> Jso
 
 
 @pytest.mark.anyio
-async def test_the_template_list_has_s1_to_s3_in_the_order_of_the_spec(web_client: httpx.AsyncClient) -> None:
+async def test_the_template_list_starts_with_s1_to_s3_in_the_order_of_the_spec(web_client: httpx.AsyncClient) -> None:
     response = await web_client.get("/api/strategy-templates")
 
     assert response.status_code == 200
     templates = response.json()
-    assert [(template["id"], template["name"]) for template in templates] == [
+    assert [(template["id"], template["name"]) for template in templates[:3]] == [
         ("s1", "200-day trend"),
         ("s2", "50-day range break"),
         ("s3", "12-month time-series momentum"),
@@ -73,7 +75,7 @@ async def test_the_template_list_has_s1_to_s3_in_the_order_of_the_spec(web_clien
         {"label": "Brock, Lakonishok & LeBaron 1992", "url": "https://doi.org/10.1111/j.1540-6261.1992.tb04681.x"},
         {"label": "Faber 2007", "url": "https://doi.org/10.3905/jwm.2007.674809"},
     ]
-    assert [template["defaults"] for template in templates[1:]] == [
+    assert [template["defaults"] for template in templates[1:3]] == [
         "Donchian 50, N = 10",
         "Look back 252 days, skip 0 days",
     ]
@@ -85,7 +87,8 @@ def test_the_start_points_are_the_blank_start_points_and_the_templates() -> None
 
 def test_each_template_has_only_rules_of_evidence_grade_a_or_b_for_its_market() -> None:
     for template in STRATEGY_TEMPLATES:
-        assert template.evidence.startswith(("A ", "B ")), template.id
+        assert template.evidence.startswith(("A", "B")), template.id
+    for template in RULE_TEMPLATES:
         assert "index" in template.evidence, template.id
         assert template.market == "US index ETFs"
 
@@ -139,7 +142,7 @@ async def test_an_unknown_start_point_is_refused(web_client: httpx.AsyncClient) 
     assert (await web_client.get("/api/strategies")).json() == []
 
 
-@pytest.mark.parametrize("template", STRATEGY_TEMPLATES, ids=lambda template: template.id)
+@pytest.mark.parametrize("template", RULE_TEMPLATES, ids=lambda template: template.id)
 def test_the_code_of_a_template_starts_with_its_docstring(template: StrategyTemplate) -> None:
     code = make_rules_code(StrategyRules.model_validate(EXPECTED_RULES[template.id]))
 
