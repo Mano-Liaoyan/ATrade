@@ -1688,6 +1688,9 @@ option and records it in this document.
   [`indicator.md`](architecture/indicator.md).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
+- Decided (#171): a named CHECK constraint holds the values of
+  `strategy_version.source`, and `read_strategy_version` does not return
+  `source` and `rules` (strategy section 9.1.1).
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).

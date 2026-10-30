@@ -50,7 +50,7 @@ puts the new parts of this section in phases.
 ### 9.1.1 Tables
 
 Migrations: `backend/migrations/versions/7c1e4a2b9d30_strategy_create_tables.py`
-and `backend/migrations/versions/4a9e7d2c6b18_strategy_add_version_source_and_rules.py`.
+and `backend/migrations/versions/8d4f2a6c1e93_strategy_add_version_source_and_rules.py`.
 
 | Table | Columns |
 |---|---|
