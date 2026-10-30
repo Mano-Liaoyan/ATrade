@@ -1,5 +1,6 @@
 """The version source and the rules of a strategy version (docs/architecture/strategy.md section 9.1.1)."""
 
+import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from urllib.parse import urlsplit, urlunsplit
@@ -14,20 +15,22 @@ from psycopg import sql
 from atrade.app.database_migrations import MIGRATIONS_DIR
 
 REVISION_BEFORE_SOURCE_AND_RULES = "6c3e9a1f2b80"
-MIGRATION_TEST_DATABASE = "atrade_version_source_migration"
+CREATED_AT_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
 
 
 @pytest.fixture
 def empty_database_url(migrated_database_url: str) -> Iterator[str]:
+    # A unique name, so that two test runs on one PostgreSQL server do not drop the database of the other run.
+    database_name = f"atrade_version_source_migration_{uuid.uuid4().hex}"
     with psycopg.connect(migrated_database_url, autocommit=True) as connection:
-        connection.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(MIGRATION_TEST_DATABASE)))
-        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(MIGRATION_TEST_DATABASE)))
-    url_parts = urlsplit(migrated_database_url)._replace(path=f"/{MIGRATION_TEST_DATABASE}")
+        connection.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(database_name)))
+        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+    url_parts = urlsplit(migrated_database_url)._replace(path=f"/{database_name}")
     try:
         yield urlunsplit(url_parts)
     finally:
         with psycopg.connect(migrated_database_url, autocommit=True) as connection:
-            connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(MIGRATION_TEST_DATABASE)))
+            connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(database_name)))
 
 
 def upgrade_to(database_url: str, revision: str) -> None:
@@ -41,14 +44,14 @@ def test_existing_versions_get_the_source_user_and_no_rules(empty_database_url: 
     upgrade_to(empty_database_url, REVISION_BEFORE_SOURCE_AND_RULES)
     with psycopg.connect(empty_database_url, autocommit=True) as connection:
         connection.execute(
-            "INSERT INTO strategy (name, created_at_utc) VALUES ('Old', %(now)s)", {"now": datetime.now(UTC)}
+            "INSERT INTO strategy (name, created_at_utc) VALUES ('Old', %(now)s)", {"now": CREATED_AT_UTC}
         )
         connection.execute(
             """
             INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc)
             SELECT id, 1, 'x = 1', 'sha', %(now)s FROM strategy
             """,
-            {"now": datetime.now(UTC)},
+            {"now": CREATED_AT_UTC},
         )
 
     upgrade_to(empty_database_url, "head")
@@ -62,7 +65,10 @@ def test_existing_versions_get_the_source_user_and_no_rules(empty_database_url: 
 async def test_the_rules_of_a_version_cannot_be_changed(web_client: httpx.AsyncClient, database_url: str) -> None:
     await web_client.post("/api/strategies", json={"name": "Moving average"})
 
-    with psycopg.connect(database_url, autocommit=True) as connection, pytest.raises(psycopg.errors.RaiseException):
+    with (
+        psycopg.connect(database_url, autocommit=True) as connection,
+        pytest.raises(psycopg.errors.RaiseException, match="append-only"),
+    ):
         connection.execute("""UPDATE strategy_version SET rules = '{"entry": []}'""")
 
 
@@ -71,17 +77,22 @@ async def test_the_source_accepts_only_user_and_rule_builder(web_client: httpx.A
     strategy = (await web_client.post("/api/strategies", json={"name": "Moving average"})).json()
     insert_version = """
         INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc, source)
-        VALUES (%(strategy_id)s, %(version_number)s, 'x = 1', 'sha', now(), %(source)s)
+        VALUES (%(strategy_id)s, %(version_number)s, 'x = 1', 'sha', %(now)s, %(source)s)
         """
 
     with psycopg.connect(database_url, autocommit=True) as connection:
-        connection.execute(insert_version, {"strategy_id": strategy["id"], "version_number": 2, "source": "user"})
         connection.execute(
-            insert_version, {"strategy_id": strategy["id"], "version_number": 3, "source": "rule_builder"}
+            insert_version,
+            {"strategy_id": strategy["id"], "version_number": 2, "source": "user", "now": CREATED_AT_UTC},
+        )
+        connection.execute(
+            insert_version,
+            {"strategy_id": strategy["id"], "version_number": 3, "source": "rule_builder", "now": CREATED_AT_UTC},
         )
         with pytest.raises(psycopg.errors.CheckViolation):
             connection.execute(
-                insert_version, {"strategy_id": strategy["id"], "version_number": 4, "source": "ai_assistant"}
+                insert_version,
+                {"strategy_id": strategy["id"], "version_number": 4, "source": "ai_assistant", "now": CREATED_AT_UTC},
             )
 
 
