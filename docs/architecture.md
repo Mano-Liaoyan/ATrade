@@ -1175,7 +1175,7 @@ Settings that `foundation/settings` reads:
 | `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
-| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
+| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. Compose gives it to `web` and `forward-test`. |
 | `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason, and the Databento import program does not download batch jobs. Compose gives it to `web`, so the import program in the `web` image gets it. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
@@ -1724,6 +1724,11 @@ option and records it in this document.
 - Decided (#165): the daily returns use the UTC date as the trading day,
   `years` comes from the request range, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
+- Decided (#166): the out-of-sample share is a share of the calendar time
+  of the request range, and the split time does not align to a bar end. The
+  route calculates the split metrics at each read from the saved equity
+  curve and trades. The out-of-sample Sharpe percent is null when the
+  in-sample Sharpe ratio is 0, below 0, or null (backtest section 10.9.4).
 - Decided (#167): the route calculates the daily Sharpe ratio of each trial
   from its saved equity curve at each read. When fewer than 2 trials have a
   daily Sharpe ratio, the DSR uses a threshold of 0 (backtest section
@@ -1807,6 +1812,21 @@ option and records it in this document.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.
+- Decided (#216): the bar fetcher is `BarFetcher` in
+  `forward_test/bar_fetcher.py`. The worker runs it next to the state
+  comparison. It reads only the ranges that no bar source in the global
+  source order saved (`read_unsaved_ranges` of `market_data`), so the daily
+  read and the warm-up fill are one code path. The daily read runs at the
+  first check after 00:30 UTC of each UTC day. When IB Gateway is not
+  reachable, it logs the reason and tries again 5 minutes later
+  (`docs/architecture/forward_test.md` section 12.24).
+- Decided (#216): the bar fetcher and the daily bar update of `web` are
+  different jobs. They use different client IDs in different processes.
+- Decided (#216): `Settings` refuses a bar fetcher client ID inside the
+  forward test range or equal to the Web client ID. The `web` and
+  `forward-test` services both get `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, so
+  both check the same value. The worker then does not start and logs the
+  reason.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. One of them:
   - The backtest look-back is 60 days for daily bars. SMA(200) and 12-1

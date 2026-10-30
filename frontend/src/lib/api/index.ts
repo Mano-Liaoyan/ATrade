@@ -737,6 +737,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -752,6 +756,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
@@ -850,6 +855,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -864,8 +873,8 @@ export interface components {
         };
         /**
          * BacktestRobustnessResponse
-         * @description The robustness checks of docs/architecture/backtest.md section 10.9.5, calculated at each read. A value without
-         *     a meaning is null, and `missing_reasons` gives its reason by its field name.
+         * @description The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+         *     value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`.
          */
         BacktestRobustnessResponse: {
             /** Trial Count */
@@ -878,6 +887,10 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+            /** Out Of Sample To In Sample Sharpe Percent */
+            out_of_sample_to_in_sample_sharpe_percent: string | null;
+            /** Out Of Sample Use Count */
+            out_of_sample_use_count: number | null;
         };
         /** @enum {string} */
         BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
@@ -971,6 +984,10 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
             /** Conversation Id */
             conversation_id: number | null;
@@ -986,6 +1003,7 @@ export interface components {
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
@@ -1833,6 +1851,11 @@ export interface components {
             /** Source Order */
             source_order: components["schemas"]["BarSource"][];
         };
+        /** SplitMetricsResponse */
+        SplitMetricsResponse: {
+            in_sample: components["schemas"]["BacktestMetricsResponse"];
+            out_of_sample: components["schemas"]["BacktestMetricsResponse"];
+        };
         /** StartBacktestRequest */
         StartBacktestRequest: {
             /** Strategy Version Id */
@@ -1856,6 +1879,11 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
             /** Source Order */
             source_order?: components["schemas"]["BarSource"][] | null;
         };

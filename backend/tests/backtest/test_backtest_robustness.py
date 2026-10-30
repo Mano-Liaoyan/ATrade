@@ -127,6 +127,8 @@ async def test_one_trial_gives_the_probabilistic_sharpe_and_two_give_the_deflate
         "sharpe_probability_kind": "probabilistic",
         "sharpe_probability_status": "likely_real",
         "missing_reasons": {},
+        "out_of_sample_to_in_sample_sharpe_percent": None,
+        "out_of_sample_use_count": None,
     }
     assert with_one_more["trial_count"] == 2
     assert with_one_more["sharpe_probability_kind"] == "deflated"
