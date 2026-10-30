@@ -22,6 +22,7 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.strategy import STRATEGY_TEMPLATE
 from tests.fakes.clock import FixedClock
+from tests.fakes.e2e_assistant import E2EAssistantService
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.fakes.ibkr import (
     SAMPLE_INSTRUMENTS,
@@ -424,7 +425,12 @@ def main() -> None:
         for number in range(1, E2E_FORWARD_TEST_ORDER_COUNT + 1)
     ]
     clock = FixedClock(FIXED_NOW_UTC)
-    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    app = create_web_app(
+        settings=settings,
+        clock=clock,
+        gateway_connection=gateway_connection,
+        assistant_service=E2EAssistantService(database_url),
+    )
     # Each fake child stops at once, like a stop that cancelled all orders (section 17.5).
     child_starter = FakeChildStarter(is_ending_children_at_once=True)
     worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=child_starter.start_child)
