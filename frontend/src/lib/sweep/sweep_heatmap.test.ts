@@ -20,10 +20,25 @@ describe('readHeatmap', () => {
     ]);
   });
 
-  it('scales a value from 0 (lowest) to 1 (highest) for the sequential color', () => {
-    const heatmap = readHeatmap(runs, 'a', 'b');
+  it('gives the lowest value Carbon sequential step 1 and the highest step 10', () => {
+    const heatmap = readHeatmap([...runs, { parameters: { a: 2, b: 20 }, value: 0.375 }], 'a', 'b');
 
-    expect(heatmap.shade(0.25)).toBe(0);
-    expect(heatmap.shade(0.5)).toBe(1);
+    expect(heatmap.step(0.25)).toBe(1);
+    expect(heatmap.step(0.375)).toBe(6);
+    expect(heatmap.step(0.5)).toBe(10);
+  });
+
+  it('keeps false and true as the 2 values of a bool parameter', () => {
+    const heatmap = readHeatmap(
+      [
+        { parameters: { a: true, b: 1 }, value: 1 },
+        { parameters: { a: false, b: 1 }, value: 2 },
+      ],
+      'a',
+      'b',
+    );
+
+    expect(heatmap.columns).toEqual([false, true]);
+    expect(heatmap.cells).toEqual([[2, 1]]);
   });
 });

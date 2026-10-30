@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vite-plus/test';
 import { sortSweepRows, type SweepRow } from './sweep_runs';
 
 const rows: SweepRow[] = [
-  { backtestId: 1, values: { roc_period: 5, total_return: 0.1 } },
-  { backtestId: 2, values: { roc_period: 10, total_return: null } },
-  { backtestId: 3, values: { roc_period: 15, total_return: 0.3 } },
+  { backtestId: 1, status: 'finished', values: { roc_period: 5, total_return: 0.1 } },
+  { backtestId: 2, status: 'queued', values: { roc_period: 10, total_return: null } },
+  { backtestId: 3, status: 'finished', values: { roc_period: 15, total_return: 0.3 } },
 ];
 
 describe('sortSweepRows', () => {

@@ -1,6 +1,24 @@
 // Counts the runs of a parameter grid and tells why a sweep cannot start (backtest.md section 10.11.1).
 import { describe, expect, it } from 'vite-plus/test';
-import { countSweepRuns, readSweepStartBlock } from './sweep_grid';
+import { buildSweepGrid, countSweepRuns, readSweepStartBlock } from './sweep_grid';
+
+describe('buildSweepGrid', () => {
+  it('has 1 entry for each checked parameter, and a bool parameter has only its name', () => {
+    const rows = [
+      { name: 'period', type: 'int', isSwept: true, start: '5', end: '40', step: '5' },
+      { name: 'size', type: 'float', isSwept: false, start: '1', end: '2', step: '1' },
+      { name: 'fast', type: 'bool', isSwept: true, start: '', end: '', step: '' },
+    ];
+
+    expect(buildSweepGrid(rows)).toEqual([{ name: 'period', start: 5, end: 40, step: 5 }, { name: 'fast' }]);
+  });
+
+  it('counts an empty range field as a range without values', () => {
+    const grid = buildSweepGrid([{ name: 'period', type: 'int', isSwept: true, start: '5', end: '', step: '5' }]);
+
+    expect(countSweepRuns(grid)).toBe(0);
+  });
+});
 
 describe('countSweepRuns', () => {
   it('multiplies the value counts of the swept parameters', () => {
@@ -35,6 +53,12 @@ describe('readSweepStartBlock', () => {
   it('blocks a grid of more than 3 parameters', () => {
     const grid = ['a', 'b', 'c', 'd'].map((name) => ({ name, start: 1, end: 2, step: 1 }));
     expect(readSweepStartBlock(grid)).toBe('The grid has 4 parameters. The limit is 3.');
+  });
+
+  it('blocks a grid with a range without values', () => {
+    expect(readSweepStartBlock([{ name: 'a', start: 5, end: 1, step: 1 }])).toBe(
+      'A range has no values. Give a start, an end after it, and a step above 0.',
+    );
   });
 
   it('blocks a grid without parameters', () => {

@@ -1,10 +1,15 @@
 // The rows of the "Runs" table of a sweep (backtest.md section 10.11.4): 1 row for each run, with the parameter
 // values and the key metrics. Each column can sort the rows.
 
+import type { components } from '#lib/api';
+
+type BacktestStatus = components['schemas']['BacktestStatus'];
+
 export type SortDirection = 'ascending' | 'descending';
 
 export interface SweepRow {
   backtestId: number;
+  status: BacktestStatus;
   values: Record<string, number | boolean | null>;
 }
 

@@ -73,6 +73,7 @@ export function createPaletteCommandGroups(watchlistInstruments: WatchlistInstru
         goToPage('Home', resolve('/')),
         goToPage('Strategies', resolve('/strategies')),
         goToPage('Backtests', resolve('/backtests/[[backtestId]]', {})),
+        goToPage('Parameter sweeps', resolve('/sweeps/[[sweepId]]', {})),
         goToPage('Forward tests', resolve('/forward-tests/[[forwardTestId]]', {})),
       ],
     },
