@@ -10,17 +10,20 @@
     /** The maximum height of the viewport. Not used with `fill`. */
     maxHeight?: string;
     fill?: boolean;
+    /** `log` for a message log: screen readers announce the new content. */
+    role?: 'region' | 'log';
+    /** The scrolling element, for a parent that scrolls it. */
+    viewport?: HTMLDivElement;
     children: Snippet;
   }
 
-  const { label, maxHeight, fill = false, children }: Props = $props();
+  let { label, maxHeight, fill = false, role = 'region', viewport = $bindable(), children }: Props = $props();
 
   // One arrow key press scrolls this far, like a mouse wheel step.
   const ARROW_KEY_STEP_PIXELS = 40;
   const PERCENT = 100;
 
   const viewportId = $props.id();
-  let viewport: HTMLDivElement | undefined = $state();
   let content: HTMLDivElement | undefined = $state();
   let scrollThumb: ScrollThumb = $state({ isOverflowing: false, thumbHeightPixels: 0, thumbTopPixels: 0 });
   let scrolledPercent = $state(0);
@@ -108,7 +111,7 @@
   <div
     class="scroll-viewport"
     id={viewportId}
-    role="region"
+    {role}
     aria-label={label}
     style:max-height={fill ? undefined : maxHeight}
     bind:this={viewport}
