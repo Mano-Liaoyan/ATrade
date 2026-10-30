@@ -154,6 +154,8 @@ needs. Examples from #136: RSI(14) reads about 100 bars. 12-1 momentum reads
 
 EMA, RSI, ATR, and MACD use recursive averages. Their value depends a little
 on the first bar that the class receives. Section 23.8 has the open point.
+Section 21.1 of [`docs/architecture.md`](../architecture.md) has the
+measured differences (#160).
 
 ## 23.5 Consistency test
 

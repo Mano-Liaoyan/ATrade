@@ -229,6 +229,10 @@ app           -> all modules
 - `indicator` imports `nautilus_trader` for the built-in indicators. Strategy
   code imports `atrade.indicator` at run time in the backtest child and the
   forward test child. import-linter does not check user code.
+- import-linter puts `indicator` in one layer with `ibkr`, just above
+  `foundation`. So `indicator` can import only `foundation`, and `indicator`
+  and `ibkr` do not import each other. A contract keeps the internal files
+  of `indicator` private (#160).
 - `assistant` does not import other capabilities. `app/` builds the port 8001
   app from the routers of `strategy`, `backtest`, and `screen`
   (`docs/architecture/assistant.md`). The `conversation_id` foreign keys of
@@ -1548,8 +1552,6 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 
 | Fact | How to check |
 |---|---|
-| A Python indicator class written by ATrade registers with `register_indicator_for_bars` (#131 read the source only). | Write a minimal class and run 1 backtest before the indicator work. |
-| Strategy code can import `atrade.indicator` (#136, #138). | Import the module in a backtest child. |
 | The 12-1 momentum class accepts skip 0 (#139, template S3). | Check the parameter in the indicator implementation. |
 | The default parameters of the template sources (#139). | Read the method section of each paper. |
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). | Run the bulk daily bar query on the real bar tables and time it. |
@@ -1586,6 +1588,10 @@ implementation" list.
 | Live bars with keepUpToDate (`stream_live_bars`, 1 minute and 1 day) on a real Gateway. | Yes. On Tuesday 2026-10-27 at about 10:00 UTC, outside the US trading hours, the first `AAPL` bar came within 60 seconds for both periods (contract test `test_streams_the_current_live_bar`). |
 | `NetLiquidation` in USD on the paper account of the owner. | No. On 2026-10-27 the paper account had the base currency EUR, and the owner cannot change it. IBKR sent `NetLiquidation` and `TotalCashValue` only in EUR, and `$LEDGER-ExchangeRate` only for `BASE` and `EUR` (`1.00`): no USD ledger, so no USD rate from the account. Decided: ATrade converts the balance to USD (section 11.9 of `paper_trading.md`) with the account `ExchangeRate` for USD when IBKR sends it, else with the IBKR forex rate (`read_exchange_rate`, last 1 hour `MIDPOINT` bar of IDEALPRO `EUR.USD`). Checked on 2026-10-27 against the real Gateway with read-only queries: `PaperAccountMonitor.read_balance()` returned base currency EUR, rate source `ibkr_forex`, and a USD net liquidation; the `ibkr_paper` cases `test_reads_the_balance_and_the_positions_of_the_paper_account` and `test_reads_the_forex_rate_for_the_paper_account_balance` pass. The account `ExchangeRate` path is checked only with the fake. |
 | Editor input latency and completion latency in the browser. | On 2026-10-27, Playwright 1.64.1 (headless Chromium and Firefox) against `tests.e2e_server` on the same machine, basedpyright 1.40.2 (#69). Input latency (key press to the next painted frame, 50 keys): Chromium median 9.8 ms, p95 16.6 ms; Firefox median 3.0 ms, p95 6.0 ms. Completion latency (Ctrl+Space to the visible list for `self.subscribe_ba` in a `Strategy` subclass): first request after the page opens 782 ms (Chromium) and 808 ms (Firefox); next 10 requests 74 to 76 ms (Chromium) and 81 to 86 ms (Firefox). Not measured through Cloudflare. |
+| A Python indicator class written by ATrade registers with `register_indicator_for_bars` (#131 read the source only). | Yes. On 2026-10-30 with NautilusTrader 2.0.0rc7 (#160), the minimal class `atrade.indicator.BarClose` ran in the backtest engine. The class does not subclass a NautilusTrader class: rc7 exports no `Indicator` base class, and `register_indicator_for_bars` accepts any object with `handle_bar(bar)` and `initialized`. NautilusTrader called `handle_bar` before `on_bar`, so `on_bar` read the close of the current bar on each of 3 bars (`tests/indicator/test_indicator_registration.py`). |
+| Strategy code can import `atrade.indicator` (#136, #138). | Yes. On 2026-10-30 (#160), a strategy version that imports `atrade.indicator` passed the checks before save (section 9.3, `ruff --select F` included) and ran in a real backtest child with the status `finished`. The indicator value in `on_bar` was the close of each of the 20 bars (`tests/indicator/test_indicator_registration.py`). |
+| The default smoothing (`ma_type`) of `RelativeStrengthIndex` and `AverageTrueRange` in NautilusTrader 2.0.0rc7. | On 2026-10-30 (#160), in the backend environment: both defaults are Wilder. `AverageTrueRange(14).ma_type` is `MovingAverageType.Wilder`. `RelativeStrengthIndex` has no `ma_type` property, so the check compared values: on 200 test closes, RSI(14) with the default gave 34.832627, the same as `ma_type=MovingAverageType.Wilder` and as a Wilder RSI written by hand; `Exponential` gave 14.769989 and `Simple` gave 5.270742. The value scale is 0 to 100. `MovingAverageConvergenceDivergence` defaults to `Exponential`. The indicator library does not need to pass `MovingAverageType.Wilder` for RSI and ATR. |
+| The difference of a recursive indicator value when it starts from fewer bars (`docs/architecture/indicator.md` section 23.4). | On 2026-10-30 (#160), NautilusTrader 2.0.0rc7 with default parameters, on 1000 fixed synthetic daily bars (no saved real daily bars were available): start close 100, each close is the previous close times `exp(N(0, 0.015))` (Python `random.Random(160)`), high and low are 0 to 1 % outside the open and the close, and the open is the previous close. The table value is the value at the last bar when the class starts N bars before the end, minus the value when it starts 1000 bars before the end. Last close 108.59. RSI(14) (1000 bars: 22.772027): N=50 +0.40, N=100 -0.0010, N=150 -0.00025, N=200 +0.0000024. EMA(20) (116.353654): N=50 +0.023, N=100 +0.00012, N=150 +0.0000027. EMA(50) (120.956079): N=50 +3.5, N=100 +0.39, N=150 -0.038, N=200 +0.00038, N=300 -0.000092. ATR(14) (2.556675): N=50 -0.0038, N=100 +0.00011, N=150 -0.0000032. MACD(12, 26) line (-3.635635): N=50 -0.21, N=100 -0.0058, N=150 -0.000051, N=200 +0.00000089. Suggested look-back (#163 decides it): 8 × the longest period of the recursive average (RSI(14): 112, EMA(20): 160, EMA(50): 400, ATR(14): 112, MACD(12, 26): 208 by the slow period). With it, every measured difference is less than 0.005, half of the last place of a value with 2 decimals. The MACD signal line was not measured. |
 | Start time of a backtest child process (estimated 1 to 3 seconds). | On 2026-10-27, a new CPython 3.14.9 process that imports `atrade.app.backtest_process` (NautilusTrader 2.0.0rc7, pyarrow 26.0.0, FastAPI) took 0.38 seconds (median of 10 runs, 0.379 to 0.392 seconds) on an AMD Ryzen 9 9950X3D, outside Docker (#70). The full test backtest of 20 daily bars, from the child start to the saved result, ends in about 1 second. Not measured in the `web` container. |
 
 ## 22. Points left to the implementation
@@ -1603,6 +1609,14 @@ option and records it in this document.
   client ID of the forward test. The child connects it with `connect()` for
   the paper account check and again for the stop steps, and disconnects it
   before the LiveNode starts.
+- Decided (#160): the minimal indicator class is `BarClose` (the close of
+  the last bar) in `indicator/bar_close.py`. The indicator tests are in
+  `backend/tests/indicator/`. Their test strategy
+  `tests/indicator/strategies/record_bar_close.py` registers the class and
+  writes the value of each `on_bar` to a file.
+- Decided (#160): an ATrade indicator class does not subclass a
+  NautilusTrader class. It has `handle_bar(bar)` and an `initialized`
+  property (section 21.1).
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - The open points of the map #129 are in the "Left to the implementation"
