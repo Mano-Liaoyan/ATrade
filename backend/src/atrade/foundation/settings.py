@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     ibkr_web_client_id: int = Field(default=1, ge=0)
     forward_test_client_id_first: int = Field(default=10, ge=0)
     forward_test_client_id_last: int = Field(default=13, ge=0)
+    # The fixed client ID of the bar fetcher in the forward-test worker (section 12.4).
+    ibkr_bar_fetcher_client_id: int = Field(default=20, ge=0)
     # Paper capital when no paper account balance is available.
     local_paper_capital_usd: Decimal = Field(default=Decimal(100000), gt=0)
     # Secret. Decision #146 names it without the ATRADE_ prefix. None when it is not configured.
@@ -62,7 +64,12 @@ class Settings(BaseSettings):
             return None
         return value
 
-    @field_validator("ibkr_web_client_id", "forward_test_client_id_first", "forward_test_client_id_last")
+    @field_validator(
+        "ibkr_web_client_id",
+        "forward_test_client_id_first",
+        "forward_test_client_id_last",
+        "ibkr_bar_fetcher_client_id",
+    )
     @classmethod
     def refuse_unusable_client_id(cls, client_id: int) -> int:
         require_usable_client_id(client_id)
@@ -84,4 +91,22 @@ class Settings(BaseSettings):
                 f" {first}-{last}. Each process must use a different client ID."
             )
             raise ValueError(message)
+        self.refuse_shared_bar_fetcher_client_id()
         return self
+
+    def refuse_shared_bar_fetcher_client_id(self) -> None:
+        bar_fetcher_client_id = self.ibkr_bar_fetcher_client_id
+        first = self.forward_test_client_id_first
+        last = self.forward_test_client_id_last
+        if first <= bar_fetcher_client_id <= last:
+            message = (
+                f"The bar fetcher client ID {bar_fetcher_client_id} is inside the forward test client ID range"
+                f" {first}-{last}. Each process must use a different client ID."
+            )
+            raise ValueError(message)
+        if bar_fetcher_client_id == self.ibkr_web_client_id:
+            message = (
+                f"The bar fetcher client ID {bar_fetcher_client_id} is equal to the Web client ID."
+                " Each process must use a different client ID."
+            )
+            raise ValueError(message)
