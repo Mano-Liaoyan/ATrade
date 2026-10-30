@@ -26,6 +26,7 @@ def test_reads_settings_from_environment_variables(
     monkeypatch.setenv("ATRADE_IBKR_WEB_CLIENT_ID", "7")
     monkeypatch.setenv("ATRADE_FORWARD_TEST_CLIENT_ID_FIRST", "20")
     monkeypatch.setenv("ATRADE_FORWARD_TEST_CLIENT_ID_LAST", "25")
+    monkeypatch.setenv("ATRADE_IBKR_BAR_FETCHER_CLIENT_ID", "30")
     monkeypatch.setenv("ATRADE_LOCAL_PAPER_CAPITAL_USD", "25000.50")
 
     settings = Settings()  # pyright: ignore[reportCallIssue] readability-exception: pydantic-settings fills required fields from the environment.
@@ -38,6 +39,7 @@ def test_reads_settings_from_environment_variables(
     assert settings.ibkr_web_client_id == 7
     assert settings.forward_test_client_id_first == 20
     assert settings.forward_test_client_id_last == 25
+    assert settings.ibkr_bar_fetcher_client_id == 30
     assert settings.local_paper_capital_usd == Decimal("25000.50")
 
 
@@ -78,3 +80,17 @@ def test_refuses_a_forward_test_client_id_range_that_ends_before_it_starts() -> 
 def test_refuses_a_web_client_id_inside_the_forward_test_range() -> None:
     with pytest.raises(ValidationError, match="Web client ID 11 is inside the forward test client ID range"):
         Settings(database_url=DATABASE_URL, ibkr_web_client_id=11)
+
+
+def test_the_bar_fetcher_client_id_is_20_by_default() -> None:
+    assert Settings(database_url=DATABASE_URL).ibkr_bar_fetcher_client_id == 20
+
+
+def test_refuses_a_bar_fetcher_client_id_inside_the_forward_test_range() -> None:
+    with pytest.raises(ValidationError, match="bar fetcher client ID 12 is inside the forward test client ID range"):
+        Settings(database_url=DATABASE_URL, ibkr_bar_fetcher_client_id=12)
+
+
+def test_refuses_a_bar_fetcher_client_id_equal_to_the_web_client_id() -> None:
+    with pytest.raises(ValidationError, match="bar fetcher client ID 1 is equal to the Web client ID"):
+        Settings(database_url=DATABASE_URL, ibkr_bar_fetcher_client_id=1)

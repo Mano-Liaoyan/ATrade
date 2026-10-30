@@ -1,5 +1,7 @@
-"""Public entry of forward_test: start and stop forward tests, the forward-test worker, and the child process body."""
+"""Public entry of forward_test: start and stop forward tests, the forward-test worker, its bar fetcher, and the child
+process body."""
 
+from atrade.forward_test.bar_fetcher import BarFetcher, ReadMemberLists
 from atrade.forward_test.comparison_routes import create_forward_test_comparison_router
 from atrade.forward_test.forward_test_child import (
     IbkrAccess,
@@ -30,6 +32,7 @@ __all__ = [
     "FORWARD_TEST_SOCKET_MESSAGE_MODELS",
     "GATEWAY_UNREACHABLE_EXIT_CODE",
     "PAPER_CHECK_FAILED_EXIT_CODE",
+    "BarFetcher",
     "ChildMode",
     "ForwardTestChild",
     "ForwardTestOnInstrument",
@@ -40,6 +43,7 @@ __all__ = [
     "LiveNodeEnd",
     "LiveNodeInput",
     "OpenGatewayConnection",
+    "ReadMemberLists",
     "RecorderInput",
     "RunLiveNode",
     "StartForwardTestChild",

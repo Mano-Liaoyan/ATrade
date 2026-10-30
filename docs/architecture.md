@@ -1156,7 +1156,7 @@ Settings that `foundation/settings` reads:
 | `forward_test_client_id_first`, `forward_test_client_id_last` (`ATRADE_FORWARD_TEST_CLIENT_ID_FIRST`, `_LAST`) | Default `10–13`. |
 | `local_paper_capital_usd` (`ATRADE_LOCAL_PAPER_CAPITAL_USD`) | Used when IBKR is not connected. Default `100000`. |
 | `database_url` (`DATABASE_URL`) | PostgreSQL connection. |
-| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. |
+| `ibkr_bar_fetcher_client_id` (`ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`) | Phase 3. Client ID of the bar fetcher in `forward-test`. Default `20`. Compose gives it to `web` and `forward-test`. |
 | `databento_api_key` (`DATABENTO_API_KEY`) | Phase 3. Secret. The Databento API key for the quarterly universe update and the history import. Empty means not configured: the quarterly update then does not run and logs the reason. |
 
 Settings refuse client ID 0, client IDs that are multiples of 1000, a range
@@ -1684,6 +1684,21 @@ option and records it in this document.
 - Decided (#188): the watchlist `saved_bars` items keep the first and the
   last bar start of each bar table. The backtest form shows, for one bar
   period, the earliest first bar and the latest last bar of all bar sources.
+- Decided (#216): the bar fetcher is `BarFetcher` in
+  `forward_test/bar_fetcher.py`. The worker runs it next to the state
+  comparison. It reads only the ranges that no bar source in the global
+  source order saved (`read_unsaved_ranges` of `market_data`), so the daily
+  read and the warm-up fill are one code path. The daily read runs at the
+  first check after 00:30 UTC of each UTC day. When IB Gateway is not
+  reachable, it logs the reason and tries again 5 minutes later
+  (`docs/architecture/forward_test.md` section 12.24).
+- Decided (#216): the bar fetcher and the daily bar update of `web` are
+  different jobs. They use different client IDs in different processes.
+- Decided (#216): `Settings` refuses a bar fetcher client ID inside the
+  forward test range or equal to the Web client ID. The `web` and
+  `forward-test` services both get `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, so
+  both check the same value. The worker then does not start and logs the
+  reason.
 - The open points of the map #129 are in the "Left to the implementation"
   lists of sections 8 to 12 and 23 to 25. Two of them:
   - How the platform gives the strategy the new universe list at each
