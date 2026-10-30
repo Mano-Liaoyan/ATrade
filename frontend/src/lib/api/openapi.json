@@ -6252,6 +6252,28 @@
         ],
         "title": "ScreenCheckFailedResponse"
       },
+      "ScreenIndicatorNamesResponse": {
+        "properties": {
+          "indicator_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Indicator Conditions"
+          },
+          "order": {
+            "type": "string",
+            "title": "Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicator_conditions",
+          "order"
+        ],
+        "title": "ScreenIndicatorNamesResponse",
+        "description": "The UI names of the indicators of the definition, for example \"RSI(14)\" (screen.md section 24.7)."
+      },
       "ScreenListItemResponse": {
         "properties": {
           "id": {
@@ -6438,6 +6460,9 @@
             "type": "object",
             "title": "Definition"
           },
+          "indicator_names": {
+            "$ref": "#/components/schemas/ScreenIndicatorNamesResponse"
+          },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/ScreenResultRowResponse"
@@ -6461,6 +6486,7 @@
           "assistant_conversation_id",
           "summary",
           "definition",
+          "indicator_names",
           "rows",
           "exclusions"
         ],
