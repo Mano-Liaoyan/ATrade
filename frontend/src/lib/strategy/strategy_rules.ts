@@ -183,6 +183,15 @@ export function findRulesVersionNumber(
   return ruleVersions.at(-1)?.version_number ?? null;
 }
 
+/** The warning of the "Rules" tab (docs/architecture/strategy.md section 9.8.4): the open version vN has no rules and
+ is newer than the latest version with rules vM. `rulesVersionNumber` is 0 when no version has rules. */
+export function describeRulesWarning(openVersionNumber: number, rulesVersionNumber: number): string | null {
+  if (rulesVersionNumber === 0 || openVersionNumber <= rulesVersionNumber) {
+    return null;
+  }
+  return `Code of v${String(openVersionNumber)} changed. Rules are from v${String(rulesVersionNumber)}.`;
+}
+
 /** The line numbers (1 is the first line) of the new code that the old code does not have. Each old line matches one
  new line. Without old code, no line changed. */
 export function findChangedLines(oldCode: string, newCode: string): number[] {

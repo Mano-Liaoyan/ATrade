@@ -1,6 +1,7 @@
 """A strategy gets the universe of each universe period as NautilusTrader custom data (#198).
 
-The decision and the reason are in docs/architecture/backtest.md section 10.10.8.
+The decision and the reason are in docs/architecture/backtest.md section 10.10.8. The platform class is in
+`atrade/backtest/universe_update.py`.
 """
 
 # The NautilusTrader 2.0 stubs type some parameters as a bare dict (docs/architecture.md section 16 G).
@@ -12,32 +13,21 @@ from pathlib import Path
 
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.model import Bar as NautilusBar
-from nautilus_trader.model import BarType, CustomData, DataType, Venue, register_custom_data_class
-from nautilus_trader.model.custom import customdataclass  # pyright: ignore[reportUnknownVariableType] untyped.
+from nautilus_trader.model import BarType, CustomData, DataType, Venue
 from nautilus_trader.persistence import BarDataWrangler
 from nautilus_trader.trading import Strategy
 
-from atrade.backtest.arrow_bars import NANOSECONDS_PER_SECOND, convert_bars_to_arrow_bytes
+from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
 from atrade.backtest.strategy_engine_run import create_engine, create_instrument
+from atrade.backtest.universe_update import UNIVERSE_UPDATE, make_universe_update
 from atrade.foundation.bar import Bar, BarPeriod
 from atrade.foundation.instrument import Instrument
 
-UNIVERSE_UPDATE = "UniverseUpdate"
 FIRST_PERIOD_START_UTC = datetime(2026, 1, 1, tzinfo=UTC)
 SECOND_PERIOD_START_UTC = datetime(2026, 1, 6, tzinfo=UTC)
 PERIOD_BAR_COUNT = 5
 FIRST_PERIOD_BAR_TYPES = ("AAA.SMART-1-DAY-LAST-EXTERNAL", "BBB.SMART-1-DAY-LAST-EXTERNAL")
 SECOND_PERIOD_BAR_TYPES = ("BBB.SMART-1-DAY-LAST-EXTERNAL", "CCC.SMART-1-DAY-LAST-EXTERNAL")
-
-
-@customdataclass
-class UniverseUpdate:
-    """The members of one universe period: their bar types, joined with commas."""
-
-    bar_types: str = ""
-
-
-register_custom_data_class(UniverseUpdate)
 
 
 class UniverseConfig(StrategyConfig):
@@ -84,18 +74,6 @@ def make_bars(first_start_utc: datetime, count: int) -> list[Bar]:
     ]
 
 
-def convert_to_nanoseconds(time_utc: datetime) -> int:
-    return int(time_utc.timestamp()) * NANOSECONDS_PER_SECOND
-
-
-def make_universe_update(period_start_utc: datetime, bar_types: tuple[str, ...]) -> CustomData:
-    time_ns = convert_to_nanoseconds(period_start_utc)
-    # readability-exception: the decorator adds the `ts_event` and `ts_init` arguments, and the type checker does
-    # not see them.
-    update = UniverseUpdate(time_ns, time_ns, bar_types=",".join(bar_types))  # pyright: ignore[reportCallIssue]
-    return CustomData(DataType(UNIVERSE_UPDATE), update)
-
-
 def run_two_universe_periods(work_directory: Path) -> FollowUniverseStrategy:
     engine = create_engine(
         starting_cash=Decimal(10000), currency="USD", venue=Venue("SMART"), work_directory=work_directory
@@ -116,8 +94,8 @@ def run_two_universe_periods(work_directory: Path) -> FollowUniverseStrategy:
     # at a period start comes before the list of that period (section 10.10.3).
     engine.add_data(
         [
-            make_universe_update(FIRST_PERIOD_START_UTC, FIRST_PERIOD_BAR_TYPES),
-            make_universe_update(SECOND_PERIOD_START_UTC, SECOND_PERIOD_BAR_TYPES),
+            make_universe_update(FIRST_PERIOD_START_UTC, list(FIRST_PERIOD_BAR_TYPES)),
+            make_universe_update(SECOND_PERIOD_START_UTC, list(SECOND_PERIOD_BAR_TYPES)),
         ]
     )
     strategy = FollowUniverseStrategy(UniverseConfig())

@@ -249,3 +249,13 @@ def test_the_macd_lines_are_value_signal_and_histogram() -> None:
     assert macd.value == pytest.approx(fast - slow, rel=1e-12)
     assert macd.signal is not None
     assert macd.histogram == pytest.approx(fast - slow - macd.signal, rel=1e-12)
+
+
+def test_an_indicator_reads_a_split_adjusted_bar_with_many_decimals() -> None:
+    """A 3-for-2 split divides 100 by 1.5. NautilusTrader accepts at most 18 decimals."""
+    price = Decimal(100) / Decimal("1.5")
+    indicator = SMA(period=1)
+
+    indicator.update(Bar(FIRST_BAR_UTC, price, price, price, price, Decimal(1000) / Decimal(3)))
+
+    assert indicator.value == pytest.approx(66.666666667)

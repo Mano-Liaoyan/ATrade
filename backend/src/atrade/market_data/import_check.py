@@ -12,11 +12,10 @@ from decimal import Decimal
 from typing import LiteralString
 
 import psycopg
-from psycopg import sql
 
 from atrade.foundation.instrument import Instrument
-from atrade.market_data.bar_source import BarSource, bar_table
 from atrade.market_data.daily_bar_summary import update_daily_bar_summaries_blocking
+from atrade.market_data.stock_split_change import StockSplitChange, change_stored_bars_blocking
 
 SELECT_WAITING_SPLITS: LiteralString = """
     SELECT id, symbol, exchange, currency, ex_date_utc, split_ratio FROM stock_split
@@ -32,13 +31,6 @@ SET_CONFIRMATION: LiteralString = "UPDATE stock_split SET confirmation = %(confi
 CHECK_LINKS: LiteralString = """
     UPDATE databento_symbol_link SET checked_at_utc = %(checked_at_utc)s WHERE checked_at_utc IS NULL
 """
-# The bar tables of all bar sources (section 8.13.3).
-ADJUST_BARS_TEMPLATE = sql.SQL("""
-    UPDATE {bar_table}
-    SET open = open / %(split_ratio)s, high = high / %(split_ratio)s, low = low / %(split_ratio)s,
-        close = close / %(split_ratio)s, volume = volume * %(split_ratio)s
-    WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s AND start_utc < %(ex_date_utc)s
-""")
 IMPORT_CHECK = "import_check"
 IMPORT_REJECTED = "import_rejected"
 
@@ -94,18 +86,6 @@ def read_unchecked_import_detections(*, database_url: str) -> ImportDetections:
         return read_detections(connection)
 
 
-def adjust_stored_bars(connection: psycopg.Connection, split: WaitingSplit) -> None:
-    parameters = {
-        "symbol": split.instrument.symbol,
-        "exchange": split.instrument.exchange,
-        "currency": split.instrument.currency,
-        "ex_date_utc": split.ex_date_utc,
-        "split_ratio": split.split_ratio,
-    }
-    for bar_source in BarSource:
-        connection.execute(ADJUST_BARS_TEMPLATE.format(bar_table=bar_table(bar_source)), parameters)
-
-
 def check_import_detections(
     *, database_url: str, rejected_split_ids: set[int], checked_at_utc: datetime
 ) -> ImportDetections:
@@ -123,7 +103,9 @@ def check_import_detections(
             confirmation = IMPORT_REJECTED if rejected else IMPORT_CHECK
             connection.execute(SET_CONFIRMATION, {"confirmation": confirmation, "id": split.id})
             if not rejected:
-                adjust_stored_bars(connection, split)
+                change_stored_bars_blocking(
+                    connection, StockSplitChange(split.instrument, split.ex_date_utc, split.split_ratio)
+                )
         confirmed_instruments = {
             split.instrument for split in detections.stock_splits if split.id not in rejected_split_ids
         }

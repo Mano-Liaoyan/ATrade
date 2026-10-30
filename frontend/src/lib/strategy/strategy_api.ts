@@ -15,6 +15,8 @@ export type StrategyDetail = components['schemas']['StrategyResponse'];
 export type StrategyListItem = components['schemas']['StrategyListItem'];
 export type StrategyVersion = components['schemas']['StrategyVersionResponse'];
 export type CodeProblem = components['schemas']['CodeProblemResponse'];
+export type StrategyTemplate = components['schemas']['StrategyTemplateResponse'];
+export type StartPoint = components['schemas']['StartPoint'];
 type CodeCheckFailedResponse = components['schemas']['CodeCheckFailedResponse'];
 type RulesCodeResponse = components['schemas']['RulesCodeResponse'];
 interface ValidationFailure {
@@ -32,6 +34,7 @@ export type DeleteResult = { kind: 'deleted' } | { kind: 'failed'; message: stri
 
 const STRATEGIES_PATH = '/api/strategies';
 const RULES_CODE_PATH = '/api/strategy-rules/code';
+const TEMPLATES_PATH = '/api/strategy-templates';
 const HTTP_CREATED = 201;
 const HTTP_UNPROCESSABLE_CONTENT = 422;
 // The strategy routes answer 404 and 409 with ErrorResponse {"detail": "<message>"}.
@@ -61,11 +64,20 @@ export function readStrategyVersion(
   return requestJson(fetchFunction, `${STRATEGIES_PATH}/${String(strategyId)}/versions/${String(versionNumber)}`);
 }
 
+export function listStrategyTemplates(fetchFunction: typeof fetch): Promise<RequestResult<StrategyTemplate[]>> {
+  return requestJson(fetchFunction, TEMPLATES_PATH);
+}
+
 export async function createStrategy(
   fetchFunction: typeof fetch,
   name: string,
+  startFrom: StartPoint = 'blank_code',
 ): Promise<{ kind: 'created'; strategy: StrategyDetail } | { kind: 'failed'; message: string }> {
-  const result = await requestJson<StrategyDetail>(fetchFunction, STRATEGIES_PATH, createJsonRequest('POST', { name }));
+  const result = await requestJson<StrategyDetail>(
+    fetchFunction,
+    STRATEGIES_PATH,
+    createJsonRequest('POST', { name, start_from: startFrom }),
+  );
   if (result.kind === 'failed') {
     return result;
   }

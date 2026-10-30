@@ -1,10 +1,11 @@
 <!-- The "Rules" tab of the strategy editor panel (docs/architecture/strategy.md section 9.8.5). Left: the rule builder
      with the Settings, Entry, and Exit blocks. Right: the read-only code from the rules. After each rule change, the tab
      asks the backend for the code (POST /api/strategy-rules/code), highlights the changed lines, and scrolls the code
-     region (not the page) to the first one. Each side scrolls in its own ScrollRegion. -->
+     region (not the page) to the first one. Each side scrolls in its own ScrollRegion. Above the blocks is the warning
+     of section 9.8.4 when the code of the open version changed after the rules. -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { Checkbox, ContentSwitcher } from '#lib/foundation/carbon';
+  import { Checkbox, ContentSwitcher, InlineNotification } from '#lib/foundation/carbon';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
@@ -20,9 +21,11 @@
   interface Props {
     rules: StrategyRules;
     onRulesChange: (rules: StrategyRules) => void;
+    // "Code of vN changed. Rules are from vM." (section 9.8.4), or null.
+    warning?: string | null;
   }
 
-  const { rules, onRulesChange }: Props = $props();
+  const { rules, onRulesChange, warning = null }: Props = $props();
 
   type PositionKind = 'fixed_shares' | 'percent_of_equity';
   const POSITION_ITEMS: { value: PositionKind; label: string }[] = [
@@ -87,6 +90,9 @@
   <div class="rules-tab__builder">
     <ScrollRegion label="Rule builder" fill>
       <div class="rules-tab__blocks">
+        {#if warning !== null}
+          <InlineNotification kind="warning" lowContrast title={warning} />
+        {/if}
         <section class="cds--tile rules-block" aria-labelledby="rules-settings">
           <h3 id="rules-settings" class="rules-block__heading">Settings</h3>
           <div class="rules-block__fields">

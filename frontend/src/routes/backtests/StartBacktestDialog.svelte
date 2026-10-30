@@ -169,6 +169,7 @@
     startError = null;
     const result = await startBacktest(fetch, {
       strategy_version_id: Number(strategyVersionId),
+      universe_kind: 'single',
       symbol: selectedInstrument.symbol,
       exchange: selectedInstrument.exchange,
       currency: selectedInstrument.currency,

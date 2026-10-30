@@ -337,6 +337,20 @@ Source: [Content of the strategy template library](https://github.com/Mano-Liaoy
   `start_from`.
 - Phase 1 lists "Blank code", "Blank rules", and the templates S1 to S3.
   Phase 3 adds the code templates M1 to M4.
+- Decided (#176): the dialog is `NewStrategyDialog.svelte` in
+  `frontend/src/routes/strategies/`. When it opens, "Blank code" is
+  selected. This is the start point of a request without `start_from`, so a
+  new strategy is the same as before when the user selects nothing.
+- Decided (#176): after "Create strategy", the strategy page opens version 1
+  with the `strategy.py` tab, for each start point. This is the tab that the
+  page opens for all strategies. The user selects the "Rules" tab to edit the
+  rules.
+- Decided (#176): the start point list is a listbox. The Up and Down arrow
+  keys move the selection. The list and the right side each scroll in their
+  own `ScrollRegion`.
+- Decided (#176): the prototype shows the market and the bar period in 1
+  row. The dialog shows them in 2 rows ("Market" and "Bar period"), as the
+  table above.
 
 ## 9.8 Rule builder (phase 1)
 
@@ -522,6 +536,14 @@ Source: [ADR 0006](../adr/0006-rule-builder-generates-code-one-way.md).
   The new code replaces the code changes of vN.
 - In the warning case, ATrade shows the diff (`CodeDiff`) of the vN code and
   the new code before the save.
+- Decided (#174): the tab shows the warning as a Carbon inline notification
+  (warning icon and color) above the Settings block. The tab of a version
+  with rules shows its own rules with no warning, also when it is older than
+  vM. When no version has rules, there is no warning.
+- Decided (#174): the diff is in the dialog "Replace code changes of vN".
+  The left side is the vN code, the right side is "Code from the rules".
+  The buttons are "Cancel" (no save) and "Save rules as new version". When
+  the code request fails, the save runs at once and shows the problems.
 - In phase 2, the AI assistant does not change rules. Its code changes count
   as code changes by hand. The AI assistant tool that reads a version also
   returns the rules JSON.
@@ -596,7 +618,6 @@ It needs the multi-instrument backtest of
 ### 9.8.7 Left to the implementation
 
 - The rules that "Blank rules" holds (for example the position size).
-- The buttons of the diff before the save.
 - Decided (#198): the platform tells the strategy the universe of each
   universe period with NautilusTrader custom data. The strategy calls
   `subscribe_data(DataType("UniverseUpdate"))` and gets the bar types of the
@@ -732,6 +753,3 @@ must check them first.
 - The rows of the dialog (section 9.7.1) for a code template. A code
   template has a rule, not an entry rule and an exit rule.
 - The version source of version 1 from a code template.
-- The default start point that the dialog selects when it opens.
-- The tab that the strategy page opens after "Create strategy" from a rules
-  start point.

@@ -160,6 +160,12 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   wait. The store saves all bars of a range with one SQL statement.
 - When no part is missing, the route does not call IBKR. Saved bars are
   returned also when IB Gateway is not reachable.
+- Hourly bars (#193): the first regular-hours bar starts at 9:30 ET, not on a
+  whole hour from the UNIX epoch. The route widens hourly ranges the same as
+  other ranges. The 9:30 ET bar is in the whole hour from 9:00 ET, so a
+  range that includes 9:00 ET or 9:30 ET reads it. A range that starts at
+  10:00 ET does not read it. The saved ranges of `databento_bar` are whole
+  days, so a widened hourly range of a bought day has no missing part.
 - Phase 3 (#188): the route reads through the global source order (section
   8.7.2). A part is missing only when no bar source in the source order saved
   it. The route asks IBKR for the missing parts and saves them in `ibkr_bar`.
@@ -407,6 +413,12 @@ Phase 3. Sources:
   `tests/market_data/test_databento_import.py`,
   `tests/app/test_databento_import_program.py`, and the fake
   `tests/fakes/databento.py`, which writes small DBN files.
+- Code (#193): `market_data/databento_hourly.py` (the hourly bars of the
+  import and the purchase list `list_hourly_purchases`). The program option
+  `--hourly-cost` prints the purchase list and its cost
+  (`DatabentoClient.read_hourly_cost`, `metadata.get_cost`). Tests:
+  `tests/market_data/test_databento_hourly_import.py` and
+  `tests/app/test_databento_import_program.py`.
 - For each instrument with a daily bar in a bought time range, the import
   writes that time range to `databento_bar_saved_range`. The daily bars
   before 2024-07-01 use the time range that all 4 history files cover. The
@@ -478,6 +490,20 @@ Hourly bars:
   IBKR regular-hours bar. Its open is the official open. Its high and low
   include the trades from 9:00 to 9:30 ET.
 - Store the start in UTC (section 8.4).
+- The official open is the open of the Databento daily bar of the same
+  instrument and day (section 8.14). The high and the low of the 9:30 ET bar
+  also include the official open.
+- The import keeps the bars of an instrument only in the quarters in which it
+  is in `us_universe_member`. The quarter of a bar is the calendar quarter of
+  its New York date. The import moves the bars of an old symbol to the new
+  symbol of `databento_symbol_link` before it compares the symbol.
+- The hourly bars get the stock split adjustment of section 8.8.3, the same
+  as the daily bars.
+- For each instrument and quarter with hourly bars, the import writes the
+  quarter (cut to the time range of the files) to
+  `databento_bar_saved_range` with the bar period `1-HOUR`.
+- A day without a Databento daily bar has no official open. The import saves
+  no hourly bar of that day and names the symbol in its log.
 
 ### 8.8.3 Stock split adjustment at save time
 
@@ -796,6 +822,11 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Some instruments are not in a universe and have no position, for example
   an instrument that the user only opened on a chart. Such an instrument
   gets evidence A when a bar read uses IBKR. The same rules apply to it.
+- Implemented (#196): the bars route and the daily bar update record
+  evidence A. A candidate is a `stock_split` row with the source
+  `ibkr_evidence` and no confirmation. The stock split check reads the
+  candidates with `read_stock_split_candidates(*, database_url)` of the
+  public entry.
 
 ### 8.13.3 Change of the stored bars
 
@@ -812,6 +843,15 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   again.
   Thus a change in place is the only method for them.
 - The saved results of earlier backtests do not change.
+- Implemented (#196): the function is `apply_stock_split(*, database_url,
+  change, confirmation, recorded_at_utc)` of the public entry. `change` is
+  a `StockSplitChange` (instrument, ex-date, split ratio). The confirmation
+  is `both_evidences`, `bar_evidence`, or `user_apply`; the caller gives it.
+  The function changes a candidate row, or adds a row with the source
+  `ibkr_evidence`. When the stock split is confirmed already, it raises
+  `StockSplitConfirmedError` and changes nothing, so the bars are not
+  divided 2 times. The user check of the Databento import (section 8.14)
+  uses the same bar change and also updates the daily bar summary.
 
 ## 8.14 Left to the implementation
 
@@ -851,9 +891,37 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   bars that it saves for the missing parts.
 - Decided (#188): bars are read only inside the saved ranges of their bar
   source. A bar outside every saved range of its bar source is not read.
-- How the stored day of evidence A is chosen, the tolerance for "ratio is
-  1", and how ATrade finds the ex-date when evidence A comes days after the
-  ex-date.
+- Decided (#196): the stored day of evidence A is the day of the last
+  stored daily bar of the instrument, through the global source order. The
+  bars route reads that day from IBKR again, before it reads the missing
+  parts. The daily bar update reads from the last saved IBKR daily bar, so
+  it needs no extra request.
+- Decided (#196): the ratio is 1 when it is within 3% of 1, the step
+  tolerance of the Databento import (section 8.8.3). Else the split ratio is
+  the fraction with the smallest denominator near the ratio, as in the
+  import.
+- Decided (#196): the ex-date of a candidate is the day after the stored
+  day. The stored day is the last stored daily bar, so no stored daily bar
+  is between the stored day and the real ex-date. The recorded ex-date can
+  be earlier than the real ex-date.
+- Decided (#196): while a stock split waits for its confirmation (a
+  candidate, or a Databento import split before the import check), each bar
+  that IBKR returns before its ex-date is saved in the old form: the prices
+  are multiplied by the split ratio and the volume is divided by it. This
+  applies to the bars route, the daily bar update, and
+  `save_received_bars`. Thus all stored bars before the ex-date have one
+  form, and the change divides each of them 1 time.
+- Decided (#196): when a stock split with an ex-date after the stored day
+  waits already, evidence A records no second candidate. `apply_stock_split()`
+  does not confirm a Databento import split; the import check does. A failed
+  IBKR read of the stored day is logged, and the read of the missing parts
+  continues.
+- Decided (#196): `market_data` does not know positions (`docs/architecture.md`
+  section 6.2). The stock split check gives the confirmation: `bar_evidence`
+  for an instrument that no owner holds.
+- Not done (#196): stored hourly and shorter bars that start after the
+  last stored daily bar and before the real ex-date keep the old prices. The
+  bar fetcher of section 8.12 does not record evidence A.
 - Decided (#192): the universe rule leaves out the symbols of
   `market_data/us_etf_symbols.py`, a list of ETFs and ETNs with a high
   trading value. Only the instruments with the highest trading values can be
@@ -863,8 +931,12 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   2018-10-01, the first quarter with a full 63-day window after 2018-05-01.
   The Databento import program calculates each quarter from 2018-10-01 that
   has no members and a Databento bar on its previous trading day.
-- The official open of the hourly 9:30 ET bar from 2024-07-01, because the
-  purchase has no `statistics` from that day.
+- Decided (#193): the official open of the hourly 9:30 ET bar is the open
+  of the Databento daily bar of that day, before and from 2024-07-01. Before
+  2024-07-01 it is `stat_type` 1. From 2024-07-01 it is the EQUS.SUMMARY open,
+  because the purchase has no `statistics` from that day. The import reads
+  the daily bar of the same import first, then `databento_bar`. Thus both
+  bars have the same stock split adjustment.
 - Decided (#192): the quarterly update saves the downloaded EQUS.SUMMARY
   bars in `databento_bar` with the Databento import, because the calculation
   reads only `databento_bar`.
@@ -904,6 +976,18 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   second time and finds the same bar count. Each save of daily bars
   calculates the summary row again from all saved bars (#195).
 - How symbol reuse is handled: a symbol that a different company uses later.
-- The bar start of the hourly 9:30 ET bar is not on a whole hour from the
-  UNIX epoch (section 8.4). The bars route widens a range to whole bar
-  periods. The implementation decides how hourly ranges are widened.
+- Decided (#193): the bars route widens hourly ranges to whole hours from
+  the UNIX epoch, with no special rule for the 9:30 ET bar (section 8.4).
+  The 9:30 ET bar is in the hour from 9:00 ET.
+- Decided (#193): the purchase list of the hourly bars has one batch job for
+  each quarter: the members of the quarter and their old symbols that were
+  in use in the quarter, from the first trading day of the quarter to the
+  first day of the next quarter (or the day of the cost read for the
+  current quarter).
+- The hourly import keeps the bars from 13:00 to 15:00 ET on a day with an
+  early close (13:00 ET). These bars are after-hours trades, and IBKR has no
+  regular-hours bars at these times. A fix needs the early-close days of the
+  US trading calendar.
+- The hourly saved range covers the whole quarter, also a day on which the
+  import saves no hourly bar because the day has no Databento daily bar.
+  The bars route then does not ask IBKR for that day.
