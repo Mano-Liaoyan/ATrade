@@ -2,14 +2,27 @@
 
 Each run plays the next script of `run_scripts`. The item HOLD makes the run wait until `release()` or `abort()`.
 An abort ends the run at once, like pi.
+
+A login plays `login_script`. After a LoginStep `prompt`, the login waits for `answer_login` with its prompt ID. The
+answers are kept in `login_answers`. A deleted credential leaves `credentials`.
 """
 
 from collections.abc import AsyncIterator
-from typing import Final
+from typing import Final, Literal
 
 import anyio
 
-from atrade.assistant import AssistantServiceError, ConversationMessage, ModelSelection, RunEvent
+from atrade.assistant import (
+    AssistantServiceError,
+    ConversationMessage,
+    CredentialSummary,
+    LoginEnd,
+    LoginEvent,
+    LoginStep,
+    ModelSelection,
+    ProviderSummary,
+    RunEvent,
+)
 
 HOLD: Final = "hold"
 
@@ -30,6 +43,13 @@ class FakeAssistantService:
         self.is_reachable = True
         self.release_event = anyio.Event()
         self.run_started = anyio.Event()
+        self.providers: list[ProviderSummary] = []
+        self.credentials: list[CredentialSummary] = []
+        self.login_script: list[LoginEvent] = []
+        self.logins: list[tuple[str, str, str]] = []
+        self.login_answers: dict[str, str] = {}
+        self.answer_event = anyio.Event()
+        self.login_closed = False
 
     def require_reachable(self) -> None:
         if not self.is_reachable:
@@ -78,3 +98,39 @@ class FakeAssistantService:
         self.require_reachable()
         self.deleted_conversations.append(conversation_id)
         self.messages.pop(conversation_id, None)
+
+    async def list_providers(self) -> list[ProviderSummary]:
+        self.require_reachable()
+        return self.providers
+
+    async def list_credentials(self) -> list[CredentialSummary]:
+        self.require_reachable()
+        return self.credentials
+
+    async def delete_credential(self, credential_id: str) -> bool:
+        self.require_reachable()
+        kept = [credential for credential in self.credentials if credential.id != credential_id]
+        deleted = len(kept) < len(self.credentials)
+        self.credentials = kept
+        return deleted
+
+    async def login(self, provider: str, method: Literal["oauth", "api_key"], name: str) -> AsyncIterator[LoginEvent]:
+        self.require_reachable()
+        self.logins.append((provider, method, name))
+        try:
+            for event in self.login_script:
+                yield event
+                if isinstance(event, LoginStep) and event.prompt_id is not None:
+                    while event.prompt_id not in self.login_answers:
+                        await self.answer_event.wait()
+                        self.answer_event = anyio.Event()
+                if isinstance(event, LoginEnd):
+                    self.credentials.append(event.credential)
+        finally:
+            self.login_closed = True
+
+    async def answer_login(self, prompt_id: str, value: str) -> bool:
+        self.require_reachable()
+        self.login_answers[prompt_id] = value
+        self.answer_event.set()
+        return True
