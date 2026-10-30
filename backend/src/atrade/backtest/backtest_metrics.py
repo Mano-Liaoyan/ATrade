@@ -233,22 +233,27 @@ def calculate_round_trip_metrics(round_trips: list[RoundTrip]) -> RoundTripMetri
     )
 
 
-def calculate_exposure_percent(equity_curve: list[EquityPoint], trades: list[BacktestTrade]) -> Decimal | None:
-    """The share of the bars with a position that is not 0 at the bar end. There is one equity point for each bar.
-    A trade counts at the first point at or after its time, as in `calculate_equity_curve`."""
-    if not equity_curve:
-        return None
+def find_positions(equity_curve: list[EquityPoint], trades: list[BacktestTrade]) -> list[bool]:
+    """For each equity point (sorted by time): True when the position at the bar end is not 0. A trade counts at the
+    first point at or after its time, as in `calculate_equity_curve`."""
     sorted_trades = sorted(trades, key=lambda trade: trade.time_utc)
     position_shares = Decimal(0)
     next_trade_index = 0
-    bars_with_position = 0
+    positions: list[bool] = []
     for point in sorted(equity_curve, key=lambda point: point.time_utc):
         while next_trade_index < len(sorted_trades) and sorted_trades[next_trade_index].time_utc <= point.time_utc:
             trade = sorted_trades[next_trade_index]
             position_shares += trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
             next_trade_index += 1
-        bars_with_position += position_shares != 0
-    return round_value(Decimal(bars_with_position) / len(equity_curve) * PERCENT)
+        positions.append(position_shares != 0)
+    return positions
+
+
+def calculate_exposure_percent(positions: list[bool]) -> Decimal | None:
+    """The share of the bars with a position that is not 0 at the bar end. There is one equity point for each bar."""
+    if not positions:
+        return None
+    return round_value(Decimal(sum(positions)) / len(positions) * PERCENT)
 
 
 def calculate_turnover_per_year(
@@ -275,24 +280,53 @@ def calculate_metrics(
 
     `years` is the calendar time from `time_range.start_utc` to `time_range.end_utc`, divided by 365.25 days.
     """
-    final_equity_usd = paper_capital_usd if not equity_curve else equity_curve[-1].equity_usd
-    total_return_percent = (final_equity_usd - paper_capital_usd) / paper_capital_usd * PERCENT
-    max_drawdown_percent = calculate_max_drawdown_percent(
-        paper_capital_usd=paper_capital_usd, equity_curve=equity_curve
+    sorted_curve = sorted(equity_curve, key=lambda point: point.time_utc)
+    return calculate_part_metrics(
+        MetricPart(
+            start_capital_usd=paper_capital_usd,
+            time_range=time_range,
+            equity_curve=sorted_curve,
+            trades=trades,
+            round_trips=find_round_trips(trades),
+            positions=find_positions(sorted_curve, trades),
+        )
     )
+
+
+@dataclass(frozen=True)
+class MetricPart:
+    """A part of a test: all of it, or the in-sample or out-of-sample part (section 10.9.4). `equity_curve` is
+    sorted by time. `positions` has one value for each equity point (`find_positions` on the full test)."""
+
+    start_capital_usd: Decimal
+    time_range: TimeRange
+    equity_curve: list[EquityPoint]
+    trades: list[BacktestTrade]
+    round_trips: list[RoundTrip]
+    positions: list[bool]
+
+
+def calculate_part_metrics(part: MetricPart) -> BacktestMetrics:
+    start_capital_usd = part.start_capital_usd
+    final_equity_usd = start_capital_usd if not part.equity_curve else part.equity_curve[-1].equity_usd
+    total_return_percent = (final_equity_usd - start_capital_usd) / start_capital_usd * PERCENT
+    max_drawdown_percent = calculate_max_drawdown_percent(
+        paper_capital_usd=start_capital_usd, equity_curve=part.equity_curve
+    )
+    time_range = part.time_range
     years = Decimal((time_range.end_utc - time_range.start_utc).total_seconds()) / SECONDS_PER_YEAR
     cagr_percent = calculate_cagr_percent(
-        paper_capital_usd=paper_capital_usd, final_equity_usd=final_equity_usd, years=years
+        paper_capital_usd=start_capital_usd, final_equity_usd=final_equity_usd, years=years
     )
     ratio_metrics = calculate_ratio_metrics(
-        calculate_daily_returns(start_capital_usd=paper_capital_usd, equity_curve=equity_curve)
+        calculate_daily_returns(start_capital_usd=start_capital_usd, equity_curve=part.equity_curve)
     )
-    round_trip_metrics = calculate_round_trip_metrics(find_round_trips(trades))
+    round_trip_metrics = calculate_round_trip_metrics(part.round_trips)
     return BacktestMetrics(
         final_equity_usd=final_equity_usd,
         total_return_percent=total_return_percent.quantize(PERCENT_STEP),
         max_drawdown_percent=round_value(max_drawdown_percent),
-        trade_count=len(trades),
+        trade_count=len(part.trades),
         cagr_percent=None if cagr_percent is None else round_value(cagr_percent),
         annual_volatility_percent=ratio_metrics.annual_volatility_percent,
         sharpe_ratio=ratio_metrics.sharpe_ratio,
@@ -306,9 +340,63 @@ def calculate_metrics(
         average_win_usd=round_trip_metrics.average_win_usd,
         average_win_percent=round_trip_metrics.average_win_percent,
         average_loss_usd=round_trip_metrics.average_loss_usd,
-        exposure_percent=calculate_exposure_percent(equity_curve, trades),
-        turnover_per_year=calculate_turnover_per_year(equity_curve, trades, years),
+        exposure_percent=calculate_exposure_percent(part.positions),
+        turnover_per_year=calculate_turnover_per_year(part.equity_curve, part.trades, years),
         win_rate_percent=round_trip_metrics.win_rate_percent,
+    )
+
+
+def find_split_time(time_range: TimeRange, out_of_sample_share: int) -> datetime | None:
+    """The start of the out-of-sample part: the last `out_of_sample_share` percent of the calendar time of the range
+    (docs/architecture/backtest.md section 10.9.4). The time does not align to a bar end. None when the share is 0."""
+    if out_of_sample_share == 0:
+        return None
+    length = time_range.end_utc - time_range.start_utc
+    return time_range.start_utc + length * (100 - out_of_sample_share) / 100
+
+
+@dataclass(frozen=True)
+class SplitMetrics:
+    in_sample: BacktestMetrics
+    out_of_sample: BacktestMetrics
+
+
+def calculate_split_metrics(
+    *,
+    paper_capital_usd: Decimal,
+    time_range: TimeRange,
+    equity_curve: list[EquityPoint],
+    trades: list[BacktestTrade],
+    split_time_utc: datetime,
+) -> SplitMetrics:
+    """The metrics of the in-sample part and of the out-of-sample part (section 10.9.4).
+
+    An equity point or a fill at or before the split time is in sample. A round trip is in the part where it ends.
+    The out-of-sample part starts with the equity of the last in-sample point, and with the position that is open
+    at the split time. Its range goes from the split time to the end of the test.
+    """
+    sorted_curve = sorted(equity_curve, key=lambda point: point.time_utc)
+    positions = find_positions(sorted_curve, trades)
+    round_trips = find_round_trips(trades)
+    in_sample_count = sum(point.time_utc <= split_time_utc for point in sorted_curve)
+    in_sample = MetricPart(
+        start_capital_usd=paper_capital_usd,
+        time_range=TimeRange(start_utc=time_range.start_utc, end_utc=split_time_utc),
+        equity_curve=sorted_curve[:in_sample_count],
+        trades=[trade for trade in trades if trade.time_utc <= split_time_utc],
+        round_trips=[round_trip for round_trip in round_trips if round_trip.end_utc <= split_time_utc],
+        positions=positions[:in_sample_count],
+    )
+    out_of_sample = MetricPart(
+        start_capital_usd=paper_capital_usd if in_sample_count == 0 else sorted_curve[in_sample_count - 1].equity_usd,
+        time_range=TimeRange(start_utc=split_time_utc, end_utc=time_range.end_utc),
+        equity_curve=sorted_curve[in_sample_count:],
+        trades=[trade for trade in trades if trade.time_utc > split_time_utc],
+        round_trips=[round_trip for round_trip in round_trips if round_trip.end_utc > split_time_utc],
+        positions=positions[in_sample_count:],
+    )
+    return SplitMetrics(
+        in_sample=calculate_part_metrics(in_sample), out_of_sample=calculate_part_metrics(out_of_sample)
     )
 
 
