@@ -66,11 +66,13 @@ INSERT_HOURLY_BARS: LiteralString = (
     HOURLY_RECORD_IN_NEW_YORK
     + """
     INSERT INTO databento_import_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
-    SELECT symbol, exchange, currency, '1-HOUR',
+    -- One row for each bar: overlapping files, and an old symbol moved onto a new symbol, can give the same hour 2 times.
+    SELECT DISTINCT ON (symbol, exchange, currency, start_utc) symbol, exchange, currency, '1-HOUR',
         CASE WHEN start_new_york::time = '09:00' THEN start_utc + interval '30 minutes' ELSE start_utc END,
         open, high, low, close, volume
     FROM regular_hours
     WHERE has_daily_bar
+    ORDER BY symbol, exchange, currency, start_utc
     ON CONFLICT (symbol, exchange, currency, bar_period, start_utc) DO UPDATE SET
         open = excluded.open, high = excluded.high, low = excluded.low,
         close = excluded.close, volume = excluded.volume

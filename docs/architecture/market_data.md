@@ -937,3 +937,10 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   in use in the quarter, from the first trading day of the quarter to the
   first day of the next quarter (or the day of the cost read for the
   current quarter).
+- The hourly import keeps the bars from 13:00 to 15:00 ET on a day with an
+  early close (13:00 ET). These bars are after-hours trades, and IBKR has no
+  regular-hours bars at these times. A fix needs the early-close days of the
+  US trading calendar.
+- The hourly saved range covers the whole quarter, also a day on which the
+  import saves no hourly bar because the day has no Databento daily bar.
+  The bars route then does not ask IBKR for that day.
