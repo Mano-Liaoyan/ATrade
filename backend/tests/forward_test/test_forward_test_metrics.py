@@ -3,11 +3,15 @@ of the comparison (docs/architecture/forward_test.md section 12.10).
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import httpx
 import psycopg
 import pytest
 
+from atrade.backtest import BacktestTrade
+from atrade.forward_test.comparison_routes import calculate_win_rate_in_period
+from atrade.foundation.bar import TimeRange
 from tests.forward_test.test_forward_test_comparison import (
     make_minute,
     start_forward_test,
@@ -161,3 +165,21 @@ async def test_the_comparison_win_rate_has_a_reason_without_a_round_trip_in_the_
     # The other round trip metrics count all fills: the losing round trip.
     assert metrics["average_loss_usd"] == "-12.00"
     assert "average_loss_usd" not in metrics["missing_reasons"]
+
+
+def fill(minute: int, side: str, price: str) -> BacktestTrade:
+    return BacktestTrade(
+        time_utc=datetime(2026, 1, 2, 3, minute, tzinfo=UTC),
+        side="BUY" if side == "BUY" else "SELL",
+        quantity_shares=Decimal(10),
+        price_usd=Decimal(price),
+        commission_usd=Decimal(0),
+    )
+
+
+def test_a_round_trip_that_starts_before_the_backtest_period_does_not_count_for_the_win_rate() -> None:
+    # The first round trip starts at 03:04, before the period. Its SELL at 03:06 is not the start of a short position.
+    fills = [fill(4, "BUY", "100"), fill(6, "SELL", "90"), fill(7, "BUY", "100"), fill(8, "SELL", "110")]
+    period = TimeRange(start_utc=datetime(2026, 1, 2, 3, 5, tzinfo=UTC), end_utc=datetime(2026, 1, 2, 3, 9, tzinfo=UTC))
+
+    assert calculate_win_rate_in_period(fills, period) == Decimal("100.00")

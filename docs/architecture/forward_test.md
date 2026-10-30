@@ -442,8 +442,10 @@ Phase 3 changes (#146, #149):
     forward test routes have the same fields, and their `net_profit_usd`
     uses `paper_capital_usd`.
   - Decided (#170): in the comparison route, `win_rate_percent` of the
-    forward test counts only the round trips of the fills from the
-    backtest start to the backtest end (both included). Without such a
+    forward test counts only the round trips that start and end in the
+    backtest period (both ends included). The round trips come from all
+    fills, so a position that opens before the backtest start does not
+    change the pairs of the later fills. Without such a
     round trip it is null with the reason
     "No round trips in the backtest period". The other metrics use all
     fills. The forward test page shows the same values as before: the

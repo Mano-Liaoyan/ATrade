@@ -20,6 +20,7 @@ from atrade.backtest import (
     BacktestTrade,
     EquityPoint,
     calculate_metrics,
+    calculate_round_trip_metrics,
     check_backtest_request,
     find_round_trips,
     queue_backtest,
@@ -240,12 +241,14 @@ def calculate_forward_test_metrics(
 
 
 def calculate_win_rate_in_period(fills: list[BacktestTrade], period: TimeRange) -> Decimal | None:
-    """The win rate of the round trips of the fills in the period (both ends included), or None without one."""
-    round_trips = find_round_trips([fill for fill in fills if period.start_utc <= fill.time_utc <= period.end_utc])
-    if not round_trips:
-        return None
-    wins = sum(1 for round_trip in round_trips if round_trip.profit_usd > 0)
-    return (Decimal(wins) / len(round_trips) * 100).quantize(Decimal("0.01"))
+    """The win rate of the round trips whose fills are all in the period (both ends included), or None without one.
+    The round trips come from all fills, so a round trip that starts before the period does not change the pairs."""
+    round_trips = [
+        round_trip
+        for round_trip in find_round_trips(fills)
+        if period.start_utc <= round_trip.start_utc and round_trip.end_utc <= period.end_utc
+    ]
+    return calculate_round_trip_metrics(round_trips).win_rate_percent
 
 
 def limit_win_rate_to_period(
