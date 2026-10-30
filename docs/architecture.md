@@ -255,12 +255,14 @@ app           -> all modules
   default system prompt (#184). The `conversation_id` foreign keys of
   `strategy_version`, `backtest`, and the screen tables point at
   `assistant_conversation` (section 6.3 allows a foreign key).
-- `paper_trading` does not import `forward_test`. Until phase 3, the refusal
-  of paper orders by hand on the instrument of a running forward test
-  (section 12.2) gets a function from `app/web.py`, which calls
-  `forward_test.find_forward_test_on_instrument()`. From phase 3, the owner
-  ledger replaces this refusal, and `app/web.py` gives `paper_trading` the
-  function `forward_test.read_allocated_capital()` for the "By hand" capital.
+- `paper_trading` does not import `forward_test`. Since #215 the owner
+  ledger replaces the refusal of paper orders by hand on the instrument of a
+  running forward test (section 12.2), and `app/web.py` gives
+  `paper_trading` no forward test function. The start of a forward test
+  moves the allocated capital from "By hand" in the owner ledger, so
+  `paper_trading` does not read the allocated capital
+  (`docs/architecture/paper_trading.md` section 11.13). `forward_test` calls
+  the public owner ledger functions of `paper_trading`.
 - `forward_test -> backtest` is only for the comparison, the metric
   functions, and the look-back of `request_bars` (`find_look_back()`,
   `write_look_back_catalog()`).
@@ -1391,7 +1393,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   comes in as an argument. Tests pass a fake.
 - Record `DataActor`: CI runs it with the test strategy in the NautilusTrader
   backtest engine on the small bar files. Assert the exact table content.
-- IB execution client (`ibkr_paper` contract test, by hand):
+- ATrade execution client in the forward test child (`ibkr_paper` contract
+  test, by hand; before #215 it was the IB execution client):
   - Send a limit order far from the market price.
   - Assert that the Web `reqAllOpenOrders` sees it and reads the forward test
     ID from `orderRef`.
@@ -1621,9 +1624,11 @@ ran them. The implementation must check them.
 | The paper Gateway needs a manual login or approval each week. | Watch the first week of operation. |
 | The Web connection gets live status updates for orders of other client IDs. Only the `reqAllOpenOrders` snapshot is checked. | The `ibkr_paper` contract tests. |
 | Orders on the real paper account: the order cases of section 7.5 and both forward test cases of section 17.4. On 2026-10-27 they did not run to the end: the Gateway API was read-only, so IBKR refused the test order (warning 321, no open order left) and refused `reqOpenOrders` (section 7.4). The forward test cases need a `NetLiquidation` value in USD: the EUR paper account now gets it through the IBKR `EUR.USD` rate (section 21.1). | Recreate `ib-gateway` with `READ_ONLY_API: "no"`, then `uv run pytest -m ibkr_paper`. |
-| The forward test LiveNode of section 12.15: the IB data client and the IB execution client use the same client ID; the venue of `SYMBOL.EXCHANGE` matches the primary exchange of IBKR; the `ClientOrderId` with `order_id_tag = FT<ID>` reaches `orderRef`; `reqOpenOrders` returns the orders of the LiveNode on a new connection with the same client ID (#76). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it`). |
+| The forward test LiveNode of section 12.15 until #215: the IB data client and the IB execution client use the same client ID; the venue of `SYMBOL.EXCHANGE` matches the primary exchange of IBKR; the `ClientOrderId` with `order_id_tag = FT<ID>` reaches `orderRef`; `reqOpenOrders` returns the orders of the LiveNode on a new connection with the same client ID (#76). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_the_forward_test_order_shows_its_forward_test_id_and_the_stop_cancels_it`). |
 | The forward test recovery of section 12.7 (#77): after `kill -9` of the child, the worker restarts it with the same client ID, the restart cancels the old order, and the stop cancels the new one. The child detects a lost IB execution client with a TCP probe of the Gateway port, because the rc7 `LiveNode` does not show the client connection state to Python. A daily Gateway restart was not watched. | `uv run pytest -m ibkr_paper tests/forward_test` (`test_after_kill_9_the_worker_restarts_with_the_same_client_id_and_cancels_the_old_order`). |
-| The forward test records of section 12.8 (#78) in a real `LiveNode`: the IB bar `ts_event` is the bar end, the `DataActor` gets the bars of the strategy bar type, and `self.cache.orders(instrument_id=...)` holds the `OrderFilled` events of the IB execution client with stable `trade_id` values after a restart. Only the backtest engine run is checked (`test_forward_test_recorder.py`). | Run a forward test on the paper account, then compare `forward_test_equity_point` times with the bar ends and `forward_test_fill` with the IBKR executions. |
+| The forward test records of section 12.8 (#78) in a real `LiveNode`: the IB bar `ts_event` is the bar end, and the `DataActor` gets the bars of the strategy bar type. Since #215 the recorder reads the fills from the owner ledger, not from `self.cache`. Only the backtest engine run is checked (`test_forward_test_recorder.py`). | Run a forward test on the paper account, then compare `forward_test_equity_point` times with the bar ends and the `owner_ledger_entry` fills with the IBKR executions. |
+| The forward test LiveNode since #215 (`forward_test.md` sections 12.15 and 12.19): the IB data client with the client ID plus 100 and the ATrade execution client with the client ID of the forward test in 1 LiveNode; the reconciliation from the owner reports in a real LiveNode; no second buy after a restart; the price precision of the IB instrument for the fills. Only the IBKR fake and a LiveNode with the ATrade data client were used (`test_forward_test_owner_ledger.py`). | `uv run pytest -m ibkr_paper tests/forward_test` (`test_forward_test_paper_contract.py` inserts the allocated capital), then a forward test on the paper account with a restart. |
+| IBKR refuses opposite orders of 2 owners on 1 instrument (self-trade prevention, `paper_trading.md` section 11.12). | On the paper account, send an AAPL buy and an AAPL sell with 2 client IDs: first with prices that do not cross, then with prices that cross. |
 | `reqExecutions` returns the executions of the current day only. The filled orders by hand (section 11.4) show only those fills. | The `ibkr_paper` contract tests, during US market hours. |
 | Live bars with periods other than 5 seconds use `reqHistoricalData` with keepUpToDate. Checked on a weekday outside the trading hours (section 21.1). Not checked on a weekend. | `uv run pytest -m ibkr_paper -k live_bar` on a Saturday or Sunday. |
 | The account `ExchangeRate` for USD (section 11.9 of `paper_trading.md`, step 3): IBKR sends it only when the ledger holds USD, as base currency units for 1 USD. Checked only with the fake; the paper account of the owner holds only EUR. | `uv run pytest -m ibkr_paper -k balance_and_the_positions` after the account holds USD cash, and compare the panel rate with the IBKR `EUR.USD` rate. |
@@ -1885,6 +1890,19 @@ option and records it in this document.
 - Decided (#178): the `tool_call` handler is `createToolGuard` in
   `assistant/src/tool_guard.ts`. It is an inline pi extension factory of
   the `assistant` process (section 25.14).
+- Decided (#215): the forward test child uses the ATrade execution client
+  with `ForwardTestLedger` of `paper_trading` and keeps the IB data client
+  with the client ID of the forward test plus 100
+  (`docs/architecture/forward_test.md` sections 12.15 and 12.24).
+- Decided (#215): the allocated capital is a ledger `transfer` from
+  "By hand" at the start, and the stop transfers the positions and the cash
+  back (`docs/architecture/paper_trading.md` section 11.13).
+  `forward_test_fill` keeps only the fills of the old forward tests
+  (`forward_test.md` section 12.24).
+- Decided (#215): an execution that IBKR makes after the stop of a run does
+  not go into the owner ledger. The next run sends fills only for its own
+  orders. The position then shows the difference as "Unattributed"
+  (`docs/architecture/paper_trading.md` section 11.7).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client
   calls `check_order()` before each order, `save_fill()` for each fill, and

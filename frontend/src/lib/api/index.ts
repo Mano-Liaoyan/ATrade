@@ -428,6 +428,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/forward-tests/capital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Capital */
+        get: operations["read_capital_api_forward_tests_capital_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forward-tests": {
         parameters: {
             query?: never;
@@ -1344,6 +1361,19 @@ export interface components {
             /** Shares */
             shares: number;
         };
+        /**
+         * ForwardTestCapitalResponse
+         * @description The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not
+         *     pass or IBKR has no NetLiquidation value in USD.
+         */
+        ForwardTestCapitalResponse: {
+            /** Net Liquidation Usd */
+            net_liquidation_usd: string | null;
+            /** Allocated Usd */
+            allocated_usd: string | null;
+            /** Unallocated Usd */
+            unallocated_usd: string | null;
+        };
         /** ForwardTestComparisonResponse */
         ForwardTestComparisonResponse: {
             forward_test: components["schemas"]["ForwardTestResponse"];
@@ -1375,6 +1405,10 @@ export interface components {
         };
         /** ForwardTestFillResponse */
         ForwardTestFillResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
             /**
              * Time Utc
              * Format: date-time
@@ -1432,6 +1466,8 @@ export interface components {
             crash_count: number;
             /** Interruptions */
             interruptions: components["schemas"]["InterruptionResponse"][];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: string | null;
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
@@ -1680,16 +1716,6 @@ export interface components {
             source: components["schemas"]["OrderSourceResponse"];
             /** Can Cancel */
             can_cancel: boolean;
-        };
-        /**
-         * OrderBlockedResponse
-         * @description A forward test runs on the instrument. ATrade did not send the order (section 12.2).
-         */
-        OrderBlockedResponse: {
-            /** Detail */
-            detail: string;
-            /** Forward Test Id */
-            forward_test_id: number;
         };
         /** OrderErrorResponse */
         OrderErrorResponse: {
@@ -2047,6 +2073,8 @@ export interface components {
             /** Currency */
             currency: string;
             bar_period: components["schemas"]["BarPeriod"];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: number | string;
             /** End Time Utc */
             end_time_utc?: string | null;
         };
@@ -2054,13 +2082,15 @@ export interface components {
         StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3";
         /**
          * StartRefusedResponse
-         * @description The start was refused. `forward_test_id` is the forward test that already runs on the instrument.
+         * @description The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18).
          */
         StartRefusedResponse: {
             /** Detail */
             detail: string;
             /** Forward Test Id */
-            forward_test_id: number | null;
+            forward_test_id?: number | null;
+            /** Unallocated Usd */
+            unallocated_usd?: string | null;
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -2748,7 +2778,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderBlockedResponse"] | components["schemas"]["OrderRefusedByLedgerResponse"];
+                    "application/json": components["schemas"]["OrderRefusedByLedgerResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3672,6 +3702,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_capital_api_forward_tests_capital_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestCapitalResponse"];
                 };
             };
         };

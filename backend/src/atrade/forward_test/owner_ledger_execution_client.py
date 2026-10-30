@@ -45,6 +45,7 @@ from nautilus_trader.model import (
     OrderType,
     PositionSide,
     PositionStatusReport,
+    Price,
     Quantity,
     TimeInForce,
     TradeId,
@@ -53,7 +54,7 @@ from nautilus_trader.model import (
     VenueOrderId,
 )
 
-from atrade.forward_test.atrade_instruments import PRICE_PRECISION, create_instrument_id, create_price
+from atrade.forward_test.atrade_instruments import PRICE_PRECISION, create_instrument_id
 from atrade.forward_test.owner_ledger import OwnerFill, OwnerLedger, OwnerOrder
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
@@ -213,6 +214,9 @@ class OwnerLedgerExecutionClient(ExecutionClient):
                 price=execution.price,
                 time_utc=execution.time_utc,
                 order_ref=sent_order.order_ref,
+                execution_id=execution.execution_id,
+                ibkr_order_id=execution.order_id,
+                commission=execution.commission,
             )
         )
         sent_order.saved_execution_ids.add(execution.execution_id)
@@ -222,7 +226,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             None,
             TradeId(execution.execution_id),
             create_quantity(execution.quantity),
-            create_price(execution.price),
+            self.make_price(sent_order.instrument, execution.price),
             Currency.from_str(sent_order.instrument.currency),
             None,
             LiquiditySide.NO_LIQUIDITY_SIDE,
@@ -284,6 +288,15 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         # The entry in sent_orders stays: a fill before the cancel can come with the next fill check.
         self.generate_order_canceled(order, venue_order_id, self.clock.timestamp_ns())
 
+    def find_price_precision(self, instrument: Instrument) -> int:
+        """The precision of the instrument in the cache. The IB data client loads IB instruments with their own
+        precision (section 12.24). Without an instrument in the cache, the precision of the ATrade instruments."""
+        cached = self.cache.instrument(create_instrument_id(instrument))
+        return PRICE_PRECISION if cached is None else int(cached.price_precision)
+
+    def make_price(self, instrument: Instrument, value: Decimal) -> Price:
+        return Price.from_str(f"{value:.{self.find_price_precision(instrument)}f}")
+
     def is_own_order(self, open_order: OpenOrder) -> bool:
         source = read_order_source(open_order.order_ref)
         return (
@@ -309,7 +322,9 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             now,
             now,
             client_order_id=ClientOrderId(open_order.order_ref),
-            price=create_price(open_order.limit_price) if is_limit and open_order.limit_price is not None else None,
+            price=self.make_price(open_order.instrument, open_order.limit_price)
+            if is_limit and open_order.limit_price is not None
+            else None,
         )
 
     @override
@@ -354,7 +369,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
                 create_quantity(position.quantity),
                 now,
                 now,
-                avg_px_open=round(position.average_price, PRICE_PRECISION),
+                avg_px_open=round(position.average_price, self.find_price_precision(position.instrument)),
             )
             for position in positions
         ]
