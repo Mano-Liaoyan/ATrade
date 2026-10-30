@@ -2,7 +2,7 @@
 (docs/architecture/market_data.md sections 8.8.3 and 8.8.4).
 
 A detected stock split waits for the check and does not change the bars. The check confirms it and changes the stored
-bars before the ex-date in place (section 8.13.3), or the user rejects it. A rejected stock split keeps its row, so
+bars before the ex-date and the daily bar summary in place (section 8.13.3), or the user rejects it. A rejected stock split keeps its row, so
 the next import does not find it again. The check also records `checked_at_utc` on each link.
 """
 
@@ -16,6 +16,7 @@ from psycopg import sql
 
 from atrade.foundation.instrument import Instrument
 from atrade.market_data.bar_source import BarSource, bar_table
+from atrade.market_data.daily_bar_summary import update_daily_bar_summaries_blocking
 
 SELECT_WAITING_SPLITS: LiteralString = """
     SELECT id, symbol, exchange, currency, ex_date_utc, split_ratio FROM stock_split
@@ -123,5 +124,9 @@ def check_import_detections(
             connection.execute(SET_CONFIRMATION, {"confirmation": confirmation, "id": split.id})
             if not rejected:
                 adjust_stored_bars(connection, split)
+        confirmed_instruments = {
+            split.instrument for split in detections.stock_splits if split.id not in rejected_split_ids
+        }
+        update_daily_bar_summaries_blocking(connection, sorted(confirmed_instruments, key=str))
         connection.execute(CHECK_LINKS, {"checked_at_utc": checked_at_utc})
     return detections

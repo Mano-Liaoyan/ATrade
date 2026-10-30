@@ -239,6 +239,11 @@ app           -> all modules
   `foundation`. So `indicator` can import only `foundation`, and `indicator`
   and `ibkr` do not import each other. A contract keeps the internal files
   of `indicator` private (#160).
+- import-linter puts `screen` in its own layer below `backtest` and
+  `paper_trading` and above `watchlist`, so `backtest` can import `screen`
+  and `screen` can import `watchlist`. A forbidden contract keeps `screen`
+  from `strategy`, `ibkr`, and `assistant`, and a contract keeps the
+  internal files of `screen` private (#205).
 - import-linter puts `assistant` in the same layer as `ibkr` and
   `indicator`, so `assistant` can import only `foundation` (#179). A
   contract keeps the internal files of `assistant` private.
@@ -1777,6 +1782,10 @@ option and records it in this document.
   symbols with `InstrumentLookup` before it saves one. On `502` or `503`
   the list does not change. A symbol that the request has 2 times is in
   `already_in_list` the second time.
+- Decided (#205): the `screen` tables, the definition keys, the comparison
+  operators, the `422` problem `location`, and the final paths of the screen
+  routes are in [`screen.md`](architecture/screen.md) sections 24.4, 24.4.1,
+  24.6, and 24.7. A delete of a screen deletes its screen results.
 - Decided (#197): the request field of the backtest source order is
   `source_order`. It holds each `BarSource` exactly 1 time, like the global
   source order (`422` otherwise). `bar_count_by_source` counts only the bars
@@ -1814,6 +1823,11 @@ option and records it in this document.
   and imports the file into `databento_bar`. The Databento import program
   calculates the quarters without members after each import. The other
   #192 choices are in `docs/architecture/market_data.md` section 8.14.
+- Decided (#195): the daily bar update is `DailyBarUpdate` of the
+  `market_data` public entry. `app/web.py` runs it and gives it the
+  watchlist read (`read_watchlist_instruments` of `watchlist`), because
+  `market_data` does not import `watchlist`. The time, the calendar, and
+  "still trading" are in `docs/architecture/market_data.md` section 8.14.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.

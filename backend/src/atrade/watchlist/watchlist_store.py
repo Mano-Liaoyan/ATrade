@@ -48,6 +48,13 @@ async def select_instruments(connection: psycopg.AsyncConnection) -> list[Watchl
         return await cursor.fetchall()
 
 
+async def read_watchlist_instruments(*, database_url: str) -> list[Instrument]:
+    """The instruments of the watchlist, in the order of their addition. The daily bar update reads them."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        records = await select_instruments(connection)
+    return [Instrument(symbol=record.symbol, exchange=record.exchange, currency=record.currency) for record in records]
+
+
 async def delete_instrument(connection: psycopg.AsyncConnection, watchlist_instrument_id: int) -> bool:
     """Returns False when no watchlist instrument has this ID."""
     cursor = await connection.execute(

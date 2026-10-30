@@ -26,6 +26,7 @@ from atrade.ibkr import GatewayConnection
 from atrade.market_data import databento_import_sql
 from atrade.market_data.bar_source import BarSource, saved_range_table
 from atrade.market_data.bar_store import JOIN_SAVED_RANGE_TEMPLATE, create_key_parameters
+from atrade.market_data.daily_bar_summary import update_daily_bar_summaries_blocking
 from atrade.market_data.databento_import_adjustment import (
     DetectedSplit,
     IbkrDailyBarReader,
@@ -200,7 +201,7 @@ def save_bars(connection: psycopg.Connection, query: LiteralString, time_range: 
     return cursor.rowcount
 
 
-def save_saved_ranges(connection: psycopg.Connection, time_range: TimeRange) -> None:
+def save_saved_ranges(connection: psycopg.Connection, time_range: TimeRange) -> list[Instrument]:
     """Records the bought time range for each instrument with a daily bar in it. A day without a bar in the range is
     a day without trading, so the bars route does not ask IBKR for it."""
     rows = connection.execute(
@@ -220,6 +221,7 @@ def save_saved_ranges(connection: psycopg.Connection, time_range: TimeRange) -> 
                 for instrument in instruments
             ],
         )
+    return instruments
 
 
 def read_file_kinds(connection: psycopg.Connection, file_paths: list[Path]) -> dict[tuple[str, str], TimeRange]:
@@ -234,7 +236,8 @@ def import_databento_files(
     *, database_url: str, file_paths: list[Path], read_ibkr_daily_bars: IbkrDailyBarReader | None = None
 ) -> DatabentoImportReport:
     """Imports the DBN files of the daily bar purchase (section 8.8.1). A second import of the same files adds no
-    row: a saved bar gets the same values, and the saved ranges join.
+    row: a saved bar gets the same values, and the saved ranges join. The daily bar summary of each imported instrument
+    changes in the same transaction.
 
     Without `read_ibkr_daily_bars`, the detection rule finds the stock splits of all instruments (section 8.8.3).
     """
@@ -260,8 +263,10 @@ def import_databento_files(
             saved_ranges.append(summary_range)
         symbol_links, stock_splits = link_and_adjust_import_bars(connection, read_ibkr_daily_bars)
         saved_bar_count = connection.execute(databento_import_sql.SAVE_IMPORT_BARS).rowcount
+        saved_instruments: list[Instrument] = []
         for saved_range in saved_ranges:
-            save_saved_ranges(connection, saved_range)
+            saved_instruments += save_saved_ranges(connection, saved_range)
+        update_daily_bar_summaries_blocking(connection, saved_instruments)
     return DatabentoImportReport(
         saved_bar_count=saved_bar_count,
         symbols_without_official_close=symbols_without_official_close,
