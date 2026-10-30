@@ -97,7 +97,7 @@
   }
 
   .count-last {
-    font-weight: 600;
+    font-weight: var(--cds-heading-compact-01-font-weight);
     color: var(--cds-text-primary);
   }
 </style>

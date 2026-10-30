@@ -520,6 +520,5 @@ Behavior:
   shows how many instruments it added, and the last refusal (for example an
   instrument that is in the watchlist already). Without selected rows, it
   adds all rows of the screen result.
-- The Carbon token for blue 70 in the g100 theme (Dark).
 - How the API reports the AI assistant caller and the conversation ID to the
   screen routes (the AI assistant section).

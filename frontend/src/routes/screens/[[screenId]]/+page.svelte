@@ -32,7 +32,8 @@
   type ShownTable = 'result' | 'excluded';
 
   const routeScreenId = $derived(page.params['screenId']);
-  const screenId = $derived(routeScreenId === undefined ? null : Number(routeScreenId));
+  // A route segment that is not a whole number opens no screen.
+  const screenId = $derived(routeScreenId !== undefined && /^\d+$/.test(routeScreenId) ? Number(routeScreenId) : null);
   const routeResultId = $derived(page.url.searchParams.get('result'));
 
   let screens: ScreenListItem[] = $state([]);
@@ -90,7 +91,12 @@
     }
     const id = screenId;
     writeLastScreenId(id);
+    screenMessage = '';
     void readScreen(fetch, id).then((result) => {
+      // A reply for a screen that is not open any more is stale.
+      if (id !== screenId) {
+        return;
+      }
       if (result.kind === 'failed') {
         screenMessage = result.message;
         return;
@@ -107,7 +113,11 @@
     const id = screenResultId;
     selectedPositions = [];
     addMessage = null;
+    resultMessage = '';
     void readScreenResult(fetch, id).then((result) => {
+      if (id !== screenResultId) {
+        return;
+      }
       if (result.kind === 'failed') {
         resultMessage = result.message;
         return;
@@ -269,6 +279,8 @@
     min-block-size: 0;
     min-inline-size: 0;
     padding: var(--cds-spacing-05);
+    /* $layer-01, so the $background group strips of the condition bar show (screen.md section 24.10.1). */
+    background: var(--cds-layer-01);
   }
 
   .screen-title {
