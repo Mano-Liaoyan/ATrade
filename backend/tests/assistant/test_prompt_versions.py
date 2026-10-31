@@ -22,7 +22,7 @@ from tests.fakes.assistant import FakeAssistantService
 from tests.fakes.clock import FixedClock
 
 MESSAGE_WAIT_SECONDS = 5
-MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1"}
+MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1", "thinking_level": "off"}
 ANSWER = MessageEnd(text="Hello.", provider="fake", model="fake-model", credential_name="Fake key")
 
 

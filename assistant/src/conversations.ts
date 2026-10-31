@@ -15,14 +15,22 @@ import {
   readConversationMessages,
   readMessageText,
   type ConversationMessage,
+  type RunEntry,
 } from './conversation_files.ts';
 import { generateTitle } from './conversation_title.ts';
-import type { ModelSelection, OpenModel } from './model_selection.ts';
+import type { ModelSelection, OpenModel, ThinkingLevel } from './model_selection.ts';
 import { toToolRunEvents, type ToolRunEvent } from './tool_events.ts';
 
 export type RunEvent =
   | { type: 'text_delta'; delta: string }
-  | { type: 'message_end'; text: string; provider: string; model: string; credential_name: string }
+  | {
+      type: 'message_end';
+      text: string;
+      provider: string;
+      model: string;
+      credential_name: string;
+      thinking_level: string;
+    }
   | { type: 'error'; message: string }
   | ToolRunEvent;
 
@@ -32,6 +40,8 @@ export type CreateTools = (run: { conversationId: string; budget: UserMessageBud
 export interface RunRequest {
   text: string;
   selection: ModelSelection;
+  /** The requested thinking level. The model can lower it (assistant_session.ts). */
+  thinkingLevel: ThinkingLevel;
   /** The system prompt of the conversation. web makes it from the prompt version and the fixed part. */
   systemPrompt: string;
 }
@@ -56,8 +66,14 @@ function readErrorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** The credential name and the thinking level of the run, for each message_end event. */
+interface RunLabels {
+  credentialName: string;
+  thinkingLevel: string;
+}
+
 /** The run event of one pi message event, or null when web does not need the pi event. */
-function toMessageRunEvent(event: AgentSessionEvent, credentialName: string): RunEvent | null {
+function toMessageRunEvent(event: AgentSessionEvent, labels: RunLabels): RunEvent | null {
   if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {
     return { type: 'text_delta', delta: event.assistantMessageEvent.delta };
   }
@@ -72,12 +88,19 @@ function toMessageRunEvent(event: AgentSessionEvent, credentialName: string): Ru
   if (text === '') {
     return null;
   }
-  return { type: 'message_end', text, provider: message.provider, model: message.model, credential_name: credentialName };
+  return {
+    type: 'message_end',
+    text,
+    provider: message.provider,
+    model: message.model,
+    credential_name: labels.credentialName,
+    thinking_level: labels.thinkingLevel,
+  };
 }
 
 /** The run events of one pi event. Empty when web does not need the pi event. */
-function toRunEvents(event: AgentSessionEvent, credentialName: string): RunEvent[] {
-  const messageEvent = toMessageRunEvent(event, credentialName);
+function toRunEvents(event: AgentSessionEvent, labels: RunLabels): RunEvent[] {
+  const messageEvent = toMessageRunEvent(event, labels);
   return messageEvent === null ? toToolRunEvents(event) : [messageEvent];
 }
 
@@ -125,12 +148,12 @@ export class Conversations {
       return;
     }
     const conversationSession = openConversationSession(this.options.piDir, conversationId);
-    conversationSession.appendCustomEntry(CREDENTIAL_ENTRY_TYPE, { credential_name: opened.credentialName });
     const budget: UserMessageBudget = { startedBacktests: 0 };
     this.budgets.set(conversationId, budget);
     const session = await createAssistantSession({
       modelRuntime: opened.modelRuntime,
       model: opened.model,
+      thinkingLevel: request.thinkingLevel,
       piDir: this.options.piDir,
       customTools: this.options.createTools({ conversationId, budget }),
       systemPrompt: request.systemPrompt,
@@ -140,9 +163,13 @@ export class Conversations {
       session.dispose();
       return;
     }
+    // The effective thinking level: pi lowers the requested level to a level of the model.
+    const labels: RunLabels = { credentialName: opened.credentialName, thinkingLevel: session.thinkingLevel };
+    const entry: RunEntry = { credential_name: labels.credentialName, thinking_level: labels.thinkingLevel };
+    conversationSession.appendCustomEntry(CREDENTIAL_ENTRY_TYPE, entry);
     this.sessions.set(conversationId, session);
     const unsubscribe = session.subscribe((event) => {
-      toRunEvents(event, opened.credentialName).forEach(emit);
+      toRunEvents(event, labels).forEach(emit);
     });
     try {
       await session.prompt(request.text);

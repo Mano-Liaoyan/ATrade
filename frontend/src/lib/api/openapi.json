@@ -4678,6 +4678,17 @@
               }
             ],
             "title": "Credential Name"
+          },
+          "thinking_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking Level"
           }
         },
         "type": "object",
@@ -4686,7 +4697,8 @@
           "text",
           "provider",
           "model",
-          "credential_name"
+          "credential_name",
+          "thinking_level"
         ],
         "title": "ConversationMessageResponse"
       },
@@ -6587,12 +6599,20 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "thinking_levels": {
+            "items": {
+              "$ref": "#/components/schemas/ThinkingLevel"
+            },
+            "type": "array",
+            "title": "Thinking Levels"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "thinking_levels"
         ],
         "title": "ProviderModelResponse"
       },
@@ -8591,6 +8611,18 @@
         ],
         "title": "TemplateSourceResponse"
       },
+      "ThinkingLevel": {
+        "enum": [
+          "off",
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "type": "string"
+      },
       "TimeInForce": {
         "type": "string",
         "enum": [
@@ -9340,7 +9372,7 @@
         "type": "object"
       },
       "MessageEndMessage": {
-        "description": "The end of one AI assistant message: its full text, its model, and its credential name.",
+        "description": "The end of one AI assistant message: its full text, its model, its credential name, and the thinking level of\nits run.",
         "properties": {
           "type": {
             "const": "message_end",
@@ -9363,13 +9395,25 @@
           "credential_name": {
             "title": "Credential Name",
             "type": "string"
+          },
+          "thinking_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking Level"
           }
         },
         "required": [
           "text",
           "provider",
           "model",
-          "credential_name"
+          "credential_name",
+          "thinking_level"
         ],
         "title": "MessageEndMessage",
         "type": "object"
@@ -9733,7 +9777,7 @@
         "type": "object"
       },
       "PromptMessage": {
-        "description": "Browser to server: a new user message, with the provider, the model, and the credential of this message.",
+        "description": "Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of\nthis message.",
         "properties": {
           "type": {
             "const": "prompt",
@@ -9760,13 +9804,17 @@
             "minLength": 1,
             "title": "Credential Id",
             "type": "string"
+          },
+          "thinking_level": {
+            "$ref": "#/components/schemas/ThinkingLevel"
           }
         },
         "required": [
           "text",
           "provider",
           "model",
-          "credential_id"
+          "credential_id",
+          "thinking_level"
         ],
         "title": "PromptMessage",
         "type": "object"

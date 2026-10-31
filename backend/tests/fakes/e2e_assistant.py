@@ -8,8 +8,8 @@ The text of a prompt selects the answer:
 - "backtest": a run_backtest tool step with a finished backtest, and a metric card.
 - "notitle": a normal answer, but the title generation fails.
 - other text: a streamed answer.
-The answer ends with the model of the prompt and the name of its credential. The messages are kept, so a reload
-shows them.
+The answer ends with the model of the prompt, the name of its credential, and its thinking level. A model without the
+requested thinking level runs with "off". The messages are kept, so a reload shows them.
 """
 
 import hashlib
@@ -36,11 +36,14 @@ from atrade.assistant import (
     ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
+    ThinkingLevel,
     ToolStep,
 )
 from tests.fakes.assistant import FakeAssistantService
 
 STREAM_PAUSE_SECONDS = 0.05
+E2E_ALL_THINKING_LEVELS: tuple[ThinkingLevel, ...] = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
+E2E_LONG_MODEL_NAME = "GPT Long Context Reasoning Preview Edition"
 E2E_BACKTEST_START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
 SMA_200: JsonValue = {"indicator": "sma", "parameters": {"period": 200}, "output": "value"}
 RSI_14: JsonValue = {"indicator": "rsi", "parameters": {"period": 14}, "output": "value"}
@@ -80,7 +83,17 @@ class E2EAssistantService(FakeAssistantService):
                 id="openai",
                 name="OpenAI",
                 login_methods=["api_key"],
-                models=[ProviderModel(id="gpt-a", name="GPT A"), ProviderModel(id="gpt-b", name="GPT B")],
+                models=[
+                    # GPT A has no reasoning, so it has only "off".
+                    ProviderModel(id="gpt-a", name="GPT A"),
+                    ProviderModel(id="gpt-b", name="GPT B", thinking_levels=list(E2E_ALL_THINKING_LEVELS)),
+                    # A name that is longer than the Model field of the 28rem column.
+                    ProviderModel(
+                        id="gpt-long",
+                        name=E2E_LONG_MODEL_NAME,
+                        thinking_levels=["off", "low", "medium", "high"],
+                    ),
+                ],
             ),
             # Many subscription providers: their list in the Credentials dialog is longer than the dialog.
             *(
@@ -97,12 +110,19 @@ class E2EAssistantService(FakeAssistantService):
     def credential_name(self, credential_id: str) -> str:
         return next((item.name for item in self.credentials if item.id == credential_id), credential_id)
 
+    def thinking_level(self, selection: ModelSelection) -> ThinkingLevel:
+        provider = next((item for item in self.providers if item.id == selection.provider), None)
+        model = next((item for item in provider.models if item.id == selection.model), None) if provider else None
+        levels = model.thinking_levels if model is not None else []
+        return selection.thinking_level if selection.thinking_level in levels else "off"
+
     def answer_end(self, conversation_id: int, text: str, selection: ModelSelection) -> MessageEnd:
         end = MessageEnd(
             text=text,
             provider=selection.provider,
             model=selection.model,
             credential_name=self.credential_name(selection.credential_id),
+            thinking_level=self.thinking_level(selection),
         )
         self.messages.setdefault(conversation_id, []).append(
             ConversationMessage(
@@ -111,6 +131,7 @@ class E2EAssistantService(FakeAssistantService):
                 provider=end.provider,
                 model=end.model,
                 credential_name=end.credential_name,
+                thinking_level=end.thinking_level,
             )
         )
         return end

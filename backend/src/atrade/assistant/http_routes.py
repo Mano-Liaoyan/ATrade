@@ -64,10 +64,11 @@ class ConversationListResponse(BaseModel):
 class ConversationMessageResponse(BaseModel):
     role: Literal["user", "assistant"]
     text: str
-    # Only for an AI assistant message: its provider, model, and credential name (25.8.2).
+    # Only for an AI assistant message: its provider, model, credential name, and thinking level (25.8.2).
     provider: str | None
     model: str | None
     credential_name: str | None
+    thinking_level: str | None
 
 
 class ConversationDetailResponse(ConversationResponse):
@@ -174,6 +175,7 @@ class ConversationRoutes:
                     provider=message.provider,
                     model=message.model,
                     credential_name=message.credential_name,
+                    thinking_level=message.thinking_level,
                 )
                 for message in messages
             ],

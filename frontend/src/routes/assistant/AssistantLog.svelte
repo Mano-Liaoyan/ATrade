@@ -51,9 +51,7 @@
           author={item.role === 'user' ? 'You' : 'AI assistant'}
           continued={entry.continued}
           streaming={item.streaming}
-        >{item.text}{#if item.model !== null}<span class="message-model"
-              >{item.model} · {item.credentialName}</span
-            >{/if}</ChatMessage
+        >{item.text}{#if item.modelLine !== null}<span class="message-model">{item.modelLine}</span>{/if}</ChatMessage
         >
       {:else if item.kind === 'tool_step'}
         {@const step = describeToolStep(item)}

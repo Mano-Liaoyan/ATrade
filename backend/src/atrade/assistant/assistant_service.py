@@ -2,8 +2,9 @@
 
 The assistant service listens on port 8002 in the network atrade-assistant-internal. web calls it over HTTP:
 
-- `POST /conversations/{id}/runs` with the user message, the model selection, and the system prompt. The answer is one
-  JSON line for each pi event that web needs: `text_delta`, `message_end` (with the model and the credential name),
+- `POST /conversations/{id}/runs` with the user message, the model selection with the thinking level, and the system
+  prompt. The answer is one JSON line for each pi event that web needs: `text_delta`, `message_end` (with the model,
+  the credential name, and the thinking level),
   `error`, and the tool events `tool_step`, `strategy_version_saved`, `backtest_finished`, `screen_saved`, and
   `screen_run_finished` (25.10).
 - `POST /conversations/{id}/steer`, `POST /conversations/{id}/abort`.
@@ -20,7 +21,7 @@ The assistant service listens on port 8002 in the network atrade-assistant-inter
 
 import json
 from collections.abc import AsyncIterator, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 import httpx
@@ -36,6 +37,10 @@ HTTP_NO_CONTENT = 204
 HTTP_NOT_FOUND = 404
 
 
+# The thinking levels of pi (THINKING_LEVEL_OPTIONS of pi-coding-agent). A model without reasoning has only "off".
+type ThinkingLevel = Literal["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
 class AssistantServiceError(Exception):
     """The assistant service is not reachable, or it refused the request. The text names the reason."""
 
@@ -45,6 +50,8 @@ class ModelSelection:
     provider: str
     model: str
     credential_id: str
+    # The requested thinking level of the run. pi lowers it to a level of the model. The title call does not use it.
+    thinking_level: ThinkingLevel
 
 
 @dataclass(frozen=True)
@@ -58,6 +65,8 @@ class MessageEnd:
     provider: str
     model: str
     credential_name: str
+    # The thinking level of the run after pi lowered it to a level of the model.
+    thinking_level: str | None = None
 
 
 @dataclass(frozen=True)
@@ -142,6 +151,8 @@ type LoginPromptType = Literal["text", "secret", "select", "manual_code"]
 class ProviderModel:
     id: str
     name: str
+    # The thinking levels of the model, in the order of pi. Only "off" for a model without reasoning.
+    thinking_levels: list[ThinkingLevel] = field(default_factory=lambda: list[ThinkingLevel](["off"]))
 
 
 @dataclass(frozen=True)
@@ -202,6 +213,8 @@ class ConversationMessage:
     provider: str | None
     model: str | None
     credential_name: str | None
+    # Null for a user message, and for an AI assistant message of a run before the thinking level was recorded.
+    thinking_level: str | None = None
 
 
 class AssistantService(Protocol):
@@ -251,6 +264,7 @@ def to_run_event(event: dict[str, Any]) -> RunEvent | None:
                 provider=str(event["provider"]),
                 model=str(event["model"]),
                 credential_name=str(event["credential_name"]),
+                thinking_level=event.get("thinking_level"),
             )
         case "error":
             return RunError(message=str(event["message"]))
@@ -314,7 +328,10 @@ def to_provider(provider: dict[str, Any]) -> ProviderSummary:
         id=provider["id"],
         name=provider["name"],
         login_methods=provider["login_methods"],
-        models=[ProviderModel(id=model["id"], name=model["name"]) for model in provider["models"]],
+        models=[
+            ProviderModel(id=model["id"], name=model["name"], thinking_levels=model["thinking_levels"])
+            for model in provider["models"]
+        ],
     )
 
 
@@ -365,6 +382,7 @@ def read_detail(response: httpx.Response) -> str:
 
 
 def selection_body(selection: ModelSelection) -> dict[str, str]:
+    """The model and the credential. Only the run body adds the thinking level."""
     return {"provider": selection.provider, "model": selection.model, "credential_id": selection.credential_id}
 
 
@@ -405,7 +423,12 @@ class AssistantServiceClient:
         self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
     ) -> AsyncIterator[RunEvent]:
         # A tool can wait 15 minutes for a backtest (25.4.2).
-        body = {"text": text, **selection_body(selection), "system_prompt": system_prompt}
+        body = {
+            "text": text,
+            **selection_body(selection),
+            "thinking_level": selection.thinking_level,
+            "system_prompt": system_prompt,
+        }
         async for line in self.stream_lines(f"/conversations/{conversation_id}/runs", body):
             event = read_event_line(line, to_run_event, "run")
             if event is not None:
@@ -436,6 +459,7 @@ class AssistantServiceClient:
                 provider=message["provider"],
                 model=message["model"],
                 credential_name=message["credential_name"],
+                thinking_level=message.get("thinking_level"),
             )
             for message in messages
         ]

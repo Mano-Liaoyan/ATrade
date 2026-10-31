@@ -44,11 +44,15 @@ export {
 export { openConversationSocket, type ConversationSocket } from './conversation_socket';
 export {
   changeProvider,
+  DEFAULT_THINKING_LEVEL,
   describeSendButton,
+  describeThinkingSelect,
   findDefaultSelection,
+  isThinkingLevel,
   listSelectItems,
   type ConnectionState,
   type LastModel,
   type ModelSelection,
+  type ThinkingLevel,
 } from './model_selection';
 export { listCredentials, listProviders } from './credentials';

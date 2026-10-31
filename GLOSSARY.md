@@ -311,6 +311,12 @@ assistant uses, for example "Anthropic API key · personal". In Chinese, write
 凭据.
 _Avoid_: account, auth, token
 
+**Thinking level**:
+How much the model reasons before it answers. The levels are the levels of
+pi: off, minimal, low, medium, high, xhigh ("Extra high"), and max. A model
+without reasoning has only off. In Chinese, write 思考级别.
+_Avoid_: effort, reasoning budget
+
 **Prompt version**:
 One saved copy of the part of the AI assistant's system prompt that the user
 can edit. It does not change after it is saved. Each conversation records the

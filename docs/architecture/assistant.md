@@ -460,7 +460,7 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   not take away a provider because of its terms.
 - Google: API key only. pi 1.4.0 has no Google Gemini or Antigravity login.
 - The user selects, for each conversation: the provider, the model, a
-  subscription or an API key, and which credential.
+  subscription or an API key, which credential, and the thinking level.
 - The model list of a provider comes from pi
   (`ModelRuntime.getAvailable(provider)` gives only the models with a
   credential).
@@ -470,6 +470,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   of `getAvailable(provider)` over its stored credentials. A provider
   without a credential has no models. pi has no models.json in ATrade
   (`modelsPath: null`).
+- Decided (side column feedback): each model has `thinking_levels`, the
+  thinking levels of pi that the model supports, in the order of pi (`off`,
+  `minimal`, `low`, `medium`, `high`, `xhigh`, `max`). The rule is the rule
+  of pi-ai `getSupportedThinkingLevels`: a model without `reasoning` has only
+  `off`; a level that `thinkingLevelMap` sets to `null` is not supported;
+  `xhigh` and `max` only when `thinkingLevelMap` names them.
+  pi-coding-agent 1.4.0 does not export the function, so
+  `assistant/src/model_selection.ts` has a copy of the rule.
 
 ### 25.7.2 Storage
 
@@ -601,10 +609,20 @@ Implemented (#179, #184):
 
 - The user can change the provider, the model, or the credential in the
   middle of a conversation.
-- Each AI assistant message shows its model and its credential name.
-- The browser sends the provider, the model, and the credential with each
-  `prompt`. `assistant` opens the JSONL file again for each run with this
-  model, so a change needs no other message (#179).
+- Each AI assistant message shows its model, its thinking level, and its
+  credential name.
+- The browser sends the provider, the model, the credential, and the
+  thinking level with each `prompt`. `assistant` opens the JSONL file again
+  for each run with this model and thinking level, so a change needs no
+  other message (#179).
+- Decided (side column feedback): `assistant` gives the thinking level to
+  `createAgentSession` (`thinkingLevel`). pi lowers a level that the model
+  does not support (pi-ai `clampThinkingLevel`): to the next higher level of
+  the model, else to its highest level. A model without reasoning runs with
+  `off`. `message_end` has the level that pi uses. The custom entry
+  `atrade_credential` of each run has `credential_name` and
+  `thinking_level`, so the saved messages show the level too. A message of
+  a run before this change has `thinking_level` null.
 - So the answers of 2 models in one conversation are easy to compare.
 
 ### 25.8.3 Title
@@ -810,11 +828,11 @@ Fields (#179). Each message is a JSON object with `type`.
 
 | `type` | Direction | Fields |
 |---|---|---|
-| `prompt` | Browser to server | `text`, `provider`, `model`, `credential_id` |
+| `prompt` | Browser to server | `text`, `provider`, `model`, `credential_id`, `thinking_level` |
 | `steer` | Browser to server | `text` |
 | `abort` | Browser to server | — |
 | `message_delta` | Server to browser | `text` |
-| `message_end` | Server to browser | `text`, `provider`, `model`, `credential_name` |
+| `message_end` | Server to browser | `text`, `provider`, `model`, `credential_name`, `thinking_level` |
 | `run_state` | Server to browser | `state`: `running` or `settled` |
 | `error` | Server to browser | `message` |
 | `heartbeat` | Server to browser | — (every 10 seconds) |
@@ -901,8 +919,9 @@ below are choices of this document. The implementation can change them.
     without it, the conversation has no strategy (`strategy_id` null).
   - `GET {conversation_id}` answers the conversation and `messages`: the
     user messages and the AI assistant messages with text, each with
-    `role`, `text`, `provider`, `model`, and `credential_name` (the last 3
-    only for an AI assistant message).
+    `role`, `text`, `provider`, `model`, `credential_name`, and
+    `thinking_level` (the last 4 only for an AI assistant message;
+    `thinking_level` is null for a run before the level was recorded).
   - `PATCH {conversation_id}` takes `{"title"}` (1 to 200 characters) and
     sets `title_state` `renamed`.
   - `DELETE {conversation_id}` answers `204`.
@@ -921,7 +940,7 @@ below are choices of this document. The implementation can change them.
     `version_number` (25.9).
 - #183 implements the providers and credentials rows:
   - `GET /api/assistant/providers` answers `{"providers": [{id, name,
-    login_methods, models: [{id, name}]}]}` (25.7.1).
+    login_methods, models: [{id, name, thinking_levels}]}]}` (25.7.1).
   - `GET /api/assistant/credentials` answers `{"credentials": [{id, name,
     provider, type, key_last4, state, state_message}]}`. `key_last4` is the
     last 4 characters of an API key, null for a subscription login.
@@ -962,15 +981,15 @@ log, the message input, and Minimize.
 |---|---|
 | Top | Conversation `Select`, "New conversation" button, "Credentials" icon button, "Prompt" icon button. The prompt version of the open conversation, for example "Prompt v3". |
 | Middle | The conversation messages (`role="log"`) in a `ScrollRegion`. Tool steps, diff cards, metric cards, and (phase 3) condition cards. |
-| Bottom | Provider, model, and credential `Select`s in one row. Below them, the message input and the "Send" button. While the AI assistant runs, "Send" becomes "Stop". |
+| Bottom | Line 1: the model `Select` (2 parts of the width, for the full model name) and the thinking `Select`. Line 2: the provider and credential `Select`s. Below them, the message input and the "Send" button. While the AI assistant runs, "Send" becomes "Stop". |
 
 - A tool step is one `StatusIndicator` line, for example
   "Backtest #42 running".
 - A diff card shows a code change (25.5.2).
 - A metric card shows the `KeyMetricRow` of a finished backtest. It links to
   the backtest.
-- Each AI assistant message shows its model and its credential name
-  (25.8.2).
+- Each AI assistant message shows its model, its thinking level, and its
+  credential name (25.8.2).
 - Copy uses the terms of `GLOSSARY.md`: "conversation", not "chat",
   "thread", or "session".
 - The Frontend Design Rules of `AGENTS.md` apply. A heading is a name only.
@@ -991,7 +1010,9 @@ Implemented (#185):
   the title), and "Delete conversation" (a danger `Dialog`), and the text
   "Prompt v<n>".
 - `AssistantLog` shows the log with `ChatLog`. A message of the AI assistant
-  ends with a line "<model> · <credential name>". The log of
+  ends with a line "<model> · <thinking level> · <credential name>". The
+  level `off` (or no recorded level) is not in the line, for example
+  "gpt-a · Work key". The log of
   `frontend/src/lib/assistant/conversation_log.ts` keeps one line for each
   `tool_call_id`. The line text is "Backtest #<id> <state>" for
   `run_backtest` with a backtest, else the tool name and its state, for
@@ -1002,9 +1023,24 @@ Implemented (#185):
 - A metric card has the link "Backtest #<id>" to the backtest page and the
   `KeyMetricRow` of the backtest.
 - Bottom: the Selects "Provider" (only the providers with a credential),
-  "Model", and "Credential" in one row. A conversation starts with its last
+  "Model", and "Credential". A conversation starts with its last
   model and credential, else with the first credential and the first model
   of its provider. Enter sends; Shift Enter adds a line.
+- Decided (side column feedback): the bottom has 2 lines of Selects in the
+  28rem column. Line 1: "Model" (2 parts of the width) and "Thinking" (1
+  part). Line 2: "Provider" and "Credential". The open list of each `Select`
+  is at least as wide as its field and as wide as its longest label, not
+  wider than the viewport. A field that cuts its label shows the full label
+  in a native `title` tooltip.
+- Decided (side column feedback): "Thinking" lists only the
+  `thinking_levels` of the selected model ("Off", "Minimal", "Low",
+  "Medium", "High", "Extra high", "Max"). The browser keeps the last chosen
+  level under `atrade.assistant-column.thinking-level` for all
+  conversations. Default: `medium`, the default of pi. For a model without
+  the chosen level, the field shows the level that pi uses (25.8.2). For a
+  model without reasoning, the field shows "No thinking", is disabled, and
+  says "The model has no thinking levels." (tooltip and accessible
+  description).
 - The browser opens one `/ws/assistant` socket for the open conversation
   (`conversation_socket.ts`). The socket does not connect again after a
   close. Each `error` message goes to the Output tab of the "Problems and
@@ -1175,7 +1211,7 @@ columns behave the same (section 13).
 
   | Request | Answer |
   |---|---|
-  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, system_prompt}` (`system_prompt` since #184) | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name}`, `error` `{message}`, and (#182) `tool_step`, `strategy_version_saved`, and `backtest_finished` with the fields of 25.10. The answer ends when the run ends. |
+  | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, thinking_level, system_prompt}` (`system_prompt` since #184). A `thinking_level` that is not a level of pi gets `400`. | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name, thinking_level}`, `error` `{message}`, and (#182) `tool_step`, `strategy_version_saved`, and `backtest_finished` with the fields of 25.10. The answer ends when the run ends. |
   | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
   | `POST /conversations/{id}/abort` | `204`. |
   | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |

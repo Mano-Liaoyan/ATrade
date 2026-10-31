@@ -10,7 +10,12 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, HTTPException, Path, status
 from pydantic import BaseModel
 
-from atrade.assistant.assistant_service import AssistantService, AssistantServiceError, CredentialSummary
+from atrade.assistant.assistant_service import (
+    AssistantService,
+    AssistantServiceError,
+    CredentialSummary,
+    ThinkingLevel,
+)
 from atrade.foundation.error_response import ERROR_RESPONSE
 
 # The credential IDs of the assistant service are UUIDs. The pattern keeps the ID one path segment.
@@ -20,6 +25,8 @@ CREDENTIAL_ID_PATTERN = r"^[A-Za-z0-9-]{1,64}$"
 class ProviderModelResponse(BaseModel):
     id: str
     name: str
+    # The thinking levels of the model, in the order of pi. Only "off" for a model without reasoning.
+    thinking_levels: list[ThinkingLevel]
 
 
 class ProviderResponse(BaseModel):
@@ -82,7 +89,10 @@ class CredentialRoutes:
                     id=provider.id,
                     name=provider.name,
                     login_methods=provider.login_methods,
-                    models=[ProviderModelResponse(id=model.id, name=model.name) for model in provider.models],
+                    models=[
+                        ProviderModelResponse(id=model.id, name=model.name, thinking_levels=model.thinking_levels)
+                        for model in provider.models
+                    ],
                 )
                 for provider in providers
             ]

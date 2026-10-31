@@ -3,8 +3,9 @@
      (assistant_session.svelte.ts) and one storage key, so a page change keeps the open conversation and Minimize.
      Header line: "Credentials" and "Prompt" open their dialogs. Top: the conversation Select (all conversations),
      "New conversation", "Rename conversation", "Delete conversation" (a danger Dialog first), and the prompt version of
-     the open conversation. Middle: the conversation log. Bottom: the provider, model, and credential Selects, the
-     message input, and "Send", which becomes "Stop" (abort) while the AI assistant runs.
+     the open conversation. Middle: the conversation log. Bottom: the Model (wide, for the full name) and Thinking Selects,
+     the Provider and Credential Selects, the message input, and "Send", which becomes "Stop" (abort) while the AI
+     assistant runs.
      The strategy page gives its open strategy, its diff card actions, and its Output tab for the errors. A page
      without an Output tab shows the last error in the column. A diff card of another strategy, or on another page,
      opens the strategy page: the card opens the diff there, and Keep opens the version. -->
@@ -25,6 +26,7 @@
     listSelectItems,
     PromptDialog,
     type DiffItem,
+    type ThinkingLevel,
   } from '#lib/assistant';
   import { Button, Dialog, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
   import { SideColumn } from '#lib/foundation/workbench';
@@ -238,19 +240,7 @@
   />
 
   <div class="assistant-bottom">
-    <div class="model-selects">
-      <Select
-        label="Provider"
-        hideLabel
-        size="sm"
-        items={items.providers}
-        value={session.selection.provider}
-        placeholder="No credential"
-        disabled={items.providers.length === 0}
-        onValueChange={(value: string) => {
-          session.selection = changeProvider(session.providers, session.credentials, value);
-        }}
-      />
+    <div class="model-row">
       <Select
         label="Model"
         hideLabel
@@ -261,6 +251,33 @@
         disabled={items.models.length === 0}
         onValueChange={(value: string) => {
           session.selection = { ...session.selection, model: value };
+        }}
+      />
+      <Select
+        label="Thinking"
+        hideLabel
+        size="sm"
+        items={session.thinking.items}
+        value={session.thinking.value}
+        placeholder="No thinking"
+        disabled={session.thinking.disabledReason !== null}
+        disabledReason={session.thinking.disabledReason}
+        onValueChange={(value: ThinkingLevel) => {
+          session.chooseThinkingLevel(value);
+        }}
+      />
+    </div>
+    <div class="credential-row">
+      <Select
+        label="Provider"
+        hideLabel
+        size="sm"
+        items={items.providers}
+        value={session.selection.provider}
+        placeholder="No credential"
+        disabled={items.providers.length === 0}
+        onValueChange={(value: string) => {
+          session.selection = changeProvider(session.providers, session.credentials, value);
         }}
       />
       <Select
@@ -389,10 +406,19 @@
     border-block-start: 1px solid var(--cds-border-subtle-01);
   }
 
-  .model-selects {
+  /* The Model field takes 2 parts, so a long model name has room. */
+  .model-row,
+  .credential-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--cds-spacing-02);
+  }
+
+  .model-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  .credential-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .message-row {

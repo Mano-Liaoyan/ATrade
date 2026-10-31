@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
-import type { ModelSelection } from '../src/model_selection.ts';
+import type { ModelSelection, ThinkingLevel } from '../src/model_selection.ts';
 import { createFakeOpenModel } from './fake_model.ts';
 import { startFakeModelServer, type FakeModelServer, type ModelStep } from './fake_model_server.ts';
 
@@ -41,9 +41,12 @@ async function runOnce(
   conversations: Conversations,
   text: string,
   selection: ModelSelection = FIRST_SELECTION,
+  thinkingLevel: ThinkingLevel = 'medium',
 ): Promise<RunEvent[]> {
   const events: RunEvent[] = [];
-  await conversations.run('7', { text, selection, systemPrompt: SYSTEM_PROMPT }, (event) => events.push(event));
+  await conversations.run('7', { text, selection, thinkingLevel, systemPrompt: SYSTEM_PROMPT }, (event) =>
+    events.push(event),
+  );
   return events;
 }
 
@@ -69,6 +72,7 @@ describe('a run of a conversation', () => {
       provider: 'fake',
       model: 'fake-model',
       credential_name: 'Fake API key · first',
+      thinking_level: 'off',
     });
   });
 
@@ -80,21 +84,23 @@ describe('a run of a conversation', () => {
 
     expect(existsSync(path.join(workDir, 'conversations', '7.jsonl'))).toBe(true);
     expect(conversations.readMessages('7')).toEqual([
-      { role: 'user', text: 'First question.', provider: null, model: null, credential_name: null },
+      { role: 'user', text: 'First question.', provider: null, model: null, credential_name: null, thinking_level: null },
       {
         role: 'assistant',
         text: 'First answer.',
         provider: 'fake',
         model: 'fake-model',
         credential_name: 'Fake API key · first',
+        thinking_level: 'off',
       },
-      { role: 'user', text: 'Second question.', provider: null, model: null, credential_name: null },
+      { role: 'user', text: 'Second question.', provider: null, model: null, credential_name: null, thinking_level: null },
       {
         role: 'assistant',
         text: 'Second answer.',
         provider: 'fake',
         model: 'fake-model-2',
         credential_name: 'Fake API key · second',
+        thinking_level: 'off',
       },
     ]);
   });
@@ -108,6 +114,28 @@ describe('a run of a conversation', () => {
     expect(events.at(-1)).toMatchObject({ type: 'message_end', model: 'fake-model-2' });
     expect(model.requests[1]?.model).toBe('fake-model-2');
     expect(JSON.stringify(model.requests[1]?.messages)).toContain('First answer.');
+  });
+
+  test('sends the thinking level to the model, and each message shows the thinking level of its run', async () => {
+    const { conversations, model } = await openConversations([{ text: 'Thought.' }, { text: 'Fast.' }]);
+    const thinkingSelection = { ...FIRST_SELECTION, model: 'fake-thinking-model' };
+
+    const events = await runOnce(conversations, 'Think hard.', thinkingSelection, 'high');
+    await runOnce(conversations, 'Do not think.', thinkingSelection, 'off');
+
+    expect(events.at(-1)).toMatchObject({ type: 'message_end', model: 'fake-thinking-model', thinking_level: 'high' });
+    expect(model.requests[0]).toMatchObject({ reasoning_effort: 'high' });
+    expect(model.requests[1]).not.toHaveProperty('reasoning_effort');
+    expect(conversations.readMessages('7').map((message) => message.thinking_level)).toEqual([null, 'high', null, 'off']);
+  });
+
+  test('a model without thinking levels runs with the thinking level "off"', async () => {
+    const { conversations, model } = await openConversations([{ text: 'Hello.' }]);
+
+    const events = await runOnce(conversations, 'Hi.', FIRST_SELECTION, 'max');
+
+    expect(events.at(-1)).toMatchObject({ type: 'message_end', thinking_level: 'off' });
+    expect(model.requests[0]).not.toHaveProperty('reasoning_effort');
   });
 
   test('sends the system prompt of the run to the model, and pi adds only the pi directory', async () => {

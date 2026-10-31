@@ -20,7 +20,8 @@ async function createFakeModelRuntime(baseUrl: string, workDir: string): Promise
       baseUrl,
       api: 'openai-completions',
       apiKey: 'fake-key',
-      models: [{ id: 'fake-model' }, { id: 'fake-model-2' }],
+      // fake-thinking-model has thinking levels. The other models have only "off".
+      models: [{ id: 'fake-model' }, { id: 'fake-model-2' }, { id: 'fake-thinking-model', reasoning: true }],
     },
   };
   writeFileSync(modelsPath, JSON.stringify({ providers }));

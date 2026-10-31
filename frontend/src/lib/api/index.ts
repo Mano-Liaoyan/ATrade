@@ -1432,6 +1432,8 @@ export interface components {
             model: string | null;
             /** Credential Name */
             credential_name: string | null;
+            /** Thinking Level */
+            thinking_level: string | null;
         };
         /** ConversationResponse */
         ConversationResponse: {
@@ -2092,6 +2094,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** Thinking Levels */
+            thinking_levels: components["schemas"]["ThinkingLevel"][];
         };
         /** ProviderResponse */
         ProviderResponse: {
@@ -2760,6 +2764,8 @@ export interface components {
             url: string;
         };
         /** @enum {string} */
+        ThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+        /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
         /** @enum {string} */
         TitleState: "new" | "generating" | "generated" | "not_generated" | "renamed";
@@ -3092,7 +3098,8 @@ export interface components {
         };
         /**
          * MessageEndMessage
-         * @description The end of one AI assistant message: its full text, its model, and its credential name.
+         * @description The end of one AI assistant message: its full text, its model, its credential name, and the thinking level of
+         *     its run.
          */
         MessageEndMessage: {
             /**
@@ -3109,6 +3116,8 @@ export interface components {
             model: string;
             /** Credential Name */
             credential_name: string;
+            /** Thinking Level */
+            thinking_level: string | null;
         };
         /** OpenOrdersMessage */
         OpenOrdersMessage: {
@@ -3218,7 +3227,8 @@ export interface components {
         };
         /**
          * PromptMessage
-         * @description Browser to server: a new user message, with the provider, the model, and the credential of this message.
+         * @description Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of
+         *     this message.
          */
         PromptMessage: {
             /**
@@ -3235,6 +3245,7 @@ export interface components {
             model: string;
             /** Credential Id */
             credential_id: string;
+            thinking_level: components["schemas"]["ThinkingLevel"];
         };
         /**
          * RunStateMessage

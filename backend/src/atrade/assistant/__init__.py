@@ -30,6 +30,7 @@ from atrade.assistant.assistant_service import (
     ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
+    ThinkingLevel,
     ToolStep,
 )
 from atrade.assistant.assistant_socket import ASSISTANT_SOCKET_MESSAGE_MODELS, create_assistant_socket_router
@@ -103,6 +104,7 @@ __all__ = [
     "StartContextReader",
     "StrategyVersionSaved",
     "TextDelta",
+    "ThinkingLevel",
     "ToolStep",
     "conversation_exists",
     "create_assistant_router",
