@@ -75,7 +75,7 @@ test('a sent paper order shows in the open orders panel', async ({ page }) => {
   await panel.getByRole('button', { name: 'Review buy order' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Buy 2 700' });
-  await expect(dialog.getByText('PAPER', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('PAPER', { exact: true })).toHaveCount(0);
   await expect(dialog).toContainText('700 / SEHK / HKD');
   await expect(dialog).toContainText('Limit, DAY');
   await dialog.getByRole('button', { name: 'Send paper order' }).click();

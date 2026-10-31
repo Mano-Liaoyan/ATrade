@@ -100,7 +100,7 @@ test('an HK screen shows the survivorship bias warning', async ({ page, request 
 
   await page.goto(`/screens/${String(screenId)}`);
 
-  await expect(page.getByText('The universe has survivorship bias', { exact: false })).toBeVisible();
+  await expect(page.getByText('Survivorship bias', { exact: false })).toBeVisible();
 });
 
 test('/screens opens the last opened screen, and a long screen list scrolls in its own track', async ({
@@ -288,10 +288,10 @@ test('shows a 422 problem at its tag, removes conditions, keeps the saved screen
   await page.getByRole('button', { name: 'Save as new screen' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${name} copy`);
   await expect(page.getByRole('region', { name: 'Screen list' })).toContainText(`${name} copy`);
-  await expect(page.getByText('The universe has survivorship bias', { exact: false })).toBeVisible();
+  await expect(page.getByText('Survivorship bias', { exact: false })).toBeVisible();
 });
 
-const WARNING_TEXT = 'The universe has survivorship bias';
+const WARNING_TEXT = 'Survivorship bias';
 
 test('"Run backtest on this screen result" opens the New backtest form with the screen', async ({
   page,

@@ -73,7 +73,6 @@
   ];
   const COMPARISON_COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
-    { header: 'Status' },
     { header: 'Start' },
     { header: 'End' },
     { header: 'Return', align: 'right' },
@@ -270,6 +269,21 @@
         {#if id === 'chart'}
           <Panel {...state} label={`Forward test #${String(forwardTest.id)}`}>
             {#snippet header()}
+              <span class="run-status" role="status" aria-label="Forward test status">
+                <StatusIndicator
+                  label={describeForwardTestStatus(forwardTest.status)}
+                  kind={findForwardTestStatusKind(forwardTest.status)}
+                />
+                {#if showsCrashCount(forwardTest)}
+                  <StatusIndicator kind="warning" label={`Crashes in a row: ${String(forwardTest.crash_count)} of 3`} />
+                {/if}
+                {#if forwardTest.split_checks_needed.length > 0}
+                  <StatusIndicator
+                    kind="warning"
+                    label={`Split check needed: ${forwardTest.split_checks_needed.map((item) => item.symbol).join(', ')}`}
+                  />
+                {/if}
+              </span>
               <h1 class="run-title">
                 <span class="run-number">#{forwardTest.id}</span>
                 <a
@@ -280,25 +294,8 @@
                 {@render instrumentOrUniverse(forwardTest, records.instruments.length)}
                 <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
-              <span class="run-status" role="status" aria-label="Forward test status">
-                <StatusIndicator
-                  label={describeForwardTestStatus(forwardTest.status)}
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                />
-              </span>
               {#if forwardTest.allocated_capital_usd !== null}
                 <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
-              {/if}
-              {#if showsCrashCount(forwardTest)}
-                <span class="run-note">Crashes in a row: {forwardTest.crash_count} of 3</span>
-              {/if}
-              {#if forwardTest.split_checks_needed.length > 0}
-                <span class="run-note">
-                  <StatusIndicator
-                    kind="warning"
-                    label={`Split check needed: ${forwardTest.split_checks_needed.map((item) => item.symbol).join(', ')}`}
-                  />
-                </span>
               {/if}
               <span class="run-actions">
                 {#if canStop(forwardTest)}
@@ -330,14 +327,7 @@
                 }}
               />
             {/if}
-            {#if records.metrics === null}
-              <div class="state-area">
-                <StatusIndicator
-                  label={describeForwardTestStatus(forwardTest.status)}
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                />
-              </div>
-            {:else}
+            {#if records.metrics !== null}
               <KeyMetricRow metrics={records.metrics} startCapitalUsd={readStartCapital(forwardTest)} />
               <div class="chart">
                 <EquityDrawdownChart
@@ -376,6 +366,11 @@
                       {#each records.same_period_backtests as backtest (backtest.id)}
                         <tr>
                           <th scope="row" align="right">
+                            <StatusIndicator
+                              label={describeBacktestStatus(backtest.status)}
+                              kind={findBacktestStatusKind(backtest.status)}
+                              align="right"
+                            />
                             <a
                               class="cds--link"
                               aria-label={`Compare with backtest #${String(backtest.id)}`}
@@ -385,12 +380,6 @@
                               })}>#{backtest.id}</a
                             >
                           </th>
-                          <td>
-                            <StatusIndicator
-                              label={describeBacktestStatus(backtest.status)}
-                              kind={findBacktestStatusKind(backtest.status)}
-                            />
-                          </td>
                           <td>{formatUtcTime(backtest.start_utc)}</td>
                           <td>{formatUtcTime(backtest.end_utc)}</td>
                           <td align="right">
@@ -462,15 +451,16 @@
     color: var(--cds-text-secondary);
   }
 
-  .run-status,
+  .run-status {
+    display: flex;
+    flex: none;
+  }
+
   .run-note {
     flex: none;
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     white-space: nowrap;
-  }
-
-  .run-note {
     color: var(--cds-text-secondary);
   }
 
@@ -482,15 +472,6 @@
     display: flex;
     flex: none;
     margin-inline-start: auto;
-  }
-
-  .state-area {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--cds-heading-compact-02-font-size);
-    line-height: var(--cds-heading-compact-02-line-height);
   }
 
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */

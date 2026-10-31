@@ -1,24 +1,22 @@
 <!-- The "New forward test" dialog of the forward test workbench: the form that starts a forward test. The form combines
-     strategy versions (strategy), the IB live bar periods (market_data), and the metrics of the latest finished
-     backtest of the selected strategy version (backtest; docs/architecture/forward_test.md 12.16), and the allocated
+     strategy versions (strategy), the IB live bar periods (market_data), the top N check (backtest), and the allocated
      capital with the unallocated amount of the paper account (12.18; paper_trading gives the account check). The form id is
      START_FORWARD_TEST_FORM_ID: the command palette opens the dialog with it. With `strategyVersion`, each open selects
      that strategy version, for example the open version of the strategy page (Start forward test). The Instruments
      select picks one instrument, the top N US instruments by trading value, or the watchlist; the last two run on
      daily bars only (12.16, 12.17). The layout is the layout of the backtest form. -->
 <script lang="ts">
-  import { checkTopN, formatMaxDrawdown, formatPercent, formatUsd, listBacktests, type Backtest } from '#lib/backtest';
+  import { checkTopN } from '#lib/backtest';
   import {
     Dialog,
     InlineNotification,
     Select,
-    StatusIndicator,
+    StatusMessage,
     TextInput,
     type NotificationMessage,
     type SelectItem,
   } from '#lib/foundation/carbon';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
-  import { formatBarPeriod } from '#lib/foundation/value_format';
   import {
     describeUnallocated,
     findCapitalBlockReason,
@@ -90,7 +88,6 @@
   let paperAccountCheck = $state<PaperAccountCheck | null>(null);
   // The value of the datetime-local input: a local time, or '' for no end time.
   let endTimeLocal = $state('');
-  let backtests: Backtest[] = $state([]);
   let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let form: HTMLFormElement | undefined = $state();
@@ -105,13 +102,6 @@
           value: String(version.id),
           label: formatVersionLabel(selectedStrategy?.name ?? '', version.version_number),
         })),
-  );
-
-  // The metrics of the latest finished backtest of the selected strategy version (docs/architecture.md 12.1).
-  const latestBacktest = $derived(
-    backtests
-      .filter((backtest) => String(backtest.strategy_version_id) === strategyVersionId && backtest.metrics !== null)
-      .reduce<Backtest | null>((latest, backtest) => (latest === null || backtest.id > latest.id ? backtest : latest), null),
   );
 
   const unallocatedUsd = $derived(capital === 'reading' || capital === null ? null : capital.unallocated_usd);
@@ -172,11 +162,6 @@
     void listStrategies(fetch).then((result) => {
       if (result.kind === 'ok') {
         strategies = result.value;
-      }
-    });
-    void listBacktests(fetch).then((result) => {
-      if (result.kind === 'ok') {
-        backtests = result.value;
       }
     });
   });
@@ -292,18 +277,6 @@
         strategyVersionId = versionId;
       }}
     />
-    {#if strategyVersionId !== ''}
-      <section class="form-note cds--form__helper-text" aria-label="Latest backtest result">
-        {#if latestBacktest === null || latestBacktest.metrics === null}
-          no backtest result
-        {:else}
-          Latest backtest #{latestBacktest.id} ({latestBacktest.symbol}, {formatBarPeriod(latestBacktest.bar_period)}): total
-          return {formatPercent(latestBacktest.metrics.total_return_percent)}, max drawdown
-          {formatMaxDrawdown(latestBacktest.metrics.max_drawdown_percent).text}, {latestBacktest.metrics.trade_count} trades,
-          final equity {formatUsd(latestBacktest.metrics.final_equity_usd)} USD.
-        {/if}
-      </section>
-    {/if}
     <Select
       label="Bar period"
       items={barPeriodItems}
@@ -340,7 +313,7 @@
     <TextInput label="End time (local, optional)" type="datetime-local" bind:value={endTimeLocal} />
     {#if unallocatedUsd === null && capitalBlockReason !== null}
       <p id={capitalReasonId} class="form-note">
-        <StatusIndicator kind={capital === 'reading' ? 'in-progress' : 'warning'} label={capitalBlockReason} />
+        <StatusMessage kind={capital === 'reading' ? 'in-progress' : 'warning'} text={capitalBlockReason} />
       </p>
     {/if}
   </form>

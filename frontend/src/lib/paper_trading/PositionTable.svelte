@@ -1,10 +1,10 @@
 <!-- The positions of the paper account, one row for each owner of the owner ledger (section 11.7). A position that is not
-     the sum of its owner positions has one more row with a warning icon and "Unattributed: <difference>". The symbol
-     cell also shows the exchange, like the open orders. The unrealized
+     the sum of its owner positions has one more row with the difference as its quantity and a warning icon before the
+     symbol (tooltip "Unattributed: <difference>"). The symbol cell also shows the exchange, like the open orders. The unrealized
      P&L shows its sign, an arrow, and a color (ChangeText). With `fill`, the table takes the full height of a workbench
      panel and scrolls in it. With `compact` (the narrow panel of the instrument page), the table has no Currency and
      Market price columns, so all column names stay on one line. An instrument in the "Split check needed" state has one
-     more row: the warning "Split check needed: 4:1", the IBKR share count before and after, and (not in the compact
+     more row: a warning icon before the symbol (tooltip "Split check needed: 4:1"), the IBKR share count before and after, and (not in the compact
      table) the buttons "Apply split 4:1" and "Keep ledger" (section 11.11). -->
 <script lang="ts">
   import {
@@ -89,8 +89,11 @@
               {@const splitText = describeSplitCheck(splitCheck)}
               {@const isResolving = resolvingSplitCheckIds.includes(splitCheck.id)}
               <tr>
-                <th scope="row">{position.symbol} <span class="exchange">{position.exchange}</span></th>
-                <td class="owner"><StatusIndicator kind="warning" label={`Split check needed: ${splitText.ratio}`} /></td>
+                <th scope="row">
+                  <StatusIndicator kind="warning" label={`Split check needed: ${splitText.ratio}`} />{position.symbol}
+                  <span class="exchange">{position.exchange}</span>
+                </th>
+                <td class="owner"></td>
                 {#if !compact}
                   <td>{position.currency}</td>
                 {/if}
@@ -116,14 +119,13 @@
               </tr>
             {:else}
             <tr>
-              <th scope="row">{position.symbol} <span class="exchange">{position.exchange}</span></th>
-              <td class="owner">
+              <th scope="row">
                 {#if row.unattributed !== null}
                   <StatusIndicator kind="warning" label={row.unattributed} />
-                {:else}
-                  {row.owner ?? ''}
-                {/if}
-              </td>
+                {/if}{position.symbol}
+                <span class="exchange">{position.exchange}</span>
+              </th>
+              <td class="owner">{row.owner ?? ''}</td>
               {#if !compact}
                 <td>{position.currency}</td>
               {/if}

@@ -1,11 +1,13 @@
 <!-- A code block of a markdown text: the code and a Copy icon button at the top end. The language is the accessible
-     name of the block; no label shows. A closed block gets syntax colors
-     (shiki, loaded on demand); an open block (the text still streams in) shows plain text, so the lines do not flicker.
-     A shell block shows each command after a "$" prompt that Copy does not copy. A diff block shows each line with its
+     name of the block; no label shows. A closed code block with a known language shows in the file view of
+     @pierre/diffs (syntax colors, loaded on demand); an open block (the text still streams in) shows plain text, so the
+     lines do not flicker. A shell block shows each command after a "$" prompt that Copy does not copy, with the syntax
+     colors of the same highlighter. A diff block shows each line with its
      + or - marker and the line color (the plain diff view of DiffBlock). -->
 <script lang="ts">
   import CopyButton from './CopyButton.svelte';
   import { highlightCode, highlightLanguage, type CodeToken } from './code_highlight';
+  import { loadFileView, type DiffView } from './diff_view';
   import { diffLines } from './diff_lines';
   import { shellCopyText, shellLines } from './shell_text';
 
@@ -39,9 +41,41 @@
   const highlightText = $derived(lines.map((line) => line.text).join('\n'));
   const tokens = $derived(highlighted?.text === highlightText ? highlighted.tokens : undefined);
 
+  // A closed code block renders in the hidden file view; the plain text shows until the file view is ready.
+  const fileLanguage = $derived(display === 'code' && closed ? highlightLanguage(language) : null);
+  let fileContainer: HTMLDivElement | undefined = $state();
+  let fileShown = $state(false);
+
+  $effect(() => {
+    const source = text;
+    const element = fileContainer;
+    const name = fileLanguage;
+    if (name === null || element === undefined) {
+      return;
+    }
+    let view: DiffView | undefined;
+    let current = true;
+    loadFileView().then(
+      (createView) => {
+        if (current) {
+          view = createView(element, source, name);
+          fileShown = true;
+        }
+      },
+      () => {
+        // The block stays plain text when the file view does not load.
+      },
+    );
+    return () => {
+      current = false;
+      view?.destroy();
+      fileShown = false;
+    };
+  });
+
   $effect(() => {
     const source = highlightText;
-    if (!closed || display === 'diff' || highlightLanguage(language) === null) {
+    if (!closed || display !== 'shell' || highlightLanguage(language) === null) {
       return;
     }
     let current = true;
@@ -63,14 +97,21 @@
 
 <figure class={['markdown-code-block', `markdown-code-block--${display}`]} aria-label={label}>
   <div class="markdown-code-block__copy"><CopyButton text={copyText} /></div>
-  <pre class="markdown-code-block__code"><code
+  {#if fileLanguage !== null}
+    <div
+      class={['markdown-diffs-view', 'markdown-code-block__file', !fileShown && 'markdown-code-block__file--hidden']}
+      aria-hidden={!fileShown}
+      bind:this={fileContainer}
+    ></div>
+  {/if}
+  {#if !fileShown}<pre class="markdown-code-block__code"><code
       >{#each lines as line, index (index)}<span class={['markdown-code-block__line', `markdown-code-block__line--${line.kind}`]}
           >{#if line.kind === 'command'}<span class="markdown-code-block__prompt" aria-hidden="true">$ </span
             >{/if}{#if tokens !== undefined && line.kind !== 'output'}{#each tokens[index] ?? [] as token, tokenIndex (tokenIndex)}<span
                 style:color={token.color}>{token.text}</span
               >{/each}{:else}{line.text}{/if}</span
         >{/each}</code
-    ></pre>
+    ></pre>{/if}
 </figure>
 
 <style>
@@ -88,6 +129,16 @@
     inset-block-start: 1px;
     inset-inline-end: 1px;
     background-color: var(--cds-layer-01);
+  }
+
+  .markdown-code-block__file {
+    min-inline-size: 0;
+  }
+
+  .markdown-code-block__file--hidden {
+    block-size: 0;
+    overflow: hidden;
+    visibility: hidden;
   }
 
   .markdown-code-block__code {

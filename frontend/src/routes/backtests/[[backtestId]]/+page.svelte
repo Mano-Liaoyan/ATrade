@@ -249,6 +249,9 @@
         {#if id === 'chart'}
           <Panel {...state} label={`Backtest #${String(detail.id)}`}>
             {#snippet header()}
+              <span class="run-status" role="status" aria-label="Backtest status">
+                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
+              </span>
               <h1 class="run-title">
                 <span class="run-number">#{detail.id}</span>
                 <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
@@ -267,9 +270,6 @@
                   >
                 {/if}
               </h1>
-              <span class="run-status" role="status" aria-label="Backtest status">
-                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
-              </span>
               <span class="run-actions">
                 <IconButton
                   label={describeForwardTestButton(detail, instrument)}
@@ -298,11 +298,7 @@
             {#if detail.survivorship_bias}
               <SurvivorshipBiasWarning />
             {/if}
-            {#if detail.metrics === null}
-              <div class="state-area">
-                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
-              </div>
-            {:else}
+            {#if detail.metrics !== null}
               <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
               <div class="chart">
                 <EquityDrawdownChart
@@ -398,25 +394,14 @@
   }
 
   .run-status {
+    display: flex;
     flex: none;
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    white-space: nowrap;
   }
 
   .run-actions {
     display: flex;
     flex: none;
     margin-inline-start: auto;
-  }
-
-  .state-area {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--cds-heading-compact-02-font-size);
-    line-height: var(--cds-heading-compact-02-line-height);
   }
 
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */

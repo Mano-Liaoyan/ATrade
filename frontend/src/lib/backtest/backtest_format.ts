@@ -11,8 +11,8 @@ const STATUS_LABELS: Record<BacktestStatus, string> = {
   timed_out: 'Timed out',
   cancelled: 'Cancelled',
 };
-// The status indicator kind of each status. The indicator also shows an icon and the status word, so the color is
-// never the only sign.
+// The status icon kind of each status. Each kind has its own icon shape, and the tooltip names the status, so the color
+// is never the only sign.
 const STATUS_KINDS: Record<BacktestStatus, StatusKind> = {
   queued: 'neutral',
   running: 'in-progress',

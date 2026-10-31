@@ -53,7 +53,7 @@ describe('the credential columns', () => {
     expect(describeCredentialState(API_KEY)).toEqual({ kind: 'success', label: 'Ready' });
     expect(
       describeCredentialState({ ...API_KEY, state: 'failed', state_message: 'OAuth refresh failed for anthropic' }),
-    ).toEqual({ kind: 'error', label: 'Log in again', reason: 'OAuth refresh failed for anthropic' });
+    ).toEqual({ kind: 'error', label: 'Log in again: OAuth refresh failed for anthropic' });
   });
 });
 

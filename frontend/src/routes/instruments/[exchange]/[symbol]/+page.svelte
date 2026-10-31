@@ -7,7 +7,8 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { ContentSwitcher, StatusIndicator } from '#lib/foundation/carbon';
+  import { ContentSwitcher, InlineNotification } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -231,9 +232,9 @@
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
               {:else if barsResult?.kind === 'failed'}
-                <p class="chart-message" role="alert"><StatusIndicator kind="error" label={barsResult.message} /></p>
+                <div class="chart-message"><InlineNotification kind="error" title={barsResult.message} lowContrast /></div>
               {:else if liveBarErrorText !== null}
-                <p class="chart-message" role="alert"><StatusIndicator kind="error" label={liveBarErrorText} /></p>
+                <div class="chart-message"><InlineNotification kind="error" title={liveBarErrorText} lowContrast /></div>
               {/if}
             </div>
           </Panel>
@@ -254,7 +255,7 @@
               <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
               {#if accountTable === 'positions'}
                 {#if account === null}
-                  <p role="status">Reading the paper account.</p>
+                  <EmptyText text="Loading" role="status" />
                 {:else}
                   <PositionTable positions={account.positions} fill compact />
                 {/if}
@@ -329,6 +330,12 @@
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     color: var(--cds-text-secondary);
+  }
+
+  /* An error notification over the chart: the notification has its own background and padding. */
+  div.chart-message {
+    padding: 0;
+    background: none;
   }
 
   .account-table {

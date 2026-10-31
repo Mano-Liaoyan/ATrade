@@ -2,8 +2,8 @@
 // (foundation/code_editor/code_colors.ts): plain text and comments are Carbon text tokens; Carbon has no syntax color
 // tokens, so the syntax colors come from the Carbon palette, grade 70 on g10 and grade 40 on g100. The theme rules
 // are the rules of foundation/carbon/carbon.scss.
-// The shiki theme of code_highlight.ts and the CSS variable theme of the diff view (@pierre/diffs) read the
-// --diffs-* variables.
+// The CSS variable theme of @pierre/diffs (diffs_library.ts: the diff view, the file view of a code block, and the
+// tokens of a shell block) reads the --diffs-* variables.
 @use '@carbon/colors';
 
 @mixin code-colors($grade) {
@@ -42,4 +42,28 @@
 
 :root[data-theme='dark'] {
   @include code-colors(40);
+}
+
+// The diff view and the file view of @pierre/diffs read these variables in their shadow root. Carbon tokens only.
+.markdown-diffs-view {
+    --diffs-font-family: var(--cds-code-01-font-family, 'IBM Plex Mono', monospace);
+    --diffs-header-font-family: var(--cds-body-compact-01-font-family, 'IBM Plex Sans', sans-serif);
+    --diffs-font-size: var(--cds-code-01-font-size);
+    --diffs-line-height: var(--cds-code-01-line-height);
+    --diffs-font-features: 'tnum';
+    --diffs-background: var(--cds-layer-01);
+    --diffs-bg-context-override: var(--cds-layer-01);
+    --diffs-bg-context-gutter-override: var(--cds-layer-01);
+    --diffs-bg-separator-override: var(--cds-layer-accent-01);
+    --diffs-bg-buffer-override: var(--cds-layer-01);
+    --diffs-bg-hover-override: var(--cds-layer-hover-01);
+    --diffs-fg-number-override: var(--cds-text-secondary);
+    --diffs-addition-color-override: var(--cds-support-success);
+    --diffs-deletion-color-override: var(--cds-support-error);
+    --diffs-bg-addition-override: color-mix(in srgb, var(--cds-support-success) 15%, transparent);
+    --diffs-bg-addition-number-override: color-mix(in srgb, var(--cds-support-success) 15%, transparent);
+    --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--cds-support-success) 40%, transparent);
+    --diffs-bg-deletion-override: color-mix(in srgb, var(--cds-support-error) 15%, transparent);
+    --diffs-bg-deletion-number-override: color-mix(in srgb, var(--cds-support-error) 15%, transparent);
+    --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--cds-support-error) 40%, transparent);
 }

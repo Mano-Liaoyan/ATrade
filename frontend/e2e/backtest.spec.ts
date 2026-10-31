@@ -135,7 +135,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: 'AAPL', exact: true })).toHaveAttribute('href', '/instruments/NASDAQ/AAPL?currency=USD');
   await expect(heading).toContainText('1 day');
-  await expect(chartPanel.getByRole('status', { name: 'Backtest status' })).toHaveText('Finished', {
+  await expect(chartPanel.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
   // The open backtest is the current row of the list.

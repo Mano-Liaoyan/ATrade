@@ -12,7 +12,7 @@ export interface OrderInstrument {
 
 const START_LIMIT_PRICE_DECIMALS = 2;
 
-/** A StatusIndicator kind: the paper account is not read yet, a warning, or an error. */
+/** A StatusMessage kind: the paper account is not read yet, a warning, or an error. */
 export type InstrumentOrderBlockKind = 'in-progress' | 'warning' | 'error';
 
 export interface InstrumentOrderBlock {

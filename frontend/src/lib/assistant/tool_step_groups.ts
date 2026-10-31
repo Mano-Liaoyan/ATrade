@@ -49,9 +49,19 @@ export function groupToolSteps<Message extends { item: LogItem }>(
   return grouped;
 }
 
-/** The summary line of a group: the count and one status for all steps. */
+// The name and tooltip of the status icon of a group.
+const GROUP_STATUS_WORDS: Record<ToolStepKind, string> = {
+  'in-progress': 'Running',
+  error: 'Failed',
+  success: 'Succeeded',
+  neutral: 'Done',
+};
+
+/** The summary line of a group: the count as the title, and one status for all steps as the status icon. */
+
 export function describeToolStepGroup(steps: readonly ToolStepItem[]): {
-  label: string;
+  title: string;
+  status: string;
   kind: ToolStepKind;
   isRunning: boolean;
 } {
@@ -65,5 +75,5 @@ export function describeToolStepGroup(steps: readonly ToolStepItem[]): {
   } else if (kinds.every((stepKind) => stepKind === 'success')) {
     kind = 'success';
   }
-  return { label: `${String(steps.length)} tool steps`, kind, isRunning };
+  return { title: `${String(steps.length)} tool steps`, status: GROUP_STATUS_WORDS[kind], kind, isRunning };
 }

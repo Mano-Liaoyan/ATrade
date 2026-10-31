@@ -92,7 +92,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await dialog.getByRole('combobox', { name: 'Strategy', exact: true }).click();
   await page.getByRole('option', { name: strategyName }).click();
   await expect(dialog.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
-  await expect(dialog.getByRole('region', { name: 'Latest backtest result' })).toHaveText('no backtest result');
+  await expect(dialog.getByRole('region', { name: 'Latest backtest result' })).toHaveCount(0);
   await dialog.getByLabel('Symbol').fill(symbol);
   await dialog.getByLabel('Exchange').fill('ARCA');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
@@ -116,12 +116,12 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
-  await expect(status).toHaveText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(status.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   // The list shows the status from /ws/forward-tests. The open forward test is the current row.
   const list = page.getByRole('complementary', { name: 'Forward tests' });
   await expect(list.getByRole('link', { name: `#${forwardTestId}`, exact: true })).toHaveAttribute('aria-current', 'page');
   const row = list.getByRole('row', { name: new RegExp(symbol) });
-  await expect(row).toContainText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(row.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   // The Logs tab lists the start, and the planned stop at the end time.
   const tables = page.getByRole('region', { name: 'Forward test tables' });
   await tables.getByRole('tab', { name: 'Logs' }).click();
@@ -138,8 +138,8 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expectErrorIconColor(stopButton);
   await stopButton.click();
 
-  await expect(status).toHaveText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });
-  await expect(row).toContainText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(status.getByRole('img', { name: 'Stopped', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(row.getByRole('img', { name: 'Stopped', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   // A stopped forward test has no Stop button.
   await expect(stopButton).toHaveCount(0);
 });
@@ -197,9 +197,9 @@ test('starts a top N forward test on daily bars with the universe name, the Inst
 
   // The client ID range allows 4 running forward tests: stop this one.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
-  await expect(status).toHaveText('Running', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(status.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   await chartPanel.getByRole('button', { name: 'Stop forward test', exact: true }).click();
-  await expect(status).toHaveText('Stopped', { timeout: STATUS_TIMEOUT_MILLISECONDS });
+  await expect(status.getByRole('img', { name: 'Stopped', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
 });
 
 test('the forward test list has a visible scroll track', async ({ page }) => {

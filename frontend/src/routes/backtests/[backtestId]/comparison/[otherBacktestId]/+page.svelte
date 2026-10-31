@@ -22,6 +22,7 @@
   } from '#lib/backtest';
   import { Button, InlineNotification } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { startPolling } from '#lib/foundation/polling';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -189,12 +190,7 @@
           >
             {#if compared.first.code === compared.second.code}
               <!-- Saving the same code again keeps the version, so the same code means the same strategy version. -->
-              <InlineNotification
-                kind="info"
-                label="Code difference"
-                title="Same strategy version: no code difference."
-                lowContrast
-              />
+              <EmptyText text="No code difference" />
               <div class="same-code-action">
                 <Button
                   kind="ghost"

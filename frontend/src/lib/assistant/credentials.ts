@@ -51,11 +51,10 @@ export function describeCredentialKind(type: Credential['type']): string {
   return type === 'oauth' ? 'Subscription' : 'API key';
 }
 
+/** The status icon before the credential name. `label` is its accessible name and tooltip, with the reason of a failure. */
 export interface CredentialStateView {
   kind: StatusKind;
   label: string;
-  /** Why the credential failed, for the tooltip of the state. */
-  reason?: string;
 }
 
 /** "failed": the last OAuth refresh failed. The user deletes the credential and logs in again. */
@@ -63,7 +62,7 @@ export function describeCredentialState(credential: Credential): CredentialState
   if (credential.state === 'ready') {
     return { kind: 'success', label: 'Ready' };
   }
-  return { kind: 'error', label: 'Log in again', reason: credential.state_message ?? 'The OAuth refresh failed.' };
+  return { kind: 'error', label: `Log in again: ${credential.state_message ?? 'The OAuth refresh failed.'}` };
 }
 
 /** The providers that have the login method, for the Provider select. */

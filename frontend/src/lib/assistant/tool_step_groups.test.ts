@@ -42,14 +42,29 @@ describe('groupToolSteps', () => {
 
 describe('describeToolStepGroup', () => {
   it('names the count, with success when all steps succeeded', () => {
-    expect(describeToolStepGroup([step(1), step(2)])).toEqual({ label: '2 tool steps', kind: 'success', isRunning: false });
+    expect(describeToolStepGroup([step(1), step(2)])).toEqual({
+      title: '2 tool steps',
+      status: 'Succeeded',
+      kind: 'success',
+      isRunning: false,
+    });
   });
 
   it('runs while one step runs', () => {
-    expect(describeToolStepGroup([step(1), step(2, 'running')])).toEqual({ label: '2 tool steps', kind: 'in-progress', isRunning: true });
+    expect(describeToolStepGroup([step(1), step(2, 'running')])).toEqual({
+      title: '2 tool steps',
+      status: 'Running',
+      kind: 'in-progress',
+      isRunning: true,
+    });
   });
 
   it('shows the error when a step failed', () => {
-    expect(describeToolStepGroup([step(1, 'failed'), step(2)])).toEqual({ label: '2 tool steps', kind: 'error', isRunning: false });
+    expect(describeToolStepGroup([step(1, 'failed'), step(2)])).toEqual({
+      title: '2 tool steps',
+      status: 'Failed',
+      kind: 'error',
+      isRunning: false,
+    });
   });
 });

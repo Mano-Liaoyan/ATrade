@@ -1,7 +1,7 @@
 // HK instrument list editor on the settings page, against the real backend with the IBKR fake. The Playwright projects
 // share one database and run at the same time, so each project uses its own symbols <PROJECT NAME>HK01 ...
 // <PROJECT NAME>HK20 (backend/tests/e2e_server.py).
-import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 const HK_INSTRUMENT_LIST_PATH = '/api/market-data/hk-instrument-list';
 const INSTRUMENTS_PER_PROJECT = 20;
@@ -50,16 +50,19 @@ test('adds pasted symbols, shows the result of each symbol, and deletes a row', 
   await pasteSymbols(page, `${first}, ${second}\n${unknown}`);
 
   const results = page.getByRole('list', { name: 'Add results' });
-  await expect(results).toContainText(`${first} added`);
-  await expect(results).toContainText(`${second} added`);
-  await expect(results).toContainText(`${unknown} not found`);
+  // Each result is the symbol with a status icon before it. The icon has the result as its name and tooltip.
+  const resultStatus = (symbol: string, status: string): Locator =>
+    results.getByRole('listitem').filter({ hasText: symbol }).getByRole('img', { name: status, exact: true });
+  await expect(resultStatus(first, 'Added')).toBeVisible();
+  await expect(resultStatus(second, 'Added')).toBeVisible();
+  await expect(resultStatus(unknown, 'Not found')).toBeVisible();
   const table = page.getByRole('region', { name: 'HK instrument list table' });
   await expect(table.getByRole('rowheader', { name: first, exact: true })).toBeVisible();
   await expect(table.getByRole('rowheader', { name: second, exact: true })).toBeVisible();
   await expect(table.getByRole('rowheader', { name: unknown, exact: true })).toHaveCount(0);
 
   await pasteSymbols(page, first);
-  await expect(results).toContainText(`${first} already in list`);
+  await expect(resultStatus(first, 'Already in list')).toBeVisible();
 
   await table.getByRole('button', { name: `Delete ${first} from the HK instrument list` }).click();
   await expect(table.getByRole('rowheader', { name: first, exact: true })).toHaveCount(0);

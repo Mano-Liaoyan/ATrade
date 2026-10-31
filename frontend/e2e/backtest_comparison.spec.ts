@@ -204,9 +204,7 @@ test('shows a note instead of an empty code difference for the same strategy ver
 
   await page.goto(`/backtests/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
 
-  await expect(page.getByRole('status', { name: 'Code difference' })).toHaveText(
-    'Same strategy version: no code difference.',
-  );
+  await expect(page.getByText('No code difference', { exact: true })).toBeVisible();
   await expect(page.locator('.cm-mergeView')).toHaveCount(0);
   await page.getByText('Show the code').click();
   // The full code shows: no collapsed lines. CodeMirror draws only the lines near the visible part.

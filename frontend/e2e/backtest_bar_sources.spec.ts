@@ -6,7 +6,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
-const WARNING_TEXT = 'The universe has survivorship bias: instruments that stopped trading are missing.';
+const WARNING_TEXT = 'Survivorship bias';
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
@@ -61,11 +61,11 @@ test('starts a backtest with a changed source order and sees the bar count of ea
   await expect(page).toHaveURL(/\/backtests\/\d+$/);
   const backtestId = page.url().split('/').at(-1) ?? '';
   const chartPanel = page.getByRole('region', { name: `Backtest #${backtestId}` });
-  await expect(chartPanel.getByRole('status', { name: 'Backtest status' })).toHaveText('Finished', {
+  await expect(chartPanel.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
   // A US backtest of 2025 has no survivorship bias warning.
-  await expect(chartPanel.getByText(WARNING_TEXT)).toHaveCount(0);
+  await expect(chartPanel.getByText(WARNING_TEXT, { exact: true })).toHaveCount(0);
 
   const tables = page.getByRole('region', { name: 'Backtest tables' });
   await tables.getByRole('tab', { name: 'Bar sources' }).click();
@@ -82,10 +82,13 @@ test('shows the survivorship bias warning on an HK backtest only', async ({ page
   const warning = hkPanel.getByRole('alert').filter({ hasText: WARNING_TEXT });
   await expect(warning).toBeVisible();
   await expect(warning.locator('svg').first()).toBeVisible();
+  // The title is short. The tooltip tells what is missing.
+  await warning.hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Instruments that stopped trading are missing from the universe.');
 
   const usBacktestId = await findBacktestId(request, 'SBUS');
   await page.goto(`/backtests/${String(usBacktestId)}`);
   const usPanel = page.getByRole('region', { name: `Backtest #${String(usBacktestId)}` });
   await expect(usPanel.getByRole('heading', { level: 1 })).toContainText('SBUS');
-  await expect(usPanel.getByText(WARNING_TEXT)).toHaveCount(0);
+  await expect(usPanel.getByText(WARNING_TEXT, { exact: true })).toHaveCount(0);
 });

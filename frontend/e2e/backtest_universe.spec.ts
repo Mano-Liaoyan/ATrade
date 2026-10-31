@@ -4,7 +4,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
-const WARNING_TEXT = 'The universe has survivorship bias: instruments that stopped trading are missing.';
+const WARNING_TEXT = 'Survivorship bias';
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
@@ -54,7 +54,7 @@ test('starts a watchlist backtest and sees each instrument and the symbol of eac
 
   await dialog.getByRole('combobox', { name: 'Instruments' }).click();
   await page.getByRole('option', { name: 'Watchlist', exact: true }).click();
-  await expect(dialog.getByText(WARNING_TEXT)).toBeVisible();
+  await expect(dialog.getByText(WARNING_TEXT, { exact: true })).toBeVisible();
   await dialog.getByLabel('Start date (UTC)').fill('2025-01-01');
   await dialog.getByLabel('End date (UTC)').fill('2025-01-11');
   await dialog.getByRole('button', { name: 'Start backtest' }).click();
@@ -63,7 +63,7 @@ test('starts a watchlist backtest and sees each instrument and the symbol of eac
   await expect(page).toHaveURL(/\/backtests\/\d+$/);
   const backtestId = page.url().split('/').at(-1) ?? '';
   const chartPanel = page.getByRole('region', { name: `Backtest #${backtestId}` });
-  await expect(chartPanel.getByRole('status', { name: 'Backtest status' })).toHaveText('Finished', {
+  await expect(chartPanel.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
   await expect(chartPanel.getByRole('heading', { level: 1 })).toContainText(/Fixed list \(\d+\)/);

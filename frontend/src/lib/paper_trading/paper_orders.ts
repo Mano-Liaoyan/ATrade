@@ -1,6 +1,7 @@
 // Paper orders by hand: checks the order form, writes the confirmation text, and calls the order routes.
 // The order list comes from the "orders" message of /ws/paper-trading (docs/architecture/paper_trading.md).
 import type { components } from '#lib/api';
+import type { StatusKind } from '#lib/foundation/carbon';
 import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
@@ -101,6 +102,27 @@ export function describeOrderSource(source: OrderSource): string {
 export interface CancelAction {
   label: string;
   disabled: boolean;
+}
+
+/**
+ * The status icon kind of an IBKR order status. The icon goes before the symbol, and the tooltip shows the IBKR status.
+ * An order that IBKR still works on is in progress. An unknown status is neutral.
+ */
+export function findOpenOrderStatusKind(status: string): StatusKind {
+  switch (status) {
+    case 'Submitted':
+    case 'PreSubmitted':
+    case 'PendingSubmit':
+    case 'PendingCancel':
+    case 'ApiPending':
+      return 'in-progress';
+    case 'Filled':
+      return 'success';
+    case 'Inactive':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
 }
 
 /** The cancel item of the row menu. A disabled item says why ATrade cannot cancel the order. */

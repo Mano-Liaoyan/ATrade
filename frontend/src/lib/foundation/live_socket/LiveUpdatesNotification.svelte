@@ -11,5 +11,5 @@
 </script>
 
 {#if !isConnected}
-  <InlineNotification kind="warning" title="Live updates paused" subtitle="ATrade connects again." lowContrast />
+  <InlineNotification kind="warning" title="Live updates paused" lowContrast />
 {/if}

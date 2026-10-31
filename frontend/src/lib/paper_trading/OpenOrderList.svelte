@@ -1,12 +1,26 @@
-<!-- Open orders of the paper account from IBKR, with the source of each order. The row menu cancels an order by hand.
+<!-- Open orders of the paper account from IBKR, with the source of each order. A status icon before the symbol shows
+     the IBKR order status in its tooltip. The row menu cancels an order by hand.
      For other orders, the cancel item is disabled and says why. With `compact` (the narrow panel of the instrument page),
      the table has no Type and Filled columns, so all column names stay on one line. -->
 <script lang="ts">
-  import { DataTable, InlineNotification, OverflowMenu, type NotificationMessage, type TableColumn } from '#lib/foundation/carbon';
+  import {
+    DataTable,
+    InlineNotification,
+    OverflowMenu,
+    StatusIndicator,
+    type NotificationMessage,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatAmount } from './paper_account';
-  import { cancelPaperOrder, describeCancelAction, describeOrderSource, type OpenOrder } from './paper_orders';
+  import {
+    cancelPaperOrder,
+    describeCancelAction,
+    describeOrderSource,
+    findOpenOrderStatusKind,
+    type OpenOrder,
+  } from './paper_orders';
 
   interface Props {
     orders: OpenOrder[];
@@ -23,7 +37,6 @@
     { header: 'Quantity', align: 'right' },
     { header: 'Type' },
     { header: 'Limit price', align: 'right' },
-    { header: 'Status' },
     { header: 'Filled', align: 'right' },
     { header: 'Source' },
     { header: 'Actions', isMenu: true },
@@ -33,7 +46,6 @@
     { header: 'Side' },
     { header: 'Quantity', align: 'right' },
     { header: 'Limit price', align: 'right' },
-    { header: 'Status' },
     { header: 'Source' },
     { header: 'Actions', isMenu: true },
   ];
@@ -80,14 +92,16 @@
         {#snippet rows()}
           {#each orders as order (`${String(order.order_id)}-${order.source.kind}-${String(order.source.forward_test_id)}`)}
             <tr>
-              <th scope="row">{order.symbol} <span class="exchange">{order.exchange}</span></th>
+              <th scope="row">
+                <StatusIndicator kind={findOpenOrderStatusKind(order.status)} label={order.status} />{order.symbol}
+                <span class="exchange">{order.exchange}</span>
+              </th>
               <td>{order.side}</td>
               <td align="right">{order.quantity}</td>
               {#if !compact}
                 <td>{order.order_type} {order.time_in_force}</td>
               {/if}
               <td align="right">{formatAmount(order.limit_price)}</td>
-              <td>{order.status}</td>
               {#if !compact}
                 <td align="right">{order.filled_quantity}</td>
               {/if}

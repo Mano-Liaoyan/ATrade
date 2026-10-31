@@ -1,10 +1,11 @@
 <!-- Parameter sweep page (docs/architecture/backtest.md section 10.11.4): a workbench like the backtest page. URL:
      /sweeps/<id>; /sweeps opens the newest sweep.
-     Left: the "Parameter sweeps" side column with the "New parameter sweep" button and the sweep list (number, strategy
-     version, status, finished runs / all runs). Top panel: the run count of each status, the "Metric" select (and the
+     Left: the "Parameter sweeps" side column with the "New parameter sweep" button and the sweep list (status icon before
+     the number, strategy version, finished runs / all runs). Top panel: the run count of each status (a status icon with
+     the status in its tooltip, then the count), the "Metric" select (and the
      select of the third parameter value), and the chart: points for 1 parameter, a heatmap for 2 or 3. Each heatmap
-     cell shows its value on a Carbon sequential color. Bottom panel "Runs": the parameter values, the status, and the
-     key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. The page reads the
+     cell shows its value on a Carbon sequential color. Bottom panel "Runs": the parameter values, the status icon, and
+     the key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. The page reads the
      sweep and the list again while a run is queued or running.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
@@ -59,7 +60,6 @@
   const LIST_COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
     { header: 'Strategy' },
-    { header: 'Status' },
     { header: 'Runs', align: 'right' },
   ];
 
@@ -198,6 +198,7 @@
                   }}
                 >
                   <th scope="row" align="right">
+                    <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
                     <a
                       class="row-link"
                       href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
@@ -209,7 +210,6 @@
                       >{formatVersionLabel(item.strategy_name, item.version_number)}</span
                     >
                   </td>
-                  <td><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} /></td>
                   <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
                 </tr>
               {/each}
@@ -248,10 +248,11 @@
               </h1>
               <span class="status-line" role="status" aria-label="Run counts">
                 {#each STATUS_LINE as status (status)}
-                  <StatusIndicator
-                    label={`${String(detail.status_counts[status] ?? 0)} ${describeBacktestStatus(status).toLowerCase()}`}
-                    kind={findBacktestStatusKind(status)}
-                  />
+                  <span class="status-count"
+                    ><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} />{String(
+                      detail.status_counts[status] ?? 0,
+                    )}</span
+                  >
                 {/each}
               </span>
             {/snippet}
@@ -432,15 +433,12 @@
     table-layout: fixed;
   }
 
+  /* The status icon and the number. */
   .sweep-list :global(th:nth-child(1)) {
-    inline-size: calc(var(--cds-spacing-09) + var(--cds-spacing-05));
+    inline-size: var(--cds-spacing-12);
   }
 
   .sweep-list :global(th:nth-child(3)) {
-    inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-06));
-  }
-
-  .sweep-list :global(th:nth-child(4)) {
     inline-size: var(--cds-spacing-11);
   }
 

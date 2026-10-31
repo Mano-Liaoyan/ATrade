@@ -16,7 +16,7 @@ export type ServerMessage =
   | Schemas['ScreenSavedMessage']
   | Schemas['ScreenRunFinishedMessage'];
 
-/** The StatusIndicator kinds of a tool step. */
+/** The status icon kinds of a tool step. */
 export type ToolStepKind = 'success' | 'in-progress' | 'error' | 'neutral';
 
 interface ItemBase {
@@ -262,13 +262,17 @@ function toWords(name: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** The StatusIndicator of a tool step, for example "Backtest #42 running". */
-export function describeToolStep(step: ToolStepFields): { label: string; kind: ToolStepKind } {
+/**
+ * The line of a tool step: the title, for example "Backtest #42", after a status icon. `status` is the name and the
+ * tooltip of the icon, for example "Running".
+ */
+export function describeToolStep(step: ToolStepFields): { title: string; status: string; kind: ToolStepKind } {
   if (step.backtestId !== null && step.backtestStatus !== null) {
     return {
-      label: `Backtest #${String(step.backtestId)} ${step.backtestStatus.replaceAll('_', ' ')}`,
+      title: `Backtest #${String(step.backtestId)}`,
+      status: toWords(step.backtestStatus),
       kind: findBacktestStateKind(step.backtestStatus, step.status),
     };
   }
-  return { label: `${toWords(step.toolName)} ${step.status}`, kind: findToolStateKind(step.status) };
+  return { title: toWords(step.toolName), status: toWords(step.status), kind: findToolStateKind(step.status) };
 }
