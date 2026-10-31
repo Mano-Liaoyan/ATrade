@@ -9,6 +9,11 @@ import type { ForwardTest } from '#lib/forward_test';
 import {
   EDITOR_SHORTCUT_KEYS,
   closeBacktestTab,
+  describeNoBacktestText,
+  listClosedBacktestTabs,
+  openBacktestTab,
+  reopenAllBacktestTabs,
+  reopenBacktestTab,
   createOutputLine,
   describeBacktestEvent,
   describeFixRequest,
@@ -155,6 +160,53 @@ describe('closed backtest tabs', () => {
     expect(closed).toEqual({ '3': [14], '4': [9] });
     expect(findClosedBacktestIds(closed, 3)).toEqual(new Set([14]));
     expect(findClosedBacktestIds(closed, 5)).toEqual(new Set());
+  });
+
+  it('reopens one closed backtest of the strategy and keeps the others closed', () => {
+    const closed = { '3': [14, 12], '4': [9] };
+
+    expect(reopenBacktestTab(closed, 3, 14)).toEqual({ '3': [12], '4': [9] });
+    expect(reopenBacktestTab(closed, 3, 99)).toEqual(closed);
+  });
+
+  it('reopens all closed backtests of the strategy only', () => {
+    expect(reopenAllBacktestTabs({ '3': [14, 12], '4': [9] }, 3)).toEqual({ '3': [], '4': [9] });
+  });
+
+  it('a backtest that opens from elsewhere leaves the closed list and is selected', () => {
+    expect(openBacktestTab({ '3': [14, 12] }, 3, 14)).toEqual({
+      closed: { '3': [12] },
+      selection: { tab: 'backtest-14', backtestId: 14 },
+    });
+  });
+
+  it('lists the closed backtests of the strategy like their tabs, the newest first', () => {
+    const backtests = [
+      createBacktest(12, 3, 'failed'),
+      createBacktest(14, 3, 'finished', '1'),
+      createBacktest(13, 3, 'finished', '2'),
+      createBacktest(9, 4, 'finished', '1'),
+    ];
+
+    expect(listClosedBacktestTabs(backtests, 3, new Set([12, 14, 9, 77]))).toEqual([
+      {
+        value: 'backtest-14',
+        label: 'Backtest #14 +1.00 %',
+        name: 'Backtest #14',
+        backtestId: 14,
+        status: 'finished',
+        change: 1,
+        changeText: '+1.00 %',
+      },
+      { value: 'backtest-12', label: 'Backtest #12', name: 'Backtest #12', backtestId: 12, status: 'failed', change: null, changeText: '' },
+    ]);
+  });
+
+  it('says "No open backtests" when the strategy has backtests and all are closed', () => {
+    const backtests = [createBacktest(14, 3, 'finished', '1')];
+
+    expect(describeNoBacktestText(backtests, 3)).toBe('No open backtests');
+    expect(describeNoBacktestText(backtests, 4)).toBe('No backtests');
   });
 
   it('reads a damaged stored value as no closed tabs', () => {

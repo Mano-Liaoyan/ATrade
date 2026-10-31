@@ -36,8 +36,10 @@
     vertical-align: top;
   }
 
+  /* The icon keeps its status color also where Carbon fills icons with its own token, for example in a menu item. */
   .status-indicator :global(.status-indicator__icon) {
     flex: none;
+    fill: currentColor;
   }
 
   .status-indicator--success :global(.status-indicator__icon) {

@@ -437,6 +437,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `MenuButton` is a ghost button with a text that opens
   a menu with the Carbon overflow menu options, on Bits UI DropdownMenu:
   `label`, `items` (`label`, `divider`, `onSelect(trigger)`).
+  `foundation/carbon` `IconMenuButton` is the same menu on a ghost
+  icon-only button (size `sm`, like `IconButton`) with a Carbon tooltip:
+  `label` (the accessible name and the tooltip), `icon`, `items` (`value`,
+  `label`, `divider`, `onSelect`), and `itemContent` (a snippet that renders
+  an item, for example a status icon and a name). After an item select, the
+  focus does not go back to the button; `onSelect` moves it. Escape returns
+  the focus to the button.
   `foundation/carbon` `Popover` is the Carbon popover (drop shadow, no
   caret) on Bits UI Popover: `open`, `onOpenChange`, `anchor` (the element
   that it opens below; one popover can serve many triggers), and `label`
@@ -778,6 +785,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   arrow keys, Home, and End; only the strip scrolls. With `onCloseItem`,
   each tab of `items` is a Carbon dismissable tab: a close button ("Close
   <tab label>") after the tab, and the Delete key on the focused tab.
+  `stripEnd` (also `Panel` `tabs`) puts content between the strip and the
+  `fixedItems`, for example the "Closed backtests" button of the strategy
+  page.
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
   The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
   rows: symbol, last price, and change from the previous close (from the
@@ -986,9 +996,19 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   fixed tabs never scroll away. Each backtest tab has a close button. Close
   only hides the tab on this page; the backtest stays. The browser keeps the
   closed tabs of each strategy (`atrade.strategy-page.closed-backtest-tabs`).
-  When the selected tab closes, the newest open backtest tab opens. A new
-  backtest always gets a tab. Delete a backtest on the backtest page
-  (backtest section 10.7).
+  When the selected tab closes, the newest open backtest tab opens. While a
+  backtest of the strategy has a closed tab, an icon button "Closed
+  backtests" (`IconMenuButton`, no count and no text) is at the end of the
+  backtest tab strip, before the fixed tabs. Its menu lists the closed
+  backtests the newest first, each with the same status icon, number, and
+  total return as its tab, and then "Reopen all". An item opens the tab
+  again and selects it; "Reopen all" opens all closed tabs of the strategy.
+  The focus then goes to the selected tab. A backtest that opens from
+  elsewhere also opens its closed tab again and selects it: a new backtest
+  that starts, and a backtest of the strategy that ends. When the strategy
+  has backtests and all their tabs are closed, the panel shows "No open
+  backtests"; "No backtests" shows only for a strategy without backtests.
+  Delete a backtest on the backtest page (backtest section 10.7).
   A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A failed or
   timed out backtest tab shows its error at once: an inline notification
   with the status ("Failed") and the last error line (`findErrorSummary` of

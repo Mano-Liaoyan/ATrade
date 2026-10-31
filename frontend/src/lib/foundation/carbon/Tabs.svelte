@@ -9,7 +9,8 @@
      The `items` are in a strip that scrolls sideways with its own track along its top edge (HorizontalScrollTrack), so a
      narrow tab line never cuts a tab and `lineEnd` stays visible. The selected tab scrolls into view in the strip. With
      `fixedItems`, those tabs stay visible after the strip. With `onCloseItem`, each tab of `items` has a Carbon
-     dismissable close button; the Delete key on the focused tab does the same. -->
+     dismissable close button; the Delete key on the focused tab does the same. `stripEnd` puts content between the
+     strip and the fixed tabs, for example the button that opens closed tabs again. -->
 <script module lang="ts">
   export interface TabItem {
     value: string;
@@ -42,6 +43,8 @@
     fixedItems?: readonly TabItem[];
     /** Closes a tab of `items`. The parent removes it from `items`. */
     onCloseItem?: (value: string) => void;
+    /** Content after the strip of `items` and before `fixedItems`, for example a button that opens closed tabs again. */
+    stripEnd?: Snippet;
   }
 
   const {
@@ -59,6 +62,7 @@
     onSelectedTabClick,
     fixedItems,
     onCloseItem,
+    stripEnd,
   }: Props = $props();
 
   const stripId = $props.id();
@@ -183,6 +187,9 @@
           {/each}
         </div>
       </div>
+      {#if stripEnd !== undefined}
+        <div class="tab-strip-end">{@render stripEnd()}</div>
+      {/if}
       {#if fixedItems !== undefined && fixedItems.length > 0}
         <div class="tab-fixed">
           {#each fixedItems as item (item.value)}
@@ -243,6 +250,12 @@
     display: flex;
     block-size: 100%;
     inline-size: max-content;
+  }
+
+  .tab-strip-end {
+    display: flex;
+    flex: none;
+    align-items: center;
   }
 
   .tab-fixed {

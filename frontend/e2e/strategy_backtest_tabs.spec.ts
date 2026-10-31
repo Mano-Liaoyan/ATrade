@@ -1,6 +1,6 @@
 // The backtest tabs of the strategy results panel: many backtest tabs scroll in their own strip with a visible track,
 // and Trades, Orders, and Logs stay visible. Each backtest tab has a status icon in front of its name and no status
-// word. A closed tab stays closed after a reload. A failed backtest tab shows its error at once: the last error line,
+// word. A closed tab stays closed after a reload, and the "Closed backtests" menu opens it again. A failed backtest tab shows its error at once: the last error line,
 // "Ask AI to fix", and the full log. The backtest routes are faked here, so no backtest runs.
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
@@ -19,9 +19,9 @@ function createUniqueName(currentTest: TestInfo, title: string): string {
   return `${title} ${currentTest.project.name} ${String(Date.now())}`;
 }
 
-function fakeBacktest(id: number, strategyId: number): Record<string, unknown> {
+function fakeBacktest(id: number, strategyId: number, count: number): Record<string, unknown> {
   // The newest backtest runs, #21 failed, and the older backtests finished.
-  const status = id === BACKTEST_COUNT ? 'running' : id === FAILED_BACKTEST_ID ? 'failed' : 'finished';
+  const status = id === count ? 'running' : id === FAILED_BACKTEST_ID ? 'failed' : 'finished';
   return {
     id,
     strategy_id: strategyId,
@@ -31,7 +31,7 @@ function fakeBacktest(id: number, strategyId: number): Record<string, unknown> {
   };
 }
 
-async function openStrategyWithFakeBacktests(page: Page, currentTest: TestInfo): Promise<void> {
+async function openStrategyWithFakeBacktests(page: Page, currentTest: TestInfo, count = BACKTEST_COUNT): Promise<void> {
   await page.goto('/strategies');
   await page.getByRole('button', { name: 'New strategy' }).click();
   const name = createUniqueName(currentTest, 'Tabs');
@@ -41,13 +41,13 @@ async function openStrategyWithFakeBacktests(page: Page, currentTest: TestInfo):
   await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
   const strategyId = Number(page.url().split('/').at(-1));
-  const backtests = Array.from({ length: BACKTEST_COUNT }, (_, index) => fakeBacktest(BACKTEST_COUNT - index, strategyId));
+  const backtests = Array.from({ length: count }, (_, index) => fakeBacktest(count - index, strategyId, count));
   await page.route('**/api/backtests', async (route) => {
     await route.fulfill({ json: backtests });
   });
   await page.route(/\/api\/backtests\/\d+$/, async (route) => {
     const id = Number(route.request().url().split('/').at(-1));
-    await route.fulfill({ json: { ...fakeBacktest(id, strategyId), trades: [], equity_curve: [] } });
+    await route.fulfill({ json: { ...fakeBacktest(id, strategyId, count), trades: [], equity_curve: [] } });
   });
   await page.reload();
 }
@@ -95,4 +95,45 @@ test('a failed backtest tab shows its error, and a closed tab stays closed after
   await page.reload();
   await expect(results.getByRole('tab', { name: 'Running Backtest #22' })).toBeVisible();
   await expect(failedTab).toHaveCount(0);
+});
+
+test('closed backtest tabs open again from the "Closed backtests" menu', async ({ page }, currentTest) => {
+  await openStrategyWithFakeBacktests(page, currentTest, 3);
+  const results = page.getByRole('region', { name: 'Results' });
+  const backtestTabs = results.getByRole('tab', { name: /Backtest #\d+/ });
+  const reopenButton = results.getByRole('button', { name: 'Closed backtests' });
+  await expect(backtestTabs).toHaveCount(3);
+  await expect(reopenButton).toHaveCount(0);
+
+  for (const name of ['Backtest #3', 'Backtest #2', 'Backtest #1']) {
+    await results.getByRole('button', { name: new RegExp(`^Close ${name}\\b`) }).click();
+  }
+  await expect(backtestTabs).toHaveCount(0);
+  await expect(results.getByText('No open backtests', { exact: true })).toBeVisible();
+  await expect(reopenButton).toBeVisible();
+
+  // The menu lists the closed backtests the newest first, like their tabs, then "Reopen all". The keyboard opens it and
+  // picks an item. The reopened tab is selected and has the focus.
+  await reopenButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem')).toHaveText(['Backtest #3', 'Backtest #2 +0.20 %', 'Backtest #1 +0.10 %', 'Reopen all']);
+  await expect(page.getByRole('menuitem', { name: 'Running Backtest #3' })).toBeFocused();
+  await expect(page.getByRole('menuitem', { name: 'Finished Backtest #2 +0.20 %' })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: /Backtest #2/ })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const secondTab = results.getByRole('tab', { name: /Backtest #2/ });
+  await expect(secondTab).toHaveAttribute('aria-selected', 'true');
+  await expect(secondTab).toBeFocused();
+  await expect(backtestTabs).toHaveCount(1);
+
+  // The closed list stays after a reload. "Reopen all" opens every closed tab, and the button goes.
+  await page.reload();
+  await expect(backtestTabs).toHaveCount(1);
+  await reopenButton.click();
+  await page.getByRole('menuitem', { name: 'Reopen all' }).click();
+  await expect(backtestTabs).toHaveCount(3);
+  await expect(reopenButton).toHaveCount(0);
+  await page.reload();
+  await expect(backtestTabs).toHaveCount(3);
 });
