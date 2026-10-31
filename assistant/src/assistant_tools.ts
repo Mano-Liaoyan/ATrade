@@ -36,6 +36,9 @@ export interface AssistantToolsContext {
 const HTTP_CREATED = 201;
 const Id = Type.Integer({ minimum: 1 });
 const BAR_PERIODS = ['1-MINUTE', '5-MINUTE', '15-MINUTE', '30-MINUTE', '1-HOUR', '1-DAY'] as const;
+// Not `rule` and not the watchlist (docs/architecture/backtest.md 10.10.8): the AI assistant backtests a screen.
+const UNIVERSE_KINDS = ['single', 'screen', 'list'] as const;
+const REBALANCE_PERIODS = ['quarter', 'month'] as const;
 
 interface VersionBody {
   id: number;
@@ -128,13 +131,23 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
       name: 'run_backtest',
       label: 'Run backtest',
       description:
-        'Queues a backtest of a saved strategy version on one instrument and waits at most 15 minutes for its end. ' +
-        'Only an instrument and a bar period with saved bars can run. One user message can start at most 5 backtests.',
+        'Queues a backtest of a saved strategy version and waits at most 15 minutes for its end. ' +
+        'universe_kind "single" (the default) needs symbol, exchange, and currency. ' +
+        '"screen" needs screen_id: the screen runs again at each rebalance_period start (quarter, the default, or ' +
+        'month). Use "screen" for a backtest from a screen. ' +
+        '"list" needs screen_result_id, and optionally symbols (a part of that screen result): a fixed list. ' +
+        'A multi-instrument backtest needs 1-DAY or 1-HOUR bars. Only instruments and a bar period with saved bars ' +
+        'can run. One user message can start at most 5 backtests.',
       parameters: Type.Object({
         strategy_version_id: Id,
-        symbol: Type.String({ minLength: 1 }),
-        exchange: Type.String({ minLength: 1 }),
-        currency: Type.String({ minLength: 1 }),
+        universe_kind: Type.Optional(Type.Union(UNIVERSE_KINDS.map((kind) => Type.Literal(kind)))),
+        symbol: Type.Optional(Type.String({ minLength: 1 })),
+        exchange: Type.Optional(Type.String({ minLength: 1 })),
+        currency: Type.Optional(Type.String({ minLength: 1 })),
+        screen_id: Type.Optional(Id),
+        rebalance_period: Type.Optional(Type.Union(REBALANCE_PERIODS.map((period) => Type.Literal(period)))),
+        screen_result_id: Type.Optional(Id),
+        symbols: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 500 })),
         bar_period: Type.Union(BAR_PERIODS.map((period) => Type.Literal(period))),
         start_utc: Type.String({ description: 'ISO 8601 time with a time zone, for example 2026-01-02T00:00:00Z.' }),
         end_utc: Type.String({ description: 'ISO 8601 time with a time zone.' }),

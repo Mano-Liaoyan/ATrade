@@ -3,6 +3,8 @@
 //   at most 15 minutes. It sends each new queue state or run state with onUpdate. After 15 minutes it returns
 //   "still running" and the backtest ID. The backtest continues.
 // - One user message starts at most 5 backtests. The sixth call starts no backtest and returns an error.
+// - A `screen` universe without a rebalance period rebalances each quarter. Each result of a fixed `list` universe
+//   has the survivorship bias warning.
 // - read_backtest returns the backtest with a summary of the equity curve and of the trades.
 import type { AgentToolUpdateCallback } from '@earendil-works/pi-coding-agent';
 import { answerResult, errorResult, isSuccess, textResult, type ToolDetails, type ToolResult } from './tool_results.ts';
@@ -15,6 +17,12 @@ const FINAL_STATUSES = new Set(['finished', 'failed', 'timed_out']);
 const MILLISECONDS_PER_MINUTE = 60_000;
 const WAIT_MINUTES = 15;
 const POLL_MILLISECONDS = 2_000;
+const DEFAULT_REBALANCE_PERIOD = 'quarter';
+
+/** The warning in each run_backtest result of a fixed `list` universe (docs/architecture/assistant.md 25.4.2). */
+export const SURVIVORSHIP_BIAS_WARNING =
+  'Survivorship bias: this fixed list comes from a screen result at the end of the range, so it has no ' +
+  'instruments that stopped trading in the range. The metrics can be too good. Write this warning in your answer.';
 
 export interface BacktestWait {
   /** The longest wait for the end of a backtest. 15 minutes in the service. */
@@ -84,25 +92,42 @@ function stateResult(state: BacktestState): ToolResult {
   return textResult(`Backtest ${String(state.id)}: ${state.status}.`, { backtest: state });
 }
 
-function stillRunningResult(state: BacktestState): ToolResult {
+function stillRunningResult(state: BacktestState, warning: string | undefined): ToolResult {
   const text =
     `Backtest ${String(state.id)} is still running (status ${state.status}). ` +
-    'Read the result later with read_backtest.';
+    'Read the result later with read_backtest.' +
+    (warning === undefined ? '' : ` ${warning}`);
   return textResult(text, { backtest: state });
+}
+
+/** The read_backtest content of a backtest with a final status, with the warning of a fixed list. */
+async function finishedResult(
+  client: WebPortClient,
+  state: BacktestState,
+  warning: string | undefined,
+  signal?: AbortSignal,
+): Promise<ToolResult> {
+  const details = { backtest: state, finishedBacktestId: state.id };
+  const answer = await client.request('GET', `/api/backtests/${String(state.id)}`, undefined, signal);
+  if (!isSuccess(answer)) {
+    return answerResult(answer, details);
+  }
+  const content = summarizeBacktest(answer.body as DetailBody);
+  return textResult(warning === undefined ? content : { ...content, survivorship_bias_warning: warning }, details);
 }
 
 async function waitForEnd(
   client: WebPortClient,
   started: BacktestState,
   wait: BacktestWait,
-  options: { signal?: AbortSignal; onUpdate?: AgentToolUpdateCallback<ToolDetails> },
+  options: { warning?: string; signal?: AbortSignal; onUpdate?: AgentToolUpdateCallback<ToolDetails> },
 ): Promise<ToolResult> {
   const deadline = wait.now() + wait.limitMilliseconds;
   let state = started;
   options.onUpdate?.(stateResult(state));
   while (!FINAL_STATUSES.has(state.status)) {
     if (wait.now() >= deadline || options.signal?.aborted === true) {
-      return stillRunningResult(state);
+      return stillRunningResult(state, options.warning);
     }
     await sleep(Math.min(wait.pollMilliseconds, Math.max(deadline - wait.now(), 0)), options.signal);
     const answer = await client.request('GET', `/api/backtests/${String(state.id)}`, undefined, options.signal);
@@ -115,8 +140,15 @@ async function waitForEnd(
       options.onUpdate?.(stateResult(state));
     }
   }
-  const read = await readBacktest(client, state.id, options.signal);
-  return { ...read, details: { backtest: state, finishedBacktestId: state.id } };
+  return finishedResult(client, state, options.warning, options.signal);
+}
+
+/** The body of POST /api/backtests. A `screen` universe without a rebalance period rebalances each quarter. */
+function toStartBody(request: Record<string, unknown>): Record<string, unknown> {
+  if (request.universe_kind === 'screen' && request.rebalance_period === undefined) {
+    return { ...request, rebalance_period: DEFAULT_REBALANCE_PERIOD };
+  }
+  return request;
 }
 
 export async function runBacktest(
@@ -135,11 +167,12 @@ export async function runBacktest(
         'No backtest started. Ask the user before you start more backtests.',
     );
   }
+  const body = toStartBody(request);
   // Count the backtest before the POST: pi runs the tool calls of one model turn in parallel.
   context.budget.startedBacktests += 1;
   let answer: WebPortAnswer;
   try {
-    answer = await client.request('POST', '/api/backtests', request, context.signal);
+    answer = await client.request('POST', '/api/backtests', body, context.signal);
   } catch (error) {
     context.budget.startedBacktests -= 1;
     throw error;
@@ -148,6 +181,8 @@ export async function runBacktest(
     context.budget.startedBacktests -= 1;
     return answerResult(answer);
   }
-  const body = answer.body as { id: number; status: string };
-  return waitForEnd(client, { id: body.id, status: body.status }, context.wait, context);
+  const started = answer.body as { id: number; status: string };
+  // A fixed list is chosen at the end of the range (backtest section 10.10.6): its result always warns.
+  const warning = body.universe_kind === 'list' ? SURVIVORSHIP_BIAS_WARNING : undefined;
+  return waitForEnd(client, { id: started.id, status: started.status }, context.wait, { ...context, warning });
 }
