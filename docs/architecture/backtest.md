@@ -202,9 +202,13 @@ Failures that the user sees in `error_message`:
 
 - An exception in the strategy code, for example in `on_bar` or in the
   configuration: the traceback. The engine logs a strategy exception and
-  does not raise it. The child runs the engine with `shutdown_on_error` and
-  writes `ERROR` log lines to a file. When the file is not empty, the backtest
-  fails with its content.
+  does not raise it. The child runs the engine with `shutdown_on_error`. A
+  subclass of the strategy class keeps the traceback of each error of an
+  `on_*` method, and the backtest fails with the first one. The child also
+  writes `ERROR` log lines to a file, for errors outside the `on_*` methods.
+  When the file is not empty, the backtest fails with its content.
+  `logger_flush()` does not wait for the log writer thread, so the file can
+  still be empty after an error in `on_bar`.
 - No saved bars in the range: a message that tells the user to open the bar
   chart of the instrument, which loads the bars from IBKR. The start route
   refuses such a request first. The child checks again, because it reads the
