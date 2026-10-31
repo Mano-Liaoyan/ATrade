@@ -11,19 +11,25 @@ test('app shell shows the product name and a connected backend', async ({ page }
   await stopBrowserClock(page);
   await page.goto('/');
 
-  await expect(page.getByRole('banner')).toContainText('ATrade');
-  await expect(page.getByRole('status', { name: 'Backend status' })).toHaveText('Backend connected. Server time 2026-01-02 03:04:05 UTC.');
+  const header = page.getByRole('banner');
+  await expect(header).toContainText('ATrade');
+  await expect(header.getByRole('status', { name: 'Backend status' }).getByRole('img')).toHaveAccessibleName(
+    'Backend connected.',
+  );
+  await expect(header.getByRole('timer', { name: 'Server time' })).toHaveText('03:04:05 UTC');
+  // A status icon stands alone: the header shows no status sentence.
+  await expect(header).not.toContainText('Backend connected');
 });
 
 test('the server time in the header ticks after the page load', async ({ page }) => {
   await stopBrowserClock(page);
   await page.goto('/');
-  const backendStatus = page.getByRole('status', { name: 'Backend status' });
-  await expect(backendStatus).toHaveText('Backend connected. Server time 2026-01-02 03:04:05 UTC.');
+  const serverTime = page.getByRole('banner').getByRole('timer', { name: 'Server time' });
+  await expect(serverTime).toHaveText('03:04:05 UTC');
 
   await page.clock.runFor(62_000);
 
-  await expect(backendStatus).toHaveText('Backend connected. Server time 2026-01-02 03:05:07 UTC.');
+  await expect(serverTime).toHaveText('03:05:07 UTC');
 });
 
 test('app shell loads for a page path that the backend does not know', async ({ page }) => {
@@ -35,7 +41,28 @@ test('app shell loads for a page path that the backend does not know', async ({ 
 test('app shell shows that IB Gateway is connected', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('status', { name: 'IB Gateway status' })).toHaveText('IB Gateway connected.');
+  await expect(page.getByRole('status', { name: 'IB Gateway status' }).getByRole('img')).toHaveAccessibleName(
+    'IB Gateway connected.',
+  );
+});
+
+test('the IB Gateway status icon gives the details in its tooltip on hover and on keyboard focus', async ({ page }) => {
+  await page.route('**/api/ibkr/gateway', (route) => route.fulfill({ json: { status: 'disconnected', host: 'ib-gateway', port: 4004 } }));
+  await page.goto('/');
+  const details =
+    'IB Gateway not reachable at ib-gateway:4004. ATrade keeps trying to connect. Make sure that the ib-gateway service runs and is logged in.';
+  const gatewayIcon = page.getByRole('status', { name: 'IB Gateway status' }).getByRole('img');
+  await expect(gatewayIcon).toHaveAccessibleName(details);
+  await expect(page.getByRole('banner')).not.toContainText('IB Gateway not reachable');
+
+  await gatewayIcon.hover();
+  await expect(page.getByRole('tooltip')).toHaveText(details);
+
+  await page.mouse.move(400, 400);
+  await expect(page.getByRole('tooltip')).toBeHidden();
+
+  await gatewayIcon.focus();
+  await expect(page.getByRole('tooltip')).toHaveText(details);
 });
 
 test('the header navigation marks the current page', async ({ page }) => {

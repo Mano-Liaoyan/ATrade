@@ -1,6 +1,6 @@
-<!-- App shell: the Carbon UI shell header (product name, page navigation, backend status, IB Gateway status,
-     server time, the Paper tag, the command palette, the theme button, and the Log out button behind Cloudflare
-     Access) and the main region for each page. -->
+<!-- App shell: the Carbon UI shell header (product name, page navigation, the server clock, the backend status icon,
+     the IB Gateway status icon, the Paper tag, the command palette, the theme button, and the Log out button behind
+     Cloudflare Access) and the main region for each page. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
@@ -8,11 +8,12 @@
   import {
     describeBackendHealth,
     fetchBackendHealth,
+    readServerClock,
     SERVER_TIME_TICK_MILLISECONDS,
     type BackendHealth,
   } from '#lib/foundation/backend_health';
   import { LogOutButton } from '#lib/foundation/access_session';
-  import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
+  import { StatusIcon, Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
   import { ThemeButton } from '#lib/foundation/color_scheme';
   import { CommandPalette } from '#lib/foundation/command_palette';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
@@ -50,6 +51,9 @@
   let nowMilliseconds = $state(Date.now());
   let paletteWatchlist: WatchlistInstrument[] = $state([]);
   let paletteWatchlistReading = $state(false);
+  const backendDescription = $derived(describeBackendHealth(backendHealth));
+  const serverClock = $derived(readServerClock(backendHealth, nowMilliseconds));
+  const gatewayDescription = $derived(describeGatewayStatus(gatewayStatus));
   const paletteCommandGroups = $derived(createPaletteCommandGroups(paletteWatchlist));
 
   // The palette reads the watchlist each time it opens, so it shows the instruments that the user added since.
@@ -133,16 +137,17 @@
       </ul>
     </nav>
     <div class="cds--header__global app-header-global">
-      <span class="app-header-status" role="status" aria-label="Backend status">
-        {describeBackendHealth(backendHealth, nowMilliseconds)}
-      </span>
-      <span
-        class="app-header-status"
-        class:app-header-status--error={gatewayStatus.kind === 'unreachable'}
-        role="status"
-        aria-label="IB Gateway status"
-      >
-        {describeGatewayStatus(gatewayStatus)}
+      {#if serverClock !== null}
+        <span class="app-header-clock" role="timer" aria-label="Server time">{serverClock}</span>
+      {/if}
+      <!-- Each status is an icon alone. Its tooltip and accessible name give the full status. -->
+      <span class="app-header-statuses">
+        <span role="status" aria-label="Backend status">
+          <StatusIcon kind={backendDescription.kind} label={backendDescription.text} align="bottom-end" />
+        </span>
+        <span role="status" aria-label="IB Gateway status">
+          <StatusIcon kind={gatewayDescription.kind} label={gatewayDescription.text} align="bottom-end" />
+        </span>
       </span>
       <Tooltip text={describePaperAccountTag(paperAccountCheck)} align="bottom-end">
         {#snippet trigger({ props })}
@@ -172,16 +177,19 @@
     padding-inline: var(--cds-spacing-05);
   }
 
-  .app-header-status {
-    font-size: var(--cds-helper-text-01-font-size);
-    line-height: var(--cds-helper-text-01-line-height);
-    letter-spacing: var(--cds-helper-text-01-letter-spacing);
-    color: var(--cds-text-secondary);
-    font-variant-numeric: tabular-nums;
+  /* The two 32px status icons stand side by side. */
+  .app-header-statuses {
+    display: inline-flex;
   }
 
-  .app-header-status--error {
-    color: var(--cds-text-error);
+  .app-header-clock {
+    font-family: var(--cds-code-01-font-family);
+    font-size: var(--cds-code-01-font-size);
+    line-height: var(--cds-code-01-line-height);
+    letter-spacing: var(--cds-code-01-letter-spacing);
+    color: var(--cds-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* The page heading of each document page. A workbench gives its headings their own style. */

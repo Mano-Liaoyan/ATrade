@@ -25,8 +25,9 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   routes under `/api/paper-trading`, the backtest routes under
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
-- The app shell header shows the backend status, the IB Gateway status, the
-  server time, and the Paper tag of the checked paper account. Behind
+- The app shell header shows the server time, a status icon for the backend
+  and one for IB Gateway, and the Paper tag of the checked paper account. The
+  tooltip of a status icon gives the details. Behind
   Cloudflare Access, it also has a Log out link.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.

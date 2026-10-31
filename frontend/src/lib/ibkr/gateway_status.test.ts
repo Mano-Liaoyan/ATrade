@@ -40,20 +40,21 @@ describe('fetchGatewayStatus', () => {
 
 describe('describeGatewayStatus', () => {
   it('says that IB Gateway is connected', () => {
-    expect(describeGatewayStatus({ kind: 'connected' })).toBe('IB Gateway connected.');
+    expect(describeGatewayStatus({ kind: 'connected' })).toEqual({ kind: 'success', text: 'IB Gateway connected.' });
   });
 
   it('says that IB Gateway is not reachable, where ATrade looks for it, and what to check', () => {
-    expect(describeGatewayStatus({ kind: 'unreachable', address: 'ib-gateway:4004' })).toBe(
-      'IB Gateway not reachable at ib-gateway:4004. ATrade keeps trying to connect. Make sure that the ib-gateway service runs and is logged in.',
-    );
+    expect(describeGatewayStatus({ kind: 'unreachable', address: 'ib-gateway:4004' })).toEqual({
+      kind: 'error',
+      text: 'IB Gateway not reachable at ib-gateway:4004. ATrade keeps trying to connect. Make sure that the ib-gateway service runs and is logged in.',
+    });
   });
 
   it('says that the Gateway status is not known when the backend does not answer', () => {
-    expect(describeGatewayStatus({ kind: 'unknown' })).toBe('IB Gateway status not known.');
+    expect(describeGatewayStatus({ kind: 'unknown' })).toEqual({ kind: 'warning', text: 'IB Gateway status not known.' });
   });
 
   it('says that the check is running before the answer', () => {
-    expect(describeGatewayStatus({ kind: 'checking' })).toBe('Checking IB Gateway.');
+    expect(describeGatewayStatus({ kind: 'checking' })).toEqual({ kind: 'in-progress', text: 'Checking IB Gateway.' });
   });
 });

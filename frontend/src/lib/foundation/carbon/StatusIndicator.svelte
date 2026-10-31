@@ -1,17 +1,8 @@
 <!-- A status as an icon and a word together with its color (Carbon status indicator pattern). The icon shape differs
      for each kind, so the status does not depend on the color only. -->
-<script module lang="ts">
-  export type StatusKind = 'success' | 'in-progress' | 'warning' | 'error' | 'neutral';
-</script>
-
 <script lang="ts">
-  import CheckmarkFilled16 from '@carbon/icons/es/checkmark--filled/16.js';
-  import CircleDash16 from '@carbon/icons/es/circle-dash/16.js';
-  import ErrorFilled16 from '@carbon/icons/es/error--filled/16.js';
-  import InProgress16 from '@carbon/icons/es/in-progress/16.js';
-  import WarningAltFilled16 from '@carbon/icons/es/warning--alt--filled/16.js';
-  import type { CarbonIconNode } from './carbon_icon';
   import Icon from './Icon.svelte';
+  import { findStatusIcon, type StatusKind } from './status_icon';
 
   interface Props {
     kind: StatusKind;
@@ -19,25 +10,10 @@
   }
 
   const { kind, label }: Props = $props();
-
-  function findIcon(statusKind: StatusKind): CarbonIconNode {
-    switch (statusKind) {
-      case 'success':
-        return CheckmarkFilled16;
-      case 'in-progress':
-        return InProgress16;
-      case 'warning':
-        return WarningAltFilled16;
-      case 'error':
-        return ErrorFilled16;
-      case 'neutral':
-        return CircleDash16;
-    }
-  }
 </script>
 
 <span class={['status-indicator', `status-indicator--${kind}`]}>
-  <Icon icon={findIcon(kind)} class="status-indicator__icon" />
+  <Icon icon={findStatusIcon(kind)} class="status-indicator__icon" />
   <span>{label}</span>
 </span>
 
