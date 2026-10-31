@@ -1524,6 +1524,10 @@ export interface components {
              * @enum {string}
              */
             side: "BUY" | "SELL";
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
             /** Forward Test Quantity Shares */
             forward_test_quantity_shares: string | null;
             /** Forward Test Price Usd */

@@ -12,6 +12,7 @@ export {
 } from './forward_test_capital';
 export {
   canBacktestSamePeriod,
+  readStartCapital,
   canStop,
   describeForwardTestStatus,
   describeForwardTestUniverse,

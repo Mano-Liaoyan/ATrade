@@ -145,9 +145,16 @@ export function canStop(forwardTest: ForwardTest): boolean {
   return forwardTest.desired_state === 'running' && forwardTest.client_id !== null;
 }
 
-/** The same period backtest uses the start balance as its paper capital (docs/architecture/forward_test.md 12.10). */
+/** The start of the equity curve and of the Net profit: the allocated capital, or the start balance of an old forward
+ * test without an allocated capital (docs/architecture/forward_test.md 12.18). Null until an old forward test has a
+ * start balance. */
+export function readStartCapital(forwardTest: ForwardTest): string | null {
+  return forwardTest.allocated_capital_usd ?? forwardTest.start_balance_usd;
+}
+
+/** The same period backtest uses the start capital as its paper capital (docs/architecture/forward_test.md 12.10). */
 export function canBacktestSamePeriod(forwardTest: ForwardTest): boolean {
-  return forwardTest.start_balance_usd !== null;
+  return readStartCapital(forwardTest) !== null;
 }
 
 export function readForwardTestsMessage(message: unknown): ForwardTest[] | null {
