@@ -4,11 +4,15 @@ Only the backtest child process calls this module, because the engine blocks the
 code is user code (docs/architecture.md section 10).
 """
 
+import functools
+import inspect
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 
 from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
 from nautilus_trader.common import FileWriterConfig, LoggerConfig, LogLevel, logger_flush
@@ -195,21 +199,54 @@ def run_engine(engine: BacktestEngine, code: str, work_directory: Path, config_f
 
     Raises StrategyFailedError with the strategy error.
     """
+    handler_errors: list[str] = []
     try:
         strategy_class, config_class = load_strategy_classes(code, work_directory)
         # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
         # them (docs/architecture/strategy.md section 9.2).
         config = config_class(**config_fields)  # pyright: ignore[reportArgumentType]
-        engine.add_strategy(strategy_class(config))
+        engine.add_strategy(record_handler_errors(strategy_class, handler_errors)(config))
         engine.run()
     except StrategyFileError as error:
         raise StrategyFailedError(str(error)) from error
     except Exception as error:
         # readability-exception: any error of the user code ends the backtest with its traceback (G1).
         raise StrategyFailedError("".join(traceback.format_exception(error))) from error
+    if handler_errors:
+        raise StrategyFailedError(handler_errors[0])
+    # The log file still catches errors outside the `on_*` methods, for example in a timer callback.
     error_log = read_error_log(work_directory)
     if error_log:
         raise StrategyFailedError(error_log)
+
+
+def record_handler_errors[StrategyClass: type](strategy_class: StrategyClass, errors: list[str]) -> StrategyClass:
+    """A subclass of `strategy_class` that adds the traceback of each error of its `on_*` methods to `errors`.
+
+    The engine logs a handler error and does not raise it. `logger_flush()` only asks the log writer thread to
+    write, so the error log file can still be empty when the child reads it.
+    """
+
+    def wrap(method: Callable[..., object]) -> Callable[..., object]:
+        @functools.wraps(method)
+        def call(*args: object, **kwargs: object) -> object:
+            try:
+                return method(*args, **kwargs)
+            except Exception as error:
+                errors.append("".join(traceback.format_exception(error)))
+                raise
+
+        return call
+
+    handlers = {
+        name: wrap(method)
+        for name in dir(strategy_class)
+        if name.startswith("on_") and inspect.isfunction(method := getattr(strategy_class, name))
+    }
+    subclass = type(strategy_class.__name__, (strategy_class,), handlers)
+    subclass.__module__ = strategy_class.__module__
+    subclass.__qualname__ = strategy_class.__qualname__
+    return cast("StrategyClass", subclass)
 
 
 def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[BacktestTrade]:
