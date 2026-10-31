@@ -11,7 +11,9 @@ from tests.backtest.test_backtest_routes import make_backtest_request, save_test
 async def start_backtest(web_client: httpx.AsyncClient, database_url: str) -> dict[str, int]:
     save_test_bars(database_url)
     saved = await save_test_strategy_version(web_client)
-    backtest = (await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))).json()
+    backtest = (
+        await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))
+    ).json()
     return {"backtest_id": backtest["id"], "strategy_version_id": saved["strategy_version_id"]}
 
 

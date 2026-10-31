@@ -34,8 +34,11 @@ function fakeBacktest(id: number, strategyId: number): Record<string, unknown> {
 async function openStrategyWithFakeBacktests(page: Page, currentTest: TestInfo): Promise<void> {
   await page.goto('/strategies');
   await page.getByRole('button', { name: 'New strategy' }).click();
-  await page.getByLabel('Strategy name').fill(createUniqueName(currentTest, 'Tabs'));
+  const name = createUniqueName(currentTest, 'Tabs');
+  await page.getByLabel('Strategy name').fill(name);
   await page.getByRole('button', { name: 'Create strategy' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
   const strategyId = Number(page.url().split('/').at(-1));
   const backtests = Array.from({ length: BACKTEST_COUNT }, (_, index) => fakeBacktest(BACKTEST_COUNT - index, strategyId));

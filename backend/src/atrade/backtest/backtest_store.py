@@ -380,7 +380,9 @@ async def delete_backtest(connection: psycopg.AsyncConnection, backtest_id: int)
             return f"Backtest #{backtest_id} is a run of sweep #{sweep_id}. Delete the sweep."
         try:
             async with connection.transaction():
-                await connection.execute("DELETE FROM backtest WHERE id = %(backtest_id)s", {"backtest_id": backtest_id})
+                await connection.execute(
+                    "DELETE FROM backtest WHERE id = %(backtest_id)s", {"backtest_id": backtest_id}
+                )
         except psycopg.errors.RestrictViolation:
             # Only forward_test_same_period_backtest refuses the delete (ON DELETE RESTRICT); the result tables cascade.
             return f"Backtest #{backtest_id} is the same-period backtest of a forward test."
