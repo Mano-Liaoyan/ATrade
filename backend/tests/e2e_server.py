@@ -21,6 +21,7 @@ from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.strategy import STRATEGY_TEMPLATE
+from tests.e2e_split_checks import add_split_checks
 from tests.fakes.clock import FixedClock
 from tests.fakes.e2e_assistant import E2EAssistantService
 from tests.fakes.forward_test_child import FakeChildStarter
@@ -31,7 +32,6 @@ from tests.fakes.ibkr import (
     make_forward_test_order,
     make_stock_position,
 )
-from tests.e2e_split_checks import add_split_checks
 from tests.saved_ranges import save_ibkr_saved_range
 
 FAKE_ACCOUNT_ID = "DU1234567"

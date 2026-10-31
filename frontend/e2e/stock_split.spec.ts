@@ -18,8 +18,8 @@ async function findForwardTestId(page: Page, symbol: string): Promise<number> {
   return forwardTest.id;
 }
 
-test('the split check shows on the 3 pages and Apply split 4:1 ends it', async ({ page }, testInfo) => {
-  const symbol = makeSplitSymbol(testInfo.project.name);
+test('the split check shows on the 3 pages and Apply split 4:1 ends it', async ({ page }, currentTest) => {
+  const symbol = makeSplitSymbol(currentTest.project.name);
   const forwardTestId = await findForwardTestId(page, symbol);
 
   // The forward test page: the header line names the instrument.
