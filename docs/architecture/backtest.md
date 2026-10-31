@@ -554,7 +554,9 @@ Rules:
 - A USD instrument needs no rates. Its run does not change.
 - A same-period backtest of a forward test stays USD only, because a
   forward test has no exchange rates ([`forward_test.md`](forward_test.md)
-  section 12.10).
+  section 12.10). The rule stays for a single instrument with the allocated
+  capital (#218). A multi-instrument forward test with members in another
+  currency gets the same `422`.
 - Tests: `tests/backtest/test_backtest_exchange_rates.py` (the route saves
   the rates from the IBKR fake, uses saved rates without IB Gateway, refuses
   without rates; a real child process converts an HKD backtest with two
@@ -847,7 +849,10 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
   allocated capital as paper capital and the members that the forward test
   recorded for each quarter
   ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146),
-  [`forward_test.md`](forward_test.md) section 12.10).
+  [`forward_test.md`](forward_test.md) section 12.10). Its universe source is
+  the forward test record. It keeps the `universe_kind` of the forward test
+  (`rule` or `list`), and its members are a copy of the recorded members
+  (section 10.10.8, #218).
 
 ### 10.10.3 Engine facts
 
@@ -940,6 +945,10 @@ look-back bars of a later member cannot give a strategy future bars. Tests:
 
 The field names are choices of this document. The implementation can change
 them.
+
+The same-period backtest of a multi-instrument forward test does not use
+`POST /api/backtests`. `POST /api/forward-tests/{id}/same-period-backtests`
+queues it with the recorded members (section 10.10.8, #218).
 
 Done in #199 for `single`, `rule`, and `list` with `instruments`. Done in
 [#208](https://github.com/Mano-Liaoyan/ATrade/issues/208) for `list` with
@@ -1081,8 +1090,22 @@ with universe data from the new route `GET /api/us-universe/range`
   "Screen <name>, each quarter" (or "each month"). The Instruments tab column
   of a monthly `screen` universe is "Months"; it counts the periods of the
   member.
-- The `universe_kind` value of the same-period backtest of a
-  multi-instrument forward test.
+- Decided (#218): the same-period backtest of a multi-instrument forward
+  test keeps the `universe_kind` of the forward test (`rule` with its
+  `universe_top_n`, or `list`). Its universe source is the forward test
+  record ([`forward_test.md`](forward_test.md) section 12.10): the route
+  `POST /api/forward-tests/{id}/same-period-backtests` copies the rows of
+  `forward_test_universe_member` to `backtest_universe_member` in the
+  transaction that adds the backtest row (`queue_backtest` with the
+  universe periods). It does not read `us_universe_member` or the
+  watchlist again. One universe period for each recorded quarter that
+  starts before the backtest end. The quarter of the start begins at the
+  backtest start, as the first `rule` period. The child reads the members
+  from `backtest_universe_member`, as for `rule` and `list`. Reason: no new
+  kind, no migration, and no change of the child, the Instruments tab, or
+  the trial count. A `list` same-period backtest has `survivorship_bias`
+  true, as each `list` backtest. Test:
+  `tests/forward_test/test_forward_test_comparison.py`.
 - Decided (#199): the round trips count for each instrument
   (`find_round_trips` groups the trades by `symbol` and `exchange`), so the
   win rate, the profit factor, and the average win and loss use them. The
@@ -1090,8 +1113,11 @@ with universe data from the new route `GET /api/us-universe/range`
   The trial count of section 10.9.5 counts the finished backtests of the same
   strategy, bar period, `universe_kind`, currency, and `universe_top_n`.
   Single-instrument results do not change.
-- Whether `run_backtest` of the AI assistant also accepts `rule` and the
-  watchlist (section 10.13).
+- Decided (#211): `run_backtest` of the AI assistant does not accept `rule`
+  and the watchlist. It accepts `single`, `screen`, and `list` with
+  `screen_result_id` (section 10.13). Reason: the simplest tool. The decision
+  (#150) names only these kinds, and port 8001 refuses no kind, so a later
+  change is only in the tool.
 
 ## 10.11 Parameter sweep
 
@@ -1363,3 +1389,9 @@ Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
     its reply.
 - One multi-instrument backtest counts as 1 of the 5 backtests of a user
   message. The 15-minute wait does not change.
+- Done (#211): the tool parameters and the warning are in
+  [`assistant.md`](assistant.md) section 25.4.2. Port 8001 takes the same
+  universe fields as port 8000 (section 10.10.6) and records the
+  conversation ID. The tool does not take `rule` and the watchlist
+  (section 10.10.8). For an HK screen, port 8001 saves the missing HKD
+  daily rates from IBKR like port 8000 (#181).

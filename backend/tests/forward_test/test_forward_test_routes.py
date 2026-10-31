@@ -515,7 +515,7 @@ async def test_the_detail_of_a_multi_instrument_forward_test_has_no_instrument(
 
 
 @pytest.mark.anyio
-async def test_refuses_a_same_period_backtest_of_a_multi_instrument_forward_test(
+async def test_refuses_a_same_period_backtest_of_a_multi_instrument_forward_test_with_an_empty_period(
     web_client: httpx.AsyncClient, database_url: str
 ) -> None:
     forward_test = await start_watchlist_forward_test(web_client, database_url)
@@ -523,4 +523,5 @@ async def test_refuses_a_same_period_backtest_of_a_multi_instrument_forward_test
     response = await web_client.post(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/same-period-backtests")
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "A multi-instrument forward test has no same-period backtest yet."
+    # The forward test started now: its period is empty.
+    assert response.json()["detail"] == "The time range must end after it starts."

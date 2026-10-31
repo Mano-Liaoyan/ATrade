@@ -27,6 +27,7 @@ export {
   type LogItem,
   type MessageItem,
   type MetricsItem,
+  type ScreenItem,
   type ServerMessage,
   type ToolStepItem,
 } from './conversation_log';

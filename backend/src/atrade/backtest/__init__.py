@@ -26,7 +26,7 @@ from atrade.backtest.backtest_metrics import (
 from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
 from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
-from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
+from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus, BacktestUniverse, UniversePeriod
 from atrade.backtest.http_routes import create_backtest_assistant_router, create_backtest_router
 from atrade.backtest.sharpe_probability import (
     calculate_deflated_sharpe,
@@ -47,11 +47,13 @@ __all__ = [
     "BacktestRunner",
     "BacktestStatus",
     "BacktestTrade",
+    "BacktestUniverse",
     "EquityPoint",
     "LookBack",
     "RoundTrip",
     "SplitMetrics",
     "UniverseInstrument",
+    "UniversePeriod",
     "UniverseUpdate",
     "calculate_daily_returns",
     "calculate_deflated_sharpe",

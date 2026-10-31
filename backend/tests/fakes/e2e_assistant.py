@@ -2,6 +2,8 @@
 
 The text of a prompt selects the answer:
 - "wait": streams one part, then waits for the abort ("Stop").
+- "screen": a create_screen tool step, a screen of the user and a changed screen of the AI assistant, and a condition
+  card with each change mark.
 - "change": a save_strategy_version tool step, a new strategy version of the AI assistant, and a diff card.
 - "backtest": a run_backtest tool step with a finished backtest, and a metric card.
 - "notitle": a normal answer, but the title generation fails.
@@ -11,11 +13,14 @@ shows them.
 """
 
 import hashlib
+import time
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import anyio
 import psycopg
+from psycopg.types.json import Jsonb
+from pydantic import JsonValue
 
 from atrade.assistant import (
     AssistantServiceError,
@@ -27,6 +32,8 @@ from atrade.assistant import (
     ProviderModel,
     ProviderSummary,
     RunEvent,
+    ScreenRunFinished,
+    ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
     ToolStep,
@@ -35,6 +42,21 @@ from tests.fakes.assistant import FakeAssistantService
 
 STREAM_PAUSE_SECONDS = 0.05
 E2E_BACKTEST_START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
+SMA_200: JsonValue = {"indicator": "sma", "parameters": {"period": 200}, "output": "value"}
+RSI_14: JsonValue = {"indicator": "rsi", "parameters": {"period": 14}, "output": "value"}
+E2E_ORDER: JsonValue = {"indicator": RSI_14, "direction": "ascending", "keep_first": 20}
+E2E_SOURCE_SCREEN: JsonValue = {
+    "start": "quarter_universe",
+    "filters": [{"field": "still_trading"}, {"field": "last_price", "operator": ">", "value": "5"}],
+    "indicator_conditions": [{"kind": "close_versus_line", "indicator": SMA_200, "side": "above"}],
+    "order": E2E_ORDER,
+}
+E2E_AI_SCREEN: JsonValue = {
+    "start": "quarter_universe",
+    "filters": [{"field": "still_trading"}, {"field": "last_price", "operator": ">", "value": "20"}],
+    "indicator_conditions": [{"kind": "compare", "indicator": RSI_14, "operator": "<", "value": "30"}],
+    "order": E2E_ORDER,
+}
 
 
 def make_credential(credential_id: str, name: str) -> CredentialSummary:
@@ -107,6 +129,11 @@ class E2EAssistantService(FakeAssistantService):
             self.abort_events[conversation_id] = abort_event
             yield TextDelta(text="Working on it")
             await abort_event.wait()
+            return
+        if "screen" in text:
+            async for event in self.save_screen(conversation_id):
+                yield event
+            yield self.answer_end(conversation_id, "I saved a new screen.", selection)
             return
         if "change" in text:
             async for event in self.save_version(conversation_id):
@@ -191,6 +218,59 @@ class E2EAssistantService(FakeAssistantService):
         yield StrategyVersionSaved(
             strategy_id=int(strategy_id), strategy_version_id=int(version_row[0]), version_number=version_number
         )
+
+    async def save_screen(self, conversation_id: int) -> AsyncIterator[RunEvent]:
+        """A screen of the user and a changed copy of the AI assistant, with each change mark of the condition card:
+        a changed value (Close > 5 to 20), a removed condition (Close above SMA(200)), and an added one (RSI(14) < 30).
+        The fake does not run the screen; its funnel counts are fixed."""
+        # The e2e database is not cleared, and screen names are unique.
+        name = f"E2E momentum {conversation_id} {time.time_ns()}"
+        yield ToolStep(
+            tool_call_id="screen", tool_name="create_screen", status="running", backtest_id=None, backtest_status=None
+        )
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            await self.insert_screen(connection, name, E2E_SOURCE_SCREEN, None)
+            screen_id = await self.insert_screen(connection, f"{name} (AI)", E2E_AI_SCREEN, conversation_id)
+        yield ToolStep(
+            tool_call_id="screen", tool_name="create_screen", status="succeeded", backtest_id=None, backtest_status=None
+        )
+        yield ScreenSaved(
+            screen_id=screen_id,
+            name=f"{name} (AI)",
+            market="US",
+            definition=E2E_AI_SCREEN,
+            previous_definition=E2E_SOURCE_SCREEN,
+        )
+        yield ScreenRunFinished(
+            screen_id=screen_id,
+            screen_result_id=0,
+            start_count=500,
+            after_filters_count=371,
+            after_indicator_conditions_count=58,
+            result_count=20,
+        )
+
+    async def insert_screen(
+        self, connection: psycopg.AsyncConnection, name: str, definition: JsonValue, conversation_id: int | None
+    ) -> int:
+        cursor = await connection.execute(
+            """
+            INSERT INTO screen (name, market, definition, kept, assistant_conversation_id, created_at_utc,
+                updated_at_utc)
+            VALUES (%(name)s, 'US', %(definition)s, %(kept)s, %(conversation_id)s, %(now)s, %(now)s)
+            RETURNING id
+            """,
+            {
+                "name": name,
+                "definition": Jsonb(definition),
+                "kept": conversation_id is None,
+                "conversation_id": conversation_id,
+                "now": datetime.now(UTC),
+            },
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        return int(row[0])
 
     async def run_backtest(self, conversation_id: int) -> AsyncIterator[RunEvent]:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:

@@ -16,6 +16,8 @@ const SERVER_MESSAGE_TYPES: (ServerMessage | AssistantErrorMessage)['type'][] = 
   'tool_step',
   'strategy_version_saved',
   'backtest_finished',
+  'screen_saved',
+  'screen_run_finished',
   'error',
 ];
 

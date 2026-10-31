@@ -1,5 +1,5 @@
 // The items of the conversation log in the assistant side column (docs/architecture/assistant.md 25.12.1): the
-// messages, the tool steps, the diff cards, and the metric cards. The /ws/assistant messages change the log
+// messages, the tool steps, the diff cards, the metric cards, and the condition cards (25.12.4). The /ws/assistant messages change the log
 // (25.10). The saved messages of a conversation have only text (25.11), so a reopened conversation shows no tool step
 // and no card.
 import type { components } from '#lib/api';
@@ -12,7 +12,9 @@ export type ServerMessage =
   | Schemas['RunStateMessage']
   | Schemas['ToolStepMessage']
   | Schemas['StrategyVersionSavedMessage']
-  | Schemas['BacktestFinishedMessage'];
+  | Schemas['BacktestFinishedMessage']
+  | Schemas['ScreenSavedMessage']
+  | Schemas['ScreenRunFinishedMessage'];
 
 /** The StatusIndicator kinds of a tool step. */
 export type ToolStepKind = 'success' | 'in-progress' | 'error' | 'neutral';
@@ -55,7 +57,26 @@ export interface MetricsItem extends ItemBase {
   backtestId: number;
 }
 
-export type LogItem = MessageItem | ToolStepItem | DiffItem | MetricsItem;
+export interface ScreenCounts {
+  start_count: number;
+  after_filters_count: number;
+  after_indicator_conditions_count: number;
+  result_count: number;
+}
+
+/** A condition card: the screen as the AI assistant saved it, and the definition that the card compares with. */
+export interface ScreenItem extends ItemBase {
+  kind: 'screen';
+  screenId: number;
+  name: string;
+  market: string;
+  definition: Schemas['JsonValue'];
+  previousDefinition: Schemas['JsonValue'];
+  /** The funnel counts of the last run_screen of the screen after this save. Null before a run. */
+  counts: ScreenCounts | null;
+}
+
+export type LogItem = MessageItem | ToolStepItem | DiffItem | MetricsItem | ScreenItem;
 
 export interface ConversationLog {
   items: LogItem[];
@@ -143,6 +164,21 @@ function addToolStep(log: ConversationLog, message: Schemas['ToolStepMessage'], 
   };
 }
 
+function addScreenCounts(log: ConversationLog, message: Schemas['ScreenRunFinishedMessage']): ConversationLog {
+  const index = log.items.findLastIndex((item) => item.kind === 'screen' && item.screenId === message.screen_id);
+  const card = log.items[index];
+  if (card?.kind !== 'screen') {
+    return log;
+  }
+  const counts: ScreenCounts = {
+    start_count: message.start_count,
+    after_filters_count: message.after_filters_count,
+    after_indicator_conditions_count: message.after_indicator_conditions_count,
+    result_count: message.result_count,
+  };
+  return { ...log, items: log.items.with(index, { ...card, counts }) };
+}
+
 export function addServerMessage(log: ConversationLog, message: ServerMessage, sentAtUtc: string): ConversationLog {
   switch (message.type) {
     case 'message_delta':
@@ -161,6 +197,22 @@ export function addServerMessage(log: ConversationLog, message: ServerMessage, s
       );
     case 'backtest_finished':
       return append(endStreaming(log), { kind: 'metrics', backtestId: message.backtest_id }, sentAtUtc);
+    case 'screen_saved':
+      return append(
+        endStreaming(log),
+        {
+          kind: 'screen',
+          screenId: message.screen_id,
+          name: message.name,
+          market: message.market,
+          definition: message.definition,
+          previousDefinition: message.previous_definition,
+          counts: null,
+        },
+        sentAtUtc,
+      );
+    case 'screen_run_finished':
+      return addScreenCounts(log, message);
   }
 }
 

@@ -1,11 +1,12 @@
 <!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages, the
-     tool steps (one StatusIndicator line each), the diff cards, and the metric cards, in a ChatLog. Each AI assistant
+     tool steps (one StatusIndicator line each), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
      message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel of the
      strategy page. Keep opens the new version in the editor, and Discard adds the discarded mark (25.5.2). -->
 <script lang="ts">
   import { describeToolStep, type DiffItem, type LogItem } from '#lib/assistant';
   import { arrangeChatLog, Button, ChatDivider, ChatLog, ChatMessage, StatusIndicator } from '#lib/foundation/carbon';
   import AssistantMetricCard from './AssistantMetricCard.svelte';
+  import AssistantScreenCard from './AssistantScreenCard.svelte';
   import type { DiffChoice } from './assistant_session.svelte';
 
   interface Props {
@@ -16,9 +17,14 @@
     onOpenDiff: (item: DiffItem) => void;
     onKeep: (item: DiffItem) => void;
     onDiscard: (item: DiffItem) => void;
+    /** The choice of each screen of the condition cards, by its screen ID. */
+    screenChoices: ReadonlyMap<number, DiffChoice>;
+    onKeepScreen: (screenId: number) => void;
+    onDiscardScreen: (screenId: number) => void;
   }
 
-  const { items, isRunning, diffChoices, onOpenDiff, onKeep, onDiscard }: Props = $props();
+  const { items, isRunning, diffChoices, onOpenDiff, onKeep, onDiscard, screenChoices, onKeepScreen, onDiscardScreen }: Props =
+    $props();
 
   const entries = $derived(
     arrangeChatLog(
@@ -91,6 +97,15 @@
               </div>
             {/if}
           </div>
+        </li>
+      {:else if item.kind === 'screen'}
+        <li class="log-item">
+          <AssistantScreenCard
+            {item}
+            choice={screenChoices.get(item.screenId)}
+            onKeep={onKeepScreen}
+            onDiscard={onDiscardScreen}
+          />
         </li>
       {:else}
         <li class="log-item"><AssistantMetricCard backtestId={item.backtestId} /></li>

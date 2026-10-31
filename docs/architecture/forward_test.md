@@ -431,6 +431,34 @@ Phase 3 changes (#146, #149):
     a difference comes only from the fills and the bars.
 - Phase 3: the `422` "no start balance" refusal goes away, because each new
   forward test has an allocated capital.
+- Implemented (#218):
+  - The paper capital is `ForwardTestRow.start_capital_usd`: the allocated
+    capital, or `start_balance_usd` of an old row without it. Only an old
+    row without a start balance gets the `422` "no start balance".
+  - The universe source "forward test record": the backtest keeps the
+    `universe_kind` of the forward test (`rule` with `universe_top_n`, or
+    `list`). The route copies each recorded quarter of
+    `forward_test_universe_member` to `backtest_universe_member` when it
+    queues the backtest. The quarter of the start begins at the backtest
+    start ([`backtest.md`](backtest.md) section 10.10.8).
+  - `422` for an empty period, for a currency that is not USD (a single
+    instrument or the members), and for a forward test without recorded
+    members in its period.
+  - The comparison route accepts a backtest with the strategy version, the
+    bar period, and the instrument (single) or the `universe_kind`
+    (multi-instrument) of the forward test. The fill table has one row for
+    each bar end, side, and instrument (`symbol`, `exchange`). The Symbol
+    column shows only for a multi-instrument forward test. The forward test
+    metrics, the Net profit, and the equity curve start from the allocated
+    capital (`readStartCapital()` in the frontend).
+  - The "Backtest the same period" button is available when the forward
+    test has an allocated capital or a start balance. Else its tooltip says
+    why it is not available.
+  - Tests: `tests/forward_test/test_forward_test_comparison.py` (single
+    instrument with the allocated capital, the recorded members of each
+    quarter, the multi-instrument comparison) and
+    `frontend/e2e/forward_test_comparison.spec.ts` (a watchlist forward
+    test of `tests/e2e_server.py` with its recorded members).
 - Implementation (#78):
   - `POST /api/forward-tests/{id}/same-period-backtests` queues the backtest
     with `queue_backtest` of `backtest` (section 10.4). It records the
@@ -635,7 +663,8 @@ and the status codes of the new refusals are choices of this document.
 | `POST /api/forward-tests` | `StartForwardTestRequest` gets `universe` (`kind`: `single`, `rule`, or `list`, then `symbol`, `exchange`, and `currency` for `single`, or `top_n` from 1 to 500 for `rule`) and `allocated_capital_usd` (decimal text, larger than 0). `422` for a `rule` or `list` universe with a bar period other than `1-DAY`, for `top_n` out of range, for an empty watchlist, or for an `allocated_capital_usd` that is not larger than 0. `409` with `StartRefusedResponse` (`detail`, `forward_test_id` null, `unallocated_usd`) when the allocated capital is larger than the unallocated amount, for example `"The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD."`. `409` when the paper account check did not pass or IBKR sent no `NetLiquidation` in USD, because ATrade cannot calculate the unallocated amount. The "already runs on" `409` goes away (section 12.2). |
 | `GET /api/forward-tests/capital` (new) | `200` with `{"net_liquidation_usd", "allocated_usd", "unallocated_usd"}`. `allocated_usd` is the sum of `allocated_capital_usd` of the forward tests that hold a client ID. `unallocated_usd` is `net_liquidation_usd` minus `allocated_usd`. All 3 are `null` when the paper account check did not pass or no USD value is available. The start dialog reads it. |
 | `GET /api/forward-tests`, `GET /api/forward-tests/{id}` | `ForwardTestResponse` gets `universe_kind`, `universe_top_n`, `allocated_capital_usd`, and `split_checks_needed` (a list of `symbol`, `exchange` of the instruments of the forward test in the "Split check needed" state). `ForwardTestDetailResponse` gets `instruments` (section 12.16) and `fills` rows with `symbol`, `exchange`, and `kind` (`fill` or `split_adjustment`). |
-| `POST /api/forward-tests/{id}/same-period-backtests` | Uses `allocated_capital_usd` and the recorded members (section 12.10). |
+| `POST /api/forward-tests/{id}/same-period-backtests` | Uses `allocated_capital_usd` and the recorded members (section 12.10). `422` "no start balance" only for an old row without `allocated_capital_usd` and without a start balance. `422` (`"The forward test has no recorded members in its period."`) for a multi-instrument forward test without recorded members. |
+| `GET /api/forward-tests/{id}/comparison/{backtest_id}` | Each `fills` row gets `symbol` and `exchange`: one row for each bar end, side, and instrument. A multi-instrument forward test compares with a backtest of its strategy version, bar period, and `universe_kind`; else `422` (`"The backtest must use the strategy version, the universe, and the bar period of the forward test."`). |
 
 - Implemented (#215) for the single-instrument forward test:
   `allocated_capital_usd` (`422` when it is not larger than 0), the `409`
@@ -664,7 +693,8 @@ and the status codes of the new refusals are choices of this document.
   `universe_top_n`. The detail of a `rule` or `list` row reads its fills
   from the owner ledger. "Backtest the same period" of a `rule` or `list`
   row gets `422` (`"A multi-instrument forward test has no same-period
-  backtest yet."`), and a comparison with a backtest gets `422`.
+  backtest yet."`), and a comparison with a backtest gets `422`. #218
+  replaced both refusals (section 12.10).
 - Implemented (#217): `ForwardTestDetailResponse.instruments`: one row for
   each recorded member (`symbol`, `exchange`, `trade_count` (the fills),
   `net_profit_usd` (the round trips that ended, after commissions), and

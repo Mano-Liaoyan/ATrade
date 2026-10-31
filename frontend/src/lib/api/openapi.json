@@ -2120,6 +2120,56 @@
         }
       }
     },
+    "/api/screens/{screen_id}/keep": {
+      "post": {
+        "summary": "Keep Screen",
+        "description": "Keep of the condition card (section 24.8): `kept` becomes true, so port 8001 cannot change the screen.",
+        "operationId": "keep_screen_api_screens__screen_id__keep_post",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/screens/{screen_id}/runs": {
       "post": {
         "summary": "Run Screen",
@@ -5087,6 +5137,14 @@
             ],
             "title": "Side"
           },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
           "forward_test_quantity_shares": {
             "anyOf": [
               {
@@ -5147,6 +5205,8 @@
         "required": [
           "bar_end_utc",
           "side",
+          "symbol",
+          "exchange",
           "forward_test_quantity_shares",
           "forward_test_price_usd",
           "backtest_quantity_shares",
@@ -10005,6 +10065,89 @@
           "state"
         ],
         "title": "RunStateMessage",
+        "type": "object"
+      },
+      "ScreenRunFinishedMessage": {
+        "description": "`run_screen` saved a screen result. The last condition card of the screen shows its funnel counts.",
+        "properties": {
+          "type": {
+            "const": "screen_run_finished",
+            "default": "screen_run_finished",
+            "title": "Type",
+            "type": "string"
+          },
+          "screen_id": {
+            "title": "Screen Id",
+            "type": "integer"
+          },
+          "screen_result_id": {
+            "title": "Screen Result Id",
+            "type": "integer"
+          },
+          "start_count": {
+            "title": "Start Count",
+            "type": "integer"
+          },
+          "after_filters_count": {
+            "title": "After Filters Count",
+            "type": "integer"
+          },
+          "after_indicator_conditions_count": {
+            "title": "After Indicator Conditions Count",
+            "type": "integer"
+          },
+          "result_count": {
+            "title": "Result Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "screen_id",
+          "screen_result_id",
+          "start_count",
+          "after_filters_count",
+          "after_indicator_conditions_count",
+          "result_count"
+        ],
+        "title": "ScreenRunFinishedMessage",
+        "type": "object"
+      },
+      "ScreenSavedMessage": {
+        "description": "The AI assistant made or changed a screen, for the condition card (25.12.4). The card compares `definition`\nwith `previous_definition`: the screen before `update_screen`, or the source screen of `create_screen`. Null when\n`create_screen` has no source screen.",
+        "properties": {
+          "type": {
+            "const": "screen_saved",
+            "default": "screen_saved",
+            "title": "Type",
+            "type": "string"
+          },
+          "screen_id": {
+            "title": "Screen Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          },
+          "previous_definition": {
+            "$ref": "#/components/schemas/JsonValue"
+          }
+        },
+        "required": [
+          "screen_id",
+          "name",
+          "market",
+          "definition",
+          "previous_definition"
+        ],
+        "title": "ScreenSavedMessage",
         "type": "object"
       },
       "SplitCheckMessage": {

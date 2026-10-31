@@ -4,7 +4,8 @@ The assistant service listens on port 8002 in the network atrade-assistant-inter
 
 - `POST /conversations/{id}/runs` with the user message, the model selection, and the system prompt. The answer is one
   JSON line for each pi event that web needs: `text_delta`, `message_end` (with the model and the credential name),
-  `error`, and the tool events `tool_step`, `strategy_version_saved`, and `backtest_finished` (25.10).
+  `error`, and the tool events `tool_step`, `strategy_version_saved`, `backtest_finished`, `screen_saved`, and
+  `screen_run_finished` (25.10).
 - `POST /conversations/{id}/steer`, `POST /conversations/{id}/abort`.
 - `POST /conversations/{id}/title`: one model call without tools. `502` with `detail` when it fails.
 - `GET /conversations/{id}/messages`: the messages of the JSONL file.
@@ -23,6 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
 import httpx
+from pydantic import JsonValue
 
 # The service name in deploy/compose.yaml and the port of assistant/src/main.ts.
 ASSISTANT_SERVICE_URL = "http://assistant:8002"
@@ -87,7 +89,41 @@ class BacktestFinished:
     backtest_id: int
 
 
-type RunEvent = TextDelta | MessageEnd | RunError | ToolStep | StrategyVersionSaved | BacktestFinished
+@dataclass(frozen=True)
+class ScreenSaved:
+    """create_screen or update_screen saved a screen, for the condition card (25.12.4). `previous_definition` is the
+    definition that the card compares with: the screen before update_screen, or the source screen of create_screen.
+    Null when create_screen has no source screen."""
+
+    screen_id: int
+    name: str
+    market: str
+    definition: JsonValue
+    previous_definition: JsonValue
+
+
+@dataclass(frozen=True)
+class ScreenRunFinished:
+    """run_screen saved a screen result. Its funnel counts are the counts of the condition card."""
+
+    screen_id: int
+    screen_result_id: int
+    start_count: int
+    after_filters_count: int
+    after_indicator_conditions_count: int
+    result_count: int
+
+
+type RunEvent = (
+    TextDelta
+    | MessageEnd
+    | RunError
+    | ToolStep
+    | StrategyVersionSaved
+    | BacktestFinished
+    | ScreenSaved
+    | ScreenRunFinished
+)
 
 TOOL_STEP_STATUSES: dict[str, Literal["running", "succeeded", "failed"]] = {
     "running": "running",
@@ -228,6 +264,23 @@ def to_run_event(event: dict[str, Any]) -> RunEvent | None:
             )
         case "backtest_finished":
             return BacktestFinished(backtest_id=int(event["backtest_id"]))
+        case "screen_saved":
+            return ScreenSaved(
+                screen_id=int(event["screen_id"]),
+                name=str(event["name"]),
+                market=str(event["market"]),
+                definition=event["definition"],
+                previous_definition=event.get("previous_definition"),
+            )
+        case "screen_run_finished":
+            return ScreenRunFinished(
+                screen_id=int(event["screen_id"]),
+                screen_result_id=int(event["screen_result_id"]),
+                start_count=int(event["start_count"]),
+                after_filters_count=int(event["after_filters_count"]),
+                after_indicator_conditions_count=int(event["after_indicator_conditions_count"]),
+                result_count=int(event["result_count"]),
+            )
         case _:
             return None
 

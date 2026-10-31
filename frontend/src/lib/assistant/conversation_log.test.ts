@@ -94,6 +94,40 @@ describe('the conversation log', () => {
       { kind: 'metrics', id: 1, sentAtUtc: NOW, backtestId: 42 },
     ]);
   });
+
+  it('adds a condition card for each saved screen; a run gives its funnel counts to the last card of that screen', () => {
+    const saved = { type: 'screen_saved' as const, screen_id: 5, name: 'Momentum (AI)', market: 'US' };
+    let log = addServerMessage(EMPTY_LOG, { ...saved, definition: { start: 'watchlist' }, previous_definition: null }, NOW);
+    log = addServerMessage(log, { ...saved, definition: { start: 'quarter_universe' }, previous_definition: { start: 'watchlist' } }, NOW);
+    const counts = { start_count: 500, after_filters_count: 300, after_indicator_conditions_count: 40, result_count: 20 };
+    log = addServerMessage(log, { type: 'screen_run_finished', screen_id: 5, screen_result_id: 9, ...counts }, NOW);
+    log = addServerMessage(log, { type: 'screen_run_finished', screen_id: 6, screen_result_id: 10, ...counts }, NOW);
+
+    expect(log.items).toEqual([
+      {
+        kind: 'screen',
+        id: 0,
+        sentAtUtc: NOW,
+        screenId: 5,
+        name: 'Momentum (AI)',
+        market: 'US',
+        definition: { start: 'watchlist' },
+        previousDefinition: null,
+        counts: null,
+      },
+      {
+        kind: 'screen',
+        id: 1,
+        sentAtUtc: NOW,
+        screenId: 5,
+        name: 'Momentum (AI)',
+        market: 'US',
+        definition: { start: 'quarter_universe' },
+        previousDefinition: { start: 'watchlist' },
+        counts,
+      },
+    ]);
+  });
 });
 
 describe('the text of a tool step', () => {

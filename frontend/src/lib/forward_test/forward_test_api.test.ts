@@ -12,6 +12,7 @@ import {
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestsMessage,
+  readStartCapital,
   startForwardTest,
   startSamePeriodBacktest,
   stopForwardTest,
@@ -150,9 +151,21 @@ describe('findForwardTestStatusKind', () => {
 });
 
 describe('canBacktestSamePeriod', () => {
-  it('needs the start balance, because the backtest uses it as the paper capital', () => {
-    expect(canBacktestSamePeriod(runningForwardTest)).toBe(true);
-    expect(canBacktestSamePeriod({ ...runningForwardTest, start_balance_usd: null })).toBe(false);
+  it('uses the allocated capital as the paper capital, also before the start balance is read', () => {
+    expect(canBacktestSamePeriod({ ...runningForwardTest, start_balance_usd: null })).toBe(true);
+  });
+
+  it('needs the start balance of an old forward test without an allocated capital', () => {
+    const oldForwardTest = { ...runningForwardTest, allocated_capital_usd: null };
+    expect(canBacktestSamePeriod(oldForwardTest)).toBe(true);
+    expect(canBacktestSamePeriod({ ...oldForwardTest, start_balance_usd: null })).toBe(false);
+  });
+});
+
+describe('readStartCapital', () => {
+  it('is the allocated capital, or the start balance of an old forward test', () => {
+    expect(readStartCapital({ ...runningForwardTest, start_balance_usd: null })).toBe('10000');
+    expect(readStartCapital({ ...runningForwardTest, allocated_capital_usd: null })).toBe('100000.00');
   });
 });
 

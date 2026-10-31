@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { createAssistantTools } from '../src/assistant_tools.ts';
-import { runBacktest, summarizeBacktest, type BacktestWait } from '../src/backtest_tools.ts';
+import { runBacktest, summarizeBacktest, SURVIVORSHIP_BIAS_WARNING, type BacktestWait } from '../src/backtest_tools.ts';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
 import { WebPortClient } from '../src/web_port_client.ts';
 import { createFakeOpenModel } from './fake_model.ts';
@@ -15,7 +15,9 @@ import {
   COMPARISON,
   NO_SAVED_BARS,
   SCREEN,
+  SCREEN_DEFINITION,
   SCREEN_LIST,
+  SOURCE_SCREEN,
   SCREEN_SUMMARY,
   screenRow,
   startFakeWebPort,
@@ -23,6 +25,7 @@ import {
   STRATEGY_LIST,
   versionBody,
   type FakeWebPort,
+  type WebPortRequest,
 } from './fake_web_port.ts';
 
 const SELECTION = { provider: 'fake', model: 'fake-model', credentialId: 'fake-key-1' };
@@ -288,6 +291,104 @@ describe('run_backtest', () => {
   });
 });
 
+const SCREEN_BACKTEST_ARGUMENTS = {
+  strategy_version_id: 102,
+  universe_kind: 'screen',
+  screen_id: 5,
+  bar_period: '1-DAY',
+  start_utc: '2018-01-01T00:00:00Z',
+  end_utc: '2026-01-01T00:00:00Z',
+  paper_capital_usd: 100000,
+};
+const LIST_BACKTEST_ARGUMENTS = {
+  strategy_version_id: 102,
+  universe_kind: 'list',
+  screen_result_id: 9,
+  symbols: ['S1', 'S2'],
+  bar_period: '1-DAY',
+  start_utc: '2018-01-01T00:00:00Z',
+  end_utc: '2026-01-01T00:00:00Z',
+  paper_capital_usd: 100000,
+};
+
+function backtestStarts(): WebPortRequest[] {
+  return web.requests.filter((request) => request.method === 'POST' && request.path === '/api/backtests');
+}
+
+describe('run_backtest with a universe (25.4.2)', () => {
+  test('starts a screen backtest with the conversation and each quarter when no period is given', async () => {
+    const conversations = await openConversations([
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      call('run_backtest', { ...SCREEN_BACKTEST_ARGUMENTS, rebalance_period: 'month' }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(backtestStarts().map((request) => [request.conversationId, request.body])).toEqual([
+      [CONVERSATION_ID, { ...SCREEN_BACKTEST_ARGUMENTS, rebalance_period: 'quarter' }],
+      [CONVERSATION_ID, { ...SCREEN_BACKTEST_ARGUMENTS, rebalance_period: 'month' }],
+    ]);
+    expect(readToolResults()).toEqual([
+      summarizeBacktest(backtestBody(11, 'finished')),
+      summarizeBacktest(backtestBody(12, 'finished')),
+    ]);
+  });
+
+  test('starts a fixed list backtest of a screen result, and each result has the survivorship bias warning', async () => {
+    const conversations = await openConversations([
+      call('run_backtest', LIST_BACKTEST_ARGUMENTS),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(backtestStarts().map((request) => [request.conversationId, request.body])).toEqual([
+      [CONVERSATION_ID, LIST_BACKTEST_ARGUMENTS],
+    ]);
+    expect(readToolResults()).toEqual([
+      { ...summarizeBacktest(backtestBody(11, 'finished')), survivorship_bias_warning: SURVIVORSHIP_BIAS_WARNING },
+    ]);
+    expect(SURVIVORSHIP_BIAS_WARNING).toContain('Write this warning in your answer');
+  });
+
+  test('returns "still running", the backtest ID, and the warning when a fixed list backtest passes the wait', async () => {
+    web.backtestStatuses = ['queued', 'running'];
+    const shortWait: BacktestWait = { limitMilliseconds: 30, pollMilliseconds: 5, now: () => Date.now() };
+    const conversations = await openConversations(
+      [call('run_backtest', LIST_BACKTEST_ARGUMENTS), { text: 'Later.' }],
+      shortWait,
+    );
+
+    await runOnce(conversations);
+
+    expect(readToolResults()).toEqual([
+      'Backtest 11 is still running (status running). Read the result later with read_backtest. ' +
+        SURVIVORSHIP_BIAS_WARNING,
+    ]);
+  });
+
+  test('a multi-instrument backtest counts as 1 of the 5 backtests of a user message', async () => {
+    web.backtestStatuses = ['finished'];
+    const conversations = await openConversations([
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      call('run_backtest', LIST_BACKTEST_ARGUMENTS),
+      call('run_backtest', BACKTEST_ARGUMENTS),
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      call('run_backtest', LIST_BACKTEST_ARGUMENTS),
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      { text: 'I ask the user.' },
+    ]);
+
+    await runOnce(conversations, 'Test the screen.');
+
+    expect(backtestStarts()).toHaveLength(5);
+    expect(readToolResults().at(-1)).toBe(
+      'This user message already started 5 backtests. No backtest started. Ask the user before you start more backtests.',
+    );
+  });
+});
+
 describe('the screen tools', () => {
   const DEFINITION = { start: 'quarter_universe', filters: [], indicator_conditions: [] };
 
@@ -308,15 +409,60 @@ describe('the screen tools', () => {
       'GET /api/screens',
       'GET /api/screens/5',
       'POST /api/screens',
+      // update_screen reads the screen before the change, for the condition card.
+      'GET /api/screens/5',
       'PUT /api/screens/5',
       'POST /api/screens/5/runs',
       'GET /api/screen-results/9?offset=0&limit=50',
     ]);
-    expect(web.requests.map((request) => request.conversationId)).toEqual(Array(6).fill(CONVERSATION_ID));
+    expect(web.requests.map((request) => request.conversationId)).toEqual(Array(7).fill(CONVERSATION_ID));
     expect(web.requests[2]?.body).toEqual({ name: 'Momentum leaders', market: 'US', definition: DEFINITION });
-    expect(web.requests[3]?.body).toEqual({ name: 'Momentum leaders (AI)', definition: DEFINITION });
+    expect(web.requests[4]?.body).toEqual({ name: 'Momentum leaders (AI)', definition: DEFINITION });
     const results = readToolResults();
     expect(results.slice(0, 4)).toEqual([SCREEN_LIST, SCREEN, SCREEN, SCREEN]);
+  });
+
+  test('create_screen and update_screen announce the screen for the condition card, with the definition before', async () => {
+    const conversations = await openConversations([
+      call('create_screen', { name: 'Momentum leaders', market: 'US', definition: DEFINITION, source_screen_id: 4 }),
+      call('create_screen', { name: 'Momentum leaders', market: 'US', definition: DEFINITION }),
+      call('update_screen', { screen_id: 5, name: 'Momentum leaders (AI)', definition: DEFINITION }),
+      { text: 'Done.' },
+    ]);
+
+    const events = await runOnce(conversations);
+
+    expect(web.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      'GET /api/screens/4',
+      'POST /api/screens',
+      'POST /api/screens',
+      'GET /api/screens/5',
+      'PUT /api/screens/5',
+    ]);
+    const saved = { type: 'screen_saved', screen_id: 5, name: 'Momentum leaders (AI)', market: 'US', definition: SCREEN_DEFINITION };
+    expect(eventsOfType(events, 'screen_saved')).toEqual([
+      { ...saved, previous_definition: SOURCE_SCREEN.definition },
+      { ...saved, previous_definition: null },
+      { ...saved, previous_definition: SCREEN_DEFINITION },
+    ]);
+  });
+
+  test('run_screen announces the funnel counts of the screen result for the condition card', async () => {
+    const conversations = await openConversations([call('run_screen', { screen_id: 5 }), { text: 'Done.' }]);
+
+    const events = await runOnce(conversations);
+
+    expect(eventsOfType(events, 'screen_run_finished')).toEqual([
+      {
+        type: 'screen_run_finished',
+        screen_id: 5,
+        screen_result_id: 9,
+        start_count: 500,
+        after_filters_count: 300,
+        after_indicator_conditions_count: 120,
+        result_count: 120,
+      },
+    ]);
   });
 
   test('read_screen_result gives the summary and the first 50 rows, and reads the next page', async () => {
@@ -367,6 +513,8 @@ describe('the screen tools', () => {
       'running',
       'succeeded',
     ]);
+    // Only the second call saved: one card, or one count.
+    expect([...eventsOfType(events, 'screen_saved'), ...eventsOfType(events, 'screen_run_finished')]).toHaveLength(1);
   });
 
   test('update_screen gives the 403 of a screen that it cannot change to the model', async () => {

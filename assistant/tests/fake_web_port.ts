@@ -34,7 +34,17 @@ export const STRATEGY = { id: 3, name: 'SMA crossover', created_at_utc: '2026-01
 export const COMPARISON = { strategy_id: 3, strategy_name: 'SMA crossover', first: { id: 11 }, second: { id: 12 } };
 export const NO_SAVED_BARS = { detail: 'No saved bars for AAPL NASDAQ USD 1-DAY in the range.' };
 export const EQUITY_POINT_COUNT = 120;
-export const SCREEN = { id: 5, name: 'Momentum leaders (AI)', market: 'US', kept: false, assistant_conversation_id: 7 };
+export const SCREEN_DEFINITION = { start: 'quarter_universe', filters: [], indicator_conditions: [] };
+export const SCREEN = {
+  id: 5,
+  name: 'Momentum leaders (AI)',
+  market: 'US',
+  definition: SCREEN_DEFINITION,
+  kept: false,
+  assistant_conversation_id: 7,
+};
+/** The screen of the user that create_screen names as its source screen. */
+export const SOURCE_SCREEN = { ...SCREEN, id: 4, name: 'Momentum leaders', definition: { start: 'watchlist' }, kept: true };
 export const SCREEN_LIST = [{ id: 5, name: 'Momentum leaders (AI)', market: 'US', kept: false }];
 export const SCREEN_ROW_COUNT = 120;
 export const SCREEN_SUMMARY = {
@@ -149,6 +159,7 @@ class FakeRoutes {
       'GET /api/backtests/11/comparison/12': () => ({ status: 200, body: COMPARISON }),
       'GET /api/screens': () => ({ status: 200, body: SCREEN_LIST }),
       'GET /api/screens/5': () => ({ status: 200, body: SCREEN }),
+      'GET /api/screens/4': () => ({ status: 200, body: SOURCE_SCREEN }),
       'POST /api/screens': () => this.screenAnswer({ status: 201, body: SCREEN }),
       'PUT /api/screens/5': () => this.screenAnswer({ status: 200, body: SCREEN }),
       'POST /api/screens/5/runs': () => this.screenAnswer({ status: 201, body: screenResultBody(0, 50) }),

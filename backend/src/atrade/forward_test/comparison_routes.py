@@ -18,7 +18,9 @@ from atrade.backtest import (
     BacktestRequest,
     BacktestStatus,
     BacktestTrade,
+    BacktestUniverse,
     EquityPoint,
+    UniversePeriod,
     calculate_metrics,
     calculate_round_trip_metrics,
     check_backtest_request,
@@ -83,6 +85,8 @@ class ComparedBacktestSummaryResponse(BaseModel):
 class FillComparisonResponse(BaseModel):
     bar_end_utc: datetime
     side: Literal["BUY", "SELL"]
+    symbol: str
+    exchange: str
     forward_test_quantity_shares: Decimal | None
     forward_test_price_usd: Decimal | None
     backtest_quantity_shares: Decimal | None
@@ -209,6 +213,8 @@ def to_fill_response(row: FillComparisonRow) -> FillComparisonResponse:
     return FillComparisonResponse(
         bar_end_utc=row.bar_end_utc,
         side=row.side,
+        symbol=row.symbol,
+        exchange=row.exchange,
         forward_test_quantity_shares=read_quantity(row.forward_test),
         forward_test_price_usd=read_price(row.forward_test),
         backtest_quantity_shares=read_quantity(row.backtest),
@@ -323,14 +329,47 @@ def limit_win_rate_to_period(
     )
 
 
+def make_recorded_periods(members: dict[datetime, list[Instrument]], time_range: TimeRange) -> list[UniversePeriod]:
+    """The universe periods of the same-period backtest of a multi-instrument forward test: one for each quarter that
+    the forward test recorded (section 12.10). The quarter of the start begins at the backtest start, as the first
+    period of a `rule` backtest (docs/architecture/backtest.md section 10.10.6)."""
+    periods: list[UniversePeriod] = []
+    for quarter_start_utc, quarter_members in sorted(members.items()):
+        start_utc = max(quarter_start_utc, time_range.start_utc)
+        if start_utc >= time_range.end_utc:
+            continue
+        if periods and periods[-1].start_utc == start_utc:
+            periods.pop()
+        periods.append(UniversePeriod(start_utc=start_utc, members=quarter_members))
+    return periods
+
+
 def is_same_setup(row: ForwardTestRow, backtest: BacktestOutcome) -> bool:
+    """The strategy version, the bar period, and the instrument or the universe kind of the forward test."""
     request = backtest.request
     return (
-        row.universe_kind == "single"
+        request.universe_kind == row.universe_kind
         and request.strategy_version_id == row.strategy_version_id
-        and request.instrument == forward_test_store.read_instrument(row)
+        and request.instrument == forward_test_store.read_single_instrument(row)
         and request.bar_period.value == row.bar_period
     )
+
+
+def describe_other_setup(row: ForwardTestRow) -> str:
+    instruments = "the instrument" if row.universe_kind == "single" else "the universe"
+    return f"The backtest must use the strategy version, {instruments}, and the bar period of the forward test."
+
+
+def name_fills(trades: list[BacktestTrade], instrument: Instrument | None) -> list[BacktestTrade]:
+    """A fill without an instrument is a fill of the single instrument (BacktestTrade.symbol)."""
+    if instrument is None:
+        return trades
+    return [
+        trade
+        if trade.symbol is not None
+        else dataclasses.replace(trade, symbol=instrument.symbol, exchange=instrument.exchange)
+        for trade in trades
+    ]
 
 
 class ComparisonRoutes:
@@ -351,23 +390,37 @@ class ComparisonRoutes:
         if row.start_capital_usd is None:
             detail = "The forward test has no start balance yet. The backtest uses it as the paper capital."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        if row.universe_kind != "single":
-            detail = "A multi-instrument forward test has no same-period backtest yet."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
         now_utc = self.clock.read_now_utc()
+        time_range = TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc)
         request = BacktestRequest(
             strategy_version_id=row.strategy_version_id,
-            instrument=forward_test_store.read_instrument(row),
+            instrument=forward_test_store.read_single_instrument(row),
             bar_period=BarPeriod(row.bar_period),
-            time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
+            time_range=time_range,
             paper_capital_usd=row.start_capital_usd,
             # A forward test has no split, so its same-period backtest has none (docs/architecture/backtest.md 10.9.4).
             out_of_sample_share=0,
         )
+        periods: list[UniversePeriod] = []
+        if row.universe_kind != "single" and time_range.end_utc > time_range.start_utc:
+            async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+                members = await forward_test_store.select_universe_members(connection, forward_test_id)
+            periods = make_recorded_periods(members, time_range)
+            if not periods:
+                detail = "The forward test has no recorded members in its period."
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+            universe = BacktestUniverse(
+                kind="rule" if row.universe_kind == "rule" else "list",
+                currency=periods[0].members[0].currency,
+                top_n=row.universe_top_n,
+            )
+            request = dataclasses.replace(request, universe=universe)
         refusal = check_backtest_request(request) or check_comparison_currency(request)
         if refusal is not None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
-        backtest_id = await queue_backtest(database_url=self.database_url, request=request, created_at_utc=now_utc)
+        backtest_id = await queue_backtest(
+            database_url=self.database_url, request=request, created_at_utc=now_utc, universe_periods=periods
+        )
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             await forward_test_records.insert_same_period_backtest(
                 connection, forward_test_id=forward_test_id, backtest_id=backtest_id
@@ -408,10 +461,7 @@ class ComparisonRoutes:
         if backtest is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
         if not is_same_setup(row, backtest):
-            detail = (
-                "The backtest must use the strategy version, the instrument, and the bar period of the forward test."
-            )
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=describe_other_setup(row))
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             forward_test_fills = await forward_test_records.select_forward_test_fills(
                 connection,
@@ -428,8 +478,15 @@ class ComparisonRoutes:
             backtest.request.time_range,
         )
         fill_rows = compare_fills(
-            forward_test_fills=fills,
-            backtest_fills=backtest.trades,
+            forward_test_fills=[
+                dataclasses.replace(
+                    forward_test_fill.trade,
+                    symbol=forward_test_fill.instrument.symbol,
+                    exchange=forward_test_fill.instrument.exchange,
+                )
+                for forward_test_fill in forward_test_fills
+            ],
+            backtest_fills=name_fills(backtest.trades, backtest.request.instrument),
             equity_curves=[equity_curve, backtest.equity_curve],
         )
         open_end_utc = row.stopped_at_utc or self.clock.read_now_utc()

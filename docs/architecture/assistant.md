@@ -160,7 +160,7 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `GET /api/strategies/{strategy_id}/versions/{version_number}` | `read_strategy_version` | 2 | None. |
 | `POST /api/strategies` | `create_strategy` | 2 | None. |
 | `POST /api/strategies/{strategy_id}/versions` | `save_strategy_version` | 2 | The version records the source "AI assistant" and the conversation ID (25.5). |
-| `POST /api/backtests` | `run_backtest` | 2 (single instrument), 3 (universe fields) | The backtest records the conversation ID. |
+| `POST /api/backtests` | `run_backtest` | 2 (single instrument), 3 (universe fields `screen` and `list`, done in #211) | The backtest records the conversation ID. |
 | `GET /api/backtests` | `list_backtests` | 2 | None. |
 | `GET /api/backtests/{backtest_id}` | `read_backtest`, `run_backtest` (wait) | 2 | None. |
 | `GET /api/backtests/{first_id}/comparison/{second_id}` | `compare_backtests` | 2 | None. |
@@ -274,6 +274,26 @@ prompt does not list the tools.
   assistant must write this warning in its answer.
 - One multi-instrument backtest counts as 1 of the 5 backtests of a user
   message. The 15 minute wait is the same.
+- Done (#211): `run_backtest` has the optional parameters `universe_kind`
+  (`single`, the default, `screen`, or `list`), `screen_id`,
+  `rebalance_period` (`quarter` or `month`), `screen_result_id`, and
+  `symbols`. `symbol`, `exchange`, and `currency` are optional, because only
+  `single` uses them. The tool sends the fields to `POST /api/backtests`
+  with no other change, so port 8001 makes the universe checks of backtest
+  section 10.10.6 and its `422` goes to the model. A `422` does not count.
+- Decided (#211): for `screen` without `rebalance_period`, the tool sends
+  `rebalance_period: "quarter"`.
+- Decided (#211): the warning of `list` is the constant
+  `SURVIVORSHIP_BIAS_WARNING` (`assistant/src/backtest_tools.ts`). It ends
+  with "Write this warning in your answer." After a final status, the tool
+  result is the `read_backtest` content with the field
+  `survivorship_bias_warning`. The "still running" text ends with the
+  warning.
+- Decided (#211): `run_backtest` does not take `rule` and the watchlist
+  (backtest section 10.10.8). The AI assistant backtests a screen.
+- Tests: `assistant/tests/assistant_tools.test.ts` ("run_backtest with a
+  universe") and `backend/tests/app/test_assistant_port.py`
+  (`test_a_multi_instrument_backtest_on_port_8001_records_the_conversation`).
 
 ### 25.4.3 Screen tools (phase 3)
 
@@ -281,8 +301,14 @@ prompt does not list the tools.
 |---|---|---|
 | `list_screens` | Lists the screens. | The screen list. |
 | `read_screen` | Reads one screen. | The conditions of the screen. |
-| `create_screen` | Saves a new screen (25.6). | The new screen. On `422`, the problem list. |
+| `create_screen` | Saves a new screen (25.6). The optional `source_screen_id` names the screen that the new screen changes (#210). | The new screen. On `422`, the problem list. |
 | `update_screen` | Changes a screen that the same conversation created and that the user has not kept. | The changed screen. `403` for each other screen. On `422`, the problem list. |
+
+Decided (#210): `create_screen` with `source_screen_id` and `update_screen`
+first read that screen (`GET /api/screens/{id}`). A saved screen sends the
+run event `screen_saved` with that definition as `previous_definition`, for
+the condition card (25.12.4). `run_screen` sends `screen_run_finished` with
+the funnel counts. A failed save or run sends neither.
 | `run_screen` | Runs a screen and saves its screen result. | The screen result ID and the summary of `read_screen_result`. On `422`, the problem list. |
 | `read_screen_result` | Reads one screen result. | See below. |
 
@@ -764,7 +790,21 @@ Browser to server:
 | `login_start` | Start a login (#183). |
 
 - Phase 3 adds a message for the condition card (a screen ID), like
-  `strategy_version_saved`. See 25.14.
+  `strategy_version_saved`. See 25.14. Decided (#210):
+
+  | `type` | Direction | Fields |
+  |---|---|---|
+  | `screen_saved` | Server to browser | `screen_id`, `name`, `market`, `definition`, `previous_definition` |
+  | `screen_run_finished` | Server to browser | `screen_id`, `screen_result_id`, `start_count`, `after_filters_count`, `after_indicator_conditions_count`, `result_count` |
+
+  `screen_saved` comes for each screen that `create_screen` or
+  `update_screen` saved. `previous_definition` is the definition before
+  `update_screen`, or the definition of the source screen of
+  `create_screen`. It is null for a new screen without a source screen.
+  `screen_run_finished` comes for each screen result of `run_screen`. The
+  `assistant` service sends both events with the same fields as JSON lines
+  of `POST /conversations/{id}/runs`. The message models are
+  `ScreenSavedMessage` and `ScreenRunFinishedMessage`.
 
 Fields (#179). Each message is a JSON object with `type`.
 
@@ -825,7 +865,8 @@ Login fields (#183):
   of both directions. Message model names: `PromptMessage`, `SteerMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
   `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
-  `BacktestFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
+  `BacktestFinishedMessage`, `ScreenSavedMessage`,
+  `ScreenRunFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
   `LoginStartMessage`, `LoginAnswerMessage`, `LoginStepMessage`,
   `LoginEndMessage`.
 
@@ -1069,6 +1110,29 @@ Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATra
 - The prototype of #150 is private. The real page must obey the first
   Frontend Design Rule.
 
+Implemented (#210, prototype variant A):
+
+- `AssistantScreenCard` (`frontend/src/routes/assistant/`): the screen name
+  and the market, the read-only `ConditionBar` of `#lib/screen` with
+  `compareWith`, and the buttons "Open screen", "Discard", and "Keep". The
+  bar wraps, and a long tag wraps its text, so all conditions stay visible.
+- The change marks come from `markConditionChanges`
+  (`frontend/src/lib/screen/condition_changes.ts`). A tag with the same
+  subject and operation and another value is a changed value; it has the
+  Edit icon and a dark border too. In the start group and the order group,
+  each other tag is a changed value. A removed tag stays in its old place.
+  Each mark icon has the name "Added", "Removed", or "Changed".
+- The card compares with `previous_definition` of `screen_saved` (25.10).
+  Without it, the card has no marks.
+- The funnel counts come from the next `run_screen` of the same screen
+  (`screen_run_finished`). Before a run, the card has no counts.
+- After `update_screen`, the old card stays as it was. Its "Open screen"
+  opens the latest state of the screen.
+- Keep and Discard apply to the screen, so all cards of one screen show the
+  same state. "Kept" has the green check `StatusIndicator` and keeps "Open
+  screen". "Discarded" has the neutral `StatusIndicator`, and the conditions
+  fade.
+
 ## 25.13 Side column width splitter (all pages)
 
 Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q7).
@@ -1170,8 +1234,13 @@ columns behave the same (section 13).
   discarded (25.11).
 - How the server records that the user kept a screen, so `update_screen`
   returns `403` after Keep. Decided (#209): `update_screen` reads the column
-  `kept` of the screen. The Keep route itself is still open (screen section
+  `kept` of the screen. Decided (#210): the Keep route is
+  `POST /api/screens/{id}/keep` on port 8000. It sets `kept` (screen section
   24.13).
+- Decided (#210): a reload shows no condition card, like the other cards
+  (#185: the messages route gives only the text messages). Keep and Discard
+  stay on the server: a kept screen has `kept` true, and a discarded screen
+  does not exist.
 - Decided (#179): a delete of the strategy deletes its conversation rows
   (`ON DELETE CASCADE`). The JSONL files stay in the volume.
 - Decided (#179): a title generation failure reaches the browser as an
@@ -1190,7 +1259,8 @@ columns behave the same (section 13).
 - Decided (#181): `POST /api/backtests` from port 8001 saves the daily
   exchange rates from IBKR like port 8000 (backtest section 10.13). Rates
   are not bars.
-- The phase 3 message for the condition card. Decided (#179, #182): the
+- Decided (#210): the phase 3 messages for the condition card are
+  `screen_saved` and `screen_run_finished` (25.10). Decided (#179, #182): the
   field names of the other `/ws/assistant` messages (25.10).
 - Decided (#205): the field that names the position of a condition in a
   screen problem (25.4.3) is `location`, the path in the request body (screen
@@ -1223,7 +1293,9 @@ columns behave the same (section 13).
   (`backend/tests/fakes/e2e_assistant.py`). The prompt text selects the
   answer: "wait" waits for the abort, "change" saves a version of the AI
   assistant, "backtest" adds a finished backtest, "notitle" makes the title
-  generation fail. No real model provider.
+  generation fail. No real model provider. Decided (#210): "screen" saves a
+  screen of the user and a changed screen of the AI assistant, and sends a
+  condition card with each change mark and fixed funnel counts.
 - Decided (#178): the `tool_call` handler that refuses unknown tools is
   `createToolGuard` in `assistant/src/tool_guard.ts`. It returns
   `{ block: true }` with the reason "<name> is not an ATrade assistant

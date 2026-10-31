@@ -20,7 +20,7 @@ import anyio
 import psycopg
 from anyio.abc import TaskGroup
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel, Field, StringConstraints, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, JsonValue, StringConstraints, TypeAdapter, ValidationError
 
 from atrade.assistant import conversation_store
 from atrade.assistant.assistant_service import (
@@ -34,6 +34,8 @@ from atrade.assistant.assistant_service import (
     ModelSelection,
     RunError,
     RunEvent,
+    ScreenRunFinished,
+    ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
     ToolStep,
@@ -127,6 +129,31 @@ class BacktestFinishedMessage(BaseModel):
     backtest_id: int
 
 
+class ScreenSavedMessage(BaseModel):
+    """The AI assistant made or changed a screen, for the condition card (25.12.4). The card compares `definition`
+    with `previous_definition`: the screen before `update_screen`, or the source screen of `create_screen`. Null when
+    `create_screen` has no source screen."""
+
+    type: Literal["screen_saved"] = "screen_saved"
+    screen_id: int
+    name: str
+    market: str
+    definition: JsonValue
+    previous_definition: JsonValue
+
+
+class ScreenRunFinishedMessage(BaseModel):
+    """`run_screen` saved a screen result. The last condition card of the screen shows its funnel counts."""
+
+    type: Literal["screen_run_finished"] = "screen_run_finished"
+    screen_id: int
+    screen_result_id: int
+    start_count: int
+    after_filters_count: int
+    after_indicator_conditions_count: int
+    result_count: int
+
+
 class AssistantErrorMessage(BaseModel):
     """An error of the conversation, for the Output tab of the "Problems and output" panel."""
 
@@ -199,6 +226,8 @@ ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
     ToolStepMessage,
     StrategyVersionSavedMessage,
     BacktestFinishedMessage,
+    ScreenSavedMessage,
+    ScreenRunFinishedMessage,
     AssistantErrorMessage,
     HeartbeatMessage,
     LoginStartMessage,
@@ -234,6 +263,23 @@ def to_socket_message(event: RunEvent) -> BaseModel:
             )
         case BacktestFinished():
             return BacktestFinishedMessage(backtest_id=event.backtest_id)
+        case ScreenSaved():
+            return ScreenSavedMessage(
+                screen_id=event.screen_id,
+                name=event.name,
+                market=event.market,
+                definition=event.definition,
+                previous_definition=event.previous_definition,
+            )
+        case ScreenRunFinished():
+            return ScreenRunFinishedMessage(
+                screen_id=event.screen_id,
+                screen_result_id=event.screen_result_id,
+                start_count=event.start_count,
+                after_filters_count=event.after_filters_count,
+                after_indicator_conditions_count=event.after_indicator_conditions_count,
+                result_count=event.result_count,
+            )
 
 
 def to_login_message(event: LoginEvent) -> BaseModel:

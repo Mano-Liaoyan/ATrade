@@ -7,11 +7,12 @@ conversation header, as the assistant service does.
 from typing import Any
 
 import httpx
-import psycopg
 import pytest
 
 from tests.app.test_assistant_port import CONVERSATION_HEADER, open_both_clients
 from tests.assistant.assistant_app import create_conversation, create_strategy
+from tests.backtest.test_backtest_routes import save_test_strategy_version
+from tests.backtest.universe_data import make_universe_request, save_universe_test_data
 from tests.fakes.clock import FixedClock
 from tests.screen.test_screen_routes import momentum_definition
 from tests.screen.test_screen_run_routes import add_to_watchlist, make_definition, save_daily_bars, stock
@@ -84,7 +85,7 @@ async def test_a_change_on_port_8001_is_only_for_an_unkept_screen_of_the_same_co
         own_screen = (await assistant.post("/api/screens", json=screen_body(), headers=headers)).json()["id"]
         other_screen = (await assistant.post("/api/screens", json=screen_body(), headers=other_headers)).json()["id"]
         kept_screen = (await assistant.post("/api/screens", json=screen_body("Kept"), headers=headers)).json()["id"]
-        await set_kept(database_url, kept_screen)
+        assert (await browser.post(f"/api/screens/{kept_screen}/keep")).status_code == httpx.codes.OK
         change = {"name": "Momentum leaders (AI)", "definition": momentum_definition()}
 
         statuses = {
@@ -107,13 +108,6 @@ async def test_a_change_on_port_8001_is_only_for_an_unkept_screen_of_the_same_co
     }
     assert refused.json()["detail"].startswith(f"The AI assistant cannot change screen {user_screen}.")
     assert user_screen_after["name"] == "Value"
-
-
-async def set_kept(database_url: str, screen_id: int) -> None:
-    """Keep: section 24.13 leaves the route to the screen page, so the test sets the column."""
-
-    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        await connection.execute("UPDATE screen SET kept = true WHERE id = %s", (screen_id,))
 
 
 @pytest.mark.anyio
@@ -192,3 +186,55 @@ async def test_a_new_screen_on_port_8001_with_no_room_for_the_ai_suffix_gives_a_
     assert fits.json()["name"] == "M" * 95 + " (AI)"
     assert no_room_for_number.status_code == httpx.codes.UNPROCESSABLE_ENTITY, no_room_for_number.text
     assert [problem["location"] for problem in no_room_for_number.json()["problems"]] == [["name"]]
+
+
+@pytest.mark.anyio
+async def test_keep_marks_the_screen_kept_and_port_8001_cannot_change_it_after_that(
+    database_url: str, clock: FixedClock, frontend_build_dir: Any
+) -> None:
+    async with open_both_clients(database_url, clock, frontend_build_dir) as (browser, assistant):
+        headers = await start_conversation(browser)
+        screen_id = (await assistant.post("/api/screens", json=screen_body(), headers=headers)).json()["id"]
+
+        kept = await browser.post(f"/api/screens/{screen_id}/keep")
+        kept_again = await browser.post(f"/api/screens/{screen_id}/keep")
+        change = await assistant.put(
+            f"/api/screens/{screen_id}",
+            json={"name": "Momentum leaders (AI)", "definition": momentum_definition()},
+            headers=headers,
+        )
+        keep_on_port_8001 = await assistant.post(f"/api/screens/{screen_id}/keep", headers=headers)
+        missing = await browser.post("/api/screens/999/keep")
+
+    assert kept.status_code == httpx.codes.OK, kept.text
+    assert (kept.json()["id"], kept.json()["kept"]) == (screen_id, True)
+    assert kept_again.status_code == httpx.codes.OK
+    assert change.status_code == httpx.codes.FORBIDDEN
+    assert keep_on_port_8001.status_code in {httpx.codes.NOT_FOUND, httpx.codes.METHOD_NOT_ALLOWED}
+    assert missing.status_code == httpx.codes.NOT_FOUND
+
+
+@pytest.mark.anyio
+async def test_discard_deletes_the_screen_of_the_ai_assistant_and_its_old_backtest_keeps_a_copy(
+    database_url: str, clock: FixedClock, frontend_build_dir: Any
+) -> None:
+    save_universe_test_data(database_url)
+    async with open_both_clients(database_url, clock, frontend_build_dir) as (browser, assistant):
+        headers = await start_conversation(browser)
+        body = {"name": "Quarter", "market": "US", "definition": make_definition(start="quarter_universe")}
+        screen_id = (await assistant.post("/api/screens", json=body, headers=headers)).json()["id"]
+        saved = await save_test_strategy_version(browser)
+        started = await browser.post(
+            "/api/backtests",
+            json=make_universe_request(saved["strategy_version_id"], universe_kind="screen", screen_id=screen_id),
+        )
+        assert started.status_code == httpx.codes.CREATED, started.text
+
+        discarded = await browser.delete(f"/api/screens/{screen_id}")
+        screen = await browser.get(f"/api/screens/{screen_id}")
+        backtest = (await browser.get(f"/api/backtests/{started.json()['id']}")).json()
+
+    assert discarded.status_code == httpx.codes.NO_CONTENT
+    assert screen.status_code == httpx.codes.NOT_FOUND
+    assert backtest["universe_screen"] == started.json()["universe_screen"]
+    assert backtest["universe_screen"]["name"] == "Quarter (AI)"
