@@ -1658,8 +1658,13 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
   the same script. Without `ATRADE_TEST_DATABASE_URL`, the script starts a
   temporary PostgreSQL container.
 - Backend formatting: `ruff format --check` with line length 120.
-- The test PostgreSQL fixture runs the migrations one time per session and
-  truncates all tables except `alembic_version` before each test.
+- `./scripts/check backend` runs pytest with pytest-xdist, 1 worker for
+  each CPU. Each worker creates its own database `<database>_gw<N>` on the
+  server of `ATRADE_TEST_DATABASE_URL`. A test that needs one more database
+  gives it a unique name.
+- The test PostgreSQL fixture runs the migrations one time per worker
+  session and truncates all tables except `alembic_version` before each
+  test.
 
 - The `assistant` service checks run in `./scripts/check assistant` (also
   in `./scripts/check` without a scope): ESLint with the readability rules,

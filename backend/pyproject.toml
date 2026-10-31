@@ -31,6 +31,7 @@ dev = [
     "httpx-ws==0.8.2",
     "import-linter==2.15",
     "pytest==9.1.1",
+    "pytest-xdist==3.8.0",
 ]
 
 [build-system]

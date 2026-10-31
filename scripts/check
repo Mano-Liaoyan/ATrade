@@ -71,7 +71,8 @@ check_backend() {
   log_step "Backend: file length (A4, at most 1000 lines)"
   find src tests migrations -name '*.py' -exec awk 'FNR == 1001 { print FILENAME ": more than 1000 lines (A4)"; failed = 1; nextfile } END { exit failed }' {} +
   log_step "Backend: pytest"
-  uv run pytest
+  # One pytest-xdist worker for each CPU. Each worker has its own database (tests/conftest.py).
+  uv run pytest --numprocesses auto
 }
 
 require_vite_plus() {
