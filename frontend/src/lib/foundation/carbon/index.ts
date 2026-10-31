@@ -33,6 +33,7 @@ export type { NotificationKind, NotificationMessage } from './notification_messa
 export { default as Checkbox } from './Checkbox.svelte';
 export { default as Toggle } from './Toggle.svelte';
 export { default as StatusIndicator } from './StatusIndicator.svelte';
+export { default as StatusMessage } from './StatusMessage.svelte';
 export { default as StatusIcon } from './StatusIcon.svelte';
 export type { StatusKind } from './status_icon';
 export { default as ChatLog } from './ChatLog.svelte';

@@ -73,9 +73,12 @@ async function startSweepFromDialog(page: Page): Promise<string> {
 /** The heatmap shows a value in each finished cell, and the "Metric" select changes the values. */
 async function checkHeatmap(page: Page, sweepId: string): Promise<void> {
   const overview = page.getByRole('region', { name: `Parameter sweep #${sweepId}` });
-  await expect(overview.getByRole('status', { name: 'Run counts' })).toContainText(/[1-4] finished/, {
-    timeout: RUN_TIMEOUT_MILLISECONDS,
-  });
+  // Each run count is a status icon (the status is its name and tooltip) and the count after it.
+  const finishedCount = overview
+    .getByRole('status', { name: 'Run counts' })
+    .getByRole('img', { name: 'Finished', exact: true })
+    .locator('xpath=ancestor::span[contains(@class, "status-count")]');
+  await expect(finishedCount).toHaveText(/^\s*[1-4]\s*$/, { timeout: RUN_TIMEOUT_MILLISECONDS });
   const heatmap = overview.getByRole('table', { name: 'Total return heatmap' });
   await expect(heatmap.getByRole('cell', { name: /^[+-]?\d+\.\d{2} %$/ }).first()).toBeVisible();
   await overview.getByRole('combobox', { name: 'Metric' }).click();

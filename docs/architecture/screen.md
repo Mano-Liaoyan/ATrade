@@ -66,8 +66,8 @@ A screen starts from one list of instruments of its market:
 | HK | The HK instrument list (`market_data.md`, the HK instrument list section) | Yes |
 | HK | The HK instruments of the watchlist | No |
 
-- An HK screen shows a warning: "The universe has survivorship bias: it has
-  no instruments that stopped trading." Source text (#145): 品种池含幸存者偏差：缺少已退市的品种。
+- An HK screen shows the warning "Survivorship bias"; its tooltip says that
+  instruments that stopped trading are missing. Source text (#145): 品种池含幸存者偏差：缺少已退市的品种。
 - The user keeps the HK instrument list. The screen page does not change it.
 
 ## 24.3 Conditions and order
@@ -438,7 +438,7 @@ Layout:
      screen", and "Save screen" (only when the screen has unsaved changes).
   2. Condition bar (section 24.10.1).
   3. Table toolbar: the "Result N" / "Excluded N" switch, the daily bar date
-     and the run time, "Add to watchlist", and "Run backtest on this screen
+     (the run list gives the run time), "Add to watchlist", and "Run backtest on this screen
      result". When the user selects rows, the toolbar changes to the batch
      actions "Add to watchlist" and "Run backtest on selected".
   4. Result table, or the excluded table.

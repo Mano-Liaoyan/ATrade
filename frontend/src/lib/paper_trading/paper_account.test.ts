@@ -242,7 +242,7 @@ describe('listPositionRows', () => {
     ).toEqual([
       { owner: 'By hand', unattributed: null, quantity: '20', averageCost: '100', marketValue: 2200, unrealizedPnl: 200 },
       { owner: 'Forward test 3', unattributed: null, quantity: '10', averageCost: '105', marketValue: 1100, unrealizedPnl: 50 },
-      { owner: null, unattributed: 'Unattributed: 50', quantity: null, averageCost: null, marketValue: null, unrealizedPnl: null },
+      { owner: null, unattributed: 'Unattributed: 50', quantity: '50', averageCost: null, marketValue: null, unrealizedPnl: null },
     ]);
   });
 

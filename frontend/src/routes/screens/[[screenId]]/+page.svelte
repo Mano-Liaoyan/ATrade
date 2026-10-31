@@ -2,7 +2,7 @@
      /screens opens the screen that the user opened last (browser storage), or the first screen of the list. Without
      ?result, the page shows the last run. Start side: the "Screens" side column (ScreenList) with "New screen". Main
      region: the title row (the name, the US / HK switch, "Save as new screen", and "Save screen" for unsaved changes), the condition
-     bar with its edit popover, the table toolbar (Result N / Excluded N, the daily bars date, the run time, "Add to
+     bar with its edit popover, the table toolbar (Result N / Excluded N, the daily bars date, "Add to
      watchlist", and "Run backtest on this screen result"; batch actions when rows are selected), and the result or the
      excluded table. Each change of a condition runs the changed screen at once (section 24.13). An HK screen shows the
      survivorship bias warning. The backtest buttons open the "New backtest" form with the screen, the screen result,
@@ -16,7 +16,6 @@
   import { ContentSwitcher, IconButton, InlineNotification, Popover } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import { formatUtcTime } from '#lib/foundation/time_format';
   import { SideColumn, Workbench } from '#lib/foundation/workbench';
   import { SurvivorshipBiasWarning } from '#lib/market_data';
   import {
@@ -586,9 +585,7 @@
                   shownTable = value;
                 }}
               />
-              <span class="run-info"
-                >Daily bars {result.summary.daily_bars_date ?? '–'} · {formatUtcTime(result.summary.run_at_utc)}</span
-              >
+              <span class="run-info">Daily bars {result.summary.daily_bars_date ?? '–'}</span>
               <button
                 type="button"
                 class="cds--btn cds--btn--ghost cds--btn--sm toolbar-button"

@@ -26,7 +26,8 @@ async function openStrategyWithConversation(page: Page, name: string, height = 9
   const column = assistantColumn(page);
   await column.getByRole('button', { name: 'New conversation' }).click();
   await expect(column.getByRole('combobox', { name: 'Conversation' })).toContainText('New conversation');
-  await expect(column.getByText(/^Prompt v\d+$/)).toBeVisible();
+  // The Prompt button names the prompt version of the open conversation in its tooltip and accessible name.
+  await expect(column.getByRole('button', { name: /^Prompt v\d+$/ })).toBeVisible();
   await expect(column.getByRole('button', { name: 'Send' })).toBeEnabled();
 }
 
@@ -201,18 +202,20 @@ test('a saved version shows a diff card: the card opens CodeDiff, Keep opens the
   await expect(versionSelect).toHaveText('v1');
 
   await sendMessage(page, 'Please change the code.');
-  await expect(log.getByText('Save strategy version succeeded')).toBeVisible();
+  await expect(
+    log.getByRole('listitem').filter({ hasText: 'Save strategy version' }).getByRole('img', { name: 'Succeeded' }),
+  ).toBeVisible();
   await log.getByRole('button', { name: 'Open the diff of v2' }).click();
   await expect(page.getByRole('tab', { name: 'v1 → v2' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByLabel('v2', { exact: true })).toContainText('# Version 2 of the AI assistant.');
   await log.getByRole('button', { name: 'Keep' }).click();
   await expect(versionSelect).toHaveText('v2');
-  await expect(log.getByText('Kept', { exact: true })).toBeVisible();
+  await expect(log.getByRole('img', { name: 'Kept', exact: true })).toBeVisible();
 
   await sendMessage(page, 'Please change the code again.');
   await expect(log.getByRole('button', { name: 'Open the diff of v3' })).toBeVisible();
   await log.getByRole('button', { name: 'Discard' }).click();
-  await expect(log.getByText('Discarded', { exact: true })).toBeVisible();
+  await expect(log.getByRole('img', { name: 'Discarded', exact: true })).toBeVisible();
   await expect(versionSelect).toHaveText('v2');
   await page.getByRole('button', { name: 'Output', exact: true }).click();
   await expectOutputLine(page, 'Discarded');
@@ -239,7 +242,7 @@ test('a saved screen shows a condition card with each change mark; Keep and Disc
   await expect(conditions.getByLabel('Order count')).toHaveText('20');
 
   await kept.getByRole('button', { name: 'Keep' }).click();
-  await expect(kept.getByText('Kept')).toBeVisible();
+  await expect(kept.getByRole('img', { name: 'Kept', exact: true })).toBeVisible();
   await expect(kept.getByRole('button', { name: 'Keep' })).toHaveCount(0);
   await expect(kept.getByRole('button', { name: 'Discard' })).toHaveCount(0);
   const keptHref = await kept.getByRole('link', { name: 'Open screen' }).getAttribute('href');
@@ -251,7 +254,7 @@ test('a saved screen shows a condition card with each change mark; Keep and Disc
   const discarded = log.getByRole('article', { name: /^Screen E2E momentum/ }).last();
   const discardedHref = await discarded.getByRole('link', { name: 'Open screen' }).getAttribute('href');
   await discarded.getByRole('button', { name: 'Discard' }).click();
-  await expect(discarded.getByText('Discarded')).toBeVisible();
+  await expect(discarded.getByRole('img', { name: 'Discarded', exact: true })).toBeVisible();
   await expect(discarded.getByRole('button')).toHaveCount(0);
   expect((await request.get(`/api${discardedHref ?? ''}`)).status()).toBe(404);
 
@@ -263,7 +266,9 @@ test('a finished backtest shows a tool step and a metric card with a link', asyn
   await openStrategyWithConversation(page, createUniqueName(currentTest, 'Backtest'));
   const log = conversationLog(page);
   await sendMessage(page, 'Please run a backtest.');
-  await expect(log.getByText(/^Backtest #\d+ finished$/)).toBeVisible();
+  // The tool step: the status icon (its name and tooltip say "Finished") before the title "Backtest #<id>".
+  const backtestStep = log.getByRole('listitem').filter({ hasText: /^\s*Backtest #\d+\s*$/ });
+  await expect(backtestStep.getByRole('img', { name: 'Finished', exact: true })).toBeVisible();
   const link = log.getByRole('link', { name: /^Backtest #\d+$/ });
   await expect(link).toBeVisible();
   await expect(log.getByText('Total return')).toBeVisible();

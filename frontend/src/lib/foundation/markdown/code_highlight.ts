@@ -1,7 +1,10 @@
-// Syntax highlight of the markdown code blocks with shiki. The page loads shiki and each language only when a closed
-// code block needs it, so the first page load does not grow. The theme colors are CSS variables (markdown.scss), so a
+// The languages of the markdown code blocks with syntax colors, and the colors of a shell block. The highlighter is
+// the shared highlighter of @pierre/diffs (diffs_library.ts), the one highlighter of all markdown code: a code block
+// shows in the file view of @pierre/diffs (diff_view.ts), and a shell block uses the tokens of this module, because
+// its "$" prompts and output lines are not part of the code. The theme colors are CSS variables (markdown.scss), so a
 // theme change needs no new highlight.
-import type { HighlighterCore, LanguageInput, ThemeRegistrationRaw } from 'shiki/core';
+import type { SupportedLanguages } from '@pierre/diffs';
+import { DIFFS_THEME_NAME, loadDiffsLibrary } from './diffs_library';
 
 export interface CodeToken {
   text: string;
@@ -9,20 +12,7 @@ export interface CodeToken {
   color: string | undefined;
 }
 
-type LanguageLoader = () => Promise<{ default: LanguageInput }>;
-
-const LANGUAGE_LOADERS: Record<string, LanguageLoader> = {
-  python: () => import('shiki/langs/python.mjs'),
-  shellscript: () => import('shiki/langs/shellscript.mjs'),
-  json: () => import('shiki/langs/json.mjs'),
-  yaml: () => import('shiki/langs/yaml.mjs'),
-  sql: () => import('shiki/langs/sql.mjs'),
-  typescript: () => import('shiki/langs/typescript.mjs'),
-  javascript: () => import('shiki/langs/javascript.mjs'),
-  toml: () => import('shiki/langs/toml.mjs'),
-};
-
-const LANGUAGE_NAMES: Record<string, string> = {
+const LANGUAGE_NAMES: Record<string, SupportedLanguages> = {
   python: 'python',
   py: 'python',
   bash: 'shellscript',
@@ -44,56 +34,20 @@ const LANGUAGE_NAMES: Record<string, string> = {
   toml: 'toml',
 };
 
-const variable = (name: string): string => `var(--diffs-${name})`;
-
-const CARBON_CODE_THEME: ThemeRegistrationRaw = {
-  name: 'atrade-carbon',
-  type: 'dark',
-  fg: variable('foreground'),
-  bg: 'transparent',
-  settings: [
-    { settings: { foreground: variable('foreground'), background: 'transparent' } },
-    { scope: ['comment', 'punctuation.definition.comment'], settings: { foreground: variable('token-comment') } },
-    { scope: ['keyword', 'storage', 'keyword.control', 'keyword.operator.word'], settings: { foreground: variable('token-keyword') } },
-    { scope: ['string', 'string.quoted'], settings: { foreground: variable('token-string') } },
-    { scope: ['constant.numeric', 'constant.language', 'constant.character'], settings: { foreground: variable('token-constant') } },
-    { scope: ['entity.name.function', 'support.function', 'meta.function-call'], settings: { foreground: variable('token-function') } },
-    { scope: ['entity.name.type', 'entity.name.class', 'support.type', 'support.class'], settings: { foreground: variable('token-type') } },
-  ],
-};
-
-let highlighter: Promise<HighlighterCore> | undefined;
-const loadedLanguages = new Map<string, Promise<void>>();
-
-async function loadHighlighter(): Promise<HighlighterCore> {
-  const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([
-    import('shiki/core'),
-    import('shiki/engine/javascript'),
-  ]);
-  return createHighlighterCore({ themes: [CARBON_CODE_THEME], langs: [], engine: createJavaScriptRegexEngine() });
-}
-
-/** The shiki language of a fence language, or null when ATrade loads no grammar for it. */
-export function highlightLanguage(language: string): string | null {
+/** The highlighter language of a fence language, or null when ATrade shows the block without syntax colors. */
+export function highlightLanguage(language: string): SupportedLanguages | null {
   return LANGUAGE_NAMES[language] ?? null;
 }
 
-/** The tokens of each line, or null when the language has no grammar. */
+/** The tokens of each line, or null when the language has no syntax colors. */
 export async function highlightCode(text: string, language: string): Promise<CodeToken[][] | null> {
   const name = highlightLanguage(language);
-  const loader = name === null ? undefined : LANGUAGE_LOADERS[name];
-  if (name === null || loader === undefined) {
+  if (name === null) {
     return null;
   }
-  highlighter ??= loadHighlighter();
-  const core = await highlighter;
-  let loaded = loadedLanguages.get(name);
-  if (loaded === undefined) {
-    loaded = loader().then((module) => core.loadLanguage(module.default));
-    loadedLanguages.set(name, loaded);
-  }
-  await loaded;
-  return core
-    .codeToTokensBase(text, { lang: name, theme: 'atrade-carbon' })
-    .map((line) => line.map((token) => ({ text: token.content, color: token.color })));
+  const { getSharedHighlighter } = await loadDiffsLibrary();
+  const highlighter = await getSharedHighlighter({ themes: [DIFFS_THEME_NAME], langs: [name] });
+  return highlighter
+    .codeToTokens(text, { lang: name, theme: DIFFS_THEME_NAME })
+    .tokens.map((line) => line.map((token) => ({ text: token.content, color: token.color })));
 }

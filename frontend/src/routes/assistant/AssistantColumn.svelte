@@ -1,9 +1,10 @@
 <!-- The "AI assistant" side column of each workbench page (docs/architecture/assistant.md 25.12). Default width 28rem,
      with the splitter, Minimize (a 32px rail with the assistant icon), and Maximize. All pages share one state
      (assistant_session.svelte.ts) and one storage key, so a page change keeps the open conversation and Minimize.
-     Header line: "Credentials" and "Prompt" open their dialogs. Top: the conversation Select (all conversations),
-     "New conversation", "Rename conversation", "Delete conversation" (a danger Dialog first), and the prompt version of
-     the open conversation. Middle: the conversation log. Bottom: the composer, one box with the message input, the inline
+     Header line: "Credentials" and "Prompt" open their dialogs. The Prompt button tooltip names the prompt version of
+     the open conversation, for example "Prompt v3". Top: the conversation Select (all conversations),
+     "New conversation", "Rename conversation", and "Delete conversation" (a danger Dialog first). Middle: the
+     conversation log. Bottom: the composer, one box with the message input, the inline
      Model (the full name) and Thinking Selects, and the "Send" icon button, which becomes "Stop" (abort) while the AI
      assistant runs. Under the box: the inline Provider and Credential Selects.
      The strategy page gives its open strategy, its diff card actions, and its Output tab for the errors. A page
@@ -177,7 +178,11 @@
 >
   {#snippet actions()}
     <IconButton label="Credentials" icon={Password16} onclick={() => (isCredentialsOpen = true)} />
-    <IconButton label="Prompt" icon={Script16} onclick={() => (isPromptOpen = true)} />
+    <IconButton
+      label={conversation === null ? 'Prompt' : `Prompt v${String(conversation.prompt_version_number)}`}
+      icon={Script16}
+      onclick={() => (isPromptOpen = true)}
+    />
   {/snippet}
   <div class="assistant-top">
     <div class="conversation-select">
@@ -211,9 +216,6 @@
       align="bottom-end"
       onclick={() => (isDeleteOpen = true)}
     />
-    {#if conversation !== null}
-      <span class="prompt-version">Prompt v{conversation.prompt_version_number}</span>
-    {/if}
   </div>
 
   {#if onError === undefined && session.errorText !== ''}
@@ -395,15 +397,6 @@
   .conversation-select {
     flex: 1;
     min-inline-size: 0;
-  }
-
-  .prompt-version {
-    flex: none;
-    color: var(--cds-text-secondary);
-    font-size: var(--cds-label-01-font-size);
-    line-height: var(--cds-label-01-line-height);
-    letter-spacing: var(--cds-label-01-letter-spacing);
-    white-space: nowrap;
   }
 
   .assistant-bottom {

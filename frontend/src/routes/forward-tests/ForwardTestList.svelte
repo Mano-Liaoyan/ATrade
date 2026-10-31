@@ -1,6 +1,6 @@
 <!-- The forward test list of the forward test workbench (the body of the "Forward tests" side column): 32px rows with
-     the number, the strategy version, the instrument symbol, and the actual status (icon and word) from
-     /ws/forward-tests. The open forward test has the Carbon selected row color. A click on a row opens its forward
+     the actual status icon from /ws/forward-tests before the number (the tooltip names the status), the strategy
+     version, and the instrument symbol. The open forward test has the Carbon selected row color. A click on a row opens its forward
      test. Stop and "Backtest the same period" are in the header line of the open forward test. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
@@ -26,7 +26,6 @@
     { header: '#', align: 'right' },
     { header: 'Strategy' },
     { header: 'Instrument' },
-    { header: 'Status' },
   ];
 
   function forwardTestHref(id: number): string {
@@ -56,6 +55,11 @@
             }}
           >
             <th scope="row" align="right">
+              <StatusIndicator
+                kind={findForwardTestStatusKind(forwardTest.status)}
+                label={describeForwardTestStatus(forwardTest.status)}
+                align="right"
+              />
               <a
                 class="row-link"
                 href={resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) })}
@@ -64,12 +68,6 @@
             </th>
             <td><span class="strategy-name" title={versionLabel}>{versionLabel}</span></td>
             <td>{forwardTest.symbol ?? describeForwardTestUniverse(forwardTest)}</td>
-            <td>
-              <StatusIndicator
-                kind={findForwardTestStatusKind(forwardTest.status)}
-                label={describeForwardTestStatus(forwardTest.status)}
-              />
-            </td>
           </tr>
         {/each}
       {/snippet}
@@ -96,15 +94,12 @@
     table-layout: fixed;
   }
 
+  /* The status icon and the number. */
   .list :global(th:nth-child(1)) {
-    inline-size: calc(var(--cds-spacing-09) + var(--cds-spacing-05));
-  }
-
-  .list :global(th:nth-child(3)) {
     inline-size: var(--cds-spacing-12);
   }
 
-  .list :global(th:nth-child(4)) {
+  .list :global(th:nth-child(3)) {
     inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-09));
   }
 
@@ -119,7 +114,7 @@
     cursor: pointer;
   }
 
-  /* A long strategy name ends with an ellipsis, so the status stays in the column. */
+  /* A long strategy name ends with an ellipsis, so the instrument stays in the column. */
   .strategy-name {
     display: block;
     overflow: hidden;

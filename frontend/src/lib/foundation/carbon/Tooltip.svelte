@@ -13,10 +13,12 @@
   interface Props {
     text: string;
     align?: TooltipAlignment;
+    /** The trigger is a block, for example a notification: the tooltip container takes the full width. */
+    block?: boolean;
     trigger: Snippet<[{ props: Record<string, unknown> }]>;
   }
 
-  const { text, align = 'bottom', trigger }: Props = $props();
+  const { text, align = 'bottom', block = false, trigger }: Props = $props();
 
   let open = $state(false);
 
@@ -58,6 +60,7 @@
       `cds--popover--${align}`,
       'cds--tooltip',
       open && 'cds--popover--open',
+      block && 'tooltip--block',
     ]}
   >
     <Tooltip.Trigger>
@@ -78,3 +81,9 @@
     </Tooltip.ContentStatic>
   </span>
 </Tooltip.Root>
+
+<style>
+  .tooltip--block {
+    display: block;
+  }
+</style>

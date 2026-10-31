@@ -559,11 +559,12 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The dialog has the steps to add a subscription login and to add an API
   key (25.7.3).
 - Implemented (#183): `frontend/src/lib/assistant/CredentialsDialog.svelte`
-  (logic in `credentials.ts`). The table columns are Name, Provider, Kind,
-  and State, and a row menu with "Delete credential". Kind is
-  "Subscription" or "API key"; an API key adds its last 4 characters
-  (`••••7a9f`). State is "Ready" (success) or "Log in again" (error, the
-  reason in the cell title). Below the table: a content switcher
+  (logic in `credentials.ts`). The table columns are Name, Provider, and
+  Kind, and a row menu with "Delete credential". Kind is "Subscription" or
+  "API key"; an API key adds its last 4 characters (`••••7a9f`). A status
+  icon before the name gives the state in its tooltip: "Ready" (success) or
+  "Log in again: <reason>" (error). While the login waits for the provider,
+  an in-progress icon shows with the tooltip "Waiting for the provider". Below the table: a content switcher
   (Subscription, API key), the Provider select (only the providers with the
   method), the Name field, and "Log in" or "Add API key". While a login
   runs, the dialog shows the steps of pi: the link "Open the authorization
@@ -746,8 +747,9 @@ Implemented (#184):
   after it is saved.
 - A new prompt version applies only to new conversations. A new
   conversation uses the latest prompt version.
-- Each conversation records its prompt version. The top of the conversation
-  shows it, for example "Prompt v3".
+- Each conversation records its prompt version. The tooltip and the
+  accessible name of the "Prompt" icon button show it, for example
+  "Prompt v3".
 - So all answers in one conversation use the same prompt and are easy to
   compare. To use a new prompt, the user starts a new conversation.
 
@@ -995,12 +997,13 @@ log, the message input, and Minimize.
 
 | Area | Content |
 |---|---|
-| Top | Conversation `Select`, "New conversation" button, "Credentials" icon button, "Prompt" icon button. The prompt version of the open conversation, for example "Prompt v3". |
+| Top | Conversation `Select`, "New conversation" button, "Credentials" icon button, "Prompt" icon button. The tooltip of "Prompt" names the prompt version of the open conversation, for example "Prompt v3". |
 | Middle | The conversation messages (`role="log"`) in a `ScrollRegion`. Tool steps, diff cards, metric cards, and (phase 3) condition cards. |
 | Bottom | The composer: one box with the message input, and under the input the inline model `Select` (the full model name), the inline thinking `Select`, and the "Send" icon button. While the AI assistant runs, "Send" becomes "Stop". Under the box: the inline provider and credential `Select`s. |
 
-- A tool step is one `StatusIndicator` line, for example
-  "Backtest #42 running". 2 or more consecutive tool steps are one group
+- A tool step is one line: a status icon (`StatusIndicator`, the state in
+  its tooltip, for example "Running") before the title, for example
+  "Backtest #42". 2 or more consecutive tool steps are one group
   (25.12.5).
 - A diff card shows a code change (25.5.2).
 - A metric card shows the `KeyMetricRow` of a finished backtest. It links to
@@ -1024,19 +1027,20 @@ Implemented (#185):
   assistant". The rail has the `ai-agent` icon.
 - Top line: the conversation `Select` (the titles, the newest first), the
   icon buttons "New conversation", "Rename conversation" (a `Dialog` with
-  the title), and "Delete conversation" (a danger `Dialog`), and the text
-  "Prompt v<n>".
+  the title), and "Delete conversation" (a danger `Dialog`). The "Prompt"
+  icon button has the label "Prompt v<n>" for the open conversation.
 - `AssistantLog` shows the log with `ChatLog`. A message of the AI assistant
   ends with a line "<model> · <thinking level> · <credential name>". The
   level `off` (or no recorded level) is not in the line, for example
   "gpt-a · Work key". The log of
   `frontend/src/lib/assistant/conversation_log.ts` keeps one line for each
-  `tool_call_id`. The line text is "Backtest #<id> <state>" for
-  `run_backtest` with a backtest, else the tool name and its state, for
-  example "Save strategy version succeeded".
+  `tool_call_id`. The line title is "Backtest #<id>" for `run_backtest` with
+  a backtest, else the tool name, for example "Save strategy version". The
+  status icon before it has the state as its name and tooltip, for example
+  "Succeeded".
 - A diff card has the link button "v<n-1> → v<n>" and the buttons "Keep" and
-  "Discard". After a click, the card shows "Kept" or "Discarded" with a
-  `StatusIndicator`.
+  "Discard". After a click, the buttons go, and a status icon "Kept" or
+  "Discarded" (`StatusIndicator`, no word) stands before the link button.
 - A metric card has the link "Backtest #<id>" to the backtest page and the
   `KeyMetricRow` of the backtest.
 - Bottom: the Selects "Provider" (only the providers with a credential),
@@ -1181,9 +1185,9 @@ Implemented (#210, prototype variant A):
 - After `update_screen`, the old card stays as it was. Its "Open screen"
   opens the latest state of the screen.
 - Keep and Discard apply to the screen, so all cards of one screen show the
-  same state. "Kept" has the green check `StatusIndicator` and keeps "Open
-  screen". "Discarded" has the neutral `StatusIndicator`, and the conditions
-  fade.
+  same state. The state is a status icon before the screen name, with no
+  word: "Kept" is the green check `StatusIndicator` and keeps "Open screen".
+  "Discarded" is the neutral `StatusIndicator`, and the conditions fade.
 
 ### 25.12.5 Conversation design (option A)
 
@@ -1198,8 +1202,9 @@ no code or asset of them.
   width of the log, so tables and code have room. Its model line stays
   under it.
 - 2 or more consecutive tool steps are one group. The group line is a
-  button with a chevron and a `StatusIndicator` "<n> tool steps": in
-  progress while a step runs, error when a step failed, else success. The
+  status icon (`StatusIndicator`, tooltip "Running", "Failed", "Succeeded",
+  or "Done") and a button with a chevron and "<n> tool steps": in progress
+  while a step runs, error when a step failed, else success. The
   group is open while a step runs and closes when all steps end. A click
   opens or closes it, and the choice stays while the page is open. A single
   tool step stays its own line. Code: `groupToolSteps` and
@@ -1242,8 +1247,11 @@ user stays plain text. `foundation/markdown` has the `Markdown` component;
   click, the icon changes for 2 seconds: a checkmark ("Copied") or a
   warning icon ("Not copied"), each with its accessible name and tooltip
   and no text next to it. A closed block gets
-  syntax colors from `shiki` (JavaScript regex engine, loaded on demand)
-  for Python, shell, JSON, YAML, SQL, TypeScript, JavaScript, and TOML. The
+  syntax colors from `@pierre/diffs` (loaded on demand): a code block shows
+  in its `File` view (no file header, no line numbers), and a shell block
+  uses the tokens of its shared highlighter, so the `$` prompts stay. One
+  highlighter and one theme for all code and diffs. Languages: Python,
+  shell, JSON, YAML, SQL, TypeScript, JavaScript, and TOML. The
   colors are the colors of the code editor (CSS variables, so a theme
   change needs no new highlight).
 - Shell block (`bash`, `sh`, `zsh`, `shell`, `console`, `shellsession`):

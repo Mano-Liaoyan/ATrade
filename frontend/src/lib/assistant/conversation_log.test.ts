@@ -133,26 +133,31 @@ describe('the conversation log', () => {
 describe('the text of a tool step', () => {
   it('names the backtest and its state for run_backtest', () => {
     expect(describeToolStep({ toolName: 'run_backtest', status: 'running', backtestId: 42, backtestStatus: 'running' })).toEqual({
-      label: 'Backtest #42 running',
+      title: 'Backtest #42',
+      status: 'Running',
       kind: 'in-progress',
     });
     expect(describeToolStep({ toolName: 'run_backtest', status: 'succeeded', backtestId: 42, backtestStatus: 'finished' })).toEqual({
-      label: 'Backtest #42 finished',
+      title: 'Backtest #42',
+      status: 'Finished',
       kind: 'success',
     });
     expect(describeToolStep({ toolName: 'run_backtest', status: 'failed', backtestId: 42, backtestStatus: 'timed_out' })).toEqual({
-      label: 'Backtest #42 timed out',
+      title: 'Backtest #42',
+      status: 'Timed out',
       kind: 'error',
     });
   });
 
   it('names the tool and the tool state for the other tools', () => {
     expect(describeToolStep({ toolName: 'save_strategy_version', status: 'succeeded', backtestId: null, backtestStatus: null })).toEqual({
-      label: 'Save strategy version succeeded',
+      title: 'Save strategy version',
+      status: 'Succeeded',
       kind: 'success',
     });
     expect(describeToolStep({ toolName: 'read_backtest', status: 'failed', backtestId: null, backtestStatus: null })).toEqual({
-      label: 'Read backtest failed',
+      title: 'Read backtest',
+      status: 'Failed',
       kind: 'error',
     });
   });

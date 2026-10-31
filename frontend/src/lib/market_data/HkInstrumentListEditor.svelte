@@ -1,5 +1,5 @@
 <!-- The HK instrument list editor (market_data.md section 8.10): the user pastes symbols, sees the result of each
-     symbol (added, not found, already in list), and deletes a row. The table scrolls in its own ScrollRegion. -->
+     symbol (a status icon before the symbol: added, not found, already in list), and deletes a row. The table scrolls in its own ScrollRegion. -->
 <script lang="ts">
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import {
@@ -57,12 +57,12 @@
 
   function toSymbolResults(added: HkInstrumentsAdded): SymbolResult[] {
     return [
-      ...added.added.map((symbol) => ({ symbol, kind: 'success' as const, label: `${symbol} added` })),
-      ...added.not_found.map((symbol) => ({ symbol, kind: 'error' as const, label: `${symbol} not found` })),
+      ...added.added.map((symbol) => ({ symbol, kind: 'success' as const, label: 'Added' })),
+      ...added.not_found.map((symbol) => ({ symbol, kind: 'error' as const, label: 'Not found' })),
       ...added.already_in_list.map((symbol) => ({
         symbol,
         kind: 'warning' as const,
-        label: `${symbol} already in list`,
+        label: 'Already in list',
       })),
     ];
   }
@@ -116,7 +116,7 @@
   {#if symbolResults.length > 0}
     <ul class="results" aria-label="Add results">
       {#each symbolResults as symbolResult, index (index)}
-        <li><StatusIndicator kind={symbolResult.kind} label={symbolResult.label} /></li>
+        <li><StatusIndicator kind={symbolResult.kind} label={symbolResult.label} />{symbolResult.symbol}</li>
       {/each}
     </ul>
   {/if}

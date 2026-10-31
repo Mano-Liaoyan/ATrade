@@ -6,6 +6,7 @@ import {
   describeOrderSource,
   describeOrderForConfirmation,
   describeOrderTitle,
+  findOpenOrderStatusKind,
   readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
@@ -109,6 +110,23 @@ describe('describeOrderSource', () => {
   it('names orders by hand and forward test orders', () => {
     expect(describeOrderSource({ kind: 'by_hand', forward_test_id: null })).toBe('by hand');
     expect(describeOrderSource({ kind: 'forward_test', forward_test_id: 42 })).toBe('forward test 42');
+  });
+});
+
+describe('findOpenOrderStatusKind', () => {
+  it.each([
+    ['Submitted', 'in-progress'],
+    ['PreSubmitted', 'in-progress'],
+    ['PendingSubmit', 'in-progress'],
+    ['PendingCancel', 'in-progress'],
+    ['ApiPending', 'in-progress'],
+    ['Filled', 'success'],
+    ['Cancelled', 'neutral'],
+    ['ApiCancelled', 'neutral'],
+    ['Inactive', 'warning'],
+    ['SomethingNew', 'neutral'],
+  ])('gives the status icon kind of the IBKR order status %s', (status, kind) => {
+    expect(findOpenOrderStatusKind(status)).toBe(kind);
   });
 });
 

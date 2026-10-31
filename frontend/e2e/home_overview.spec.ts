@@ -41,8 +41,10 @@ test('the Positions table shows the owner of each row and the unattributed diffe
   await expect(rows.nth(0)).toContainText('By hand');
   await expect(rows.nth(0).getByRole('cell').nth(2)).toHaveText('5');
   const unattributed = rows.nth(1);
-  await expect(unattributed).toContainText('Unattributed: 5');
-  await expect(unattributed.locator('.status-indicator--warning svg')).toBeAttached();
+  // The difference is the quantity. The warning icon before the symbol has the name and the tooltip.
+  await expect(unattributed.getByRole('cell').nth(2)).toHaveText('5');
+  await expect(unattributed.getByRole('img', { name: 'Unattributed: 5' })).toBeVisible();
+  await expect(unattributed).not.toContainText('Unattributed');
 });
 
 test('the home page has no paper order form', async ({ page }) => {

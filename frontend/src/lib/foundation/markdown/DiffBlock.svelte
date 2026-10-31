@@ -56,7 +56,7 @@
     aria-label={language === '' ? 'diff' : language}
     aria-hidden={!shown}
   >
-    <div class="markdown-diff__view" bind:this={container}></div>
+    <div class="markdown-diffs-view markdown-diff__view" bind:this={container}></div>
   </figure>
 {/if}
 {#if !shown}
@@ -79,29 +79,7 @@
     visibility: hidden;
   }
 
-  /* The diff view reads these variables in its shadow root. Carbon tokens only. */
   .markdown-diff__view {
-    --diffs-font-family: var(--cds-code-01-font-family, 'IBM Plex Mono', monospace);
-    --diffs-header-font-family: var(--cds-body-compact-01-font-family, 'IBM Plex Sans', sans-serif);
-    --diffs-font-size: var(--cds-code-01-font-size);
-    --diffs-line-height: var(--cds-code-01-line-height);
-    --diffs-font-features: 'tnum';
-    --diffs-background: var(--cds-layer-01);
-    --diffs-bg-context-override: var(--cds-layer-01);
-    --diffs-bg-context-gutter-override: var(--cds-layer-01);
-    --diffs-bg-separator-override: var(--cds-layer-accent-01);
-    --diffs-bg-buffer-override: var(--cds-layer-01);
-    --diffs-bg-hover-override: var(--cds-layer-hover-01);
-    --diffs-fg-number-override: var(--cds-text-secondary);
-    --diffs-addition-color-override: var(--cds-support-success);
-    --diffs-deletion-color-override: var(--cds-support-error);
-    --diffs-bg-addition-override: color-mix(in srgb, var(--cds-support-success) 15%, transparent);
-    --diffs-bg-addition-number-override: color-mix(in srgb, var(--cds-support-success) 15%, transparent);
-    --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--cds-support-success) 40%, transparent);
-    --diffs-bg-deletion-override: color-mix(in srgb, var(--cds-support-error) 15%, transparent);
-    --diffs-bg-deletion-number-override: color-mix(in srgb, var(--cds-support-error) 15%, transparent);
-    --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--cds-support-error) 40%, transparent);
-
     min-inline-size: 0;
   }
 </style>

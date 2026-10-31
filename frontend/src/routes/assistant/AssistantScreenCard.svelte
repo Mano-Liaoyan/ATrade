@@ -1,7 +1,7 @@
 <!-- The condition card of the assistant side column (docs/architecture/assistant.md 25.12.4): the name and the market
      of the screen, its full condition bar with the change marks against the definition before, and the buttons "Open
-     screen", "Discard", and "Keep". After a click, the buttons become the state "Kept" or "Discarded"; a discarded card
-     fades. The indicator names come from the indicator catalog, as on the screen page. -->
+     screen", "Discard", and "Keep". After a click, the buttons go, and a status icon "Kept" or "Discarded" stands before the
+     screen name; a discarded card fades. The indicator names come from the indicator catalog, as on the screen page. -->
 <script module lang="ts">
   import { listScreenIndicators, type ScreenIndicator } from '#lib/screen';
 
@@ -51,6 +51,11 @@
 
 <article class={['cds--tile assistant-card screen-card', choice === 'discarded' && 'screen-card--discarded']} aria-label={`Screen ${item.name}`}>
   <div class="screen-card__head">
+    {#if choice === 'discarded'}
+      <StatusIndicator label="Discarded" kind="neutral" />
+    {:else if choice === 'kept'}
+      <StatusIndicator label="Kept" kind="success" />
+    {/if}
     <span class="screen-card__name">{item.name}</span>
     <span class="screen-card__market">{item.market}</span>
   </div>
@@ -64,13 +69,8 @@
       />
     </div>
   {/if}
-  <div class="screen-card__buttons">
-    {#if choice === 'discarded'}
-      <StatusIndicator label="Discarded" kind="neutral" />
-    {:else}
-      {#if choice === 'kept'}
-        <StatusIndicator label="Kept" kind="success" />
-      {/if}
+  {#if choice !== 'discarded'}
+    <div class="screen-card__buttons">
       <a class="cds--btn cds--btn--ghost cds--btn--sm" {href}>Open screen</a>
       {#if choice === undefined}
         <Button
@@ -88,8 +88,8 @@
           }}>Keep</Button
         >
       {/if}
-    {/if}
-  </div>
+    </div>
+  {/if}
 </article>
 
 <style>
@@ -104,7 +104,7 @@
 
   .screen-card__head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--cds-spacing-03);
     min-inline-size: 0;
   }

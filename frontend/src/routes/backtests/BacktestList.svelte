@@ -1,5 +1,6 @@
-<!-- The backtest list of the backtest workbench (the body of the "Backtests" side column): 32px rows with the number,
-     the strategy version, the instrument symbol, the status (icon and word), and the total return (ChangeText). The open
+<!-- The backtest list of the backtest workbench (the body of the "Backtests" side column): 32px rows with the status
+     icon before the number (the tooltip names the status), the strategy version, the instrument symbol, and the total
+     return (ChangeText). The open
      backtest (or both compared backtests) has the Carbon selected row color. A click on a row opens its backtest.
      When 1 or more rows are checked, the Carbon batch action bar shows. With 2 or more, it has Compare: it opens the
      comparison of 2 backtests of the same strategy, and its text says why Compare is not available (docs/architecture
@@ -49,7 +50,6 @@
     { header: '#', align: 'right' },
     { header: 'Strategy' },
     { header: 'Instrument' },
-    { header: 'Status' },
     { header: 'Return', align: 'right' },
   ];
 
@@ -210,6 +210,11 @@
                 />
               </td>
               <th scope="row" align="right">
+                <StatusIndicator
+                  label={describeBacktestStatus(item.status)}
+                  kind={findBacktestStatusKind(item.status)}
+                  align="right"
+                />
                 <a
                   class="row-link"
                   href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
@@ -222,9 +227,6 @@
                 >
               </td>
               <td>{item.symbol}</td>
-              <td>
-                <StatusIndicator label={describeBacktestStatus(item.status)} kind={findBacktestStatusKind(item.status)} />
-              </td>
               <td align="right">
                 {#if item.metrics !== null}
                   <ChangeText
@@ -273,16 +275,16 @@
     inline-size: var(--cds-spacing-09);
   }
 
+  /* The status icon and the number. */
   .list :global(th:nth-child(2)) {
-    inline-size: calc(var(--cds-spacing-09) + var(--cds-spacing-05));
+    inline-size: var(--cds-spacing-12);
   }
 
   .list :global(th:nth-child(4)) {
     inline-size: var(--cds-spacing-12);
   }
 
-  .list :global(th:nth-child(5)),
-  .list :global(th:nth-child(6)) {
+  .list :global(th:nth-child(5)) {
     inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-06));
   }
 

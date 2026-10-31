@@ -67,7 +67,8 @@ orders only when all 4 conditions are true:
 - The user can cancel an order. There is no order change. To change an order,
   cancel it and send a new one.
 - Before sending, a confirmation dialog shows the instrument, side, quantity,
-  order type, price, account number, and a clear `PAPER` mark.
+  order type, price, and account number. ATrade sends paper orders only, so
+  the dialog has no extra `PAPER` mark (UI rule).
 - Until Phase 3: when a forward test runs on an instrument, the Web process
   refuses paper orders by hand for that instrument. It shows which forward test blocks it
   (#76). "Runs" means that the forward test holds a client ID
@@ -289,8 +290,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   (`InstrumentOrderPanel.svelte`, section 13): the order is for the instrument
   of the page. "Review buy order" or "Review sell order" opens the Carbon
   modal. The modal label is the paper account number, and the modal title is
-  the full order, for example "Buy 50 AAPL". The body has the `PAPER` mark,
-  the instrument, the order type, and the price. Only "Send paper order" in
+  the full order, for example "Buy 50 AAPL". The body has the instrument, the
+  order type, and the price. Only "Send paper order" in
   the modal sends the order. "Cancel", the close button, a click outside, and
   Escape send nothing. Focus stays in the modal while it is open, and goes
   back to the review button when it closes.
@@ -302,20 +303,23 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   42"). Each row has an overflow menu "Actions for order N". Its cancel item
   is enabled only when `can_cancel` is true. A disabled item says why, for
   example "Stop forward test 42 to cancel". It uses
-  `foundation/scroll_region` with the label "Open orders".
+  `foundation/scroll_region` with the label "Open orders". The table has no
+  Status column: a status icon before the symbol has the IBKR order status
+  as its name and tooltip (`findOpenOrderStatusKind`).
 - Phase 3 (#146): the Positions table gets an "Owner" column. Each owner of
   an instrument has its own row, for example "By hand" or "Forward test 3".
   The frontend changes the forward test ID into "Forward test <ID>" in
   `routes/`.
 - Phase 3 (#146): when the IBKR position of an instrument is not the sum of
   the owner positions, the row of that instrument shows a warning icon and
-  the difference, for example "Unattributed: 50". The icon and the word
-  together show the state, not only the color.
+  the difference, for example "Unattributed: 50". The icon shape and the
+  tooltip show the state, not only the color.
 - Implemented (#214): `PositionTable.svelte` shows one row for each owner
   (`listPositionRows` of `paper_account.ts`): the owner quantity and
   average cost, the market value and the unrealized P&L at the IBKR market
-  price. The difference is one more row of the instrument with the warning
-  status "Unattributed: 50" in the Owner column and empty number cells. A
+  price. The difference is one more row of the instrument: a warning icon
+  before the symbol (tooltip "Unattributed: 50"), the difference in the
+  Quantity column, an empty Owner cell, and empty other number cells. A
   position without owners and without a difference has one row with the
   IBKR values and an empty Owner cell. The compact table of the instrument
   page also has the Owner column.
@@ -325,8 +329,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   "Apply split 4:1" (the ratio of the row) and "Keep ledger". Each button
   says what it does. The row has no other help text.
   Implemented (#220): the row is one more row of the instrument in
-  `PositionTable.svelte`: the warning status "Split check needed: 4:1" in
-  the Owner column, "10 → 40" in the Quantity column, and the 2 buttons in
+  `PositionTable.svelte`: a warning icon before the symbol (tooltip "Split
+  check needed: 4:1"), "10 → 40" in the Quantity column, and the 2 buttons in
   the other cells. The compact table of the instrument page shows the row
   without the buttons. A failed button shows the error notification "Split
   check not changed". `frontend/e2e/stock_split.spec.ts` checks the row,

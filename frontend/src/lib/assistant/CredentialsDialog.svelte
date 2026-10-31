@@ -1,5 +1,6 @@
 <!-- The "Credentials" dialog of the AI assistant (docs/architecture/assistant.md 25.7.4). The table lists the credentials:
-     name, provider, kind (an API key shows only its last 4 characters), and state. Below it, a subscription login or an
+     name with a status icon before it (the tooltip gives the state and the reason of a failure), provider, and kind (an
+     API key shows only its last 4 characters). Below it, a subscription login or an
      API key is added: the dialog starts a login on /ws/assistant and shows each step that pi asks for (the
      authorization link, the device code, a field to paste a code, or a password field for a new API key).
      Closing the dialog closes the socket, and the login stops. #185 puts the icon button in the side column. -->
@@ -50,7 +51,6 @@
     { header: 'Name' },
     { header: 'Provider' },
     { header: 'Kind' },
-    { header: 'State' },
     { header: 'Actions', isMenu: true },
   ];
   const METHODS = [
@@ -199,13 +199,12 @@
           {#each credentials as credential (credential.id)}
             {@const state = describeCredentialState(credential)}
             <tr>
-              <th scope="row">{credential.name}</th>
+              <th scope="row"><StatusIndicator kind={state.kind} label={state.label} />{credential.name}</th>
               <td>{providerNames.get(credential.provider) ?? credential.provider}</td>
               <td>
                 {describeCredentialKind(credential.type)}
                 {#if credential.key_last4 !== null}<span class="credentials__key">{formatKey(credential)}</span>{/if}
               </td>
-              <td title={state.reason}><StatusIndicator kind={state.kind} label={state.label} /></td>
               <td class="cds--table-column-menu">
                 <OverflowMenu
                   label={`Actions for ${credential.name}`}
@@ -243,7 +242,7 @@
           <p>{login.progress}</p>
         {/if}
         {#if isLoginWaiting(login)}
-          <StatusIndicator kind="in-progress" label="Waiting for the provider" />
+          <StatusIndicator kind="in-progress" label="Waiting for the provider" align="right" />
         {/if}
         {#if login.prompt !== null}
           <form class="credentials__form" onsubmit={sendAnswer}>

@@ -683,9 +683,9 @@ Phase 3. Sources:
   instrument list" of the settings page `/settings` (`docs/architecture.md`
   section 13). It has the text input "Symbols" (spaces, tabs, commas, and
   line ends separate the symbols) and the button "Add to HK instrument
-  list". After an add, the list "Add results" shows each symbol with a
-  `StatusIndicator`: "<symbol> added" (success), "<symbol> not found"
-  (error), and "<symbol> already in list" (warning). On `502` or `503`, an
+  list". After an add, the list "Add results" shows each symbol after a
+  status icon (`StatusIndicator`, the result in its tooltip): "Added"
+  (success), "Not found" (error), and "Already in list" (warning). On `502` or `503`, an
   error notification shows the `detail` text. The table (Symbol, Added,
   Delete) is a Carbon `sm` data table in a `ScrollRegion` named "HK
   instrument list table". Each row has the Delete icon button "Delete

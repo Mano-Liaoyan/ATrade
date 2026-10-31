@@ -74,7 +74,7 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await chartPanel.getByRole('button', { name: 'Backtest the same period', exact: true }).click();
 
   await expect(page).toHaveURL(/\/forward-tests\/\d+\/comparison\/\d+$/);
-  await expect(page.getByRole('status', { name: 'Backtest status' })).toContainText('Finished', {
+  await expect(page.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
 
@@ -138,7 +138,7 @@ test('compares a multi-instrument forward test with a backtest of its recorded m
   await chartPanel.getByRole('button', { name: 'Backtest the same period', exact: true }).click();
 
   await expect(page).toHaveURL(/\/forward-tests\/\d+\/comparison\/\d+$/);
-  await expect(page.getByRole('status', { name: 'Backtest status' })).toContainText('Finished', {
+  await expect(page.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
 
@@ -174,7 +174,7 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
   await expect(heading.getByRole('link', { name: COMPARED_STRATEGY_LABEL })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: 'FTCMP', exact: true })).toHaveAttribute('href', '/instruments/ARCA/FTCMP?currency=USD');
   await expect(heading).toContainText('1 day');
-  await expect(chartPanel.getByRole('status', { name: 'Forward test status' })).toHaveText('Stopped');
+  await expect(chartPanel.getByRole('status', { name: 'Forward test status' }).getByRole('img', { name: 'Stopped' })).toBeVisible();
   // A stopped forward test has no Stop button.
   await expect(chartPanel.getByRole('button', { name: 'Stop forward test' })).toHaveCount(0);
   // The same key metrics as the backtest page, in the same order. The max drawdown is a negative percent (or 0.00 %).

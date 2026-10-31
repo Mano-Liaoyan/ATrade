@@ -189,7 +189,7 @@ export function listPositionRows(positions: readonly PaperPosition[]): PositionR
         position,
         owner: null,
         unattributed: `Unattributed: ${position.unattributed_quantity}`,
-        quantity: null,
+        quantity: position.unattributed_quantity,
         averageCost: null,
         marketValue: null,
         unrealizedPnl: null,

@@ -1,9 +1,11 @@
 <!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages (an AI
      assistant message renders its markdown, 25.12.6), the
-     tool steps (one StatusIndicator line each; 2 or more consecutive steps are one group "<n> tool steps" that is open
-     while a step runs, and a click opens or closes it), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
+     tool steps (one line each: a status icon before the title, for example "Backtest #42", with the status in its
+     tooltip; 2 or more consecutive steps are one group "<n> tool steps" with one status icon, open while a step runs,
+     and a click opens or closes it), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
      message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel of the
-     strategy page. Keep opens the new version in the editor, and Discard adds the discarded mark (25.5.2). -->
+     strategy page. Keep opens the new version in the editor, and Discard adds the discarded mark (25.5.2). After the choice, a status
+     icon "Kept" or "Discarded" stands before the card title. -->
 <script lang="ts">
   import ChevronDown16 from '@carbon/icons/es/chevron--down/16.js';
   import ChevronRight16 from '@carbon/icons/es/chevron--right/16.js';
@@ -65,22 +67,25 @@
       {@const group = describeToolStepGroup(entry.steps)}
       {@const isOpen = groupChoices.get(entry.id) ?? group.isRunning}
       <li class="log-item step-group">
-        <button
-          type="button"
-          class="step-group__toggle"
-          aria-expanded={isOpen}
-          onclick={() => {
-            groupChoices.set(entry.id, !isOpen);
-          }}
-        >
-          <Icon icon={isOpen ? ChevronDown16 : ChevronRight16} />
-          <StatusIndicator label={group.label} kind={group.kind} />
-        </button>
+        <div class="step-line">
+          <StatusIndicator label={group.status} kind={group.kind} />
+          <button
+            type="button"
+            class="step-group__toggle"
+            aria-expanded={isOpen}
+            onclick={() => {
+              groupChoices.set(entry.id, !isOpen);
+            }}
+          >
+            <Icon icon={isOpen ? ChevronDown16 : ChevronRight16} />
+            {group.title}
+          </button>
+        </div>
         {#if isOpen}
           <ol class="step-group__steps">
             {#each entry.steps as item (item.id)}
               {@const step = describeToolStep(item)}
-              <li><StatusIndicator label={step.label} kind={step.kind} /></li>
+              <li class="step-line"><StatusIndicator label={step.status} kind={step.kind} />{step.title}</li>
             {/each}
           </ol>
         {/if}
@@ -99,7 +104,7 @@
         >
       {:else if item.kind === 'tool_step'}
         {@const step = describeToolStep(item)}
-        <li class="log-item"><StatusIndicator label={step.label} kind={step.kind} /></li>
+        <li class="log-item step-line"><StatusIndicator label={step.status} kind={step.kind} />{step.title}</li>
       {:else if item.kind === 'diff'}
         {@const choice = diffChoices.get(item.id)}
         <li class="log-item">
@@ -111,14 +116,17 @@
               onOpenDiff(item);
             }}
           >
-            <button type="button" class="cds--link diff-card__name" aria-label={`Open the diff of v${String(item.versionNumber)}`}>
-              v{item.versionNumber - 1} → v{item.versionNumber}
-            </button>
-            {#if choice === 'discarded'}
-              <StatusIndicator label="Discarded" kind="neutral" />
-            {:else if choice === 'kept'}
-              <StatusIndicator label="Kept" kind="success" />
-            {:else}
+            <div class="diff-card__title">
+              {#if choice === 'discarded'}
+                <StatusIndicator label="Discarded" kind="neutral" />
+              {:else if choice === 'kept'}
+                <StatusIndicator label="Kept" kind="success" />
+              {/if}
+              <button type="button" class="cds--link diff-card__name" aria-label={`Open the diff of v${String(item.versionNumber)}`}>
+                v{item.versionNumber - 1} → v{item.versionNumber}
+              </button>
+            </div>
+            {#if choice === undefined}
               <div class="diff-card__buttons">
                 <Button
                   kind="primary"
@@ -162,6 +170,11 @@
 <style>
   .step-group {
     flex-direction: column;
+  }
+
+  .step-line {
+    display: flex;
+    align-items: center;
   }
 
   .step-group__toggle {
@@ -222,8 +235,12 @@
     background: var(--cds-layer-hover-01);
   }
 
+  .diff-card__title {
+    display: flex;
+    align-items: center;
+  }
+
   .diff-card__name {
-    align-self: flex-start;
     padding: 0;
     border: 0;
     background: none;

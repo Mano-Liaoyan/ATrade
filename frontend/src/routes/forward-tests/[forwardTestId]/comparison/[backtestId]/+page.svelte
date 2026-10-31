@@ -147,6 +147,12 @@
         {#if id === 'chart'}
           <Panel {...state} label={title}>
             {#snippet header()}
+              <span class="run-status" role="status" aria-label="Backtest status">
+                <StatusIndicator
+                  label={describeBacktestStatus(compared.backtest.status)}
+                  kind={findBacktestStatusKind(compared.backtest.status)}
+                />
+              </span>
               <h1 class="run-title">
                 <span>{title}</span>
                 <a
@@ -157,12 +163,6 @@
                 {@render instrumentOrUniverse(forwardTest)}
                 <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
-              <span class="run-status" role="status" aria-label="Backtest status">
-                <StatusIndicator
-                  label={describeBacktestStatus(compared.backtest.status)}
-                  kind={findBacktestStatusKind(compared.backtest.status)}
-                />
-              </span>
             {/snippet}
             <div class="compare-area">
               <div class="metrics">
@@ -231,10 +231,8 @@
   }
 
   .run-status {
+    display: flex;
     flex: none;
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    white-space: nowrap;
   }
 
   /* The metrics over the chart: the chart keeps at least 6rem, and the metrics take the rest up to their full height.
