@@ -59,7 +59,14 @@ class E2EAssistantService(FakeAssistantService):
                 name="OpenAI",
                 login_methods=["api_key"],
                 models=[ProviderModel(id="gpt-a", name="GPT A"), ProviderModel(id="gpt-b", name="GPT B")],
-            )
+            ),
+            # Many subscription providers: their list in the Credentials dialog is longer than the dialog.
+            *(
+                ProviderSummary(
+                    id=f"subscription-{number}", name=f"Subscription {number}", login_methods=["oauth"], models=[]
+                )
+                for number in range(1, 10)
+            ),
         ]
         self.credentials = [make_credential("work", "Work key"), make_credential("home", "Home key")]
         self.abort_events: dict[int, anyio.Event] = {}

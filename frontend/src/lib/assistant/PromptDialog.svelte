@@ -30,7 +30,8 @@
   let dialogState = $state<PromptDialogState | null>(null);
   let problem = $state<NotificationMessage | null>(null);
   let isSaving = $state(false);
-  let textArea: HTMLTextAreaElement | undefined = $state();
+  // bind:this sets null when the dialog closes and the text area goes.
+  let textArea: HTMLTextAreaElement | null | undefined = $state();
 
   // Each open reads the versions again.
   $effect(() => {
@@ -51,7 +52,7 @@
   // The text area shows the text of the state and grows with it. The ScrollRegion around it scrolls and draws the
   // track.
   $effect(() => {
-    if (textArea === undefined || dialogState === null) {
+    if (textArea === undefined || textArea === null || dialogState === null) {
       return;
     }
     if (textArea.value !== dialogState.text) {
