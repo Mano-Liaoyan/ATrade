@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from atrade.foundation.clock import Clock
+from atrade.ibkr import GatewayRequestError
 from atrade.market_data import StockSplitConfirmedError
 from atrade.paper_trading.account_socket import OwnerMessage, OwnerPositionMessage, create_account_socket_router
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor, fetch_paper_capital_usd
@@ -61,6 +62,9 @@ class StockSplitRoutes:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(error)) from error
         except (SplitCheckResolvedError, StockSplitConfirmedError) as error:
             raise HTTPException(status.HTTP_409_CONFLICT, detail=str(error)) from error
+        except GatewayRequestError as error:
+            # The last IBKR close (without a stored daily bar) or the forex rate of the cash in lieu.
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
         return StockSplitAppliedResponse(
             split_check=SplitCheckResolvedResponse(
                 id=split_check.id,

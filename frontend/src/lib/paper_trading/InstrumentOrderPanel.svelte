@@ -96,7 +96,7 @@
     }
   });
 
-  const blockReason = $derived(findInstrumentOrderBlock(account));
+  const blockReason = $derived(findInstrumentOrderBlock(account, instrument));
   // The paper account that passed the check. The backend checks it again before it sends the order.
   const accountId = $derived(account?.check.status === 'passed' ? (account.check.actual_accounts[0] ?? null) : null);
   const position = $derived(findInstrumentPosition(account, instrument));

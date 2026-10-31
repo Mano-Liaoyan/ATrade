@@ -2,7 +2,7 @@
      /forward-tests/<id>; /forward-tests opens the newest forward test.
      Left: the "Forward tests" side column (ForwardTestList, live from /ws/forward-tests) with the "New forward test"
      button. Center: the panel of the open forward test (header line: number, strategy version, instrument, bar
-     period, status, the allocated capital, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
+     period, status, the allocated capital, "Split check needed: AAPL" while an instrument needs a split check, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
      key metric row and the equity and drawdown curves with the interruptions in grey) over the
      Fills / Comparison / Logs panel. Comparison links to the comparison with each backtest of the same period. Logs
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
@@ -290,6 +290,14 @@
               {/if}
               {#if showsCrashCount(forwardTest)}
                 <span class="run-note">Crashes in a row: {forwardTest.crash_count} of 3</span>
+              {/if}
+              {#if forwardTest.split_checks_needed.length > 0}
+                <span class="run-note">
+                  <StatusIndicator
+                    kind="warning"
+                    label={`Split check needed: ${forwardTest.split_checks_needed.map((item) => item.symbol).join(', ')}`}
+                  />
+                </span>
               {/if}
               <span class="run-actions">
                 {#if canStop(forwardTest)}

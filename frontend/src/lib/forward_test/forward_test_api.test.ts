@@ -26,6 +26,7 @@ const request: ForwardTestRequest = {
   currency: 'USD',
   bar_period: '1-MINUTE',
   allocated_capital_usd: '10000',
+  split_checks_needed: [],
 };
 
 const runningForwardTest: ForwardTest = {
@@ -51,6 +52,7 @@ const runningForwardTest: ForwardTest = {
   crash_count: 0,
   interruptions: [],
   allocated_capital_usd: '10000',
+  split_checks_needed: [],
 };
 
 function makeFetch(status: number, body: unknown, requests: Request[] = []): typeof fetch {

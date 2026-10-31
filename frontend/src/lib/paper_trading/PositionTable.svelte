@@ -3,13 +3,23 @@
      cell also shows the exchange, like the open orders. The unrealized
      P&L shows its sign, an arrow, and a color (ChangeText). With `fill`, the table takes the full height of a workbench
      panel and scrolls in it. With `compact` (the narrow panel of the instrument page), the table has no Currency and
-     Market price columns, so all column names stay on one line. -->
+     Market price columns, so all column names stay on one line. An instrument in the "Split check needed" state has one
+     more row: the warning "Split check needed: 4:1", the IBKR share count before and after, and (not in the compact
+     table) the buttons "Apply split 4:1" and "Keep ledger" (section 11.11). -->
 <script lang="ts">
-  import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
+  import {
+    Button,
+    DataTable,
+    InlineNotification,
+    StatusIndicator,
+    type NotificationMessage,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatSignedNumber } from '#lib/foundation/value_format';
   import { formatAmount, listPositionRows, type PaperPosition } from './paper_account';
+  import { applyStockSplit, describeSplitCheck, keepLedger, type SplitCheck, type SplitCheckResult } from './stock_split';
 
   interface Props {
     positions: PaperPosition[];
@@ -39,7 +49,31 @@
   ];
 
   const positionRows = $derived(listPositionRows(positions));
+  // The cells after the Quantity cell of a split check row: 4 in the full table, 3 in the compact table.
+  const SPLIT_ACTION_COLSPAN = 4;
+  const COMPACT_SPLIT_ACTION_COLSPAN = 3;
+  const splitActionColspan = $derived(compact ? COMPACT_SPLIT_ACTION_COLSPAN : SPLIT_ACTION_COLSPAN);
+
+  let resolvingSplitCheckIds = $state<number[]>([]);
+  let splitCheckError = $state<NotificationMessage | null>(null);
+
+  async function resolveSplitCheck(
+    splitCheck: SplitCheck,
+    action: (fetchFunction: typeof fetch, splitCheckId: number) => Promise<SplitCheckResult>,
+  ): Promise<void> {
+    splitCheckError = null;
+    resolvingSplitCheckIds = [...resolvingSplitCheckIds, splitCheck.id];
+    const result = await action(fetch, splitCheck.id);
+    resolvingSplitCheckIds = resolvingSplitCheckIds.filter((id) => id !== splitCheck.id);
+    if (result.kind === 'failed') {
+      splitCheckError = { kind: 'error', title: 'Split check not changed', subtitle: result.message };
+    }
+  }
 </script>
+
+{#if splitCheckError !== null}
+  <InlineNotification {...splitCheckError} onClose={() => (splitCheckError = null)} />
+{/if}
 
 {#if positions.length === 0}
   <EmptyText text="No positions" />
@@ -50,6 +84,37 @@
         {#snippet rows()}
           {#each positionRows as row (row.key)}
             {@const position = row.position}
+            {#if row.splitCheck !== null}
+              {@const splitCheck = row.splitCheck}
+              {@const splitText = describeSplitCheck(splitCheck)}
+              {@const isResolving = resolvingSplitCheckIds.includes(splitCheck.id)}
+              <tr>
+                <th scope="row">{position.symbol} <span class="exchange">{position.exchange}</span></th>
+                <td class="owner"><StatusIndicator kind="warning" label={`Split check needed: ${splitText.ratio}`} /></td>
+                {#if !compact}
+                  <td>{position.currency}</td>
+                {/if}
+                <td align="right">{splitText.shareCounts}</td>
+                <td colspan={splitActionColspan}>
+                  {#if !compact}
+                    <div class="split-actions">
+                      <Button
+                        size="sm"
+                        kind="primary"
+                        disabled={isResolving}
+                        onclick={() => void resolveSplitCheck(splitCheck, applyStockSplit)}>{splitText.applyLabel}</Button
+                      >
+                      <Button
+                        size="sm"
+                        kind="ghost"
+                        disabled={isResolving}
+                        onclick={() => void resolveSplitCheck(splitCheck, keepLedger)}>Keep ledger</Button
+                      >
+                    </div>
+                  {/if}
+                </td>
+              </tr>
+            {:else}
             <tr>
               <th scope="row">{position.symbol} <span class="exchange">{position.exchange}</span></th>
               <td class="owner">
@@ -74,6 +139,7 @@
                 {/if}
               </td>
             </tr>
+            {/if}
           {/each}
         {/snippet}
       </DataTable>
@@ -91,5 +157,10 @@
 
   .exchange {
     color: var(--cds-text-helper);
+  }
+
+  .split-actions {
+    display: flex;
+    gap: var(--cds-spacing-03);
   }
 </style>
