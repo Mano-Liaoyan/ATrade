@@ -73,7 +73,9 @@ test('the watchlist rows and the position rows are 32px high', async ({ page, re
 
 test('position table has a visible scroll track and its last row can be scrolled into view', async ({ page }) => {
   await page.goto('/');
-  const lastRow = positionsPanel(page).getByRole('row', { name: /TEST40/ });
+  // The last row of the table, not a fixed symbol: other tests (for example the split check) add positions after
+  // TEST40.
+  const lastRow = positionsPanel(page).getByRole('row').last();
   const track = page.getByRole('scrollbar', { name: 'Positions scroll bar' });
   const thumb = track.locator('.scroll-thumb');
 
