@@ -573,7 +573,10 @@ async def test_compares_a_multi_instrument_forward_test_with_its_same_period_bac
     comparison = response.json()
     # The start capital of both sides is the allocated capital 10000.
     assert comparison["backtest"]["paper_capital_usd"] == "10000"
-    assert (comparison["forward_test_metrics"]["net_profit_usd"], comparison["forward_test_metrics"]["trade_count"]) == (
+    assert (
+        comparison["forward_test_metrics"]["net_profit_usd"],
+        comparison["forward_test_metrics"]["trade_count"],
+    ) == (
         "100",
         2,
     )
@@ -616,9 +619,7 @@ async def test_a_backtest_of_another_universe_is_refused_for_a_multi_instrument_
         await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(forward_test["strategy_version_id"]))
     ).json()
     write_forward_test_end(database_url, single_forward_test["id"])
-    other_backtest_id = (await start_same_period_backtest(web_client, single_forward_test["id"])).json()[
-        "backtest_id"
-    ]
+    other_backtest_id = (await start_same_period_backtest(web_client, single_forward_test["id"])).json()["backtest_id"]
 
     response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/comparison/{other_backtest_id}")
 

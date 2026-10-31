@@ -387,7 +387,9 @@ class ComparisonRoutes:
                 detail = "The forward test has no recorded members in its period."
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
             universe = BacktestUniverse(
-                kind="rule" if row.universe_kind == "rule" else "list", currency=periods[0].members[0].currency, top_n=row.universe_top_n
+                kind="rule" if row.universe_kind == "rule" else "list",
+                currency=periods[0].members[0].currency,
+                top_n=row.universe_top_n,
             )
             request = dataclasses.replace(request, universe=universe)
         refusal = check_backtest_request(request) or check_comparison_currency(request)
