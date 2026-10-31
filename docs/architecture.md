@@ -527,19 +527,34 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   header in a `cds--g100` zone in all themes. It shows the product name, the
   page links (Home, Screens, Strategies, Backtests, Parameter sweeps,
   Forward tests) with
-  `aria-current="page"` on the current page, the server clock, the backend
-  status icon, the IB Gateway status icon, and the Paper tag. The server
-  clock is a short time text, for example "03:04:05 UTC" (`role="timer"`,
-  name "Server time"). Each status icon (`StatusIcon` of
-  `foundation/carbon`) is a Carbon status icon alone, with no word next to
-  it: green check (connected), red error (not reachable), info in-progress
-  (checking), or warning (not known). Each icon is in a `role="status"`
-  region ("Backend status", "IB Gateway status"). The icon takes the keyboard
-  focus. Its accessible name and its tooltip give the full status, for
-  example the IB Gateway host and port and what to check. The Paper tag is a
-  Carbon operational tag with a tooltip. The tooltip shows the checked paper
+  `aria-current="page"` on the current page, then at the end the Paper tag,
+  a divider, and the header actions: the Connections button, the command
+  palette button, the theme button, and the Log out link. The header actions
+  are 40px cells (`$spacing-08`) side by side without gaps. All icons are
+  20px. The Connections button (`src/routes/HeaderConnections.svelte`, data
+  from `summarizeConnections` in `src/routes/header_connections.ts`) is a
+  Carbon header action with the `@carbon/icons` Plug icon. It shows the
+  backend (`GET /api/health`) and IB Gateway (`GET /api/ibkr/gateway`). When
+  both are connected, the plug has no badge and the button name is
+  "Connections". A problem adds a 12px Carbon status icon as a badge on the
+  top end corner of the plug: red error (not reachable), yellow warning (not
+  known), or blue in-progress (checking). The badge shows the worst status.
+  The badge shape differs for each kind, so the color is not the only sign.
+  The button name and its tooltip name the problem, for example
+  "Connections: IB Gateway not reachable.". A click, Enter, or Space opens a
+  Carbon popover (dialog "Connections") with one row for the backend and one
+  for IB Gateway. Each row has a Carbon status icon before the name (with an
+  accessible name such as "Connected"). The backend row also has the server
+  clock, for example "Server time 03:04:05 UTC" (`role="timer"`, name
+  "Server time"). A row with a problem says the problem below the name, for
+  example "Not reachable." The IB Gateway row of a not reachable Gateway
+  gives the host and port and what to check. Escape and a click outside close the
+  popover. The header has no status word and no clock of its own. The Paper
+  tag is a Carbon operational tag with a tooltip. The tooltip shows the checked paper
   account number with its middle hidden, for example `DU****567`. The header
-  reads the account check from `/ws/paper-trading`. Carbon hides the header
+  reads the account check from `/ws/paper-trading`. A header tooltip is the
+  light Carbon high-contrast bubble. It has the Carbon popover drop shadow,
+  so it stays visible on the light page. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
   navigation at all widths. Header buttons go in `cds--header__global`.
 - The Log out link (`LogOutButton` of `foundation/access_session`) is the
@@ -1000,8 +1015,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   on all pages: the text with an arrow icon and `--cds-support-success` (up)
   or `--cds-support-error` (down), so the color is never the only sign.
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
-- The app shell header shows the server time of day ("03:04:05 UTC") and
-  updates it every second:
+- The Connections popover of the app shell header shows the server time of
+  day ("Server time 03:04:05 UTC") and updates it every second:
   the `time_utc` of `GET /api/health` plus the browser time since the answer
   (`foundation/backend_health`).
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
