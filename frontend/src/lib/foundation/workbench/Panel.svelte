@@ -27,7 +27,7 @@
     onValueChange: (value: string) => void;
     /** The text of a tab (Tabs `itemLabel`), for example a name with a ChangeText. */
     itemLabel?: Snippet<[{ value: string; label: string }]>;
-    /** Tabs that never scroll away; then `items` scroll in a strip (Tabs `fixedItems`). */
+    /** Tabs that never scroll away, after the strip of `items` (Tabs `fixedItems`). */
     fixedItems?: readonly { value: string; label: string }[];
     /** Closes a tab of `items` (Tabs `onCloseItem`). */
     onCloseItem?: (value: string) => void;

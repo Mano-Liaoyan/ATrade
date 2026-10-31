@@ -768,10 +768,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
   header line before the Minimize button. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
-  `panelClass`. With `fixedItems` (also `Panel` `tabs`), the `items` are in a
-  strip that scrolls sideways with a `HorizontalScrollTrack` along its top
-  edge ("<label> scroll bar"), and the `fixedItems` stay at the end of the tab
-  line. The selected tab of the strip scrolls into view. With `onCloseItem`,
+  `panelClass`. The `items` are always in a strip that scrolls sideways, so a
+  narrow tab line never cuts a tab and `lineEnd` (the panel buttons) stays
+  visible. The strip shows a `HorizontalScrollTrack` along its top edge
+  ("<label> scroll bar") while the tabs overflow. With `fixedItems` (also
+  `Panel` `tabs`), the `fixedItems` stay at the end of the tab line after the
+  strip. The selected tab of the strip scrolls into view, also after the
+  arrow keys, Home, and End; only the strip scrolls. With `onCloseItem`,
   each tab of `items` is a Carbon dismissable tab: a close button ("Close
   <tab label>") after the tab, and the Delete key on the focused tab.
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
